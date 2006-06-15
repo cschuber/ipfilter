@@ -14,18 +14,16 @@
 #define	SOLARIS	(defined(sun) && (defined(__svr4__) || defined(__SVR4)))
 #endif
 
-#if defined(__STDC__) || defined(__GNUC__)
+#if defined(__STDC__) || defined(__GNUC__) || defined(_AIX51)
 #define	SIOCADNAT	_IOW('r', 60, struct ipfobj)
 #define	SIOCRMNAT	_IOW('r', 61, struct ipfobj)
 #define	SIOCGNATS	_IOWR('r', 62, struct ipfobj)
 #define	SIOCGNATL	_IOWR('r', 63, struct ipfobj)
-#define	SIOCPROXY	_IOWR('r', 64, struct ap_control)
 #else
 #define	SIOCADNAT	_IOW(r, 60, struct ipfobj)
 #define	SIOCRMNAT	_IOW(r, 61, struct ipfobj)
 #define	SIOCGNATS	_IOWR(r, 62, struct ipfobj)
 #define	SIOCGNATL	_IOWR(r, 63, struct ipfobj)
-#define	SIOCPROXY	_IOWR(r, 64, struct ap_control)
 #endif
 
 #undef	LARGE_NAT	/* define	this if you're setting up a system to NAT
@@ -135,7 +133,6 @@ typedef	struct	nat	{
 #define	nat_seq		nat_un.nat_uni.ici_seq
 #define	nat_id		nat_un.nat_uni.ici_id
 #define	nat_tcpstate	nat_tqe.tqe_state
-#define	nat_gre		nat_un.nat_ugre
 
 /*
  * Values for nat_dir
@@ -187,7 +184,8 @@ typedef	struct	ipnat	{
 	u_int		in_hv;
 	int		in_flineno;		/* conf. file line number */
 	u_short		in_pnext;
-	u_char		in_xxx1[2];
+	u_char		in_v;
+	u_char		in_xxx;
 	/* From here to the end is covered by IPN_CMPSIZ */
 	u_32_t		in_flags;
 	u_32_t		in_mssclamp;		/* if != 0 clamp MSS to this */
@@ -248,6 +246,8 @@ typedef	struct	ipnat	{
 #define	IPN_STICKY	0x80000
 #define	IPN_FRAG	0x100000
 #define	IPN_FIXEDDPORT	0x200000
+#define	IPN_FINDFORWARD	0x400000
+#define	IPN_IN		0x800000
 #define	IPN_USERFLAGS	(IPN_TCPUDP|IPN_AUTOPORTMAP|IPN_IPRANGE|IPN_SPLIT|\
 			 IPN_ROUNDR|IPN_FILTER|IPN_NOTSRC|IPN_NOTDST|\
 			 IPN_FRAG|IPN_STICKY|IPN_FIXEDDPORT|IPN_ICMPQUERY)
@@ -293,6 +293,7 @@ typedef	struct	natget	{
 } natget_t;
 
 
+#undef	tr_flags
 typedef	struct	nattrpnt	{
 	struct	in_addr	tr_dstip;	/* real destination IP# */
 	struct	in_addr	tr_srcip;	/* real source IP# */
@@ -426,6 +427,7 @@ extern	int	fr_nat_lock;
 extern	void	fr_natsync __P((void *));
 extern	u_long	fr_defnatage;
 extern	u_long	fr_defnaticmpage;
+extern	u_long	fr_defnatipage;
 	/* nat_table[0] -> hashed list sorted by inside (ip, port) */
 	/* nat_table[1] -> hashed list sorted by outside (ip, port) */
 extern	nat_t	**nat_table[2];

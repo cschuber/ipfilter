@@ -155,6 +155,7 @@ int	ipl_buffer_sz;
 int	ipl_logmax = IPL_LOGMAX;
 int	ipl_logall = 0;
 int	ipl_log_init = 0;
+int	ipl_logsize = IPFILTER_LOGSIZE;
 int	ipl_magic[IPL_LOGSIZE] = { IPL_MAGIC, IPL_MAGIC_NAT, IPL_MAGIC_STATE,
 				   IPL_MAGIC, IPL_MAGIC, IPL_MAGIC,
 				   IPL_MAGIC, IPL_MAGIC };
@@ -413,9 +414,7 @@ int *types, cnt;
 	iplog_t *ipl;
 	size_t len;
 	int i;
-# if defined(_KERNEL) && !defined(MENTAT) && defined(USE_SPL)
-	int s;
-# endif
+	SPL_INT(s);
 
 	/*
 	 * Check to see if this log record has a CRC which matches the last
@@ -453,7 +452,7 @@ int *types, cnt;
 		return -1;
 	SPL_NET(s);
 	MUTEX_ENTER(&ipl_mutex);
-	if ((iplused[dev] + len) > IPFILTER_LOGSIZE) {
+	if ((iplused[dev] + len) > ipl_logsize) {
 		MUTEX_EXIT(&ipl_mutex);
 		SPL_X(s);
 		KFREES(buf, len);
@@ -535,9 +534,7 @@ struct uio *uio;
 	size_t dlen, copied;
 	int error = 0;
 	iplog_t *ipl;
-# if defined(_KERNEL) && !defined(MENTAT) && defined(USE_SPL)
-	int s;
-# endif
+	SPL_INT(s);
 
 	/*
 	 * Sanity checks.  Make sure the minor # is valid and we're copying
@@ -548,7 +545,7 @@ struct uio *uio;
 	if (uio->uio_resid == 0)
 		return 0;
 	if ((uio->uio_resid < sizeof(iplog_t)) ||
-	    (uio->uio_resid > IPFILTER_LOGSIZE))
+	    (uio->uio_resid > ipl_logsize))
 		return EINVAL;
 
 	/*
@@ -649,9 +646,7 @@ minor_t unit;
 {
 	iplog_t *ipl;
 	int used;
-# if defined(_KERNEL) && !defined(MENTAT) && defined(USE_SPL)
-	int s;
-# endif
+	SPL_INT(s);
 
 	SPL_NET(s);
 	MUTEX_ENTER(&ipl_mutex);

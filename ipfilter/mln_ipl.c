@@ -82,7 +82,7 @@ struct	cdevsw	ipldevsw =
 	iplopen,		/* open */
 	iplclose,		/* close */
 	iplread,		/* read */
-	0,			/* write */
+	iplwrite,		/* write */
 	iplioctl,		/* ioctl */
 	0,			/* stop */
 	0,			/* tty */
@@ -97,7 +97,7 @@ struct	cdevsw	ipldevsw =
 	iplopen,		/* open */
 	iplclose,		/* close */
 	iplread,		/* read */
-	(void *)nullop,		/* write */
+	iplwrite,		/* write */
 	iplioctl,		/* ioctl */
 	(void *)nullop,		/* stop */
 	(void *)nullop,		/* reset */
@@ -149,11 +149,13 @@ int cmd;
 			return EEXIST;
 
 #if defined(__NetBSD__) && (__NetBSD_Version__ >= 106080000)
+# if (__NetBSD_Version__ < 200000000)
 		err = devsw_attach(args->lkm_devname,
 				   args->lkm_bdev, &args->lkm_bdevmaj,
 				   args->lkm_cdev, &args->lkm_cdevmaj);
 		if (err != 0)
 			return (err);
+# endif
 		ipl_major = args->lkm_cdevmaj;
 #else
 		for (i = 0; i < nchrdev; i++)

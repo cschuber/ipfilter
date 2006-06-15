@@ -39,7 +39,7 @@
 #include <arpa/nameser.h>
 #include <resolv.h>
 #include "ipf.h"
-#include "ipl.h"
+#include "netinet/ipl.h"
 
 #if !defined(lint)
 static const char rcsid[] = "@(#)Id: ipfs.c,v 1.12 2003/12/01 01:56:53 darrenr Exp";
@@ -224,7 +224,7 @@ char *argv[];
 				usage();
 			break;
 		case 'f' :
-			if ((set == 0) && !dirname && !filename)
+			if ((set != 0) && !dirname && !filename)
 				filename = optarg;
 			else
 				usage();
@@ -249,7 +249,7 @@ char *argv[];
 			set = 1;
 			break;
 		case 'r' :
-			if ((ns >= 0) || dirname || (rw != -1))
+			if (dirname || (rw != -1) || (ns == -1))
 				usage();
 			rw = 0;
 			set = 1;
@@ -585,16 +585,12 @@ char *file;
 			return 1;
 		}
 
-		if (ipn.ipn_dsize > 0) {
-			n = ipn.ipn_dsize;
+		in = (nat_save_t *)malloc(ipn.ipn_dsize);
+		if (!in)
+			break;
 
-			if (n > sizeof(ipn.ipn_data))
-				n -= sizeof(ipn.ipn_data);
-			else
-				n = 0;
-			in = malloc(sizeof(*in) + n);
-			if (!in)
-				break;
+		if (ipn.ipn_dsize > sizeof(ipn)) {
+			n = ipn.ipn_dsize - sizeof(ipn);
 			if (n > 0) {
 				s = in->ipn_data + sizeof(in->ipn_data);
  				i = read(nfd, s, n);
@@ -608,9 +604,6 @@ char *file;
 					return 1;
 				}
 			}
-		} else {
-			ipn.ipn_dsize = 0;
-			in = (nat_save_t *)malloc(sizeof(*in));
 		}
 		bcopy((char *)&ipn, (char *)in, sizeof(ipn));
 
@@ -749,7 +742,7 @@ char *file;
 		if (opts & OPT_VERBOSE)
 			printf("Got nat next %p ipn_dsize %d ng_sz %d\n",
 				ipnp->ipn_next, ipnp->ipn_dsize, ng.ng_sz);
-		if (write(nfd, ipnp, ng.ng_sz) != ng.ng_sz) {
+		if (write(nfd, ipnp, ipnp->ipn_dsize) != ipnp->ipn_dsize) {
 			perror("nat:write");
 			close(nfd);
 			free(ipnp);

@@ -25,12 +25,9 @@ frentry_t *fp;
 		printf(" or-block");
 	if (fp->fr_loglevel != 0xffff) {
 		printf(" level ");
-		if (fp->fr_loglevel & LOG_FACMASK) {
-			s = fac_toname(fp->fr_loglevel);
-			if (s == NULL)
-				s = "!!!";
-		} else
-			s = "";
+		s = fac_toname(fp->fr_loglevel);
+		if (s == NULL)
+			s = "!!!";
 		u = pri_toname(fp->fr_loglevel);
 		if (u == NULL)
 			u = "!!!";

@@ -233,9 +233,6 @@ cfg_subsys_attr_t ipfilter_attributes[] = {
 				(caddr_t)&fr_minttl, 0, 1, 0 },
 { "fr_running",		CFG_ATTR_INTTYPE, CFG_OP_QUERY,
 				(caddr_t)&fr_minttl, 0, 1, 0 },
-{ "fr_unreach",		CFG_ATTR_INTTYPE, CFG_OP_QUERY |
-				CFG_OP_CONFIGURE | CFG_OP_RECONFIGURE,
-				(caddr_t) &fr_unreach, 0, 255, 0 },
 { "fr_control_forwarding",
 			CFG_ATTR_INTTYPE, CFG_OP_QUERY |
 				CFG_OP_CONFIGURE | CFG_OP_RECONFIGURE,
@@ -609,7 +606,7 @@ struct ifnet *ifp;
 	}
 
 	if (cmd == (ioctlcmd_t)SIOCAIFADDR)
-		frsync();
+		frsync(NULL);
 
 	RWLOCK_EXIT(&ipf_tru64);
 }
@@ -638,6 +635,7 @@ ipfilter_attach(void)
 	RWLOCK_INIT(&ipf_tru64, 1);
 	RWLOCK_INIT(&ipf_global, 1);
 	RWLOCK_INIT(&ipf_mutex, 1);
+	RWLOCK_INIT(&ipf_frcache, 1);
 	ipftru64_inited = 1;
 
 	status = iplattach();
@@ -803,6 +801,7 @@ ipfilter_detach(void)
 		if (ipftru64_inited == 1) {
 			RW_DESTROY(&ipf_tru64);
 			RW_DESTROY(&ipf_global);
+			RW_DESTROY(&ipf_frcache);
 			RW_DESTROY(&ipf_mutex);
 			ipftru64_inited = 0;
 		}

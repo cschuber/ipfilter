@@ -429,14 +429,15 @@ char *argv[];
 		if (role != IPL_LOGALL) {
 			ptr = plstp->ipls_list[role];
 			while (ptr != NULL) {
-				ptr = printpool(ptr, kmemcpywrap, opts);
+				ptr = printpool(ptr, kmemcpywrap, poolname,
+						opts);
 			}
 		} else {
 			for (role = 0; role <= IPL_LOGMAX; role++) {
 				ptr = plstp->ipls_list[role];
 				while (ptr != NULL) {
 					ptr = printpool(ptr, kmemcpywrap,
-							opts);
+							poolname, opts);
 				}
 			}
 			role = IPL_LOGALL;
@@ -456,14 +457,15 @@ char *argv[];
 		if (role != IPL_LOGALL) {
 			hptr = htstp->iphs_tables;
 			while (hptr != NULL) {
-				hptr = printhash(hptr, kmemcpywrap, opts);
+				hptr = printhash(hptr, kmemcpywrap,
+						 poolname, opts);
 			}
 		} else {
 			for (role = 0; role <= IPL_LOGMAX; role++) {
 				hptr = htstp->iphs_tables;
 				while (hptr != NULL) {
 					hptr = printhash(hptr, kmemcpywrap,
-							 opts);
+							 poolname, opts);
 				}
 
 				op.iplo_unit = role;

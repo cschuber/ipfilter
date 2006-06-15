@@ -66,7 +66,9 @@ struct	in_addr	gwip;
 
 	bcopy((char *)buf, s + sizeof(*eh), len);
 	if (gwip.s_addr == last_gw.s_addr)
+	    {
 		bcopy(last_arp, (char *)A_A eh->ether_dhost, 6);
+	    }
 	else if (arp((char *)&gwip, (char *)A_A eh->ether_dhost) == -1)
 	    {
 		perror("arp");
@@ -109,7 +111,9 @@ int	frag;
 
 	bzero((char *)A_A eh->ether_shost, sizeof(eh->ether_shost));
 	if (last_gw.s_addr && (gwip.s_addr == last_gw.s_addr))
+	    {
 		bcopy(last_arp, (char *)A_A eh->ether_dhost, 6);
+	    }
 	else if (arp((char *)&gwip, (char *)A_A eh->ether_dhost) == -1)
 	    {
 		perror("arp");
@@ -132,11 +136,7 @@ int	frag;
 	}
 
 	if (ip->ip_src.s_addr != local_ip.s_addr) {
-		if (arp((char *)&ip->ip_src, (char *)A_A local_arp) == -1)
-		    {
-			perror("arp");
-			return -2;
-		    }
+		(void) arp((char *)&ip->ip_src, (char *)A_A local_arp);
 		bcopy(local_arp, (char *)A_A eh->ether_shost,sizeof(last_arp));
 		local_ip = ip->ip_src;
 	} else

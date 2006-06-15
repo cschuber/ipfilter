@@ -20,13 +20,15 @@ extern	struct ifnet	*get_unit __P((char *, int));
 extern	void	init_ifp __P((void));
 extern	ipnat_t	*natparse __P((char *, int));
 extern	int	fr_running;
+extern	hostmap_t **maptable;
 
 ipfmutex_t	ipl_mutex, ipf_authmx, ipf_rw, ipf_stinsert;
 ipfmutex_t	ipf_nat_new, ipf_natio, ipf_timeoutlock;
-ipfrwlock_t	ipf_mutex, ipf_global, ipf_ipidfrag, ip_poolrw;
+ipfrwlock_t	ipf_mutex, ipf_global, ipf_ipidfrag, ip_poolrw, ipf_frcache;
 ipfrwlock_t	ipf_frag, ipf_state, ipf_nat, ipf_natfrag, ipf_auth;
 int	opts = OPT_DONOTHING;
 int	use_inet6 = 0;
+int	docksum = 0;
 int	pfil_delayed_copy = 0;
 int	main __P((int, char *[]));
 int	loadrules __P((char *, int));
@@ -75,6 +77,7 @@ char *argv[];
 {
 	char	*datain, *iface, *ifname, *logout;
 	int	fd, i, dir, c, loaded, dump, hlen;
+	struct	in_addr	sip;
 	struct	ifnet	*ifp;
 	struct	ipread	*r;
 	mb_t	mb, *m;
@@ -88,21 +91,23 @@ char *argv[];
 	r = &iptext;
 	iface = NULL;
 	logout = NULL;
-	ifname = "anon0";
 	datain = NULL;
+	sip.s_addr = 0;
+	ifname = "anon0";
 
 	MUTEX_INIT(&ipf_rw, "ipf rw mutex");
 	MUTEX_INIT(&ipf_timeoutlock, "ipf timeout lock");
 	RWLOCK_INIT(&ipf_global, "ipf filter load/unload mutex");
 	RWLOCK_INIT(&ipf_mutex, "ipf filter rwlock");
 	RWLOCK_INIT(&ipf_ipidfrag, "ipf IP NAT-Frag rwlock");
+	RWLOCK_INIT(&ipf_frcache, "ipf filter cache");
 
 	initparse();
 	if (fr_initialise() == -1)
 		abort();
 	fr_running = 1;
 
-	while ((c = getopt(argc, argv, "6bdDF:i:I:l:N:P:or:RT:vxX")) != -1)
+	while ((c = getopt(argc, argv, "6bCdDF:i:I:l:N:P:or:RS:T:vxX")) != -1)
 		switch (c)
 		{
 		case '6' :
@@ -118,6 +123,9 @@ char *argv[];
 			break;
 		case 'd' :
 			opts |= OPT_DEBUG;
+			break;
+		case 'C' :
+			docksum = 1;
 			break;
 		case 'D' :
 			dump = 1;
@@ -145,21 +153,6 @@ char *argv[];
 		case 'l' :
 			logout = optarg;
 			break;
-		case 'o' :
-			opts |= OPT_SAVEOUT;
-			break;
-		case 'r' :
-			if (ipf_parsefile(-1, ipf_addrule, iocfunctions,
-					  optarg) == -1)
-				return -1;
-			loaded = 1;
-			break;
-		case 'R' :
-			opts |= OPT_NORESOLVE;
-			break;
-		case 'v' :
-			opts |= OPT_VERBOSE;
-			break;
 		case 'N' :
 			if (ipnat_parsefile(-1, ipnat_addrule, ipnattestioctl,
 					    optarg) == -1)
@@ -167,13 +160,31 @@ char *argv[];
 			loaded = 1;
 			opts |= OPT_NAT;
 			break;
+		case 'o' :
+			opts |= OPT_SAVEOUT;
+			break;
 		case 'P' :
 			if (ippool_parsefile(-1, optarg, ipooltestioctl) == -1)
 				return -1;
 			loaded = 1;
 			break;
+		case 'r' :
+			if (ipf_parsefile(-1, ipf_addrule, iocfunctions,
+					  optarg) == -1)
+				return -1;
+			loaded = 1;
+			break;
+		case 'S' :
+			sip.s_addr = inet_addr(optarg);
+			break;
+		case 'R' :
+			opts |= OPT_NORESOLVE;
+			break;
 		case 'T' :
 			ipf_dotuning(-1, optarg, ipftestioctl);
+			break;
+		case 'v' :
+			opts |= OPT_VERBOSE;
 			break;
 		case 'x' :
 			opts |= OPT_HEX;
@@ -205,9 +216,11 @@ char *argv[];
 		if (!use_inet6) {
 			ip->ip_off = ntohs(ip->ip_off);
 			ip->ip_len = ntohs(ip->ip_len);
-			if (r->r_flags & R_DO_CKSUM)
+			if ((r->r_flags & R_DO_CKSUM) || docksum)
 				fixv4sums(m, ip);
 			hlen = IP_HL(ip) << 2;
+			if (sip.s_addr)
+				dir = !(sip.s_addr == ip->ip_src.s_addr);
 		}
 #ifdef	USE_INET6
 		else
@@ -281,6 +294,9 @@ char *argv[];
 		}
 		m = &mb;
 	}
+
+	if (i != 0)
+		fprintf(stderr, "readip failed: %d\n", i);
 	(*r->r_close)();
 
 	if (logout != NULL) {
@@ -615,6 +631,8 @@ void dumpnat()
 {
 	ipnat_t	*ipn;
 	nat_t	*nat;
+	hostmap_t *hm;
+	int	i;
 
 	printf("List of active MAP/Redirect filters:\n");
 	for (ipn = nat_list; ipn != NULL; ipn = ipn->in_next)
@@ -624,6 +642,12 @@ void dumpnat()
 		printactivenat(nat, opts);
 		if (nat->nat_aps)
 			printaps(nat->nat_aps, opts);
+	}
+
+	printf("\nHostmap table:\n");
+	for (i = 0; i < ipf_hostmap_sz; i++) {
+		for (hm = maptable[i]; hm != NULL; hm = hm->hm_next)
+			printhostmap(hm, i);
 	}
 }
 
@@ -651,12 +675,12 @@ void dumplookups()
 	printf("List of configured pools\n");
 	for (i = 0; i < IPL_LOGSIZE; i++)
 		for (ipl = ip_pool_list[i]; ipl != NULL; ipl = ipl->ipo_next)
-			printpool(ipl, bcopywrap, opts);
+			printpool(ipl, bcopywrap, NULL, opts);
 
 	printf("List of configured hash tables\n");
 	for (i = 0; i < IPL_LOGSIZE; i++)
 		for (iph = ipf_htables[i]; iph != NULL; iph = iph->iph_next)
-			printhash(iph, bcopywrap, opts);
+			printhash(iph, bcopywrap, NULL, opts);
 }
 
 
@@ -761,6 +785,10 @@ ip_t *ip;
 	case IPPROTO_UDP :
 		hdr = csump;
 		csump += offsetof(udphdr_t, uh_sum);
+		break;
+	case IPPROTO_ICMP :
+		hdr = csump;
+		csump += offsetof(icmphdr_t, icmp_cksum);
 		break;
 	default :
 		csump = NULL;

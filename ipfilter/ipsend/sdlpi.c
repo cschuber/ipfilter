@@ -68,7 +68,7 @@ int	tout;
 	(void) strncat(devname, device, sizeof(devname) - strlen(devname));
 
 	s = devname + 5;
-	while (*s && !isdigit(*s))
+	while (*s && !ISDIGIT(*s))
 		s++;
 	if (!*s)
 	    {

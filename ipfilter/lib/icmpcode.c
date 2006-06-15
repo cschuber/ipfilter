@@ -32,7 +32,7 @@ char *str;
 
 	if ((s = strrchr(str, ')')))
 		*s = '\0';
-	if (isdigit(*str)) {
+	if (ISDIGIT(*str)) {
 		if (!ratoi(str, &i, 0, 255))
 			return -1;
 		else

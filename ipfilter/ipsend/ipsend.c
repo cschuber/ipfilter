@@ -171,7 +171,7 @@ udpcksum(ip_t *ip, struct udphdr *udp, int len)
 		u_short w[6];
 	} ph;
 	u_32_t temp32;
-	u_short cksum, *opts;
+	u_short *opts;
 
 	ph.h.len = htons(len);
 	ph.h.ttl = 0;

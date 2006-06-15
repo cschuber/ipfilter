@@ -30,7 +30,7 @@ static const char rcsid[] = "@(#)$Id$";
 # include <sys/proc.h>
 #endif
 #if !defined(ultrix) && !defined(hpux) && !defined(linux) && \
-    !defined(__sgi) && !defined(__osf__)
+    !defined(__sgi) && !defined(__osf__) && !defined(_AIX51)
 # include <kvm.h>
 #endif
 #ifndef	ultrix

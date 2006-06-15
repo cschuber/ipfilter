@@ -32,7 +32,7 @@ struct file;
 # endif
 #endif
 #include <sys/socket.h>
-#if !defined(__hpux) && !defined(__osf__) && !defined(linux)
+#if !defined(__hpux) && !defined(__osf__) && !defined(linux) && !defined(AIX)
 # include <sys/ioccom.h>
 #endif
 #ifdef __FreeBSD__
@@ -298,7 +298,7 @@ int n;
 				return 1;
 			break;
 		case '?' :
-			if (!isalpha(*up) || ((*s & 0x5f) != (*up & 0x5f)))
+			if (!ISALPHA(*up) || ((*s & 0x5f) != (*up & 0x5f)))
 				return 1;
 			break;
 		case '*' :
@@ -523,21 +523,22 @@ ipstate_t *is;
 	 */
 	s0 = is->is_s0[rv];
 	off = seq - s0;
-	if ((seq > s0 + 15) || (off < 0))
+	if ((off > 15) || (off < 0))
 		return 1;
 	thoff = TCP_OFF(tcp) << 2;
 	dlen = fin->fin_dlen - thoff;
 	if (dlen <= 0)
 		return 1;
-	seq += dlen;
-	if (seq > s0 + 15)
-		dlen -= (seq - (s0 + 15));
+	if (dlen > 16)
+		dlen = 16;
+	if (off + dlen > 16)
+		dlen = 16 - off;
 
 	j = 0xffff >> (16 - dlen);
 	i = (0xffff & j) << off;
 #ifdef _KERNEL
-	COPYDATA(*(mb_t **)fin->fin_mp, fin->fin_hlen + thoff, dlen,
-		 (caddr_t)is->is_sbuf[rv] + off);
+	COPYDATA(*(mb_t **)fin->fin_mp, fin->fin_plen - fin->fin_dlen + thoff,
+		 dlen, (caddr_t)is->is_sbuf[rv] + off);
 #endif
 	is->is_smsk[rv] |= i;
 	for (j = 0, i = is->is_smsk[rv]; i & 1; i >>= 1)

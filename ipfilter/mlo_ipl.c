@@ -60,7 +60,7 @@ struct	cdevsw	ipldevsw =
 	iplopen,		/* open */
 	iplclose,		/* close */
 	iplread,		/* read */
-	(void *)nullop,		/* write */
+	iplwrite,		/* write */
 	iplioctl,		/* ioctl */
 	(void *)nullop,		/* stop */
 	(void *)NULL,		/* tty */

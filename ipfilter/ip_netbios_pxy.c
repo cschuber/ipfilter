@@ -80,19 +80,17 @@ nat_t *nat;
 	aps = aps;	/* LINT */
 	nat = nat;	/* LINT */
 
-	ip = fin->fin_ip;
-	m = *(mb_t **)fin->fin_mp;
-	off = fin->fin_hlen + sizeof(udphdr_t);
-	dlen = M_LEN(m);
-	dlen -= off;
-
+	m = fin->fin_m;
+	dlen = fin->fin_dlen - sizeof(*udp);
 	/*
 	 * no net bios datagram could possibly be shorter than this
 	 */
 	if (dlen < 11)
 		return 0;
 
+	ip = fin->fin_ip;
 	udp = (udphdr_t *)fin->fin_dp;
+	off = (char *)udp - (char *)ip + sizeof(*udp) + fin->fin_ipoff;
 
 	/*
 	 * move past the

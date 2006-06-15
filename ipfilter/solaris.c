@@ -57,9 +57,7 @@
 extern	struct	filterstats	frstats[];
 extern	int	fr_running;
 extern	int	fr_flags;
-#ifdef IPFILTER_SYNC
 extern	int	iplwrite __P((dev_t, struct uio *, cred_t *));
-#endif
 
 extern ipnat_t *nat_list;
 
@@ -91,11 +89,7 @@ static struct cb_ops ipf_cb_ops = {
 	nodev,		/* print */
 	nodev,		/* dump */
 	iplread,
-#ifdef IPFILTER_SYNC
 	iplwrite,	/* write */
-#else
-	nodev,		/* write */
-#endif
 	iplioctl,	/* ioctl */
 	nodev,		/* devmap */
 	nodev,		/* mmap */
@@ -297,6 +291,7 @@ ddi_attach_cmd_t cmd;
 		 */
 		RWLOCK_INIT(&ipf_global, "ipf filter load/unload mutex");
 		RWLOCK_INIT(&ipf_mutex, "ipf filter rwlock");
+		RWLOCK_INIT(&ipf_frcache, "ipf cache rwlock");
 
 		/*
 		 * Lock people out while we set things up.
@@ -310,6 +305,11 @@ ddi_attach_cmd_t cmd;
 		if (pfil_add_hook(fr_check, PFIL_IN|PFIL_OUT, &pfh_inet4))
 			cmn_err(CE_WARN, "IP Filter: %s(pfh_inet4) failed",
 				"pfil_add_hook");
+#ifdef USE_INET6
+		if (pfil_add_hook(fr_check, PFIL_IN|PFIL_OUT, &pfh_inet6))
+			cmn_err(CE_WARN, "IP Filter: %s(pfh_inet6) failed",
+				"pfil_add_hook");
+#endif
 		if (pfil_add_hook(fr_qifsync, PFIL_IN|PFIL_OUT, &pfh_sync))
 			cmn_err(CE_WARN, "IP Filter: %s(pfh_sync) failed",
 				"pfil_add_hook");
@@ -330,7 +330,9 @@ ddi_attach_cmd_t cmd;
 	}
 
 attach_failed:
+#ifdef	IPFDEBUG
 	cmn_err(CE_NOTE, "IP Filter: failed to attach\n");
+#endif
 	/*
 	 * Use our own detach routine to toss
 	 * away any stuff we allocated above.
@@ -370,6 +372,11 @@ ddi_detach_cmd_t cmd;
 		if (pfil_remove_hook(fr_check, PFIL_IN|PFIL_OUT, &pfh_inet4))
 			cmn_err(CE_WARN, "IP Filter: %s(pfh_inet4) failed",
 				"pfil_remove_hook");
+#ifdef USE_INET6
+		if (pfil_remove_hook(fr_check, PFIL_IN|PFIL_OUT, &pfh_inet6))
+			cmn_err(CE_WARN, "IP Filter: %s(pfh_inet6) failed",
+				"pfil_add_hook");
+#endif
 		if (pfil_remove_hook(fr_qifsync, PFIL_IN|PFIL_OUT, &pfh_sync))
 			cmn_err(CE_WARN, "IP Filter: %s(pfh_sync) failed",
 				"pfil_remove_hook");
@@ -399,6 +406,7 @@ ddi_detach_cmd_t cmd;
 		if (!ipldetach()) {
 			RWLOCK_EXIT(&ipf_global);
 			RW_DESTROY(&ipf_mutex);
+			RW_DESTROY(&ipf_frcache);
 			RW_DESTROY(&ipf_global);
 			cmn_err(CE_CONT, "!%s detached.\n", ipfilter_version);
 			return (DDI_SUCCESS);
@@ -457,7 +465,7 @@ void *qif;
 mblk_t **mp;
 {
 
-	frsync();
+	frsync(qif);
 	/*
 	 * Resync. any NAT `connections' using this interface and its IP #.
 	 */
@@ -473,18 +481,7 @@ mblk_t **mp;
  */
 int ipfsync()
 {
-	qpktinfo_t qpi;
-	qif_t *qf;
-
-	frsync();
-	/*
-	 * Resync. any NAT `connections' using this interface and its IP #.
-	 */
-	qf = NULL;
-	while (qif_walk(&qf)) {
-		qpi.qpi_real = qf;
-		(void) fr_qifsync(NULL, 0, (void *)qf->qf_ill, -1, &qpi, NULL);
-	}
+	frsync(NULL);
 	return 0;
 }
 

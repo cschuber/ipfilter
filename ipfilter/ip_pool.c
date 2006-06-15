@@ -53,7 +53,8 @@ struct file;
 # include <sys/malloc.h>
 #endif
 
-#if (defined(__osf__) || defined(__hpux) || defined(__sgi)) && defined(_KERNEL)
+#if defined(_KERNEL) && (defined(__osf__) || defined(AIX) || \
+     defined(__hpux) || defined(__sgi))
 # ifdef __osf__
 #  include <net/radix.h>
 # endif
@@ -305,7 +306,11 @@ iplookupop_t *op;
 		for (i = 0; i < IPL_LOGSIZE; i++)
 			stats.ipls_list[i] = ip_pool_list[i];
 	} else if (unit >= 0 && unit < IPL_LOGSIZE) {
-		stats.ipls_list[unit] = ip_pool_list[unit];
+		if (op->iplo_name[0] != '\0')
+			stats.ipls_list[unit] = ip_pool_find(unit,
+							     op->iplo_name);
+		else
+			stats.ipls_list[unit] = ip_pool_list[unit];
 	} else
 		err = EINVAL;
 	if (err == 0)
@@ -330,7 +335,7 @@ char *name;
 	ip_pool_t *p;
 
 	for (p = ip_pool_list[unit]; p != NULL; p = p->ipo_next)
-		if (strcmp(p->ipo_name, name) == 0)
+		if (strncmp(p->ipo_name, name, sizeof(p->ipo_name)) == 0)
 			break;
 	return p;
 }
@@ -350,11 +355,9 @@ ip_pool_t *ipo;
 addrfamily_t *addr, *mask;
 {
 	struct radix_node *n;
-#ifdef USE_SPL
-	int s;
+	SPL_INT(s);
 
 	SPL_NET(s);
-#endif
 	RADIX_NODE_HEAD_LOCK(ipo->ipo_head);
 	n = ipo->ipo_head->rnh_lookup(addr, mask, ipo->ipo_head);
 	RADIX_NODE_HEAD_UNLOCK(ipo->ipo_head);
@@ -365,7 +368,7 @@ addrfamily_t *addr, *mask;
 
 /* ------------------------------------------------------------------------ */
 /* Function:    ip_pool_search                                              */
-/* Returns:     int     - 0 == +ve match, -1 == error, 1 == -ve match       */
+/* Returns:     int     - 0 == +ve match, -1 == error, 1 == -ve/no match    */
 /* Parameters:  tptr(I)    - pointer to the pool to search                  */
 /*              version(I) - IP protocol version (4 or 6)                   */
 /*              dptr(I)    - pointer to address information                 */
@@ -388,7 +391,7 @@ void *dptr;
 	if (ipo == NULL)
 		return -1;
 
-	rv = -1;
+	rv = 1;
 	m = NULL;
 	addr = (i6addr_t *)dptr;
 	bzero(&v, sizeof(v));
@@ -530,7 +533,8 @@ iplookupop_t *op;
 #endif
 
 		for (p = ip_pool_list[unit]; p != NULL; ) {
-			if (strcmp(name, p->ipo_name) == 0) {
+			if (strncmp(name, p->ipo_name,
+				    sizeof(p->ipo_name)) == 0) {
 				poolnum++;
 #if defined(SNPRINTF) && defined(_KERNEL)
 				SNPRINTF(name, sizeof(name), "%x", poolnum);
@@ -543,6 +547,7 @@ iplookupop_t *op;
 		}
 
 		(void)strncpy(h->ipo_name, name, sizeof(h->ipo_name));
+		(void)strncpy(op->iplo_name, name, sizeof(op->iplo_name));
 	} else {
 		(void) strncpy(h->ipo_name, op->iplo_name, sizeof(h->ipo_name));
 	}

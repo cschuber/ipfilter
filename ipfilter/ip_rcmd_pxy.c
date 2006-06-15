@@ -86,7 +86,7 @@ char *ptr;
 	register char *s = ptr, c;
 	register u_short i = 0;
 
-	while (((c = *s++) != '\0') && isdigit(c)) {
+	while (((c = *s++) != '\0') && ISDIGIT(c)) {
 		i *= 10;
 		i += c - '0';
 	}
@@ -151,6 +151,8 @@ nat_t *nat;
 	 * other way.
 	 */
 	bcopy((char *)fin, (char *)&fi, sizeof(fi));
+	fi.fin_state = NULL;
+	fi.fin_nat = NULL;
 	fi.fin_flx |= FI_IGNORE;
 	fi.fin_data[0] = sp;
 	fi.fin_data[1] = 0;
@@ -201,6 +203,8 @@ nat_t *nat;
 				ip->ip_dst = nat->nat_inip;
 			}
 			(void) fr_addstate(&fi, &nat2->nat_state, SI_W_DPORT);
+			if (fi.fin_state != NULL)
+				fr_statederef(&fi, (ipstate_t **)&fi.fin_state);
 		}
 		ip->ip_len = slen;
 		ip->ip_src = swip;

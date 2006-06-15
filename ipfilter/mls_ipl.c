@@ -76,7 +76,7 @@ struct	dev_ops	ipl_ops =
 	iplopen,
 	iplclose,
 	iplread,
-	NULL,		/* write */
+	iplwrite,
 	NULL,		/* strategy */
 	NULL,		/* dump */
 	0,		/* psize */

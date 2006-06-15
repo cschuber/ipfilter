@@ -31,7 +31,7 @@ extern	int	optind;
 extern	frentry_t *frtop;
 
 
-void	frsync __P((void));
+void	ipf_frsync __P((void));
 void	zerostats __P((void));
 int	main __P((int, char *[]));
 
@@ -142,7 +142,7 @@ char *argv[];
 				exit(1);
 			break;
 		case 'y' :
-			frsync();
+			ipf_frsync();
 			break;
 		case 'z' :
 			opts ^= OPT_ZERORULEST;
@@ -438,7 +438,7 @@ static void swapactive()
 }
 
 
-void frsync()
+void ipf_frsync()
 {
 	int frsyn = 0;
 

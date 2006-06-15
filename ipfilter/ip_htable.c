@@ -102,8 +102,10 @@ iplookupop_t *op;
 	int err, i, unit;
 
 	KMALLOC(iph, iphtable_t *);
-	if (iph == NULL)
+	if (iph == NULL) {
+		ipht_nomem[op->iplo_unit]++;
 		return ENOMEM;
+	}
 
 	err = COPYIN(op->iplo_struct, iph, sizeof(*iph));
 	if (err != 0) {
@@ -137,12 +139,9 @@ iplookupop_t *op;
 					    sizeof(oiph->iph_name)) == 0)
 					break;
 		} while (oiph != NULL);
+
 		(void)strncpy(iph->iph_name, name, sizeof(iph->iph_name));
-		err = COPYOUT(iph, op->iplo_struct, sizeof(*iph));
-		if (err != 0) {
-			KFREE(iph);
-			return EFAULT;
-		}
+		(void)strncpy(op->iplo_name, name, sizeof(op->iplo_name));
 		iph->iph_type |= IPHASH_ANON;
 	}
 
@@ -375,6 +374,15 @@ void *tptr, *aptr;
 }
 
 
+/* ------------------------------------------------------------------------ */
+/* Function:    fr_iphmfindip                                               */
+/* Returns:     int     - 0 == +ve match, -1 == error, 1 == -ve/no match    */
+/* Parameters:  tptr(I)    - pointer to the pool to search                  */
+/*              version(I) - IP protocol version (4 or 6)                   */
+/*              aptr(I)    - pointer to address information                 */
+/*                                                                          */
+/* Search the hash table for a given address and return a search result.    */
+/* ------------------------------------------------------------------------ */
 int fr_iphmfindip(tptr, version, aptr)
 void *tptr, *aptr;
 int version;
@@ -385,10 +393,10 @@ int version;
 	int rval;
 
 	if (version != 4)
-		return 1;
+		return -1;
 
 	if (tptr == NULL || aptr == NULL)
-		return 1;
+		return -1;
 
 	iph = tptr;
 	addr = aptr;

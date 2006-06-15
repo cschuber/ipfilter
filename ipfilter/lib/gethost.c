@@ -13,6 +13,9 @@ u_32_t *hostp;
 		return 0;
 	}
 
+	if (!strcmp(name, "<thishost>"))
+		name = thishost;
+
 	h = gethostbyname(name);
 	if (h != NULL) {
 		if ((h->h_addr != NULL) && (h->h_length == sizeof(addr))) {

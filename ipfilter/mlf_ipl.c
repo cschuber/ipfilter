@@ -118,8 +118,6 @@ SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_defnatage, CTLFLAG_RWO,
 	   &fr_defnatage, 0, "");
 SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_ipfrttl, CTLFLAG_RW,
 	   &fr_ipfrttl, 0, "");
-SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_unreach, CTLFLAG_RW,
-	   &fr_unreach, 0, "");
 SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_running, CTLFLAG_RD,
 	   &fr_running, 0, "");
 SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_statesize, CTLFLAG_RWO,
