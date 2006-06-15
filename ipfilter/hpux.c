@@ -46,8 +46,6 @@ struct uio;
 #undef	IPFDEBUG
 
 extern	struct	filterstats	frstats[];
-extern	ipfrwlock_t	ipf_mutex, ipf_nat, ipf_global;
-extern	ipfmutex_t	ipf_rw, ipf_stinsert;
 extern	int	fr_running;
 extern	int	fr_flags;
 extern	int	fr_check __P(());
@@ -470,12 +468,7 @@ mblk_t **mp;
 	register struct frentry *f;
 	register ipnat_t *np;
 
-	frsync();
-	/*
-	 * Resync. any NAT `connections' using this interface and its IP #.
-	 */
-	fr_natsync(qif);
-	fr_statesync(qif);
+	frsync(NULL);
 	return 0;
 }
 

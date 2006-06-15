@@ -20,7 +20,7 @@ u_32_t *addr, *mask;
 	switch (type)
 	{
 	case FRI_BROADCAST :
-		suffix = "/bcast";
+		suffix = "bcast";
 		break;
 
 	case FRI_DYNAMIC :
@@ -30,15 +30,15 @@ u_32_t *addr, *mask;
 		break;
 
 	case FRI_NETWORK :
-		suffix = "/net";
+		suffix = "net";
 		break;
 
 	case FRI_NETMASKED :
-		suffix = "/netmasked";
+		suffix = "netmasked";
 		break;
 
 	case FRI_PEERADDR :
-		suffix = "/peer";
+		suffix = "peer";
 		break;
 
 	case FRI_LOOKUP :
@@ -105,6 +105,9 @@ ioctlfunc_t	iocfunc;
 	if ((fp->fr_type & FR_T_BUILTIN) != 0)
 		printf("# Builtin: ");
 
+	if (fp->fr_collect != 0)
+		printf("%u ", fp->fr_collect);
+
 	if (fp->fr_type == FR_T_CALLFUNC) {
 		;
 	} else if (fp->fr_func != NULL) {
@@ -166,31 +169,32 @@ ioctlfunc_t	iocfunc;
 		if (*fp->fr_ifnames[1] && strcmp(fp->fr_ifnames[1], "*"))
 			printifname(",", fp->fr_ifnames[1], fp->fr_ifas[1]);
 		putchar(' ');
+	}
 
-		if (*fp->fr_dif.fd_ifname)
-			print_toif("dup-to", &fp->fr_dif);
-		if (*fp->fr_tif.fd_ifname)
-			print_toif("to", &fp->fr_tif);
-		if (fp->fr_flags & FR_FASTROUTE)
-			printf("fastroute ");
+	if (*fp->fr_dif.fd_ifname || (fp->fr_flags & FR_DUP))
+		print_toif("dup-to", &fp->fr_dif);
+	if (*fp->fr_tif.fd_ifname)
+		print_toif("to", &fp->fr_tif);
+	if (*fp->fr_rif.fd_ifname)
+		print_toif("reply-to", &fp->fr_rif);
+	if (fp->fr_flags & FR_FASTROUTE)
+		printf("fastroute ");
 
-		if ((*fp->fr_ifnames[2] && strcmp(fp->fr_ifnames[2], "*")) ||
-		    (*fp->fr_ifnames[3] && strcmp(fp->fr_ifnames[3], "*"))) {
-			if (fp->fr_flags & FR_OUTQUE)
-				printf("in-via ");
-			else
-				printf("out-via ");
+	if ((*fp->fr_ifnames[2] && strcmp(fp->fr_ifnames[2], "*")) ||
+	    (*fp->fr_ifnames[3] && strcmp(fp->fr_ifnames[3], "*"))) {
+		if (fp->fr_flags & FR_OUTQUE)
+			printf("in-via ");
+		else
+			printf("out-via ");
 
-			if (*fp->fr_ifnames[2]) {
-				printifname("", fp->fr_ifnames[2],
-					    fp->fr_ifas[2]);
-				putchar(' ');
-
-				if (*fp->fr_ifnames[3]) {
-					printifname(",", fp->fr_ifnames[3],
-						    fp->fr_ifas[3]);
-				}
+		if (*fp->fr_ifnames[2]) {
+			printifname("", fp->fr_ifnames[2],
+				    fp->fr_ifas[2]);
+			if (*fp->fr_ifnames[3]) {
+				printifname(",", fp->fr_ifnames[3],
+					    fp->fr_ifas[3]);
 			}
+			putchar(' ');
 		}
 	}
 
@@ -204,10 +208,10 @@ ioctlfunc_t	iocfunc;
 			pr = -1;
 		} else if (fp->fr_mip.fi_p) {
 			pr = fp->fr_ip.fi_p;
-			if ((p = getprotobynumber(fp->fr_proto)))
-				printf("proto %s ", p->p_name);
-			else
-				printf("proto %d ", fp->fr_proto);
+			p = getprotobynumber(pr);
+			printf("proto ");
+			printproto(p, pr, NULL);
+			putchar(' ');
 		}
 	}
 
@@ -319,6 +323,13 @@ ioctlfunc_t	iocfunc;
 			printf("frag");
 			comma = ",";
 		}
+		if (fp->fr_mflx & FI_FRAGBODY) {
+			fputs(comma, stdout);
+			if (!(fp->fr_flx & FI_FRAGBODY))
+				printf("not ");
+			printf("frag-body");
+			comma = ",";
+		}
 		if (fp->fr_mflx & FI_NATED) {
 			fputs(comma, stdout);
 			if (!(fp->fr_flx & FI_NATED))
@@ -359,12 +370,41 @@ ioctlfunc_t	iocfunc;
 			if (!(fp->fr_flx & FI_OOW))
 				printf("not ");
 			printf("oow");
+			comma = ",";
+		}
+		if (fp->fr_mflx & FI_MBCAST) {
+			fputs(comma, stdout);
+			if (!(fp->fr_flx & FI_MBCAST))
+				printf("not ");
+			printf("mbcast");
+			comma = ",";
+		}
+		if (fp->fr_mflx & FI_BROADCAST) {
+			fputs(comma, stdout);
+			if (!(fp->fr_flx & FI_BROADCAST))
+				printf("not ");
+			printf("bcast");
+			comma = ",";
+		}
+		if (fp->fr_mflx & FI_MULTICAST) {
+			fputs(comma, stdout);
+			if (!(fp->fr_flx & FI_MULTICAST))
+				printf("not ");
+			printf("mcast");
+			comma = ",";
+		}
+		if (fp->fr_mflx & FI_STATE) {
+			fputs(comma, stdout);
+			if (!(fp->fr_flx & FI_STATE))
+				printf("not ");
+			printf("state");
+			comma = ",";
 		}
 	}
 
 	if (fp->fr_flags & FR_KEEPSTATE) {
 		printf(" keep state");
-		if ((fp->fr_flags & (FR_STSTRICT|FR_NEWISN|FR_NOICMPERR)) ||
+		if ((fp->fr_flags & (FR_STSTRICT|FR_NEWISN|FR_NOICMPERR|FR_STATESYNC)) ||
 		    (fp->fr_statemax != 0) || (fp->fr_age[0] != 0)) {
 			char *comma = "";
 			printf(" (");
@@ -384,6 +424,10 @@ ioctlfunc_t	iocfunc;
 				printf("%sno-icmp-err", comma);
 				comma = ",";
 			}
+			if (fp->fr_flags & FR_STATESYNC) {
+				printf("%ssync", comma);
+				comma = ",";
+			}
 			if (fp->fr_age[0] || fp->fr_age[1])
 				printf("%sage %d/%d", comma, fp->fr_age[0],
 				       fp->fr_age[1]);
@@ -395,8 +439,8 @@ ioctlfunc_t	iocfunc;
 		if (fp->fr_flags & (FR_FRSTRICT)) {
 			printf(" (");
 			if (fp->fr_flags & FR_FRSTRICT)
-				printf(" strict");
-			printf(" )");
+				printf("strict");
+			printf(")");
 				
 		}
 	}
@@ -410,8 +454,20 @@ ioctlfunc_t	iocfunc;
 		printf(" head %s", fp->fr_grhead);
 	if (*fp->fr_group != '\0')
 		printf(" group %s", fp->fr_group);
-	if (fp->fr_logtag != FR_NOLOGTAG)
-		printf(" log-tag %u", fp->fr_logtag);
+	if (fp->fr_logtag != FR_NOLOGTAG || *fp->fr_nattag.ipt_tag) {
+		char *s = "";
+
+		printf(" set-tag(");
+		if (fp->fr_logtag != FR_NOLOGTAG) {
+			printf("log=%u", fp->fr_logtag);
+			s = ", ";
+		}
+		if (*fp->fr_nattag.ipt_tag) {
+			printf("%snat=%-.*s", s, IPFTAG_LEN,
+				fp->fr_nattag.ipt_tag);
+		}
+		printf(")");
+	}
 	if (fp->fr_pps)
 		printf(" pps %d", fp->fr_pps);
 	(void)putchar('\n');

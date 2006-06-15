@@ -31,7 +31,7 @@ int     linenum;
 			return NULL;
 	}
 
-	while (*line && isspace(*line))
+	while (*line && ISSPACE(*line))
 		line++;
 	if (!*line)
 		return NULL;

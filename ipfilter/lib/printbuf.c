@@ -20,7 +20,7 @@ int len, zend;
 
 	for (s = buf, i = len; i; i--) {
 		c = *s++;
-		if (isprint(c))
+		if (ISPRINT(c))
 			putchar(c);
 		else
 			printf("\\%03o", c);

@@ -74,6 +74,20 @@ static const char rcsid[] = "@(#)$Id$";
 int inet_aton __P((const char *, struct in_addr *));
 
 /*
+ * Because the ctype(3) posix definition, if used "safely" in code everywhere,
+ * would mean all normal code that walks through strings needed casts.  Yuck.
+ */
+#define	ISALNUM(x)	isalnum((u_char)(x))
+#define	ISALPHA(x)	isalpha((u_char)(x))
+#define	ISASCII(x)	isascii((u_char)(x))
+#define	ISDIGIT(x)	isdigit((u_char)(x))
+#define	ISPRINT(x)	isprint((u_char)(x))
+#define	ISSPACE(x)	isspace((u_char)(x))
+#define	ISUPPER(x)	isupper((u_char)(x))
+#define	ISXDIGIT(x)	isxdigit((u_char)(x))
+#define	ISLOWER(x)	islower((u_char)(x))
+
+/*
  * Check whether "cp" is a valid ascii representation
  * of an Internet address and convert to a binary address.
  * Returns 1 if the address is valid, 0 if not.
@@ -98,7 +112,7 @@ inet_aton(cp, addr)
 		 * Values are specified as for C:
 		 * 0x=hex, 0=octal, isdigit=decimal.
 		 */
-		if (!isdigit(c))
+		if (!ISDIGIT(c))
 			return (0);
 		val = 0; base = 10;
 		if (c == '0') {
@@ -109,12 +123,12 @@ inet_aton(cp, addr)
 				base = 8;
 		}
 		for (;;) {
-			if (isascii(c) && isdigit(c)) {
+			if (ISASCII(c) && ISDIGIT(c)) {
 				val = (val * base) + (c - '0');
 				c = *++cp;
-			} else if (base == 16 && isascii(c) && isxdigit(c)) {
+			} else if (base == 16 && ISASCII(c) && ISXDIGIT(c)) {
 				val = (val << 4) |
-					(c + 10 - (islower(c) ? 'a' : 'A'));
+					(c + 10 - (ISLOWER(c) ? 'a' : 'A'));
 				c = *++cp;
 			} else
 				break;
@@ -136,7 +150,7 @@ inet_aton(cp, addr)
 	/*
 	 * Check for trailing characters.
 	 */
-	if (c != '\0' && (!isascii(c) || !isspace(c)))
+	if (c != '\0' && (!ISASCII(c) || !ISSPACE(c)))
 		return (0);
 	/*
 	 * Concoct the address according to

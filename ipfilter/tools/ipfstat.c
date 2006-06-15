@@ -105,8 +105,10 @@ int	ipf_fd = -1;
 #define	STSORT_BYTES	2
 #define	STSORT_TTL	3
 #define	STSORT_SRCIP	4
-#define	STSORT_DSTIP	5
-#define	STSORT_MAX	STSORT_DSTIP
+#define	STSORT_SRCPT	5
+#define	STSORT_DSTIP	6
+#define	STSORT_DSTPT	7
+#define	STSORT_MAX	STSORT_DSTPT
 #define	STSORT_DEFAULT	STSORT_BYTES
 
 
@@ -151,7 +153,9 @@ static	int	sort_pkts __P((const void *, const void *));
 static	int	sort_bytes __P((const void *, const void *));
 static	int	sort_ttl __P((const void *, const void *));
 static	int	sort_srcip __P((const void *, const void *));
+static	int	sort_srcpt __P((const void *, const void *));
 static	int	sort_dstip __P((const void *, const void *));
+static	int	sort_dstpt __P((const void *, const void *));
 #endif
 
 
@@ -1002,10 +1006,11 @@ int topclosed;
 {
 	char str1[STSTRSIZE], str2[STSTRSIZE], str3[STSTRSIZE], str4[STSTRSIZE];
 	int maxtsentries = 0, reverse = 0, sorting = STSORT_DEFAULT;
-	int i, j, winy, tsentry, maxx, maxy, redraw = 0;
+	int i, j, winy, tsentry, maxx, maxy, redraw = 0, ret = 0;
 	int len, srclen, dstlen, forward = 1, c = 0;
 	ips_stat_t ipsst, *ipsstp = &ipsst;
 	statetop_t *tstable = NULL, *tp;
+	const char *errstr = "";
 	ipstate_t ips;
 	ipfobj_t ipfo;
 	struct timeval selecttimeout;
@@ -1045,8 +1050,9 @@ int topclosed;
 		/* get state table */
 		bzero((char *)&ipsst, sizeof(ipsst));
 		if ((ioctl(state_fd, SIOCGETFS, &ipfo) == -1)) {
-			perror("ioctl(SIOCGETFS)");
-			exit(-1);
+			errstr = "ioctl(SIOCGETFS)";
+			ret = -1;
+			goto out;
 		}
 
 		/* clear the history */
@@ -1171,9 +1177,17 @@ int topclosed;
 				qsort(tstable, tsentry + 1,
 				      sizeof(statetop_t), sort_srcip);
 				break;
+			case STSORT_SRCPT:
+				qsort(tstable, tsentry +1,
+					sizeof(statetop_t), sort_srcpt);
+				break;
 			case STSORT_DSTIP:
 				qsort(tstable, tsentry + 1,
 				      sizeof(statetop_t), sort_dstip);
+				break;
+			case STSORT_DSTPT:
+				qsort(tstable, tsentry + 1,
+				      sizeof(statetop_t), sort_dstpt);
 				break;
 			default:
 				break;
@@ -1253,8 +1267,14 @@ int topclosed;
 		case STSORT_SRCIP:
 			sprintf(str4, "src ip");
 			break;
+		case STSORT_SRCPT:
+			sprintf(str4, "src port");
+			break;
 		case STSORT_DSTIP:
 			sprintf(str4, "dest ip");
+			break;
+		case STSORT_DSTPT:
+			sprintf(str4, "dest port");
 			break;
 		default:
 			sprintf(str4, "unknown");
@@ -1269,18 +1289,27 @@ int topclosed;
 		printw("Src: %s, Dest: %s, Proto: %s, Sorted by: %s\n\n",
 		       str1, str2, str3, str4);
 
-		/* need at least 14 + 7 characters */
-		if (srclen < 14)
-			srclen = 14;
-		if (dstlen < 14)
-			dstlen = 14;
+		/* 
+		 * For an IPv4 IP address we need at most 15 characters,
+		 * 4 tuples of 3 digits, separated by 3 dots. Enforce this
+		 * length, so the colums do not change positions based
+		 * on the size of the IP address. This length makes the
+		 * output fit in a 80 column terminal. 
+		 * We are lacking a good solution for IPv6 addresses (that
+		 * can be longer that 15 characters), so we do not enforce 
+		 * a maximum on the IP field size.
+		 */
+		if (srclen < 15)
+			srclen = 15;
+		if (dstlen < 15)
+			dstlen = 15;
 
 		/* print column description */
 		winy += 2;
 		move(winy,0);
 		attron(A_BOLD);
 		printw("%-*s %-*s %3s %4s %7s %9s %9s\n",
-		       srclen + 7, "Source IP", dstlen + 7, "Destination IP",
+		       srclen + 6, "Source IP", dstlen + 6, "Destination IP",
 		       "ST", "PR", "#pkts", "#bytes", "ttl");
 		attroff(A_BOLD);
 
@@ -1309,7 +1338,7 @@ int topclosed;
 			}
 			winy++;
 			move(winy, 0);
-			printw("%-*s %-*s", srclen + 7, str1, dstlen + 7, str2);
+			printw("%-*s %-*s", srclen + 6, str1, dstlen + 6, str2);
 
 			/* print state */
 			sprintf(str1, "%X/%X", tp->st_state[0],
@@ -1368,8 +1397,8 @@ int topclosed;
 			if (c == ERR)
 				continue;
 
-			if (isalpha(c) && isupper(c))
-				c = tolower(c);
+			if (ISALPHA(c) && ISUPPER(c))
+				c = TOLOWER(c);
 			if (c == 'l') {
 				redraw = 1;
 			} else if (c == 'q') {
@@ -1387,12 +1416,15 @@ int topclosed;
 		}
 	} /* while */
 
+out:
 	printw("\n");
 	curs_set(1);
-	nocbreak();
+	/* nocbreak(); XXX - endwin() should make this redundant */
 	endwin();
 
 	free(tstable);
+	if (ret != 0)
+		perror(errstr);
 }
 #endif
 
@@ -1583,7 +1615,9 @@ static char *getip(v, addr)
 int v;
 i6addr_t *addr;
 {
+#ifdef  USE_INET6
 	static char hostbuf[MAXHOSTNAMELEN+1];
+#endif
 
 	if (v == 4)
 		return inet_ntoa(addr->in4);
@@ -1706,6 +1740,20 @@ const void *b;
 	return -1;
 }
 
+static int sort_srcpt(a, b)
+const void *a;
+const void *b;
+{
+	register const statetop_t *ap = a;
+	register const statetop_t *bp = b;
+
+	if (htons(ap->st_sport) == htons(bp->st_sport))
+		return 0;
+	else if (htons(ap->st_sport) > htons(bp->st_sport))
+		return 1;
+	return -1;
+}
+
 static int sort_dstip(a, b)
 const void *a;
 const void *b;
@@ -1731,4 +1779,19 @@ const void *b;
 	}
 	return -1;
 }
+
+static int sort_dstpt(a, b)
+const void *a;
+const void *b;
+{
+	register const statetop_t *ap = a;
+	register const statetop_t *bp = b;
+
+	if (htons(ap->st_dport) == htons(bp->st_dport))
+		return 0;
+	else if (htons(ap->st_dport) > htons(bp->st_dport))
+		return 1;
+	return -1;
+}
+
 #endif

@@ -28,7 +28,7 @@ int     linenum;
 		return 0;
 	if (!strcasecmp(**seg, "port") && *(*seg + 1) && *(*seg + 2)) {
 		(*seg)++;
-		if (isalnum(***seg) && *(*seg + 2)) {
+		if (ISALNUM(***seg) && *(*seg + 2)) {
 			if (portnum(**seg, proto, pp, linenum) == 0)
 				return -1;
 			(*seg)++;

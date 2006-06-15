@@ -77,6 +77,7 @@ struct file;
 #include "netinet/ip_pool.h"
 #include "netinet/ip_scan.h"
 #include "netinet/ip_htable.h"
+#include "netinet/ip_sync.h"
 
 #include "opts.h"
 
@@ -193,7 +194,7 @@ extern char *fac_toname __P((int));
 extern int fac_findname __P((char *));
 extern void fill6bits __P((int, u_int *));
 extern int gethost __P((char *, u_32_t *));
-extern int getport __P((struct frentry *, char *));
+extern int getport __P((struct frentry *, char *, u_short *));
 extern int getportproto __P((char *, int));
 extern int getproto __P((char *));
 extern char *getline __P((char *, size_t, FILE *, int *));
@@ -247,8 +248,8 @@ extern void printaps __P((ap_session_t *, int));
 extern void printbuf __P((char *, int, int));
 extern void printfr __P((struct frentry *, ioctlfunc_t));
 extern void printtunable __P((ipftune_t *));
-extern struct iphtable_s *printhash __P((struct iphtable_s *,
-					 copyfunc_t, int));
+extern struct iphtable_s *printhash __P((struct iphtable_s *, copyfunc_t,
+					 char *, int));
 extern struct iphtent_s *printhashnode __P((struct iphtable_s *,
 					    struct iphtent_s *,
 					    copyfunc_t, int));
@@ -259,8 +260,10 @@ extern void printlookup __P((i6addr_t *addr, i6addr_t *mask));
 extern void printmask __P((u_32_t *));
 extern void printpacket __P((struct ip *));
 extern void printpacket6 __P((struct ip *));
-extern struct ip_pool_s *printpool __P((struct ip_pool_s *, copyfunc_t, int));
+extern struct ip_pool_s *printpool __P((struct ip_pool_s *, copyfunc_t,
+					char *, int));
 extern struct ip_pool_node *printpoolnode __P((struct ip_pool_node *, int));
+extern void printproto __P((struct protoent *, int, struct ipnat *));
 extern void printportcmp __P((int, struct frpcmp *));
 extern void optprint __P((u_short *, u_long, u_long));
 #ifdef	USE_INET6

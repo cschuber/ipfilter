@@ -24,7 +24,7 @@ union	{
 
 FILE *yyin;
 
-#define	ishex(c)	(isdigit(c) || ((c) >= 'a' && (c) <= 'f') || \
+#define	ishex(c)	(ISDIGIT(c) || ((c) >= 'a' && (c) <= 'f') || \
 			 ((c) >= 'A' && (c) <= 'F'))
 #define	TOOLONG		-3
 
@@ -61,6 +61,8 @@ static int yygetc()
 
 	if (yypos < yylast) {
 		c = yytext[yypos++];
+		if (c == '\n')
+			yylineNum++;
 		return c;
 	}
 
@@ -72,9 +74,9 @@ static int yygetc()
 		yypos++;
 	} else {
 		c = fgetc(yyin);
-		if (c == '\n')
-			yylineNum++;
 	}
+	if (c == '\n')
+		yylineNum++;
 	yytext[yypos++] = c;
 	yylast = yypos;
 	yytext[yypos] = '\0';
@@ -86,6 +88,8 @@ static int yygetc()
 static void yyunputc(c)
 int c;
 {
+	if (c == '\n')
+		yylineNum--;
 	yytext[--yypos] = c;
 }
 
@@ -179,6 +183,8 @@ nextchar:
 		}
 		yylast -= yypos;
 		yypos = 0;
+		lnext = 0;
+		nokey = 0;
 		goto nextchar;
 
 	case '\\' :
@@ -198,6 +204,9 @@ nextchar:
 
 	if (lnext == 1) {
 		lnext = 0;
+		if ((isbuilding == 0) && !ISALNUM(c)) {
+			return c;
+		}
 		goto nextchar;
 	}
 
@@ -210,7 +219,7 @@ nextchar:
 		}
 		yyswallow('\n');
 		rval = YY_COMMENT;
-		goto done;
+		goto nextchar;
 
 	case '$' :
 		if (isbuilding == 1) {
@@ -225,13 +234,13 @@ nextchar:
 			}
 			(void) yygetc();
 		} else {
-			if (!isalpha(n)) {
+			if (!ISALPHA(n)) {
 				yyunputc(n);
 				break;
 			}
 			do {
 				n = yygetc();
-			} while (isalpha(n) || isdigit(n) || n == '_');
+			} while (ISALPHA(n) || ISDIGIT(n) || n == '_');
 			yyunputc(n);
 		}
 
@@ -276,6 +285,13 @@ nextchar:
 		break;
 
 	case EOF :
+		yylineNum = 1;
+		yypos = 0;
+		yylast = -1;
+		yyexpectaddr = 0;
+		yybreakondot = 0;
+		yyvarnext = 0;
+		yytokentype = 0;
 		return 0;
 	}
 
@@ -300,6 +316,8 @@ nextchar:
 	switch (c)
 	{
 	case '-' :
+		if (yyexpectaddr)
+			break;
 		if (isbuilding == 1)
 			break;
 		n = yygetc();
@@ -326,6 +344,8 @@ nextchar:
 		goto done;
 
 	case '<' :
+		if (yyexpectaddr)
+			break;
 		if (isbuilding == 1) {
 			yyunputc(c);
 			goto done;
@@ -344,6 +364,8 @@ nextchar:
 		goto done;
 
 	case '>' :
+		if (yyexpectaddr)
+			break;
 		if (isbuilding == 1) {
 			yyunputc(c);
 			goto done;
@@ -426,10 +448,10 @@ nextchar:
 	/*
 	 * No negative numbers with leading - sign..
 	 */
-	if (isbuilding == 0 && isdigit(c)) {
+	if (isbuilding == 0 && ISDIGIT(c)) {
 		do {
 			n = yygetc();
-		} while (isdigit(n));
+		} while (ISDIGIT(n));
 		yyunputc(n);
 		rval = YY_NUMBER;
 		goto done;
@@ -467,12 +489,13 @@ done:
 	yytokentype = rval;
 
 	if (yydebug)
-		printf("lexed(%s) => %d\n", yystr, rval);
+		printf("lexed(%s) [%d,%d,%d] => %d\n", yystr, string_start,
+			string_end, pos, rval);
 
 	switch (rval)
 	{
 	case YY_NUMBER :
-		yylval.num = atoi(yystr);
+		sscanf(yystr, "%u", &yylval.num);
 		break;
 
 	case YY_HEX :

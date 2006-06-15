@@ -101,6 +101,12 @@ static int rn_lexobetter __P((void *, void *));
 static struct radix_mask *rn_new_radix_mask __P((struct radix_node *,
     struct radix_mask *));
 static int rn_freenode __P((struct radix_node *, void *));
+#if defined(AIX) && !defined(_KERNEL)
+struct radix_node *rn_match __P((void *, struct radix_node_head *));
+struct radix_node *rn_addmask __P((int, int, void *));
+#define	FreeS(x, y)	KFREES(x, y)
+#define	Bcopy(x, y, z)	bcopy(x, y, z)
+#endif
 
 /*
  * The data structure for the keys is a radix tree with one way
@@ -1044,7 +1050,7 @@ rn_init()
 	addmask_key = cplim = rn_ones + max_keylen;
 	while (cp < cplim)
 		*cp++ = -1;
-	if (rn_inithead((void **)&mask_rnhead, 0) == 0)
+	if (rn_inithead((void *)&mask_rnhead, 0) == 0)
 		panic("rn_init 2");
 }
 

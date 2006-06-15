@@ -9,7 +9,7 @@
 #ifndef	__IP_STATE_H__
 #define	__IP_STATE_H__
 
-#if defined(__STDC__) || defined(__GNUC__)
+#if defined(__STDC__) || defined(__GNUC__) || defined(_AIX51)
 # define	SIOCDELST	_IOW('r', 61, struct ipfobj)
 #else
 # define	SIOCDELST	_IOW(r, 61, struct ipfobj)
@@ -58,8 +58,8 @@ typedef struct ipstate {
 	u_char	is_v;
 	u_32_t	is_hv;
 	u_32_t	is_tag;
-	u_32_t	is_opt;			/* packet options set */
-	u_32_t	is_optmsk;		/*    "      "    mask */
+	u_32_t	is_opt[2];		/* packet options set */
+	u_32_t	is_optmsk[2];		/*    "      "    mask */
 	u_short	is_sec;			/* security options set */
 	u_short	is_secmsk;		/*    "        "    mask */
 	u_short	is_auth;		/* authentication options set */
@@ -105,6 +105,7 @@ typedef struct ipstate {
 #define	is_ifpin	is_ifp[0]
 #define	is_ifpout	is_ifp[2]
 #define	is_gre		is_ps.is_ug
+#define	is_call		is_gre.gs_call
 
 #define	IS_WSPORT	SI_W_SPORT	/* 0x00100 */
 #define	IS_WDPORT	SI_W_DPORT	/* 0x00200 */
@@ -117,6 +118,7 @@ typedef struct ipstate {
 #define	IS_STRICT			   0x20000
 #define	IS_ISNSYN			   0x40000
 #define	IS_ISNACK			   0x80000
+#define	IS_STATESYNC			   0x100000
 /*
  * IS_SC flags are for scan-operations that need to be recognised in state.
  */
@@ -224,6 +226,7 @@ extern	u_long	fr_udptimeout;
 extern	u_long	fr_udpacktimeout;
 extern	u_long	fr_icmptimeout;
 extern	u_long	fr_icmpacktimeout;
+extern	u_long	fr_iptimeout;
 extern	int	fr_statemax;
 extern	int	fr_statesize;
 extern	int	fr_state_lock;

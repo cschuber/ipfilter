@@ -62,6 +62,7 @@ struct file;
 #include <stdlib.h>
 #include <ctype.h>
 #include <fcntl.h>
+#include <arpa/inet.h>
 
 #ifdef __hpux
 # define _NET_ROUTE_INCLUDED
@@ -144,6 +145,7 @@ static	struct	ifnet **ifneta = NULL;
 static	int	nifs = 0;
 
 static	int	frzerostats __P((caddr_t));
+static	void	fr_setifpaddr __P((struct ifnet *, char *));
 void	init_ifp __P((void));
 #if defined(__sgi) && (IRIX < 60500)
 static int 	no_output __P((struct ifnet *, struct mbuf *,
@@ -402,7 +404,7 @@ int mode;
 		if (!(mode & FWRITE))
 			error = EPERM;
 		else {
-			frsync();
+			frsync(NULL);
 		}
 		break;
 	default :
@@ -511,11 +513,58 @@ struct sockaddr *s;
 }
 
 
+static void fr_setifpaddr(ifp, addr)
+struct ifnet *ifp;
+char *addr;
+{
+#ifdef __sgi
+	struct in_ifaddr *ifa;
+#else
+	struct ifaddr *ifa;
+#endif
+
+#if defined(__NetBSD__) || defined(__OpenBSD__) || defined(__FreeBSD__)
+	if (ifp->if_addrlist.tqh_first != NULL)
+#else
+# ifdef __sgi
+	if (ifp->in_ifaddr != NULL)
+# else
+	if (ifp->if_addrlist != NULL)
+# endif
+#endif
+		return;
+
+	ifa = (struct ifaddr *)malloc(sizeof(*ifa));
+#if defined(__NetBSD__) || defined(__OpenBSD__) || defined(__FreeBSD__)
+	ifp->if_addrlist.tqh_first = ifa;
+#else
+# ifdef __sgi
+	ifp->in_ifaddr = ifa;
+# else
+	ifp->if_addrlist = ifa;
+# endif
+#endif
+
+	if (ifa != NULL) {
+		struct sockaddr_in *sin;
+
+#ifdef __sgi
+		sin = (struct sockaddr_in *)&ifa->ia_addr;
+#else
+		sin = (struct sockaddr_in *)&ifa->ifa_addr;
+#endif
+		sin->sin_addr.s_addr = inet_addr(addr);
+		if (sin->sin_addr.s_addr == 0)
+			abort();
+	}
+}
+
 struct ifnet *get_unit(name, v)
 char *name;
 int v;
 {
-	struct ifnet *ifp, **ifa, **old_ifneta;
+	struct ifnet *ifp, **ifpp, **old_ifneta;
+	char *addr;
 #if (defined(NetBSD) && (NetBSD <= 1991011) && (NetBSD >= 199606)) || \
     (defined(OpenBSD) && (OpenBSD >= 199603)) || defined(linux) || \
     (defined(__FreeBSD__) && (__FreeBSD_version >= 501113))
@@ -523,9 +572,16 @@ int v;
 	if (name == NULL)
 		name = "anon0";
 
-	for (ifa = ifneta; ifa && (ifp = *ifa); ifa++) {
-		if (!strcmp(name, ifp->if_xname))
+	addr = strchr(name, '=');
+	if (addr != NULL)
+		*addr++ = '\0';
+
+	for (ifpp = ifneta; ifpp && (ifp = *ifpp); ifpp++) {
+		if (!strcmp(name, ifp->if_xname)) {
+			if (addr != NULL)
+				fr_setifpaddr(ifp, addr);
 			return ifp;
+		}
 	}
 #else
 	char *s, ifname[LIFNAMSIZ+1];
@@ -533,10 +589,17 @@ int v;
 	if (name == NULL)
 		name = "anon0";
 
-	for (ifa = ifneta; ifa && (ifp = *ifa); ifa++) {
+	addr = strchr(name, '=');
+	if (addr != NULL)
+		*addr++ = '\0';
+
+	for (ifpp = ifneta; ifpp && (ifp = *ifpp); ifpp++) {
 		COPYIFNAME(ifp, ifname);
-		if (!strcmp(name, ifname))
+		if (!strcmp(name, ifname)) {
+			if (addr != NULL)
+				fr_setifpaddr(ifp, addr);
 			return ifp;
+		}
 	}
 #endif
 
@@ -555,7 +618,7 @@ int v;
 		old_ifneta = ifneta;
 		nifs++;
 		ifneta = (struct ifnet **)realloc(ifneta,
-						  (nifs + 1) * sizeof(*ifa));
+						  (nifs + 1) * sizeof(ifp));
 		if (!ifneta) {
 			free(old_ifneta);
 			nifs = 0;
@@ -575,9 +638,9 @@ int v;
     (defined(__FreeBSD__) && (__FreeBSD_version >= 501113))
 	(void) strncpy(ifp->if_xname, name, sizeof(ifp->if_xname));
 #else
-	for (s = name; *s && !isdigit(*s); s++)
+	for (s = name; *s && !ISDIGIT(*s); s++)
 		;
-	if (*s && isdigit(*s)) {
+	if (*s && ISDIGIT(*s)) {
 		ifp->if_unit = atoi(s);
 		ifp->if_name = (char *)malloc(s - name + 1);
 		(void) strncpy(ifp->if_name, name, s - name);
@@ -588,6 +651,11 @@ int v;
 	}
 #endif
 	ifp->if_output = no_output;
+
+	if (addr != NULL) {
+		fr_setifpaddr(ifp, addr);
+	}
+
 	return ifp;
 }
 
@@ -610,14 +678,14 @@ struct ifnet *ifp;
 
 void init_ifp()
 {
-	struct ifnet *ifp, **ifa;
+	struct ifnet *ifp, **ifpp;
 	char fname[32];
 	int fd;
 
 #if (defined(NetBSD) && (NetBSD <= 1991011) && (NetBSD >= 199606)) || \
     (defined(OpenBSD) && (OpenBSD >= 199603)) || defined(linux) || \
     (defined(__FreeBSD__) && (__FreeBSD_version >= 501113))
-	for (ifa = ifneta; ifa && (ifp = *ifa); ifa++) {
+	for (ifpp = ifneta; ifpp && (ifp = *ifpp); ifpp++) {
 		ifp->if_output = write_output;
 		sprintf(fname, "/tmp/%s", ifp->if_xname);
 		fd = open(fname, O_WRONLY|O_CREAT|O_EXCL|O_TRUNC, 0600);
@@ -628,7 +696,7 @@ void init_ifp()
 	}
 #else
 
-	for (ifa = ifneta; ifa && (ifp = *ifa); ifa++) {
+	for (ifpp = ifneta; ifpp && (ifp = *ifpp); ifpp++) {
 		ifp->if_output = write_output;
 		sprintf(fname, "/tmp/%s%d", ifp->if_name, ifp->if_unit);
 		fd = open(fname, O_WRONLY|O_CREAT|O_EXCL|O_TRUNC, 0600);
@@ -685,7 +753,8 @@ int dst;
 }
 
 
-void frsync()
+void frsync(ifp)
+void *ifp;
 {
 	return;
 }
@@ -823,3 +892,74 @@ fr_info_t *fin;
 		fin->fin_flx |= FI_BAD;
 }
 #endif
+
+
+/*
+ * See above for description, except that all addressing is in user space.
+ */
+int copyoutptr(src, dst, size)
+void *src, *dst;
+size_t size;
+{
+	caddr_t ca;
+
+	bcopy(dst, (char *)&ca, sizeof(ca));
+	bcopy(src, ca, size);
+	return 0;
+}
+
+
+/*
+ * See above for description, except that all addressing is in user space.
+ */
+int copyinptr(src, dst, size)
+void *src, *dst;
+size_t size;
+{
+	caddr_t ca;
+
+	bcopy(src, (char *)&ca, sizeof(ca));
+	bcopy(ca, dst, size);
+	return 0;
+}
+
+
+/*
+ * return the first IP Address associated with an interface
+ */
+int fr_ifpaddr(v, atype, ifptr, inp, inpmask)
+int v, atype;
+void *ifptr;
+struct in_addr *inp, *inpmask;
+{
+	struct ifnet *ifp = ifptr;
+#ifdef __sgi
+	struct in_ifaddr *ifa;
+#else
+	struct ifaddr *ifa;
+#endif
+
+#if defined(__NetBSD__) || defined(__OpenBSD__) || defined(__FreeBSD__)
+	ifa = ifp->if_addrlist.tqh_first;
+#else
+# ifdef __sgi
+	ifa = (struct in_ifaddr *)ifp->in_ifaddr;
+# else
+	ifa = ifp->if_addrlist;
+# endif
+#endif
+	if (ifa != NULL) {
+		struct sockaddr_in *sin, mask;
+
+		mask.sin_addr.s_addr = 0xffffffff;
+
+#ifdef __sgi
+		sin = (struct sockaddr_in *)&ifa->ia_addr;
+#else
+		sin = (struct sockaddr_in *)&ifa->ifa_addr;
+#endif
+
+		return fr_ifpfillv4addr(atype, sin, &mask, inp, inpmask);
+	}
+	return 0;
+}

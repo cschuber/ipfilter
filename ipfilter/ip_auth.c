@@ -260,7 +260,7 @@ u_32_t *passp;
 			RWLOCK_EXIT(&ipf_auth);
 			if (passp != NULL)
 				*passp = pass;
-			ATOMIC_INCL(fr_authstats.fas_hits);
+			ATOMIC_INC64(fr_authstats.fas_hits);
 			return fr;
 		}
 		i++;
@@ -269,7 +269,7 @@ u_32_t *passp;
 	}
 	fr_authstats.fas_miss++;
 	RWLOCK_EXIT(&ipf_auth);
-	ATOMIC_INCL(fr_authstats.fas_miss);
+	ATOMIC_INC64(fr_authstats.fas_miss);
 	return NULL;
 }
 
@@ -366,9 +366,7 @@ int mode;
 #if defined(_KERNEL) && !defined(MENTAT) && !defined(linux) && \
     (!defined(__FreeBSD_version) || (__FreeBSD_version < 501000))
 	struct ifqueue *ifq;
-# ifdef USE_SPL
-	int s;
-# endif /* USE_SPL */
+	SPL_INT(s);
 #endif
 	frauth_t auth, *au = &auth, *fra;
 	int i, error = 0, len;
@@ -505,10 +503,10 @@ fr_authioctlloop:
 # ifdef MENTAT
 			error = !putq(fra->fra_q, m);
 # else /* MENTAT */
-#  ifdef linux
+#  if defined(linux) || defined(AIX)
 #  else
 #   if (_BSDI_VERSION >= 199802) || defined(__OpenBSD__) || \
-       (defined(__sgi) && (IRIX >= 60500) || \
+       (defined(__sgi) && (IRIX >= 60500) || defined(AIX) || \
        (defined(__FreeBSD__) && (__FreeBSD_version >= 470102)))
 			error = ip_output(m, NULL, NULL, IP_FORWARDING, NULL,
 					  NULL);
@@ -525,12 +523,12 @@ fr_authioctlloop:
 # ifdef MENTAT
 			error = !putq(fra->fra_q, m);
 # else /* MENTAT */
-#  ifdef linux
+#  if defined(linux) || defined(AIX)
 #  else
-#   if __FreeBSD_version >= 501000
+#   if (__FreeBSD_version >= 501000)
 			netisr_dispatch(NETISR_IP, m);
 #   else
-#    if IRIX >= 60516
+#    if (IRIX >= 60516)
 			ifq = &((struct ifnet *)fra->fra_info.fin_ifp)->if_snd;
 #    else
 			ifq = &ipintrq;
@@ -661,9 +659,7 @@ void fr_authexpire()
 	register frauthent_t *fae, **faep;
 	register frentry_t *fr, **frp;
 	mb_t *m;
-# if !defined(MENAT) && defined(_KERNEL) && defined(USE_SPL)
-	int s;
-# endif
+	SPL_INT(s);
 
 	if (fr_auth_lock)
 		return;
@@ -712,9 +708,7 @@ frentry_t *fr, **frptr;
 {
 	frauthent_t *fae, **faep;
 	int error = 0;
-# if !defined(MENAT) && defined(_KERNEL) && defined(USE_SPL)
-	int s;
-#endif
+	SPL_INT(s);
 
 	if ((cmd != SIOCADAFR) && (cmd != SIOCRMAFR))
 		return EIO;

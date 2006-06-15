@@ -10,7 +10,7 @@
 #define	__IP_POOL_H__
 
 #if defined(_KERNEL) && !defined(__osf__) && !defined(__hpux) && \
-    !defined(linux) && !defined(sun)
+    !defined(linux) && !defined(sun) && !defined(AIX)
 # include <net/radix.h>
 extern void rn_freehead __P((struct radix_node_head *));
 # define FreeS(p, z)		KFREES(p, z)

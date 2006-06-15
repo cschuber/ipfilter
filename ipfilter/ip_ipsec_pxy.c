@@ -25,6 +25,7 @@ static	ipftq_t		*ipsecstatetqe;
 static	char	ipsec_buffer[1500];
 
 int	ipsec_proxy_init = 0;
+int	ipsec_proxy_ttl = 60;
 
 /*
  * IPSec application proxy initialization.
@@ -37,28 +38,37 @@ int ippr_ipsec_init()
 	MUTEX_INIT(&ipsecfr.fr_lock, "IPsec proxy rule lock");
 	ipsec_proxy_init = 1;
 
-	ipsecnattqe = fr_addtimeoutqueue(&nat_utqe, 60);
+	ipsecnattqe = fr_addtimeoutqueue(&nat_utqe, ipsec_proxy_ttl);
 	if (ipsecnattqe == NULL)
 		return -1;
-	ipsecstatetqe = fr_addtimeoutqueue(&ips_utqe, 60);
+	ipsecstatetqe = fr_addtimeoutqueue(&ips_utqe, ipsec_proxy_ttl);
 	if (ipsecstatetqe == NULL) {
-		fr_deletetimeoutqueue(ipsecnattqe);
+		if (fr_deletetimeoutqueue(ipsecnattqe) == 0)
+			fr_freetimeoutqueue(ipsecnattqe);
 		ipsecnattqe = NULL;
 		return -1;
 	}
-	ipsecfr.fr_age[0] = 60;
-	ipsecfr.fr_age[1] = 60;
+
+	ipsecnattqe->ifq_flags |= IFQF_PROXY;
+	ipsecstatetqe->ifq_flags |= IFQF_PROXY;
+
+	ipsecfr.fr_age[0] = ipsec_proxy_ttl;
+	ipsecfr.fr_age[1] = ipsec_proxy_ttl;
 	return 0;
 }
 
 
 void ippr_ipsec_fini()
 {
-	if (ipsecnattqe != NULL)
-		fr_deletetimeoutqueue(ipsecnattqe);
+	if (ipsecnattqe != NULL) {
+		if (fr_deletetimeoutqueue(ipsecnattqe) == 0)
+			fr_freetimeoutqueue(ipsecnattqe);
+	}
 	ipsecnattqe = NULL;
-	if (ipsecstatetqe != NULL)
-		fr_deletetimeoutqueue(ipsecstatetqe);
+	if (ipsecstatetqe != NULL) {
+		if (fr_deletetimeoutqueue(ipsecstatetqe) == 0)
+			fr_freetimeoutqueue(ipsecstatetqe);
+	}
 	ipsecstatetqe = NULL;
 
 	if (ipsec_proxy_init == 1) {
@@ -84,8 +94,8 @@ nat_t *nat;
 	mb_t *m;
 	ip_t *ip;
 
+	off = fin->fin_plen - fin->fin_dlen + fin->fin_ipoff;
 	bzero(ipsec_buffer, sizeof(ipsec_buffer));
-	off = fin->fin_hlen + sizeof(udphdr_t);
 	ip = fin->fin_ip;
 	m = fin->fin_m;
 
@@ -133,13 +143,15 @@ nat_t *nat;
 	ipn->in_p = IPPROTO_ESP;
 
 	bcopy((char *)fin, (char *)&fi, sizeof(fi));
+	fi.fin_state = NULL;
+	fi.fin_nat = NULL;
 	fi.fin_fi.fi_p = IPPROTO_ESP;
 	fi.fin_fr = &ipsecfr;
 	fi.fin_data[0] = 0;
 	fi.fin_data[1] = 0;
 	p = ip->ip_p;
 	ip->ip_p = IPPROTO_ESP;
-	fi.fin_flx &= ~FI_TCPUDP;
+	fi.fin_flx &= ~(FI_TCPUDP|FI_STATE|FI_FRAG);
 	fi.fin_flx |= FI_IGNORE;
 
 	ptr = ipsec_buffer;
@@ -164,6 +176,8 @@ nat_t *nat;
 		fi.fin_data[1] = 0;
 		ipsec->ipsc_state = fr_addstate(&fi, &ipsec->ipsc_state,
 						SI_WILDP);
+		if (fi.fin_state != NULL)
+			fr_statederef(&fi, (ipstate_t **)&fi.fin_state);
 	}
 	ip->ip_p = p & 0xff;
 	return 0;
@@ -198,12 +212,14 @@ nat_t *nat;
 
 		if ((ipsec->ipsc_nat == NULL) || (ipsec->ipsc_state == NULL)) {
 			bcopy((char *)fin, (char *)&fi, sizeof(fi));
+			fi.fin_state = NULL;
+			fi.fin_nat = NULL;
 			fi.fin_fi.fi_p = IPPROTO_ESP;
 			fi.fin_fr = &ipsecfr;
 			fi.fin_data[0] = 0;
 			fi.fin_data[1] = 0;
 			ip->ip_p = IPPROTO_ESP;
-			fi.fin_flx &= ~FI_TCPUDP;
+			fi.fin_flx &= ~(FI_TCPUDP|FI_STATE|FI_FRAG);
 			fi.fin_flx |= FI_IGNORE;
 		}
 
@@ -239,6 +255,8 @@ nat_t *nat;
 			ipsec->ipsc_state = fr_addstate(&fi,
 							&ipsec->ipsc_state,
 							SI_WILDP);
+			if (fi.fin_state != NULL)
+				fr_statederef(&fi, (ipstate_t **)&fi.fin_state);
 		}
 		ip->ip_p = p;
 	}
@@ -267,8 +285,8 @@ nat_t *nat;
 	if ((fin->fin_dlen < sizeof(cookies)) || (fin->fin_flx & FI_FRAG))
 		return -1;
 
+	off = fin->fin_plen - fin->fin_dlen + fin->fin_ipoff;
 	ipsec = aps->aps_data;
-	off = fin->fin_hlen + sizeof(udphdr_t);
 	m = fin->fin_m;
 	COPYDATA(m, off, sizeof(cookies), (char *)cookies);
 

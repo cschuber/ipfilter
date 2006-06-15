@@ -25,7 +25,7 @@ int     linenum;
 	u_short	p1 = 0;
 	int i;
 
-	if (isdigit(*name)) {
+	if (ISDIGIT(*name)) {
 		if (ratoi(name, &i, 0, USHRT_MAX)) {
 			*port = (u_short)i;
 			return 1;

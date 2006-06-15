@@ -134,10 +134,8 @@ static	char	*pidfile = "/etc/ipmon.pid";
 
 static	char	line[2048];
 static	int	opts = 0;
-static	FILE	*newlog = NULL;
 static	char	*logfile = NULL;
 static	FILE	*binarylog = NULL;
-static	FILE	*newbinarylog = NULL;
 static	char	*binarylogfile = NULL;
 static	int	donehup = 0;
 static	void	usage __P((char *));
@@ -389,17 +387,7 @@ size_t tablesz;
 static void handlehup(sig)
 int sig;
 {
-	FILE	*fp;
-
-	if (donehup == 1)
-		return;
-
 	signal(SIGHUP, handlehup);
-	if (logfile && (fp = fopen(logfile, "a")))
-		newlog = fp;
-	if (binarylogfile && (fp = fopen(binarylogfile, "a")))
-		newbinarylog = fp;
-	init_tabs();
 	donehup = 1;
 }
 
@@ -430,6 +418,14 @@ static void init_tabs()
 			    p->p_name != NULL && protocols[p->p_proto] == NULL)
 				protocols[p->p_proto] = strdup(p->p_name);
 		endprotoent();
+#if defined(_AIX51)
+		if (protocols[0])
+			free(protocols[0]);
+		if (protocols[252])
+			free(protocols[252]);
+		protocols[0] = "ip";
+		protocols[252] = NULL;
+#endif
 	}
 
 	if (udp_ports != NULL) {
@@ -666,7 +662,7 @@ int	len;
 			sprintf((char *)t, "        ");
 			t += 8;
 			for (k = 16; k; k--, s++)
-				*t++ = (isprint(*s) ? *s : '.');
+				*t++ = (ISPRINT(*s) ? *s : '.');
 			s--;
 		}
 			
@@ -684,7 +680,7 @@ int	len;
 		t += 7;
 		s -= j & 0xf;
 		for (k = j & 0xf; k; k--, s++)
-			*t++ = (isprint(*s) ? *s : '.');
+			*t++ = (ISPRINT(*s) ? *s : '.');
 		*t++ = '\n';
 		*t = '\0';
 	}
@@ -1019,7 +1015,7 @@ int	blen;
 	(void) sprintf(t, "%s", ifname);
 	t += strlen(t);
 # if defined(MENTAT) || defined(linux)
-	if (isalpha(*(t - 1))) {
+	if (ISALPHA(*(t - 1))) {
 		sprintf(t, "%d", ipf->fl_unit);
 		t += strlen(t);
 	}
@@ -1034,7 +1030,8 @@ int	blen;
 	(void) sprintf(t, "%*.*s%u", len, len, ipf->fl_ifname, ipf->fl_unit);
 	t += strlen(t);
 #endif
-#ifdef __sgi
+#if defined(__sgi) || defined(_AIX51) || defined(__powerpc__) || \
+    defined(__arm__)
 	if ((ipf->fl_group[0] == 255) && (ipf->fl_group[1] == '\0'))
 #else
 	if ((ipf->fl_group[0] == -1) && (ipf->fl_group[1] == '\0'))
@@ -1420,6 +1417,7 @@ char *argv[];
 {
 	struct	stat	sb;
 	FILE	*log = stdout;
+	FILE	*fp;
 	int	fd[3], doread, n, i;
 	int	tr, nr, regular[3], c;
 	int	fdt[3], devices = 0, make_daemon = 0;
@@ -1623,16 +1621,15 @@ char *argv[];
 
 			tr = read_log(fd[i], &n, buf, sizeof(buf));
 			if (donehup) {
-				if (newlog) {
+				if (logfile && (fp = fopen(logfile, "a"))) {
 					fclose(log);
-					log = newlog;
-					newlog = NULL;
+					log = fp;
 				}
-				if (newbinarylog) {
+				if (binarylogfile && (fp = fopen(binarylogfile, "a"))) {
 					fclose(binarylog);
-					binarylog = newbinarylog;
-					newbinarylog = NULL;
+					binarylog = fp;
 				}
+				init_tabs();
 				if (conf_file != NULL)
 					load_config(conf_file);
 				donehup = 0;

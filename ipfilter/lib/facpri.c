@@ -40,10 +40,10 @@ table_t	facs[] = {
 #else
 	{ "cron", LOG_CRON1 },
 #endif
-#ifdef	LOG_FTP
+#ifdef LOG_FTP
 	{ "ftp", LOG_FTP },
 #endif
-#ifdef	LOG_AUTHPRIV
+#ifdef LOG_AUTHPRIV
 	{ "authpriv", LOG_AUTHPRIV },
 #endif
 #ifdef	LOG_AUDIT

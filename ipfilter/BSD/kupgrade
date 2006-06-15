@@ -20,6 +20,9 @@ ipfdir=/sys/netinet
 if [ -d /sys/contrib/ipfilter ] ; then
 	ipfdir=/sys/contrib/ipfilter/netinet
 fi
+if [ -d /sys/dist/ipf ] ; then
+	ipfdir=/sys/dist/ipf/netinet
+fi
 confdir="$archdir/conf"
 if [ -f /dev/ipnat ] ; then
 	major=`ls -l /dev/ipnat | sed -e 's/.* \([0-9]*\),.*/\1/'`
@@ -28,6 +31,14 @@ else
 	major=x
 fi
  
+if [ ! -f ip_rules.c -o ! -f ip_rules.h ] ; then
+	echo "Please do a build of ipfilter and then run the following"
+	echo "command to build extra files:"
+	echo
+	echo "make ip_rules.c"
+	exit 1
+fi
+
 echo -n "Installing "
 for j in auth frag nat proxy scan state sync pool htable lookup rules; do
 	for i in ip_$j.[ch]; do
@@ -62,11 +73,12 @@ SunOS)
 	;;
 esac
 
-if [ -d $ipfdir/$filc ] ; then
+if [ -f $ipfdir/$filc ] ; then
 	echo -n "$filc -> $ipfdir/$filc "
 	cp $filc $ipfdir/$filc
 	chmod 644 $ipfdir/$filc
-else
+fi
+if [ -f $ipfdir/ip_fil.c ] ; then
 	echo -n "$filc -> $ipfdir/ip_fil.c "
 	cp $filc $ipfdir/ip_fil.c
 	chmod 644 $ipfdir/ip_fil.c
@@ -166,7 +178,7 @@ if [ $os = NetBSD -a -f /sys/conf/files ] ; then
 		mv files files.preipf4
 		cp -p files.preipf4 files
 	fi
-	if [ $fullrev -ge 010600 ] ; then
+	if [ $fullrev -ge 010600 -a $fullrev -lt 020000 ] ; then
 		for i in htable pool lookup; do
 			grep ip_$i.c files >/dev/null 2>&1
 			if [ $? -ne 0 ] ; then
@@ -213,5 +225,36 @@ if [ $os = OpenBSD -a -f /sys/conf/files ] ; then
 			echo 'file	netinet/ip_rules.c	ipfilter & ipfilter_compiled' >> files
 		fi
 	fi
+fi
+
+if [ -f /usr/src/sys/modules/ipfilter/Makefile -a \
+   ! -f /usr/src/sys/modules/ipfilter/Makefile.orig ] ; then
+cat | (cd /usr/src/sys/modules/ipfilter; patch) <<__EOF__
+*** Makefile.orig	Mon Mar 28 09:10:11 2005
+--- Makefile	Mon Mar 28 09:12:51 2005
+***************
+*** 5,13 ****
+  KMOD=	ipl
+  SRCS=	mlfk_ipl.c ip_nat.c ip_frag.c ip_state.c ip_proxy.c ip_auth.c \\
+! 	ip_log.c ip_fil.c fil.c
+  
+  .if !defined(NOINET6)
+  CFLAGS+= -DUSE_INET6
+  .endif
+  CFLAGS+=  -I$${.CURDIR}/../../contrib/ipfilter
+! CFLAGS+= -DIPFILTER=1 -DIPFILTER_LKM -DIPFILTER_LOG -DPFIL_HOOKS
+--- 5,15 ----
+  KMOD=	ipl
+  SRCS=	mlfk_ipl.c ip_nat.c ip_frag.c ip_state.c ip_proxy.c ip_auth.c \\
+! 	ip_log.c ip_fil.c fil.c ip_lookup.c ip_pool.c ip_htable.c \\
+! 	ip_sync.c ip_scan.c ip_rules.c
+  
+  .if !defined(NOINET6)
+  CFLAGS+= -DUSE_INET6
+  .endif
+  CFLAGS+=  -I$${.CURDIR}/../../contrib/ipfilter
+! CFLAGS+= -DIPFILTER=1 -DIPFILTER_LKM -DIPFILTER_LOG -DPFIL_HOOKS \\
+! 	-DIPFILTER_LOOKUP -DIPFILTER_COMPILED
+__EOF__
 fi
 exit 0

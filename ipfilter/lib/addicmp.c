@@ -34,7 +34,7 @@ int     linenum;
 		return -1;
 	if (!fp->fr_proto)	/* to catch lusers */
 		fp->fr_proto = IPPROTO_ICMP;
-	if (isdigit(***cp)) {
+	if (ISDIGIT(***cp)) {
 		if (!ratoi(**cp, &i, 0, 255)) {
 			fprintf(stderr,
 				"%d: Invalid icmp-type (%s) specified\n",
@@ -68,7 +68,7 @@ int     linenum;
 	if (**cp && strcasecmp("code", **cp))
 		return 0;
 	(*cp)++;
-	if (isdigit(***cp)) {
+	if (ISDIGIT(***cp)) {
 		if (!ratoi(**cp, &i, 0, 255)) {
 			fprintf(stderr,
 				"%d: Invalid icmp code (%s) specified\n",

@@ -1,9 +1,8 @@
+
 #include "ipf-linux.h"
 #include <linux/devfs_fs_kernel.h>
-#include <linux/init.h>
 
 #ifdef CONFIG_PROC_FS
-#include <linux/module.h>
 #include <linux/proc_fs.h>
 #endif
 
@@ -11,14 +10,13 @@
 MODULE_SUPPORTED_DEVICE("ipf");
 MODULE_AUTHOR("Darren Reed");
 MODULE_DESCRIPTION("IP-Filter Firewall");
-MODULE_LICENSE("(C)Copyright 2003 Darren Reed");
+MODULE_LICENSE("(C)Copyright 2003-2004 Darren Reed");
 
 MODULE_PARM(fr_flags, "i");
 MODULE_PARM(fr_control_forwarding, "i");
 MODULE_PARM(fr_update_ipid, "i");
 MODULE_PARM(fr_chksrc, "i");
 MODULE_PARM(fr_pass, "i");
-MODULE_PARM(fr_unreach, "i");
 MODULE_PARM(ipstate_logging, "i");
 MODULE_PARM(nat_logging, "i");
 MODULE_PARM(ipl_suppress, "i");
@@ -146,6 +144,9 @@ static	char	*ipf_devfiles[] = { IPL_NAME, IPNAT_NAME, IPSTATE_NAME,
 #endif
 
 static struct file_operations ipf_fops = {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
+	.owner = THIS_MODULE,
+#endif
 	open:	ipf_open,
 	read:	ipf_read,
 	write:	ipf_write,
@@ -154,7 +155,9 @@ static struct file_operations ipf_fops = {
 
 
 #ifdef	CONFIG_DEVFS_FS
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
 static	devfs_handle_t	dh[IPL_LOGSIZE];
+#endif
 #endif
 static	int		ipfmajor = 0;
 
@@ -177,7 +180,7 @@ static int ipfilter_init(void)
 
 	ipfmajor = register_chrdev(0, "ipf", &ipf_fops);
 	if (ipfmajor < 0) {
-		printf("unable to get major for ipf devs\n");
+		printf("unable to get major for ipf devs (%d)\n", ipfmajor);
 		return -EINVAL;
 	}
 
@@ -185,9 +188,13 @@ static int ipfilter_init(void)
 	for (i = 0; ipf_devfiles[i] != NULL; i++) {
 		s = strrchr(ipf_devfiles[i], '/');
 		if (s != NULL) {
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
 			dh[i] = devfs_register(NULL, s + 1, DEVFS_FL_DEFAULT,
 					       ipfmajor, i, 0600|S_IFCHR,
 					       &ipf_fops, NULL);
+#else
+			devfs_mk_cdev(MKDEV(ipfmajor, i),0600|S_IFCHR,s+1);
+#endif
 		}
 	}
 #endif
@@ -214,21 +221,23 @@ static int ipfilter_init(void)
 		printk(KERN_INFO "%s initialized.  Default = %s all, "
 		       "Logging = %s%s\n",
 			ipfilter_version, defpass,
-#ifdef IPFILTER_LOG
+# ifdef IPFILTER_LOG
 			"enabled",
-#else
+# else
 			"disabled",
-#endif
-#ifdef IPFILTER_COMPILED
+# endif
+# ifdef IPFILTER_COMPILED
 			" (COMPILED)"
-#else
+# else
 			""
-#endif
+# endif
 			);
 
 		fr_running = 1;
 	}
-#endif
+#else
+	printf("IPFilter: device major number: %d\n", ipfmajor);
+#endif /* CONFIG_PROC_FS */
 
 	return i;
 }
@@ -264,10 +273,16 @@ static int ipfilter_fini(void)
 	for (i = 0; ipf_devfiles[i] != NULL; i++) {
 		s = strrchr(ipf_devfiles[i], '/');
 		if (s != NULL)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
 			devfs_unregister_chrdev(ipfmajor, s + 1);
+#else
+			devfs_remove(s+1);
+#endif
 	}
 #endif
-	unregister_chrdev(ipfmajor, "ipf");
+
+	if (ipfmajor >= 0)
+		unregister_chrdev(ipfmajor, "ipf");
 	printk(KERN_INFO "%s unloaded\n", ipfilter_version);
 
 	return 0;
@@ -290,4 +305,3 @@ static void __exit ipf_fini(void)
 
 module_init(ipf_init)
 module_exit(ipf_fini)
-

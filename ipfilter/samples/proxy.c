@@ -92,14 +92,14 @@ char *argv[];
 	natlook.nl_outip = sin.sin_addr;
 	natlook.nl_inip = sloc.sin_addr;
 	natlook.nl_flags = IPN_TCP;
-	natlook.nl_outport = ntohs(sin.sin_port);
-	natlook.nl_inport = ntohs(sloc.sin_port);
+	natlook.nl_outport = sin.sin_port;
+	natlook.nl_inport = sloc.sin_port;
 
 	/*
 	 * Open the NAT device and lookup the mapping pair.
 	 */
 	fd = open(IPNAT_NAME, O_RDONLY);
-	if (ioctl(fd, SIOCGNATL, &natlookp) == -1) {
+	if (ioctl(fd, SIOCGNATL, &obj) == -1) {
 		perror("ioctl(SIOCGNATL)");
 		exit(-1);
 	}
@@ -139,6 +139,7 @@ char *extif;
 	struct sockaddr_in usin;
 	u_32_t sum1, sum2, sumd;
 	int onoff, ofd, slen;
+	ipfobj_t obj;
 	ipnat_t *ipn;
 	nat_t *nat;
 
@@ -198,9 +199,15 @@ printf("local port# to use: %d\n", ntohs(usin.sin_port));
 
 	nat->nat_flags = IPN_TCPUDP;
 
+	bzero((char *)&obj, sizeof(obj));
+	obj.ipfo_rev = IPFILTER_VERSION;
+	obj.ipfo_size = sizeof(*nsp);
+	obj.ipfo_ptr = nsp;
+	obj.ipfo_type = IPFOBJ_NATSAVE;
+
 	onoff = 1;
 	if (ioctl(fd, SIOCSTLCK, &onoff) == 0) {
-		if (ioctl(fd, SIOCSTPUT, &nsp) != 0)
+		if (ioctl(fd, SIOCSTPUT, &obj) != 0)
 			perror("SIOCSTPUT");
 		onoff = 0;
 		if (ioctl(fd, SIOCSTLCK, &onoff) != 0)

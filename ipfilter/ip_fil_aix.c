@@ -456,10 +456,10 @@ int mode;
 		if (!(mode & FWRITE))
 			error = EPERM;
 		else
-			BCOPYIN(data, &ipf_flags, sizeof(ipf_flags));
+			BCOPYIN(data, &fr_flags, sizeof(fr_flags));
 		break;
 	case SIOCGETFF :
-		BCOPYOUT(&ipf_flags, data, sizeof(ipf_flags));
+		BCOPYOUT(&fr_flags, data, sizeof(fr_flags));
 		break;
 	case SIOCFUNCL :
 		error = fr_resolvefunc(data);
@@ -1071,8 +1071,18 @@ frdest_t *fdp;
 		goto bad;
 	}
 
-	if ((fdp != NULL) && (fdp->fd_ip.s_addr != 0))
-		dst->sin_addr = fdp->fd_ip;
+	/*
+	 * In case we're here due to "to <if>" being used with "keep state",
+	 * check that we're going in the correct direction.
+	 */
+	if ((fr != NULL) && (fin->fin_rev != 0)) {
+		if ((ifp != NULL) && (fdp == &fr->fr_tif))
+			return -1;
+	}
+	if (fdp != NULL) {
+		if (fdp->fd_ip.s_addr != 0)
+			dst->sin_addr = fdp->fd_ip;
+	}
 
 	dst->sin_len = sizeof(*dst);
 	rtalloc(ro);

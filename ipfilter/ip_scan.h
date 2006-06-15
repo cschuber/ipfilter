@@ -25,7 +25,7 @@ struct ip;
 struct ipstate;
 
 
-#if defined(__STDC__) || defined(__GNUC__)
+#if defined(__STDC__) || defined(__GNUC__) || defined(_AIX51)
 # define	SIOCADSCA	_IOWR('r', 60, struct ipscan *)
 # define	SIOCRMSCA	_IOWR('r', 61, struct ipscan *)
 # define	SIOCGSCST	_IOWR('r', 62, struct ipscan *)

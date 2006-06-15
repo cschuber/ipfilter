@@ -9,7 +9,7 @@ static const char rcsid[] = "@(#)$Id$";
 #endif
 #include <sys/types.h>
 #include <sys/socket.h>
-#if !defined(ultrix) && !defined(hpux) && !defined(__hpux) && !defined(__osf__)
+#if !defined(ultrix) && !defined(hpux) && !defined(__hpux) && !defined(__osf__) && !defined(_AIX51)
 #include <sys/sockio.h>
 #endif
 #include <sys/ioctl.h>

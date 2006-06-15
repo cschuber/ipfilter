@@ -8,12 +8,23 @@ int proto;
 	struct servent *s;
 	struct protoent *p;
 
-	if (isdigit(*name) && atoi(name) > 0)
-		return htons(atoi(name) & 65535);
+	if (ISDIGIT(*name)) {
+		int number;
+		char *s;
+
+		for (s = name; *s != '\0'; s++)
+			if (!ISDIGIT(*s))
+				return -1;
+
+		number = atoi(name);
+		if (number < 0 || number > 65535)
+			return -1;
+		return htons(number);
+	}
 
 	p = getprotobynumber(proto);
 	s = getservbyname(name, p ? p->p_name : NULL);
 	if (s != NULL)
 		return s->s_port;
-	return 0;
+	return -1;
 }

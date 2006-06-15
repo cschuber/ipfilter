@@ -48,7 +48,7 @@ void ippr_irc_fini()
 }
 
 
-char *ippr_irc_dcctypes[] = {
+const char *ippr_irc_dcctypes[] = {
 	"CHAT ",	/* CHAT chat ipnumber portnumber */
 	"SEND ",	/* SEND filename ipnumber portnumber */
 	"MOVE ",
@@ -93,10 +93,10 @@ size_t len;
 		s++;
 		c = *s;
 		ircp->irc_snick = s;
-		if (!isalpha(c))
+		if (!ISALPHA(c))
 			return 0;
 		i--;
-		for (c = *s; !isspace(c) && (i > 0); i--)
+		for (c = *s; !ISSPACE(c) && (i > 0); i--)
 			c = *s++;
 		if (i < 31)
 			return 0;
@@ -118,9 +118,9 @@ size_t len;
 	/*
 	 * Loosely check that the destination is a nickname of some sort
 	 */
-	if (!isalpha(c))
+	if (!ISALPHA(c))
 		return 0;
-	for (; !isspace(c) && (i > 0); i--)
+	for (; !ISSPACE(c) && (i > 0); i--)
 		c = *s++;
 	if (i < 20)
 		return 0;
@@ -164,7 +164,7 @@ size_t len;
 	 * Check for the arg
 	 */
 	c = *s;
-	if (isspace(c))
+	if (ISSPACE(c))
 		return 0;
 	ircp->irc_arg = s;
 	for (; (c != ' ') && (c != '\001') && (i > 0); i--)
@@ -179,13 +179,13 @@ size_t len;
 	s++;
 	i--;
 	c = *s;
-	if (!isdigit(c))
+	if (!ISDIGIT(c))
 		return 0;
 	ircp->irc_addr = s;
 	/*
 	 * Get the IP#
 	 */
-	for (l = 0; isdigit(c) && (i > 0); i--) {
+	for (l = 0; ISDIGIT(c) && (i > 0); i--) {
 		l *= 10;
 		l += c - '0';
 		c = *s++;
@@ -201,12 +201,12 @@ size_t len;
 	s++;
 	i--;
 	c = *s;
-	if (!isdigit(c))
+	if (!ISDIGIT(c))
 		return 0;
 	/*
 	 * Get the port#
 	 */
-	for (l = 0; isdigit(c) && (i > 0); i--) {
+	for (l = 0; ISDIGIT(c) && (i > 0); i--) {
 		l *= 10;
 		l += c - '0';
 		c = *s++;
@@ -397,6 +397,8 @@ nat_t *nat;
 		tcp2->th_win = htons(8192);
 		tcp2->th_sport = sp;
 		tcp2->th_dport = 0; /* XXX - don't specify remote port */
+		fi.fin_state = NULL;
+		fi.fin_nat = NULL;
 		fi.fin_data[0] = ntohs(sp);
 		fi.fin_data[1] = 0;
 		fi.fin_dp = (char *)tcp2;
@@ -412,6 +414,8 @@ nat_t *nat;
 			nat_update(&fi, nat2, nat2->nat_ptr);
 
 			(void) fr_addstate(&fi, NULL, SI_W_DPORT);
+			if (fi.fin_state != NULL)
+				fr_statederef(&fi, (ipstate_t **)&fi.fin_state);
 		}
 		ip->ip_src = swip;
 	}
