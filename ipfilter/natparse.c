@@ -111,7 +111,7 @@ int *status;
 {
 	static ipnat_t ipn;
 	struct protoent *pr;
-	char *dnetm = NULL, *dport = NULL;
+	char *dnetm = NULL, *dport = NULL, *dhost = NULL;
 	char *s, *t, *cps[31], **cpp;
 	int i, cnt;
 	char *port1a = NULL, *port1b = NULL, *port2a = NULL;
@@ -382,6 +382,7 @@ int *status;
 		}
 	}
 
+	dhost = *cpp;
 	if (ipn.in_flags & IPN_IPRANGE) {
 		dnetm = strrchr(*cpp, '-');
 		if (dnetm == NULL) {
@@ -421,7 +422,7 @@ int *status;
 			ipn.in_flags |= IPN_SPLIT;
 			*dnetm++ = '\0';
 		}
-		if (hostnum((u_32_t *)&ipn.in_inip, *cpp, linenum) == -1) {
+		if (hostnum((u_32_t *)&ipn.in_inip, dhost, linenum) == -1) {
 			*status = -1;
 			return NULL;
 		}
@@ -436,7 +437,7 @@ int *status;
 	} else {
 		if (!strcmp(*cpp, ipn.in_ifname))
 			*cpp = "0";
-		if (hostnum((u_32_t *)&ipn.in_outip, *cpp, linenum) == -1) {
+		if (hostnum((u_32_t *)&ipn.in_outip, dhost, linenum) == -1) {
 			*status = -1;
 			return NULL;
 		}

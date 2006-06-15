@@ -54,8 +54,7 @@ static const char rcsid[] = "@(#)$Id$";
 #define	MIN(a,b)	(((a)<(b))?(a):(b))
 #endif
 
-
-extern	fr_flags, fr_active;
+extern	qif_t	*_qif_head;
 
 int	fr_running = 0;
 int	ipl_unreach = ICMP_UNREACH_HOST;
@@ -376,8 +375,11 @@ int *rp;
 	case SIOCFRSYN :
 		if (!(mode & FWRITE))
 			error = EPERM;
-		else
+		else {
+			RWLOCK_EXIT(&ipf_solaris);
+			WRITE_ENTER(&ipf_solaris);
 			error = ipfsync();
+		}
 		break;
 	case SIOCGFRST :
 		error = IWCOPYPTR((caddr_t)ipfr_fragstats(), (caddr_t)data,
@@ -407,11 +409,7 @@ ill_t	*get_unit(name, v)
 char	*name;
 int	v;
 {
-	size_t len = strlen(name) + 1;	/* includes \0 */
-	ill_t *il;
-#if SOLARIS2 >= 10
-	ill_walk_context_t ctx;
-#endif
+	qif_t *qif;
 	int sap;
 
 	if (v == 4)
@@ -420,14 +418,9 @@ int	v;
 		sap = 0x86dd;
 	else
 		return NULL;
-#if SOLARIS2 >= 10
-	for (il = ILL_START_WALK_ALL(&ctx); il; il = ill_next(&ctx, il))
-#else
-	for (il = ill_g_head; il; il = il->ill_next)
-#endif
-		if ((len == il->ill_name_length) && (il->ill_sap == sap) &&
-		    !strncmp(il->ill_name, name, len))
-			return il;
+	for (qif = _qif_head; qif != NULL; qif = qif->qf_next)
+		if ((sap == qif->qf_sap) && !strcmp(name, qif->qf_name))
+			return qif->qf_ill;
 	return NULL;
 }
 
