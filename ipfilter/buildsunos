@@ -1,0 +1,59 @@
+#! /bin/sh
+if [ ! -f netinet/done ] ; then
+	echo "Do NOT run this script directly, do 'make solaris'!"
+	exit 1
+fi
+# $Id$
+:
+rev=`uname -r | sed -e 's/^\([^\.]*\)\..*/\1/'`
+if [ -d /usr/ccs/bin ] ; then
+	PATH=/usr/ccs/bin:${PATH}
+fi
+if [ $rev = 5 ] ; then
+	cpu=`uname -p`
+	cpudir=${cpu}-`uname -r`
+	solrev=`uname -r | sh -c 'IFS=. read j n x; echo $n'`
+	if [ ! -d SunOS5/${cpudir} -a ! -h  SunOS5/${cpudir} ] ; then
+		mkdir -p SunOS5/${cpudir}
+	fi
+	/bin/rm -f SunOS5/${cpudir}/Makefile
+	/bin/rm -f SunOS5/${cpudir}/Makefile.ipsend
+	ln -s `pwd`/SunOS5/Makefile SunOS5/${cpudir}/Makefile
+	ln -s `pwd`/SunOS5/Makefile.ipsend SunOS5/${cpudir}/Makefile.ipsend
+	ARCHINC=
+	XARCH=
+	/bin/optisa sparcv9 >/dev/null 2>&1
+	if [ $? -eq 0 ] ; then
+		if [ ! -d /opt/SUNWspro/bin ] ; then
+			echo "You must have SUNWspro to build a 64bit ipf"
+			exit 1
+		fi
+	fi
+	if [ -d /opt/SUNWspro/bin ] ; then
+		CC="/opt/SUNWspro/bin/cc  ${CFL}"
+		XARCH="-Xa -xF -xildoff"
+		export CC
+		/bin/optisa sparcv9 >/dev/null 2>&1
+		if [ $? -eq 0 ] ; then
+			ARCHINC="-I/usr/include/v9"
+			XARCH="${XARCH} -xarch=v9 -xchip=ultra -dalign"
+			XARCH="${XARCH} -xcode=abs32"
+		fi
+	else
+		CC=gcc
+	fi
+else
+	cpu=`uname -m`
+	cpudir=${cpu}-`uname -r`
+fi
+#		CC=gcc
+if [ $cpu = i386 ] ; then
+	make ${1+"$@"} sunos5x86 SOLARIS2="-DSOLARIS2=$solrev" CPU= CPUDIR=${cpudir} CC="$CC $XARCH" XARCH="$XARCH" ARCHINC="$ARCHINC"
+	exit $?
+fi
+if [ x$solrev = x ] ; then
+	make ${1+"$@"} sunos$rev "ARCH=`uname -m`"
+	exit $?
+fi
+make ${1+"$@"} sunos$rev SOLARIS2="-DSOLARIS2=$solrev" CPU= CPUDIR=${cpudir} CC="$CC $XARCH" XARCH="$XARCH" ARCHINC="$ARCHINC"
+exit $?
