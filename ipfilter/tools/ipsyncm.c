@@ -20,7 +20,7 @@ static const char rcsid[] = "@(#)$Id$";
 #include <stdlib.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include <strings.h>
+#include <string.h>
 #include <syslog.h>
 #include <signal.h>
 
@@ -32,6 +32,7 @@ static const char rcsid[] = "@(#)$Id$";
 
 
 int	main __P((int, char *[]));
+void	usage __P((const char *));
 
 int	terminate = 0;
 
@@ -39,10 +40,12 @@ void usage(const char *progname) {
 	fprintf(stderr, "Usage: %s <destination IP> <destination port>\n", progname);
 }
 
+#if 0
 static void handleterm(int sig)
 {
 	terminate = sig;
 }
+#endif
 
  
 /* should be large enough to hold header + any datatype */
@@ -115,7 +118,7 @@ char *argv[];
 			goto tryagain;
 		}
 
-		syslog(LOG_INFO, "Established connection to %s",
+		syslog(LOG_INFO, "Sending data to %s",
 		       inet_ntoa(sin.sin_addr));
 	
 		inbuf = 0;	

@@ -52,7 +52,7 @@ ioctlfunc_t iocfunc;
 
 	if (err != 0) {
 		if ((opts & OPT_DONOTHING) == 0) {
-			perror("load_pool:SIOCLOOKUP*NODE");
+			perror("load_poolnode:SIOCLOOKUP*NODE");
 			return -1;
 		}
 	}

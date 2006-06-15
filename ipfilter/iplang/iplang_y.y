@@ -1646,7 +1646,7 @@ void *ptr;
 	for (sto = toipopts; sto->sto_st; sto++)
 		if (sto->sto_st == state)
 			break;
-	if (!sto || !sto->sto_st) {
+	if (!sto->sto_st) {
 		fprintf(stderr, "No mapping for state %d to IP option\n",
 			state);
 		return;

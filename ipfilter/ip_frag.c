@@ -224,6 +224,7 @@ ipfr_t *table[];
 {
 	ipfr_t *fra, frag;
 	u_int idx, off;
+	frentry_t *fr;
 	ip_t *ip;
 
 	if (ipfr_inuse >= IPFT_SIZE)
@@ -275,12 +276,9 @@ ipfr_t *table[];
 		return NULL;
 	}
 
-	fra->ipfr_rule = fin->fin_fr;
-	if (fra->ipfr_rule != NULL) {
-
-		frentry_t *fr;
-
-		fr = fin->fin_fr;
+	fr = fin->fin_fr;
+	fra->ipfr_rule = fr;
+	if (fr != NULL) {
 		MUTEX_ENTER(&fr->fr_lock);
 		fr->fr_ref++;
 		MUTEX_EXIT(&fr->fr_lock);

@@ -111,5 +111,7 @@ extern	int		ipfsync_nat __P((synchdr_t *sp, void *data));
 extern	int		ipfsync_state __P((synchdr_t *sp, void *data));
 extern	int		ipfsync_read __P((struct uio *uio));
 extern	int		ipfsync_write __P((struct uio *uio));
+extern	int		ipfsync_canread __P((void));
+extern	int		ipfsync_canwrite __P((void));
 
 #endif /* IP_SYNC */

@@ -923,8 +923,6 @@ ips_stat_t *ipsp;
 			ipsp->iss_tcp, ipsp->iss_udp, ipsp->iss_icmp);
 		PRINTF("\t%lu hits\n\t%lu misses\n", ipsp->iss_hits,
 			ipsp->iss_miss);
-		PRINTF("\t%lu maximum\n\t%lu no memory\n\t%lu max bucket\n",
-			ipsp->iss_max, ipsp->iss_nomem, ipsp->iss_bucketfull);
 		PRINTF("\t%lu maximum\n\t%lu no memory\n\t%lu bkts in use\n",
 			ipsp->iss_max, ipsp->iss_nomem, ipsp->iss_inuse);
 		PRINTF("\t%lu active\n\t%lu expired\n\t%lu closed\n",

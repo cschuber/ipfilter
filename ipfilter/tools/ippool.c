@@ -52,6 +52,7 @@ int	poolflush __P((int, char *[]));
 int	poolstats __P((int, char *[]));
 int	gettype __P((char *, u_int *));
 int	getrole __P((char *));
+int	setnodeaddr __P((ip_pool_node_t *node, char *arg));
 
 int	opts = 0;
 int	fd = -1;
@@ -113,7 +114,9 @@ char *argv[];
 		exit(1);
 	}
 
-	return err;
+	if (err != 0)
+		exit(1);
+	return 0;
 }
 
 
@@ -121,10 +124,9 @@ int poolnodecommand(remove, argc, argv)
 int remove, argc;
 char *argv[];
 {
-	char *poolname = NULL, *s;
 	int err, c, ipset, role;
+	char *poolname = NULL;
 	ip_pool_node_t node;
-	struct in_addr mask;
 
 	ipset = 0;
 	role = IPL_LOGIPF;
@@ -138,22 +140,8 @@ char *argv[];
 			ippool_yydebug++;
 			break;
 		case 'i' :
-			s = strchr(optarg, '/');
-			if (s == NULL)
-				mask.s_addr = 0xffffffff;
-			else if (strchr(s, '.') == NULL) {
-				if (ntomask(4, atoi(s + 1), &mask.s_addr) != 0)
-					return -1;
-			} else {
-				mask.s_addr = inet_addr(s + 1);
-			}
-			if (s != NULL)
-				*s = '\0';
-			ipset = 1;
-			node.ipn_addr.adf_len = sizeof(node.ipn_addr);
-			node.ipn_addr.adf_addr.in4.s_addr = inet_addr(optarg);
-			node.ipn_mask.adf_len = sizeof(node.ipn_mask);
-			node.ipn_mask.adf_addr.in4.s_addr = mask.s_addr;
+			if (setnodeaddr(&node, optarg) == 0)
+				ipset = 1;
 			break;
 		case 'm' :
 			poolname = optarg;
@@ -174,11 +162,19 @@ char *argv[];
 			break;
 		}
 
+	if (argv[optind] != NULL && ipset == 0) {
+		if (setnodeaddr(&node, argv[optind]) == 0)
+			ipset = 1;
+	}
+
 	if (opts & OPT_DEBUG)
 		fprintf(stderr, "poolnodecommand: opts = %#x\n", opts);
 
-	if (ipset == 0)
+	if (ipset == 0) {
+		fprintf(stderr, "no IP address given with -i\n");
 		return -1;
+	}
+
 	if (poolname == NULL) {
 		fprintf(stderr, "poolname not given with add/remove node\n");
 		return -1;
@@ -681,7 +677,7 @@ u_int *minor;
 {
 	int type;
 
-	if (!strcasecmp(optarg, "tree")) {
+	if (!strcasecmp(optarg, "tree") || !strcasecmp(optarg, "pool")) {
 		type = IPLT_POOL;
 	} else if (!strcasecmp(optarg, "hash")) {
 		type = IPLT_HASH;
@@ -695,4 +691,29 @@ u_int *minor;
 		type = IPLT_NONE;
 	}
 	return type;
+}
+
+
+int setnodeaddr(ip_pool_node_t *node, char *arg)
+{
+	struct in_addr mask;
+	char *s;
+
+	s = strchr(arg, '/');
+	if (s == NULL)
+		mask.s_addr = 0xffffffff;
+	else if (strchr(s, '.') == NULL) {
+		if (ntomask(4, atoi(s + 1), &mask.s_addr) != 0)
+			return -1;
+	} else {
+		mask.s_addr = inet_addr(s + 1);
+	}
+	if (s != NULL)
+		*s = '\0';
+	node->ipn_addr.adf_len = sizeof(node->ipn_addr);
+	node->ipn_addr.adf_addr.in4.s_addr = inet_addr(arg);
+	node->ipn_mask.adf_len = sizeof(node->ipn_mask);
+	node->ipn_mask.adf_addr.in4.s_addr = mask.s_addr;
+
+	return 0;
 }

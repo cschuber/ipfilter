@@ -34,6 +34,7 @@ static const char rcsid[] = "@(#)$Id$";
 #include <sys/mbuf.h>
 #include <sys/protosw.h>
 #include <sys/socket.h>
+#include <sys/poll.h>
 
 #include <net/if.h>
 #include <net/route.h>
@@ -110,9 +111,19 @@ int (*fr_checkp) __P((ip_t *ip, int hlen, void *ifp, int out, mb_t **mp));
 #endif /* NETBSD_PF */
 
 #if (__NetBSD_Version__ >= 106080000) && defined(_KERNEL)
+# include <sys/select.h>
+
+# if  (__NetBSD_Version__ >= 399001400)
+int iplpoll __P((dev_t dev, int events, struct lwp *p));
+# else
+int iplpoll __P((dev_t dev, int events, struct proc *p));
+# endif
+
+struct selinfo ipfselwait[IPL_LOGSIZE];
+
 const struct cdevsw ipl_cdevsw = {
 	iplopen, iplclose, iplread, nowrite, iplioctl,
-	nostop, notty, nopoll, nommap,
+	nostop, notty, iplpoll, nommap,
 };
 #endif
 
@@ -200,7 +211,7 @@ struct mbuf **mp;
 struct ifnet *ifp;
 int dir;
 {
-#  ifdef M_CSUM_TCPv6
+#  if defined(M_CSUM_TCPv6) && (__NetBSD_Version__ > 200000000)
 	/*
 	 * If the packet is out-bound, we can't delay checksums
 	 * here.  For in-bound, the checksum has already been
@@ -221,7 +232,9 @@ int dir;
 # endif
 
 
-# ifdef PFIL_TYPE_IFNET
+# if defined(PFIL_TYPE_IFNET) && defined(PFIL_IFNET)
+static int ipf_pfilsync(void *, struct mbuf **, struct ifnet *, int);
+
 static int ipf_pfilsync(hdr, mp, ifp, dir)
 void *hdr;
 struct mbuf **mp;
@@ -280,7 +293,7 @@ int iplattach()
 #  ifdef USE_INET6
         struct pfil_head *ph_inet6;
 #  endif
-#  ifdef PFIL_TYPE_IFNET
+#  if defined(PFIL_TYPE_IFNET) && defined(PFIL_IFNET)
         struct pfil_head *ph_ifsync;
 #  endif
 # endif
@@ -305,7 +318,7 @@ int iplattach()
 #   ifdef USE_INET6
 	ph_inet6 = pfil_head_get(PFIL_TYPE_AF, AF_INET6);
 #   endif
-#   ifdef PFIL_TYPE_IFNET
+#   if defined(PFIL_TYPE_IFNET) && defined(PFIL_IFNET)
 	ph_ifsync = pfil_head_get(PFIL_TYPE_IFNET, 0);
 #   endif
 
@@ -313,7 +326,7 @@ int iplattach()
 #   ifdef USE_INET6
 	    && ph_inet6 == NULL
 #   endif
-#   ifdef PFIL_TYPE_IFNET
+#   if defined(PFIL_TYPE_IFNET) && defined(PFIL_IFNET)
 	    && ph_ifsync == NULL
 #   endif
 	   ) {
@@ -359,13 +372,14 @@ int iplattach()
 #  endif
 # endif
 
-# ifdef PFIL_TYPE_IFNET
+# if defined(PFIL_TYPE_IFNET) && defined(PFIL_IFNET)
 	if (ph_ifsync != NULL)
 		(void) pfil_add_hook((void *)ipf_pfilsync, NULL,
 				     PFIL_IFNET, ph_ifsync);
 # endif
 #endif
 
+	bzero((char *)ipfselwait, sizeof(ipfselwait));
 	bzero((char *)frcache, sizeof(frcache));
 	fr_savep = fr_checkp;
 	fr_checkp = fr_check;
@@ -409,7 +423,7 @@ int ipldetach()
 #  ifdef USE_INET6
 	struct pfil_head *ph_inet6 = pfil_head_get(PFIL_TYPE_AF, AF_INET6);
 #  endif
-#  ifdef PFIL_TYPE_IFNET
+#  if defined(PFIL_TYPE_IFNET) && defined(PFIL_IFNET)
 	struct pfil_head *ph_ifsync = pfil_head_get(PFIL_TYPE_IFNET, 0);
 #  endif
 # endif
@@ -435,7 +449,7 @@ int ipldetach()
 #ifdef NETBSD_PF
 # if (__NetBSD_Version__ >= 104200000)
 #  if __NetBSD_Version__ >= 105110000
-#   ifdef PFIL_TYPE_IFNET
+#   if defined(PFIL_TYPE_IFNET) && defined(PFIL_IFNET)
 	(void) pfil_remove_hook((void *)ipf_pfilsync, NULL,
 				PFIL_IFNET, ph_ifsync);
 #   endif
@@ -482,7 +496,11 @@ int ipldetach()
 int iplioctl(dev, cmd, data, mode
 #if (NetBSD >= 199511)
 , p)
+# if  (__NetBSD_Version__ >= 399001400)
+struct lwp *p;
+# else
 struct proc *p;
+# endif
 #else
 )
 #endif
@@ -706,20 +724,24 @@ int iplopen(dev, flags
 #if (NetBSD >= 199511)
 , devtype, p)
 int devtype;
+# if  (__NetBSD_Version__ >= 399001400)
+struct lwp *p;
+# else
 struct proc *p;
+# endif
 #else
 )
 #endif
 dev_t dev;
 int flags;
 {
-	u_int min = GET_MINOR(dev);
+	u_int xmin = GET_MINOR(dev);
 
-	if (IPL_LOGMAX < min)
-		min = ENXIO;
+	if (IPL_LOGMAX < xmin)
+		xmin = ENXIO;
 	else
-		min = 0;
-	return min;
+		xmin = 0;
+	return xmin;
 }
 
 
@@ -727,20 +749,24 @@ int iplclose(dev, flags
 #if (NetBSD >= 199511)
 , devtype, p)
 int devtype;
+# if  (__NetBSD_Version__ >= 399001400)
+struct lwp *p;
+# else
 struct proc *p;
+# endif
 #else
 )
 #endif
 dev_t dev;
 int flags;
 {
-	u_int	min = GET_MINOR(dev);
+	u_int	xmin = GET_MINOR(dev);
 
-	if (IPL_LOGMAX < min)
-		min = ENXIO;
+	if (IPL_LOGMAX < xmin)
+		xmin = ENXIO;
 	else
-		min = 0;
-	return min;
+		xmin = 0;
+	return xmin;
 }
 
 /*
@@ -1209,18 +1235,8 @@ frdest_t *fdp;
 		goto bad;
 	}
 
-	/*
-	 * In case we're here due to "to <if>" being used with "keep state",
-	 * check that we're going in the correct direction.
-	 */
-	if ((fr != NULL) && (fin->fin_rev != 0)) {
-		if ((ifp != NULL) && (fdp == &fr->fr_tif))
-			return -1;
-	}
-	if (fdp != NULL) {
-		if (fdp->fd_ip.s_addr != 0)
-			dst->sin_addr = fdp->fd_ip;
-	}
+	if ((fdp != NULL) && (fdp->fd_ip.s_addr != 0))
+		dst->sin_addr = fdp->fd_ip;
 
 	dst->sin_len = sizeof(*dst);
 	rtalloc(ro);
@@ -1820,16 +1836,16 @@ struct mbuf *m0;
 /* not been called.  Both fin_ip and fin_dp are updated before exiting _IF_ */
 /* and ONLY if the pullup succeeds.                                         */
 /*                                                                          */
-/* We assume that 'min' is a pointer to a buffer that is part of the chain  */
+/* We assume that 'xmin' is a pointer to a buffer that is part of the chain */
 /* of buffers that starts at *fin->fin_mp.                                  */
 /* ------------------------------------------------------------------------ */
-void *fr_pullup(min, fin, len)
-mb_t *min;
+void *fr_pullup(xmin, fin, len)
+mb_t *xmin;
 fr_info_t *fin;
 int len;
 {
 	int out = fin->fin_out, dpoff, ipoff;
-	mb_t *m = min;
+	mb_t *m = xmin;
 	char *ip;
 
 	if (m == NULL)
@@ -1885,4 +1901,53 @@ int len;
 	if (len == fin->fin_plen)
 		fin->fin_flx |= FI_COALESCE;
 	return ip;
+}
+
+
+int iplpoll(dev, events, p)
+dev_t dev;
+int events;
+#if  (__NetBSD_Version__ >= 399001400)
+struct lwp *p;
+#else
+struct proc *p;
+#endif
+{
+	u_int xmin = GET_MINOR(dev);
+	int revents = 0;
+
+	if (IPL_LOGMAX < xmin)
+		return ENXIO;
+
+	switch (xmin)
+	{
+	case IPL_LOGIPF :
+	case IPL_LOGNAT :
+	case IPL_LOGSTATE :
+#ifdef IPFILTER_LOG
+		if ((events & (POLLIN | POLLRDNORM)) && ipflog_canread(xmin))
+			revents |= events & (POLLIN | POLLRDNORM);
+#endif
+		break;
+	case IPL_LOGAUTH :
+		if ((events & (POLLIN | POLLRDNORM)) && fr_auth_waiting())
+			revents |= events & (POLLIN | POLLRDNORM);
+		break;
+	case IPL_LOGSYNC :
+#ifdef IPFILTER_SYNC
+		if ((events & (POLLIN | POLLRDNORM)) && ipfsync_canread())
+			revents |= events & (POLLIN | POLLRDNORM);
+		if ((events & (POLLOUT | POLLWRNORM)) && ipfsync_canwrite())
+			revents |= events & (POLLOUT | POLLOUTNORM);
+#endif
+		break;
+	case IPL_LOGSCAN :
+	case IPL_LOGLOOKUP :
+	default :
+		break;
+	}
+
+	if ((revents == 0) && ((events & (POLLIN|POLLRDNORM)) != 0))
+		selrecord(p, &ipfselwait[xmin]);
+	return revents;
 }

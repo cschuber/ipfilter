@@ -1222,7 +1222,7 @@ frgroup_t *grp;
 	char *instr;
 
 	group = grp->fg_name;
-	dogrp = 0;
+	dogrp = *group ? 1 : 0;
 
 	if (in && out) {
 		fprintf(stderr,

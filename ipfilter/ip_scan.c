@@ -84,18 +84,23 @@ int ipsc_matchstr __P((sinfo_t *, char *, int));
 int ipsc_matchisc __P((ipscan_t *, ipstate_t *, int, int, int *));
 int ipsc_match __P((ipstate_t *));
 
+static int	ipsc_inited = 0;
 
 
 int ipsc_init()
 {
 	RWLOCK_INIT(&ipsc_rwlock, "ip scan rwlock");
+	ipsc_inited = 1;
 	return 0;
 }
 
 
 void fr_scanunload()
 {
-	RW_DESTROY(&ipsc_rwlock);
+	if (ipsc_inited == 1) {
+		RW_DESTROY(&ipsc_rwlock);
+		ipsc_inited = 0;
+	}
 }
 
 
@@ -431,6 +436,8 @@ ipstate_t *is;
 		}
 		if (k == 1)
 			isc = lm;
+		if (isc == NULL)
+			return 0;
 
 		/*
 		 * No matches or partial matches, so reset the respective

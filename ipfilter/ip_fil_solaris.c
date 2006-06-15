@@ -617,7 +617,7 @@ fr_info_t *fin;
 		ip->ip_p = IPPROTO_TCP;
 		ip->ip_len = sizeof(*ip) + sizeof(*tcp);
 		ip->ip_tos = fin->fin_ip->ip_tos;
-		tcp2->th_sum = fr_cksum(m, ip, IPPROTO_TCP, tcp2);
+		tcp2->th_sum = fr_cksum(m, ip, IPPROTO_TCP, tcp2, ip->ip_len);
 	}
 	return fr_send_ip(fin, m, &m);
 }
@@ -1107,16 +1107,11 @@ fr_info_t *fin;
 frdest_t *fdp;
 {
 	struct in_addr dst;
-	queue_t *q = NULL;
-	mblk_t *mp = NULL;
-	size_t hlen = 0;
 	qpktinfo_t *qpi;
 	frentry_t *fr;
 	frdest_t fd;
 	qif_t *qif;
-	ill_t *ifp;
-	ire_t *dir;
-	u_char *s;
+	void *dstp;
 	ip_t *ip;
 #ifndef	sparc
 	u_short __iplen, __ipoff;
@@ -1126,7 +1121,6 @@ frdest_t *fdp;
 	struct in6_addr dst6;
 #endif
 
-	dir = NULL;
 	fr = fin->fin_fr;
 	ip = fin->fin_ip;
 	qpi = fin->fin_qpi;
@@ -1143,202 +1137,88 @@ frdest_t *fdp;
 	 * If there is another M_PROTO, we don't want it
 	 */
 	if (*mpp != mb) {
+		mblk_t *mp;
+		
 		mp = unlinkb(*mpp);
 		freeb(*mpp);
 		*mpp = mp;
 	}
 
-	/*
-	 * If the fdp is NULL then there is no set route for this packet.
-	 */
 	if (fdp == NULL) {
-		qif = fin->fin_ifp;
-
-		switch (fin->fin_v)
-		{
-		case 4 :
-			fd.fd_ip = ip->ip_dst;
-			break;
-#ifdef USE_INET6
-		case 6 :
-			fd.fd_ip6.in6 = ip6->ip6_dst;
-			break;
-#endif
-		}
 		fdp = &fd;
-	} else {
-		qif = fdp->fd_ifp;
-
-		if (qif == NULL || qif == (void *)-1)
-			goto bad_fastroute;
+		fdp->fd_ip.s_addr = 0;
+		fdp->fd_ifp = NULL;
+		fdp->fd_ifname[0] = '\0';
 	}
 
-	/*
-	 * In case we're here due to "to <if>" being used with
-	 * "keep state", check that we're going in the correct
-	 * direction.
-	 */
-	if ((fr != NULL) && (fin->fin_rev != 0)) {
-		if ((qif != NULL) && (fdp == &fr->fr_tif))
-			return -1;
-		dst.s_addr = fin->fin_fi.fi_daddr;
-	} else {
-		if (fin->fin_v == 4) {
-			if (fdp->fd_ip.s_addr != 0)
-				dst = fdp->fd_ip;
-			else
-				dst.s_addr = fin->fin_fi.fi_daddr;
-		}
-#ifdef USE_INET6
-		else if (fin->fin_v == 6) {
-			if (IP6_NOTZERO(&fdp->fd_ip))
-				dst6 = fdp->fd_ip6.in6;
-			else
-				dst6 = fin->fin_dst6;
-		}
-#endif
-	}
-
-#if SOLARIS2 >= 6
 	if (fin->fin_v == 4) {
-		dir = ire_route_lookup(dst.s_addr, 0xffffffff, 0, 0, NULL,
-					NULL, NULL, MATCH_IRE_DSTONLY|
-					MATCH_IRE_DEFAULT|MATCH_IRE_RECURSIVE);
+		if (fdp->fd_ip.s_addr != 0)
+			dst.s_addr = fdp->fd_ip.s_addr;
+		else
+			dst.s_addr = fin->fin_fi.fi_daddr;
+		dstp = &dst;
 	}
-# ifdef	USE_INET6
+#ifdef USE_INET6
 	else if (fin->fin_v == 6) {
-		dir = ire_route_lookup_v6(&ip6->ip6_dst, NULL, 0, 0,
-					NULL, NULL, NULL, MATCH_IRE_DSTONLY|
-					MATCH_IRE_DEFAULT|MATCH_IRE_RECURSIVE);
+		if (IP6_NOTZERO(&fdp->fd_ip))
+			dst6 = fdp->fd_ip6.in6;
+		else
+			dst6 = fin->fin_dst6;
+		dstp = &dst6;
 	}
-# endif
-#else
-	dir = ire_lookup(dst.s_addr);
 #endif
-#if SOLARIS2 < 8
-	if (dir != NULL)
-		if (dir->ire_ll_hdr_mp == NULL || dir->ire_ll_hdr_length == 0)
-			dir = NULL;
-#else
-	if (dir != NULL)
-		if (dir->ire_fp_mp == NULL || dir->ire_dlureq_mp == NULL) {
-			ire_refrele(dir);
-			dir = NULL;
+	qif = fdp->fd_ifp;
+	if (qif == NULL)
+		qif = qif_illrouteto(fin->fin_v, dstp);
+
+	if (qif == NULL || qif == (void *)-1)
+		goto bad_fastroute;
+
+	if (fin->fin_out == 0) {
+		void *saveqif;
+		u_32_t pass;
+
+		saveqif = fin->fin_ifp;
+		fin->fin_ifp = qif;
+		fin->fin_out = 1;
+		fr_acctpkt(fin, &pass);
+		fin->fin_fr = NULL;
+		if (!fr || !(fr->fr_flags & FR_RETMASK))
+			(void) fr_checkstate(fin, &pass);
+
+		switch (fr_checknatout(fin, NULL))
+		{
+		case 0 :
+			break;
+		case 1 :
+			ip->ip_sum = 0;
+			break;
+		case -1 :
+			goto bad_fastroute;
+			break;
 		}
-#endif
 
-	if (dir != NULL) {
-#if SOLARIS2 < 8
-		mp = dir->ire_ll_hdr_mp;
-		hlen = dir->ire_ll_hdr_length;
-#else
-		mp = dir->ire_fp_mp;
-		hlen = mp ? mp->b_wptr - mp->b_rptr : 0;
-		if (mp == NULL)
-			mp = dir->ire_dlureq_mp;
-#endif
-
-		if (fin->fin_out == 0) {
-			void *saveqif;
-			u_32_t pass;
-
-			saveqif = fin->fin_ifp;
-			fin->fin_ifp = qif;
-			fin->fin_out = 1;
-			fr_acctpkt(fin, &pass);
-			fin->fin_fr = NULL;
-			if (!fr || !(fr->fr_flags & FR_RETMASK))
-				(void) fr_checkstate(fin, &pass);
-
-			switch (fr_checknatout(fin, NULL))
-			{
-			case 0 :
-				break;
-			case 1 :
-				ip->ip_sum = 0;
-				break;
-			case -1 :
-				goto bad_fastroute;
-				break;
-			}
-
-			fin->fin_out = 0;
-			fin->fin_ifp = saveqif;
-		}
+		fin->fin_out = 0;
+		fin->fin_ifp = saveqif;
+	}
 #ifndef sparc
-		if (fin->fin_v == 4) {
-			__iplen = (u_short)ip->ip_len,
-			__ipoff = (u_short)ip->ip_off;
+	if (fin->fin_v == 4) {
+		__iplen = (u_short)ip->ip_len,
+		__ipoff = (u_short)ip->ip_off;
 
-			ip->ip_len = htons(__iplen);
-			ip->ip_off = htons(__ipoff);
-		}
-#endif
-
-		ifp = qif->qf_ill;
-
-		if (mp != NULL) {
-			s = mb->b_rptr;
-			if (
-#if (SOLARIS2 >= 6) && defined(ICK_M_CTL_MAGIC)
-			    (dohwcksum &&
-			     ifp->ill_ick.ick_magic == ICK_M_CTL_MAGIC) ||
-#endif
-			    (hlen && (s - mb->b_datap->db_base) >= hlen)) {
-				s -= hlen;
-				mb->b_rptr = (u_char *)s;
-				bcopy((char *)mp->b_rptr, (char *)s, hlen);
-			} else {
-				mblk_t *mp2;
-
-				mp2 = copyb(mp);
-				if (mp2 == NULL)
-					goto bad_fastroute;
-				linkb(mp2, mb);
-				mb = mp2;
-			}
-		}
-		*mpp = mb;
-
-		if (dir->ire_stq != NULL)
-			q = dir->ire_stq;
-		else if (dir->ire_rfq != NULL)
-			q = WR(dir->ire_rfq);
-		if (q != NULL)
-			q = q->q_next;
-		if (q != NULL) {
-			RWLOCK_EXIT(&ipf_global);
-#if (SOLARIS2 >= 6) && defined(ICK_M_CTL_MAGIC)
-			if ((fin->fin_p == IPPROTO_TCP) && dohwcksum &&
-			    (ifp->ill_ick.ick_magic == ICK_M_CTL_MAGIC)) {
-				tcphdr_t *tcp;
-				u_32_t t;
-
-				tcp = (tcphdr_t *)((char *)ip + fin->fin_hlen);
-				t = ip->ip_src.s_addr;
-				t += ip->ip_dst.s_addr;
-				t += 30;
-				t = (t & 0xffff) + (t >> 16);
-				tcp->th_sum = t & 0xffff;
-			}
-#endif
-			putnext(q, mb);
-			ATOMIC_INCL(fr_frouteok[0]);
-#if SOLARIS2 >= 8
-			ire_refrele(dir);
-#endif
-			READ_ENTER(&ipf_global);
-			return 0;
-		}
+		ip->ip_len = htons(__iplen);
+		ip->ip_off = htons(__ipoff);
 	}
-
-bad_fastroute:
-#if SOLARIS2 >= 8
-	if (dir != NULL)
-		ire_refrele(dir);
 #endif
-	freemsg(mb);
+	if (pfil_sendbuf(qif, mb, ip, dstp) == 0) {
+		ATOMIC_INCL(fr_frouteok[0]);
+	} else {
+		ATOMIC_INCL(fr_frouteok[1]);
+	}
+	return 0;
+bad_fastroute:
 	ATOMIC_INCL(fr_frouteok[1]);
+	freemsg(mb);
 	return -1;
 }
 
@@ -1414,4 +1294,26 @@ int len;
 	if (len == fin->fin_plen)
 		fin->fin_flx |= FI_COALESCE;
 	return ip;
+}
+
+
+int ipf_inject(fr_info_t *fin)
+{
+	qifpkt_t *qp;
+
+	qp = kmem_alloc(sizeof(*qp), KM_NOSLEEP);
+	if (qp == NULL) {
+		freemsg(*fin->fin_mp);
+		return ENOMEM;
+	}
+
+	qp->qp_mb = *fin->fin_mp;
+	if (fin->fin_v == 4)
+		qp->qp_sap = 0x800;
+	else if (fin->fin_v == 6)
+		qp->qp_sap = 0x86dd;
+	qp->qp_inout = fin->fin_out;
+	strncpy(qp->qp_ifname, fin->fin_ifname, LIFNAMSIZ);
+	qif_addinject(qp);
+	return 0;
 }

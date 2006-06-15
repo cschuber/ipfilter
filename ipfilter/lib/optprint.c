@@ -23,6 +23,10 @@ u_long optmsk, optbits;
 			if ((io->on_value != IPOPT_SECURITY) ||
 			    (!secmsk && !secbits)) {
 				printf("%s%s", s, io->on_name);
+				/*
+				 * Because the ionames table has this entry
+				 * twice.
+				 */
 				if (io->on_value == IPOPT_SECURITY)
 					io++;
 				s = ",";
