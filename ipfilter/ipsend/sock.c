@@ -1,23 +1,16 @@
 /*
  * sock.c (C) 1995-1998 Darren Reed
  *
- * Redistribution and use in source and binary forms are permitted
- * provided that this notice is preserved and due credit is given
- * to the original author and the contributors.
+ * See the IPFILTER.LICENCE file for details on licencing.
+ *
  */
 #if !defined(lint)
 static const char sccsid[] = "@(#)sock.c	1.2 1/11/96 (C)1995 Darren Reed";
 static const char rcsid[] = "@(#)$Id$";
 #endif
-#include <stdio.h>
-#include <unistd.h>
-#include <string.h>
-#include <stdlib.h>
-#include <stddef.h>
-#include <pwd.h>
+#include <sys/param.h>
 #include <sys/types.h>
 #include <sys/time.h>
-#include <sys/param.h>
 #include <sys/stat.h>
 #ifndef	ultrix
 #include <fcntl.h>
@@ -27,21 +20,23 @@ static const char rcsid[] = "@(#)$Id$";
 #else
 # include <sys/dir.h>
 #endif
-#define _KERNEL
-#define	KERNEL
-#ifdef	ultrix
-# undef	LOCORE
-# include <sys/smp_lock.h>
+#if !defined(__osf__)
+# define _KERNEL
+# define	KERNEL
+# ifdef	ultrix
+#  undef	LOCORE
+#  include <sys/smp_lock.h>
+# endif
+# include <sys/file.h>
+# undef  _KERNEL
+# undef  KERNEL
 #endif
-#include <sys/file.h>
-#undef  _KERNEL
-#undef  KERNEL
 #include <nlist.h>
 #include <sys/user.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
 #include <sys/proc.h>
-#if !defined(ultrix) && !defined(hpux)
+#if !defined(ultrix) && !defined(hpux) && !defined(__osf__)
 # include <kvm.h>
 #endif
 #ifdef sun
@@ -64,7 +59,14 @@ static const char rcsid[] = "@(#)$Id$";
 #include <netinet/in_pcb.h>
 #include <netinet/tcp_timer.h>
 #include <netinet/tcp_var.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <stdlib.h>
+#include <stddef.h>
+#include <pwd.h>
 #include "ipsend.h"
+
 
 int	nproc;
 struct	proc	*proc;
@@ -187,8 +189,6 @@ struct	tcpiphdr *ti;
 
 	if (!(p = getproc()))
 		return NULL;
-printf("fl %x ty %x cn %d mc %d\n",
-f->f_flag, f->f_type, f->f_count, f->f_msgcount);
 	up = (struct user *)malloc(sizeof(*up));
 #ifndef	ultrix
 	if (KMCPY(up, p->p_uarea, sizeof(*up)) == -1)
@@ -282,12 +282,21 @@ struct	tcpiphdr *ti;
 		return NULL;
 
 	fd = (struct filedesc *)malloc(sizeof(*fd));
+#if defined( __FreeBSD_version) && __FreeBSD_version >= 500013
+	if (KMCPY(fd, p->ki_fd, sizeof(*fd)) == -1)
+	    {
+		fprintf(stderr, "read(%#lx,%#lx) failed\n",
+			(u_long)p, (u_long)p->ki_fd);
+		return NULL;
+	    }
+#else
 	if (KMCPY(fd, p->kp_proc.p_fd, sizeof(*fd)) == -1)
 	    {
 		fprintf(stderr, "read(%#lx,%#lx) failed\n",
 			(u_long)p, (u_long)p->kp_proc.p_fd);
 		return NULL;
 	    }
+#endif
 
 	o = (struct file **)calloc(1, sizeof(*o) * (fd->fd_lastfile + 1));
 	if (KMCPY(o, fd->fd_ofiles, (fd->fd_lastfile + 1) * sizeof(*o)) == -1)
@@ -369,7 +378,7 @@ struct	in_addr	gwip;
 	(void) getsockname(fd, (struct sockaddr *)&lsin, &len);
 	ti->ti_sport = lsin.sin_port;
 	printf("sport %d\n", ntohs(lsin.sin_port));
-	nfd = initdevice(dev, ntohs(lsin.sin_port), 1);
+	nfd = initdevice(dev, 1);
 
 	if (!(t = find_tcp(fd, ti)))
 		return -1;

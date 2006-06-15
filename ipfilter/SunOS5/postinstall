@@ -16,6 +16,12 @@ fi
 if [ x"`grep minor=ipauth ${DEVLINK}`" = x ] ; then
 	echo "type=ddi_pseudo;name=ipf;minor=ipauth	\M0" >> ${DEVLINK}
 fi
+if [ x"`grep minor=ipsync ${DEVLINK}`" = x ] ; then
+	echo "type=ddi_pseudo;name=ipf;minor=ipsync	\M0" >> ${DEVLINK}
+fi
+if [ x"`grep minor=ipscan ${DEVLINK}`" = x ] ; then
+	echo "type=ddi_pseudo;name=ipf;minor=ipscan	\M0" >> ${DEVLINK}
+fi
 if [ x${BASEDIR} = x -o x${BASEDIR} = x/ ] ; then
 	add_drv -m '* 0600 root root' ipf
 else

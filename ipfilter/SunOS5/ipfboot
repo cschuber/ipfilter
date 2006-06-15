@@ -1,81 +1,189 @@
 #!/bin/sh
-id=`/usr/sbin/modinfo | grep ipf | awk ' { print $1 } ' -`
-pid=`ps -e | grep ipmon | awk ' { print $1 } ' -`
-PATH=${PATH}:/sbin:/opt/ipf/bin
-IPFILCONF=/etc/opt/ipf/ipf.conf
-IPNATCONF=/etc/opt/ipf/ipnat.conf
+#
+IPFBASE=/etc/opt/ipf
+PIDFILE=${IPFBASE}/ipmon.pid
+
+PATH=/bin:/sbin:/usr/sbin:${PATH}:/opt/ipf/bin
+IPFILCONF=${IPFBASE}/ipf.conf
+IP6FILCONF=${IPFBASE}/ipf6.conf
+IPNATCONF=${IPFBASE}/ipnat.conf
+IPPOOLCONF=${IPFBASE}/ippool.conf
+PFILCHECKED=no
+
+
+logmsg()
+{
+	logger -p local0.emerg -t ipfilter "$1"
+	echo "$1" >&2
+}
+
+
+checkpfil()
+{
+	if [ $PFILCHECKED = yes ] ; then
+		return
+	fi
+	ndd /dev/pfil qif_status 2>&1 > /dev/null
+	if [ $? -ne 0 ] ; then
+		logmsg "pfil not available to support ipfilter"
+		exit 1
+	fi
+	realnic=`/sbin/ifconfig -a modlist 2>/dev/null | grep -c pfil`
+	if [ $realnic -eq 0 ] ; then
+		logmsg "pfil not configured for firewall/NAT operation"
+	fi
+	PFILCHECKED=yes
+}
+
+
+getids()
+{
+	id=`modinfo 2>&1 | awk '/ipf/ { print $1 } ' - 2>/dev/null`
+	if [ -f $PIDFILE ] ; then
+		pid=`cat $PIDFILE 2>/dev/null`
+	else
+		pid=`pgrep ipmon`
+	fi
+}
+
 
 block_default_workaround() {
-      ipf -F a
-      echo "constructing minimal name resolution rules..."
-      NAMESERVERS=`cat /etc/resolv.conf | nawk '/nameserver/ {printf "%s ", $2}'`
-      for NS in $NAMESERVERS
-      do
-	      IF_TO_NS=`/usr/sbin/route -n get $NS | nawk '/interface/ {print $NF}'`
-	      IP_TO_NS=`ifconfig hme0 | head -2 | tail -1 | nawk '{print $2}'`
-	      echo "pass out quick proto udp from $IP_TO_NS to $NS port = 53 keep state" | \
-		      ipf -f -
-      done
+	ipf -F a
+	echo "constructing minimal name resolution rules..."
+	NAMESERVERS=`cat /etc/resolv.conf  2>/dev/null| \
+		     nawk '/nameserver/ {printf "%s ", $2}' 2>/dev/null`
+	if [ -z "$NAMESERVERS" ] ; then
+		return
+	fi
+	for NS in $NAMESERVERS ; do
+		IF_TO_NS=`route -n get $NS  2>/dev/null| \
+			  nawk '$1 == "interface:" { print $NF ; exit }' \
+			  2>/dev/null`
+		if [ -z "$IF_TO_NS" ] ; then
+			continue
+		fi
+		IP_TO_NS=`ifconfig $IF_TO_NS  2>/dev/null| \
+			nawk 'NR == "2" { print $2 ; exit }' 2>/dev/null`
+		if [ -z "$IP_TO_NS" ] ; then
+			continue
+		fi
+		echo "pass out quick on $IF_TO_NS proto udp from $IP_TO_NS to $NS port = 53 keep state" | \
+		ipf -f -
+	done
 }
+
+
+load_ipf_config() {
+	bad=0
+	if [ -r ${IPFILCONF} ]; then
+		checkpfil
+		if `ipf -V | \
+		      nawk '$1 == "Default:" && $2 == "pass" { exit 1 }'` ; then
+			block_default_workaround
+		fi
+		ipf -IFa -f ${IPFILCONF}
+		if [ $? != 0 ]; then
+			echo "$0: load of ${IPFILCONF} into alternate set failed"
+			bad=1
+		fi
+	fi
+	if [ -r ${IP6FILCONF} ]; then
+		checkpfil
+		ipf -6IFa -f ${IP6FILCONF}
+		if [ $? != 0 ]; then
+			echo "$0: load of ${IPFILCONF} into alternate set failed"
+			bad=1
+		fi
+	fi
+	if [ $bad -eq 0 ] ; then
+		ipf -s -y
+	else
+		echo Not switching config due to load error.
+	fi
+}
+
+
+load_ipnat_config() {
+	if [ -r ${IPNATCONF} ]; then
+		checkpfil
+		ipnat -CF -f ${IPNATCONF}
+		if [ $? != 0 ]; then
+			echo "$0: load of ${IPNATCONF} failed"
+		else
+			ipf -y
+		fi
+	fi
+}
+
+
+load_ippool_config() {
+	if [ -r ${IPPOOLCONF} ]; then
+		checkpfil
+		ippool -F
+		ippool -f ${IPPOOLCONF}
+		if [ $? != 0 ]; then
+			echo "$0: load of ${IPPOOLCONF} failed"
+		fi
+	fi
+}
+
 
 case "$1" in
 	start)
-		if [ x$pid != x ] ; then
-			kill -TERM $pid
-		fi
-		if [ x$id != x ] ; then
-			modunload -i $id
-		fi
+		[ -n "$pid" ] && kill -TERM $pid 2>/dev/null
+		[ -n "$id" ] && modunload -i $id 2>/dev/null
 		modload /usr/kernel/drv/ipf
-		if [ -r ${IPFILCONF} ]; then
-			BLOCK_DEFAULT=`/sbin/ipf -V | grep Default | nawk '{print $2}'`
-			if [ x$BLOCK_DEFAULT = "xblock" ] ; then
-				block_default_workaround
-			fi
-			ipf -IFa -f ${IPFILCONF}
-			if [ $? != 0 ]; then
-				echo "$0: load of ${IPFILCONF} into alternate set failed"
-			else
-				ipf -s
-			fi
-		fi
-		if [ -r ${IPNATCONF} ]; then
-			ipnat -CF -f ${IPNATCONF}
-			if [ $? != 0 ]; then
-				echo "$0: load of ${IPNATCONF} failed"
-			fi
-		fi
-#		ipmon -sn &
+		load_ippool_config
+		load_ipf_config
+		load_ipnat_config
+		ipmon -Ds
 		;;
 
 	stop)
-		if [ x$pid != x ] ; then
-			kill -TERM $pid
-		fi
-		if [ x$id != x ] ; then
-			modunload -i $id
+		[ -n "$pid" ] && kill -TERM $pid
+		[ -n "$id" ] && modunload -i $id
+		;;
+
+	pause)
+		ipfs -l
+		ipfs -NS -w
+		ipf -D
+		if [ -f $PIDFILE ] ; then
+			if kill -0 $pid; then
+				kill -TERM $pid
+			else    
+				cp /dev/null $PIDFILE
+			fi
+		fi      
+		;;
+
+	resume)
+		ipf -E
+		ipfs -R
+		load_ippool_config
+		load_ipf_config
+		load_ipnat_config
+		if [ -f $PIDFILE -a x$pid != x ] ; then
+			ipmon -Ds
 		fi
 		;;
 
 	reload)
-		if [ -r ${IPFILCONF} ]; then
-			ipf -I -Fa -f ${IPFILCONF}
-			if [ $? != 0 ]; then
-				echo "$0: reload of ${IPFILCONF} into alternate set failed"
-			else
-				ipf -s
-			fi
-		fi
-		if [ -r ${IPNATCONF} ]; then
-			ipnat -CF -f ${IPNATCONF}
-			if [ $? != 0 ]; then
-				echo "$0: reload of ${IPNATCONF} failed"
-			fi
-		fi
+		load_ippool_config
+		load_ipf_config
+		load_ipnat_config
+		;;
+
+	reipf)
+		load_ipf_config
+		;;
+
+	reipnat)
+		load_ipnat_config
 		;;
 
 	*)
-		echo "Usage: $0 (start|stop|reload)" >&2
+		echo "Usage: $0 (start|stop|reload|reipf|reipnat|pause|resume)" >&2
 		exit 1
 		;;
 

@@ -1,23 +1,23 @@
 /*
  * larp.c (C) 1995-1998 Darren Reed
  *
- * Redistribution and use in source and binary forms are permitted
- * provided that this notice is preserved and due credit is given
- * to the original author and the contributors.
+ * See the IPFILTER.LICENCE file for details on licencing.
+ *
  */
 #if !defined(lint)
 static const char sccsid[] = "@(#)larp.c	1.1 8/19/95 (C)1995 Darren Reed";
 static const char rcsid[] = "@(#)$Id$";
 #endif
-#include <stdio.h>
-#include <errno.h>
+#include <sys/param.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>
-#include <netdb.h>
 #include <netinet/in.h>
 #include <net/if.h>
 #include <net/if_arp.h>
+#include <stdio.h>
+#include <netdb.h>
+#include <errno.h>
 
 #include "ip_compat.h"
 #include "iplang/iplang.h"
@@ -27,7 +27,7 @@ static const char rcsid[] = "@(#)$Id$";
  * its IP address in address
  * (4 bytes)
  */
-int	resolve(host, address) 
+int	resolve(host, address)
 char	*host, *address;
 {
         struct	hostent	*hp;

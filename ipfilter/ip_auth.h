@@ -1,9 +1,7 @@
 /*
- * Copyright (C) 1997-2000 by Darren Reed & Guido Van Rooij.
+ * Copyright (C) 1997-2001 by Darren Reed & Guido Van Rooij.
  *
- * Redistribution and use in source and binary forms are permitted
- * provided that this notice is preserved and due credit is given
- * to the original author and the contributors.
+ * See the IPFILTER.LICENCE file for details on licencing.
  *
  * $Id$
  *
@@ -15,10 +13,12 @@
 
 typedef struct  frauth {
 	int	fra_age;
+	int	fra_len;
 	int	fra_index;
 	u_32_t	fra_pass;
 	fr_info_t	fra_info;
-#if SOLARIS
+	char	*fra_buf;
+#ifdef	MENTAT
 	queue_t	*fra_q;
 #endif
 } frauth_t;
@@ -51,18 +51,14 @@ extern	int	fr_authend;
 extern	int	fr_authsize;
 extern	int	fr_authused;
 extern	int	fr_auth_lock;
-extern	u_32_t	fr_checkauth __P((ip_t *, fr_info_t *));
+extern	frentry_t *fr_checkauth __P((fr_info_t *, u_32_t *));
 extern	void	fr_authexpire __P((void));
+extern	int	fr_authinit __P((void));
 extern	void	fr_authunload __P((void));
-extern	mb_t	*fr_authpkts[];
-#if defined(_KERNEL) && SOLARIS
-extern	int	fr_newauth __P((mb_t *, fr_info_t *, ip_t *, qif_t *));
-#else
-extern	int	fr_newauth __P((mb_t *, fr_info_t *, ip_t *));
-#endif
-#if defined(__NetBSD__) || defined(__OpenBSD__)
-extern	int	fr_auth_ioctl __P((caddr_t, u_long, frentry_t *, frentry_t **));
-#else
-extern	int	fr_auth_ioctl __P((caddr_t, int, frentry_t *, frentry_t **));
-#endif
+extern	int	fr_authflush __P((void));
+extern	mb_t	**fr_authpkts;
+extern	int	fr_newauth __P((mb_t *, fr_info_t *));
+extern	int	fr_preauthcmd __P((ioctlcmd_t, frentry_t *, frentry_t **));
+extern	int	fr_auth_ioctl __P((caddr_t, ioctlcmd_t, int));
+
 #endif	/* __IP_AUTH_H__ */

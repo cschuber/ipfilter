@@ -1,9 +1,8 @@
 /*
  * (C)opyright 1992-1998 Darren Reed. (from tcplog)
  *
- * Redistribution and use in source and binary forms are permitted
- * provided that this notice is preserved and due credit is given
- * to the original author and the contributors.
+ * See the IPFILTER.LICENCE file for details on licencing.
+ *
  */
 
 #include <stdio.h>
@@ -44,9 +43,9 @@ static	int	timeout;
 static	char	*eth_dev = NULL;
 
 
-int	initdevice(dev, sport, spare)
+int	initdevice(dev, spare)
 char	*dev;
-int	sport, spare;
+int	spare;
 {
 	int fd;
 

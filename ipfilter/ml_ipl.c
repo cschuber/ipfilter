@@ -1,12 +1,7 @@
 /*
- * Copyright (C) 1993-2000 by Darren Reed.
+ * Copyright (C) 1993-2001 by Darren Reed.
  *
- * Redistribution and use in source and binary forms are permitted
- * provided that this notice is preserved and due credit is given
- * to the original author and the contributors.  The author accepts no
- * responsibility and is not changed in any way.
- *
- * I hate legaleese, don't you ?
+ * See the IPFILTER.LICENCE file for details on licencing.
  */
 /*
  * 29/12/94 Added code from Marc Huber <huber@fzi.de> to allow it to allocate
@@ -37,7 +32,7 @@
 extern	int	iplattach(), iplopen(), iplclose(), iplioctl(), iplread();
 extern	int	nulldev(), iplidentify(), errno;
 
-struct	cdevsw	ipldevsw = 
+struct	cdevsw	ipldevsw =
 {
 	iplopen, iplclose, iplread, nulldev,
 	iplioctl, nulldev, nulldev, nulldev,
@@ -45,7 +40,7 @@ struct	cdevsw	ipldevsw =
 };
 
 
-struct	dev_ops	ipl_ops = 
+struct	dev_ops	ipl_ops =
 {
 	1,
 	iplidentify,
@@ -65,7 +60,7 @@ struct	dev_ops	ipl_ops =
 int	ipl_major = 0;
 
 #ifdef sun4m
-struct	vdldrv	vd = 
+struct	vdldrv	vd =
 {
 	VDMAGIC_PSEUDO,
 	"ipl",
