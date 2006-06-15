@@ -10,6 +10,14 @@ static const char rcsid[] = "@(#)$Id$";
 #endif
 #include <sys/param.h>
 #include <sys/types.h>
+#if defined(__NetBSD__) && defined(__vax__)
+/*
+ * XXX need to declare boolean_t for _KERNEL <sys/files.h>
+ * which ends up including <sys/device.h> for vax.  See PR#32907
+ * for further details.
+ */
+typedef	int	boolean_t;
+#endif
 #include <sys/time.h>
 #if !defined(__osf__)
 # define _KERNEL
@@ -30,7 +38,7 @@ static const char rcsid[] = "@(#)$Id$";
 # include <sys/proc.h>
 #endif
 #if !defined(ultrix) && !defined(hpux) && !defined(linux) && \
-    !defined(__sgi) && !defined(__osf__)
+    !defined(__sgi) && !defined(__osf__) && !defined(_AIX51)
 # include <kvm.h>
 #endif
 #ifndef	ultrix
@@ -59,6 +67,9 @@ static const char rcsid[] = "@(#)$Id$";
 # include <asm/atomic.h>
 #endif
 #if !defined(linux)
+# if defined(__FreeBSD__)
+#  include "radix_ipf.h"
+# endif
 # include <net/route.h>
 #else
 # define __KERNEL__	/* because there's a macro not wrapped by this */
@@ -88,10 +99,18 @@ static const char rcsid[] = "@(#)$Id$";
 # include <netinet/tcp_timer.h>
 # include <netinet/tcp_var.h>
 #endif
+#if defined(__NetBSD_Version__) && (__NetBSD_Version__ >= 106000000)
+# define USE_NANOSLEEP
+#endif
 
 
-#define	PAUSE()	tv.tv_sec = 0; tv.tv_usec = 10000; \
+#ifdef USE_NANOSLEEP
+# define	PAUSE() ts.tv_sec = 0; ts.tv_nsec = 10000000; \
+		  (void) nanosleep(&ts, NULL)
+#else
+# define	PAUSE()	tv.tv_sec = 0; tv.tv_usec = 10000; \
 		  (void) select(0, NULL, NULL, NULL, &tv)
+#endif
 
 
 void	ip_test1(dev, mtu, ip, gwip, ptest)
@@ -101,7 +120,11 @@ ip_t	*ip;
 struct	in_addr	gwip;
 int	ptest;
 {
+#ifdef USE_NANOSLEEP
+	struct	timespec ts;
+#else
 	struct	timeval	tv;
+#endif
 	udphdr_t *u;
 	int	nfd, i = 0, len, id = getpid();
 
@@ -119,7 +142,10 @@ int	ptest;
 	u->uh_ulen = htons(sizeof(*u) + 4);
 	ip->ip_len = sizeof(*ip) + ntohs(u->uh_ulen);
 	len = ip->ip_len;
+
 	nfd = initdevice(dev, 1);
+	if (nfd == -1)
+		return;
 
 	if (!ptest || (ptest == 1)) {
 		/*
@@ -445,15 +471,22 @@ ip_t	*ip;
 struct	in_addr	gwip;
 int	ptest;
 {
+#ifdef USE_NANOSLEEP
+	struct	timespec ts;
+#else
 	struct	timeval	tv;
+#endif
 	int	nfd;
 	u_char	*s;
 
-	s = (u_char *)(ip + 1);
+
 	nfd = initdevice(dev, 1);
+	if (nfd == -1)
+		return;
 
 	IP_HL_A(ip, 6);
 	ip->ip_len = IP_HL(ip) << 2;
+	s = (u_char *)(ip + 1);
 	s[IPOPT_OPTVAL] = IPOPT_NOP;
 	s++;
 	if (!ptest || (ptest == 1)) {
@@ -536,7 +569,11 @@ int	ptest;
 {
 	static	int	ict1[10] = { 8, 9, 10, 13, 14, 15, 16, 17, 18, 0 };
 	static	int	ict2[8] = { 3, 9, 10, 13, 14, 17, 18, 0 };
+#ifdef USE_NANOSLEEP
+	struct	timespec ts;
+#else
 	struct	timeval	tv;
+#endif
 	struct	icmp	*icp;
 	int	nfd, i;
 
@@ -549,7 +586,10 @@ int	ptest;
 	ip->ip_sum = 0;
 	ip->ip_len = sizeof(*ip) + sizeof(*icp);
 	icp = (struct icmp *)((char *)ip + (IP_HL(ip) << 2));
+
 	nfd = initdevice(dev, 1);
+	if (nfd == -1)
+		return;
 
 	if (!ptest || (ptest == 1)) {
 		/*
@@ -728,7 +768,11 @@ ip_t	*ip;
 struct	in_addr	gwip;
 int	ptest;
 {
+#ifdef USE_NANOSLEEP
+	struct	timespec ts;
+#else
 	struct	timeval	tv;
+#endif
 	udphdr_t	*u;
 	int	nfd, i;
 
@@ -744,7 +788,10 @@ int	ptest;
 	u->uh_sport = htons(1);
 	u->uh_dport = htons(1);
 	u->uh_ulen = htons(sizeof(*u) + 4);
+
 	nfd = initdevice(dev, 1);
+	if (nfd == -1)
+		return;
 
 	if (!ptest || (ptest == 1)) {
 		/*
@@ -886,7 +933,11 @@ ip_t	*ip;
 struct	in_addr	gwip;
 int	ptest;
 {
+#ifdef USE_NANOSLEEP
+	struct	timespec ts;
+#else
 	struct	timeval	tv;
+#endif
 	tcphdr_t *t;
 	int	nfd, i;
 
@@ -903,7 +954,10 @@ int	ptest;
 	t->th_seq = htonl(1);
 	t->th_ack = 0;
 	ip->ip_len = sizeof(ip_t) + sizeof(tcphdr_t);
+
 	nfd = initdevice(dev, 1);
+	if (nfd == -1)
+		return;
 
 	if (!ptest || (ptest == 1)) {
 		/*
@@ -1228,7 +1282,11 @@ ip_t	*ip;
 struct	in_addr	gwip;
 int	ptest;
 {
+#ifdef USE_NANOSLEEP
+	struct	timespec ts;
+#else
 	struct	timeval	tv;
+#endif
 	udphdr_t *u;
 	int	nfd, i, j, k;
 
@@ -1244,6 +1302,9 @@ int	ptest;
 	u->uh_sum = 0;
 
 	nfd = initdevice(dev, 1);
+	if (nfd == -1)
+		return;
+
 	u->uh_ulen = htons(7168);
 
 	printf("6. Exhaustive mbuf test.\n");
@@ -1304,11 +1365,18 @@ struct	in_addr	gwip;
 int	ptest;
 {
 	ip_t	*pip;
+#ifdef USE_NANOSLEEP
+	struct	timespec ts;
+#else
 	struct	timeval	tv;
+#endif
 	int	nfd, i, j;
 	u_char	*s;
 
 	nfd = initdevice(dev, 1);
+	if (nfd == -1)
+		return;
+
 	pip = (ip_t *)tbuf;
 
 	srand(time(NULL) ^ (getpid() * getppid()));

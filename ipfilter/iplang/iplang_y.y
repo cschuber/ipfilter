@@ -23,10 +23,6 @@
 #include <unistd.h>
 #include <stddef.h>
 #include <sys/socket.h>
-#if defined(__osf__)
-# define radix_node ipf_radix_node
-# define radix_node_head ipf_radix_node_head
-#endif
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
@@ -769,7 +765,7 @@ char **arg;
 
 	while ((c = *s++)) {
 		if (todo) {
-			if (isdigit(c)) {
+			if (ISDIGIT(c)) {
 				todo--;
 				if (c > '7') {
 					fprintf(stderr, "octal with %c!\n", c);
@@ -778,7 +774,7 @@ char **arg;
 				val <<= 3;
 				val |= (c - '0');
 			}
-			if (!isdigit(c) || !todo) {
+			if (!ISDIGIT(c) || !todo) {
 				*t++ = (u_char)(val & 0xff);
 				todo = 0;
 			}
@@ -786,7 +782,7 @@ char **arg;
 				continue;
 		}
 		if (quote) {
-			if (isdigit(c)) {
+			if (ISDIGIT(c)) {
 				todo = 2;
 				if (c > '7') {
 					fprintf(stderr, "octal with %c!\n", c);
@@ -1292,8 +1288,14 @@ void prep_packet()
 	if (ifp->if_fd == -1)
 		ifp->if_fd = initdevice(ifp->if_name, 5);
 	gwip = sending.snd_gw;
-	if (!gwip.s_addr)
+	if (!gwip.s_addr) {
+		if (aniphead == NULL) {
+			fprintf(stderr,
+				"no destination address defined for sending\n");
+			return;
+		}
 		gwip = aniphead->ah_ip->ip_dst;
+	}
 	(void) send_ip(ifp->if_fd, ifp->if_MTU, (ip_t *)ipbuffer, gwip, 2);
 }
 
@@ -1322,7 +1324,7 @@ void packet_done()
 				sprintf((char *)t, "	");
 				t += 8;
 				for (k = 16; k; k--, s++)
-					*t++ = (isprint(*s) ? *s : '.');
+					*t++ = (ISPRINT(*s) ? *s : '.');
 				s--;
 			}
 
@@ -1340,7 +1342,7 @@ void packet_done()
 			t += 7;
 			s -= j & 0xf;
 			for (k = j & 0xf; k; k--, s++)
-				*t++ = (isprint(*s) ? *s : '.');
+				*t++ = (ISPRINT(*s) ? *s : '.');
 			*t++ = '\n';
 			*t = '\0';
 		}
@@ -1644,7 +1646,7 @@ void *ptr;
 	for (sto = toipopts; sto->sto_st; sto++)
 		if (sto->sto_st == state)
 			break;
-	if (!sto || !sto->sto_st) {
+	if (!sto->sto_st) {
 		fprintf(stderr, "No mapping for state %d to IP option\n",
 			state);
 		return;

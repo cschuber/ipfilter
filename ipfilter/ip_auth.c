@@ -121,8 +121,9 @@ static const char rcsid[] = "@(#)$Id$";
 #endif
 
 
-#if SOLARIS
+#if SOLARIS && defined(_KERNEL)
 extern kcondvar_t ipfauthwait;
+extern struct pollhead iplpollhead[IPL_LOGSIZE];
 #endif /* SOLARIS */
 #if defined(linux) && defined(_KERNEL)
 wait_queue_head_t     fr_authnext_linux;
@@ -154,7 +155,7 @@ int fr_authinit()
 	if (fr_authpkts != NULL)
 		bzero((char *)fr_authpkts, fr_authsize * sizeof(*fr_authpkts));
 	else
-		return -1;
+		return -2;
 
 	MUTEX_INIT(&ipf_authmx, "ipf auth log mutex");
 	RWLOCK_INIT(&ipf_auth, "ipf IP User-Auth rwlock");
@@ -260,7 +261,7 @@ u_32_t *passp;
 			RWLOCK_EXIT(&ipf_auth);
 			if (passp != NULL)
 				*passp = pass;
-			ATOMIC_INCL(fr_authstats.fas_hits);
+			ATOMIC_INC64(fr_authstats.fas_hits);
 			return fr;
 		}
 		i++;
@@ -269,7 +270,7 @@ u_32_t *passp;
 	}
 	fr_authstats.fas_miss++;
 	RWLOCK_EXIT(&ipf_auth);
-	ATOMIC_INCL(fr_authstats.fas_miss);
+	ATOMIC_INC64(fr_authstats.fas_miss);
 	return NULL;
 }
 
@@ -317,7 +318,10 @@ fr_info_t *fin;
 
 	fra = fr_auth + i;
 	fra->fra_index = i;
-	fra->fra_pass = 0;
+	if (fin->fin_fr != NULL)
+		fra->fra_pass = fin->fin_fr->fr_flags;
+	else
+		fra->fra_pass = 0;
 	fra->fra_age = fr_defaultauthage;
 	bcopy((char *)fin, (char *)&fra->fra_info, sizeof(*fin));
 #if !defined(sparc) && !defined(m68k)
@@ -339,17 +343,15 @@ fr_info_t *fin;
 	}
 #endif
 #if SOLARIS && defined(_KERNEL)
+	COPYIFNAME(fin->fin_ifp, fra->fra_info.fin_ifname);
 	m->b_rptr -= qpi->qpi_off;
 	fr_authpkts[i] = *(mblk_t **)fin->fin_mp;
 	fra->fra_q = qpi->qpi_q;	/* The queue can disappear! */
+	fra->fra_m = *fin->fin_mp;
+	fra->fra_info.fin_mp = &fra->fra_m;
 	cv_signal(&ipfauthwait);
+	pollwakeup(&iplpollhead[IPL_LOGAUTH], POLLIN|POLLRDNORM);
 #else
-# if defined(BSD) && !defined(sparc) && (BSD >= 199306)
-	if (!fin->fin_out) {
-		ip->ip_len = htons(ip->ip_len);
-		ip->ip_off = htons(ip->ip_off);
-	}
-# endif
 	fr_authpkts[i] = m;
 	WAKEUP(&fr_authnext,0);
 #endif
@@ -362,26 +364,33 @@ caddr_t data;
 ioctlcmd_t cmd;
 int mode;
 {
+	frauth_t auth, *au = &auth, *fra;
+	int i, error = 0, len;
+	char *t;
 	mb_t *m;
 #if defined(_KERNEL) && !defined(MENTAT) && !defined(linux) && \
     (!defined(__FreeBSD_version) || (__FreeBSD_version < 501000))
 	struct ifqueue *ifq;
-# ifdef USE_SPL
-	int s;
-# endif /* USE_SPL */
+	SPL_INT(s);
 #endif
-	frauth_t auth, *au = &auth, *fra;
-	int i, error = 0, len;
-	char *t;
 
 	switch (cmd)
 	{
+	case SIOCADAFR :
+	case SIOCRMAFR :
+		if (!(mode & FWRITE))
+			error = EPERM, ipf_interror = 13;
+		else
+			error = frrequest(IPL_LOGAUTH, cmd, data,
+					  fr_active, 1);
+		break;
+
 	case SIOCSTLCK :
 		if (!(mode & FWRITE)) {
 			error = EPERM;
 			break;
 		}
-		error = fr_lock(data, &fr_auth_lock);
+		fr_lock(data, &fr_auth_lock);
 		break;
 
 	case SIOCATHST:
@@ -401,10 +410,14 @@ int mode;
 	case SIOCAUTHW:
 fr_authioctlloop:
 		error = fr_inobj(data, au, IPFOBJ_FRAUTH);
+		if (error != 0)
+			break;
 		READ_ENTER(&ipf_auth);
 		if ((fr_authnext != fr_authend) && fr_authpkts[fr_authnext]) {
 			error = fr_outobj(data, &fr_auth[fr_authnext],
 					  IPFOBJ_FRAUTH);
+			if (error != 0)
+				break;
 			if (auth.fra_len != 0 && auth.fra_buf != NULL) {
 				/*
 				 * Copy packet contents out to user space if
@@ -418,11 +431,12 @@ fr_authioctlloop:
 				for (t = auth.fra_buf; m && (len > 0); ) {
 					i = MIN(M_LEN(m), len);
 					error = copyoutptr(MTOD(m, char *),
-							  t, i);
+							   &t, i);
 					len -= i;
 					t += i;
 					if (error != 0)
 						break;
+					m = m->m_next;
 				}
 			}
 			RWLOCK_EXIT(&ipf_auth);
@@ -475,10 +489,8 @@ fr_authioctlloop:
 #endif
 		MUTEX_EXIT(&ipf_authmx);
 		READ_ENTER(&ipf_global);
-		if (error == 0) {
-			READ_ENTER(&ipf_auth);
+		if (error == 0)
 			goto fr_authioctlloop;
-		}
 		break;
 
 	case SIOCAUTHR:
@@ -489,6 +501,7 @@ fr_authioctlloop:
 		WRITE_ENTER(&ipf_auth);
 		i = au->fra_index;
 		fra = fr_auth + i;
+		error = 0;
 		if ((i < 0) || (i >= fr_authsize) ||
 		    (fra->fra_info.fin_id != au->fra_info.fin_id)) {
 			RWLOCK_EXIT(&ipf_auth);
@@ -503,12 +516,16 @@ fr_authioctlloop:
 #ifdef	_KERNEL
 		if ((m != NULL) && (au->fra_info.fin_out != 0)) {
 # ifdef MENTAT
-			error = !putq(fra->fra_q, m);
+			error = ipf_inject(&fra->fra_info);
+			if (error != 0) {
+				FREE_MB_T(m);
+				error = ENOBUFS;
+			}
 # else /* MENTAT */
-#  ifdef linux
+#  if defined(linux) || defined(AIX)
 #  else
 #   if (_BSDI_VERSION >= 199802) || defined(__OpenBSD__) || \
-       (defined(__sgi) && (IRIX >= 60500) || \
+       (defined(__sgi) && (IRIX >= 60500) || defined(AIX) || \
        (defined(__FreeBSD__) && (__FreeBSD_version >= 470102)))
 			error = ip_output(m, NULL, NULL, IP_FORWARDING, NULL,
 					  NULL);
@@ -523,14 +540,18 @@ fr_authioctlloop:
 				fr_authstats.fas_sendok++;
 		} else if (m) {
 # ifdef MENTAT
-			error = !putq(fra->fra_q, m);
+			error = ipf_inject(&fra->fra_info);
+			if (error != 0) {
+				FREE_MB_T(m);
+				error = ENOBUFS;
+			}
 # else /* MENTAT */
-#  ifdef linux
+#  if defined(linux) || defined(AIX)
 #  else
-#   if __FreeBSD_version >= 501000
+#   if (__FreeBSD_version >= 501000)
 			netisr_dispatch(NETISR_IP, m);
 #   else
-#    if IRIX >= 60516
+#    if (IRIX >= 60516)
 			ifq = &((struct ifnet *)fra->fra_info.fin_ifp)->if_snd;
 #    else
 			ifq = &ipintrq;
@@ -554,10 +575,6 @@ fr_authioctlloop:
 				fr_authstats.fas_queok++;
 		} else
 			error = EINVAL;
-# ifdef MENTAT
-		if (error != 0)
-			error = EINVAL;
-# else /* MENTAT */
 		/*
 		 * If we experience an error which will result in the packet
 		 * not being processed, make sure we advance to the next one.
@@ -581,7 +598,6 @@ fr_authioctlloop:
 				}
 			}
 		}
-# endif /* MENTAT */
 #endif /* _KERNEL */
 		SPL_X(s);
 		break;
@@ -661,9 +677,7 @@ void fr_authexpire()
 	register frauthent_t *fae, **faep;
 	register frentry_t *fr, **frp;
 	mb_t *m;
-# if !defined(MENAT) && defined(_KERNEL) && defined(USE_SPL)
-	int s;
-# endif
+	SPL_INT(s);
 
 	if (fr_auth_lock)
 		return;
@@ -681,6 +695,9 @@ void fr_authexpire()
 		}
 	}
 
+	/*
+	 * Expire pre-auth rules
+	 */
 	for (faep = &fae_list; ((fae = *faep) != NULL); ) {
 		fae->fae_age--;
 		if (fae->fae_age == 0) {
@@ -712,13 +729,11 @@ frentry_t *fr, **frptr;
 {
 	frauthent_t *fae, **faep;
 	int error = 0;
-# if !defined(MENAT) && defined(_KERNEL) && defined(USE_SPL)
-	int s;
-#endif
+	SPL_INT(s);
 
 	if ((cmd != SIOCADAFR) && (cmd != SIOCRMAFR))
 		return EIO;
-	
+
 	for (faep = &fae_list; ((fae = *faep) != NULL); ) {
 		if (&fae->fae_fr == fr)
 			break;
@@ -799,4 +814,10 @@ int fr_authflush()
 	fr_authnext = 0;
 
 	return num_flushed;
+}
+
+
+int fr_auth_waiting()
+{
+	return (fr_authnext != fr_authend) && fr_authpkts[fr_authnext];
 }

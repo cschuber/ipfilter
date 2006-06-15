@@ -3,6 +3,7 @@
 #
 # See the IPFILTER.LICENCE file for details on licencing.
 #
+TOP=$(shell echo `pwd`/..)
 TOP:sh=echo `pwd`/..
 BINDEST=/usr/local/bin
 SBINDEST=/sbin/$(OBJ)
@@ -12,6 +13,7 @@ CFLAGS=-I$(TOP)
 #
 # For SunOS 5.x
 #
+CPUDIR=$(shell echo `uname -p`-`uname -r`)
 CPUDIR:sh=echo `uname -p`-`uname -r`
 ROOT=$(CPUDIR)/root
 PKGDIR=$(ROOT)/opt/ipf
@@ -20,10 +22,30 @@ PKGBIN=$(PKGDIR)/bin/$(OBJ)
 #
 DEST=$(OBJ)
 TOOL=$(TOP)/tools
+#CPU=$(shell uname -p)
+#REV=$(shell uname -v)
 #CPU:sh=uname -p
 #REV:sh=uname -r
 HERE=SunOS5/$(CPUDIR)
-BITS:sh=if optisa sparcv9 >/dev/null 2>&1; then echo "64"; else echo "32"; fi
+BITS=$(shell if optisa amd64 sparcv9 >/dev/null 2>&1; then echo "64"; else echo "32"; fi)
+BITS:sh=if optisa amd64 sparcv9 >/dev/null 2>&1; then echo "64"; else echo "32"; fi
+ARCH=$(shell uname -p)
+ARCH:sh=uname -p
+
+OBJ32_i386=i86
+OBJ64_i386=amd64
+OBJ32_sparc=sparcv7
+OBJ64_sparc=sparcv9
+OBJ32=$(OBJ32_$(ARCH))
+OBJ64=$(OBJ64_$(ARCH))
+
+PROTO32_i386=prototype_ia32
+PROTO64_i386=prototype_amd64
+PROTO32_sparc=prototype32
+PROTO64_sparc=prototype64
+PROTO32=$(PROTO32_$(ARCH))
+PROTO64=$(PROTO64_$(ARCH))
+
 CC=gcc -Wall
 DEBUG=-g
 LIBS=-lsocket -lnsl -lelf -L$(OBJ) -lipf $(LIBBPF)
@@ -112,7 +134,7 @@ $(OBJ)/ipfstat: $(FILS) $(OBJ)/libipf.a
 $(OBJ)/ipf.exe: $(IPF) $(OBJ)/libipf.a
 	$(CC) $(CCARGS) $(IPF) -o $@ $(LIBS) -ll $(LIBBPF)
 
-# Magic dependency on ipf.exe creates the $(TOP)/sparcv{7,9} directories.
+# Magic dependency on ipf.exe creates the $(TOP)/$(OBJ{32,64}) directories.
 $(OBJ)/ipftest: $(IPT) $(OBJ)/ipf.exe $(OBJ)/libipf.a
 	$(CC) $(CCARGS) $(IPT) -o $@ $(LIBS) -ll $(LIBBPF)
 
@@ -196,11 +218,14 @@ ipnat_l.h: $(TOOL)/lexer.h
 $(OBJ)/mlso_rule.o: $(TOP)/mlso_rule.c
 	$(CC) -I$(TOP) $(DFLAGS) -c $(TOP)/mlso_rule.c -o $@
 
-$(OBJ)/ip_rules.o: $(TOP)/ip_rules.c $(TOP)/ip_rules.h
-	$(CC) -I$(TOP) $(DFLAGS) -c $(TOP)/ip_rules.c -o $@
+$(OBJ)/ip_rules.o: $(OBJ)/ip_rules.c $(TOP)/ip_rules.h
+	$(CC) -I$(TOP) $(DFLAGS) -c $(OBJ)/ip_rules.c -o $@
 
-$(OBJ)/ipfrule: $(OBJ)/ip_rules.o $(OBJ)/mlso_rule.o
-	ld -r $(OBJ)/ip_rules.o $(OBJ)/mlso_rule.o -o $@
+$(OBJ)/ip_rulesx.o: $(OBJ)/ip_rules.c $(TOP)/ip_rules.h
+	$(CC) -I$(TOP) -DIPFILTER_COMPILED $(DFLAGS) -c $(OBJ)/ip_rules.c -o $@
+
+$(OBJ)/ipfrule: $(OBJ)/ip_rulesx.o $(OBJ)/mlso_rule.o
+	ld -r $(OBJ)/ip_rulesx.o $(OBJ)/mlso_rule.o -o $@
 
 $(OBJ)/ipf: $(MODOBJS)
 	ld -dy -Ndrv/ip -Ndrv/pfil -Nmisc/md5 -r $(MODOBJS) -o $@
@@ -208,7 +233,7 @@ $(OBJ)/ipf: $(MODOBJS)
 $(OBJ)/md5.o: $(TOP)/md5.c $(TOP)/md5.h
 	$(CC) -I$(TOP) $(DFLAGS) -c $(TOP)/md5.c -o $@
 
-$(OBJ)/radix.o: $(TOP)/md5.c $(TOP)/radix.h
+$(OBJ)/radix.o: $(TOP)/md5.c $(TOP)/radix_ipf.h
 	$(CC) -I$(TOP) $(DFLAGS) -c $(TOP)/radix.c -o $@
 
 $(OBJ)/ip_nat.o: $(TOP)/ip_nat.c $(TOP)/ip_nat.h $(TOP)/ip_compat.h
@@ -260,7 +285,7 @@ $(OBJ)/bpf_filter_u.o: $(TOP)/bpf_filter.c
 $(OBJ)/md5_u.o: $(TOP)/md5.c $(TOP)/md5.h
 	$(CC) $(CCARGS) $(EXTRA) -c $(TOP)/md5.c -o $@
 
-$(OBJ)/radix_u.o: $(TOP)/radix.c $(TOP)/radix.h
+$(OBJ)/radix_u.o: $(TOP)/radix.c $(TOP)/radix_ipf.h
 	$(CC) $(CCARGS) $(EXTRA) -c $(TOP)/radix.c -o $@
 
 $(OBJ)/ip_nat_u.o: $(TOP)/ip_nat.c $(TOP)/ip_nat.h $(TOP)/ip_compat.h
@@ -303,8 +328,17 @@ $(OBJ)/ip_proxy_u.o: $(TOP)/ip_proxy.c $(TOP)/ip_proxy.h $(TOP)/ip_compat.h \
 	$(TOP)/ip_fil.h
 	$(CC) $(CCARGS) $(EXTRA) -c $(TOP)/ip_proxy.c -o $@
 
-$(OBJ)/ip_rules_u.o: $(TOP)/ip_rules.c $(TOP)/ip_fil.h $(TOP)/ip_rules.h
-	$(CC) $(CCARGS) $(EXTRA) -c $(TOP)/ip_rules.c -o $@
+$(OBJ)/ip_rules.c: $(OBJ)/ipf.exe $(TOP)/tools/ipfcomp.c $(TOP)/rules/ip_rules
+	$(OBJ)/ipf.exe -cc -nf $(TOP)/rules/ip_rules
+	-/bin/mv -f ip_rules.c $(OBJ)
+
+$(TOP)/ip_rules.h: $(OBJ)/ip_rules.c
+	if [ -f ip_rules.h ] ; then \
+		/bin/mv -f ip_rules.h $(TOP) ; \
+	fi
+
+$(OBJ)/ip_rules_u.o: $(OBJ)/ip_rules.c $(TOP)/ip_fil.h $(TOP)/ip_rules.h
+	$(CC) $(CCARGS) $(EXTRA) -c $(OBJ)/ip_rules.c -o $@
 
 $(OBJ)/ip_fil_u.o: $(TOP)/ip_fil.c $(TOP)/ip_fil.h
 	$(CC) $(CCARGS) $(EXTRA) -c $(TOP)/ip_fil.c -o $@
@@ -407,12 +441,12 @@ clean:
 		${RM} -f ip_fil.c ipf_l.c ipf_y.c ipf_y.h ipf_l.h; \
 		${RM} -f ipscan ipscan_y.c ipscan_y.h ipscan_l.c; \
 		${RM} -f ippool ippool_y.c ippool_y.h ippool_l.c; \
-		${RM} -f ipscan_l.h ippool_l.h; \
+		${RM} -f ipscan_l.h ippool_l.h ip_rules.c ip_rules.h; \
 		${RM} -f ipnat_y.c ipnat_y.h ipnat_l.c ipnat_l.h; \
 		${RM} -f ipmon_y.c ipmon_y.h ipmon_l.c ipmon_l.h; \
 		${RM} -f ipsyncm ipsyncs ipfs; \
 	fi
-	/bin/rm -rf */root ipf.pkg* sparcv7 sparcv9
+	/bin/rm -rf */root ipf.pkg* $(OBJ32) $(OBJ64)
 	make -f Makefile.ipsend clean "TOP=${TOP}"
 	-(for i in *; do \
 		if [ -d $${i} -a -h $${i}/Makefile ] ; then \
@@ -423,10 +457,10 @@ clean:
 	 done)
 
 $(CPUDIR)/ipf.pkg: $(CPUDIR)/ipf.pkg.common
-	if [ -d $(CPUDIR)/sparcv7 ]; then \
-		$(MAKE) PROTO=prototype32 PKG=ipf OBJ=sparcv7 \
+	if [ -d $(CPUDIR)/$(OBJ32) ]; then \
+		$(MAKE) PROTO=$(PROTO32) PKG=ipf OBJ=$(OBJ32) \
 		 BITS=32 TOP=$(TOP) ipf.pkg.bin; \
-		$(MAKE) PROTO=prototype64 PKG=ipfx OBJ=sparcv9 \
+		$(MAKE) PROTO=$(PROTO64) PKG=ipfx OBJ=$(OBJ64) \
 		 BITS=64 TOP=$(TOP) ipf.pkg.bin; \
 	else \
 		($(MAKE) PROTO=prototype OBJ=. BITS=${BITS} \
@@ -455,9 +489,11 @@ $(CPUDIR)/ipf.pkg.common:
 	-$(INSTALL) ipl.4 $(PKGMAN)/man4
 	-$(INSTALL) ipf.5 $(PKGMAN)/man5
 	-$(INSTALL) ipnat.5 $(PKGMAN)/man5
+	-$(INSTALL) ippool.5 $(PKGMAN)/man5
 	-$(INSTALL) ipfilter.5 $(PKGMAN)/man5
 	-$(INSTALL) ipfstat.8 $(PKGMAN)/man8
 	-$(INSTALL) ipmon.8 $(PKGMAN)/man8
+	-$(INSTALL) ippool.8 $(PKGMAN)/man8
 	-cp $(TOP)/rules/* $(PKGDIR)/examples
 	-cp $(TOP)/ip_fil.h $(TOP)/ip_compat.h $(TOP)/ip_state.h .
 	-cp $(TOP)/ip_nat.h $(TOP)/ip_frag.h $(TOP)/ip_proxy.h .
@@ -488,6 +524,7 @@ ipf.pkg.bin:
 	-$(INSTALL) -c $(TOP)/mkfilters $(PKGBIN)/mkfilters
 	-$(INSTALL) -c $(OBJDIR)/ipf $(ROOT)/usr/kernel/drv/$(OBJ)/ipf
 	-$(INSTALL) -c -s $(OBJDIR)/ipnat $(ROOT)/$(SBINDEST)/ipnat
+	-$(INSTALL) -c -s $(OBJDIR)/ippool $(ROOT)/$(SBINDEST)/ippool
 	-$(INSTALL) -c -s $(OBJDIR)/ipf.exe $(ROOT)/$(SBINDEST)/ipf
 	-$(INSTALL) -c -s $(OBJDIR)/ipfs $(ROOT)/$(SBINDEST)/ipfs
 	-$(INSTALL) -c -s $(OBJDIR)/ipfstat $(ROOT)/$(SBINDEST)/ipfstat
@@ -498,16 +535,17 @@ ipf.pkg.bin:
 	-sed -e 's/ipf/$(PKG)/' -e "s/NAME=.*/&$(BITTYPE)/" \
 	     -e "s/ARCH=.*/ARCH=`uname -p` (${BITS}-bit)/" \
 		< pkginfo > $(CPUDIR)/pkginfo
-	-if [ "$(BITS)" = 64 ]; then echo 'SUNW_ISA=sparcv9' >> $(CPUDIR)/pkginfo; fi
+	-if [ "$(BITS)" = 64 ]; then echo 'SUNW_ISA=$(OBJ64)' >> $(CPUDIR)/pkginfo; fi
 	(cd $(CPUDIR); pkgmk -a `uname -p` -o -d $(TMP))
 
 
 package install: $(CPUDIR)/ipf.pkg
+	/bin/rm -f ipf.pkg
 	ln -s $(CPUDIR)/ipf.pkg ipf.pkg
 	@if [ `id|sed -e 's/^.[^(]*(\([^)]*\)).*/\1/'` != root ] ; then \
 		echo "Can only install if root"; \
 		exit 1; \
 	fi
 	# Must add ipfx before ipf or driver attach fails.
-	-[ -d $(CPUDIR)/sparcv9 ] && pkgadd -d ipf.pkg ipfx
+	-[ -d $(CPUDIR)/$(OBJ64) ] && pkgadd -d ipf.pkg ipfx
 	-pkgadd -d ipf.pkg ipf

@@ -13,6 +13,12 @@
 #define SOLARIS (defined(sun) && (defined(__svr4__) || defined(__SVR4)))
 #endif
 
+#if defined(__STDC__) || defined(__GNUC__) || defined(_AIX51)
+#define	SIOCPROXY	_IOWR('r', 64, struct ap_control)
+#else
+#define	SIOCPROXY	_IOWR(r, 64, struct ap_control)
+#endif
+
 #ifndef	APR_LABELLEN
 #define	APR_LABELLEN	16
 #endif
@@ -20,15 +26,16 @@
 
 struct	nat;
 struct	ipnat;
+struct	ipstate;
 
 typedef	struct	ap_tcp {
 	u_short	apt_sport;	/* source port */
 	u_short	apt_dport;	/* destination port */
 	short	apt_sel[2];	/* {seq,ack}{off,min} set selector */
 	short	apt_seqoff[2];	/* sequence # difference */
-	tcp_seq	apt_seqmin[2];	/* don't change seq-off until after this */
+	u_32_t	apt_seqmin[2];	/* don't change seq-off until after this */
 	short	apt_ackoff[2];	/* sequence # difference */
-	tcp_seq	apt_ackmin[2];	/* don't change seq-off until after this */
+	u_32_t	apt_ackmin[2];	/* don't change seq-off until after this */
 	u_char	apt_state[2];	/* connection state */
 } ap_tcp_t;
 
@@ -133,6 +140,7 @@ typedef	struct	aproxy	{
  * For the ftp proxy.
  */
 #define	FTP_BUFSZ	160
+#define	IPF_FTPBUFSZ	160
 
 typedef struct  ftpside {
 	char	*ftps_rptr;
@@ -142,12 +150,15 @@ typedef struct  ftpside {
 	u_32_t	ftps_len;
 	int	ftps_junk;
 	int	ftps_cmds;
+	int	ftps_cmd;
 	char	ftps_buf[FTP_BUFSZ];
 } ftpside_t;
 
 typedef struct  ftpinfo {
 	int 	  	ftp_passok;
 	int		ftp_incok;
+	ipstate_t	*ftp_pendstate;
+	nat_t		*ftp_pendnat;
 	ftpside_t	ftp_side[2];
 } ftpinfo_t;
 
@@ -186,7 +197,7 @@ typedef	struct	raudio_s {
 	u_32_t	rap_sbf;	/* flag to indicate which of the 19 bytes have
 				 * been filled
 				 */
-	tcp_seq	rap_sseq;
+	u_32_t	rap_sseq;
 } raudio_t;
 
 #define	RA_ID_END	0
@@ -199,6 +210,9 @@ typedef	struct	raudio_s {
 #define	RAP_M_UDP_ROBUST	(RAP_M_UDP|RAP_M_ROBUST)
 
 
+/*
+ * MSN RPC proxy
+ */
 typedef	struct	msnrpcinfo	{
 	u_int		mri_flags;
 	int		mri_cmd[2];
@@ -219,8 +233,31 @@ typedef struct ipsec_pxy {
 	int		ipsc_rckset;
 	ipnat_t		ipsc_rule;
 	nat_t		*ipsc_nat;
-	ipstate_t	*ipsc_state;
+	struct ipstate	*ipsc_state;
 } ipsec_pxy_t;
+
+/*
+ * PPTP proxy
+ */
+typedef	struct pptp_side {
+	u_32_t		pptps_nexthdr;
+	u_32_t		pptps_next;
+	int		pptps_state;
+	int		pptps_gothdr;
+	int		pptps_len;
+	int		pptps_bytes;
+	char		*pptps_wptr;
+	char		pptps_buffer[512];
+} pptp_side_t;
+
+typedef	struct pptp_pxy {
+	ipnat_t		pptp_rule;
+	nat_t		*pptp_nat;
+	struct ipstate	*pptp_state;
+	u_short		pptp_call[2];
+	pptp_side_t	pptp_side[2];
+} pptp_pxy_t;
+
 
 /*
  * Sun RPCBIND proxy

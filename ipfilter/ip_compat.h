@@ -40,20 +40,22 @@
 # endif
 #endif
 #if defined(__FreeBSD_version) && (__FreeBSD_version >= 400000) && \
-    !defined(_KERNEL)
+    !defined(_KERNEL) && !defined(USE_INET6) && !defined(NOINET6)
 # define	USE_INET6
 #endif
 #if defined(__NetBSD_Version__) && (__NetBSD_Version__ >= 105000000) && \
-    !defined(_KERNEL)
+    !defined(_KERNEL) && !defined(USE_INET6)
 # define	USE_INET6
+# define	IPFILTER_M_IPFILTER
 #endif
-#if defined(OpenBSD) && (OpenBSD >= 200206) && !defined(_KERNEL)
+#if defined(OpenBSD) && (OpenBSD >= 200206) && \
+    !defined(_KERNEL) && !defined(USE_INET6)
 # define	USE_INET6
 #endif
 #if defined(__osf__)
 # define	USE_INET6
 #endif
-#if defined(linux) && defined(CONFIG_IPV6)
+#if defined(linux) && (!defined(_KERNEL) || defined(CONFIG_IPV6))
 # define	USE_INET6
 #endif
 #if defined(HPUXREV) && (HPUXREV >= 1111)
@@ -163,6 +165,9 @@ struct file;
 # undef	IPOPT_LSRR
 # undef	IPOPT_RR
 # undef	IPOPT_SSRR
+# ifdef i386
+#  define _SYS_PROMIF_H
+# endif
 # include <inet/ip.h>
 # undef COPYOUT
 # include <inet/ip_ire.h>
@@ -436,6 +441,7 @@ extern	void	*get_unit __P((char *, int));
 				  wakeup(id + x); \
 				  spinunlock(_l); \
 				}
+#  define	POLLWAKEUP(x)	;
 #  define	KMALLOC(a, b)	MALLOC((a), b, sizeof(*(a)), M_IOSYS, M_NOWAIT)
 #  define	KMALLOCS(a, b, c)	MALLOC((a), b, (c), M_IOSYS, M_NOWAIT)
 #  define	KFREE(x)	kmem_free((char *)(x), sizeof(*(x)))
@@ -573,6 +579,7 @@ typedef struct {
 #  define	UIOMOVE(a,b,c,d)	uiomove((caddr_t)a,b,c,d)
 #  define	SLEEP(id, n)	sleep((id), PZERO+1)
 #  define	WAKEUP(id,x)	wakeup(id+x)
+#  define	POLLWAKEUP(x)	;
 #  define	KFREE(x)	kmem_free((char *)(x), sizeof(*(x)))
 #  define	KFREES(x,s)	kmem_free((char *)(x), (s))
 #  define	GETIFP(n,v)	ifunit(n)
@@ -654,15 +661,17 @@ typedef struct mbuf mb_t;
 #  define	GETIFP(n, v)		ifunit(n)
 #  define	GET_MINOR		getminor
 #  define	WAKEUP(id,x)		wakeup(id + x)
+#  define	POLLWAKEUP(x)		;
 #  define	COPYIN(a,b,c)	copyin((caddr_t)(a), (caddr_t)(b), (c))
 #  define	COPYOUT(a,b,c)	copyout((caddr_t)(a), (caddr_t)(b), (c))
 #  define	BCOPYIN(a,b,c)	bcopy((caddr_t)(a), (caddr_t)(b), (c))
 #  define	BCOPYOUT(a,b,c)	bcopy((caddr_t)(a), (caddr_t)(b), (c))
 #  define	KMALLOC(a, b)	MALLOC((a), b, sizeof(*(a)), M_PFILT, M_NOWAIT)
-#  define	KMALLOCS(a, b, c)	MALLOC((a), b, (c), M_PFILT, M_NOWAIT)
+#  define	KMALLOCS(a, b, c)	MALLOC((a), b, (c), M_PFILT, \
+					    ((c) > 4096) ? M_WAITOK : M_NOWAIT)
 #  define	KFREE(x)	FREE((x), M_PFILT)
 #  define	KFREES(x,s)	FREE((x), M_PFILT)
-#  define	MSGDSIZE(x)	(x)->m_pkthdr.len
+#  define	MSGDSIZE(x)	mbufchainlen(x)
 #  define	M_LEN(x)	(x)->m_len
 #  define	M_DUPLICATE(x)	m_copy((x), 0, M_COPYALL)
 #  define	GETKTIME(x)	microtime((struct timeval *)x)
@@ -677,8 +686,10 @@ typedef struct mbuf mb_t;
 #  define	IP_HL(x)	((x)->ip_vhl & 0xf)
 #  define	IP_V_A(x,y)	(x)->ip_vhl |= (((y) << 4) & 0xf0)
 #  define	IP_HL_A(x,y)	(x)->ip_vhl |= ((y) & 0xf)
+#  define	TCP_X2(x)	((x)->th_xoff & 0xf)
+#  define	TCP_X2_A(x,y)	(x)->th_xoff |= ((y) & 0xf)
 #  define	TCP_OFF(x)	((x)->th_xoff >> 4)
-#  define	TCP_OFF_A(x,y)	(x)->th_xoff = ((y) << 4)
+#  define	TCP_OFF_A(x,y)	(x)->th_xoff |= (((y) << 4) & 0xf0)
 # endif
 
 /*
@@ -715,14 +726,21 @@ typedef unsigned int    u_32_t;
 #  ifdef INET6
 #   define USE_INET6
 #  endif
+#  if (__NetBSD_Version__ >= 105000000)
+#   define HAVE_M_PULLDOWN 1
+#  endif
 # endif
 
 # ifdef _KERNEL
-#  define	MSGDSIZE(x)	(x)->m_pkthdr.len
+#  define	MSGDSIZE(x)	mbufchainlen(x)
 #  define	M_LEN(x)	(x)->m_len
 #  define	M_DUPLICATE(x)	m_copy((x), 0, M_COPYALL)
 #  define	GETKTIME(x)	microtime((struct timeval *)x)
 #  define	IPF_PANIC(x,y)	if (x) { printf y; panic("ipf_panic"); }
+#  define	COPYIN(a,b,c)	copyin((caddr_t)(a), (caddr_t)(b), (c))
+#  define	COPYOUT(a,b,c)	copyout((caddr_t)(a), (caddr_t)(b), (c))
+#  define	BCOPYIN(a,b,c)	bcopy((caddr_t)(a), (caddr_t)(b), (c))
+#  define	BCOPYOUT(a,b,c)	bcopy((caddr_t)(a), (caddr_t)(b), (c))
 typedef struct mbuf mb_t;
 # endif /* _KERNEL */
 # if (NetBSD <= 1991011) && (NetBSD >= 199606)
@@ -743,7 +761,6 @@ typedef	int		minor_t;
 typedef	u_int32_t	u_32_t;
 # define	U_32_T	1
 
-
 # define OS_RECOGNISED 1
 #endif /* __NetBSD__ */
 
@@ -752,21 +769,36 @@ typedef	u_int32_t	u_32_t;
 /*                                F R E E B S D                            */
 /* ----------------------------------------------------------------------- */
 #ifdef __FreeBSD__
-# if defined(_KERNEL) && !defined(IPFILTER_LKM) && !defined(KLD_MODULE)
-#  include "bpf.h"
+# if defined(_KERNEL)
+#  if (__FreeBSD_version >= 500000)                          
+#   include "opt_bpf.h"
+#  else
+#   include "bpf.h"    
+#  endif
 #  if defined(__FreeBSD_version) && (__FreeBSD_version >= 400000)
 #   include "opt_inet6.h"
 #  endif
-#  ifdef INET6
+#  if defined(INET6) && !defined(USE_INET6)
 #   define USE_INET6
 #  endif
 # endif
 
 # if defined(_KERNEL)
+#  if (__FreeBSD_version >= 400000)
+/*
+ * When #define'd, the 5.2.1 kernel panics when used with the ftp proxy.
+ * There may be other, safe, kernels but this is not extensively tested yet.
+ */
+#   define HAVE_M_PULLDOWN
+#  endif
 #  if !defined(IPFILTER_LKM) && (__FreeBSD_version >= 300000)
-#   include "bpf.h"
 #   include "opt_ipfilter.h"
 #  endif
+#  define	COPYIN(a,b,c)	copyin((caddr_t)(a), (caddr_t)(b), (c))
+#  define	COPYOUT(a,b,c)	copyout((caddr_t)(a), (caddr_t)(b), (c))
+#  define	BCOPYIN(a,b,c)	bcopy((caddr_t)(a), (caddr_t)(b), (c))
+#  define	BCOPYOUT(a,b,c)	bcopy((caddr_t)(a), (caddr_t)(b), (c))
+
 #  if (__FreeBSD_version >= 500043)
 #   define NETBSD_PF
 #  endif
@@ -774,8 +806,33 @@ typedef	u_int32_t	u_32_t;
 
 # if (__FreeBSD_version >= 500043)
 #  include <sys/mutex.h>
+#  include <sys/sx.h>
+/*
+ * Whilst the sx(9) locks on FreeBSD have the right semantics and interface
+ * for what we want to use them for, despite testing showing they work -
+ * with a WITNESS kernel, it generates LOR messages.
+ */
 #  define	KMUTEX_T		struct mtx
-#  define	KRWLOCK_T		struct mtx
+#  if 1
+#   define	KRWLOCK_T		struct mtx
+#  else
+#   define	KRWLOCK_T		struct sx
+#  endif
+# endif
+
+# if (__FreeBSD_version >= 501113)
+#  include <net/if_var.h>
+#  define	IFNAME(x)	((struct ifnet *)x)->if_xname
+#  define	COPYIFNAME(x, b) \
+				(void) strncpy(b, \
+					       ((struct ifnet *)x)->if_xname, \
+					       LIFNAMSIZ)
+# endif
+# if (__FreeBSD_version >= 500043)
+#  define	CACHE_HASH(x)	((((struct ifnet *)fin->fin_ifp)->if_index) & 7)
+# else
+#  define	CACHE_HASH(x)	((IFNAME(fin->fin_ifp)[0] + \
+				  ((struct ifnet *)fin->fin_ifp)->if_unit) & 7)
 # endif
 
 # ifdef _KERNEL
@@ -790,47 +847,62 @@ typedef	u_int32_t	u_32_t;
 #  if (__FreeBSD_version >= 500043)
 #   define	USE_MUTEXES
 #   define	MUTEX_ENTER(x)		mtx_lock(&(x)->ipf_lk)
-#   define	READ_ENTER(x)		mtx_lock(&(x)->ipf_lk)
-#   define	WRITE_ENTER(x)		mtx_lock(&(x)->ipf_lk)
-#   define	MUTEX_DOWNGRADE(x)	;
-#   define	RWLOCK_INIT(x, y)	mtx_init(&(x)->ipf_lk, (y), NULL, \
-						 MTX_DEF)
-#   define	RW_DESTROY(x)		mtx_destroy(&(x)->ipf_lk)
-#   define	RWLOCK_EXIT(x)		mtx_unlock(&(x)->ipf_lk)
 #   define	MUTEX_EXIT(x)		mtx_unlock(&(x)->ipf_lk)
 #   define	MUTEX_INIT(x,y)		mtx_init(&(x)->ipf_lk, (y), NULL,\
 						 MTX_DEF)
 #   define	MUTEX_DESTROY(x)	mtx_destroy(&(x)->ipf_lk)
-#  define	MUTEX_NUKE(x)		bzero((x), sizeof(*(x)))
+#   define	MUTEX_NUKE(x)		bzero((x), sizeof(*(x)))
+/*
+ * Whilst the sx(9) locks on FreeBSD have the right semantics and interface
+ * for what we want to use them for, despite testing showing they work -
+ * with a WITNESS kernel, it generates LOR messages.
+ */
+#   if 1
+#    define	READ_ENTER(x)		mtx_lock(&(x)->ipf_lk)
+#    define	WRITE_ENTER(x)		mtx_lock(&(x)->ipf_lk)
+#    define	RWLOCK_EXIT(x)		mtx_unlock(&(x)->ipf_lk)
+#    define	MUTEX_DOWNGRADE(x)	;
+#    define	RWLOCK_INIT(x,y)	mtx_init(&(x)->ipf_lk, (y), NULL,\
+						 MTX_DEF)
+#    define	RW_DESTROY(x)		mtx_destroy(&(x)->ipf_lk)
+#   else
+#    define	READ_ENTER(x)		sx_slock(&(x)->ipf_lk)
+#    define	WRITE_ENTER(x)		sx_xlock(&(x)->ipf_lk)
+#    define	MUTEX_DOWNGRADE(x)	sx_downgrade(&(x)->ipf_lk)
+#    define	RWLOCK_INIT(x, y)	sx_init(&(x)->ipf_lk, (y))
+#    define	RW_DESTROY(x)		sx_destroy(&(x)->ipf_lk)
+#    ifdef sx_unlock
+#     define	RWLOCK_EXIT(x)		sx_unlock(x)
+#    else
+#     define	RWLOCK_EXIT(x)		do { \
+					    if ((x)->ipf_lk.sx_cnt < 0) \
+						sx_xunlock(&(x)->ipf_lk); \
+					    else \
+						sx_sunlock(&(x)->ipf_lk); \
+					} while (0)
+#    endif
+#   endif
 #   include <machine/atomic.h>
 #   define	ATOMIC_INC(x)		{ mtx_lock(&ipf_rw.ipf_lk); (x)++; \
 					  mtx_unlock(&ipf_rw.ipf_lk); }
 #   define	ATOMIC_DEC(x)		{ mtx_lock(&ipf_rw.ipf_lk); (x)--; \
 					  mtx_unlock(&ipf_rw.ipf_lk); }
-#   if 0
-#    define	ATOMIC_INCL(x)		atomic_add_long(x, 1)
-#    define	ATOMIC_INC64(x)		atomic_add_(x, 1)
-#    define	ATOMIC_INC32(x)		atomic_add_(x, 1)
-#    define	ATOMIC_INC16(x)		atomic_add_short(x, 1)
-#    define	ATOMIC_DECL(x)		atomic_subtrct_long(x, -1)
-#    define	ATOMIC_DEC64(x)		atomic_subtrct_(x, -1)
-#    define	ATOMIC_DEC32(x)		atomic_subtrct_(x, -1)
-#    define	ATOMIC_DEC16(x)		atomic_subtrct_short(x, -1)
-#   endif
+#   define	ATOMIC_INCL(x)		atomic_add_long(&(x), 1)
+#   define	ATOMIC_INC64(x)		ATOMIC_INC(x)
+#   define	ATOMIC_INC32(x)		atomic_add_32(&(x), 1)
+#   define	ATOMIC_INC16(x)		atomic_add_16(&(x), 1)
+#   define	ATOMIC_DECL(x)		atomic_add_long(&(x), -1)
+#   define	ATOMIC_DEC64(x)		ATOMIC_DEC(x)
+#   define	ATOMIC_DEC32(x)		atomic_add_32(&(x), -1)
+#   define	ATOMIC_DEC16(x)		atomic_add_16(&(x), -1)
 #   define	SPL_X(x)	;
 #   define	SPL_NET(x)	;
 #   define	SPL_IMP(x)	;
 extern	int	in_cksum __P((struct mbuf *, int));
 #  endif /* __FreeBSD_version >= 500043 */
-#  define	MSGDSIZE(x)	(x)->m_pkthdr.len
+#  define	MSGDSIZE(x)	mbufchainlen(x)
 #  define	M_LEN(x)	(x)->m_len
 #  define	M_DUPLICATE(x)	m_copy((x), 0, M_COPYALL)
-#  if (__FreeBSD_version >= 500043)
-#   define	CACHE_HASH(x)	((((struct ifnet *)fin->fin_ifp)->if_index) & 7)
-#  else
-#   define	CACHE_HASH(x)	((IFNAME(fin->fin_ifp)[0] + \
-				  ((struct ifnet *)fin->fin_ifp)->if_unit) & 7)
-#  endif
 #  define	IPF_PANIC(x,y)	if (x) { printf y; panic("ipf_panic"); }
 typedef struct mbuf mb_t;
 # endif /* _KERNEL */
@@ -878,8 +950,15 @@ typedef	u_int32_t	u_32_t;
 #    include "netinet6/nd6.h"
 #   endif
 #  endif
+#  if (OpenBSD >= 200012)
+#   define HAVE_M_PULLDOWN 1
+#  endif
+#  define	COPYIN(a,b,c)	copyin((caddr_t)(a), (caddr_t)(b), (c))
+#  define	COPYOUT(a,b,c)	copyout((caddr_t)(a), (caddr_t)(b), (c))
+#  define	BCOPYIN(a,b,c)	bcopy((caddr_t)(a), (caddr_t)(b), (c))
+#  define	BCOPYOUT(a,b,c)	bcopy((caddr_t)(a), (caddr_t)(b), (c))
 #  define	GETKTIME(x)	microtime((struct timeval *)x)
-#  define	MSGDSIZE(x)	(x)->m_pkthdr.len
+#  define	MSGDSIZE(x)	mbufchainlen(x)
 #  define	M_LEN(x)	(x)->m_len
 #  define	M_DUPLICATE(x)	m_copy((x), 0, M_COPYALL)
 #  define	IPF_PANIC(x,y)	if (x) { printf y; panic("ipf_panic"); }
@@ -917,7 +996,7 @@ typedef	u_int32_t	u_32_t;
 
 # ifdef _KERNEL
 #  define	GETKTIME(x)	microtime((struct timeval *)x)
-#  define	MSGDSIZE(x)	(x)->m_pkthdr.len
+#  define	MSGDSIZE(x)	mbufchainlen(x)
 #  define	M_LEN(x)	(x)->m_len
 #  define	M_DUPLICATE(x)	m_copy((x), 0, M_COPYALL)
 #  define	CACHE_HASH(x)	((IFNAME(fin->fin_ifp)[0] + \
@@ -953,6 +1032,7 @@ typedef	u_int32_t	u_32_t;
 #  define	KFREES(x,s)	kmem_free((char *)(x), (s))
 #  define	SLEEP(id, n)	sleep((id), PZERO+1)
 #  define	WAKEUP(id,x)	wakeup(id + x)
+#  define	POLLWAKEUP(x)	;
 #  define	UIOMOVE(a,b,c,d)	uiomove((caddr_t)a,b,c,d)
 #  define	IPF_PANIC(x,y)	if (x) { printf y; panic("ipf_panic"); }
 
@@ -976,7 +1056,21 @@ typedef	unsigned int	u_32_t;
 /*                            L I N U X                                    */
 /* ----------------------------------------------------------------------- */
 #if defined(linux) && !defined(OS_RECOGNISED)
+#include <linux/config.h>
+#include <linux/version.h>
+# if LINUX >= 20600
+#  define	 HDR_T_PRIVATE	1
+# endif
+# undef USE_INET6
+# ifdef USE_INET6
+struct ip6_ext {
+	u_char	ip6e_nxt;
+	u_char	ip6e_len;
+};
+# endif
+
 # ifdef _KERNEL
+#  define	IPF_PANIC(x,y)	if (x) { printf y; panic("ipf_panic"); }
 #  define	BCOPYIN(a,b,c)	bcopy((caddr_t)(a), (caddr_t)(b), (c))
 #  define	BCOPYOUT(a,b,c)	bcopy((caddr_t)(a), (caddr_t)(b), (c))
 #  define	COPYIN(a,b,c)	copy_from_user((caddr_t)(b), (caddr_t)(a), (c))
@@ -984,6 +1078,7 @@ typedef	unsigned int	u_32_t;
 #  define	FREE_MB_T(m)	kfree_skb(m)
 #  define	GETKTIME(x)	do_gettimeofday((struct timeval *)x)
 #  define	SLEEP(x,s)	0, interruptible_sleep_on(x##_linux)
+#  define	POLLWAKEUP(x)	;
 #  define	WAKEUP(x,y)	wake_up(x##_linux + y)
 #  define	UIOMOVE(a,b,c,d)	uiomove(a,b,c,d)
 #  define	USE_MUTEXES
@@ -1024,32 +1119,38 @@ typedef	unsigned int	u_32_t;
 			  ((struct net_device *)fin->fin_ifp)->ifindex) & 7)
 typedef	struct	sk_buff	mb_t;
 extern	void	m_copydata __P((mb_t *, int, int, caddr_t));
+extern	void	m_copyback __P((mb_t *, int, int, caddr_t));
+extern	void	m_adj __P((mb_t *, int));
+extern	mb_t	*m_pullup __P((mb_t *, int));
 #  define	mbuf	sk_buff
 
-#	define	mtod(m, t)	((t)(m)->data)
-#	define	m_len		len
-#	define	m_next		next
-#	define	m_pullup(m,l)	(m)
-#	define	M_DUPLICATE(m)	skb_clone((m), GFP_KERNEL)
-#	define	MSGDSIZE(m)	(m)->len
-#	define	M_LEN(m)	(m)->len
+#  define	mtod(m, t)	((t)(m)->data)
+#  define	m_data		data
+#  define	m_len		len
+#  define	m_next		next
+#  define	M_DUPLICATE(m)	skb_clone((m), in_interrupt() ? GFP_ATOMIC : \
+								GFP_KERNEL)
+#  define	MSGDSIZE(m)	(m)->len
+#  define	M_LEN(m)	(m)->len
 
-#	define	splnet(x)	;
-#	define	printf		printk
-#	define	bcopy(s,d,z)	memmove(d, s, z)
-#	define	bzero(s,z)	memset(s, 0, z)
-#	define	bcmp(a,b,z)	memcmp(a, b, z)
+#  define	splnet(x)	;
+#  define	printf		printk
+#  define	bcopy(s,d,z)	memmove(d, s, z)
+#  define	bzero(s,z)	memset(s, 0, z)
+#  define	bcmp(a,b,z)	memcmp(a, b, z)
 
-#	define	ifnet		net_device
-#	define	if_name		name
-#	define	if_unit		ifindex 
+#  define	ifnet		net_device
+#  define	if_xname	name
+#  define	if_unit		ifindex 
 
-#	define	KMALLOC(x,t)	(x) = (t)kmalloc(sizeof(*(x)), GFP_KERNEL)
-#	define	KFREE(x)	kfree(x)
-#	define	KMALLOCS(x,t,s)	(x) = (t)kmalloc((s), GFP_KERNEL)
-#	define	KFREES(x,s)	kfree(x)
+#  define	KMALLOC(x,t)	(x) = (t)kmalloc(sizeof(*(x)), \
+				    in_interrupt() ? GFP_ATOMIC : GFP_KERNEL)
+#  define	KFREE(x)	kfree(x)
+#  define	KMALLOCS(x,t,s)	(x) = (t)kmalloc((s), \
+				    in_interrupt() ? GFP_ATOMIC : GFP_KERNEL)
+#  define	KFREES(x,s)	kfree(x)
 
-#	define GETIFP(n,v)	dev_get_by_name(n)
+#  define GETIFP(n,v)	dev_get_by_name(n)
 
 # else
 #  include <net/ethernet.h>
@@ -1057,18 +1158,26 @@ extern	void	m_copydata __P((mb_t *, int, int, caddr_t));
 struct mbuf {
 };
 
-#ifndef	_NET_ROUTE_H
+#  ifndef _NET_ROUTE_H
 struct rtentry {
 };
-#endif
+#  endif
 
 struct ifnet {
-	char	*if_name;
+	char	if_xname[IFNAMSIZ];
 	int	if_unit;
 	int	(* if_output) __P((struct ifnet *, struct mbuf *, struct sockaddr *, struct rtentry *));
+	struct	ifaddr	*if_addrlist;
 };
+# define	IFNAME(x)	((struct ifnet *)x)->if_xname
 
-# endif
+# endif	/* _KERNEL */
+
+# define	COPYIFNAME(x, b) \
+				(void) strncpy(b, \
+					       ((struct ifnet *)x)->if_xname, \
+					       LIFNAMSIZ)
+
 # include <linux/fs.h>
 # define	FWRITE	FMODE_WRITE
 # define	FREAD	FMODE_READ
@@ -1101,6 +1210,116 @@ typedef u_int32_t 	u_32_t;
 #endif
 
 
+/* ----------------------------------------------------------------------- */
+/*                                    A I X                                */
+/* ----------------------------------------------------------------------- */
+#if defined(_AIX51)
+# undef		MENTAT
+
+# include <sys/lock.h>
+# include <sys/sysmacros.h>
+
+# ifdef _KERNEL
+#  define rw_read_locked(x)		0
+#  include <net/net_globals.h>
+#  include <net/net_malloc.h>
+#  define	KMUTEX_T		simple_lock_t
+#  define	KRWLOCK_T		complex_lock_t
+#  define	USE_MUTEXES		1
+#  define	USE_SPL			1
+#  define	READ_ENTER(x)		lock_read((x)->ipf_lk)
+#  define	WRITE_ENTER(x)		lock_write((x)->ipf_lk)
+#  define	MUTEX_DOWNGRADE(x)	lock_write_to_read((x)->ipf_lk)
+#  define	RWLOCK_INIT(x, y)	lock_alloc(&(x)->ipf_lk, \
+						   LOCK_ALLOC_PIN, \
+						   (u_short)y, 0); \
+					lock_init((x)->ipf_lk, TRUE)
+#  define	RWLOCK_EXIT(x)		lock_done((x)->ipf_lk)
+#  define	RW_DESTROY(x)		lock_free(&(x)->ipf_lk)
+#  define	MUTEX_ENTER(x)		simple_lock((x)->ipf_lk)
+#  define	MUTEX_INIT(x, y)	lock_alloc(&(x)->ipf_lk, \
+						   LOCK_ALLOC_PIN, \
+						   (u_short)y, 0); \
+					simple_lock_init((x)->ipf_lk)
+#  define	MUTEX_DESTROY(x)	lock_free(&(x)->ipf_lk)
+#  define	MUTEX_EXIT(x)		simple_unlock((x)->ipf_lk)
+#  define	MUTEX_NUKE(x)		bzero(&(x)->ipf_lk, sizeof((x)->ipf_lk))
+#   define	ATOMIC_INC64(x)		{ MUTEX_ENTER(&ipf_rw); (x)++; \
+					  MUTEX_EXIT(&ipf_rw); }
+#   define	ATOMIC_DEC64(x)		{ MUTEX_ENTER(&ipf_rw); (x)--; \
+					  MUTEX_EXIT(&ipf_rw); }
+#   define	ATOMIC_INC32(x)		{ MUTEX_ENTER(&ipf_rw); (x)++; \
+					  MUTEX_EXIT(&ipf_rw); }
+#   define	ATOMIC_DEC32(x)		{ MUTEX_ENTER(&ipf_rw); (x)--; \
+					  MUTEX_EXIT(&ipf_rw); }
+#   define	ATOMIC_INCL(x)		{ MUTEX_ENTER(&ipf_rw); (x)++; \
+					  MUTEX_EXIT(&ipf_rw); }
+#   define	ATOMIC_DECL(x)		{ MUTEX_ENTER(&ipf_rw); (x)--; \
+					  MUTEX_EXIT(&ipf_rw); }
+#   define	ATOMIC_INC(x)		{ MUTEX_ENTER(&ipf_rw); (x)++; \
+					  MUTEX_EXIT(&ipf_rw); }
+#   define	ATOMIC_DEC(x)		{ MUTEX_ENTER(&ipf_rw); (x)--; \
+					  MUTEX_EXIT(&ipf_rw); }
+#  define	SPL_NET(x)		x = splnet()
+#  define	SPL_IMP(x)		x = splimp()
+#  undef	SPL_X
+#  define	SPL_X(x)		splx(x)
+#  define	UIOMOVE(a,b,c,d)	uiomove((caddr_t)a,b,c,d)
+extern void* getifp __P((char *, int));
+#  define	GETIFP(n, v)		getifp(n, v)
+#  define	GET_MINOR		minor
+#  define	SLEEP(id, n)	sleepx((id), PZERO+1, 0)
+#  define	WAKEUP(id,x)	wakeup(id)
+#  define	POLLWAKEUP(x)	;
+#  define	COPYIN(a,b,c)	copyin((caddr_t)(a), (caddr_t)(b), (c))
+#  define	COPYOUT(a,b,c)	copyout((caddr_t)(a), (caddr_t)(b), (c))
+#  define	BCOPYIN(a,b,c)	bcopy((caddr_t)(a), (caddr_t)(b), (c))
+#  define	BCOPYOUT(a,b,c)	bcopy((caddr_t)(a), (caddr_t)(b), (c))
+#  define	KMALLOC(a, b)	MALLOC((a), b, sizeof(*(a)), M_TEMP, M_NOWAIT)
+#  define	KMALLOCS(a, b, c)	MALLOC((a), b, (c), M_TEMP, \
+					    ((c) > 4096) ? M_WAITOK : M_NOWAIT)
+#  define	KFREE(x)	FREE((x), M_TEMP)
+#  define	KFREES(x,s)	FREE((x), M_TEMP)
+#  define	MSGDSIZE(x)	mbufchainlen(x)
+#  define	M_LEN(x)	(x)->m_len
+#  define	M_DUPLICATE(x)	m_copy((x), 0, M_COPYALL)
+#  define	GETKTIME(x)
+#  define	CACHE_HASH(x)	((IFNAME(fin->fin_ifp)[0] + \
+				  ((struct ifnet *)fin->fin_ifp)->if_unit) & 7)
+#  define	IPF_PANIC(x,y)
+typedef struct mbuf mb_t;
+# endif /* _KERNEL */
+
+/*
+ * These are from's Solaris' #defines for little endian.
+ */
+#if !defined(IP6F_MORE_FRAG)
+# define	IP6F_MORE_FRAG		0x0100
+#endif
+#if !defined(IP6F_RESERVED_MASK)
+# define	IP6F_RESERVED_MASK	0x0600
+#endif
+#if !defined(IP6F_OFF_MASK)
+# define	IP6F_OFF_MASK		0xf8ff
+#endif
+
+struct ip6_ext {
+	u_char	ip6e_nxt;
+	u_char	ip6e_len;
+};
+
+typedef	int		ioctlcmd_t;  
+typedef	int		minor_t;
+/*
+ * Really, any arch where sizeof(long) != sizeof(int).
+ */
+typedef unsigned int    u_32_t;
+# define	U_32_T	1
+
+# define OS_RECOGNISED 1
+#endif	/* _AIX51 */
+
+
 #ifndef	OS_RECOGNISED
 #error	ip_compat.h does not recognise this platform/OS.
 #endif
@@ -1116,8 +1335,11 @@ typedef u_int32_t 	u_32_t;
  * For BSD kernels, if bpf is in the kernel, enable ipfilter to use bpf in
  * filter rules.
  */
-#if !defined(IPFILTER_BPF) && ((NBPF > 0) || (NBPFILTER > 0))
-# define IPFILTER_BPF
+#if !defined(IPFILTER_BPF)
+# if (defined(NBPF) && (NBPF > 0)) || (defined(DEV_BPF) && (DEV_BPF > 0)) || \
+     (defined(NBPFILTER) && (NBPFILTER > 0))
+#  define	IPFILTER_BPF
+# endif
 #endif
 
 /*
@@ -1175,19 +1397,20 @@ typedef union {
 #define	ipf_isw		ipf_lkun_s.ipf_sw
 #define	ipf_magic	ipf_lkun_s.ipf_magic
 
-#ifdef	__GNUC__
-# define	INLINE	__inline__
-#else
+#if !defined(__GNUC__) || \
+    (defined(__FreeBSD_version) && (__FreeBSD_version >= 503000))
 # ifndef	INLINE
 #  define	INLINE
 # endif
+#else
+# define	INLINE	__inline__
 #endif
 
 #if defined(linux) && defined(_KERNEL)
-extern	INLINE	void	ipf_read_enter __P((ipfrwlock_t *));
-extern	INLINE	void	ipf_write_enter __P((ipfrwlock_t *));
-extern	INLINE	void	ipf_rw_exit __P((ipfrwlock_t *));
-extern	INLINE	void	ipf_rw_downgrade __P((ipfrwlock_t *));
+extern	void	ipf_read_enter __P((ipfrwlock_t *));
+extern	void	ipf_write_enter __P((ipfrwlock_t *));
+extern	void	ipf_rw_exit __P((ipfrwlock_t *));
+extern	void	ipf_rw_downgrade __P((ipfrwlock_t *));
 #endif
 
 /*
@@ -1198,19 +1421,25 @@ extern	INLINE	void	ipf_rw_downgrade __P((ipfrwlock_t *));
 #ifndef _KERNEL
 typedef	struct	mb_s	{
 	struct	mb_s	*mb_next;
+	char		*mb_data;
 	int		mb_len;
 	u_long		mb_buf[2048];
 } mb_t;
 # undef		m_next
 # define	m_next		mb_next
+# undef		m_len
+# define	m_len		mb_len
+# undef		m_data
+# define	m_data		mb_data
 # define	MSGDSIZE(x)	(x)->mb_len	/* XXX - from ipt.c */
 # define	M_LEN(x)	(x)->mb_len
 # define	M_DUPLICATE(x)	(x)
 # define	GETKTIME(x)	gettimeofday((struct timeval *)(x), NULL)
-# define	MTOD(m, t)	((t)(m)->mb_buf)
+# define	MTOD(m, t)	((t)(m)->mb_data)
 # define	FREE_MB_T(x)
 # define	SLEEP(x,y)	1;
 # define	WAKEUP(x,y)	;
+# define	POLLWAKEUP(y)	;
 # define	IPF_PANIC(x,y)	;
 # define	PANIC(x,y)	;
 # define	SPL_NET(x)	;
@@ -1221,8 +1450,8 @@ typedef	struct	mb_s	{
 # define	KFREE(x)	free(x)
 # define	KFREES(x,s)	free(x)
 # define	GETIFP(x, v)	get_unit(x,v)
-# define	COPYIN(a,b,c)	(bcopy((a), (b), (c)), 0)
-# define	COPYOUT(a,b,c)	(bcopy((a), (b), (c)), 0)
+# define	COPYIN(a,b,c)	bcopywrap((a), (b), (c))
+# define	COPYOUT(a,b,c)	bcopywrap((a), (b), (c))
 # define	BCOPYIN(a,b,c)	(bcopy((a), (b), (c)), 0)
 # define	BCOPYOUT(a,b,c)	(bcopy((a), (b), (c)), 0)
 # define	COPYDATA(m, o, l, b)	bcopy(MTOD((mb_t *)m, char *) + (o), \
@@ -1233,6 +1462,7 @@ typedef	struct	mb_s	{
 # define	UIOMOVE(a,b,c,d)	ipfuiomove(a,b,c,d)
 extern	void	m_copydata __P((mb_t *, int, int, caddr_t));
 extern	int	ipfuiomove __P((caddr_t, int, int, struct uio *));
+extern	int	bcopywrap __P((void *, void *, size_t));
 # ifndef CACHE_HASH
 #  define	CACHE_HASH(x)	((IFNAME(fin->fin_ifp)[0] + \
 				  ((struct ifnet *)fin->fin_ifp)->if_unit) & 7)
@@ -1296,8 +1526,8 @@ extern void eMrwlock_downgrade __P((eMrwlock_t *, char *, int));
 # if defined(__NetBSD__) || defined(__OpenBSD__) || defined(__FreeBSD__) || \
      defined(__osf__) || defined(linux)
 #  include <netinet/ip6.h>
-#  ifndef linux
-#   include <netinet/icmp6.h>
+#  include <netinet/icmp6.h>
+#  if !defined(linux)
 #   if defined(_KERNEL) && !defined(__osf__)
 #    include <netinet6/ip6_var.h>
 #   endif
@@ -1311,6 +1541,7 @@ typedef	struct ip6_hdr	ip6_t;
 #endif
 
 #if defined(_KERNEL)
+extern struct selinfo ipfselwait[];
 # ifdef MENTAT
 #  define	COPYDATA	mb_copydata
 #  define	COPYBACK	mb_copyback
@@ -1341,28 +1572,26 @@ extern  vm_map_t        kmem_map;
 #  ifdef IPFILTER_M_IPFILTER
 #    include <sys/malloc.h>
 MALLOC_DECLARE(M_IPFILTER);
-#    define	KMALLOC(a, b)	MALLOC((a), b, sizeof(*(a)), M_IPFILTER, \
-				       M_NOWAIT)
-#    define	KMALLOCS(a, b, c)	MALLOC((a), b, (c), M_IPFILTER, \
-					       M_NOWAIT)
-#    define	KFREE(x)	FREE((x), M_IPFILTER)
-#    define	KFREES(x,s)	FREE((x), M_IPFILTER)
+#    define	_M_IPF		M_IPFILTER
 #  else /* IPFILTER_M_IPFILTER */
 #   ifdef M_PFIL
-#    define	KMALLOC(a, b)	MALLOC((a), b, sizeof(*(a)), M_PFIL, M_NOWAIT)
-#    define	KMALLOCS(a, b, c)	MALLOC((a), b, (c), M_PFIL, M_NOWAIT)
-#    define	KFREE(x)	FREE((x), M_PFIL)
-#    define	KFREES(x,s)	FREE((x), M_PFIL)
-#   else /* M_PFIL */
-#    define	KMALLOC(a, b)	MALLOC((a), b, sizeof(*(a)), M_TEMP, M_NOWAIT)
-#    define	KMALLOCS(a, b, c)	MALLOC((a), b, (c), M_TEMP, M_NOWAIT)
-#    define	KFREE(x)	FREE((x), M_TEMP)
-#    define	KFREES(x,s)	FREE((x), M_TEMP)
+#    define	_M_IPF		M_PFIL
+#   else
+#    ifdef M_IPFILTER
+#     define	_M_IPF		M_IPFILTER
+#    else
+#     define	_M_IPF		M_TEMP
+#    endif /* M_IPFILTER */
 #   endif /* M_PFIL */
 #  endif /* IPFILTER_M_IPFILTER */
+#  define	KMALLOC(a, b)	MALLOC((a), b, sizeof(*(a)), _M_IPF, M_NOWAIT)
+#  define	KMALLOCS(a, b, c)	MALLOC((a), b, (c), _M_IPF, M_NOWAIT)
+#  define	KFREE(x)	FREE((x), _M_IPF)
+#  define	KFREES(x,s)	FREE((x), _M_IPF)
 #  define	UIOMOVE(a,b,c,d)	uiomove(a,b,d)
 #  define	SLEEP(id, n)	tsleep((id), PPAUSE|PCATCH, n, 0)
 #  define	WAKEUP(id,x)	wakeup(id+x)
+#  define	POLLWAKEUP(x)	selwakeup(ipfselwait+x)
 #  define	GETIFP(n, v)	ifunit(n)
 # endif /* (Free)BSD */
 
@@ -1419,6 +1648,22 @@ extern	char	*fr_getifname __P((struct ifnet *, char *));
 #endif
 
 /*
+ * Because the ctype(3) posix definition, if used "safely" in code everywhere,
+ * would mean all normal code that walks through strings needed casts.  Yuck.
+ */
+#define	ISALNUM(x)	isalnum((u_char)(x))
+#define	ISALPHA(x)	isalpha((u_char)(x))
+#define	ISASCII(x)	isascii((u_char)(x))
+#define	ISDIGIT(x)	isdigit((u_char)(x))
+#define	ISPRINT(x)	isprint((u_char)(x))
+#define	ISSPACE(x)	isspace((u_char)(x))
+#define	ISUPPER(x)	isupper((u_char)(x))
+#define	ISXDIGIT(x)	isxdigit((u_char)(x))
+#define	ISLOWER(x)	islower((u_char)(x))
+#define	TOUPPER(x)	toupper((u_char)(x))
+#define	TOLOWER(x)	tolower((u_char)(x))
+
+/*
  * If mutexes aren't being used, turn all the mutex functions into null-ops.
  */
 #if !defined(USE_MUTEXES)
@@ -1444,6 +1689,12 @@ extern	char	*fr_getifname __P((struct ifnet *, char *));
 # define	ATOMIC_DEC(x)		(x)--
 #endif
 
+#if defined(USE_SPL) && defined(_KERNEL)
+# define	SPL_INT(x)	int x
+#else
+# define	SPL_INT(x)
+#endif
+
 /*
  * If there are no atomic operations for bit sizes defined, define them to all
  * use a generic one that works for all sizes.
@@ -1459,8 +1710,10 @@ extern	char	*fr_getifname __P((struct ifnet *, char *));
 # define	ATOMIC_DEC16		ATOMIC_DEC
 #endif
 
+#ifndef HDR_T_PRIVATE
 typedef	struct	tcphdr	tcphdr_t;
 typedef	struct	udphdr	udphdr_t;
+#endif
 typedef	struct	icmp	icmphdr_t;
 typedef	struct	ip	ip_t;
 typedef	struct	ether_header	ether_header_t;
@@ -1493,6 +1746,12 @@ typedef	struct	tcpiphdr	tcpiphdr_t;
 #endif
 #ifndef	IP_HL_A
 # define	IP_HL_A(x,y)	(x)->ip_hl = (y)
+#endif
+#ifndef	TCP_X2
+# define	TCP_X2(x)	(x)->th_x2
+#endif
+#ifndef	TCP_X2_A
+# define	TCP_X2_A(x,y)	(x)->th_x2 = (y)
 #endif
 #ifndef	TCP_OFF
 # define	TCP_OFF(x)	(x)->th_off
@@ -1602,6 +1861,8 @@ typedef	struct	tcpiphdr	tcpiphdr_t;
 #define	IPOPT_UMP	152
 #undef	IPOPT_FINN
 #define	IPOPT_FINN	205	/* FINN */
+#undef	IPOPT_AH
+#define	IPOPT_AH	256+IPPROTO_AH
 
 #ifndef TCPOPT_EOL
 # define TCPOPT_EOL		0
@@ -1910,9 +2171,10 @@ typedef	struct	tcpiphdr	tcpiphdr_t;
 #ifndef	IPPROTO_DSTOPTS
 # define	IPPROTO_DSTOPTS	60
 #endif
-#ifndef	IPPROTO_FRAGMENT
-# define	IPPROTO_FRAGMENT	44
+#ifndef	IPPROTO_MOBILITY
+# define	IPPROTO_MOBILITY	135
 #endif
+
 #ifndef	ICMP_ROUTERADVERT
 # define	ICMP_ROUTERADVERT	9
 #endif
@@ -2146,7 +2408,7 @@ typedef	struct	tcpiphdr	tcpiphdr_t;
 /*
  * ICMP error replies have an IP header (20 bytes), 8 bytes of ICMP data,
  * another IP header and then 64 bits of data, totalling 56.  Of course,
- * the last 64 bits is dependant on that being available.
+ * the last 64 bits is dependent on that being available.
  */
 #define	ICMPERR_ICMPHLEN	8
 #define	ICMPERR_IPICMPHLEN	(20 + 8)
@@ -2159,10 +2421,26 @@ typedef	struct	tcpiphdr	tcpiphdr_t;
 # define	MIN(a,b)	(((a)<(b))?(a):(b))
 #endif
 
+#ifdef RESCUE
+# undef IPFILTER_BPF
+#endif
+
 #ifdef IPF_DEBUG
 # define	DPRINT(x)	printf x
 #else
 # define	DPRINT(x)
 #endif
+
+#ifndef	AF_INET6
+# define	AF_INET6	26
+#endif
+
+struct ip6_routing {
+	u_int8_t	ip6r_nxt;	/* next header */ 
+	u_int8_t	ip6r_len;	/* length in units of 8 octets */  
+	u_int8_t	ip6r_type;	/* always zero */
+	u_int8_t	ip6r_segleft;	/* segments left */
+	u_int32_t	ip6r_reserved;	/* reserved field */ 
+};
 
 #endif	/* __IP_COMPAT_H__ */

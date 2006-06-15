@@ -24,7 +24,7 @@ union	{
 
 FILE *yyin;
 
-#define	ishex(c)	(isdigit(c) || ((c) >= 'a' && (c) <= 'f') || \
+#define	ishex(c)	(ISDIGIT(c) || ((c) >= 'a' && (c) <= 'f') || \
 			 ((c) >= 'A' && (c) <= 'F'))
 #define	TOOLONG		-3
 
@@ -32,6 +32,7 @@ extern int	string_start;
 extern int	string_end;
 extern char	*string_val;
 extern int	pos;
+extern int	yydebug;
 
 char		*yystr = NULL;
 int		yytext[YYBUFSIZ+1];
@@ -43,6 +44,9 @@ int		yybreakondot = 0;
 int		yyvarnext = 0;
 int		yytokentype = 0;
 wordtab_t	*yywordtab = NULL;
+int		yysavedepth = 0;
+wordtab_t	*yysavewords[30];
+
 
 static	wordtab_t	*yyfindkey __P((char *));
 static	int		yygetc __P((void));
@@ -51,13 +55,14 @@ static	int		yyswallow __P((int));
 static	char		*yytexttostr __P((int, int));
 static	void		yystrtotext __P((char *));
 
-
 static int yygetc()
 {
 	int c;
 
 	if (yypos < yylast) {
 		c = yytext[yypos++];
+		if (c == '\n')
+			yylineNum++;
 		return c;
 	}
 
@@ -70,6 +75,8 @@ static int yygetc()
 	} else {
 		c = fgetc(yyin);
 	}
+	if (c == '\n')
+		yylineNum++;
 	yytext[yypos++] = c;
 	yylast = yypos;
 	yytext[yypos] = '\0';
@@ -145,7 +152,7 @@ int offset, max;
 
 int yylex()
 {
-	int c, n, isbuilding, rval, lnext;
+	int c, n, isbuilding, rval, lnext, nokey = 0;
 	char *name;
 
 	isbuilding = 0;
@@ -163,7 +170,8 @@ nextchar:
 	switch (c)
 	{
 	case '\n' :
-		yylineNum++;
+		lnext = 0;
+		nokey = 0;
 	case '\t' :
 	case '\r' :
 	case ' ' :
@@ -177,6 +185,8 @@ nextchar:
 		}
 		yylast -= yypos;
 		yypos = 0;
+		lnext = 0;
+		nokey = 0;
 		goto nextchar;
 
 	case '\\' :
@@ -187,6 +197,8 @@ nextchar:
 				yypos--;
 			} else
 				yypos--;
+			if (yypos == 0)
+				nokey = 1;
 			goto nextchar;
 		}
 		break;
@@ -194,6 +206,9 @@ nextchar:
 
 	if (lnext == 1) {
 		lnext = 0;
+		if ((isbuilding == 0) && !ISALNUM(c)) {
+			return c;
+		}
 		goto nextchar;
 	}
 
@@ -206,7 +221,7 @@ nextchar:
 		}
 		yyswallow('\n');
 		rval = YY_COMMENT;
-		goto done;
+		goto nextchar;
 
 	case '$' :
 		if (isbuilding == 1) {
@@ -221,13 +236,13 @@ nextchar:
 			}
 			(void) yygetc();
 		} else {
-			if (!isalpha(n)) {
+			if (!ISALPHA(n)) {
 				yyunputc(n);
 				break;
 			}
 			do {
 				n = yygetc();
-			} while (isalpha(n) || isdigit(n) || n == '_');
+			} while (ISALPHA(n) || ISDIGIT(n) || n == '_');
 			yyunputc(n);
 		}
 
@@ -272,6 +287,13 @@ nextchar:
 		break;
 
 	case EOF :
+		yylineNum = 1;
+		yypos = 0;
+		yylast = -1;
+		yyexpectaddr = 0;
+		yybreakondot = 0;
+		yyvarnext = 0;
+		yytokentype = 0;
 		return 0;
 	}
 
@@ -296,6 +318,8 @@ nextchar:
 	switch (c)
 	{
 	case '-' :
+		if (yyexpectaddr)
+			break;
 		if (isbuilding == 1)
 			break;
 		n = yygetc();
@@ -322,6 +346,8 @@ nextchar:
 		goto done;
 
 	case '<' :
+		if (yyexpectaddr)
+			break;
 		if (isbuilding == 1) {
 			yyunputc(c);
 			goto done;
@@ -340,6 +366,8 @@ nextchar:
 		goto done;
 
 	case '>' :
+		if (yyexpectaddr)
+			break;
 		if (isbuilding == 1) {
 			yyunputc(c);
 			goto done;
@@ -422,10 +450,10 @@ nextchar:
 	/*
 	 * No negative numbers with leading - sign..
 	 */
-	if (isbuilding == 0 && isdigit(c)) {
+	if (isbuilding == 0 && ISDIGIT(c)) {
 		do {
 			n = yygetc();
-		} while (isdigit(n));
+		} while (ISDIGIT(n));
 		yyunputc(n);
 		rval = YY_NUMBER;
 		goto done;
@@ -443,21 +471,33 @@ done:
 		w = NULL;
 		isbuilding = 0;
 
-		if (yyvarnext == 0)
+		if ((yyvarnext == 0) && (nokey == 0)) {
 			w = yyfindkey(yystr);
-		else
+			if (w == NULL && yywordtab != NULL) {
+				yyresetdict();
+				w = yyfindkey(yystr);
+			}
+		} else
 			yyvarnext = 0;
 		if (w != NULL)
 			rval = w->w_value;
 		else
 			rval = YY_STR;
 	}
+
+	if (rval == YY_STR && yysavedepth > 0)
+		yyresetdict();
+
 	yytokentype = rval;
+
+	if (yydebug)
+		printf("lexed(%s) [%d,%d,%d] => %d\n", yystr, string_start,
+			string_end, pos, rval);
 
 	switch (rval)
 	{
 	case YY_NUMBER :
-		yylval.num = atoi(yystr);
+		sscanf(yystr, "%u", &yylval.num);
 		break;
 
 	case YY_HEX :
@@ -549,6 +589,31 @@ char *msg;
 		free(txt);
 	exit(1);
 }
+
+
+void yysetdict(newdict)
+wordtab_t *newdict;
+{
+	if (yysavedepth == sizeof(yysavewords)/sizeof(yysavewords[0])) {
+		fprintf(stderr, "%d: at maximum dictionary depth\n",
+			yylineNum);
+		return;
+	}
+
+	yysavewords[yysavedepth++] = yysettab(newdict);
+	if (yydebug)
+		printf("yysavedepth++ => %d\n", yysavedepth);
+}
+
+void yyresetdict()
+{
+	if (yysavedepth > 0) {
+		yysettab(yysavewords[--yysavedepth]);
+		if (yydebug)
+			printf("yysavedepth-- => %d\n", yysavedepth);
+	}
+}
+
 
 
 #ifdef	TEST_LEXER

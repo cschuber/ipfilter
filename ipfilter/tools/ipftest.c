@@ -20,13 +20,15 @@ extern	struct ifnet	*get_unit __P((char *, int));
 extern	void	init_ifp __P((void));
 extern	ipnat_t	*natparse __P((char *, int));
 extern	int	fr_running;
+extern	hostmap_t **maptable;
 
 ipfmutex_t	ipl_mutex, ipf_authmx, ipf_rw, ipf_stinsert;
 ipfmutex_t	ipf_nat_new, ipf_natio, ipf_timeoutlock;
-ipfrwlock_t	ipf_mutex, ipf_global, ipf_ipidfrag, ip_poolrw;
+ipfrwlock_t	ipf_mutex, ipf_global, ipf_ipidfrag, ip_poolrw, ipf_frcache;
 ipfrwlock_t	ipf_frag, ipf_state, ipf_nat, ipf_natfrag, ipf_auth;
 int	opts = OPT_DONOTHING;
 int	use_inet6 = 0;
+int	docksum = 0;
 int	pfil_delayed_copy = 0;
 int	main __P((int, char *[]));
 int	loadrules __P((char *, int));
@@ -36,6 +38,7 @@ void	dumpnat __P((void));
 void	dumpstate __P((void));
 void	dumplookups __P((void));
 void	dumpgroups __P((void));
+void	dumprules __P((frentry_t *));
 void	drain_log __P((char *));
 void	fixv4sums __P((mb_t *, ip_t *));
 
@@ -75,6 +78,7 @@ char *argv[];
 {
 	char	*datain, *iface, *ifname, *logout;
 	int	fd, i, dir, c, loaded, dump, hlen;
+	struct	in_addr	sip;
 	struct	ifnet	*ifp;
 	struct	ipread	*r;
 	mb_t	mb, *m;
@@ -88,21 +92,23 @@ char *argv[];
 	r = &iptext;
 	iface = NULL;
 	logout = NULL;
-	ifname = "anon0";
 	datain = NULL;
+	sip.s_addr = 0;
+	ifname = "anon0";
 
 	MUTEX_INIT(&ipf_rw, "ipf rw mutex");
 	MUTEX_INIT(&ipf_timeoutlock, "ipf timeout lock");
 	RWLOCK_INIT(&ipf_global, "ipf filter load/unload mutex");
 	RWLOCK_INIT(&ipf_mutex, "ipf filter rwlock");
 	RWLOCK_INIT(&ipf_ipidfrag, "ipf IP NAT-Frag rwlock");
+	RWLOCK_INIT(&ipf_frcache, "ipf filter cache");
 
 	initparse();
 	if (fr_initialise() == -1)
 		abort();
 	fr_running = 1;
 
-	while ((c = getopt(argc, argv, "6bdDF:i:I:l:N:P:or:RT:vxX")) != -1)
+	while ((c = getopt(argc, argv, "6bCdDF:i:I:l:N:P:or:RS:T:vxX")) != -1)
 		switch (c)
 		{
 		case '6' :
@@ -118,6 +124,9 @@ char *argv[];
 			break;
 		case 'd' :
 			opts |= OPT_DEBUG;
+			break;
+		case 'C' :
+			docksum = 1;
 			break;
 		case 'D' :
 			dump = 1;
@@ -145,21 +154,6 @@ char *argv[];
 		case 'l' :
 			logout = optarg;
 			break;
-		case 'o' :
-			opts |= OPT_SAVEOUT;
-			break;
-		case 'r' :
-			if (ipf_parsefile(-1, ipf_addrule, iocfunctions,
-					  optarg) == -1)
-				return -1;
-			loaded = 1;
-			break;
-		case 'R' :
-			opts |= OPT_NORESOLVE;
-			break;
-		case 'v' :
-			opts |= OPT_VERBOSE;
-			break;
 		case 'N' :
 			if (ipnat_parsefile(-1, ipnat_addrule, ipnattestioctl,
 					    optarg) == -1)
@@ -167,13 +161,31 @@ char *argv[];
 			loaded = 1;
 			opts |= OPT_NAT;
 			break;
+		case 'o' :
+			opts |= OPT_SAVEOUT;
+			break;
 		case 'P' :
 			if (ippool_parsefile(-1, optarg, ipooltestioctl) == -1)
 				return -1;
 			loaded = 1;
 			break;
+		case 'r' :
+			if (ipf_parsefile(-1, ipf_addrule, iocfunctions,
+					  optarg) == -1)
+				return -1;
+			loaded = 1;
+			break;
+		case 'S' :
+			sip.s_addr = inet_addr(optarg);
+			break;
+		case 'R' :
+			opts |= OPT_NORESOLVE;
+			break;
 		case 'T' :
 			ipf_dotuning(-1, optarg, ipftestioctl);
+			break;
+		case 'v' :
+			opts |= OPT_VERBOSE;
 			break;
 		case 'x' :
 			opts |= OPT_HEX;
@@ -196,18 +208,19 @@ char *argv[];
 	if (fd < 0)
 		exit(-1);
 
+	m->m_data = (char *)m->mb_buf;
 	ip = MTOD(m, ip_t *);
 	while ((i = (*r->r_readip)(MTOD(m, char *), sizeof(m->mb_buf),
 				    &iface, &dir)) > 0) {
-		if (iface == NULL || *iface == '\0')
+		if ((iface == NULL) || (*iface == '\0'))
 			iface = ifname;
 		ifp = get_unit(iface, IP_V(ip));
 		if (!use_inet6) {
-			ip->ip_off = ntohs(ip->ip_off);
-			ip->ip_len = ntohs(ip->ip_len);
-			if (r->r_flags & R_DO_CKSUM)
+			if ((r->r_flags & R_DO_CKSUM) || docksum)
 				fixv4sums(m, ip);
 			hlen = IP_HL(ip) << 2;
+			if (sip.s_addr)
+				dir = !(sip.s_addr == ip->ip_src.s_addr);
 		}
 #ifdef	USE_INET6
 		else
@@ -236,7 +249,10 @@ char *argv[];
 				(void)printf("pass");
 				break;
 			case 1 :
-				(void)printf("nomatch");
+				if (m == NULL)
+					(void)printf("bad-packet");
+				else
+					(void)printf("nomatch");
 				break;
 			case 3 :
 				(void)printf("block return-rst");
@@ -251,10 +267,6 @@ char *argv[];
 				(void)printf("recognised return %#x\n", i);
 				break;
 			}
-		if (!use_inet6) {
-			ip->ip_off = htons(ip->ip_off);
-			ip->ip_len = htons(ip->ip_len);
-		}
 
 		if (!(opts & OPT_BRIEF)) {
 			putchar(' ');
@@ -281,6 +293,9 @@ char *argv[];
 		}
 		m = &mb;
 	}
+
+	if (i != 0)
+		fprintf(stderr, "readip failed: %d\n", i);
 	(*r->r_close)();
 
 	if (logout != NULL) {
@@ -305,6 +320,7 @@ char *argv[];
 	defined(__osf__) || defined(linux)
 int ipftestioctl(int dev, ioctlcmd_t cmd, ...)
 {
+	extern int ipf_interror;
 	caddr_t data;
 	va_list ap;
 	int i;
@@ -315,8 +331,8 @@ int ipftestioctl(int dev, ioctlcmd_t cmd, ...)
 
 	i = iplioctl(IPL_LOGIPF, cmd, data, FWRITE|FREAD);
 	if (opts & OPT_DEBUG)
-		fprintf(stderr, "iplioctl(IPF,%#x,%p) = %d\n",
-			(u_int)cmd, data, i);
+		fprintf(stderr, "iplioctl(IPF,%#x,%p) = %d (%d)\n",
+			(u_int)cmd, data, i, ipf_interror);
 	if (i != 0) {
 		errno = i;
 		return -1;
@@ -461,11 +477,12 @@ dev_t dev;
 ioctlcmd_t cmd;
 void *data;
 {
+	extern	int	ipf_interror;
 	int i;
 
 	i = iplioctl(IPL_LOGIPF, cmd, data, FWRITE|FREAD);
 	if ((opts & OPT_DEBUG) || (i != 0))
-		fprintf(stderr, "iplioctl(IPF,%#x,%p) = %d\n", cmd, data, i);
+		fprintf(stderr, "iplioctl(IPF,%#x,%p) = %d (%d)\n", cmd, data, i, ipf_interror);
 	if (i != 0) {
 		errno = i;
 		return -1;
@@ -615,13 +632,24 @@ void dumpnat()
 {
 	ipnat_t	*ipn;
 	nat_t	*nat;
+	hostmap_t *hm;
+	int	i;
 
 	printf("List of active MAP/Redirect filters:\n");
 	for (ipn = nat_list; ipn != NULL; ipn = ipn->in_next)
 		printnat(ipn, opts & (OPT_DEBUG|OPT_VERBOSE));
 	printf("\nList of active sessions:\n");
-	for (nat = nat_instances; nat; nat = nat->nat_next)
+	for (nat = nat_instances; nat; nat = nat->nat_next) {
 		printactivenat(nat, opts);
+		if (nat->nat_aps)
+			printaps(nat->nat_aps, opts);
+	}
+
+	printf("\nHostmap table:\n");
+	for (i = 0; i < ipf_hostmap_sz; i++) {
+		for (hm = maptable[i]; hm != NULL; hm = hm->hm_next)
+			printhostmap(hm, i);
+	}
 }
 
 
@@ -634,7 +662,8 @@ void dumpstate()
 
 	printf("List of active state sessions:\n");
 	for (ips = ips_list; ips != NULL; )
-		ips = printstate(ips, opts & (OPT_DEBUG|OPT_VERBOSE));
+		ips = printstate(ips, opts & (OPT_DEBUG|OPT_VERBOSE),
+				 fr_ticks);
 }
 
 
@@ -647,19 +676,18 @@ void dumplookups()
 	printf("List of configured pools\n");
 	for (i = 0; i < IPL_LOGSIZE; i++)
 		for (ipl = ip_pool_list[i]; ipl != NULL; ipl = ipl->ipo_next)
-			printpool(ipl, bcopywrap, opts);
+			printpool(ipl, bcopywrap, NULL, opts);
 
 	printf("List of configured hash tables\n");
 	for (i = 0; i < IPL_LOGSIZE; i++)
 		for (iph = ipf_htables[i]; iph != NULL; iph = iph->iph_next)
-			printhash(iph, bcopywrap, opts);
+			printhash(iph, bcopywrap, NULL, opts);
 }
 
 
 void dumpgroups()
 {
 	frgroup_t *fg;
-	frentry_t *fr;
 	int i;
 
 	printf("List of groups configured (set 0)\n");
@@ -667,14 +695,7 @@ void dumpgroups()
 		for (fg =  ipfgroups[i][0]; fg != NULL; fg = fg->fg_next) {
 			printf("Dev.%d. Group %s Ref %d Flags %#x\n",
 				i, fg->fg_name, fg->fg_ref, fg->fg_flags);
-			for (fr = fg->fg_start; fr != NULL; fr = fr->fr_next) {
-#ifdef	USE_QUAD_T
-				printf("%qu ",(unsigned long long)fr->fr_hits);
-#else
-				printf("%ld ", fr->fr_hits);
-#endif
-				printfr(fr, ipftestioctl);
-			}
+			dumprules(fg->fg_start);
 		}
 
 	printf("List of groups configured (set 1)\n");
@@ -682,15 +703,41 @@ void dumpgroups()
 		for (fg =  ipfgroups[i][1]; fg != NULL; fg = fg->fg_next) {
 			printf("Dev.%d. Group %s Ref %d Flags %#x\n",
 				i, fg->fg_name, fg->fg_ref, fg->fg_flags);
-			for (fr = fg->fg_start; fr != NULL; fr = fr->fr_next) {
-#ifdef	USE_QUAD_T
-				printf("%qu ",(unsigned long long)fr->fr_hits);
-#else
-				printf("%ld ", fr->fr_hits);
-#endif
-				printfr(fr, ipftestioctl);
-			}
+			dumprules(fg->fg_start);
 		}
+
+	printf("Rules configured (set 0, in)\n");
+	dumprules(ipfilter[0][0]);
+	printf("Rules configured (set 0, out)\n");
+	dumprules(ipfilter[1][0]);
+	printf("Rules configured (set 1, in)\n");
+	dumprules(ipfilter[0][1]);
+	printf("Rules configured (set 1, out)\n");
+	dumprules(ipfilter[1][1]);
+
+	printf("Accounting rules configured (set 0, in)\n");
+	dumprules(ipacct[0][0]);
+	printf("Accounting rules configured (set 0, out)\n");
+	dumprules(ipacct[0][1]);
+	printf("Accounting rules configured (set 1, in)\n");
+	dumprules(ipacct[1][0]);
+	printf("Accounting rules configured (set 1, out)\n");
+	dumprules(ipacct[1][1]);
+}
+
+void dumprules(rulehead)
+frentry_t *rulehead;
+{
+	frentry_t *fr;
+
+	for (fr = rulehead; fr != NULL; fr = fr->fr_next) {
+#ifdef	USE_QUAD_T
+		printf("%qu ",(unsigned long long)fr->fr_hits);
+#else
+		printf("%ld ", fr->fr_hits);
+#endif
+		printfr(fr, ipftestioctl);
+	}
 }
 
 
@@ -701,7 +748,7 @@ char *filename;
 	struct iovec iov;
 	struct uio uio;
 	size_t resid;
-	int fd;
+	int fd, i;
 
 	fd = open(filename, O_CREAT|O_TRUNC|O_WRONLY, 0644);
 	if (fd == -1) {
@@ -709,26 +756,27 @@ char *filename;
 		return;
 	}
 
-	while (1) {
-		bzero((char *)&iov, sizeof(iov));
-		iov.iov_base = buffer;
-		iov.iov_len = sizeof(buffer);
+	for (i = 0; i <= IPL_LOGMAX; i++)
+		while (1) {
+			bzero((char *)&iov, sizeof(iov));
+			iov.iov_base = buffer;
+			iov.iov_len = sizeof(buffer);
 
-		bzero((char *)&uio, sizeof(uio));
-		uio.uio_iov = &iov;
-		uio.uio_iovcnt = 1;
-		uio.uio_resid = iov.iov_len;
-		resid = uio.uio_resid;
+			bzero((char *)&uio, sizeof(uio));
+			uio.uio_iov = &iov;
+			uio.uio_iovcnt = 1;
+			uio.uio_resid = iov.iov_len;
+			resid = uio.uio_resid;
 
-		if (ipflog_read(0, &uio) == 0) {
-			/*
-			 * If nothing was read then break out.
-			 */
-			if (uio.uio_resid == resid)
+			if (ipflog_read(i, &uio) == 0) {
+				/*
+				 * If nothing was read then break out.
+				 */
+				if (uio.uio_resid == resid)
+					break;
+				write(fd, buffer, resid - uio.uio_resid);
+			} else
 				break;
-			write(fd, buffer, resid - uio.uio_resid);
-		} else
-			break;
 	}
 
 	close(fd);
@@ -757,6 +805,10 @@ ip_t *ip;
 		hdr = csump;
 		csump += offsetof(udphdr_t, uh_sum);
 		break;
+	case IPPROTO_ICMP :
+		hdr = csump;
+		csump += offsetof(icmphdr_t, icmp_cksum);
+		break;
 	default :
 		csump = NULL;
 		hdr = NULL;
@@ -764,6 +816,7 @@ ip_t *ip;
 	}
 	if (hdr != NULL) {
 		*csump = 0;
-		*(u_short *)csump = fr_cksum(m, ip, ip->ip_p, hdr);
+		*(u_short *)csump = fr_cksum(m, ip, ip->ip_p, hdr,
+					     ntohs(ip->ip_len));
 	}
 }

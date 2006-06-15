@@ -12,6 +12,7 @@ TOP=..
 #
 # For SunOS 4.1.x
 #
+DCPU=$(shell uname -m)
 DCPU:sh=uname -m
 DEF=-D$(DCPU) -D__$(DCPU)__ -DINET -DKERNEL -D_KERNEL -Dsun $(CPU)
 IPDEF=$(DEF) -DGATEWAY -DDIRECTED_BROADCAST
@@ -29,7 +30,7 @@ MFLAGS="BINDEST=$(BINDEST)" "SBINDEST=$(SBINDEST)" "MANDIR=$(MANDIR)" \
 	"LOGFAC=$(LOGFAC)" "POLICY=$(POLICY)" "SOLARIS2=$(SOLARIS2)" \
 	"DEBUG=$(DEBUG)" "DCPU=$(CPU)" "CPUDIR=$(CPUDIR)" \
 	"LOOKUP=$(LOOKUP)" "SYNC=$(SYNC)" "ALLOPTS=$(ALLOPTS)"
-LIBS=-L. -lipf -L/home/darrenr/src/efence-2.0.1 -lefence
+LIBS=-L. -lipf
 #
 ########## ########## ########## ########## ########## ########## ##########
 #
@@ -93,7 +94,7 @@ ipsyncs.o: $(TOOL)/ipsyncs.c $(TOP)/ip_sync.h
 	$(CC) -DIPFILTER_SYNC $(CCARGS) -c $(TOOL)/ipsyncs.c -o $@
 
 ipftest: $(IPFTEST) libipf.a
-	$(CC) $(CCARGS) $(IPFTEST) -o $@ $(LIBS) -ll -L. -lefence $(LIBBPF)
+	$(CC) $(CCARGS) $(IPFTEST) -o $@ $(LIBS) -ll -L. $(LIBBPF)
 
 ipnat: $(IPNAT) libipf.a
 	$(CC) $(CCARGS) $(IPNAT) -o $@ $(LIBS) -lkvm -ll
@@ -120,7 +121,7 @@ ipf.o: $(TOOL)/ipf.c $(TOP)/ip_fil.h $(TOP)/ipf.h
 md5.o: $(TOP)/md5.c $(TOP)/md5.h
 	$(CC) $(CCARGS) $(DFLAGS) -c $(TOP)/md5.c -o $@
 
-radix.o: $(TOP)/radix.c $(TOP)/radix.h
+radix.o: $(TOP)/radix.c $(TOP)/radix_ipf.h
 	$(CC) $(CCARGS) $(DFLAGS) -c $(TOP)/radix.c -o $@
 
 bpf_filter_u.o: $(TOP)/bpf_filter.c
@@ -129,7 +130,7 @@ bpf_filter_u.o: $(TOP)/bpf_filter.c
 md5_u.o: $(TOP)/md5.c $(TOP)/md5.h
 	$(CC) $(CCARGS) -c $(TOP)/md5.c -o $@
 
-radix_u.o: $(TOP)/radix.c $(TOP)/radix.h
+radix_u.o: $(TOP)/radix.c $(TOP)/radix_ipf.h
 	$(CC) $(CCARGS) -c $(TOP)/radix.c -o $@
 
 ipfcomp.o: $(TOOL)/ipfcomp.c $(TOP)/ip_fil.h $(TOP)/ipf.h
@@ -176,8 +177,18 @@ ip_trafcon.o: $(TOP)/ip_trafcon.c $(TOP)/ip_compat.h $(TOP)/ip_fil.h \
 	$(TOP)/ip_trafcon.h
 	$(CC) $(CCARGS) $(DFLAGS) -c $(TOP)/ip_trafcon.c -o $@
 
-ip_rules.o: $(TOP)/ip_rules.c $(TOP)/ip_rules.h
-	$(CC) -I. $(CFLAGS) $(DFLAGS) -c $(TOP)/ip_rules.c -o $@
+ip_rules.c: ipf $(TOP)/tools/ipfcomp.c $(TOP)/rules/ip_rules
+	./ipf -cc -nf $(TOP)/rules/ip_rules
+
+$(TOP)/ip_rules.h: ip_rules.c
+	if [ ! -f $(TOP)/ip_rules.h ] ; then \
+		/bin/mv -f ip_rules.h $(TOP); \
+	else \
+		touch $(TOP)/ip_rules.h; \
+	fi
+
+ip_rules.o: ip_rules.c $(TOP)/ip_rules.h
+	$(CC) -I. $(CFLAGS) $(DFLAGS) -c ip_rules.c -o $@
 
 ip_proxy.o: $(TOP)/ip_proxy.c $(TOP)/ip_proxy.h $(TOP)/ip_compat.h \
 	$(TOP)/ip_ftp_pxy.c $(TOP)/ip_rcmd_pxy.c $(TOP)/ip_raudio_pxy.c \
@@ -193,8 +204,8 @@ ip_nat_u.o: $(TOP)/ip_nat.c $(TOP)/ip_nat.h $(TOP)/ip_compat.h
 ip_frag_u.o: $(TOP)/ip_frag.c $(TOP)/ip_frag.h $(TOP)/ip_compat.h
 	$(CC) $(CCARGS) $(EXTRA) -c $(TOP)/ip_frag.c -o $@
 
-ip_rules_u.o: $(TOP)/ip_rules.c $(TOP)/ip_rules.h $(TOP)/ip_compat.h
-	$(CC) -DIPFILTER_SCAN $(CCARGS) $(EXTRA) -c $(TOP)/ip_rules.c -o $@
+ip_rules_u.o: ip_rules.c $(TOP)/ip_rules.h $(TOP)/ip_compat.h
+	$(CC) -DIPFILTER_SCAN $(CCARGS) $(EXTRA) -c ip_rules.c -o $@
 
 ip_state_u.o: $(TOP)/ip_state.c $(TOP)/ip_state.h $(TOP)/ip_compat.h
 	$(CC) $(CCARGS) $(EXTRA) -c $(TOP)/ip_state.c -o $@
@@ -363,7 +374,7 @@ clean:
 	${RM} -f ippool ippool_y.c ippool_y.h ippool_l.c ippool_l.h
 	${RM} -f ipnat_y.c ipnat_y.h ipnat_l.c ipnat_l.h
 	${RM} -f ipmon_y.c ipmon_y.h ipmon_l.c ipmon_l.h
-	${RM} -f ipsyncm ipsyncs ipfs
+	${RM} -f ipsyncm ipsyncs ipfs ip_rules.c ip_rules.h
 	${MAKE} TOP=.. -f Makefile.ipsend clean
 
 

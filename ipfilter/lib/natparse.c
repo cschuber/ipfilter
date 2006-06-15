@@ -55,7 +55,7 @@ int linenum;
 		*s = '\0';
 	if ((s = strchr(line, '#')))
 		*s = '\0';
-	while (*line && isspace(*line))
+	while (*line && ISSPACE(*line))
 		line++;
 	if (!*line)
 		return NULL;
@@ -223,7 +223,7 @@ int linenum;
 			return NULL;
 		}
 
-		if (isdigit(**cpp) && (s = strchr(*cpp, '-')))
+		if (ISDIGIT(**cpp) && (s = strchr(*cpp, '-')))
 			*s++ = '\0';
 		else
 			s = NULL;

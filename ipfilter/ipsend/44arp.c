@@ -11,6 +11,9 @@
 #endif
 #include <net/if_dl.h>
 #include <net/if_types.h>
+#if defined(__FreeBSD__)
+# include "radix_ipf.h"
+#endif
 #include <net/route.h>
 #include <netinet/in.h>
 #include <netinet/if_ether.h>
@@ -73,6 +76,9 @@ char	*addr, *eaddr;
 		return 0;
 #endif
 
+	if (!addr)
+		return -1;
+
 	mib[0] = CTL_NET;
 	mib[1] = PF_ROUTE;
 	mib[2] = 0;
@@ -100,8 +106,8 @@ char	*addr, *eaddr;
 		rtm = (struct rt_msghdr *)next;
 		sin = (struct sockaddr_inarp *)(rtm + 1);
 		sdl = (struct sockaddr_dl *)(sin + 1);
-		if (addr && !bcmp(addr, (char *)&sin->sin_addr,
-				  sizeof(struct in_addr)))
+		if (!bcmp(addr, (char *)&sin->sin_addr,
+			  sizeof(struct in_addr)))
 		    {
 			bcopy(LLADDR(sdl), eaddr, sdl->sdl_alen);
 			return 0;

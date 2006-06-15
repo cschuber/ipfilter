@@ -12,6 +12,10 @@
 #include <sys/conf.h>
 #include <sys/socket.h>
 #include <sys/sysctl.h>
+#include <sys/select.h>
+#if __FreeBSD_version >= 500000
+# include <sys/selinfo.h>
+#endif                  
 #include <net/if.h>
 #include <netinet/in_systm.h>
 #include <netinet/in.h>
@@ -24,12 +28,41 @@
 #include <netinet/ip_nat.h>
 #include <netinet/ip_auth.h>
 #include <netinet/ip_frag.h>
+#include <netinet/ip_sync.h>
 
+extern	struct	selinfo	ipfselwait[IPL_LOGSIZE];
+
+#if __FreeBSD_version >= 502116
+static struct cdev *ipf_devs[IPL_LOGSIZE];
+#else
 static dev_t ipf_devs[IPL_LOGSIZE];
+#endif
 
 static int sysctl_ipf_int ( SYSCTL_HANDLER_ARGS );
 static int ipf_modload(void);
 static int ipf_modunload(void);
+
+#if (__FreeBSD_version >= 500024)
+# if (__FreeBSD_version >= 502116)
+static	int	iplopen __P((struct cdev*, int, int, struct thread *));
+static	int	iplclose __P((struct cdev*, int, int, struct thread *));
+# else
+static	int	iplopen __P((dev_t, int, int, struct thread *));
+static	int	iplclose __P((dev_t, int, int, struct thread *));
+# endif /* __FreeBSD_version >= 502116 */
+#else
+static	int	iplopen __P((dev_t, int, int, struct proc *));
+static	int	iplclose __P((dev_t, int, int, struct proc *));
+#endif
+#if (__FreeBSD_version >= 502116)
+extern	int	iplread __P((struct cdev*, struct uio *, int));
+extern	int	iplwrite __P((struct cdev*, struct uio *, int));
+#else
+extern	int	iplread __P((dev_t, struct uio *, int));
+extern	int	iplwrite __P((dev_t, struct uio *, int));
+#endif /* __FreeBSD_version >= 502116 */
+
+
 
 SYSCTL_DECL(_net_inet);
 #define SYSCTL_IPF(parent, nbr, name, access, ptr, val, descr) \
@@ -38,7 +71,7 @@ SYSCTL_DECL(_net_inet);
 #define	CTLFLAG_OFF	0x00800000	/* IPFilter must be disabled */
 #define	CTLFLAG_RWO	(CTLFLAG_RW|CTLFLAG_OFF)
 SYSCTL_NODE(_net_inet, OID_AUTO, ipf, CTLFLAG_RW, 0, "IPF");
-SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_flags, CTLFLAG_RW, &fr_flags, 0, "");
+SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_flags, CTLFLAG_RW, &ipf_flags, 0, "");
 SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_pass, CTLFLAG_RW, &fr_pass, 0, "");
 SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_active, CTLFLAG_RD, &fr_active, 0, "");
 SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_tcpidletimeout, CTLFLAG_RWO,
@@ -55,14 +88,14 @@ SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_tcpclosed, CTLFLAG_RWO,
 	   &fr_tcpclosed, 0, "");
 SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_udptimeout, CTLFLAG_RWO,
 	   &fr_udptimeout, 0, "");
+SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_udpacktimeout, CTLFLAG_RWO,
+	   &fr_udpacktimeout, 0, "");
 SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_icmptimeout, CTLFLAG_RWO,
 	   &fr_icmptimeout, 0, "");
 SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_defnatage, CTLFLAG_RWO,
 	   &fr_defnatage, 0, "");
 SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_ipfrttl, CTLFLAG_RW,
 	   &fr_ipfrttl, 0, "");
-SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_unreach, CTLFLAG_RW,
-	   &fr_unreach, 0, "");
 SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_running, CTLFLAG_RD,
 	   &fr_running, 0, "");
 SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_statesize, CTLFLAG_RWO,
@@ -88,11 +121,21 @@ SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_minttl, CTLFLAG_RW, &fr_minttl, 0, "");
 
 #define CDEV_MAJOR 79
 #if __FreeBSD_version >= 501000
+# include <sys/poll.h>
+# include <sys/select.h>
+static int iplpoll(struct cdev *dev, int events, struct thread *td);
+
 static struct cdevsw ipl_cdevsw = {
+#if __FreeBSD_version >= 502103
+	.d_version =	D_VERSION,
+	.d_flags =	0,	/* D_NEEDGIANT - Should be SMP safe */
+#endif
 	.d_open =	iplopen,
 	.d_close =	iplclose,
 	.d_read =	iplread,
+	.d_write =	iplwrite,
 	.d_ioctl =	iplioctl,
+	.d_poll =	iplpoll,
 	.d_name =	"ipl",
 	.d_maj =	CDEV_MAJOR,
 };
@@ -101,9 +144,9 @@ static struct cdevsw ipl_cdevsw = {
 	/* open */	iplopen,
 	/* close */	iplclose,
 	/* read */	iplread,
-	/* write */	nowrite,
+	/* write */	iplwrite,
 	/* ioctl */	iplioctl,
-	/* poll */	nopoll,
+	/* poll */	iplpoll,
 	/* mmap */	nommap,
 	/* strategy */	nostrategy,
 	/* name */	"ipl",
@@ -119,7 +162,8 @@ static struct cdevsw ipl_cdevsw = {
 #endif
 
 static char *ipf_devfiles[] = {	IPL_NAME, IPNAT_NAME, IPSTATE_NAME, IPAUTH_NAME,
-				IPSCAN_NAME, IPSYNC_NAME, IPLOOKUP_NAME, NULL };
+				IPSYNC_NAME, IPSCAN_NAME, IPLOOKUP_NAME, NULL };
+
 
 static int
 ipfilter_modevent(module_t mod, int type, void *unused)
@@ -197,9 +241,15 @@ ipf_modunload()
 {
 	int error, i;
 
-	error = ipldetach();
-	if (error != 0)
-		return error;
+	if (fr_refcnt)
+		return EBUSY;
+
+	if (fr_running >= 0) {
+		error = ipldetach();
+		if (error != 0)
+			return error;
+	} else
+		error = 0;
 
 	fr_running = -2;
 
@@ -215,13 +265,16 @@ ipf_modunload()
 
 
 static moduledata_t ipfiltermod = {
-	IPL_VERSION,
+	"ipfilter",
 	ipfilter_modevent,
 	0
 };
 
 
 DECLARE_MODULE(ipfilter, ipfiltermod, SI_SUB_PROTO_DOMAIN, SI_ORDER_ANY);
+#ifdef	MODULE_VERSION
+MODULE_VERSION(ipfilter, 1);
+#endif
 
 
 #ifdef SYSCTL_IPF
@@ -249,3 +302,176 @@ sysctl_ipf_int ( SYSCTL_HANDLER_ARGS )
 	return (error);
 }
 #endif
+
+
+#if __FreeBSD_version >= 501000
+static int
+iplpoll(struct cdev *dev, int events, struct thread *td)
+{
+	u_int xmin = GET_MINOR(dev);
+	int revents;
+
+	if (xmin < 0 || xmin > IPL_LOGMAX)
+		return 0;
+
+	revents = 0;
+
+	switch (xmin) 
+	{
+	case IPL_LOGIPF :
+	case IPL_LOGNAT :
+	case IPL_LOGSTATE :
+#ifdef IPFILTER_LOG
+		if ((events & (POLLIN | POLLRDNORM)) && ipflog_canread(xmin))
+			revents |= events & (POLLIN | POLLRDNORM);
+#endif  
+		break;
+	case IPL_LOGAUTH :
+		if ((events & (POLLIN | POLLRDNORM)) && fr_auth_waiting())
+			revents |= events & (POLLIN | POLLRDNORM);
+		break; 
+	case IPL_LOGSYNC :
+#ifdef IPFILTER_SYNC
+		if ((events & (POLLIN | POLLRDNORM)) && ipfsync_canread())
+			revents |= events & (POLLIN | POLLRDNORM);
+		if ((events & (POLLOUT | POLLWRNORM)) && ipfsync_canwrite())
+			revents |= events & (POLLOUT | POLLWRNORM);
+#endif
+		break;
+	case IPL_LOGSCAN :
+	case IPL_LOGLOOKUP :
+	default :
+		break;
+	}
+
+	if ((revents == 0) && ((events & (POLLIN|POLLRDNORM)) != 0))
+		selrecord(td, &ipfselwait[xmin]);
+
+	return revents;
+}
+#endif
+
+
+/*
+ * routines below for saving IP headers to buffer
+ */
+static int iplopen(dev, flags
+#if ((BSD >= 199506) || (__FreeBSD_version >= 220000))
+, devtype, p)
+int devtype;
+# if (__FreeBSD_version >= 500024)
+struct thread *p;
+# else
+struct proc *p;
+# endif /* __FreeBSD_version >= 500024 */
+#else
+)
+#endif
+#if (__FreeBSD_version >= 502116)
+struct cdev *dev;
+#else
+dev_t dev;
+#endif
+int flags;
+{
+	u_int min = GET_MINOR(dev);
+
+	if (IPL_LOGMAX < min)
+		min = ENXIO;
+	else
+		min = 0;
+	return min;
+}
+
+
+static int iplclose(dev, flags
+#if ((BSD >= 199506) || (__FreeBSD_version >= 220000))
+, devtype, p)
+int devtype;
+# if (__FreeBSD_version >= 500024)
+struct thread *p;
+# else
+struct proc *p;
+# endif /* __FreeBSD_version >= 500024 */
+#else
+)
+#endif
+#if (__FreeBSD_version >= 502116)
+struct cdev *dev;
+#else
+dev_t dev;
+#endif
+int flags;
+{
+	u_int	min = GET_MINOR(dev);
+
+	if (IPL_LOGMAX < min)
+		min = ENXIO;
+	else
+		min = 0;
+	return min;
+}
+
+/*
+ * iplread/ipllog
+ * both of these must operate with at least splnet() lest they be
+ * called during packet processing and cause an inconsistancy to appear in
+ * the filter lists.
+ */
+#if (BSD >= 199306)
+static int iplread(dev, uio, ioflag)
+int ioflag;
+#else
+static int iplread(dev, uio)
+#endif
+#if (__FreeBSD_version >= 502116)
+struct cdev *dev;
+#else
+dev_t dev;
+#endif
+register struct uio *uio;
+{
+	u_int	xmin = GET_MINOR(dev);
+
+	if (xmin < 0)
+		return ENXIO;
+
+# ifdef	IPFILTER_SYNC
+	if (xmin == IPL_LOGSYNC)
+		return ipfsync_read(uio);
+# endif
+
+#ifdef IPFILTER_LOG
+	return ipflog_read(xmin, uio);
+#else
+	return ENXIO;
+#endif
+}
+
+
+/*
+ * iplwrite
+ * both of these must operate with at least splnet() lest they be
+ * called during packet processing and cause an inconsistancy to appear in
+ * the filter lists.
+ */
+#if (BSD >= 199306)
+static int iplwrite(dev, uio, ioflag)
+int ioflag;
+#else
+static int iplwrite(dev, uio)
+#endif
+#if (__FreeBSD_version >= 502116)
+struct cdev *dev;
+#else
+dev_t dev;
+#endif
+register struct uio *uio;
+{
+
+#ifdef	IPFILTER_SYNC
+	if (GET_MINOR(dev) == IPL_LOGSYNC)
+		return ipfsync_write(uio);
+#endif
+	return ENXIO;
+}

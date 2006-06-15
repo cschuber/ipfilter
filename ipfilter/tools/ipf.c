@@ -31,7 +31,7 @@ extern	int	optind;
 extern	frentry_t *frtop;
 
 
-void	frsync __P((void));
+void	ipf_frsync __P((void));
 void	zerostats __P((void));
 int	main __P((int, char *[]));
 
@@ -59,7 +59,7 @@ static	ioctlfunc_t	iocfunctions[IPL_LOGSIZE] = { ioctl, ioctl, ioctl,
 static void usage()
 {
 	fprintf(stderr, "usage: ipf [-6AdDEInoPrRsvVyzZ] %s %s %s\n",
-		"[-l block|pass|nomatch|state|nat]", "[-F i|o|a|s|S|u]",
+		"[-l block|pass|nomatch|state|nat]", "[-cc] [-F i|o|a|s|S|u]",
 		"[-f filename] [-T <tuneopts>]");
 	exit(1);
 }
@@ -74,22 +74,24 @@ char *argv[];
 	if (argc < 2)
 		usage();
 
-	while ((c = getopt(argc, argv, "6ACdDEf:F:Il:noPrRsT:vVyzZ")) != -1) {
+	while ((c = getopt(argc, argv, "46Ac:dDEf:F:Il:noPrRsT:vVyzZ")) != -1) {
 		switch (c)
 		{
 		case '?' :
 			usage();
 			break;
-#ifdef	USE_INET6
+		case '4' :
+			use_inet6 = -1;
+			break;
 		case '6' :
 			use_inet6 = 1;
 			break;
-#endif
 		case 'A' :
 			opts &= ~OPT_INACTIVE;
 			break;
-		case 'C' :
-			outputc = 1;
+		case 'c' :
+			if (strcmp(optarg, "c") == 0)
+				outputc = 1;
 			break;
 		case 'E' :
 			set_state((u_int)1);
@@ -141,7 +143,7 @@ char *argv[];
 				exit(1);
 			break;
 		case 'y' :
-			frsync();
+			ipf_frsync();
 			break;
 		case 'z' :
 			opts ^= OPT_ZERORULEST;
@@ -195,7 +197,7 @@ static void closedevice()
 
 static	int	get_flags()
 {
-	int i;
+	int i = 0;
 
 	if ((opendevice(ipfname, 1) != -2) &&
 	    (ioctl(fd, SIOCGETFF, &i) == -1)) {
@@ -349,9 +351,20 @@ char	*arg;
 		rem = fl;
 
 		closedevice();
-		if (opendevice(IPSTATE_NAME, 1) != -2 &&
-		    ioctl(fd, SIOCIPFFL, &fl) == -1)
-			perror("ioctl(SIOCIPFFL)");
+		if (opendevice(IPSTATE_NAME, 1) == -2)
+			exit(1);
+
+		if (!(opts & OPT_DONOTHING)) {
+			if (use_inet6) {
+				fprintf(stderr,
+					"IPv6 rules are no longer seperate\n");
+			} else {
+				if (ioctl(fd, SIOCIPFFL, &fl) == -1) {
+					perror("ioctl(SIOCIPFFL)");
+					exit(1);
+				}
+			}
+		}
 		if ((opts & (OPT_DONOTHING|OPT_VERBOSE)) == OPT_VERBOSE) {
 			printf("remove flags %s (%d)\n", arg, rem);
 			printf("removed %d filter rules\n", fl);
@@ -387,8 +400,23 @@ char	*arg;
 		fl |= FR_INACTIVE;
 	rem = fl;
 
-	if (opendevice(ipfname, 1) != -2 && ioctl(fd, SIOCIPFFL, &fl) == -1)
-		perror("ioctl(SIOCIPFFL)");
+	if (opendevice(ipfname, 1) == -2)
+		exit(1);
+
+	if (!(opts & OPT_DONOTHING)) {
+		if (use_inet6) {
+			if (ioctl(fd, SIOCIPFL6, &fl) == -1) {
+				perror("ioctl(SIOCIPFL6)");
+				exit(1);
+			}
+		} else {
+			if (ioctl(fd, SIOCIPFFL, &fl) == -1) {
+				perror("ioctl(SIOCIPFFL)");
+				exit(1);
+			}
+		}
+	}
+
 	if ((opts & (OPT_DONOTHING|OPT_VERBOSE)) == OPT_VERBOSE) {
 		printf("remove flags %s%s (%d)\n", (rem & FR_INQUE) ? "I" : "",
 			(rem & FR_OUTQUE) ? "O" : "", rem);
@@ -409,7 +437,7 @@ static void swapactive()
 }
 
 
-void frsync()
+void ipf_frsync()
 {
 	int frsyn = 0;
 
@@ -422,15 +450,21 @@ void frsync()
 
 void zerostats()
 {
+	ipfobj_t	obj;
 	friostat_t	fio;
-	friostat_t	*fiop = &fio;
+
+	obj.ipfo_rev = IPFILTER_VERSION;
+	obj.ipfo_type = IPFOBJ_IPFSTAT;
+	obj.ipfo_size = sizeof(fio);
+	obj.ipfo_ptr = &fio;
+	obj.ipfo_offset = 0;
 
 	if (opendevice(ipfname, 1) != -2) {
-		if (ioctl(fd, SIOCFRZST, &fiop) == -1) {
+		if (ioctl(fd, SIOCFRZST, &obj) == -1) {
 			perror("ioctl(SIOCFRZST)");
 			exit(-1);
 		}
-		showstats(fiop);
+		showstats(&fio);
 	}
 
 }

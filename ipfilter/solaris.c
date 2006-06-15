@@ -53,13 +53,12 @@
 #include "netinet/ip_auth.h"
 #include "netinet/ip_state.h"
 
+struct pollhead iplpollhead[IPL_LOGSIZE];
 
 extern	struct	filterstats	frstats[];
 extern	int	fr_running;
 extern	int	fr_flags;
-#ifdef IPFILTER_SYNC
 extern	int	iplwrite __P((dev_t, struct uio *, cred_t *));
-#endif
 
 extern ipnat_t *nat_list;
 
@@ -72,9 +71,14 @@ static	int	ipf_attach __P((dev_info_t *, ddi_attach_cmd_t));
 static	int	ipf_detach __P((dev_info_t *, ddi_detach_cmd_t));
 static	int	fr_qifsync __P((ip_t *, int, void *, int, void *, mblk_t **));
 static	int	ipf_property_update __P((dev_info_t *));
+static 	int	iplpoll __P((dev_t, short, int, short *, struct pollhead **));
 static	char	*ipf_devfiles[] = { IPL_NAME, IPNAT_NAME, IPSTATE_NAME,
 				    IPAUTH_NAME, IPSYNC_NAME, IPSCAN_NAME,
 				    IPLOOKUP_NAME, NULL };
+static	int	iplclose __P((dev_t, int, int, cred_t *));
+static	int	iplopen __P((dev_t, int, int, cred_t *));
+static	int	iplread __P((dev_t, struct uio *, cred_t *));
+static	int	iplwrite __P((dev_t, struct uio *, cred_t *));
 
 
 #if SOLARIS2 >= 7
@@ -91,16 +95,12 @@ static struct cb_ops ipf_cb_ops = {
 	nodev,		/* print */
 	nodev,		/* dump */
 	iplread,
-#ifdef IPFILTER_SYNC
 	iplwrite,	/* write */
-#else
-	nodev,		/* write */
-#endif
 	iplioctl,	/* ioctl */
 	nodev,		/* devmap */
 	nodev,		/* mmap */
 	nodev,		/* segmap */
-	nochpoll,	/* poll */
+	iplpoll,	/* poll */
 	ddi_prop_op,
 	NULL,
 	D_MTSAFE,
@@ -297,6 +297,7 @@ ddi_attach_cmd_t cmd;
 		 */
 		RWLOCK_INIT(&ipf_global, "ipf filter load/unload mutex");
 		RWLOCK_INIT(&ipf_mutex, "ipf filter rwlock");
+		RWLOCK_INIT(&ipf_frcache, "ipf cache rwlock");
 
 		/*
 		 * Lock people out while we set things up.
@@ -310,6 +311,11 @@ ddi_attach_cmd_t cmd;
 		if (pfil_add_hook(fr_check, PFIL_IN|PFIL_OUT, &pfh_inet4))
 			cmn_err(CE_WARN, "IP Filter: %s(pfh_inet4) failed",
 				"pfil_add_hook");
+#ifdef USE_INET6
+		if (pfil_add_hook(fr_check, PFIL_IN|PFIL_OUT, &pfh_inet6))
+			cmn_err(CE_WARN, "IP Filter: %s(pfh_inet6) failed",
+				"pfil_add_hook");
+#endif
 		if (pfil_add_hook(fr_qifsync, PFIL_IN|PFIL_OUT, &pfh_sync))
 			cmn_err(CE_WARN, "IP Filter: %s(pfh_sync) failed",
 				"pfil_add_hook");
@@ -351,6 +357,9 @@ ddi_detach_cmd_t cmd;
 #endif
 	switch (cmd) {
 	case DDI_DETACH:
+		if (fr_refcnt != 0)
+			return DDI_FAILURE;
+
 		if (fr_running == -2 || fr_running == 0)
 			break;
 		/*
@@ -367,6 +376,11 @@ ddi_detach_cmd_t cmd;
 		if (pfil_remove_hook(fr_check, PFIL_IN|PFIL_OUT, &pfh_inet4))
 			cmn_err(CE_WARN, "IP Filter: %s(pfh_inet4) failed",
 				"pfil_remove_hook");
+#ifdef USE_INET6
+		if (pfil_remove_hook(fr_check, PFIL_IN|PFIL_OUT, &pfh_inet6))
+			cmn_err(CE_WARN, "IP Filter: %s(pfh_inet6) failed",
+				"pfil_add_hook");
+#endif
 		if (pfil_remove_hook(fr_qifsync, PFIL_IN|PFIL_OUT, &pfh_sync))
 			cmn_err(CE_WARN, "IP Filter: %s(pfh_sync) failed",
 				"pfil_remove_hook");
@@ -396,6 +410,7 @@ ddi_detach_cmd_t cmd;
 		if (!ipldetach()) {
 			RWLOCK_EXIT(&ipf_global);
 			RW_DESTROY(&ipf_mutex);
+			RW_DESTROY(&ipf_frcache);
 			RW_DESTROY(&ipf_global);
 			cmn_err(CE_CONT, "!%s detached.\n", ipfilter_version);
 			return (DDI_SUCCESS);
@@ -454,7 +469,7 @@ void *qif;
 mblk_t **mp;
 {
 
-	frsync();
+	frsync(qif);
 	/*
 	 * Resync. any NAT `connections' using this interface and its IP #.
 	 */
@@ -470,18 +485,7 @@ mblk_t **mp;
  */
 int ipfsync()
 {
-	qpktinfo_t qpi;
-	qif_t *qf;
-
-	frsync();
-	/*
-	 * Resync. any NAT `connections' using this interface and its IP #.
-	 */
-	qf = NULL;
-	while (qif_walk(&qf)) {
-		qpi.qpi_real = qf;
-		(void) fr_qifsync(NULL, 0, (void *)qf->qf_ill, -1, &qpi, NULL);
-	}
+	frsync(NULL);
 	return 0;
 }
 
@@ -568,4 +572,145 @@ dev_info_t *dip;
 	}
 
 	return err;
+}
+
+
+static int iplpoll(dev, events, anyyet, reventsp, phpp)
+dev_t dev;
+short events;
+int anyyet;
+short *reventsp;
+struct pollhead **phpp;
+{
+	u_int xmin = getminor(dev);
+	int revents = 0;
+
+	if (xmin < 0 || xmin > IPL_LOGMAX)
+		return ENXIO;
+
+	switch (xmin) 
+	{
+	case IPL_LOGIPF :
+	case IPL_LOGNAT :
+	case IPL_LOGSTATE :
+#ifdef IPFILTER_LOG
+		if ((events & (POLLIN | POLLRDNORM)) && ipflog_canread(xmin))
+			revents |= events & (POLLIN | POLLRDNORM);
+#endif  
+		break;
+	case IPL_LOGAUTH :
+		if ((events & (POLLIN | POLLRDNORM)) && fr_auth_waiting())
+			revents |= events & (POLLIN | POLLRDNORM);
+		break; 
+	case IPL_LOGSYNC :
+#ifdef IPFILTER_SYNC
+		if ((events & (POLLIN | POLLRDNORM)) && ipfsync_canread())
+			revents |= events & (POLLIN | POLLRDNORM);
+		if ((events & (POLLOUT | POLLWRNORM)) && ipfsync_canwrite())
+			revents |= events & (POLLOUT | POLLOUTNORM);
+#endif
+		break;
+	case IPL_LOGSCAN :
+	case IPL_LOGLOOKUP :
+	default :
+		break;
+	}
+
+	if (revents) {
+		*reventsp = revents;
+	} else {
+		*reventsp = 0;
+		if (!anyyet)
+			*phpp = &iplpollhead[xmin];
+	}
+	return 0;
+}
+
+
+/*
+ * routines below for saving IP headers to buffer
+ */
+/*ARGSUSED*/
+static int iplopen(devp, flags, otype, cred)
+dev_t *devp;
+int flags, otype;
+cred_t *cred;
+{
+	minor_t min = getminor(*devp);
+
+#ifdef	IPFDEBUG
+	cmn_err(CE_CONT, "iplopen(%x,%x,%x,%x)\n", devp, flags, otype, cred);
+#endif
+	if (!(otype & OTYP_CHR))
+		return ENXIO;
+
+	min = (IPL_LOGMAX < min) ? ENXIO : 0;
+	return min;
+}
+
+
+/*ARGSUSED*/
+static int iplclose(dev, flags, otype, cred)
+dev_t dev;
+int flags, otype;
+cred_t *cred;
+{
+	minor_t	min = getminor(dev);
+
+#ifdef	IPFDEBUG
+	cmn_err(CE_CONT, "iplclose(%x,%x,%x,%x)\n", dev, flags, otype, cred);
+#endif
+
+	min = (IPL_LOGMAX < min) ? ENXIO : 0;
+	return min;
+}
+
+
+/*
+ * iplread/ipllog
+ * both of these must operate with at least splnet() lest they be
+ * called during packet processing and cause an inconsistancy to appear in
+ * the filter lists.
+ */
+/*ARGSUSED*/
+static int iplread(dev, uio, cp)
+dev_t dev;
+register struct uio *uio;
+cred_t *cp;
+{
+#ifdef	IPFDEBUG
+	cmn_err(CE_CONT, "iplread(%x,%x,%x)\n", dev, uio, cp);
+#endif
+#ifdef	IPFILTER_SYNC
+	if (getminor(dev) == IPL_LOGSYNC)
+		return ipfsync_read(uio);
+#endif
+
+#ifdef	IPFILTER_LOG
+	return ipflog_read(getminor(dev), uio);
+#else
+	return ENXIO;
+#endif
+}
+
+
+/*
+ * iplread/ipllog
+ * both of these must operate with at least splnet() lest they be
+ * called during packet processing and cause an inconsistancy to appear in
+ * the filter lists.
+ */
+static int iplwrite(dev, uio, cp)
+dev_t dev;
+register struct uio *uio;
+cred_t *cp;
+{
+#ifdef	IPFDEBUG
+	cmn_err(CE_CONT, "iplwrite(%x,%x,%x)\n", dev, uio, cp);
+#endif
+#ifdef	IPFILTER_SYNC
+	if (getminor(dev) == IPL_LOGSYNC)
+		return ipfsync_write(uio);
+#endif /* IPFILTER_SYNC */
+	return ENXIO;
 }

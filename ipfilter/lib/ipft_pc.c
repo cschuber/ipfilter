@@ -160,10 +160,19 @@ static	int	pcap_close()
 static	int	pcap_read_rec(rec)
 struct	pcap_pkthdr *rec;
 {
-	int	n, p;
+	int	n, p, i;
+	char	*s;
 
-	if (read(pfd, (char *)rec, sizeof(*rec)) != sizeof(*rec))
-		return -2;
+	s = (char *)rec;
+	n = sizeof(*rec);
+
+	while (n > 0) {
+		i = read(pfd, (char *)rec, sizeof(*rec));
+		if (i <= 0)
+			return -2;
+		s += i;
+		n -= i;
+	}
 
 	if (swapped) {
 		rec->ph_clen = SWAPLONG(rec->ph_clen);
@@ -176,6 +185,8 @@ struct	pcap_pkthdr *rec;
 	if (!n || n < 0)
 		return -3;
 
+	if (p < 0 || p > 65536)
+		return -4;
 	return p;
 }
 
@@ -222,7 +233,7 @@ int	cnt, *dir;
 	struct	pcap_pkthdr rec;
 	struct	llc	*l;
 	char	*s, ty[4];
-	int	i, n;
+	int	i, j, n;
 
 	l = llcp;
 
@@ -236,8 +247,14 @@ int	cnt, *dir;
 			bufp = realloc(bufp, i);
 		s = bufp;
 
-		if (read(pfd, s, i) != i)
-			return -2;
+		for (j = i, n = 0; j > 0; ) {
+			n = read(pfd, s, j);
+			if (n <= 0)
+				return -2;
+			j -= n;
+			s += n;
+		}
+		s = bufp;
 
 		i -= l->lc_sz;
 		s += l->lc_to;

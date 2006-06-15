@@ -6,20 +6,48 @@
 # in providing a very available location for the IP Filter home page and
 # distribution center.
 #
-# Thanks to Tel.Net Media for allowing me to maintain and further develop
-# IP Filter as part of my job and supplying Sun equipment for testing the
-# move to 64bits and Gigabit Ethernet.
-#
-# Thanks to BSDI for providing object files for BSD/OS 3.1 and the means
-# to further support development of IP Filter under BSDI.
-#
-# Thanks to Craig Bishop of connect.com.au and Sun Microsystems for the
-# loan of a machine to work on a Solaris 2.x port of this software.
-#
 # Thanks also to all those who have contributed patches and other code,
 # and especially those who have found the time to port IP Filter to new
 # platforms.
 #
+get return-rst and return-icmp* and fastroute working on Linux
+
+passing of pointers to interface structures wrong for HP-UX/Solaris with
+return-* rules.
+
+Make the solaris boot script able to run on 2.5.1
+
+ippool related files missing from Solaris packages
+
+The name /dev/ippool should be /dev/iplookup
+
+add regression testing for parsing long interface names in nat rules,
+along with mssclamp and tags.  Also add test for mssclamp operation.
+
+ttl displayed for "ipfstat -t" is wrong because ttl is not computed.
+
+parse logical interface names (Sun)
+
+unloading LKMs was only working if they were enabled.
+
+sync'ing up NAT sessions when NICs change should cause NAT rules to
+re-lookup name->pointer mappings
+
+not all of the ippool ioctl's are IOWR and they should be because they
+use the ipfobj_t for passing information in/out of the kernel.  leave the
+old values defined and handle them, for compatibility.
+
+pool stats wrong: ippoolstate used where ipoolstat should be, hash table
+  statistics not reported at all
+
+fr_running not set correctly for OpenBSD when compiled into the kernel
+
+Allow SIOCGETFF while disabled
+
+Fix mssclamp with NAT (pasing and printing of the word, plus wrong bytes
+altered.  How do you say "untested" ?)
+
+4.1 - RELEASED - 12 February 2004
 
 4.0-BETA1 20 August 2003
 

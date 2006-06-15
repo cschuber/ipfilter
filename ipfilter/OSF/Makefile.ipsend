@@ -45,9 +45,9 @@ ipsopt.o: $(TOP)/ipsend/ipsopt.c
 ipresend.o: $(TOP)/ipsend/ipresend.c
 	$(CC) $(CCARGS) -c $(TOP)/ipsend/ipresend.c -o $@
 ip.o: $(TOP)/ipsend/ip.c
-	$(CC) $(CCARGS) $(FIXRADIX) -c $(TOP)/ipsend/ip.c -o $@
+	$(CC) $(CCARGS) -c $(TOP)/ipsend/ip.c -o $@
 resend.o: $(TOP)/ipsend/resend.c
-	$(CC) $(CCARGS) $(FIXRADIX) -c $(TOP)/ipsend/resend.c -o $@
+	$(CC) $(CCARGS) -c $(TOP)/ipsend/resend.c -o $@
 ipft_sn.o: $(TOP)/ipft_sn.c
 	$(CC) $(CCARGS) -c $(TOP)/ipft_sn.c -o $@
 ipft_pc.o: $(TOP)/ipft_pc.c
@@ -55,7 +55,7 @@ ipft_pc.o: $(TOP)/ipft_pc.c
 iptest.o: $(TOP)/ipsend/iptest.c
 	$(CC) $(CCARGS) -c $(TOP)/ipsend/iptest.c -o $@
 iptests.o: $(TOP)/ipsend/iptests.c
-	$(CC) $(CCARGS) $(FIXRADIX) -c $(TOP)/ipsend/iptests.c -o $@
+	$(CC) $(CCARGS) -c $(TOP)/ipsend/iptests.c -o $@
 sbpf.o: $(TOP)/ipsend/sbpf.c
 	$(CC) $(CCARGS) -c $(TOP)/ipsend/sbpf.c -o $@
 snit.o: $(TOP)/ipsend/snit.c
@@ -63,7 +63,7 @@ snit.o: $(TOP)/ipsend/snit.c
 sock.o: $(TOP)/ipsend/sock.c
 	$(CC) $(CCARGS) -c $(TOP)/ipsend/sock.c -o $@
 arp.o: $(TOP)/ipsend/arp.c
-	$(CC) $(CCARGS) $(FIXRADIX) -c $(TOP)/ipsend/arp.c -o $@
+	$(CC) $(CCARGS) -c $(TOP)/ipsend/arp.c -o $@
 44arp.o: $(TOP)/ipsend/44arp.c
 	$(CC) $(CCARGS) -c $(TOP)/ipsend/44arp.c -o $@
 lsock.o: $(TOP)/ipsend/lsock.c
@@ -75,4 +75,4 @@ larp.o: $(TOP)/ipsend/larp.c
 dlcommon.o: $(TOP)/ipsend/dlcommon.c
 	$(CC) $(CCARGS) -c $(TOP)/ipsend/dlcommon.c -o $@
 sdlpi.o: $(TOP)/ipsend/sdlpi.c
-	$(CC) $(CCARGS) $(FIXRADIX) -c $(TOP)/ipsend/sdlpi.c -o $@
+	$(CC) $(CCARGS) -c $(TOP)/ipsend/sdlpi.c -o $@

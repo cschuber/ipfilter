@@ -43,9 +43,12 @@
 #include <netinet/tcp.h>
 #include <netinet/tcpip.h>
 #include <sys/lkm.h>
+#include <sys/poll.h>
+#include <sys/select.h>
 #include "ipl.h"
 #include "ip_compat.h"
 #include "ip_fil.h"
+#include "ip_auth.h"
 
 #if !defined(__NetBSD_Version__) || __NetBSD_Version__ < 103050000
 #define vn_lock(v,f) VOP_LOCK(v)
@@ -71,18 +74,46 @@ static	char	*ipf_devfiles[] = { IPL_NAME, IPNAT_NAME, IPSTATE_NAME,
 				    IPAUTH_NAME, IPSYNC_NAME, IPSCAN_NAME,
 				    IPLOOKUP_NAME, NULL };
 
+#if  (__NetBSD_Version__ >= 399001400)
+# define	PROC_T	struct lwp
+#else
+# define	PROC_T	struct proc
+#endif
+#if (NetBSD >= 199511)
+static	int	iplopen(dev_t dev, int flags, int devtype, PROC_T *p);
+static	int	iplclose(dev_t dev, int flags, int devtype, PROC_T *p);
+#else
+static	int	iplopen(dev_t dev, int flags);
+static	int	iplclose(dev_t dev, int flags);
+#endif
+static	int	iplread(dev_t, struct uio *, int ioflag);
+static	int	iplwrite(dev_t, struct uio *, int ioflag);
+static	int	iplpoll(dev_t, int events, PROC_T *);
+
+struct selinfo	ipfselwait[IPL_LOGSIZE];
 
 #if (defined(NetBSD1_0) && (NetBSD1_0 > 1)) || \
     (defined(NetBSD) && (NetBSD <= 1991011) && (NetBSD >= 199511))
 # if defined(__NetBSD__) && (__NetBSD_Version__ >= 106080000)
-extern const struct cdevsw ipl_cdevsw;
+
+const struct cdevsw ipl_cdevsw = {
+	iplopen,
+	iplclose,
+	iplread,
+	iplwrite,
+	iplioctl,
+	nostop,
+	notty,
+	iplpoll,
+	nommap,
+};
 # else
 struct	cdevsw	ipldevsw =
 {
 	iplopen,		/* open */
 	iplclose,		/* close */
 	iplread,		/* read */
-	0,			/* write */
+	iplwrite,		/* write */
 	iplioctl,		/* ioctl */
 	0,			/* stop */
 	0,			/* tty */
@@ -97,7 +128,7 @@ struct	cdevsw	ipldevsw =
 	iplopen,		/* open */
 	iplclose,		/* close */
 	iplread,		/* read */
-	(void *)nullop,		/* write */
+	iplwrite,		/* write */
 	iplioctl,		/* ioctl */
 	(void *)nullop,		/* stop */
 	(void *)nullop,		/* reset */
@@ -149,11 +180,13 @@ int cmd;
 			return EEXIST;
 
 #if defined(__NetBSD__) && (__NetBSD_Version__ >= 106080000)
+# if (__NetBSD_Version__ < 200000000)
 		err = devsw_attach(args->lkm_devname,
 				   args->lkm_bdev, &args->lkm_bdevmaj,
 				   args->lkm_cdev, &args->lkm_cdevmaj);
 		if (err != 0)
 			return (err);
+# endif
 		ipl_major = args->lkm_cdevmaj;
 #else
 		for (i = 0; i < nchrdev; i++)
@@ -225,9 +258,12 @@ static int ipl_unload()
 	 * Unloading - remove the filter rule check from the IP
 	 * input/output stream.
 	 */
-	error = ipldetach();
+	if (fr_refcnt)
+		error = EBUSY;
+	else if (fr_running >= 0)
+		error = ipldetach();
 
-	if (!error) {
+	if (error == 0) {
 		fr_running = -2;
 		error = ipl_remove();
 		printf("%s unloaded\n", ipfilter_version);
@@ -302,4 +338,138 @@ static int ipl_load()
 		fr_running = 1;
 	}
 	return error;
+}
+
+
+/*
+ * routines below for saving IP headers to buffer
+ */
+static int iplopen(dev, flags
+#if (NetBSD >= 199511)
+, devtype, p)
+int devtype;
+PROC_T *p;
+#else
+)
+#endif
+dev_t dev;
+int flags;
+{
+	u_int xmin = GET_MINOR(dev);
+
+	if (IPL_LOGMAX < xmin)
+		xmin = ENXIO;
+	else
+		xmin = 0;
+	return xmin;
+}
+
+
+static int iplclose(dev, flags
+#if (NetBSD >= 199511)
+, devtype, p)
+int devtype;
+PROC_T *p;
+#else
+)
+#endif
+dev_t dev;
+int flags;
+{
+	u_int	xmin = GET_MINOR(dev);
+
+	if (IPL_LOGMAX < xmin)
+		xmin = ENXIO;
+	else
+		xmin = 0;
+	return xmin;
+}
+
+/*
+ * iplread/ipllog
+ * both of these must operate with at least splnet() lest they be
+ * called during packet processing and cause an inconsistancy to appear in
+ * the filter lists.
+ */
+static int iplread(dev, uio, ioflag)
+int ioflag;
+dev_t dev;
+register struct uio *uio;
+{
+
+# ifdef	IPFILTER_SYNC
+	if (GET_MINOR(dev) == IPL_LOGSYNC)
+		return ipfsync_read(uio);
+# endif
+
+#ifdef IPFILTER_LOG
+	return ipflog_read(GET_MINOR(dev), uio);
+#else
+	return ENXIO;
+#endif
+}
+
+
+/*
+ * iplwrite
+ * both of these must operate with at least splnet() lest they be
+ * called during packet processing and cause an inconsistancy to appear in
+ * the filter lists.
+ */
+static int iplwrite(dev, uio, ioflag)
+int ioflag;
+dev_t dev;
+register struct uio *uio;
+{
+
+#ifdef	IPFILTER_SYNC
+	if (GET_MINOR(dev) == IPL_LOGSYNC)
+		return ipfsync_write(uio);
+#endif
+	return ENXIO;
+}
+
+
+static int iplpoll(dev, events, p)
+dev_t dev;
+int events;
+PROC_T *p;
+{
+	u_int xmin = GET_MINOR(dev);
+	int revents = 0;
+
+	if (IPL_LOGMAX < xmin)
+		return ENXIO;
+
+	switch (xmin)
+	{
+	case IPL_LOGIPF :
+	case IPL_LOGNAT :
+	case IPL_LOGSTATE :
+#ifdef IPFILTER_LOG
+		if ((events & (POLLIN | POLLRDNORM)) && ipflog_canread(xmin))
+			revents |= events & (POLLIN | POLLRDNORM);
+#endif
+		break;
+	case IPL_LOGAUTH :
+		if ((events & (POLLIN | POLLRDNORM)) && fr_auth_waiting())
+			revents |= events & (POLLIN | POLLRDNORM);
+		break;
+	case IPL_LOGSYNC :
+#ifdef IPFILTER_SYNC
+		if ((events & (POLLIN | POLLRDNORM)) && ipfsync_canread())
+			revents |= events & (POLLIN | POLLRDNORM);
+		if ((events & (POLLOUT | POLLWRNORM)) && ipfsync_canwrite())
+			revents |= events & (POLLOUT | POLLOUTNORM);
+#endif
+		break;
+	case IPL_LOGSCAN :
+	case IPL_LOGLOOKUP :
+	default :
+		break;
+	}
+
+	if ((revents == 0) && ((events & (POLLIN|POLLRDNORM) != 0)))
+		selrecord(p, &ipfselwait[xmin]);
+	return revents;
 }

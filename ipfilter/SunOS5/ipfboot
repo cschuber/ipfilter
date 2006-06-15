@@ -1,7 +1,6 @@
 #!/bin/sh
 #
 IPFBASE=/etc/opt/ipf
-PIDFILE=${IPFBASE}/ipmon.pid
 
 PATH=/bin:/sbin:/usr/sbin:${PATH}:/opt/ipf/bin
 IPFILCONF=${IPFBASE}/ipf.conf
@@ -9,7 +8,23 @@ IP6FILCONF=${IPFBASE}/ipf6.conf
 IPNATCONF=${IPFBASE}/ipnat.conf
 IPPOOLCONF=${IPFBASE}/ippool.conf
 PFILCHECKED=no
+if [ -d /var/run ] ; then
+	PIDFILE=/var/run/ipmon.pid
+else
+	PIDFILE=${IPFBASE}/ipmon.pid
+fi
 
+
+getpid()
+{
+	if [ -f /usr/bin/pgrep ] ; then
+		rval=`pgrep $1`
+	else
+		rval=`ps -ef | awk "/$1/ { print \\$2; } " -`
+	fi
+
+	return $rval
+}
 
 logmsg()
 {
@@ -23,12 +38,21 @@ checkpfil()
 	if [ $PFILCHECKED = yes ] ; then
 		return
 	fi
-	ndd /dev/pfil qif_status 2>&1 > /dev/null
-	if [ $? -ne 0 ] ; then
+	if [ -z "`ndd /dev/pfil qif_status 2>/dev/null`" ] ; then
 		logmsg "pfil not available to support ipfilter"
 		exit 1
 	fi
-	realnic=`/sbin/ifconfig -a modlist 2>/dev/null | grep -c pfil`
+	if [ `uname -r|cut -d. -f2` -gt 7 ] ; then
+		realnic=`/sbin/ifconfig -a modlist 2>/dev/null | grep -c pfil`
+	else
+		for i in `ifconfig -a | cut -d: -f1 | egrep -v '[ 	]|^lo'`
+		do
+			if strconf -m pfil < /dev/$i >/dev/null 2>&1 ; then
+				realnic=1;
+				break;
+			fi
+		done
+	fi
 	if [ $realnic -eq 0 ] ; then
 		logmsg "pfil not configured for firewall/NAT operation"
 	fi
@@ -38,11 +62,13 @@ checkpfil()
 
 getids()
 {
-	id=`modinfo 2>&1 | awk '/ipf/ { print $1 } ' - 2>/dev/null`
+	ipfid=`modinfo 2>&1 | awk '/ipf / { print $1 } ' - 2>/dev/null`
+	ipfruleid=`modinfo 2>&1 | awk '/ipfrule/ { print $1 } ' - 2>/dev/null`
 	if [ -f $PIDFILE ] ; then
 		pid=`cat $PIDFILE 2>/dev/null`
 	else
-		pid=`pgrep ipmon`
+		getpid ipmon
+		pid=$?
 	fi
 }
 
@@ -130,9 +156,14 @@ load_ippool_config() {
 
 case "$1" in
 	start)
+		getids
 		[ -n "$pid" ] && kill -TERM $pid 2>/dev/null
-		[ -n "$id" ] && modunload -i $id 2>/dev/null
+		[ -n "$ipfruleid" ] && modunload -i $ipfruleid 2>/dev/null
+		[ -n "$ipfid" ] && modunload -i $ipfid 2>/dev/null
 		modload /usr/kernel/drv/ipf
+		if [ -f /usr/kernel/drv/ipfrule ] ; then
+			modload /usr/kernel/drv/ipfrule
+		fi
 		load_ippool_config
 		load_ipf_config
 		load_ipnat_config
@@ -140,11 +171,15 @@ case "$1" in
 		;;
 
 	stop)
+		getids
 		[ -n "$pid" ] && kill -TERM $pid
-		[ -n "$id" ] && modunload -i $id
+		/bin/rm -f $PIDFILE
+		[ -n "$ipfruleid" ] && modunload -i $ipfruleid 2>/dev/null
+		[ -n "$ipfid" ] && modunload -i $ipfid
 		;;
 
 	pause)
+		getids
 		ipfs -l
 		ipfs -NS -w
 		ipf -D
@@ -158,6 +193,7 @@ case "$1" in
 		;;
 
 	resume)
+		getids
 		ipf -E
 		ipfs -R
 		load_ippool_config

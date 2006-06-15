@@ -10,19 +10,19 @@
 #define	__IP_POOL_H__
 
 #if defined(_KERNEL) && !defined(__osf__) && !defined(__hpux) && \
-    !(defined(sun) && (defined(__svr4__) || defined(__SVR4)))
+    !defined(linux) && !defined(sun) && !defined(AIX)
 # include <net/radix.h>
 extern void rn_freehead __P((struct radix_node_head *));
 # define FreeS(p, z)		KFREES(p, z)
 extern int max_keylen;
 #else
 # if defined(__osf__) || defined(__hpux)
-#  include "radix_ipf.h"
+#  include "radix_ipf_local.h"
 #  define radix_mask ipf_radix_mask
 #  define radix_node ipf_radix_node
 #  define radix_node_head ipf_radix_node_head
 # else
-#  include "radix.h"
+#  include "radix_ipf.h"
 # endif
 #endif
 #include "netinet/ip_lookup.h"
@@ -71,13 +71,15 @@ extern	int	ip_pool_search __P((void *, int, void *));
 extern	int	ip_pool_init __P((void));
 extern	void	ip_pool_fini __P((void));
 extern	int	ip_pool_create __P((iplookupop_t *));
-extern	int	ip_pool_insert __P((ip_pool_t *, i6addr_t *, i6addr_t *, int));
+extern	int	ip_pool_insert __P((ip_pool_t *, ip_pool_node_t *));
 extern	int	ip_pool_remove __P((ip_pool_t *, ip_pool_node_t *));
 extern	int	ip_pool_destroy __P((iplookupop_t *));
 extern	void	ip_pool_free __P((ip_pool_t *));
 extern	void	ip_pool_deref __P((ip_pool_t *));
 extern	void	*ip_pool_find __P((int, char *));
 extern	ip_pool_node_t *ip_pool_findeq __P((ip_pool_t *,
-					  struct in_addr *, struct in_addr *));
+					  addrfamily_t *, addrfamily_t *));
+extern	int	ip_pool_flush __P((iplookupflush_t *));
+extern	int	ip_pool_statistics __P((iplookupop_t *));
 
 #endif /* __IP_POOL_H__ */

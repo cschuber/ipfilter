@@ -93,7 +93,7 @@ int sysctl_ipf_int SYSCTL_HANDLER_ARGS;
 # define	CTLFLAG_OFF	0x00800000	/* IPFilter must be disabled */
 # define	CTLFLAG_RWO	(CTLFLAG_RW|CTLFLAG_OFF)
 SYSCTL_NODE(_net_inet, OID_AUTO, ipf, CTLFLAG_RW, 0, "IPF");
-SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_flags, CTLFLAG_RW, &fr_flags, 0, "");
+SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_flags, CTLFLAG_RW, &ipf_flags, 0, "");
 SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_pass, CTLFLAG_RW, &fr_pass, 0, "");
 SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_active, CTLFLAG_RD, &fr_active, 0, "");
 SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_chksrc, CTLFLAG_RW, &fr_chksrc, 0, "");
@@ -118,8 +118,6 @@ SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_defnatage, CTLFLAG_RWO,
 	   &fr_defnatage, 0, "");
 SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_ipfrttl, CTLFLAG_RW,
 	   &fr_ipfrttl, 0, "");
-SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_unreach, CTLFLAG_RW,
-	   &fr_unreach, 0, "");
 SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_running, CTLFLAG_RD,
 	   &fr_running, 0, "");
 SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_statesize, CTLFLAG_RWO,
@@ -467,3 +465,128 @@ sysctl_ipf_int SYSCTL_HANDLER_ARGS
 SYSINIT(ipldev,SI_SUB_DRIVERS,SI_ORDER_MIDDLE+CDEV_MAJOR,ipl_drvinit,NULL)
 # endif /* IPFILTER_LKM */
 #endif /* _FreeBSD_version */
+
+
+/*
+ * routines below for saving IP headers to buffer
+ */
+int iplopen(dev, flags
+#if ((BSD >= 199506) || (__FreeBSD_version >= 220000))
+, devtype, p)
+int devtype;
+# if (__FreeBSD_version >= 500024)
+struct thread *p;
+# else
+struct proc *p;
+# endif /* __FreeBSD_version >= 500024 */
+#else
+)
+#endif
+#if (__FreeBSD_version >= 502116)
+struct cdev *dev;
+#else
+dev_t dev;
+#endif
+int flags;
+{
+	u_int min = GET_MINOR(dev);
+
+	if (IPL_LOGMAX < min)
+		min = ENXIO;
+	else
+		min = 0;
+	return min;
+}
+
+
+int iplclose(dev, flags
+#if ((BSD >= 199506) || (__FreeBSD_version >= 220000))
+, devtype, p)
+int devtype;
+# if (__FreeBSD_version >= 500024)
+struct thread *p;
+# else
+struct proc *p;
+# endif /* __FreeBSD_version >= 500024 */
+#else
+)
+#endif
+#if (__FreeBSD_version >= 502116)
+struct cdev *dev;
+#else
+dev_t dev;
+#endif
+int flags;
+{
+	u_int	min = GET_MINOR(dev);
+
+	if (IPL_LOGMAX < min)
+		min = ENXIO;
+	else
+		min = 0;
+	return min;
+}
+
+/*
+ * iplread/ipllog
+ * both of these must operate with at least splnet() lest they be
+ * called during packet processing and cause an inconsistancy to appear in
+ * the filter lists.
+ */
+#if (BSD >= 199306)
+int iplread(dev, uio, ioflag)
+int ioflag;
+#else
+int iplread(dev, uio)
+#endif
+#if (__FreeBSD_version >= 502116)
+struct cdev *dev;
+#else
+dev_t dev;
+#endif
+register struct uio *uio;
+{
+	u_int	xmin = GET_MINOR(dev);
+
+	if (xmin < 0)
+		return ENXIO;
+
+# ifdef	IPFILTER_SYNC
+	if (xmin == IPL_LOGSYNC)
+		return ipfsync_read(uio);
+# endif
+
+#ifdef IPFILTER_LOG
+	return ipflog_read(xmin, uio);
+#else
+	return ENXIO;
+#endif
+}
+
+
+/*
+ * iplwrite
+ * both of these must operate with at least splnet() lest they be
+ * called during packet processing and cause an inconsistancy to appear in
+ * the filter lists.
+ */
+#if (BSD >= 199306)
+int iplwrite(dev, uio, ioflag)
+int ioflag;
+#else
+int iplwrite(dev, uio)
+#endif
+#if (__FreeBSD_version >= 502116)
+struct cdev *dev;
+#else
+dev_t dev;
+#endif
+register struct uio *uio;
+{
+
+#ifdef	IPFILTER_SYNC
+	if (GET_MINOR(dev) == IPL_LOGSYNC)
+		return ipfsync_write(uio);
+#endif
+	return ENXIO;
+}

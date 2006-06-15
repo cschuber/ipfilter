@@ -207,7 +207,7 @@ char *src;
 			j = k = 0;
 			do {
 				c = *s++;
-				if (j && (!isdigit(c) || (c > '7') ||
+				if (j && (!ISDIGIT(c) || (c > '7') ||
 				     (k >= 248))) {
 					*u++ = k, i++;
 					j = k = 0;
@@ -216,7 +216,7 @@ char *src;
 				}
 				i++;
 
-				if (isalpha(c) || (c > '7')) {
+				if (ISALPHA(c) || (c > '7')) {
 					switch (c)
 					{
 					case 'n' :
@@ -232,7 +232,7 @@ char *src;
 						*u++ = c;
 						break;
 					}
-				} else if (isdigit(c)) {
+				} else if (ISDIGIT(c)) {
 					j = 1;
 					k <<= 3;
 					k |= (c - '0');

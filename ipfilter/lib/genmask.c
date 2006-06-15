@@ -9,7 +9,8 @@
 #include "ipf.h"
 
 
-int genmask(msk, mskp)
+int genmask(family, msk, mskp)
+int family;
 char *msk;
 u_32_t *mskp;
 {
@@ -19,36 +20,47 @@ u_32_t *mskp;
 	if (strchr(msk, '.') || strchr(msk, 'x') || strchr(msk, ':')) {
 		/* possibly of the form xxx.xxx.xxx.xxx
 		 * or 0xYYYYYYYY */
-#ifdef	USE_INET6
-		if (use_inet6) {
+		switch (family)
+		{
+#ifdef USE_INET6
+		case AF_INET6 :
 			if (inet_pton(AF_INET6, msk, mskp) != 1)
 				return -1;
-		} else
+			break;
 #endif
-		if (inet_aton(msk, (struct in_addr *)mskp) == 0)
+		case AF_INET :
+			if (inet_aton(msk, (struct in_addr *)mskp) == 0)
+				return -1;
+			break;
+		default :
 			return -1;
+			/*NOTREACHED*/
+		}
 	} else {
 		/*
 		 * set x most significant bits
 		 */
 		bits = (int)strtol(msk, &endptr, 0);
-#ifdef	USE_INET6
-		if ((*endptr != '\0') ||
-		    ((bits > 32) && !use_inet6) || (bits < 0) ||
-		    ((bits > 128) && use_inet6))
-#else
-		if (*endptr != '\0' || bits > 32 || bits < 0)
-#endif
-			return -1;
-#ifdef	USE_INET6
-		if (use_inet6)
+
+		switch (family)
+		{
+		case AF_INET6 :
+			if ((*endptr != '\0') || (bits < 0) || (bits > 128))
+				return -1;
 			fill6bits(bits, mskp);
-		else
-#endif
-		if (bits == 0)
-			*mskp = 0;
-		else
-			*mskp = htonl(0xffffffff << (32 - bits));
+			break;
+		case AF_INET :
+			if (*endptr != '\0' || bits > 32 || bits < 0)
+				return -1;
+			if (bits == 0)
+				*mskp = 0;
+			else
+				*mskp = htonl(0xffffffff << (32 - bits));
+			break;
+		default :
+			return -1;
+			/*NOTREACHED*/
+		}
 	}
 	return 0;
 }

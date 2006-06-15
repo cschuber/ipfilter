@@ -17,20 +17,23 @@ typedef	struct	ipfr	{
 	struct	ipfr	*ipfr_next, **ipfr_prev;
 	void	*ipfr_data;
 	void	*ipfr_ifp;
-	struct	in_addr	ipfr_src;
-	struct	in_addr	ipfr_dst;
+	i6addr_t	ipfr_source;
+	i6addr_t	ipfr_dest;
 	u_32_t	ipfr_optmsk;
 	u_short	ipfr_secmsk;
 	u_short	ipfr_auth;
-	u_short	ipfr_id;
-	u_char	ipfr_p;
-	u_char	ipfr_tos;
+	u_32_t	ipfr_id;
 	u_32_t	ipfr_pass;
 	u_short	ipfr_off;
+	u_short	ipfr_firstend;
+	u_char	ipfr_p;
 	u_char	ipfr_ttl;
 	u_char	ipfr_seen0;
 	frentry_t *ipfr_rule;
 } ipfr_t;
+
+#define	ipfr_src	ipfr_source.in4
+#define	ipfr_dst	ipfr_dest.in4
 
 
 typedef	struct	ipfrstat {
@@ -81,4 +84,4 @@ extern	void	fr_slowtimer __P((void *));
 extern	int	fr_slowtimer __P((void));
 #endif
 
-#endif	/* __IP_FIL_H__ */
+#endif	/* __IP_FRAG_H__ */

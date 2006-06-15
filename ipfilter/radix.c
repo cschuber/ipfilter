@@ -77,7 +77,7 @@ void panic __P((char *str));
 #include "netinet/ip_compat.h"
 #include "netinet/ip_fil.h"
 /* END OF INCLUDES */
-#include "radix.h"
+#include "radix_ipf.h"
 #ifndef min
 # define	min	MIN
 #endif
@@ -101,6 +101,12 @@ static int rn_lexobetter __P((void *, void *));
 static struct radix_mask *rn_new_radix_mask __P((struct radix_node *,
     struct radix_mask *));
 static int rn_freenode __P((struct radix_node *, void *));
+#if defined(AIX) && !defined(_KERNEL)
+struct radix_node *rn_match __P((void *, struct radix_node_head *));
+struct radix_node *rn_addmask __P((int, int, void *));
+#define	FreeS(x, y)	KFREES(x, y)
+#define	Bcopy(x, y, z)	bcopy(x, y, z)
+#endif
 
 /*
  * The data structure for the keys is a radix tree with one way
@@ -131,7 +137,7 @@ static int rn_freenode __P((struct radix_node *, void *));
  * node as high in the tree as we can go.
  *
  * The present version of the code makes use of normal routes in short-
- * circuiting an explict mask and compare operation when testing whether
+ * circuiting an explicit mask and compare operation when testing whether
  * a key satisfies a normal route, and also in remembering the unique leaf
  * that governs a subtree.
  */
@@ -1044,7 +1050,7 @@ rn_init()
 	addmask_key = cplim = rn_ones + max_keylen;
 	while (cp < cplim)
 		*cp++ = -1;
-	if (rn_inithead((void **)&mask_rnhead, 0) == 0)
+	if (rn_inithead((void *)&mask_rnhead, 0) == 0)
 		panic("rn_init 2");
 }
 
@@ -1115,7 +1121,7 @@ main(int argc, char *argv[])
 {
 	struct radix_node_head *rnh;
 	struct radix_node *rn;
-	addrfamily_t af;
+	addrfamily_t af, mf;
 	myst_t st1, st2, *stp;
 
 	memset(&st1, 0, sizeof(st1));
@@ -1145,7 +1151,18 @@ main(int argc, char *argv[])
 	af.adf_addr.in4.s_addr = inet_addr("127.0.1.0");
 	rn = rnh->rnh_matchaddr(&af, rnh);
 	if (rn != NULL) {
-		printf("lookup = %p key %p mask %p\n", rn, rn->rn_key, rn->rn_mask);
+		printf("1.lookup = %p key %p mask %p\n", rn, rn->rn_key, rn->rn_mask);
+		stp = rn->rn_key;
+		printf("%s/", inet_ntoa(stp->dst.adf_addr.in4));
+		stp = rn->rn_mask;
+		printf("%s\n", inet_ntoa(stp->dst.adf_addr.in4));
+	}
+
+	mf.adf_len = sizeof(mf);
+	mf.adf_addr.in4.s_addr = inet_addr("255.255.255.0");
+	rn = rnh->rnh_lookup(&af, &mf, rnh);
+	if (rn != NULL) {
+		printf("2.lookup = %p key %p mask %p\n", rn, rn->rn_key, rn->rn_mask);
 		stp = rn->rn_key;
 		printf("%s/", inet_ntoa(stp->dst.adf_addr.in4));
 		stp = rn->rn_mask;
@@ -1156,7 +1173,7 @@ main(int argc, char *argv[])
 	af.adf_addr.in4.s_addr = inet_addr("126.0.0.1");
 	rn = rnh->rnh_matchaddr(&af, rnh);
 	if (rn != NULL) {
-		printf("lookup = %p key %p mask %p\n", rn, rn->rn_key, rn->rn_mask);
+		printf("3.lookup = %p key %p mask %p\n", rn, rn->rn_key, rn->rn_mask);
 		stp = rn->rn_key;
 		printf("%s/", inet_ntoa(stp->dst.adf_addr.in4));
 		stp = rn->rn_mask;

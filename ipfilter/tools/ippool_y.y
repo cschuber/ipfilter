@@ -43,25 +43,27 @@ static	ip_pool_t	iplo;
 static	ioctlfunc_t	poolioctl = NULL;
 static	char		poolname[FR_GROUPLEN];
 
+static void ippool_setnodesize __P((ip_pool_node_t *));
+
 %}
 
 %union	{
 	char	*str;
 	u_32_t	num;
-	struct	in_addr	addr;
+	struct	in_addr	ip4;
 	struct	alist_s	*alist;
-	struct	in_addr	adrmsk[2];
+	union	i6addr	adrmsk[2];
 	iphtent_t	*ipe;
 	ip_pool_node_t	*ipp;
 	union	i6addr	ip6;
 }
 
-%token  <num>   YY_NUMBER YY_HEX
-%token  <str>   YY_STR
-%token	  YY_COMMENT 
-%token	  YY_CMP_EQ YY_CMP_NE YY_CMP_LE YY_CMP_GE YY_CMP_LT YY_CMP_GT
-%token	  YY_RANGE_OUT YY_RANGE_IN
-%token  <ip6>   YY_IPV6
+%token  <num>	YY_NUMBER YY_HEX
+%token  <str>	YY_STR
+%token  <ip6>	YY_IPV6
+%token	YY_COMMENT 
+%token	YY_CMP_EQ YY_CMP_NE YY_CMP_LE YY_CMP_GE YY_CMP_LT YY_CMP_GT
+%token	YY_RANGE_OUT YY_RANGE_IN
 
 %token	IPT_IPF IPT_NAT IPT_COUNT IPT_AUTH IPT_IN IPT_OUT
 %token	IPT_TABLE IPT_GROUPMAP IPT_HASH
@@ -72,7 +74,8 @@ static	char		poolname[FR_GROUPLEN];
 %type	<adrmsk> addrmask
 %type	<ipe> ipfgroup ipfhash hashlist hashentry
 %type	<ipe> groupentry setgrouplist grouplist
-%type	<addr> ipaddr mask ipv4
+%type	<ip6> ipaddr mask
+%type	<ip4> ipv4
 %type	<str> number setgroup
 
 %%
@@ -86,11 +89,13 @@ line:	table role ipftree eol		{ iplo.ipo_unit = $2;
 					  iplo.ipo_list = $3;
 					  load_pool(&iplo, poolioctl);
 					  resetlexer();
+					  use_inet6 = 0;
 					}
 	| table role ipfhash eol	{ ipht.iph_unit = $2;
 					  ipht.iph_type = IPHASH_LOOKUP;
 					  load_hash(&ipht, $3, poolioctl);
 					  resetlexer();
+					  use_inet6 = 0;
 					}
 	| groupmap role number ipfgroup eol
 					{ ipht.iph_unit = $2;
@@ -99,6 +104,7 @@ line:	table role ipftree eol		{ iplo.ipo_unit = $2;
 					  ipht.iph_type = IPHASH_GROUPMAP;
 					  load_hash(&ipht, $4, poolioctl);
 					  resetlexer();
+					  use_inet6 = 0;
 					}
 	| YY_COMMENT
 	;
@@ -146,7 +152,7 @@ role:
 	;
 
 ipftree:
-	IPT_TYPE '=' IPT_TREE number '{' addrlist '}'
+	IPT_TYPE '=' IPT_TREE number start addrlist end
 					{ strncpy(iplo.ipo_name, $4,
 						  sizeof(iplo.ipo_name));
 					  $$ = $6;
@@ -154,7 +160,7 @@ ipftree:
 	;
 
 ipfhash:
-	IPT_TYPE '=' IPT_HASH number hashopts '{' hashlist '}'
+	IPT_TYPE '=' IPT_HASH number hashopts start hashlist end
 					{ strncpy(ipht.iph_name, $4,
 						  sizeof(ipht.iph_name));
 					  $$ = $7;
@@ -162,7 +168,7 @@ ipfhash:
 	;
 
 ipfgroup:
-	setgroup hashopts '{' grouplist '}'
+	setgroup hashopts start grouplist end
 					{ iphtent_t *e;
 					  for (e = $4; e != NULL;
 					       e = e->ipe_next)
@@ -172,7 +178,7 @@ ipfgroup:
 								FR_GROUPLEN);
 					  $$ = $4;
 					}
-	| hashopts '{' setgrouplist '}'		{ $$ = $3; }
+	| hashopts start setgrouplist end	{ $$ = $3; }
 	;
 
 number:	IPT_NUM '=' YY_NUMBER			{ sprintf(poolname, "%u", $3);
@@ -200,35 +206,50 @@ hashopts:
 	;
 
 addrlist:
-	range ',' addrlist		{ $1->ipn_next = $3; $$ = $1; }
-	| range				{ $$ = $1; }
+	';'				{ $$ = NULL; }
+	| range next addrlist		{ $1->ipn_next = $3; $$ = $1; }
+	| range next			{ $$ = $1; }
 	;
 
 grouplist:
-	groupentry ';' grouplist	{ $$ = $1; $1->ipe_next = $3; }
-	| addrmask ';' grouplist	{ $$ = calloc(1, sizeof(iphtent_t));
+	';'				{ $$ = NULL; }
+	| groupentry next grouplist	{ $$ = $1; $1->ipe_next = $3; }
+	| addrmask next grouplist	{ $$ = calloc(1, sizeof(iphtent_t));
 					  bcopy((char *)&($1[0]),
 						(char *)&($$->ipe_addr),
 						sizeof($$->ipe_addr));
 					  bcopy((char *)&($1[1]),
 						(char *)&($$->ipe_mask),
 						sizeof($$->ipe_mask));
+#ifdef AF_INET6
+					  if (use_inet6)
+						$$->ipe_family = AF_INET6;
+					  else
+#endif
+						$$->ipe_family = AF_INET;
 					  $$->ipe_next = $3;
 					}
-	| groupentry ';'		{ $$ = $1; }
-	| addrmask ';'			{ $$ = calloc(1, sizeof(iphtent_t));
+	| groupentry next		{ $$ = $1; }
+	| addrmask next			{ $$ = calloc(1, sizeof(iphtent_t));
 					  bcopy((char *)&($1[0]),
 						(char *)&($$->ipe_addr),
 						sizeof($$->ipe_addr));
 					  bcopy((char *)&($1[1]),
 						(char *)&($$->ipe_mask),
 						sizeof($$->ipe_mask));
+#ifdef AF_INET6
+					  if (use_inet6)
+						$$->ipe_family = AF_INET6;
+					  else
+#endif
+						$$->ipe_family = AF_INET;
 					}
 	;
 
 setgrouplist:
-	groupentry ';'			{ $$ = $1; }
-	| groupentry ';' setgrouplist	{ $1->ipe_next = $3; $$ = $1; }
+	';'				{ $$ = NULL; }
+	| groupentry next		{ $$ = $1; }
+	| groupentry next setgrouplist	{ $1->ipe_next = $3; $$ = $1; }
 	;
 
 groupentry:
@@ -241,48 +262,85 @@ groupentry:
 						sizeof($$->ipe_mask));
 					  strncpy($$->ipe_group, $3,
 						  FR_GROUPLEN);
+#ifdef AF_INET6
+					  if (use_inet6)
+						$$->ipe_family = AF_INET6;
+					  else
+#endif
+						$$->ipe_family = AF_INET;
 					  free($3);
 					}
 	;
 
 range:	addrmask	{ $$ = calloc(1, sizeof(*$$));
 			  $$->ipn_info = 0;
-			  $$->ipn_addr.adf_addr.in4.s_addr = $1[0].s_addr;
-			  $$->ipn_mask.adf_addr.in4.s_addr = $1[1].s_addr;
+			  ippool_setnodesize($$);
+			  bcopy(&($1[0]), &($$->ipn_addr.adf_addr),
+				sizeof($$->ipn_addr.adf_addr));
+			  bcopy(&($1[1]), &($$->ipn_mask.adf_addr),
+				sizeof($$->ipn_mask.adf_addr));
 			}
 	| '!' addrmask	{ $$ = calloc(1, sizeof(*$$));
 			  $$->ipn_info = 1;
-			  $$->ipn_addr.adf_addr.in4.s_addr = $2[0].s_addr;
-			  $$->ipn_mask.adf_addr.in4.s_addr = $2[1].s_addr;
+			  ippool_setnodesize($$);
+			  bcopy(&($2[0]), &($$->ipn_addr.adf_addr),
+				sizeof($$->ipn_addr.adf_addr));
+			  bcopy(&($2[1]), &($$->ipn_mask.adf_addr),
+				sizeof($$->ipn_mask.adf_addr));
 			}
 
 hashlist:
-	hashentry ';'			{ $$ = $1; }
-	| hashentry ';' hashlist	{ $1->ipe_next = $3; $$ = $1; }
+	';'				{ $$ = NULL; }
+	| hashentry next		{ $$ = $1; }
+	| hashentry next hashlist	{ $1->ipe_next = $3; $$ = $1; }
 	;
 
 hashentry:
-	addrmask 			{ $$ = calloc(1, sizeof(iphtent_t));
-					  bcopy((char *)&($1[0]),
-						(char *)&($$->ipe_addr),
-						sizeof($$->ipe_addr));
-					  bcopy((char *)&($1[1]),
-						(char *)&($$->ipe_mask),
-						sizeof($$->ipe_mask));
-					}
+	addrmask 		{ $$ = calloc(1, sizeof(iphtent_t));
+				  bcopy((char *)&($1[0]),
+					(char *)&($$->ipe_addr),
+					sizeof($$->ipe_addr));
+				  bcopy((char *)&($1[1]),
+					(char *)&($$->ipe_mask),
+					sizeof($$->ipe_mask));
+#ifdef USE_INET6
+				  if (use_inet6)
+					$$->ipe_family = AF_INET6;
+				  else
+#endif
+					$$->ipe_family = AF_INET;
+				}
 	;
 
 addrmask:
-	ipaddr '/' mask		{ $$[0] = $1; $$[1].s_addr = $3.s_addr; }
-	| ipaddr		{ $$[0] = $1; $$[1].s_addr = 0xffffffff; }
+	ipaddr '/' mask		{ $$[0] = $1; $$[1] = $3; }
+	| ipaddr		{ $$[0] = $1;
+				  $$[1].i6[0] = 0xffffffff;
+				  $$[1].i6[1] = 0xffffffff;
+				  $$[1].i6[2] = 0xffffffff;
+				  $$[1].i6[3] = 0xffffffff;
+				}
 	;
 
-ipaddr:	ipv4			{ $$ = $1; }
-	| YY_NUMBER		{ $$.s_addr = htonl($1); }
+ipaddr:	ipv4			{ use_inet6 = 0; $$.in4 = $1; }
+	| YY_NUMBER		{ use_inet6 = 0; $$.in4.s_addr = htonl($1); }
+	| YY_IPV6		{ use_inet6 = 1; $$ = $1; }
+	| YY_STR		{ use_inet6 = 0;
+				  if (gethost($1, &($$.in4.s_addr)) == -1)
+					yyerror("Unknown hostname");
+				}
 	;
 
-mask:	YY_NUMBER		{ ntomask(4, $1, (u_32_t *)&$$.s_addr); }
-	| ipv4			{ $$ = $1; }
+mask:	YY_NUMBER		{ if (use_inet6) {
+					if (ntomask(6, $1, (u_32_t *)&$$) == -1)
+						yyerror("bad bitmask");
+				  } else {
+					if (ntomask(4, $1, (u_32_t *)&$$.in4) == -1)
+						yyerror("bad bitmask");
+				  }
+				}
+	| ipv4			{ $$.in4 = $1; }
+	| YY_IPV6		{ $$ = $1; }
 	;
 
 size:	IPT_SIZE '=' YY_NUMBER	{ ipht.iph_size = $3; }
@@ -300,6 +358,16 @@ ipv4:	YY_NUMBER '.' YY_NUMBER '.' YY_NUMBER '.' YY_NUMBER
 		  $$.s_addr = htonl($$.s_addr);
 		}
 	;
+
+next:	';'				{ yyexpectaddr = 1; }
+	;
+
+start:	'{'				{ yyexpectaddr = 1; }
+	;
+
+end:	'}'				{ yyexpectaddr = 0; }
+	;
+
 %%
 static	wordtab_t	yywords[] = {
 	{ "auth",	IPT_AUTH },
@@ -386,4 +454,23 @@ ioctlfunc_t iocfunc;
 	yyin = fp;
 	yyparse();
 	return 1;
+}
+
+static void ippool_setnodesize(node)
+ip_pool_node_t *node;
+{
+#ifdef AF_INET6
+	  if (use_inet6) {
+		  node->ipn_addr.adf_len = 20;
+		  node->ipn_addr.adf_family = AF_INET6;
+		  node->ipn_mask.adf_len = 20;
+		  node->ipn_mask.adf_family = AF_INET6;
+	  } else
+#endif
+	  {
+		  node->ipn_addr.adf_len = 8;
+		  node->ipn_addr.adf_family = AF_INET;
+		  node->ipn_mask.adf_len = 8;
+		  node->ipn_mask.adf_family = AF_INET;
+	  }
 }

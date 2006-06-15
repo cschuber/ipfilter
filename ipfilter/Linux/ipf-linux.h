@@ -2,15 +2,22 @@
 #define __IPF_LINUX_H__
 
 #include <linux/config.h>
+#include <linux/version.h>
 #ifndef CONFIG_NETFILTER
 # define CONFIG_NETFILTER
 #endif
-#include <linux/compatmac.h>
-#include <linux/version.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
+# define __irq_h	1	/* stop it being included! */
+# include <linux/mtd/compatmac.h>
+#else
+# include <linux/compatmac.h>
+# include <linux/version.h>
+#endif
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/time.h>
+#include <linux/string.h>
 #include <linux/slab.h>
 #include <linux/socket.h>
 #include <linux/netdevice.h>
@@ -23,8 +30,14 @@
 #include <linux/netfilter.h>
 #include <linux/netfilter_ipv4.h>
 #include <linux/netfilter_ipv6.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
+# include <asm/ioctls.h>
+#else
+# define	ipftcphdr	tcphdr
+# define	ipfudphdr	udphdr
+#endif
 
-struct	tcphdr	{
+struct	ipftcphdr	{
 	__u16	th_sport;
 	__u16	th_dport;
 	__u32	th_seq;
@@ -45,7 +58,7 @@ struct	tcphdr	{
 
 typedef	__u32	tcp_seq;
 
-struct	udphdr	{
+struct	ipfudphdr	{
 	__u16	uh_sport;
 	__u16	uh_dport;
 	__u16	uh_ulen;
@@ -86,13 +99,18 @@ struct icmp {
 			__u16	icd_id;
 			__u16	icd_seq;
 		} ih_idseq;
-		int ih_void;
+		__u32	 ih_void;
+		struct	ih_pmtu	{
+			__u16	ipm_void;
+			__u16	ipm_nextmtu;
+		} ih_pmtu;
 	} icmp_hun;
 # define	icmp_pptr	icmp_hun.ih_pptr
 # define	icmp_gwaddr	icmp_hun.ih_gwaddr
 # define	icmp_id		icmp_hun.ih_idseq.icd_id
 # define	icmp_seq	icmp_hun.ih_idseq.icd_seq
 # define	icmp_void	icmp_hun.ih_void
+# define	icmp_nextmtu	icmp_hun.ih_pmtu.ipm_nextmtu
 	union {
 		struct id_ts {
 			__u32	its_otime;
@@ -131,6 +149,11 @@ struct	ether_header	{
 	__u8	ether_shost[6];
 	__u16	ether_type;
 };
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
+typedef	struct	ipftcphdr	tcphdr_t;
+typedef	struct	ipfudphdr	udphdr_t;
+#endif
 
 #include "ip_compat.h"
 #include "ip_fil.h"

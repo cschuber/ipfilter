@@ -21,14 +21,6 @@ time permitting:
 
 * record buffering for TCP/UDP
 
-* modular application proxying
--done
-
-* allow multiple ip addresses in a source route list for ipsend
-
-* port IP Filter to Linux
-Not in this century.
-
 * document bimap
 
 * document NAT rule order processing

@@ -86,7 +86,7 @@ char *ptr;
 	register char *s = ptr, c;
 	register u_short i = 0;
 
-	while (((c = *s++) != '\0') && isdigit(c)) {
+	while (((c = *s++) != '\0') && ISDIGIT(c)) {
 		i *= 10;
 		i += c - '0';
 	}
@@ -122,9 +122,13 @@ nat_t *nat;
 
 	m = fin->fin_m;
 	ip = fin->fin_ip;
-	off = (char *)tcp - MTOD(m, char *) + (TCP_OFF(tcp) << 2);
+	off = (char *)tcp - (char *)ip + (TCP_OFF(tcp) << 2) + fin->fin_ipoff;
 
+#ifdef __sgi
+	dlen = fin->fin_plen - off;
+#else
 	dlen = MSGDSIZE(m) - off;
+#endif
 	if (dlen <= 0)
 		return 0;
 
@@ -147,6 +151,8 @@ nat_t *nat;
 	 * other way.
 	 */
 	bcopy((char *)fin, (char *)&fi, sizeof(fi));
+	fi.fin_state = NULL;
+	fi.fin_nat = NULL;
 	fi.fin_flx |= FI_IGNORE;
 	fi.fin_data[0] = sp;
 	fi.fin_data[1] = 0;
@@ -160,7 +166,7 @@ nat_t *nat;
 		int slen;
 
 		slen = ip->ip_len;
-		ip->ip_len = fin->fin_hlen + sizeof(*tcp);
+		ip->ip_len = htons(fin->fin_hlen + sizeof(*tcp));
 		bzero((char *)tcp2, sizeof(*tcp2));
 		tcp2->th_win = htons(8192);
 		tcp2->th_sport = htons(sp);
@@ -196,7 +202,9 @@ nat_t *nat;
 				fi.fin_fi.fi_daddr = nat->nat_inip.s_addr;
 				ip->ip_dst = nat->nat_inip;
 			}
-			(void) fr_addstate(&fi, &nat2->nat_state, SI_W_DPORT);
+			(void) fr_addstate(&fi, NULL, SI_W_DPORT);
+			if (fi.fin_state != NULL)
+				fr_statederef(&fi, (ipstate_t **)&fi.fin_state);
 		}
 		ip->ip_len = slen;
 		ip->ip_src = swip;

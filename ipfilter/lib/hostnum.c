@@ -35,7 +35,7 @@ char	*ifname;
 			return -1;
 	}
 #endif
-	if (isdigit(*host) && inet_aton(host, &ip)) {
+	if (ISDIGIT(*host) && inet_aton(host, &ip)) {
 		*ipa = ip.s_addr;
 		return 0;
 	}

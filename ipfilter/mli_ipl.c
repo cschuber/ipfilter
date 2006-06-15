@@ -57,7 +57,7 @@ char	*ipfiltermversion = M_VERSION;
 ipfmutex_t	ipl_mutex, ipfi_mutex, ipf_rw, ipf_stinsert, ipf_authmx;
 ipfmutex_t	ipf_nat_new, ipf_natio, ipf_timeoutlock;
 ipfrwlock_t	ipf_frag, ipf_state, ipf_nat, ipf_natfrag, ipf_auth;
-ipfrwlock_t	ipf_global, ipf_mutex, ipf_ipidfrag;
+ipfrwlock_t	ipf_global, ipf_mutex, ipf_ipidfrag, ipf_frcache;
 
 int     (*fr_checkp) __P((struct ip *, int, void *, int, mb_t **));
 
@@ -159,9 +159,14 @@ ipl_if_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 
 		switch(m->m_type)
 		{
-		case MT_DATA:
-			/* FALLTHROUGH */
 		case MT_HEADER:
+			if (m->m_len == 0) {
+				if (m->m_next == NULL)
+					break;
+				m = m->m_next;
+			}
+			/* FALLTHROUGH */
+		case MT_DATA:
 			if (!MBUF_IS_CLUSTER(m) &&
 			    ((m->m_off < MMINOFF) || (m->m_off > MMAXOFF))) {
 #if (IPFDEBUG >= 4)
@@ -265,9 +270,14 @@ ipl_kernel(struct ifnet *rcvif, struct mbuf *m)
 			return IPF_DROPIT;
 		}
 
+		ip->ip_len = htons(ip->ip_len);
+		ip->ip_off = htons(ip->ip_off);
 		hlen = ip->ip_hl << 2;
 		if ((*fr_checkp)(ip, hlen, rcvif, 0, &m1) || !m1)
 			return IPF_DROPIT;
+		ip = mtod(m1, struct ip *);
+		ip->ip_len = ntohs(ip->ip_len);
+		ip->ip_off = ntohs(ip->ip_off);
 
 #if (IPFDEBUG >= 2)
 		if (m != m1)
@@ -534,7 +544,7 @@ ipl_ipfilter_intfsync(void)
 	if (nif_interfaces != in_interfaces) {
 		/* if the number of interfaces has changed, resync */
 		MUTEX_EXIT(&ipfi_mutex);
-		frsync();
+		frsync(NULL);
 	} else
 		MUTEX_EXIT(&ipfi_mutex);
 }
@@ -574,6 +584,7 @@ iplunload(void)
 	LOCK_DEALLOC(ipf_frag.l);
 	LOCK_DEALLOC(ipf_authmx.l);
 	LOCK_DEALLOC(ipf_mutex.l);
+	LOCK_DEALLOC(ipf_frcache.l);
 	LOCK_DEALLOC(ipfi_mutex.l);
 	RWLOCK_EXIT(&ipf_global);
 	LOCK_DEALLOC(ipf_global.l);
@@ -582,6 +593,7 @@ iplunload(void)
 	MUTEX_DESTROY(&ipfi_mutex);
 	MUTEX_DESTROY(&ipf_timeoutlock);
 	RW_DESTROY(&ipf_mutex);
+	RW_DESTROY(&ipf_frcache);
 	RWLOCK_EXIT(&ipf_global);
 	delay(hz);
 	RW_DESTROY(&ipf_global);
@@ -605,6 +617,7 @@ ipfilterinit(void)
 #if (IRIX < 60500)
 	ipfi_mutex.l = LOCK_ALLOC((uchar_t)-1, IPF_LOCK_PL, (lkinfo_t *)-1, KM_NOSLEEP);
 ipf_mutex.l = LOCK_ALLOC((uchar_t)-1, IPF_LOCK_PL, (lkinfo_t *)-1, KM_NOSLEEP);
+ipf_frcache.l = LOCK_ALLOC((uchar_t)-1, IPF_LOCK_PL, (lkinfo_t *)-1, KM_NOSLEEP);
 ipf_timeoutlock.l = LOCK_ALLOC((uchar_t)-1, IPF_LOCK_PL, (lkinfo_t *)-1, KM_NOSLEEP);
 	ipf_global.l = LOCK_ALLOC((uchar_t)-1, IPF_LOCK_PL, (lkinfo_t *)-1, KM_NOSLEEP);
 	ipf_frag.l = LOCK_ALLOC((uchar_t)-1, IPF_LOCK_PL, (lkinfo_t *)-1, KM_NOSLEEP);
@@ -620,13 +633,14 @@ ipf_timeoutlock.l = LOCK_ALLOC((uchar_t)-1, IPF_LOCK_PL, (lkinfo_t *)-1, KM_NOSL
 	if (!ipfi_mutex.l || !ipf_mutex.l || !ipf_timeoutlock.l ||
 	    !ipf_frag.l || !ipf_state.l || !ipf_nat.l || !ipf_natfrag.l ||
 	    !ipf_auth.l || !ipf_rw.l || !ipf_ipidfrag.l || !ipl_mutex.l ||
-	    !ipf_stinsert.l || !ipf_authmx.l)
+	    !ipf_stinsert.l || !ipf_authmx.l || !ipf_frcache.l)
 		panic("IP Filter: LOCK_ALLOC failed");
 #else
 	MUTEX_INIT(&ipf_rw, "ipf rw mutex");
 	MUTEX_INIT(&ipf_timeoutlock, "ipf timeout mutex");
 	RWLOCK_INIT(&ipf_global, "ipf filter load/unload mutex");
 	RWLOCK_INIT(&ipf_mutex, "ipf filter rwlock");
+	RWLOCK_INIT(&ipf_frcache, "ipf cache rwlock");
 #endif
 
 #ifdef IPFILTER_LKM

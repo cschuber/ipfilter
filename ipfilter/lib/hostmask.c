@@ -14,8 +14,9 @@
  * found in the line segments, there is an error processing this information,
  * or there is an error processing ports information.
  */
-int	hostmask(seg, proto, ifname, sa, msk, linenum)
-char	***seg, *proto, *ifname;
+int	hostmask(family, seg, ifname, sa, msk, linenum)
+int	family;
+char	***seg, *ifname;
 u_32_t	*sa, *msk;
 int	linenum;
 {
@@ -36,7 +37,7 @@ int	linenum;
 	if ((s = strchr(**seg, '/')) ||
 	    ((s = strchr(**seg, ':')) && !strchr(s + 1, ':'))) {
 		*s++ ='\0';
-		if (genmask(s, msk) == -1) {
+		if (genmask(family, s, msk) == -1) {
 			fprintf(stderr, "%d: bad mask (%s)\n", linenum, s);
 			return -1;
 		}
@@ -78,13 +79,11 @@ int	linenum;
 		}
 		(*seg)++;
 		k = *sa ? 0xffffffff : 0;
-#ifdef	USE_INET6
-		if (use_inet6) {
+		if (family == AF_INET6) {
 			msk[1] = k;
 			msk[2] = k;
 			msk[3] = k;
 		}
-#endif
 		*msk = k;
 		return 0;
 	}

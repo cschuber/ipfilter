@@ -225,6 +225,8 @@ struct	in_addr	gwip;
 	ti->ti_sport = lsin.sin_port;
 	printf("sport %d\n", ntohs(lsin.sin_port));
 	nfd = initdevice(dev, 0);
+	if (nfd == -1)
+		return -1;
 
 	if (!(s = find_tcp(fd, ti)))
 		return -1;

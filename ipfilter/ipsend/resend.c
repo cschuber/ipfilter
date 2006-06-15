@@ -79,6 +79,9 @@ char	*datain;
 	ip_t	*ip;
 	int	fd, wfd = initdevice(dev, 5), len, i;
 
+	if (wfd == -1)
+		return -1;
+
 	if (datain)
 		fd = (*r->r_open)(datain);
 	else
@@ -99,6 +102,7 @@ char	*datain;
 	if (gwip.s_addr && (arp((char *)&gwip, dhost) == -1))
 	    {
 		perror("arp");
+		free(eh);
 		return -2;
 	    }
 
@@ -135,5 +139,6 @@ char	*datain;
 		    }
 	    }
 	(*r->r_close)();
+	free(eh);
 	return 0;
 }

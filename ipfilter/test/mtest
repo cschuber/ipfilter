@@ -18,7 +18,7 @@ echo "$1...";
 
 /bin/cp /dev/null results/$1
 
-../ipftest -F $format -Rbr regress/$1 -i input/$1 > results/$1
+../ipftest -F $format $4 -Rbr regress/$1 -i input/$1 > results/$1
 if [ $? -ne 0 ] ; then
 	exit 1
 fi

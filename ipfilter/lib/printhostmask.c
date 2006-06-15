@@ -9,8 +9,8 @@
 #include "ipf.h"
 
 
-void	printhostmask(v, addr, mask)
-int	v;
+void	printhostmask(family, addr, mask)
+int	family;
 u_32_t	*addr, *mask;
 {
 #ifdef  USE_INET6
@@ -19,26 +19,17 @@ u_32_t	*addr, *mask;
 	struct in_addr ipa;
 #endif
 
-	if (!*addr && !*mask)
+	if ((family == -1) || (!*addr && !*mask))
 		printf("any");
 	else {
-#ifdef  USE_INET6
 		void *ptr = addr;
-		int af;
 
-		if (v == 4) {
-			ptr = addr;
-			af = AF_INET;
-		} else if (v == 6) {
-			ptr = addr;
-			af = AF_INET6;
-		} else
-			af = 0;
-		printf("%s", inet_ntop(af, ptr, ipbuf, sizeof(ipbuf)));
+#ifdef  USE_INET6
+		printf("%s", inet_ntop(family, ptr, ipbuf, sizeof(ipbuf)));
 #else
 		ipa.s_addr = *addr;
 		printf("%s", inet_ntoa(ipa));
 #endif
-		printmask(mask);
+		printmask(family, mask);
 	}
 }

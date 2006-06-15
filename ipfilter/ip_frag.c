@@ -45,7 +45,7 @@ struct file;
 # endif
 #endif
 #if !defined(__SVR4) && !defined(__svr4__)
-# if defined(_KERNEL) && !defined(__sgi)
+# if defined(_KERNEL) && !defined(__sgi) && !defined(AIX)
 #  include <sys/kernel.h>
 # endif
 #else
@@ -117,6 +117,7 @@ static ipfr_t   **ipfr_ipidtail = &ipfr_ipidlist;
 static ipfr_t	**ipfr_ipidtab;
 
 static ipfrstat_t ipfr_stats;
+static frentry_t ipfr_block;
 static int	ipfr_inuse = 0;
 int		ipfr_size = IPFT_SIZE;
 
@@ -126,8 +127,8 @@ int	fr_frag_init = 0;
 u_long	fr_ticks = 0;
 
 
-static ipfr_t *ipfr_newfrag __P((fr_info_t *, u_32_t, ipfr_t **));
-static ipfr_t *fr_fraglookup __P((fr_info_t *, ipfr_t **));
+static ipfr_t *ipfr_newfrag __P((fr_info_t *, u_32_t, ipfr_t **, ipfrwlock_t *));
+static ipfr_t *fr_fraglookup __P((fr_info_t *, ipfr_t **, ipfrwlock_t *));
 static void fr_fragdelete __P((ipfr_t *, ipfr_t ***));
 
 
@@ -156,6 +157,11 @@ int fr_fraginit()
 	bzero((char *)ipfr_ipidtab, ipfr_size * sizeof(ipfr_t *));
 
 	RWLOCK_INIT(&ipf_frag, "ipf fragment rwlock");
+
+	bzero((char *)&ipfr_block, sizeof(ipfr_block));
+	ipfr_block.fr_flags = FR_BLOCK|FR_QUICK;
+	ipfr_block.fr_ref = 1;
+
 	fr_frag_init = 1;
 
 	return 0;
@@ -213,18 +219,23 @@ ipfrstat_t *fr_fragstats()
 /* Returns:     ipfr_t * - pointer to fragment cache state info or NULL     */
 /* Parameters:  fin(I)   - pointer to packet information                    */
 /*              table(I) - pointer to frag table to add to                  */
+/*              lock(I)  - pointer to lock to get a write hold of           */
 /*                                                                          */
 /* Add a new entry to the fragment cache, registering it as having come     */
 /* through this box, with the result of the filter operation.               */
+/*                                                                          */
+/* If this function succeeds, it returns with a write lock held on "lock".  */
+/* If it fails, no lock is held on return.                                  */
 /* ------------------------------------------------------------------------ */
-static ipfr_t *ipfr_newfrag(fin, pass, table)
+static ipfr_t *ipfr_newfrag(fin, pass, table, lock)
 fr_info_t *fin;
 u_32_t pass;
 ipfr_t *table[];
+ipfrwlock_t *lock;
 {
-	ipfr_t *fra, frag;
+	ipfr_t *fra, frag, *fran;
 	u_int idx, off;
-	ip_t *ip;
+	frentry_t *fr;
 
 	if (ipfr_inuse >= IPFT_SIZE)
 		return NULL;
@@ -232,21 +243,18 @@ ipfr_t *table[];
 	if ((fin->fin_flx & (FI_FRAG|FI_BAD)) != FI_FRAG)
 		return NULL;
 
-	ip = fin->fin_ip;
-
 	if (pass & FR_FRSTRICT)
-		if ((ip->ip_off & IP_OFFMASK) != 0)
+		if (fin->fin_off != 0)
 			return NULL;
 
-	frag.ipfr_p = ip->ip_p;
-	idx = ip->ip_p;
-	frag.ipfr_id = ip->ip_id;
-	idx += ip->ip_id;
-	frag.ipfr_tos = ip->ip_tos;
-	frag.ipfr_src.s_addr = ip->ip_src.s_addr;
-	idx += ip->ip_src.s_addr;
-	frag.ipfr_dst.s_addr = ip->ip_dst.s_addr;
-	idx += ip->ip_dst.s_addr;
+	frag.ipfr_p = fin->fin_p;
+	idx = fin->fin_p;
+	frag.ipfr_id = fin->fin_id;
+	idx += fin->fin_id;
+	frag.ipfr_source = fin->fin_fi.fi_src;
+	idx += frag.ipfr_src.s_addr;
+	frag.ipfr_dest = fin->fin_fi.fi_dst;
+	idx += frag.ipfr_dst.s_addr;
 	frag.ipfr_ifp = fin->fin_ifp;
 	idx *= 127;
 	idx %= IPFT_SIZE;
@@ -255,28 +263,52 @@ ipfr_t *table[];
 	frag.ipfr_secmsk = fin->fin_fi.fi_secmsk;
 	frag.ipfr_auth = fin->fin_fi.fi_auth;
 
+	off = fin->fin_off >> 3;
+#ifdef USE_INET6
+	if ((off == 0) && (fin->fin_v == 6)) {
+		char *ptr;
+		int end;
+
+		ptr = (char *)fin->fin_fraghdr + sizeof(struct ip6_frag);
+		end = fin->fin_plen - (ptr - (char *)fin->fin_ip);
+		frag.ipfr_firstend = end >> 3;
+	} else
+#endif
+		frag.ipfr_firstend = 0;
+
+	/*
+	 * allocate some memory, if possible, if not, just record that we
+	 * failed to do so.
+	 */
+	KMALLOC(fran, ipfr_t *);
+	if (fran == NULL) {
+		ipfr_stats.ifs_nomem++;
+		return NULL;
+	}
+
+	WRITE_ENTER(lock);
+
 	/*
 	 * first, make sure it isn't already there...
 	 */
 	for (fra = table[idx]; (fra != NULL); fra = fra->ipfr_hnext)
 		if (!bcmp((char *)&frag.ipfr_ifp, (char *)&fra->ipfr_ifp,
 			  IPFR_CMPSZ)) {
+			RWLOCK_EXIT(lock);
 			ipfr_stats.ifs_exists++;
+			KFREE(fra);
 			return NULL;
 		}
 
-	/*
-	 * allocate some memory, if possible, if not, just record that we
-	 * failed to do so.
-	 */
-	KMALLOC(fra, ipfr_t *);
-	if (fra == NULL) {
-		ipfr_stats.ifs_nomem++;
-		return NULL;
+	fra = fran;
+	fran = NULL;
+	fr = fin->fin_fr;
+	fra->ipfr_rule = fr;
+	if (fr != NULL) {
+		MUTEX_ENTER(&fr->fr_lock);
+		fr->fr_ref++;
+		MUTEX_EXIT(&fr->fr_lock);
 	}
-
-	if ((fra->ipfr_rule = fin->fin_fr) != NULL)
-		fin->fin_fr->fr_ref++;
 
 	/*
 	 * Insert the fragment into the fragment table, copy the struct used
@@ -290,11 +322,11 @@ ipfr_t *table[];
 	table[idx] = fra;
 	bcopy((char *)&frag.ipfr_ifp, (char *)&fra->ipfr_ifp, IPFR_CMPSZ);
 	fra->ipfr_ttl = fr_ticks + fr_ipfrttl;
+	fra->ipfr_firstend = frag.ipfr_firstend;
 
 	/*
 	 * Compute the offset of the expected start of the next packet.
 	 */
-	off = ip->ip_off & IP_OFFMASK;
 	if (off == 0)
 		fra->ipfr_seen0 = 1;
 	fra->ipfr_off = off + (fin->fin_dlen >> 3);
@@ -318,11 +350,10 @@ fr_info_t *fin;
 {
 	ipfr_t	*fra;
 
-	if ((fin->fin_v != 4) || (fr_frag_lock != 0))
+	if (fr_frag_lock != 0)
 		return -1;
 
-	WRITE_ENTER(&ipf_frag);
-	fra = ipfr_newfrag(fin, pass, ipfr_heads);
+	fra = ipfr_newfrag(fin, pass, ipfr_heads, &ipf_frag);
 	if (fra != NULL) {
 		*ipfr_tail = fra;
 		fra->ipfr_prev = ipfr_tail;
@@ -330,8 +361,8 @@ fr_info_t *fin;
 		if (ipfr_list == NULL)
 			ipfr_list = fra;
 		fra->ipfr_next = NULL;
+		RWLOCK_EXIT(&ipf_frag);
 	}
-	RWLOCK_EXIT(&ipf_frag);
 	return fra ? 0 : -1;
 }
 
@@ -355,8 +386,7 @@ nat_t *nat;
 	if ((fin->fin_v != 4) || (fr_frag_lock != 0))
 		return 0;
 
-	WRITE_ENTER(&ipf_natfrag);
-	fra = ipfr_newfrag(fin, pass, ipfr_nattab);
+	fra = ipfr_newfrag(fin, pass, ipfr_nattab, &ipf_natfrag);
 	if (fra != NULL) {
 		fra->ipfr_data = nat;
 		nat->nat_data = fra;
@@ -364,8 +394,8 @@ nat_t *nat;
 		fra->ipfr_prev = ipfr_nattail;
 		ipfr_nattail = &fra->ipfr_next;
 		fra->ipfr_next = NULL;
+		RWLOCK_EXIT(&ipf_natfrag);
 	}
-	RWLOCK_EXIT(&ipf_natfrag);
 	return fra ? 0 : -1;
 }
 
@@ -385,19 +415,18 @@ u_32_t ipid;
 {
 	ipfr_t	*fra;
 
-	if ((fin->fin_v != 4) || (fr_frag_lock))
+	if (fr_frag_lock)
 		return 0;
 
-	WRITE_ENTER(&ipf_ipidfrag);
-	fra = ipfr_newfrag(fin, 0, ipfr_ipidtab);
+	fra = ipfr_newfrag(fin, 0, ipfr_ipidtab, &ipf_ipidfrag);
 	if (fra != NULL) {
 		fra->ipfr_data = (void *)ipid;
 		*ipfr_ipidtail = fra;
 		fra->ipfr_prev = ipfr_ipidtail;
 		ipfr_ipidtail = &fra->ipfr_next;
 		fra->ipfr_next = NULL;
+		RWLOCK_EXIT(&ipf_ipidfrag);
 	}
-	RWLOCK_EXIT(&ipf_ipidfrag);
 	return fra ? 0 : -1;
 }
 
@@ -411,14 +440,30 @@ u_32_t ipid;
 /*                                                                          */
 /* Check the fragment cache to see if there is already a record of this     */
 /* packet with its filter result known.                                     */
+/*                                                                          */
+/* If this function succeeds, it returns with a write lock held on "lock".  */
+/* If it fails, no lock is held on return.                                  */
 /* ------------------------------------------------------------------------ */
-static ipfr_t *fr_fraglookup(fin, table)
+static ipfr_t *fr_fraglookup(fin, table, lock)
 fr_info_t *fin;
 ipfr_t *table[];
+ipfrwlock_t *lock;
 {
 	ipfr_t *f, frag;
 	u_int idx;
-	ip_t *ip;
+
+	/*
+	 * We don't want to let short packets match because they could be
+	 * compromising the security of other rules that want to match on
+	 * layer 4 fields (and can't because they have been fragmented off.)
+	 * Why do this check here?  The counter acts as an indicator of this
+	 * kind of attack, whereas if it was elsewhere, it wouldn't know if
+	 * other matching packets had been seen.
+	 */
+	if (fin->fin_flx & FI_SHORT) {
+		ATOMIC_INCL(ipfr_stats.ifs_short);
+		return NULL;
+	}
 
 	if ((fin->fin_flx & (FI_FRAG|FI_BAD)) != FI_FRAG)
 		return NULL;
@@ -429,16 +474,14 @@ ipfr_t *table[];
 	 *
 	 * build up a hash value to index the table with.
 	 */
-	ip = fin->fin_ip;
-	frag.ipfr_p = ip->ip_p;
-	idx = ip->ip_p;
-	frag.ipfr_id = ip->ip_id;
-	idx += ip->ip_id;
-	frag.ipfr_tos = ip->ip_tos;
-	frag.ipfr_src.s_addr = ip->ip_src.s_addr;
-	idx += ip->ip_src.s_addr;
-	frag.ipfr_dst.s_addr = ip->ip_dst.s_addr;
-	idx += ip->ip_dst.s_addr;
+	frag.ipfr_p = fin->fin_p;
+	idx = fin->fin_p;
+	frag.ipfr_id = fin->fin_id;
+	idx += fin->fin_id;
+	frag.ipfr_source = fin->fin_fi.fi_src;
+	idx += frag.ipfr_src.s_addr;
+	frag.ipfr_dest = fin->fin_fi.fi_dst;
+	idx += frag.ipfr_dst.s_addr;
 	frag.ipfr_ifp = fin->fin_ifp;
 	idx *= 127;
 	idx %= IPFT_SIZE;
@@ -447,28 +490,15 @@ ipfr_t *table[];
 	frag.ipfr_secmsk = fin->fin_fi.fi_secmsk;
 	frag.ipfr_auth = fin->fin_fi.fi_auth;
 
+	READ_ENTER(lock);
+
 	/*
 	 * check the table, careful to only compare the right amount of data
 	 */
-	for (f = table[idx]; f; f = f->ipfr_hnext)
+	for (f = table[idx]; f; f = f->ipfr_hnext) {
 		if (!bcmp((char *)&frag.ipfr_ifp, (char *)&f->ipfr_ifp,
 			  IPFR_CMPSZ)) {
 			u_short	off;
-
-			/*
-			 * We don't want to let short packets match because
-			 * they could be compromising the security of other
-			 * rules that want to match on layer 4 fields (and
-			 * can't because they have been fragmented off.)
-			 * Why do this check here?  The counter acts as an
-			 * indicator of this kind of attack, whereas if it was
-			 * elsewhere, it wouldn't know if other matching
-			 * packets had been seen.
-			 */
-			if (fin->fin_flx & FI_SHORT) {
-				ATOMIC_INCL(ipfr_stats.ifs_short);
-				continue;
-			}
 
 			/*
 			 * XXX - We really need to be guarding against the
@@ -476,11 +506,20 @@ ipfr_t *table[];
 			 * because a fragmented packet is never resent with
 			 * the same IP ID# (or shouldn't).
 			 */
-			off = ip->ip_off & IP_OFFMASK;
+			off = fin->fin_off >> 3;
 			if (f->ipfr_seen0) {
 				if (off == 0) {
 					ATOMIC_INCL(ipfr_stats.ifs_retrans0);
 					continue;
+				}
+
+				/*
+				 * Case 3. See comment for frpr_fragment6.
+				 */
+				if ((f->ipfr_firstend != 0) &&
+				    (off < f->ipfr_firstend)) {
+					fin->fin_flx |= FI_BAD;
+					break;
 				}
 			} else if (off == 0)
 				f->ipfr_seen0 = 1;
@@ -510,14 +549,19 @@ ipfr_t *table[];
 			 * last (in order), shrink expiration time.
 			 */
 			if (off == f->ipfr_off) {
+#if 0
 				if (!(ip->ip_off & IP_MF))
 					f->ipfr_ttl = fr_ticks + 1;
+#endif
 				f->ipfr_off = (fin->fin_dlen >> 3) + off;
 			} else if (f->ipfr_pass & FR_FRSTRICT)
 				continue;
 			ATOMIC_INCL(ipfr_stats.ifs_hits);
 			return f;
 		}
+	}
+
+	RWLOCK_EXIT(lock);
 	return NULL;
 }
 
@@ -538,8 +582,7 @@ fr_info_t *fin;
 
 	if ((fin->fin_v != 4) || (fr_frag_lock) || !ipfr_natlist)
 		return NULL;
-	READ_ENTER(&ipf_natfrag);
-	ipf = fr_fraglookup(fin, ipfr_nattab);
+	ipf = fr_fraglookup(fin, ipfr_nattab, &ipf_natfrag);
 	if (ipf != NULL) {
 		nat = ipf->ipfr_data;
 		/*
@@ -549,9 +592,9 @@ fr_info_t *fin;
 			nat->nat_data = NULL;
 			ipf->ipfr_data = NULL;
 		}
+		RWLOCK_EXIT(&ipf_natfrag);
 	} else
 		nat = NULL;
-	RWLOCK_EXIT(&ipf_natfrag);
 	return nat;
 }
 
@@ -573,13 +616,12 @@ fr_info_t *fin;
 	if ((fin->fin_v != 4) || (fr_frag_lock) || !ipfr_ipidlist)
 		return 0xffffffff;
 
-	READ_ENTER(&ipf_ipidfrag);
-	ipf = fr_fraglookup(fin, ipfr_ipidtab);
-	if (ipf != NULL)
+	ipf = fr_fraglookup(fin, ipfr_ipidtab, &ipf_ipidfrag);
+	if (ipf != NULL) {
 		id = (u_32_t)ipf->ipfr_data;
-	else
+		RWLOCK_EXIT(&ipf_ipidfrag);
+	} else
 		id = 0xffffffff;
-	RWLOCK_EXIT(&ipf_ipidfrag);
 	return id;
 }
 
@@ -603,22 +645,28 @@ u_32_t *passp;
 	ipfr_t	*fra;
 	u_32_t pass;
 
-	if ((fin->fin_v != 4) || (fr_frag_lock) || (ipfr_list == NULL))
+	if ((fr_frag_lock) || (ipfr_list == NULL))
 		return NULL;
 
-	READ_ENTER(&ipf_frag);
-	fra = fr_fraglookup(fin, ipfr_heads);
+	fra = fr_fraglookup(fin, ipfr_heads, &ipf_frag);
 	if (fra != NULL) {
-		fr = fra->ipfr_rule;
+		if (fin->fin_flx & FI_BAD) {
+			fr = &ipfr_block;
+		} else {
+			fr = fra->ipfr_rule;
+		}
 		fin->fin_fr = fr;
 		if (fr != NULL) {
 			pass = fr->fr_flags;
+			if ((pass & FR_KEEPSTATE) != 0) {
+				fin->fin_flx |= FI_STATE;
+			}
 			if ((pass & FR_LOGFIRST) != 0)
 				pass &= ~(FR_LOGFIRST|FR_LOG);
 			*passp = pass;
 		}
+		RWLOCK_EXIT(&ipf_frag);
 	}
-	RWLOCK_EXIT(&ipf_frag);
 	return fr;
 }
 
@@ -744,9 +792,7 @@ void fr_fragexpire()
 {
 	ipfr_t	**fp, *fra;
 	nat_t	*nat;
-#if defined(USE_SPL) && defined(_KERNEL)
-	int	s;
-#endif
+	SPL_INT(s);
 
 	if (fr_frag_lock)
 		return;

@@ -9,7 +9,7 @@
 #ifndef	__IP_STATE_H__
 #define	__IP_STATE_H__
 
-#if defined(__STDC__) || defined(__GNUC__)
+#if defined(__STDC__) || defined(__GNUC__) || defined(_AIX51)
 # define	SIOCDELST	_IOW('r', 61, struct ipfobj)
 #else
 # define	SIOCDELST	_IOW(r, 61, struct ipfobj)
@@ -58,8 +58,8 @@ typedef struct ipstate {
 	u_char	is_v;
 	u_32_t	is_hv;
 	u_32_t	is_tag;
-	u_32_t	is_opt;			/* packet options set */
-	u_32_t	is_optmsk;		/*    "      "    mask */
+	u_32_t	is_opt[2];		/* packet options set */
+	u_32_t	is_optmsk[2];		/*    "      "    mask */
 	u_short	is_sec;			/* security options set */
 	u_short	is_secmsk;		/*    "        "    mask */
 	u_short	is_auth;		/* authentication options set */
@@ -105,6 +105,7 @@ typedef struct ipstate {
 #define	is_ifpin	is_ifp[0]
 #define	is_ifpout	is_ifp[2]
 #define	is_gre		is_ps.is_ug
+#define	is_call		is_gre.gs_call
 
 #define	IS_WSPORT	SI_W_SPORT	/* 0x00100 */
 #define	IS_WDPORT	SI_W_DPORT	/* 0x00200 */
@@ -117,6 +118,7 @@ typedef struct ipstate {
 #define	IS_STRICT			   0x20000
 #define	IS_ISNSYN			   0x40000
 #define	IS_ISNACK			   0x80000
+#define	IS_STATESYNC			   0x100000
 /*
  * IS_SC flags are for scan-operations that need to be recognised in state.
  */
@@ -192,9 +194,6 @@ typedef	struct	ips_stat {
 	u_long	iss_miss;
 	u_long	iss_max;
 	u_long	iss_maxref;
-	u_long	iss_tcp;
-	u_long	iss_udp;
-	u_long	iss_icmp;
 	u_long	iss_nomem;
 	u_long	iss_expire;
 	u_long	iss_fin;
@@ -206,11 +205,25 @@ typedef	struct	ips_stat {
 	u_long	iss_killed;
 	u_long	iss_ticks;
 	u_long	iss_bucketfull;
+	u_long	iss_oow;
+	u_long	iss_addbad;
+	u_long	iss_addcant;
+	u_long	iss_icmphits;
+	u_long	iss_icmpbad;
+	u_long	iss_icmpshort;
+	u_long	iss_icmpmiss;
+	u_long	iss_tcpstrict;
+	u_long	iss_tcpfsm;
+	u_long	iss_tcpbadopt;
+	u_long	iss_winsack;
+	u_long	iss_cloned;
+	u_long	iss_missmask;
 	int	iss_statesize;
 	int	iss_statemax;
 	ipstate_t **iss_table;
 	ipstate_t *iss_list;
 	u_long	*iss_bucketlen;
+	u_long	iss_proto[256];
 } ips_stat_t;
 
 
@@ -224,6 +237,7 @@ extern	u_long	fr_udptimeout;
 extern	u_long	fr_udpacktimeout;
 extern	u_long	fr_icmptimeout;
 extern	u_long	fr_icmpacktimeout;
+extern	u_long	fr_iptimeout;
 extern	int	fr_statemax;
 extern	int	fr_statesize;
 extern	int	fr_state_lock;
@@ -242,7 +256,7 @@ extern	void	fr_timeoutstate __P((void));
 extern	int	fr_tcp_age __P((struct ipftqent *, struct fr_info *,
 				struct ipftq *, int));
 extern	int	fr_tcpinwindow __P((struct fr_info *, struct tcpdata *,
-				    struct tcpdata *, struct tcphdr *, int));
+				    struct tcpdata *, tcphdr_t *, int));
 extern	void	fr_stateunload __P((void));
 extern	void	ipstate_log __P((struct ipstate *, u_int));
 extern	int	fr_state_ioctl __P((caddr_t, ioctlcmd_t, int));
@@ -252,5 +266,6 @@ extern	void	fr_sttab_destroy __P((struct ipftq *));
 extern	void	fr_updatestate __P((fr_info_t *, ipstate_t *, ipftq_t *));
 extern	void	fr_statederef __P((fr_info_t *, ipstate_t **));
 extern	void	fr_setstatequeue __P((ipstate_t *, int));
+extern	void	fr_setstatepending __P((ipstate_t *));
 
 #endif /* __IP_STATE_H__ */

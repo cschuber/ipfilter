@@ -14,18 +14,16 @@
 #define	SOLARIS	(defined(sun) && (defined(__svr4__) || defined(__SVR4)))
 #endif
 
-#if defined(__STDC__) || defined(__GNUC__)
+#if defined(__STDC__) || defined(__GNUC__) || defined(_AIX51)
 #define	SIOCADNAT	_IOW('r', 60, struct ipfobj)
 #define	SIOCRMNAT	_IOW('r', 61, struct ipfobj)
 #define	SIOCGNATS	_IOWR('r', 62, struct ipfobj)
 #define	SIOCGNATL	_IOWR('r', 63, struct ipfobj)
-#define	SIOCPROXY	_IOWR('r', 64, struct ap_control)
 #else
 #define	SIOCADNAT	_IOW(r, 60, struct ipfobj)
 #define	SIOCRMNAT	_IOW(r, 61, struct ipfobj)
 #define	SIOCGNATS	_IOWR(r, 62, struct ipfobj)
 #define	SIOCGNATL	_IOWR(r, 63, struct ipfobj)
-#define	SIOCPROXY	_IOWR(r, 64, struct ap_control)
 #endif
 
 #undef	LARGE_NAT	/* define	this if you're setting up a system to NAT
@@ -84,6 +82,10 @@
 struct ipstate;
 struct ap_session;
 
+/*
+ * This structure is used in the active NAT table and represents an
+ * active NAT session.
+ */
 typedef	struct	nat	{
 	ipfmutex_t	nat_lock;
 	struct	nat	*nat_next;
@@ -122,6 +124,8 @@ typedef	struct	nat	{
 	int		nat_ref;		/* reference count */
 	int		nat_hv[2];
 	char		nat_ifnames[2][LIFNAMSIZ];
+	int		nat_rev;		/* 0 = forward, 1 = reverse */
+	int		nat_v;
 } nat_t;
 
 #define	nat_inip	nat_inip6.in4
@@ -134,7 +138,6 @@ typedef	struct	nat	{
 #define	nat_seq		nat_un.nat_uni.ici_seq
 #define	nat_id		nat_un.nat_uni.ici_id
 #define	nat_tcpstate	nat_tqe.tqe_state
-#define	nat_gre		nat_un.nat_ugre
 
 /*
  * Values for nat_dir
@@ -155,6 +158,7 @@ typedef	struct	nat	{
 
 #define	NAT_TCPUDP	(NAT_TCP|NAT_UDP)
 #define	NAT_TCPUDPICMP	(NAT_TCP|NAT_UDP|NAT_ICMPERR)
+#define	NAT_TCPUDPICMPQ	(NAT_TCP|NAT_UDP|NAT_ICMPQUERY)
 #define	NAT_FROMRULE	(NAT_TCP|NAT_UDP)
 
 /* 0x0100 reserved for FI_W_SPORT */
@@ -168,6 +172,9 @@ typedef	struct	nat	{
 
 #define	NAT_DEBUG	0x800000
 
+/*
+ * This structure represents an actual NAT rule, loaded by ipnat.
+ */
 typedef	struct	ipnat	{
 	struct	ipnat	*in_next;		/* NAT rule list next */
 	struct	ipnat	*in_rnext;		/* rdr rule hash next */
@@ -185,8 +192,9 @@ typedef	struct	ipnat	{
 	u_int		in_hv;
 	int		in_flineno;		/* conf. file line number */
 	u_short		in_pnext;
-	u_char		in_xxx1[2];
 	/* From here to the end is covered by IPN_CMPSIZ */
+	u_char		in_v;
+	u_char		in_xxx;
 	u_32_t		in_flags;
 	u_32_t		in_mssclamp;		/* if != 0 clamp MSS to this */
 	u_int		in_age[2];
@@ -202,6 +210,10 @@ typedef	struct	ipnat	{
 	char		in_ifnames[2][LIFNAMSIZ];
 	char		in_plabel[APR_LABELLEN];	/* proxy label. */
 	ipftag_t	in_tag;
+	int		in_inatype;
+	int		in_outatype;
+	int		in_srcatype;
+	u_char		in_xxx2[80];
 } ipnat_t;
 
 #define	in_pmin		in_port[0]	/* Also holds static redir port */
@@ -210,6 +222,7 @@ typedef	struct	ipnat	{
 #define	in_nip		in_next6.in4.s_addr
 #define	in_inip		in_in[0].in4.s_addr
 #define	in_inmsk	in_in[1].in4.s_addr
+#define	in_outip	in_out[0].in4.s_addr
 #define	in_outip	in_out[0].in4.s_addr
 #define	in_outmsk	in_out[1].in4.s_addr
 #define	in_srcip	in_src[0].in4.s_addr
@@ -220,6 +233,18 @@ typedef	struct	ipnat	{
 #define	in_dtop		in_tuc.ftu_dtop
 #define	in_sport	in_tuc.ftu_sport
 #define	in_dport	in_tuc.ftu_dport
+#define	in_innum	in_in[0].iplookupnum
+#define	in_intype	in_in[0].iplookuptype
+#define	in_inptr	in_in[1].iplookupptr
+#define	in_infunc	in_in[1].iplookupfunc
+#define	in_outnum	in_out[0].iplookupnum
+#define	in_outtype	in_out[0].iplookuptype
+#define	in_outptr	in_out[1].iplookupptr
+#define	in_outfunc	in_out[1].iplookupfunc
+#define	in_srcnum	in_src[0].iplookupnum
+#define	in_srctype	in_src[0].iplookuptype
+#define	in_srcptr	in_src[1].iplookupptr
+#define	in_srcfunc	in_src[1].iplookupfunc
 
 /*
  * Bit definitions for in_flags
@@ -231,12 +256,14 @@ typedef	struct	ipnat	{
 #define	IPN_ICMPERR	0x00004
 #define	IPN_TCPUDPICMP	(IPN_TCP|IPN_UDP|IPN_ICMPERR)
 #define	IPN_ICMPQUERY	0x00008
+#define	IPN_TCPUDPICMPQ	(IPN_TCP|IPN_UDP|IPN_ICMPQUERY)
 #define	IPN_RF		(IPN_TCPUDP|IPN_DELETE|IPN_ICMPERR)
 #define	IPN_AUTOPORTMAP	0x00010
 #define	IPN_IPRANGE	0x00020
 #define	IPN_FILTER	0x00040
 #define	IPN_SPLIT	0x00080
 #define	IPN_ROUNDR	0x00100
+#define	IPN_NO		0x00200
 #define	IPN_NOTSRC	0x04000
 #define	IPN_NOTDST	0x08000
 #define	IPN_DYNSRCIP	0x10000	/* dynamic src IP# */
@@ -244,9 +271,12 @@ typedef	struct	ipnat	{
 #define	IPN_DELETE	0x40000
 #define	IPN_STICKY	0x80000
 #define	IPN_FRAG	0x100000
+#define	IPN_FIXEDDPORT	0x200000
+#define	IPN_FINDFORWARD	0x400000
+#define	IPN_IN		0x800000
 #define	IPN_USERFLAGS	(IPN_TCPUDP|IPN_AUTOPORTMAP|IPN_IPRANGE|IPN_SPLIT|\
-			 IPN_ROUNDR|IPN_FILTER|IPN_NOTSRC|IPN_NOTDST|\
-			 IPN_FRAG|IPN_STICKY)
+			 IPN_ROUNDR|IPN_FILTER|IPN_NOTSRC|IPN_NOTDST|IPN_NO|\
+			 IPN_FRAG|IPN_STICKY|IPN_FIXEDDPORT|IPN_ICMPQUERY)
 
 /*
  * Values for in_redir
@@ -259,7 +289,7 @@ typedef	struct	ipnat	{
 #define	MAPBLK_MINPORT	1024	/* don't use reserved ports for src port */
 #define	USABLE_PORTS	(65536 - MAPBLK_MINPORT)
 
-#define	IPN_CMPSIZ	(sizeof(ipnat_t) - offsetof(ipnat_t, in_flags))
+#define	IPN_CMPSIZ	(sizeof(ipnat_t) - offsetof(ipnat_t, in_v))
 
 typedef	struct	natlookup {
 	struct	in_addr	nl_inip;
@@ -289,6 +319,7 @@ typedef	struct	natget	{
 } natget_t;
 
 
+#undef	tr_flags
 typedef	struct	nattrpnt	{
 	struct	in_addr	tr_dstip;	/* real destination IP# */
 	struct	in_addr	tr_srcip;	/* real source IP# */
@@ -334,7 +365,7 @@ typedef struct	natinfo	{
 	u_32_t		nai_sum2;
 	u_32_t		nai_nflags;
 	u_32_t		nai_flags;
-	struct	in_addr	nai_ip;
+	struct	in_addr	nai_ip;		/* In host byte order */
 	u_short		nai_port;
 	u_short		nai_nport;
 	u_short		nai_sport;
@@ -353,6 +384,8 @@ typedef	struct	natstat	{
 	u_long	ns_memfail;
 	u_long	ns_badnat;
 	u_long	ns_addtrpnt;
+	u_long	ns_drop[2];
+	u_long	ns_xxul[20];
 	nat_t	**ns_table[2];
 	hostmap_t **ns_maptable;
 	ipnat_t	*ns_list;
@@ -364,15 +397,16 @@ typedef	struct	natstat	{
 	u_int	ns_rdrtab_sz;
 	u_int	ns_trpntab_sz;
 	u_int	ns_hostmap_sz;
+	u_int	ns_xxui[20];
 	nat_t	*ns_instances;
 	nattrpnt_t *ns_trpntlist;
 	u_long	*ns_bucketlen[2];
 } natstat_t;
 
 typedef	struct	natlog {
-	struct	in_addr	nl_origip;
-	struct	in_addr	nl_outip;
-	struct	in_addr	nl_inip;
+	i6addr_t	nl_origip;
+	i6addr_t	nl_outip;
+	i6addr_t	nl_inip;
 	u_short	nl_origport;
 	u_short	nl_outport;
 	u_short	nl_inport;
@@ -381,6 +415,7 @@ typedef	struct	natlog {
 	U_QUAD_T	nl_pkts[2];
 	U_QUAD_T	nl_bytes[2];
 	u_char	nl_p;
+	u_char	nl_v;
 } natlog_t;
 
 
@@ -422,6 +457,7 @@ extern	int	fr_nat_lock;
 extern	void	fr_natsync __P((void *));
 extern	u_long	fr_defnatage;
 extern	u_long	fr_defnaticmpage;
+extern	u_long	fr_defnatipage;
 	/* nat_table[0] -> hashed list sorted by inside (ip, port) */
 	/* nat_table[1] -> hashed list sorted by outside (ip, port) */
 extern	nat_t	**nat_table[2];
@@ -451,6 +487,8 @@ extern	nat_t	*nat_icmperrorlookup __P((fr_info_t *, int));
 extern	nat_t	*nat_icmperror __P((fr_info_t *, u_int *, int));
 extern	int	nat_insert __P((nat_t *, int));
 
+extern	frentry_t *fr_ipfnatin __P((fr_info_t *, u_32_t *));
+extern	frentry_t *fr_ipfnatout __P((fr_info_t *, u_32_t *));
 extern	int	fr_checknatout __P((fr_info_t *, u_32_t *));
 extern	int	fr_natout __P((fr_info_t *, nat_t *, int, u_32_t));
 extern	int	fr_checknatin __P((fr_info_t *, u_32_t *));
@@ -464,5 +502,6 @@ extern	void	fr_natderef __P((nat_t **));
 extern	u_short	*nat_proto __P((fr_info_t *, nat_t *, u_int));
 extern	void	nat_update __P((fr_info_t *, nat_t *, ipnat_t *));
 extern	void	fr_setnatqueue __P((nat_t *, int));
+extern	void	fr_setnatpending __P((nat_t *));
 
 #endif /* __IP_NAT_H__ */
