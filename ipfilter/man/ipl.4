@@ -7,7 +7,7 @@ packet headers of packets you wish to log.  If a packet header is to be
 logged, the entire header is logged (including any IP options \- TCP/UDP
 options are not included when it calculates header size) or not at all.
 The packet contents are also logged after the header.  If the log reader
-is busy or otherwise unable to read log records, upto IPLLOGSIZE (8192 is the
+is busy or otherwise unable to read log records, up to IPLLOGSIZE (8192 is the
 default) bytes of data are stored.
 .PP
 Prepending every packet header logged is a structure containing information
@@ -49,8 +49,8 @@ When reading from the \fBipl\fP device, it is necessary to call read(2) with
 a buffer big enough to hold at least 1 complete log record - reading of partial
 log records is not supported.
 .PP
-If the packet contents is more then 128 bytes when \fBlog body\fP is used,
-then only 128 bytes of the packet contents is logged.
+If the packet contents are more than 128 bytes when \fBlog body\fP is used,
+then only 128 bytes of the packet contents are logged.
 .PP
 Although it is only possible to read from the \fBipl\fP device, opening it
 for writing is required when using an ioctl which changes any kernel data.

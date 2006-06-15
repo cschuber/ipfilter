@@ -1,23 +1,23 @@
 /*
  * Copyright (C) 1995-1998 by Darren Reed.
  *
- * Redistribution and use in source and binary forms are permitted
- * provided that this notice is preserved and due credit is given
- * to the original author and the contributors.
+ * See the IPFILTER.LICENCE file for details on licencing.
+ *
  */
 #if !defined(lint)
 static const char sccsid[] = "@(#)ipsopt.c	1.2 1/11/96 (C)1995 Darren Reed";
 static const char rcsid[] = "@(#)$Id$";
 #endif
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
+#include <sys/param.h>
 #include <sys/types.h>
 #include <sys/time.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
 #ifndef	linux
 #include <netinet/ip_var.h>
 #endif
@@ -59,7 +59,7 @@ struct	ipopt_names secnames[] = {
 };
 
 
-u_short seclevel(slevel)
+u_short ipseclevel(slevel)
 char *slevel;
 {
 	struct ipopt_names *so;
@@ -104,14 +104,17 @@ char *class;
 			len += val;
 		} else
 			*op++ = io->on_siz;
-		*op++ = IPOPT_MINOFF;
+		if (io->on_value == IPOPT_TS)
+			*op++ = IPOPT_MINOFF + 1;
+		else
+			*op++ = IPOPT_MINOFF;
 
 		while (class && *class) {
 			t = NULL;
 			switch (io->on_value)
 			{
 			case IPOPT_SECURITY :
-				lvl = seclevel(class);
+				lvl = ipseclevel(class);
 				*(op - 1) = lvl;
 				break;
 			case IPOPT_LSRR :

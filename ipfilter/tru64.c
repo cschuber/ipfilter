@@ -49,6 +49,10 @@ static const char rcsid[] = "@(#)$Id$";
 
 /* #undef	IPFDEBUG	*/
 
+static int iplopen(dev_t dev, int flags);
+static int iplclose(dev_t dev, int flags);
+static int iplread(dev_t dev, struct uio *);
+
 /* function prototypes */
 int	ipfilter_attach(void);
 int	ipfilter_detach(void);
@@ -218,14 +222,11 @@ cfg_subsys_attr_t ipfilter_attributes[] = {
 				(caddr_t)&fr_minttl, 0, 0xffffffff, 0 },
 { "fr_flags",		CFG_ATTR_INTTYPE, CFG_OP_QUERY |
 				CFG_OP_CONFIGURE | CFG_OP_RECONFIGURE,
-				(caddr_t)&fr_minttl, 0, 0xffffffff, 0 },
+				(caddr_t)&ipf_flags, 0, 0xffffffff, 0 },
 { "fr_active",		CFG_ATTR_INTTYPE, CFG_OP_QUERY,
 				(caddr_t)&fr_minttl, 0, 1, 0 },
 { "fr_running",		CFG_ATTR_INTTYPE, CFG_OP_QUERY,
 				(caddr_t)&fr_minttl, 0, 1, 0 },
-{ "fr_unreach",		CFG_ATTR_INTTYPE, CFG_OP_QUERY |
-				CFG_OP_CONFIGURE | CFG_OP_RECONFIGURE,
-				(caddr_t) &fr_unreach, 0, 255, 0 },
 { "fr_control_forwarding",
 			CFG_ATTR_INTTYPE, CFG_OP_QUERY |
 				CFG_OP_CONFIGURE | CFG_OP_RECONFIGURE,
@@ -271,6 +272,10 @@ ulong outdata_size;
 	switch (op)
 	{
 	case CFG_OP_CONFIGURE :
+#ifdef IPFDEBUG
+		printf("ipfilter_config=%d\n",ipfilter_config);
+		printf("driver_cfg_state=%d\n",driver_cfg_state);
+#endif
 		if (ipfilter_config == TRUE) {
 			/*
 			 * We have already been configured
@@ -342,6 +347,9 @@ ulong outdata_size;
 				return (status);
 			}
 			status = ipfilter_attach();
+#ifdef IPFDEBUG
+			printf("ipfilter_attach=%d\n",status);
+#endif
 		}
 		break;
 
@@ -381,6 +389,9 @@ ulong outdata_size;
 		break;
 	}
 
+#ifdef IPFDEBUG
+	printf("ipfilter_configure(%d)=%d\n",op,status);
+#endif
 	return status;
 }
 
@@ -474,8 +485,7 @@ struct mbuf *m;
 	/*
 	 * Convert fields to host representation.
 	 */
-	ip->ip_len = ntohs(ip->ip_len);
-	len = ip->ip_len;
+	len = ntohs(ip->ip_len);
 	if (len < hlen) {
 		ipfilter_stat.ip_input_badlen++;
 		goto bad;
@@ -491,16 +501,10 @@ struct mbuf *m;
 		} else
 			m_adj(m, len - m->m_pkthdr.len);
 	}
-	ip->ip_off = ntohs(ip->ip_off);
 
 	if (fr_check(ip, hlen, m->m_pkthdr.rcvif, 0, &m) == 0) {
 		if (m != NULL) {
 			m->m_flags &= ~M_PROTOCOL_SUM|M_NOCHECKSUM|M_CHECKSUM;
-			/*
-			 * Convert back to network byte order.
-			 */
-			ip->ip_len = htons(ip->ip_len);
-			ip->ip_off = htons(ip->ip_off);
 
 			ipfilter_stat.ip_input_accept++;
 			RWLOCK_EXIT(&ipf_tru64);
@@ -589,7 +593,7 @@ struct ifnet *ifp;
 	}
 
 	if (cmd == (ioctlcmd_t)SIOCAIFADDR)
-		frsync();
+		frsync(NULL);
 
 	RWLOCK_EXIT(&ipf_tru64);
 }
@@ -618,14 +622,17 @@ ipfilter_attach(void)
 	RWLOCK_INIT(&ipf_tru64, 1);
 	RWLOCK_INIT(&ipf_global, 1);
 	RWLOCK_INIT(&ipf_mutex, 1);
+	RWLOCK_INIT(&ipf_frcache, 1);
 	ipftru64_inited = 1;
 
 	status = iplattach();
 #ifdef	IPFDEBUG
 	printf("iplattach() = %d\n", status);
 #endif
-	if (status != ESUCCESS)
+	if (status != ESUCCESS) {
+		(void) ipldetach();
 		return status;
+	}
 
 	ipfilter_registered = 1;
 
@@ -781,6 +788,7 @@ ipfilter_detach(void)
 		if (ipftru64_inited == 1) {
 			RW_DESTROY(&ipf_tru64);
 			RW_DESTROY(&ipf_global);
+			RW_DESTROY(&ipf_frcache);
 			RW_DESTROY(&ipf_mutex);
 			ipftru64_inited = 0;
 		}
@@ -936,6 +944,7 @@ ipfilter_preconfig_callback(int point, int order, ulong argument, ulong event_ar
 	int status;
 	struct hwconfig *hwc;
 	hwc = create_hwconfig_struct();
+
 	if (hwc == NULL)
 		return;
 
@@ -1116,6 +1125,10 @@ int ipfilterioctl(dev_t dev, unsigned int cmd, caddr_t data, int flag)
 	READ_ENTER(&ipf_tru64);
 	if (ipfilter_registered < 1 || ipftru64_inited == 0) {
 		RWLOCK_EXIT(&ipf_tru64);
+#ifdef IPFDEBUG
+		printf("ipfilter_registered %d ipftru64_inited %d\n",
+			ipfilter_registered, ipftru64_inited);
+#endif
 		return EIO;
 	}
 	err = iplioctl(dev, cmd, data, flag);
@@ -1179,4 +1192,52 @@ void ipfilter_timer()
 		ipf_timeout = 0;
 	}
 	thread_halt_self();
+}
+
+
+/*
+ * routines below for saving IP headers to buffer
+ */
+static int iplopen(dev, flags)
+dev_t dev;
+int flags;
+{
+	u_int min = minor(dev);
+
+	if (IPL_LOGMAX < min)
+		min = ENXIO;
+	else
+		min = 0;
+	return min;
+}
+
+
+static int iplclose(dev, flags)
+dev_t dev;
+int flags;
+{
+	u_int	min = minor(dev);
+
+	if (IPL_LOGMAX < min)
+		min = ENXIO;
+	else
+		min = 0;
+	return min;
+}
+
+/*
+ * iplread/ipllog
+ * both of these must operate with at least splnet() lest they be
+ * called during packet processing and cause an inconsistancy to appear in
+ * the filter lists.
+ */
+static int iplread(dev, uio)
+dev_t dev;
+register struct uio *uio;
+{
+#ifdef IPFILTER_LOG
+	return ipflog_read(minor(dev), uio);
+#else
+	return ENXIO;
+#endif
 }

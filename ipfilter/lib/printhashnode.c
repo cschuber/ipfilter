@@ -16,29 +16,40 @@ copyfunc_t copyfunc;
 int opts;
 {
 	iphtent_t ipe;
+	u_int hv;
 
 	if ((*copyfunc)(ipep, &ipe, sizeof(ipe)))
 		return NULL;
 
-	ipe.ipe_addr.in4_addr = htonl(ipe.ipe_addr.in4_addr);
-	ipe.ipe_mask.in4_addr = htonl(ipe.ipe_mask.in4_addr);
+	hv = IPE_V4_HASH_FN(ipe.ipe_addr.i6[0], ipe.ipe_mask.i6[0],
+			    iph->iph_size);
+	ipe.ipe_addr.i6[0] = htonl(ipe.ipe_addr.i6[0]);
+	ipe.ipe_addr.i6[1] = htonl(ipe.ipe_addr.i6[1]);
+	ipe.ipe_addr.i6[2] = htonl(ipe.ipe_addr.i6[2]);
+	ipe.ipe_addr.i6[3] = htonl(ipe.ipe_addr.i6[3]);
+	ipe.ipe_mask.i6[0] = htonl(ipe.ipe_mask.i6[0]);
+	ipe.ipe_mask.i6[1] = htonl(ipe.ipe_mask.i6[1]);
+	ipe.ipe_mask.i6[2] = htonl(ipe.ipe_mask.i6[2]);
+	ipe.ipe_mask.i6[3] = htonl(ipe.ipe_mask.i6[3]);
 
 	if ((opts & OPT_DEBUG) != 0) {
-		PRINTF("\tAddress: %s",
+		PRINTF("\t%d\tAddress: %s", hv,
 			inet_ntoa(ipe.ipe_addr.in4));
-		printmask((u_32_t *)&ipe.ipe_mask.in4_addr);
-		PRINTF("\tRef. Count: %d\tValue: %d\n", ipe.ipe_ref,
-			ipe.ipe_value);
+		printmask(ipe.ipe_family, (u_32_t *)&ipe.ipe_mask.in4_addr);
+		PRINTF("\tRef. Count: %d\tGroup: %s\n", ipe.ipe_ref,
+			ipe.ipe_group);
 	} else {
 		putchar(' ');
-		printip((u_32_t *)&ipe.ipe_addr.in4_addr);
-		printmask((u_32_t *)&ipe.ipe_mask.in4_addr);
+		printip(ipe.ipe_family, (u_32_t *)&ipe.ipe_addr.in4_addr);
+		printmask(ipe.ipe_family, (u_32_t *)&ipe.ipe_mask.in4_addr);
 		if (ipe.ipe_value != 0) {
 			switch (iph->iph_type & ~IPHASH_ANON)
 			{
 			case IPHASH_GROUPMAP :
-				PRINTF(", group = %s", ipe.ipe_group);
-					break;
+				if (strncmp(ipe.ipe_group, iph->iph_name,
+					    FR_GROUPLEN))
+					PRINTF(", group = %s", ipe.ipe_group);
+				break;
 			}
 		}
 		putchar(';');

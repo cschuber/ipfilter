@@ -1,9 +1,8 @@
 /*
  * lsock.c (C) 1995-1998 Darren Reed
  *
- * Redistribution and use in source and binary forms are permitted
- * provided that this notice is preserved and due credit is given
- * to the original author and the contributors.
+ * See the IPFILTER.LICENCE file for details on licencing.
+ *
  */
 #if !defined(lint)
 static const char sccsid[] = "@(#)lsock.c	1.2 1/11/96 (C)1995 Darren Reed";
@@ -225,7 +224,9 @@ struct	in_addr	gwip;
 	(void) getsockname(fd, (struct sockaddr *)&lsin, &len);
 	ti->ti_sport = lsin.sin_port;
 	printf("sport %d\n", ntohs(lsin.sin_port));
-	nfd = initdevice(dev, ntohs(lsin.sin_port), 0);
+	nfd = initdevice(dev, 0);
+	if (nfd == -1)
+		return -1;
 
 	if (!(s = find_tcp(fd, ti)))
 		return -1;

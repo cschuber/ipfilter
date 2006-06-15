@@ -12,7 +12,7 @@ u_32_t *ap;
 	switch (v)
 	{
 	case 4 :
-		if (nbits > 32 || use_inet6 != 0)
+		if (nbits > 32 || use_inet6 == 1)
 			return -1;
 		if (nbits == 0) {
 			mask = 0;
@@ -24,7 +24,7 @@ u_32_t *ap;
 		break;
 
 	case 6 :
-		if ((nbits > 128) || (use_inet6 == 0))
+		if ((nbits > 128) || (use_inet6 == -1))
 			return -1;
 		fill6bits(nbits, ap);
 		break;

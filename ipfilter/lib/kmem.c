@@ -16,7 +16,7 @@
 #include <string.h>
 #include <fcntl.h>
 #include <sys/file.h>
-#if !defined(__sgi) && !defined(__hpux) && !defined(__osf__) && !defined(linux)
+#if !defined(__sgi) && !defined(__hpux) && !defined(__osf__) && !defined(linux) && !defined(_AIX51)
 #include <kvm.h>
 #endif
 #include <fcntl.h>
@@ -47,7 +47,8 @@ static const char rcsid[] = "@(#)$Id$";
 
 
 
-#if !defined(__sgi) && !defined(__hpux) && !defined(__osf__) && !defined(linux)
+#if !defined(__sgi) && !defined(__hpux) && !defined(__osf__) && \
+    !defined(linux) && !defined(_AIX51)
 /*
  * For all platforms where there is a libkvm and a kvm_t, we use that...
  */
@@ -132,7 +133,7 @@ char	*kern, *core;
 		perror("openkmem:open");
 		return -1;
 	    }
-	return (int)kvm_f;
+	return kvm_f != NULL;
 }
 
 int	kmemcpy(buf, pos, n)

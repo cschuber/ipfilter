@@ -9,20 +9,19 @@
 #include "ipf.h"
 
 
-void	printmask(mask)
+void	printmask(family, mask)
+int	family;
 u_32_t	*mask;
 {
 	struct in_addr ipa;
 	int ones;
 
-#ifdef  USE_INET6
-	if (use_inet6)
+	if (use_inet6 || (family == AF_INET6)) {
 		printf("/%d", count6bits(mask));
-	else
-#endif
-	if ((ones = count4bits(*mask)) == -1) {
+	} else if ((ones = count4bits(*mask)) == -1) {
 		ipa.s_addr = *mask;
 		printf("/%s", inet_ntoa(ipa));
-	} else
+	} else {
 		printf("/%d", ones);
+	}
 }

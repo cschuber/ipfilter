@@ -52,7 +52,7 @@ struct ifnet *ptr;
 	if (kmemcpy((char *)&netif, (u_long)ptr, sizeof(netif)) == -1)
 		return "X";
 # if defined(NetBSD) && (NetBSD >= 199905) && (NetBSD < 1991011) || \
-    defined(__OpenBSD__) || \
+    defined(__OpenBSD__) || defined(linux) || \
     (defined(__FreeBSD__) && (__FreeBSD_version >= 501113))
 	return strdup(netif.if_xname);
 # else

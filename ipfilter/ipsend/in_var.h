@@ -76,7 +76,7 @@ struct	ifqueue	ipintrq;		/* ip packet input queue */
 	     (ia) != NULL && (ia)->ia_ifp != (ifp);			  \
 	     (ia) = (ia)->ia_next);					  \
 }
-#endif KERNEL
+#endif /* KERNEL */
 
 /*
  * Per-interface router version information is kept in this list.
@@ -173,5 +173,5 @@ struct in_multistep {
 }
 
 struct in_multi *in_addmulti();
-#endif KERNEL
+#endif /* KERNEL */
 #endif /*!_netinet_in_var_h*/

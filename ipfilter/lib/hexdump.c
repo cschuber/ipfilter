@@ -18,7 +18,7 @@ int len, ascii;
 			if (ascii != 0) {
 				fputc('\t', fpout);
 				for (t = s - 15; t<= s; t++)
-					fputc(isprint(*t) ? *t : '.', fpout);
+					fputc(ISPRINT(*t) ? *t : '.', fpout);
 			}
 			fputc('\n', fpout);
 		} else if (i % 4 == 3) {

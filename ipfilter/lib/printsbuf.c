@@ -12,7 +12,7 @@ char *buf;
 	int i;
 
 	for (s = (u_char *)buf, i = ISC_TLEN; i; i--, s++) {
-		if (isprint(*s))
+		if (ISPRINT(*s))
 			putchar(*s);
 		else
 			printf("\\%o", *s);

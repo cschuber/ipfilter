@@ -7,16 +7,23 @@
  * $Id$
  */
 
+#ifndef __IP_SYNC_H__
+#define __IP_SYNC_H__
+
 typedef	struct	synchdr	{
-	u_char	sm_v;		/* version: 4,6 */
-	u_char	sm_p;		/* protocol */
-	u_char	sm_cmd;		/* command */
-	u_char	sm_table;	/* NAT, STATE, etc */
-	u_int	sm_num;		/* table entry number */
-	int	sm_rev;		/* forward/reverse */
+	u_32_t		sm_magic;	/* magic */
+	u_char		sm_v;		/* version: 4,6 */
+	u_char		sm_p;		/* protocol */
+	u_char		sm_cmd;		/* command */
+	u_char		sm_table;	/* NAT, STATE, etc */
+	u_int		sm_num;		/* table entry number */
+	int		sm_rev;		/* forward/reverse */
+	int		sm_len;		/* length of the data section */
 	struct	synclist	*sm_sl;		/* back pointer to parent */
 } synchdr_t;
 
+
+#define SYNHDRMAGIC 0x0FF51DE5
 
 /*
  * Commands
@@ -41,7 +48,7 @@ typedef	struct	synchdr	{
 typedef	struct	synctcp_update	{
 	u_long		stu_age;
 	tcpdata_t	stu_data[2];
-	u_char		stu_state[2];
+	int		stu_state[2];
 } synctcp_update_t;
 
 
@@ -60,12 +67,14 @@ typedef	struct	synclist	{
 #define	sl_ptr	sl_un.slu_ptr
 #define	sl_ips	sl_un.slu_ips
 #define	sl_ipn	sl_un.slu_ipn
+#define	sl_magic sl_hdr.sm_magic
 #define	sl_v	sl_hdr.sm_v
 #define	sl_p	sl_hdr.sm_p
 #define	sl_cmd	sl_hdr.sm_cmd
 #define	sl_rev	sl_hdr.sm_rev
 #define	sl_table	sl_hdr.sm_table
 #define	sl_num	sl_hdr.sm_num
+#define	sl_len	sl_hdr.sm_len
 
 /*
  * NOTE: SYNCLOG_SZ is defined *low*.  It should be the next power of two
@@ -98,7 +107,11 @@ extern	synclist_t	*ipfsync_new __P((int, fr_info_t *, void *));
 extern	void		ipfsync_del __P((synclist_t *));
 extern	void		ipfsync_update __P((int, fr_info_t *, synclist_t *));
 extern	int		ipfsync_init __P((void));
-extern	int		ipfsync_nat __P((synchdr_t *sp, struct uio *uio));
-extern	int		ipfsync_state __P((synchdr_t *sp, struct uio *uio));
+extern	int		ipfsync_nat __P((synchdr_t *sp, void *data));
+extern	int		ipfsync_state __P((synchdr_t *sp, void *data));
 extern	int		ipfsync_read __P((struct uio *uio));
 extern	int		ipfsync_write __P((struct uio *uio));
+extern	int		ipfsync_canread __P((void));
+extern	int		ipfsync_canwrite __P((void));
+
+#endif /* IP_SYNC */

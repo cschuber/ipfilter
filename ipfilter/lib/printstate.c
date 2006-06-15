@@ -10,11 +10,13 @@
 #define	PRINTF	(void)printf
 #define	FPRINTF	(void)fprintf
 
-ipstate_t *printstate(sp, opts)
+ipstate_t *printstate(sp, opts, now)
 ipstate_t *sp;
 int opts;
+u_long now;
 {
 	ipstate_t ips;
+	synclist_t ipsync;
 
 	if (kmemcpy((char *)&ips, (u_long)sp, sizeof(ips)))
 		return NULL;
@@ -23,7 +25,7 @@ int opts;
 	PRINTF("%s pass %#x pr %d state %d/%d bkt %d\n",
 		hostname(ips.is_v, &ips.is_dst.in4), ips.is_pass, ips.is_p,
 		ips.is_state[0], ips.is_state[1], ips.is_hv);
-	PRINTF("\ttag %u ttl %lu", ips.is_tag, ips.is_die - ips.is_touched);
+	PRINTF("\ttag %u ttl %lu", ips.is_tag, ips.is_die - now);
 
 	if (ips.is_p == IPPROTO_TCP) {
 		PRINTF("\n\t%hu -> %hu %x:%x %hu<<%d:%hu<<%d\n",
@@ -45,19 +47,22 @@ int opts;
 		printsbuf(ips.is_sbuf[1]);
 		PRINTF("]\n");
 #endif
-	} else if (ips.is_p == IPPROTO_UDP)
+	} else if (ips.is_p == IPPROTO_UDP) {
 		PRINTF(" %hu -> %hu\n", ntohs(ips.is_sport),
 			ntohs(ips.is_dport));
-	else if (ips.is_p == IPPROTO_ICMP
+	} else if (ips.is_p == IPPROTO_GRE) {
+		PRINTF(" call %hx/%hx\n", ntohs(ips.is_gre.gs_call[0]),
+		       ntohs(ips.is_gre.gs_call[1]));
+	} else if (ips.is_p == IPPROTO_ICMP
 #ifdef	USE_INET6
 		 || ips.is_p == IPPROTO_ICMPV6
 #endif
 		)
-		PRINTF(" id %hu seq %hu type %d\n", ntohs(ips.is_icmp.ici_id),
-			ntohs(ips.is_icmp.ici_seq), ips.is_icmp.ici_type);
+		PRINTF(" id %hu seq %hu type %d\n", ips.is_icmp.ici_id,
+			ips.is_icmp.ici_seq, ips.is_icmp.ici_type);
 
 #ifdef        USE_QUAD_T
-	PRINTF("\tforward: pkts in %qd bytes in %qd pkts out %qd bytes out %qd\n\tbackward: pkts in %qd bytes in %qd pkts out %qd bytes out %qd",
+	PRINTF("\tforward: pkts in %qd bytes in %qd pkts out %qd bytes out %qd\n\tbackward: pkts in %qd bytes in %qd pkts out %qd bytes out %qd\n",
 		ips.is_pkts[0], ips.is_bytes[0],
 		ips.is_pkts[1], ips.is_bytes[1],
 		ips.is_pkts[2], ips.is_bytes[2],
@@ -126,16 +131,19 @@ int opts;
 	if (ips.is_pass & FR_KEEPFRAG)
 		PRINTF(" keep frags");
 	/* a given; no? */
-	if (ips.is_pass & FR_KEEPSTATE)
+	if (ips.is_pass & FR_KEEPSTATE) {
 		PRINTF(" keep state");
+		if (ips.is_pass & FR_STATESYNC)	
+			PRINTF(" ( sync )");
+	}
 	PRINTF("\tIPv%d", ips.is_v);
 	PRINTF("\n");
 
 	PRINTF("\tpkt_flags & %x(%x) = %x,\t",
 		ips.is_flags & 0xf, ips.is_flags,
 		ips.is_flags >> 4);
-	PRINTF("\tpkt_options & %x = %x\n", ips.is_optmsk,
-		ips.is_opt);
+	PRINTF("\tpkt_options & %x = %x, %x = %x \n", ips.is_optmsk[0],
+		ips.is_opt[0], ips.is_optmsk[1], ips.is_opt[1]);
 	PRINTF("\tpkt_security & %x = %x, pkt_auth & %x = %x\n",
 		ips.is_secmsk, ips.is_sec, ips.is_authmsk,
 		ips.is_auth);
@@ -158,6 +166,22 @@ int opts;
 	if (opts & OPT_DEBUG)
 		PRINTF("/%p", ips.is_ifp[3]);
 	PRINTF("]\n");
+
+	if (ips.is_sync != NULL) {
+
+		if (kmemcpy((char *)&ipsync, (u_long)ips.is_sync, sizeof(ipsync))) {
+	
+			PRINTF("\tSync status: status could not be retrieved\n");
+			return NULL;
+		}
+
+		PRINTF("\tSync status: idx %d num %d v %d pr %d rev %d\n",
+			ipsync.sl_idx, ipsync.sl_num, ipsync.sl_v,
+			ipsync.sl_p, ipsync.sl_rev);
+		
+	} else {
+		PRINTF("\tSync status: not synchronized\n");
+	}
 
 	return ips.is_next;
 }

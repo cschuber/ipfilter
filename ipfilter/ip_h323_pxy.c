@@ -23,7 +23,9 @@
 # include <sys/fcntl.h>
 # include <sys/filio.h>
 #else
-# include <sys/ioctl.h>
+# ifndef linux
+#  include <sys/ioctl.h>
+# endif
 #endif
 
 #define IPF_H323_PROXY
@@ -244,7 +246,7 @@ nat_t *nat;
 	tcp = (tcphdr_t *)fin->fin_dp;
 	ipaddr = nat->nat_inip.s_addr;
 	data = (caddr_t)tcp + (TCP_OFF(tcp) << 2);
-	datlen = ip->ip_len - fin->fin_hlen - (TCP_OFF(tcp) << 2);
+	datlen = fin->fin_plen - fin->fin_hlen - (TCP_OFF(tcp) << 2);
 	if (find_port(ipaddr, data, datlen, &off, &port) == 0) {
 		fr_info_t fi;
 		nat_t     *nat2;
@@ -257,7 +259,7 @@ nat_t *nat;
 			struct udphdr udp;
 			
 			bcopy((caddr_t)ip, (caddr_t)&newip, sizeof(newip));
-			newip.ip_len = fin->fin_hlen + sizeof(udp);
+			newip.ip_len = htons(fin->fin_hlen + sizeof(udp));
 			newip.ip_p = IPPROTO_UDP;
 			newip.ip_src = nat->nat_inip;
 			

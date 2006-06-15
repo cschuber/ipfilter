@@ -46,10 +46,8 @@ struct uio;
 #undef	IPFDEBUG
 
 extern	struct	filterstats	frstats[];
-extern	ipfrwlock_t	ipf_mutex, ipf_nat, ipf_global;
-extern	ipfmutex_t	ipf_rw, ipf_stinsert;
 extern	int	fr_running;
-extern	int	fr_flags;
+extern	int	ipf_flags;
 extern	int	fr_check __P(());
 
 extern ipnat_t *nat_list;
@@ -341,6 +339,9 @@ static int ipf_detach()
 {
 	int i;
 
+	if (fr_refcnt)
+		return EBUSY;
+
 	/*
 	 * Make sure we're the only one's modifying things.  With
 	 * this lock others should just fall out of the loop.
@@ -467,12 +468,7 @@ mblk_t **mp;
 	register struct frentry *f;
 	register ipnat_t *np;
 
-	frsync();
-	/*
-	 * Resync. any NAT `connections' using this interface and its IP #.
-	 */
-	fr_natsync(qif);
-	fr_statesync(qif);
+	frsync(NULL);
 	return 0;
 }
 
@@ -683,3 +679,77 @@ static int fr_slowtimer()
 	RWLOCK_EXIT(&ipf_global);
 }
 
+
+/*
+ * routines below for saving IP headers to buffer
+ */
+int iplopen(dev, flag, dummy, mode)
+dev_t dev;
+int flag;
+intptr_t dummy;
+int mode;
+{
+	minor_t min = getminor(dev);
+
+#ifdef  IPFDEBUG
+	cmn_err(CE_CONT, "iplopen(%x,%x,%x,%x)\n", dev, flag, dummy, mode);
+#endif
+	min = (IPL_LOGMAX < min) ? ENXIO : 0;
+	return min;
+}
+
+
+int iplclose(dev, flag, mode)
+dev_t dev;
+int flag;
+int mode;
+{
+	minor_t min = getminor(dev);
+
+#ifdef  IPFDEBUG
+	cmn_err(CE_CONT, "iplclose(%x,%x,%x)\n", dev, flag, mode);
+#endif
+	min = (IPL_LOGMAX < min) ? ENXIO : 0;
+	return min;
+}
+
+
+#ifdef IPFILTER_LOG
+/*
+ * iplread/ipllog
+ * both of these must operate with at least splnet() lest they be
+ * called during packet processing and cause an inconsistancy to appear in
+ * the filter lists.
+ */
+int iplread(dev, uio)
+dev_t dev;
+register struct uio *uio;
+{
+#ifdef	IPFDEBUG
+	cmn_err(CE_CONT, "iplread(%x,%x)\n", dev, uio);
+#endif
+	return ipflog_read(getminor(dev), uio);
+}
+#endif /* IPFILTER_LOG */
+
+
+#if 0
+/*
+ * iplread/ipllog
+ * both of these must operate with at least splnet() lest they be
+ * called during packet processing and cause an inconsistancy to appear in
+ * the filter lists.
+ */
+int iplwrite(dev, uio, cp)
+dev_t dev;
+register struct uio *uio;
+cred_t *cp;
+{
+#ifdef	IPFDEBUG
+	cmn_err(CE_CONT, "iplwrite(%x,%x,%x)\n", dev, uio, cp);
+#endif
+	if (getminor(dev) != IPL_LOGSYNC)
+		return ENXIO;
+	return ipfsync_write(uio);
+}
+#endif /* IPFILTER_SYNC */

@@ -13,8 +13,11 @@ else
 fi
 echo "$1...";
 /bin/cp /dev/null results/$1
-if [ -f regress/$1.pool ] ; then
+if [ -f regress/$1.pool -a -f regress/$1.ipf ] ; then
 	../ipftest -RD -b -P regress/$1.pool -r regress/$1.ipf -i input/$1 >> \
+		results/$1
+elif [ -f regress/$1.pool -a -f regress/$1.nat ] ; then
+	../ipftest -RD -b -P regress/$1.pool -N regress/$1.nat -i input/$1 >> \
 		results/$1
 else
 	../ipftest -RD -b -r regress/$1.ipf -i input/$1 >> results/$1

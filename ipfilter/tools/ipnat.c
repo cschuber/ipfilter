@@ -49,7 +49,7 @@
 # include <nlist.h>
 #endif
 #include "ipf.h"
-#include "ipl.h"
+#include "netinet/ipl.h"
 #include "kmem.h"
 
 #ifdef	__hpux
@@ -325,6 +325,8 @@ int opts;
 			if (kmemcpy((char *)&nat, (long)np, sizeof(nat)))
 				break;
 			printactivenat(&nat, opts);
+			if (nat.nat_aps)
+				printaps(nat.nat_aps, opts);
 		}
 
 		if (opts & OPT_VERBOSE)

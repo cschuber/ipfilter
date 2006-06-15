@@ -14,7 +14,6 @@
 static const char rcsid[] = "@(#)$Id$";
 #endif
 
-
 /*
  * Print out a NAT rule
  */
@@ -26,6 +25,9 @@ int opts;
 	int	bits;
 
 	pr = getprotobynumber(np->in_p);
+
+	if (np->in_flags & IPN_NO)
+		printf("no ");
 
 	switch (np->in_redir)
 	{
@@ -50,7 +52,7 @@ int opts;
 	printf(" %s", np->in_ifnames[0]);
 	if ((np->in_ifnames[1][0] != '\0') &&
 	    (strncmp(np->in_ifnames[0], np->in_ifnames[1], LIFNAMSIZ) != 0)) {
-		printf(",%s ", np->in_ifnames[1]);
+		printf(",%s", np->in_ifnames[1]);
 	}
 	putchar(' ');
 
@@ -59,11 +61,13 @@ int opts;
 			printf("! ");
 		printf("from ");
 		if (np->in_redir == NAT_REDIRECT) {
-			printhostmask(4, (u_32_t *)&np->in_srcip,
-				      (u_32_t *)&np->in_srcmsk);
+			printaddr(AF_INET, np->in_srcatype, np->in_ifnames[0],
+				  (u_32_t *)&np->in_src[0],
+				  (u_32_t *)&np->in_src[1]);
 		} else {
-			printhostmask(4, (u_32_t *)&np->in_inip,
-				      (u_32_t *)&np->in_inmsk);
+			printaddr(AF_INET, np->in_inatype, np->in_ifnames[0],
+				  (u_32_t *)&np->in_in[0],
+				  (u_32_t *)&np->in_in[1]);
 		}
 		if (np->in_scmp)
 			printportcmp(np->in_p, &np->in_tuc.ftu_src);
@@ -72,11 +76,13 @@ int opts;
 			printf(" !");
 		printf(" to ");
 		if (np->in_redir == NAT_REDIRECT) {
-			printhostmask(4, (u_32_t *)&np->in_outip,
-				      (u_32_t *)&np->in_outmsk);
+			printaddr(AF_INET, np->in_outatype, np->in_ifnames[0],
+				  (u_32_t *)&np->in_out[0],
+				  (u_32_t *)&np->in_out[1]);
 		} else {
-			printhostmask(4, (u_32_t *)&np->in_srcip,
-				      (u_32_t *)&np->in_srcmsk);
+			printaddr(AF_INET, np->in_srcatype, np->in_ifnames[0],
+				  (u_32_t *)&np->in_src[0],
+				  (u_32_t *)&np->in_src[1]);
 		}
 		if (np->in_dcmp)
 			printportcmp(np->in_p, &np->in_tuc.ftu_dst);
@@ -84,32 +90,34 @@ int opts;
 
 	if (np->in_redir == NAT_REDIRECT) {
 		if (!(np->in_flags & IPN_FILTER)) {
-			printf("%s", inet_ntoa(np->in_out[0].in4));
-			bits = count4bits(np->in_outmsk);
-			if (bits != -1)
-				printf("/%d ", bits);
-			else
-				printf("/%s ", inet_ntoa(np->in_out[1].in4));
-			printf("port %d", ntohs(np->in_pmin));
-			if (np->in_pmax != np->in_pmin)
-				printf("-%d", ntohs(np->in_pmax));
+			printaddr(AF_INET, np->in_outatype, np->in_ifnames[0],
+				  (u_32_t *)&np->in_out[0],
+				  (u_32_t *)&np->in_out[1]);
+			if (np->in_flags & IPN_TCPUDP) {
+				printf(" port %d", ntohs(np->in_pmin));
+				if (np->in_pmax != np->in_pmin)
+					printf("-%d", ntohs(np->in_pmax));
+			}
+		}
+		if (np->in_flags & IPN_NO) {
+			putchar(' ');
+			printproto(pr, np->in_p, np);
+			printf(";\n");
+			return;
 		}
 		printf(" -> %s", inet_ntoa(np->in_in[0].in4));
 		if (np->in_flags & IPN_SPLIT)
 			printf(",%s", inet_ntoa(np->in_in[1].in4));
-		printf(" port %d", ntohs(np->in_pnext));
-		if ((np->in_flags & IPN_TCPUDP) == IPN_TCPUDP)
-			printf(" tcp/udp");
-		else if ((np->in_flags & IPN_TCP) == IPN_TCP)
-			printf(" tcp");
-		else if ((np->in_flags & IPN_UDP) == IPN_UDP)
-			printf(" udp");
-		else if (np->in_p == 0)
-			printf(" ip");
-		else if (pr != NULL)
-			printf(" %s", pr->p_name);
-		else
-			printf(" %d", np->in_p);
+		else if (np->in_inmsk == 0 && np->in_inip == 0)
+			printf("/0");
+		if (np->in_flags & IPN_TCPUDP) {
+			if ((np->in_flags & IPN_FIXEDDPORT) != 0)
+				printf(" port = %d", ntohs(np->in_pnext));
+			else
+				printf(" port %d", ntohs(np->in_pnext));
+		}
+		putchar(' ');
+		printproto(pr, np->in_p, np);
 		if (np->in_flags & IPN_ROUNDR)
 			printf(" round-robin");
 		if (np->in_flags & IPN_FRAG)
@@ -124,17 +132,22 @@ int opts;
 		if (*np->in_plabel != '\0')
 			printf(" proxy %.*s", (int)sizeof(np->in_plabel),
 				np->in_plabel);
+		if (np->in_tag.ipt_tag[0] != '\0')
+			printf(" tag %-.*s", IPFTAG_LEN, np->in_tag.ipt_tag);
 		printf("\n");
 		if (opts & OPT_DEBUG)
 			printf("\tpmax %u\n", np->in_pmax);
 	} else {
 		if (!(np->in_flags & IPN_FILTER)) {
-			printf("%s/", inet_ntoa(np->in_in[0].in4));
-			bits = count4bits(np->in_inmsk);
-			if (bits != -1)
-				printf("%d", bits);
-			else
-				printf("%s", inet_ntoa(np->in_in[1].in4));
+			printaddr(AF_INET, np->in_inatype, np->in_ifnames[0],
+				  (u_32_t *)&np->in_in[0],
+				  (u_32_t *)&np->in_in[1]);
+		}
+		if (np->in_flags & IPN_NO) {
+			putchar(' ');
+			printproto(pr, np->in_p, np);
+			printf(";\n");
+			return;
 		}
 		printf(" -> ");
 		if (np->in_flags & IPN_IPRANGE) {
@@ -163,10 +176,7 @@ int opts;
 			}
 			printf(" %.*s/", (int)sizeof(np->in_plabel),
 				np->in_plabel);
-			if (pr != NULL)
-				fputs(pr->p_name, stdout);
-			else
-				printf("%d", np->in_p);
+			printproto(pr, np->in_p, NULL);
 		} else if (np->in_redir == NAT_MAPBLK) {
 			if ((np->in_pmin == 0) &&
 			    (np->in_flags & IPN_AUTOPORTMAP))
@@ -176,13 +186,12 @@ int opts;
 			if (opts & OPT_DEBUG)
 				printf("\n\tip modulous %d", np->in_pmax);
 		} else if (np->in_pmin || np->in_pmax) {
-			printf(" portmap");
-			if ((np->in_flags & IPN_TCPUDP) == IPN_TCPUDP)
-				printf(" tcp/udp");
-			else if (np->in_flags & IPN_TCP)
-				printf(" tcp");
-			else if (np->in_flags & IPN_UDP)
-				printf(" udp");
+			if (np->in_flags & IPN_ICMPQUERY) {
+				printf(" icmpidmap ");
+			} else {
+				printf(" portmap ");
+			}
+			printproto(pr, np->in_p, np);
 			if (np->in_flags & IPN_AUTOPORTMAP) {
 				printf(" auto");
 				if (opts & OPT_DEBUG)
@@ -194,12 +203,20 @@ int opts;
 				printf(" %d:%d", ntohs(np->in_pmin),
 				       ntohs(np->in_pmax));
 			}
+		} else if ((np->in_flags & IPN_TCPUDP) || np->in_p) {
+			putchar(' ');
+			printproto(pr, np->in_p, np);
 		}
+
 		if (np->in_flags & IPN_FRAG)
 			printf(" frag");
 		if (np->in_age[0] != 0 || np->in_age[1] != 0) {
 			printf(" age %d/%d", np->in_age[0], np->in_age[1]);
 		}
+		if (np->in_mssclamp != 0)
+			printf(" mssclamp %d", np->in_mssclamp);
+		if (np->in_tag.ipt_tag[0] != '\0')
+			printf(" tag %s", np->in_tag.ipt_tag);
 		printf("\n");
 		if (opts & OPT_DEBUG) {
 			struct in_addr nip;

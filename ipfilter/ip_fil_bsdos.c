@@ -66,10 +66,6 @@ extern	struct	protosw	inetsw[];
 
 static	int	(*fr_savep) __P((ip_t *, int, void *, int, struct mbuf **));
 static	int	fr_send_ip __P((ip_t *, fr_info_t *, mb_t *, mb_t **));
-#ifdef KMUTEX_T
-extern  ipfmutex_t	ipf_rw;
-extern	ipfrwlock_t	ipf_mutex;
-#endif
 
 #if (_BSDI_VERSION >= 199510)
 # include <sys/device.h>
@@ -114,7 +110,7 @@ int iplattach()
 		return EBUSY;
 	}
 
-	if (fr_initialise() == -1) {
+	if (fr_initialise() < 0) {
 		SPL_X(s);
 		return EIO;
 	}
@@ -214,7 +210,8 @@ int mode;
 		if (unit != IPL_LOGIPF)
 			return EIO;
 		if (cmd != SIOCIPFGETNEXT && cmd != SIOCIPFGET &&
-		    cmd != SIOCIPFSET && cmd != SIOCFRENB && cmd != SIOCGETFS)
+		    cmd != SIOCIPFSET && cmd != SIOCFRENB &&
+		    cmd != SIOCGETFS && cmd != SIOCGETFF)
 			return EIO;
 	}
 
@@ -271,10 +268,10 @@ int mode;
 		if (!(mode & FWRITE))
 			error = EPERM;
 		else
-			error = COPYIN(data, &fr_flags, sizeof(fr_flags));
+			error = COPYIN(data, &ipf_flags, sizeof(ipf_flags));
 		break;
 	case SIOCGETFF :
-		error = COPYOUT(&fr_flags, data, sizeof(fr_flags));
+		error = COPYOUT(&ipf_flags, data, sizeof(ipf_flags));
 		break;
 	case SIOCFUNCL :
 		error = fr_resolvefunc(data);
@@ -351,7 +348,7 @@ int mode;
 		if (!(mode & FWRITE))
 			error = EPERM;
 		else {
-			frsync();
+			frsync(NULL);
 		}
 		break;
 	default :
@@ -363,6 +360,7 @@ int mode;
 }
 
 
+#if 0
 void fr_forgetifp(ifp)
 void *ifp;
 {
@@ -381,23 +379,10 @@ void *ifp;
 	for (f = ipfilter[1][fr_active]; (f != NULL); f = f->fr_next)
 		if (f->fr_ifa == ifp)
 			f->fr_ifa = (void *)-1;
-#ifdef USE_INET6
-	for (f = ipacct6[0][fr_active]; (f != NULL); f = f->fr_next)
-		if (f->fr_ifa == ifp)
-			f->fr_ifa = (void *)-1;
-	for (f = ipacct6[1][fr_active]; (f != NULL); f = f->fr_next)
-		if (f->fr_ifa == ifp)
-			f->fr_ifa = (void *)-1;
-	for (f = ipfilter6[0][fr_active]; (f != NULL); f = f->fr_next)
-		if (f->fr_ifa == ifp)
-			f->fr_ifa = (void *)-1;
-	for (f = ipfilter6[1][fr_active]; (f != NULL); f = f->fr_next)
-		if (f->fr_ifa == ifp)
-			f->fr_ifa = (void *)-1;
-#endif
 	RWLOCK_EXIT(&ipf_mutex);
 	fr_natsync(ifp);
 }
+#endif
 
 
 /*
@@ -455,11 +440,41 @@ dev_t dev;
 register struct uio *uio;
 int ioflag;
 {
+
+# ifdef	IPFILTER_SYNC
+	if (GET_MINOR(dev) == IPL_LOGSYNC)
+		return ipfsync_read(uio);
+# endif
+
 #ifdef IPFILTER_LOG
 	return ipflog_read(GET_MINOR(dev), uio);
 #else
 	return ENXIO;
 #endif
+}
+
+
+/*
+ * iplwrite
+ * both of these must operate with at least splnet() lest they be
+ * called during packet processing and cause an inconsistancy to appear in
+ * the filter lists.
+ */
+#if (BSD >= 199306)
+int iplwrite(dev, uio, ioflag)
+int ioflag;
+#else
+int iplwrite(dev, uio)
+#endif
+dev_t dev;
+register struct uio *uio;
+{
+
+#ifdef	IPFILTER_SYNC
+	if (GET_MINOR(dev) == IPL_LOGSYNC)
+		return ipfsync_write(uio);
+#endif
+	return ENXIO;
 }
 
 
@@ -487,12 +502,6 @@ fr_info_t *fin;
 		return -1;
 #endif
 
-	m = m_gethdr(M_DONTWAIT, MT_HEADER);
-	if (m == NULL)
-		return ENOBUFS;
-	if (m == NULL)
-		return -1;
-
 	tlen = fin->fin_dlen - (TCP_OFF(tcp) << 2) +
 			((tcp->th_flags & TH_SYN) ? 1 : 0) +
 			((tcp->th_flags & TH_FIN) ? 1 : 0);
@@ -502,33 +511,57 @@ fr_info_t *fin;
 #else
 	hlen = sizeof(ip_t);
 #endif
+#ifdef MGETHDR
+	MGETHDR(m, M_DONTWAIT, MT_HEADER);
+#else
+	MGET(m, M_DONTWAIT, MT_HEADER);
+#endif
+	if (m == NULL)
+		return -1;
+	if (sizeof(*tcp2) + hlen > MHLEN) {
+		MCLGET(m, M_DONTWAIT);
+		if ((m->m_flags & M_EXT) == 0) {
+			FREE_MB_T(m);
+			return -1;
+		}
+	}
+
 	m->m_len = sizeof(*tcp2) + hlen;
 	m->m_data += max_linkhdr;
 	m->m_pkthdr.len = m->m_len;
 	m->m_pkthdr.rcvif = (struct ifnet *)0;
 	ip = mtod(m, struct ip *);
+	bzero((char *)ip, hlen);
 #ifdef USE_INET6
 	ip6 = (ip6_t *)ip;
 #endif
-	bzero((char *)ip, sizeof(*tcp2) + hlen);
 	tcp2 = (struct tcphdr *)((char *)ip + hlen);
-
 	tcp2->th_sport = tcp->th_dport;
 	tcp2->th_dport = tcp->th_sport;
+
 	if (tcp->th_flags & TH_ACK) {
 		tcp2->th_seq = tcp->th_ack;
 		tcp2->th_flags = TH_RST;
+		tcp2->th_ack = 0;
 	} else {
+		tcp2->th_seq = 0;
 		tcp2->th_ack = ntohl(tcp->th_seq);
 		tcp2->th_ack += tlen;
 		tcp2->th_ack = htonl(tcp2->th_ack);
 		tcp2->th_flags = TH_RST|TH_ACK;
 	}
+	TCP_X2_A(tcp2, 0);
 	TCP_OFF_A(tcp2, sizeof(*tcp2) >> 2);
+	tcp2->th_win = tcp->th_win;
+	tcp2->th_sum = 0;
+	tcp2->th_urp = 0;
+
 #ifdef USE_INET6
 	if (fin->fin_v == 6) {
+		ip6->ip6_flow = ((ip6_t *)fin->fin_ip)->ip6_flow;
 		ip6->ip6_plen = htons(sizeof(struct tcphdr));
 		ip6->ip6_nxt = IPPROTO_TCP;
+		ip6->ip6_hlim = 0
 		ip6->ip6_src = fin->fin_dst6;
 		ip6->ip6_dst = fin->fin_src6;
 		tcp2->th_sum = in6_cksum(m, IPPROTO_TCP,
@@ -550,28 +583,37 @@ static int fr_send_ip(fin, m, mpp)
 fr_info_t *fin;
 mb_t *m, **mpp;
 {
+	fr_info_t fnew;
 	ip_t *ip, *oip;
+	int hlen;
 
 	ip = mtod(m, ip_t *);
-	oip = fin->fin_ip;
+	bzero((char *)&fnew, sizeof(fnew));
 
 	IP_V_A(ip, fin->fin_v);
 	switch (fin->fin_v)
 	{
 	case 4 :
+		fnew.fin_v = 4;
+		oip = fin->fin_ip;
 		IP_HL_A(ip, sizeof(*oip) >> 2);
 		ip->ip_tos = oip->ip_tos;
 		ip->ip_id = fin->fin_ip->ip_id;
 		ip->ip_off = ip_mtudisc ? IP_DF : 0;
 		ip->ip_ttl = ip_defttl;
 		ip->ip_sum = 0;
+		hlen = sizeof(*oip);
 		break;
 #ifdef USE_INET6
 	case 6 :
 	{
 		ip6_t *ip6 = (ip6_t *)ip;
 
+		ip6->ip6_vfc = 0x60;
 		ip6->ip6_hlim = IPDEFTTL;
+
+		fnew.fin_v = 6;
+		hlen = sizeof(*ip6);
 	}
 #endif
 	default :
@@ -580,7 +622,17 @@ mb_t *m, **mpp;
 #ifdef IPSEC
 	m->m_pkthdr.rcvif = NULL;
 #endif
-	return fr_fastroute(m, mpp, fin, NULL);
+
+	fnew.fin_ifp = fin->fin_ifp;
+	fnew.fin_flx = FI_NOCKSUM;
+	fnew.fin_m = m;
+	fnew.fin_ip = ip;
+	fnew.fin_mp = mpp;
+	fnew.fin_hlen = hlen;
+	fnew.fin_dp = (char *)ip + hlen;
+	(void) fr_makefrip(hlen, ip, &fnew);
+
+	return fr_fastroute(m, mpp, &fnew, NULL);
 }
 
 
@@ -593,10 +645,10 @@ int dst;
 	struct in_addr dst4;
 	struct icmp *icmp;
 	struct mbuf *m;
+	i6addr_t dst6;
 	void *ifp;
 #ifdef USE_INET6
-	ip6_t *ip6, *ip62;
-	struct in6_addr dst6;
+	ip6_t *ip6;
 #endif
 	ip_t *ip, *ip2;
 
@@ -613,9 +665,15 @@ int dst;
 	if (fr_checkl4sum(fin) == -1)
 		return -1;
 #endif
+#ifdef MGETHDR
+	MGETHDR(m, M_DONTWAIT, MT_HEADER);
+#else
+	MGET(m, M_DONTWAIT, MT_HEADER);
+#endif
+	if (m == NULL)
+		return -1;
+	avail = MHLEN;
 
-	avail = 0;
-	m = NULL;
 	ifp = fin->fin_ifp;
 	if (fin->fin_v == 4) {
 		if ((fin->fin_p == IPPROTO_ICMP) &&
@@ -628,20 +686,17 @@ int dst;
 			case ICMP_MASKREQ :
 				break;
 			default :
+				FREE_MB_T(m);
 				return 0;
 			}
 
-		avail = MHLEN;
-		m = m_gethdr(M_DONTWAIT, MT_HEADER);
-		if (m == NULL)
-			return ENOBUFS;
-
 		if (dst == 0) {
 			if (fr_ifpaddr(4, FRI_NORMAL, ifp,
-				       &dst, NULL) == -1) {
+				       &dst6, NULL) == -1) {
 				FREE_MB_T(m);
 				return -1;
 			}
+			dst4 = dst6.in4;
 		} else
 			dst4.s_addr = fin->fin_daddr;
 
@@ -660,19 +715,20 @@ int dst;
 		if (type == ICMP6_DST_UNREACH)
 			code = icmptoicmp6unreach[code];
 
-		MGETHDR(m, M_DONTWAIT, MT_HEADER);
-		if (m == NULL)
-			return ENOBUFS;
-
-		MCLGET(m, M_DONTWAIT);
-		if (m == NULL)
-			return ENOBUFS;
-		avail = (m->m_flags & M_EXT) ? MCLBYTES : MHLEN;
-		xtra = MIN(fin->fin_plen + sizeof(ip6_t),
+		if (hlen + sizeof(*icmp) + max_linkhdr +
+		    fin->fin_plen > avail) {
+			MCLGET(m, M_DONTWAIT);
+			if ((m->m_flags & M_EXT) == 0) {
+				FREE_MB_T(m);
+				return -1;
+			}
+			avail = MCLBYTES;
+		}
+		xtra = MIN(fin->fin_plen,
 			   avail - hlen - sizeof(*icmp) - max_linkhdr);
 		if (dst == 0) {
 			if (fr_ifpaddr(6, FRI_NORMAL, ifp,
-				       (struct in_addr *)&dst6, NULL) == -1) {
+				       &dst6, NULL) == -1) {
 				FREE_MB_T(m);
 				return -1;
 			}
@@ -680,24 +736,27 @@ int dst;
 			dst6 = fin->fin_dst6;
 	}
 #endif
+	else {
+		FREE_MB_T(m);
+		return -1;
+	}
 
-	iclen = hlen + sizeof(*icmp) + xtra;
+	iclen = hlen + sizeof(*icmp);
 	avail -= (max_linkhdr + iclen);
-	m->m_data += max_linkhdr;
-	m->m_pkthdr.rcvif = (struct ifnet *)0;
+	if (avail < 0) {
+		FREE_MB_T(m);
+		return -1;
+	}
 	if (xtra > avail)
 		xtra = avail;
 	iclen += xtra;
+	m->m_data += max_linkhdr;
+	m->m_pkthdr.rcvif = (struct ifnet *)0;
 	m->m_pkthdr.len = iclen;
-	if (avail < 0) {
-		m_freem(m);
-		return ENOBUFS;
-	}
 	m->m_len = iclen;
 	ip = mtod(m, ip_t *);
 	icmp = (struct icmp *)((char *)ip + hlen);
 	ip2 = (ip_t *)&icmp->icmp_ip;
-	bzero((char *)ip, iclen);
 
 	icmp->icmp_type = type;
 	icmp->icmp_code = fin->fin_icode;
@@ -713,10 +772,7 @@ int dst;
 #ifdef USE_INET6
 	ip6 = (ip6_t *)ip;
 	if (fin->fin_v == 6) {
-		ip62 = (ip6_t *)ip2;
-		ip62->ip6_plen = htons(ip62->ip6_plen);
-
-		ip6->ip6_flow = 0;
+		ip6->ip6_flow = ((ip6_t *)fin->fin_ip)->ip6_flow;
 		ip6->ip6_plen = htons(iclen - hlen);
 		ip6->ip6_nxt = IPPROTO_ICMPV6;
 		ip6->ip6_hlim = 0;
@@ -731,7 +787,7 @@ int dst;
 #endif
 	{
 		ip2->ip_len = htons(ip2->ip_len);
-
+		ip2->ip_off = htons(ip2->ip_off);
 		ip->ip_p = IPPROTO_ICMP;
 		ip->ip_src.s_addr = dst4.s_addr;
 		ip->ip_dst.s_addr = fin->fin_saddr;
@@ -791,11 +847,13 @@ frdest_t *fdp;
 	*/
 	if (M_WRITABLE(m) == 0) {
 		if ((m0 = m_dup(m, M_DONTWAIT)) != 0) {
-			m_freem(m);
+			FREE_MB_T(m);
 			m = m0;
+			*mpp = m;
 		} else {
 			error = ENOBUFS;
-			m_freem(m);
+			FREE_MB_T(m);
+			*mpp = NULL;
 			fr_frouteok[1]++;
 		}
 	}
@@ -820,30 +878,16 @@ frdest_t *fdp;
 	bzero((caddr_t)ro, sizeof (*ro));
 	dst = (struct sockaddr_in *)&ro->ro_dst;
 	dst->sin_family = AF_INET;
+	dst->sin_addr = ip->ip_dst;
 
 	fr = fin->fin_fr;
-	if (fdp)
+	if (fdp != NULL)
 		ifp = fdp->fd_ifp;
-	else {
+	else
 		ifp = fin->fin_ifp;
-		dst->sin_addr = ip->ip_dst;
-	}
 
-	/*
-	 * In case we're here due to "to <if>" being used with "keep state",
-	 * check that we're going in the correct direction.
-	 */
-	if ((fr != NULL) && (fin->fin_rev != 0)) {
-		if ((ifp != NULL) && (fdp == &fr->fr_tif))
-			return -1;
-		dst->sin_addr = ip->ip_dst;
-	} else if (fdp) {
-		if (fdp->fd_ip.s_addr) {
-			dst->sin_addr = fdp->fd_ip;
-			ip->ip_dst = fdp->fd_ip;
-		} else
-			dst->sin_addr = ip->ip_dst;
-	}
+	if ((fdp != NULL) && (fdp->fd_ip.s_addr != 0))
+		dst->sin_addr = fdp->fd_ip;
 
 	dst->sin_len = sizeof(*dst);
 	rtalloc(ro);
@@ -861,7 +905,7 @@ frdest_t *fdp;
 			goto bad;
 		}
 		if (ro->ro_rt->rt_flags & RTF_GATEWAY)
-			dst = (struct sockaddr_in *)&ro->ro_rt->rt_gateway;
+			dst = (struct sockaddr_in *)ro->ro_rt->rt_gateway;
 	}
 	if (ro->ro_rt)
 		ro->ro_rt->rt_use++;
@@ -871,9 +915,10 @@ frdest_t *fdp;
 	 * go back through output filtering and miss their chance to get
 	 * NAT'd and counted.
 	 */
-	fin->fin_ifp = ifp;
 	if (fin->fin_out == 0) {
 		fin->fin_out = 1;
+		sifp = fin->fin_ifp;
+		fin->fin_ifp = ifp;
 		if ((fin->fin_fr = ipacct[1][fr_active]) &&
 		    (fr_scanlist(fin, FR_NOMATCH) & FR_ACCOUNT)) {
 			ATOMIC_INCL(frstats[1].fr_acct);
@@ -884,7 +929,22 @@ frdest_t *fdp;
 
 			(void) fr_checkstate(fin, &pass);
 		}
-		(void) fr_checknatout(fin, &pass);
+
+		switch (fr_checknatout(fin, &pass))
+		{
+		case 0 :
+			break;
+		case 1 :
+			ip->ip_sum = 0;
+			break;
+		case -1 :
+			error = -1;
+			goto done;
+			break;
+		}
+
+		fin->fin_ifp = sifp;
+		fin->fin_out = 0;
 	} else
 		ip->ip_sum = 0;
 	/*
@@ -934,6 +994,7 @@ frdest_t *fdp;
 		MGET(m, M_DONTWAIT, MT_HEADER);
 #endif
 		if (m == 0) {
+			m = m0;
 			error = ENOBUFS;
 			goto bad;
 		}
@@ -982,7 +1043,7 @@ sendorfree:
 			error = (*ifp->if_output)(ifp, m,
 			    (struct sockaddr *)dst, ro->ro_rt);
 		else
-			m_freem(m);
+			FREE_MB_T(m);
 	}
     }	
 done:
@@ -1006,7 +1067,7 @@ bad:
 		fin->fin_ifp = sifp;
 		fin->fin_icode = code;
 	}
-	m_freem(m);
+	FREE_MB_T(m);
 	goto done;
 }
 
@@ -1036,7 +1097,7 @@ fr_info_t *fin;
 int fr_ifpaddr(v, atype, ifptr, inp inpmask)
 int v, atype;
 void *ifptr;
-struct in_addr *inp, *inpmask;
+i6addr_t *inp, *inpmask;
 {
 #ifdef USE_INET6
 	struct in6_addr *inp6 = NULL;
@@ -1046,14 +1107,16 @@ struct in_addr *inp, *inpmask;
 	struct in_addr in;
 	struct ifnet *ifp;
 
+	if ((ifptr == NULL) || (ifptr == (void *)-1))
+		return -1;
+
 	ifp = ifptr;
 
 	if (v == 4)
-		inp->s_addr = 0;
-#ifdef USE_INET6
-	else if (v == 6)
-		bzero((char *)inp, sizeof(struct in6_addr));
-#endif
+		inp->in4.s_addr = 0;
+	else
+		bzero((char *)inp, sizeof(*inp));
+
 	ifa = ifp->if_addrlist;
 	sin = (struct sockaddr_in *)ifa->ifa_addr;
 	while (sin && ifa) {
@@ -1087,7 +1150,7 @@ struct in_addr *inp, *inpmask;
 					inp, inpmask);
 	}
 #endif
-	return fr_ifpfillv4addr(atype, sin, mask, inp, inpmask);
+	return fr_ifpfillv4addr(atype, sin, mask, &inp->in4, &inpmask->in4);
 }
 
 
@@ -1166,8 +1229,25 @@ INLINE void fr_checkv6sum(fin)
 fr_info_t *fin;
 {
 # ifdef IPFILTER_CKSUM
-	if (fr_checkl6sum(fin) == -1)
+	if (fr_checkl4sum(fin) == -1)
 		fin->fin_flx |= FI_BAD;
 # endif
 }
 #endif /* USE_INET6 */
+
+
+size_t mbufchainlen(m0)
+struct mbuf *m0;
+{
+	size_t len;
+
+	if ((m0->m_flags & M_PKTHDR) != 0) {
+		len = m0->m_pkthdr.len;
+	} else {
+		struct mbuf *m;
+
+		for (m = m0, len = 0; m != NULL; m = m->m_next)
+			len += m->m_len;
+	}
+	return len;
+}

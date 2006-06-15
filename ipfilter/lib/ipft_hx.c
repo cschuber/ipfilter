@@ -81,7 +81,7 @@ int	cnt, *dir;
 			*s = '\0';
 		if (!*line)
 			continue;
-		if (!(opts & OPT_BRIEF)) {
+		if ((opts & OPT_DEBUG) != 0) {
 			printf("input: %s", line);
 		}
 
@@ -106,12 +106,12 @@ int	cnt, *dir;
 			s = line;
 		t = (char *)ip;
 		ip = (ip_t *)readhex(s, (char *)ip);
-		if (!(opts & OPT_BRIEF)) {
+		if ((opts & OPT_DEBUG) != 0) {
 			if (opts & OPT_ASCII) {
 				if (t < (char *)ip)
 					putchar('\t');
 				while (t < (char *)ip) {
-					if (isprint(*t) && isascii(*t))
+					if (ISPRINT(*t) && ISASCII(*t))
 						putchar(*t);
 					else
 						putchar('.');
@@ -122,6 +122,8 @@ int	cnt, *dir;
 			fflush(stdout);
 		}
 	}
+	if (feof(tfp))
+		return 0;
 	return -1;
 }
 
@@ -133,7 +135,7 @@ register char	*src, *dst;
 	char	c;
 
 	while ((c = *src++)) {
-		if (isspace(c)) {
+		if (ISSPACE(c)) {
 			if (state) {
 				dst++;
 				state = 0;
@@ -141,7 +143,7 @@ register char	*src, *dst;
 			continue;
 		} else if ((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') ||
 			   (c >= 'A' && c <= 'F')) {
-			c = isdigit(c) ? (c - '0') : (toupper(c) - 55);
+			c = ISDIGIT(c) ? (c - '0') : (TOUPPER(c) - 55);
 			if (state == 0) {
 				*dst = (c << 4);
 				state++;

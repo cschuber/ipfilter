@@ -16,6 +16,7 @@ LIBOBJS=$(DEST)/addicmp.o \
      $(DEST)/fill6bits.o \
      $(DEST)/genmask.o \
      $(DEST)/gethost.o \
+     $(DEST)/geticmptype.o \
      $(DEST)/getifname.o \
      $(DEST)/getline.o \
      $(DEST)/getnattype.o \
@@ -28,6 +29,8 @@ LIBOBJS=$(DEST)/addicmp.o \
      $(DEST)/hostname.o \
      $(DEST)/hostnum.o \
      $(DEST)/icmpcode.o \
+     $(DEST)/icmptypename.o \
+     $(DEST)/icmptypes.o \
      $(DEST)/inet_addr.o \
      $(DEST)/initparse.o \
      $(DEST)/ionames.o \
@@ -61,14 +64,18 @@ LIBOBJS=$(DEST)/addicmp.o \
      $(DEST)/ports.o \
      $(DEST)/print_toif.o \
      $(DEST)/printactivenat.o \
+     $(DEST)/printaddr.o \
      $(DEST)/printaps.o \
      $(DEST)/printbuf.o \
      $(DEST)/printhash.o \
      $(DEST)/printhashnode.o \
      $(DEST)/printip.o \
+     $(DEST)/printlookup.o \
      $(DEST)/printpool.o \
      $(DEST)/printpoolnode.o \
+     $(DEST)/printproto.o \
      $(DEST)/printfr.o \
+     $(DEST)/printfraginfo.o \
      $(DEST)/printhostmap.o \
      $(DEST)/printifname.o \
      $(DEST)/printhostmask.o \
@@ -116,7 +123,7 @@ $(DEST)/buildopts.o: $(LIBSRC)/buildopts.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/buildopts.c -o $@
 $(DEST)/count6bits.o: $(LIBSRC)/count6bits.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/count6bits.c -o $@
-$(DEST)/checkrev.o: $(LIBSRC)/checkrev.c $(INCDEP)
+$(DEST)/checkrev.o: $(LIBSRC)/checkrev.c $(INCDEP) $(TOP)/ipl.h
 	$(CC) $(CCARGS) -c $(LIBSRC)/checkrev.c -o $@
 $(DEST)/count4bits.o: $(LIBSRC)/count4bits.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/count4bits.c -o $@
@@ -136,6 +143,8 @@ $(DEST)/getline.o: $(LIBSRC)/getline.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/getline.c -o $@
 $(DEST)/gethost.o: $(LIBSRC)/gethost.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/gethost.c -o $@
+$(DEST)/geticmptype.o: $(LIBSRC)/geticmptype.c $(INCDEP)
+	$(CC) $(CCARGS) -c $(LIBSRC)/geticmptype.c -o $@
 $(DEST)/getifname.o: $(LIBSRC)/getifname.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/getifname.c -o $@
 $(DEST)/getnattype.o: $(LIBSRC)/getnattype.c $(INCDEP)
@@ -158,6 +167,10 @@ $(DEST)/hostnum.o: $(LIBSRC)/hostnum.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/hostnum.c -o $@
 $(DEST)/icmpcode.o: $(LIBSRC)/icmpcode.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/icmpcode.c -o $@
+$(DEST)/icmptypename.o: $(LIBSRC)/icmptypename.c $(INCDEP)
+	$(CC) $(CCARGS) -c $(LIBSRC)/icmptypename.c -o $@
+$(DEST)/icmptypes.o: $(LIBSRC)/icmptypes.c $(INCDEP)
+	$(CC) $(CCARGS) -c $(LIBSRC)/icmptypes.c -o $@
 $(DEST)/ipoptsec.o: $(LIBSRC)/ipoptsec.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/ipoptsec.c -o $@
 $(DEST)/inet_addr.o: $(LIBSRC)/inet_addr.c $(INCDEP)
@@ -225,12 +238,16 @@ $(DEST)/print_toif.o: $(LIBSRC)/print_toif.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/print_toif.c -o $@
 $(DEST)/printactivenat.o: $(LIBSRC)/printactivenat.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/printactivenat.c -o $@
+$(DEST)/printaddr.o: $(LIBSRC)/printaddr.c $(INCDEP)
+	$(CC) $(CCARGS) -c $(LIBSRC)/printaddr.c -o $@
 $(DEST)/printaps.o: $(LIBSRC)/printaps.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/printaps.c -o $@
 $(DEST)/printbuf.o: $(LIBSRC)/printbuf.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/printbuf.c -o $@
 $(DEST)/printfr.o: $(LIBSRC)/printfr.c $(TOP)/ip_fil.h
 	$(CC) $(CCARGS) -c $(LIBSRC)/printfr.c -o $@
+$(DEST)/printfraginfo.o: $(LIBSRC)/printfraginfo.c $(TOP)/ip_fil.h
+	$(CC) $(CCARGS) -c $(LIBSRC)/printfraginfo.c -o $@
 $(DEST)/printhash.o: $(LIBSRC)/printhash.c $(TOP)/ip_fil.h $(TOP)/ip_htable.h
 	$(CC) $(CCARGS) -c $(LIBSRC)/printhash.c -o $@
 $(DEST)/printhashnode.o: $(LIBSRC)/printhashnode.c $(TOP)/ip_fil.h \
@@ -238,11 +255,15 @@ $(DEST)/printhashnode.o: $(LIBSRC)/printhashnode.c $(TOP)/ip_fil.h \
 	$(CC) $(CCARGS) -c $(LIBSRC)/printhashnode.c -o $@
 $(DEST)/printip.o: $(LIBSRC)/printip.c $(TOP)/ip_fil.h
 	$(CC) $(CCARGS) -c $(LIBSRC)/printip.c -o $@
+$(DEST)/printlookup.o: $(LIBSRC)/printlookup.c $(INCDEP)
+	$(CC) $(CCARGS) -c $(LIBSRC)/printlookup.c -o $@
 $(DEST)/printpool.o: $(LIBSRC)/printpool.c $(TOP)/ip_fil.h $(TOP)/ip_pool.h
 	$(CC) $(CCARGS) -c $(LIBSRC)/printpool.c -o $@
 $(DEST)/printpoolnode.o: $(LIBSRC)/printpoolnode.c $(TOP)/ip_fil.h \
     $(TOP)/ip_pool.h $(TOP)/ip_lookup.h
 	$(CC) $(CCARGS) -c $(LIBSRC)/printpoolnode.c -o $@
+$(DEST)/printproto.o: $(LIBSRC)/printproto.c $(TOP)/ip_fil.h
+	$(CC) $(CCARGS) -c $(LIBSRC)/printproto.c -o $@
 $(DEST)/printhostmap.o: $(LIBSRC)/printhostmap.c $(TOP)/ip_fil.h
 	$(CC) $(CCARGS) -c $(LIBSRC)/printhostmap.c -o $@
 $(DEST)/printifname.o: $(LIBSRC)/printifname.c $(INCDEP)

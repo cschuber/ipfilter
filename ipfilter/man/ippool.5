@@ -25,15 +25,12 @@ hashopts ::= size [ seed ] | seed .
 size ::= "size" number .
 seed ::= "seed" number .
 
-addrlist ::= range [ "," addrlist ] .
-grouplist ::= groupentry [ ";" grouplist ] | groupentry ";" |
-              addrmask ";" | addrmask ";" [ grouplist ] .
+addrlist ::= [ "!" ] addrmask ";" [ addrlist ] .
+grouplist ::= groupentry ";" [ grouplist ] | addrmask ";" [ grouplist ] .
 
 setgrouplist ::= groupentry ";" [ setgrouplist ] .
 
 groupentry ::= addrmask "," setgroup .
-
-range ::= addrmask | "!" addrmask .
 
 hashlist ::= hashentry ";" [ hashlist ] .
 hashentry ::= addrmask .
@@ -117,7 +114,7 @@ in 2.2.0.0/16, except for those in 2.2.2.0/24.
 .PP
 .nf
 table role = ipf type = tree number = 100
-        { 1.1.1.1/32, 2.2.0.0/16, !2.2.2.0/24 };
+        { 1.1.1.1/32; 2.2.0.0/16; !2.2.2.0/24 };
 .fi
 .TP
 2
@@ -147,7 +144,7 @@ group-map out role = ipf number = 2010 group = 2020
 	{ 2.2.2.2/32; 4.4.0.0/16; 5.0.0.0/8, group = 2040; };
 .fi
 .SH FILES
-/dev/ippool
+/dev/iplookup
 .br
 /etc/ippool.conf
 .br

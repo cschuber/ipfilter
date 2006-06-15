@@ -1,24 +1,24 @@
+
 #include "ipf-linux.h"
 #include <linux/devfs_fs_kernel.h>
-#include <linux/init.h>
 
 #ifdef CONFIG_PROC_FS
-#include <linux/module.h>
 #include <linux/proc_fs.h>
 #endif
+
+extern wait_queue_head_t	iplh_linux[IPL_LOGSIZE];
 
 #ifdef MODULE
 MODULE_SUPPORTED_DEVICE("ipf");
 MODULE_AUTHOR("Darren Reed");
 MODULE_DESCRIPTION("IP-Filter Firewall");
-MODULE_LICENSE("(C)Copyright 2003 Darren Reed");
+MODULE_LICENSE("(C)Copyright 2003-2004 Darren Reed");
 
-MODULE_PARM(fr_flags, "i");
+MODULE_PARM(ipf_flags, "i");
 MODULE_PARM(fr_control_forwarding, "i");
 MODULE_PARM(fr_update_ipid, "i");
 MODULE_PARM(fr_chksrc, "i");
 MODULE_PARM(fr_pass, "i");
-MODULE_PARM(fr_unreach, "i");
 MODULE_PARM(ipstate_logging, "i");
 MODULE_PARM(nat_logging, "i");
 MODULE_PARM(ipl_suppress, "i");
@@ -28,7 +28,35 @@ MODULE_PARM(ipl_logall, "i");
 static int ipf_open(struct inode *, struct file *);
 static ssize_t ipf_write(struct file *, const char *, size_t, loff_t *);
 static ssize_t ipf_read(struct file *, char *, size_t, loff_t *);
+static u_int ipf_poll(struct file *fp, struct poll_table_struct *wait);
 extern int ipf_ioctl(struct inode *, struct file *, u_int, u_long);
+
+
+#ifdef	CONFIG_DEVFS_FS
+static	char	*ipf_devfiles[] = { IPL_NAME, IPNAT_NAME, IPSTATE_NAME,
+				    IPAUTH_NAME, IPSYNC_NAME, IPSCAN_NAME,
+				    IPLOOKUP_NAME, NULL };
+#endif
+
+static struct file_operations ipf_fops = {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
+	.owner = THIS_MODULE,
+#endif
+	open:	ipf_open,
+	read:	ipf_read,
+	write:	ipf_write,
+	ioctl:	ipf_ioctl,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
+	poll:	ipf_poll,
+#endif
+};
+
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
+static	devfs_handle_t	dh[IPL_LOGSIZE];
+#endif
+static	int		ipfmajor = 0;
+
 
 
 int uiomove(address, nbytes, rwflag, uiop)
@@ -139,24 +167,51 @@ static ssize_t ipf_read(struct file *fp, char *buf, size_t count, loff_t *posp)
 	return err;
 }
 
-#ifdef	CONFIG_DEVFS_FS
-static	char	*ipf_devfiles[] = { IPL_NAME, IPNAT_NAME, IPSTATE_NAME,
-				    IPAUTH_NAME, IPSYNC_NAME, IPSCAN_NAME,
-				    IPLOOKUP_NAME, NULL };
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
+static u_int ipf_poll(struct file *fp, poll_table *wait)
+{
+	struct inode *i;
+	u_int revents;
+	int unit;
+
+	revents = 0;
+	i = fp->f_dentry->d_inode;
+	unit = MINOR(i->i_rdev);
+	if (unit < 0 || unit > IPL_LOGMAX)
+		return 0;
+
+	poll_wait(fp, &iplh_linux[unit], wait);
+
+	switch (unit)
+	{
+	case IPL_LOGIPF :
+	case IPL_LOGNAT :
+	case IPL_LOGSTATE :
+# ifdef IPFILTER_LOG
+		if (ipflog_canread(unit))
+			revents = (POLLIN | POLLRDNORM);
+# endif
+		break;
+	case IPL_LOGAUTH :
+		if (fr_auth_waiting())
+			revents = (POLLIN | POLLRDNORM);
+		break;
+	case IPL_LOGSYNC :
+# ifdef IPFILTER_SYNC
+		if (ipfsync_canread())
+			revents = (POLLIN | POLLRDNORM);
+# endif
+		break;
+	case IPL_LOGSCAN :
+	case IPL_LOGLOOKUP :
+	default :
+		break;
+	}
+
+	return revents;
+}
 #endif
-
-static struct file_operations ipf_fops = {
-	open:	ipf_open,
-	read:	ipf_read,
-	write:	ipf_write,
-	ioctl:	ipf_ioctl,
-};
-
-
-#ifdef	CONFIG_DEVFS_FS
-static	devfs_handle_t	dh[IPL_LOGSIZE];
-#endif
-static	int		ipfmajor = 0;
 
 
 #ifdef	CONFIG_PROC_FS
@@ -177,18 +232,21 @@ static int ipfilter_init(void)
 
 	ipfmajor = register_chrdev(0, "ipf", &ipf_fops);
 	if (ipfmajor < 0) {
-		printf("unable to get major for ipf devs\n");
+		printf("unable to get major for ipf devs (%d)\n", ipfmajor);
 		return -EINVAL;
 	}
-	printk("IPFilter got cdev major #%d\n", ipfmajor);
 
 #ifdef	CONFIG_DEVFS_FS
 	for (i = 0; ipf_devfiles[i] != NULL; i++) {
 		s = strrchr(ipf_devfiles[i], '/');
 		if (s != NULL) {
+# if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
 			dh[i] = devfs_register(NULL, s + 1, DEVFS_FL_DEFAULT,
 					       ipfmajor, i, 0600|S_IFCHR,
 					       &ipf_fops, NULL);
+# else
+			devfs_mk_cdev(MKDEV(ipfmajor, i),0600|S_IFCHR,s+1);
+# endif
 		}
 	}
 #endif
@@ -212,23 +270,26 @@ static int ipfilter_init(void)
 		else
 			defpass = "no-match -> block";
 
-		printf("%s initialized.  Default = %s all, Logging = %s%s\n",
+		printk(KERN_INFO "%s initialized.  Default = %s all, "
+		       "Logging = %s%s\n",
 			ipfilter_version, defpass,
-#ifdef IPFILTER_LOG
+# ifdef IPFILTER_LOG
 			"enabled",
-#else
+# else
 			"disabled",
-#endif
-#ifdef IPFILTER_COMPILED
+# endif
+# ifdef IPFILTER_COMPILED
 			" (COMPILED)"
-#else
+# else
 			""
-#endif
+# endif
 			);
 
 		fr_running = 1;
 	}
-#endif
+#else
+	printf("IPFilter: device major number: %d\n", ipfmajor);
+#endif /* CONFIG_PROC_FS */
 
 	return i;
 }
@@ -242,11 +303,16 @@ static int ipfilter_fini(void)
 	int i;
 #endif
 
-	result = ipldetach();
-	if (result != 0) {
-		if (result > 0)
-			result = -result;
-		return result;
+	if (fr_refcnt)
+		return EBUSY;
+
+	if (fr_running >= 0) {
+		result = ipldetach();
+		if (result != 0) {
+			if (result > 0)
+				result = -result;
+			return result;
+		}
 	}
 
 	fr_running = -2;
@@ -259,11 +325,17 @@ static int ipfilter_fini(void)
 	for (i = 0; ipf_devfiles[i] != NULL; i++) {
 		s = strrchr(ipf_devfiles[i], '/');
 		if (s != NULL)
+# if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
 			devfs_unregister_chrdev(ipfmajor, s + 1);
+# else
+			devfs_remove(s+1);
+# endif
 	}
 #endif
-	unregister_chrdev(ipfmajor, "ipf");
-	printf("%s unloaded\n", ipfilter_version);
+
+	if (ipfmajor >= 0)
+		unregister_chrdev(ipfmajor, "ipf");
+	printk(KERN_INFO "%s unloaded\n", ipfilter_version);
 
 	return 0;
 }
@@ -285,4 +357,3 @@ static void __exit ipf_fini(void)
 
 module_init(ipf_init)
 module_exit(ipf_fini)
-

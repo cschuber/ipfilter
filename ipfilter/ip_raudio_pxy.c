@@ -1,19 +1,23 @@
 /*
+ * Copyright (C) 1998-2003 by Darren Reed
+ *
+ * See the IPFILTER.LICENCE file for details on licencing.
+ *
  * $Id$
  */
-#if SOLARIS && defined(_KERNEL)
-extern	kmutex_t	ipf_rw;
-#endif
 
 #define	IPF_RAUDIO_PROXY
 
 
 int ippr_raudio_init __P((void));
-int ippr_raudio_new __P((fr_info_t *, ip_t *, ap_session_t *, nat_t *));
-int ippr_raudio_in __P((fr_info_t *, ip_t *, ap_session_t *, nat_t *));
-int ippr_raudio_out __P((fr_info_t *, ip_t *, ap_session_t *, nat_t *));
+void ippr_raudio_fini __P((void));
+int ippr_raudio_new __P((fr_info_t *, ap_session_t *, nat_t *));
+int ippr_raudio_in __P((fr_info_t *, ap_session_t *, nat_t *));
+int ippr_raudio_out __P((fr_info_t *, ap_session_t *, nat_t *));
 
 static	frentry_t	raudiofr;
+
+int	raudio_proxy_init = 0;
 
 
 /*
@@ -24,25 +28,38 @@ int ippr_raudio_init()
 	bzero((char *)&raudiofr, sizeof(raudiofr));
 	raudiofr.fr_ref = 1;
 	raudiofr.fr_flags = FR_INQUE|FR_PASS|FR_QUICK|FR_KEEPSTATE;
+	MUTEX_INIT(&raudiofr.fr_lock, "Real Audio proxy rule lock");
+	raudio_proxy_init = 1;
+
 	return 0;
+}
+
+
+void ippr_raudio_fini()
+{
+	if (raudio_proxy_init == 1) {
+		MUTEX_DESTROY(&raudiofr.fr_lock);
+		raudio_proxy_init = 0;
+	}
 }
 
 
 /*
  * Setup for a new proxy to handle Real Audio.
  */
-int ippr_raudio_new(fin, ip, aps, nat)
+int ippr_raudio_new(fin, aps, nat)
 fr_info_t *fin;
-ip_t *ip;
 ap_session_t *aps;
 nat_t *nat;
 {
 	raudio_t *rap;
 
-
 	KMALLOCS(aps->aps_data, void *, sizeof(raudio_t));
 	if (aps->aps_data == NULL)
 		return -1;
+
+	fin = fin;	/* LINT */
+	nat = nat;	/* LINT */
 
 	bzero(aps->aps_data, sizeof(raudio_t));
 	rap = aps->aps_data;
@@ -53,9 +70,8 @@ nat_t *nat;
 
 
 
-int ippr_raudio_out(fin, ip, aps, nat)
+int ippr_raudio_out(fin, aps, nat)
 fr_info_t *fin;
-ip_t *ip;
 ap_session_t *aps;
 nat_t *nat;
 {
@@ -66,9 +82,8 @@ nat_t *nat;
 	int off, dlen;
 	int len = 0;
 	mb_t *m;
-#if	SOLARIS
-	mb_t *m1;
-#endif
+
+	nat = nat;	/* LINT */
 
 	/*
 	 * If we've already processed the start messages, then nothing left
@@ -77,24 +92,24 @@ nat_t *nat;
 	if (rap->rap_eos == 1)
 		return 0;
 
+	m = fin->fin_m;
 	tcp = (tcphdr_t *)fin->fin_dp;
-	off = (ip->ip_hl << 2) + (tcp->th_off << 2);
-	bzero(membuf, sizeof(membuf));
-#if	SOLARIS
-	m = fin->fin_qfm;
+	off = (char *)tcp - (char *)fin->fin_ip;
+	off += (TCP_OFF(tcp) << 2) + fin->fin_ipoff;
 
-	dlen = msgdsize(m) - off;
-	if (dlen <= 0)
-		return 0;
-	copyout_mblk(m, off, MIN(sizeof(membuf), dlen), (char *)membuf);
+#ifdef __sgi
+	dlen = fin->fin_plen - off;
 #else
-	m = *(mb_t **)fin->fin_mp;
-
-	dlen = mbufchainlen(m) - off;
+	dlen = MSGDSIZE(m) - off;
+#endif
 	if (dlen <= 0)
 		return 0;
-	m_copydata(m, off, MIN(sizeof(membuf), dlen), (char *)membuf);
-#endif
+
+	if (dlen > sizeof(membuf))
+		dlen = sizeof(membuf);
+
+	bzero((char *)membuf, sizeof(membuf));
+	COPYDATA(m, off, dlen, (char *)membuf);
 	/*
 	 * In all the startup parsing, ensure that we don't go outside
 	 * the packet buffer boundary.
@@ -161,9 +176,8 @@ nat_t *nat;
 }
 
 
-int ippr_raudio_in(fin, ip, aps, nat)
+int ippr_raudio_in(fin, aps, nat)
 fr_info_t *fin;
-ip_t *ip;
 ap_session_t *aps;
 nat_t *nat;
 {
@@ -171,17 +185,15 @@ nat_t *nat;
 	tcphdr_t *tcp, tcph, *tcp2 = &tcph;
 	raudio_t *rap = aps->aps_data;
 	struct in_addr swa, swb;
-	u_int a1, a2, a3, a4;
+	int off, dlen, slen;
+	int a1, a2, a3, a4;
 	u_short sp, dp;
-	int off, dlen;
 	fr_info_t fi;
 	tcp_seq seq;
-	nat_t *ipn;
+	nat_t *nat2;
 	u_char swp;
+	ip_t *ip;
 	mb_t *m;
-#if	SOLARIS
-	mb_t *m1;
-#endif
 
 	/*
 	 * Wait until we've seen the end of the start messages and even then
@@ -191,25 +203,24 @@ nat_t *nat;
 	if (rap->rap_sdone != 0)
 		return 0;
 
+	m = fin->fin_m;
 	tcp = (tcphdr_t *)fin->fin_dp;
-	off = (ip->ip_hl << 2) + (tcp->th_off << 2);
-	m = *(mb_t **)fin->fin_mp;
+	off = (char *)tcp - (char *)fin->fin_ip;
+	off += (TCP_OFF(tcp) << 2) + fin->fin_ipoff;
 
-#if	SOLARIS
-	m = fin->fin_qfm;
-
-	dlen = msgdsize(m) - off;
-	if (dlen <= 0)
-		return 0;
-	bzero(membuf, sizeof(membuf));
-	copyout_mblk(m, off, MIN(sizeof(membuf), dlen), (char *)membuf);
+#ifdef __sgi
+	dlen = fin->fin_plen - off;
 #else
-	dlen = mbufchainlen(m) - off;
+	dlen = MSGDSIZE(m) - off;
+#endif
 	if (dlen <= 0)
 		return 0;
-	bzero(membuf, sizeof(membuf));
-	m_copydata(m, off, MIN(sizeof(membuf), dlen), (char *)membuf);
-#endif
+
+	if (dlen > sizeof(membuf))
+		dlen = sizeof(membuf);
+
+	bzero((char *)membuf, sizeof(membuf));
+	COPYDATA(m, off, dlen, (char *)membuf);
 
 	seq = ntohl(tcp->th_seq);
 	/*
@@ -252,6 +263,7 @@ nat_t *nat;
 		rap->rap_srport = (*s << 8) | *(s + 1);
 	}
 
+	ip = fin->fin_ip;
 	swp = ip->ip_p;
 	swa = ip->ip_src;
 	swb = ip->ip_dst;
@@ -262,9 +274,17 @@ nat_t *nat;
 
 	bcopy((char *)fin, (char *)&fi, sizeof(fi));
 	bzero((char *)tcp2, sizeof(*tcp2));
+	TCP_OFF_A(tcp2, 5);
+	fi.fin_state = NULL;
+	fi.fin_nat = NULL;
+	fi.fin_flx |= FI_IGNORE;
 	fi.fin_dp = (char *)tcp2;
 	fi.fin_fr = &raudiofr;
+	fi.fin_dlen = sizeof(*tcp2);
+	fi.fin_plen = fi.fin_hlen + sizeof(*tcp2);
 	tcp2->th_win = htons(8192);
+	slen = ip->ip_len;
+	ip->ip_len = htons(fin->fin_hlen + sizeof(*tcp));
 
 	if (((rap->rap_mode & RAP_M_UDP_ROBUST) == RAP_M_UDP_ROBUST) &&
 	    (rap->rap_srport != 0)) {
@@ -274,12 +294,17 @@ nat_t *nat;
 		tcp2->th_dport = htons(dp);
 		fi.fin_data[0] = dp;
 		fi.fin_data[1] = sp;
-		ipn = nat_new(nat->nat_ptr, ip, &fi, 
-			      IPN_UDP | (sp ? 0 : FI_W_SPORT),
-			      NAT_OUTBOUND);
-		if (ipn != NULL) {
-			ipn->nat_age = fr_defnatage;
-			(void) fr_addstate(ip, &fi, sp ? 0 : FI_W_SPORT);
+		fi.fin_out = 0;
+		nat2 = nat_new(&fi, nat->nat_ptr, NULL,
+			       NAT_SLAVE|IPN_UDP | (sp ? 0 : SI_W_SPORT),
+			       NAT_OUTBOUND);
+		if (nat2 != NULL) {
+			(void) nat_proto(&fi, nat2, IPN_UDP);
+			nat_update(&fi, nat2, nat2->nat_ptr);
+
+			(void) fr_addstate(&fi, NULL, (sp ? 0 : SI_W_SPORT));
+			if (fi.fin_state != NULL)
+				fr_statederef(&fi, (ipstate_t **)&fi.fin_state);
 		}
 	}
 
@@ -289,15 +314,22 @@ nat_t *nat;
 		tcp2->th_dport = 0; /* XXX - don't specify remote port */
 		fi.fin_data[0] = sp;
 		fi.fin_data[1] = 0;
-		ipn = nat_new(nat->nat_ptr, ip, &fi, IPN_UDP|FI_W_DPORT,
-			      NAT_OUTBOUND);
-		if (ipn != NULL) {
-			ipn->nat_age = fr_defnatage;
-			(void) fr_addstate(ip, &fi, FI_W_DPORT);
+		fi.fin_out = 1;
+		nat2 = nat_new(&fi, nat->nat_ptr, NULL,
+			       NAT_SLAVE|IPN_UDP|SI_W_DPORT,
+			       NAT_OUTBOUND);
+		if (nat2 != NULL) {
+			(void) nat_proto(&fi, nat2, IPN_UDP);
+			nat_update(&fi, nat2, nat2->nat_ptr);
+
+			(void) fr_addstate(&fi, NULL, SI_W_DPORT);
+			if (fi.fin_state != NULL)
+				fr_statederef(&fi, (ipstate_t **)&fi.fin_state);
 		}
 	}
-		
+
 	ip->ip_p = swp;
+	ip->ip_len = slen;
 	ip->ip_src = swa;
 	ip->ip_dst = swb;
 	return 0;

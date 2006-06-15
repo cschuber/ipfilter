@@ -220,7 +220,8 @@ ippr_rpcb_in(fin, aps, nat)
 	rs = (rpcb_session_t *)aps->aps_data;
 
 	m = fin->fin_m;
-	off = (char *)fin->fin_dp - MTOD(m, char *) + sizeof(udphdr_t);
+	off = (char *)fin->fin_dp - (char *)fin->fin_ip;
+	off += sizeof(udphdr_t) + fin->fin_ipoff;
 	dlen = fin->fin_dlen - sizeof(udphdr_t);
 
 	/* Disallow packets outside legal range for supported requests. */
@@ -291,7 +292,8 @@ ippr_rpcb_out(fin, aps, nat)
 	rs = (rpcb_session_t *)aps->aps_data;
 
 	m = fin->fin_m;
-	off = (char *)fin->fin_dp - MTOD(m, char *) + sizeof(udphdr_t);
+	off = (char *)fin->fin_dp - (char *)fin->fin_ip;
+	off += sizeof(udphdr_t) + fin->fin_ipoff;
 	dlen = fin->fin_dlen - sizeof(udphdr_t);
 	diff = 0;
 
@@ -680,11 +682,11 @@ ippr_rpcb_getuaddr(rm, xu, p)
 	 * Expected format: a.b.c.d.e.f where [a-d] correspond to bytes of
 	 * an IP address and [ef] are the bytes of a L4 port.
 	 */
-	if (!(isdigit(uastr[0]) && isdigit(uastr[l-1])))
+	if (!(ISDIGIT(uastr[0]) && ISDIGIT(uastr[l-1])))
 		return(-1);
 	b = uastr;
 	for (c = &uastr[1], d = 0, dd = 0; c < &uastr[l-1]; c++) {
-		if (isdigit(*c)) {
+		if (ISDIGIT(*c)) {
 			dd = 0;
 			continue;
 		}
@@ -738,7 +740,7 @@ ippr_rpcb_atoi(ptr)
 	register char *s = ptr, c;
 	register u_int i = 0;
 
-	while (((c = *s++) != '\0') && isdigit(c)) {
+	while (((c = *s++) != '\0') && ISDIGIT(c)) {
 		i *= 10;
 		i += c - '0';
 	}
@@ -816,9 +818,9 @@ ippr_rpcb_modreq(fin, nat, rm, m, off)
 	if (diff != 0) {
 		udp = fin->fin_dp;
 		udp->uh_ulen = htons(ntohs(udp->uh_ulen) + diff);
-		fin->fin_ip->ip_len += diff;
-		fin->fin_dlen += diff;
 		fin->fin_plen += diff;
+		fin->fin_ip->ip_len = htons(fin->fin_plen);
+		fin->fin_dlen += diff;
 		/* XXX Storage lengths. */
 	}
 
@@ -1268,6 +1270,8 @@ ippr_rpcb_getnat(fin, nat, proto, port)
 			 */
 			return(-1);
 		}
+		if (fi.fin_state != NULL)
+			fr_statederef(&fi, (ipstate_t **)&fi.fin_state);
 	}
 
 	return(0);
@@ -1446,9 +1450,9 @@ ippr_rpcb_fixlen(fin, len)
 
         udp = fin->fin_dp;
         udp->uh_ulen = htons(ntohs(udp->uh_ulen) + len);
-        fin->fin_ip->ip_len += len;
-        fin->fin_dlen += len;
         fin->fin_plen += len;
+        fin->fin_ip->ip_len = htons(fin->fin_plen);
+        fin->fin_dlen += len;
 }
 
 #undef B

@@ -92,3 +92,4 @@ extern	int	load_config __P((char *));
 extern	void	dumphex __P((FILE *, int, char *, int));
 extern	int	check_action __P((char *, char *, int, int));
 extern	char	*getword __P((int));
+extern	int	fac_findname __P((char *));

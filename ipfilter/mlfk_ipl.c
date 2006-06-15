@@ -1,29 +1,7 @@
 /*
- * Copyright 1999 Guido van Rooij.  All rights reserved.
- * 
+ * Copyright (C) 2000 by Darren Reed.
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are
- * met:
- *  1. Redistributions of source code must retain the above copyright
- *     notice, this list of conditions and the following disclaimer.
- *  2. Redistributions in binary form must reproduce the above copyright notice,
- *     this list of conditions and the following disclaimer in the documentation
- *     and/or other materials provided with the distribution.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDER ``AS IS'' AND ANY EXPRESS
- * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED.  IN NO EVENT SHALL THE HOLDER OR CONTRIBUTORS BE LIABLE FOR
- * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
- * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
- * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
- *
- * $Id$
+ * See the IPFILTER.LICENCE file for details on licencing.
  */
 
 
@@ -34,6 +12,10 @@
 #include <sys/conf.h>
 #include <sys/socket.h>
 #include <sys/sysctl.h>
+#include <sys/select.h>
+#if __FreeBSD_version >= 500000
+# include <sys/selinfo.h>
+#endif                  
 #include <net/if.h>
 #include <netinet/in_systm.h>
 #include <netinet/in.h>
@@ -46,51 +28,125 @@
 #include <netinet/ip_nat.h>
 #include <netinet/ip_auth.h>
 #include <netinet/ip_frag.h>
+#include <netinet/ip_sync.h>
 
-static dev_t ipf_devs[IPL_LOGMAX + 1];
+extern	struct	selinfo	ipfselwait[IPL_LOGSIZE];
+
+#if __FreeBSD_version >= 502116
+static struct cdev *ipf_devs[IPL_LOGSIZE];
+#else
+static dev_t ipf_devs[IPL_LOGSIZE];
+#endif
+
+static int sysctl_ipf_int ( SYSCTL_HANDLER_ARGS );
+static int ipf_modload(void);
+static int ipf_modunload(void);
+
+#if (__FreeBSD_version >= 500024)
+# if (__FreeBSD_version >= 502116)
+static	int	iplopen __P((struct cdev*, int, int, struct thread *));
+static	int	iplclose __P((struct cdev*, int, int, struct thread *));
+# else
+static	int	iplopen __P((dev_t, int, int, struct thread *));
+static	int	iplclose __P((dev_t, int, int, struct thread *));
+# endif /* __FreeBSD_version >= 502116 */
+#else
+static	int	iplopen __P((dev_t, int, int, struct proc *));
+static	int	iplclose __P((dev_t, int, int, struct proc *));
+#endif
+#if (__FreeBSD_version >= 502116)
+extern	int	iplread __P((struct cdev*, struct uio *, int));
+extern	int	iplwrite __P((struct cdev*, struct uio *, int));
+#else
+extern	int	iplread __P((dev_t, struct uio *, int));
+extern	int	iplwrite __P((dev_t, struct uio *, int));
+#endif /* __FreeBSD_version >= 502116 */
+
+
 
 SYSCTL_DECL(_net_inet);
+#define SYSCTL_IPF(parent, nbr, name, access, ptr, val, descr) \
+	SYSCTL_OID(parent, nbr, name, CTLTYPE_INT|access, \
+		   ptr, val, sysctl_ipf_int, "I", descr);
+#define	CTLFLAG_OFF	0x00800000	/* IPFilter must be disabled */
+#define	CTLFLAG_RWO	(CTLFLAG_RW|CTLFLAG_OFF)
 SYSCTL_NODE(_net_inet, OID_AUTO, ipf, CTLFLAG_RW, 0, "IPF");
-SYSCTL_INT(_net_inet_ipf, OID_AUTO, fr_flags, CTLFLAG_RW, &fr_flags, 0, "");
-SYSCTL_INT(_net_inet_ipf, OID_AUTO, fr_pass, CTLFLAG_RW, &fr_pass, 0, "");
-SYSCTL_INT(_net_inet_ipf, OID_AUTO, fr_active, CTLFLAG_RD, &fr_active, 0, "");
-SYSCTL_INT(_net_inet_ipf, OID_AUTO, fr_tcpidletimeout, CTLFLAG_RW,
+SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_flags, CTLFLAG_RW, &ipf_flags, 0, "");
+SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_pass, CTLFLAG_RW, &fr_pass, 0, "");
+SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_active, CTLFLAG_RD, &fr_active, 0, "");
+SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_tcpidletimeout, CTLFLAG_RWO,
 	   &fr_tcpidletimeout, 0, "");
-SYSCTL_INT(_net_inet_ipf, OID_AUTO, fr_tcpclosewait, CTLFLAG_RW,
+SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_tcphalfclosed, CTLFLAG_RWO,
+	   &fr_tcphalfclosed, 0, "");
+SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_tcpclosewait, CTLFLAG_RWO,
 	   &fr_tcpclosewait, 0, "");
-SYSCTL_INT(_net_inet_ipf, OID_AUTO, fr_tcplastack, CTLFLAG_RW,
+SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_tcplastack, CTLFLAG_RWO,
 	   &fr_tcplastack, 0, "");
-SYSCTL_INT(_net_inet_ipf, OID_AUTO, fr_tcptimeout, CTLFLAG_RW,
+SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_tcptimeout, CTLFLAG_RWO,
 	   &fr_tcptimeout, 0, "");
-SYSCTL_INT(_net_inet_ipf, OID_AUTO, fr_tcpclosed, CTLFLAG_RW,
+SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_tcpclosed, CTLFLAG_RWO,
 	   &fr_tcpclosed, 0, "");
-SYSCTL_INT(_net_inet_ipf, OID_AUTO, fr_udptimeout, CTLFLAG_RW,
+SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_udptimeout, CTLFLAG_RWO,
 	   &fr_udptimeout, 0, "");
-SYSCTL_INT(_net_inet_ipf, OID_AUTO, fr_icmptimeout, CTLFLAG_RW,
+SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_udpacktimeout, CTLFLAG_RWO,
+	   &fr_udpacktimeout, 0, "");
+SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_icmptimeout, CTLFLAG_RWO,
 	   &fr_icmptimeout, 0, "");
-SYSCTL_INT(_net_inet_ipf, OID_AUTO, fr_defnatage, CTLFLAG_RW,
+SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_defnatage, CTLFLAG_RWO,
 	   &fr_defnatage, 0, "");
-SYSCTL_INT(_net_inet_ipf, OID_AUTO, fr_ipfrttl, CTLFLAG_RW,
+SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_ipfrttl, CTLFLAG_RW,
 	   &fr_ipfrttl, 0, "");
-SYSCTL_INT(_net_inet_ipf, OID_AUTO, ipl_unreach, CTLFLAG_RW,
-	   &ipl_unreach, 0, "");
-SYSCTL_INT(_net_inet_ipf, OID_AUTO, fr_running, CTLFLAG_RD,
+SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_running, CTLFLAG_RD,
 	   &fr_running, 0, "");
-SYSCTL_INT(_net_inet_ipf, OID_AUTO, fr_authsize, CTLFLAG_RD,
+SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_statesize, CTLFLAG_RWO,
+	   &fr_statesize, 0, "");
+SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_statemax, CTLFLAG_RWO,
+	   &fr_statemax, 0, "");
+SYSCTL_IPF(_net_inet_ipf, OID_AUTO, ipf_nattable_sz, CTLFLAG_RWO,
+	   &ipf_nattable_sz, 0, "");
+SYSCTL_IPF(_net_inet_ipf, OID_AUTO, ipf_natrules_sz, CTLFLAG_RWO,
+	   &ipf_natrules_sz, 0, "");
+SYSCTL_IPF(_net_inet_ipf, OID_AUTO, ipf_rdrrules_sz, CTLFLAG_RWO,
+	   &ipf_rdrrules_sz, 0, "");
+SYSCTL_IPF(_net_inet_ipf, OID_AUTO, ipf_hostmap_sz, CTLFLAG_RWO,
+	   &ipf_hostmap_sz, 0, "");
+SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_authsize, CTLFLAG_RWO,
 	   &fr_authsize, 0, "");
-SYSCTL_INT(_net_inet_ipf, OID_AUTO, fr_authused, CTLFLAG_RD,
+SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_authused, CTLFLAG_RD,
 	   &fr_authused, 0, "");
-SYSCTL_INT(_net_inet_ipf, OID_AUTO, fr_defaultauthage, CTLFLAG_RW,
+SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_defaultauthage, CTLFLAG_RW,
 	   &fr_defaultauthage, 0, "");
+SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_chksrc, CTLFLAG_RW, &fr_chksrc, 0, "");
+SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_minttl, CTLFLAG_RW, &fr_minttl, 0, "");
 
 #define CDEV_MAJOR 79
+#if __FreeBSD_version >= 501000
+# include <sys/poll.h>
+# include <sys/select.h>
+static int iplpoll(struct cdev *dev, int events, struct thread *td);
+
+static struct cdevsw ipl_cdevsw = {
+#if __FreeBSD_version >= 502103
+	.d_version =	D_VERSION,
+	.d_flags =	0,	/* D_NEEDGIANT - Should be SMP safe */
+#endif
+	.d_open =	iplopen,
+	.d_close =	iplclose,
+	.d_read =	iplread,
+	.d_write =	iplwrite,
+	.d_ioctl =	iplioctl,
+	.d_poll =	iplpoll,
+	.d_name =	"ipl",
+	.d_maj =	CDEV_MAJOR,
+};
+#else
 static struct cdevsw ipl_cdevsw = {
 	/* open */	iplopen,
 	/* close */	iplclose,
 	/* read */	iplread,
-	/* write */	nowrite,
+	/* write */	iplwrite,
 	/* ioctl */	iplioctl,
-	/* poll */	nopoll,
+	/* poll */	iplpoll,
 	/* mmap */	nommap,
 	/* strategy */	nostrategy,
 	/* name */	"ipl",
@@ -98,73 +154,30 @@ static struct cdevsw ipl_cdevsw = {
 	/* dump */	nodump,
 	/* psize */	nopsize,
 	/* flags */	0,
-	/* bmaj */	-1
+# if (__FreeBSD_version < 500043)
+	/* bmaj */	-1,
+# endif
+	/* kqfilter */	NULL
 };
+#endif
+
+static char *ipf_devfiles[] = {	IPL_NAME, IPNAT_NAME, IPSTATE_NAME, IPAUTH_NAME,
+				IPSYNC_NAME, IPSCAN_NAME, IPLOOKUP_NAME, NULL };
+
 
 static int
 ipfilter_modevent(module_t mod, int type, void *unused)
 {
-	char	*c;
-	int	i, error = 0;
+	int error = 0;
 
-	switch (type) {
+	switch (type)
+	{
 	case MOD_LOAD :
-
-		error = iplattach();
-		if (error)
-			break;
-
-		c = NULL;
-		for(i=strlen(IPL_NAME); i>0; i--)
-			if (IPL_NAME[i] == '/') {
-				c = &IPL_NAME[i+1];
-				break;
-			}
-		if (!c)
-			c = IPL_NAME;
-		ipf_devs[IPL_LOGIPF] =
-		    make_dev(&ipl_cdevsw, IPL_LOGIPF, 0, 0, 0600, c);
-
-		c = NULL;
-		for(i=strlen(IPL_NAT); i>0; i--)
-			if (IPL_NAT[i] == '/') {
-				c = &IPL_NAT[i+1];
-				break;
-			}
-		if (!c)
-			c = IPL_NAT;
-		ipf_devs[IPL_LOGNAT] =
-		    make_dev(&ipl_cdevsw, IPL_LOGNAT, 0, 0, 0600, c);
-
-		c = NULL;
-		for(i=strlen(IPL_STATE); i>0; i--)
-			if (IPL_STATE[i] == '/') {
-				c = &IPL_STATE[i+1];
-				break;
-			}
-		if (!c)
-			c = IPL_STATE;
-		ipf_devs[IPL_LOGSTATE] =
-		    make_dev(&ipl_cdevsw, IPL_LOGSTATE, 0, 0, 0600, c);
-
-		c = NULL;
-		for(i=strlen(IPL_AUTH); i>0; i--)
-			if (IPL_AUTH[i] == '/') {
-				c = &IPL_AUTH[i+1];
-				break;
-			}
-		if (!c)
-			c = IPL_AUTH;
-		ipf_devs[IPL_LOGAUTH] =
-		    make_dev(&ipl_cdevsw, IPL_LOGAUTH, 0, 0, 0600, c);
-
+		error = ipf_modload();
 		break;
+
 	case MOD_UNLOAD :
-		destroy_dev(ipf_devs[IPL_LOGIPF]);
-		destroy_dev(ipf_devs[IPL_LOGNAT]);
-		destroy_dev(ipf_devs[IPL_LOGSTATE]);
-		destroy_dev(ipf_devs[IPL_LOGAUTH]);
-		error = ipldetach();
+		error = ipf_modunload();
 		break;
 	default:
 		error = EINVAL;
@@ -173,9 +186,292 @@ ipfilter_modevent(module_t mod, int type, void *unused)
 	return error;
 }
 
+
+static int
+ipf_modload()
+{
+	char *defpass, *c, *str;
+	int i, j, error;
+
+	error = iplattach();
+	if (error)
+		return error;
+
+	for (i = 0; i < IPL_LOGSIZE; i++)
+		ipf_devs[i] = NULL;
+
+	for (i = 0; (str = ipf_devfiles[i]); i++) {
+		c = NULL;
+		for(j = strlen(str); j > 0; j--)
+			if (str[j] == '/') {
+				c = str + j + 1;
+				break;
+			}
+		if (!c)
+			c = str;
+		ipf_devs[i] = make_dev(&ipl_cdevsw, i, 0, 0, 0600, c);
+	}
+
+	if (FR_ISPASS(fr_pass))
+		defpass = "pass";
+	else if (FR_ISBLOCK(fr_pass))
+		defpass = "block";
+	else          
+		defpass = "no-match -> block";
+
+	printf("%s initialized.  Default = %s all, Logging = %s%s\n",
+		ipfilter_version, defpass,                
+#ifdef IPFILTER_LOG
+		"enabled",
+#else
+		"disabled",
+#endif
+#ifdef IPFILTER_COMPILED
+		" (COMPILED)"
+#else
+		""
+#endif
+		);         
+	return 0;
+}
+
+
+static int
+ipf_modunload()
+{
+	int error, i;
+
+	if (fr_refcnt)
+		return EBUSY;
+
+	if (fr_running >= 0) {
+		error = ipldetach();
+		if (error != 0)
+			return error;
+	} else
+		error = 0;
+
+	fr_running = -2;
+
+	for (i = 0; ipf_devfiles[i]; i++) {
+		if (ipf_devs[i] != NULL)
+			destroy_dev(ipf_devs[i]);
+	}
+
+	printf("%s unloaded\n", ipfilter_version);
+
+	return error;
+}
+
+
 static moduledata_t ipfiltermod = {
-	IPL_VERSION,
+	"ipfilter",
 	ipfilter_modevent,
-        0
+	0
 };
+
+
 DECLARE_MODULE(ipfilter, ipfiltermod, SI_SUB_PROTO_DOMAIN, SI_ORDER_ANY);
+#ifdef	MODULE_VERSION
+MODULE_VERSION(ipfilter, 1);
+#endif
+
+
+#ifdef SYSCTL_IPF
+int
+sysctl_ipf_int ( SYSCTL_HANDLER_ARGS )
+{
+	int error = 0;
+
+	if (arg1)
+		error = SYSCTL_OUT(req, arg1, sizeof(int));
+	else
+		error = SYSCTL_OUT(req, &arg2, sizeof(int));
+
+	if (error || !req->newptr)
+		return (error);
+
+	if (!arg1)
+		error = EPERM;
+	else {
+		if ((oidp->oid_kind & CTLFLAG_OFF) && (fr_running > 0))
+			error = EBUSY;
+		else
+			error = SYSCTL_IN(req, arg1, sizeof(int));
+	}
+	return (error);
+}
+#endif
+
+
+#if __FreeBSD_version >= 501000
+static int
+iplpoll(struct cdev *dev, int events, struct thread *td)
+{
+	u_int xmin = GET_MINOR(dev);
+	int revents;
+
+	if (xmin < 0 || xmin > IPL_LOGMAX)
+		return 0;
+
+	revents = 0;
+
+	switch (xmin) 
+	{
+	case IPL_LOGIPF :
+	case IPL_LOGNAT :
+	case IPL_LOGSTATE :
+#ifdef IPFILTER_LOG
+		if ((events & (POLLIN | POLLRDNORM)) && ipflog_canread(xmin))
+			revents |= events & (POLLIN | POLLRDNORM);
+#endif  
+		break;
+	case IPL_LOGAUTH :
+		if ((events & (POLLIN | POLLRDNORM)) && fr_auth_waiting())
+			revents |= events & (POLLIN | POLLRDNORM);
+		break; 
+	case IPL_LOGSYNC :
+#ifdef IPFILTER_SYNC
+		if ((events & (POLLIN | POLLRDNORM)) && ipfsync_canread())
+			revents |= events & (POLLIN | POLLRDNORM);
+		if ((events & (POLLOUT | POLLWRNORM)) && ipfsync_canwrite())
+			revents |= events & (POLLOUT | POLLWRNORM);
+#endif
+		break;
+	case IPL_LOGSCAN :
+	case IPL_LOGLOOKUP :
+	default :
+		break;
+	}
+
+	if ((revents == 0) && ((events & (POLLIN|POLLRDNORM)) != 0))
+		selrecord(td, &ipfselwait[xmin]);
+
+	return revents;
+}
+#endif
+
+
+/*
+ * routines below for saving IP headers to buffer
+ */
+static int iplopen(dev, flags
+#if ((BSD >= 199506) || (__FreeBSD_version >= 220000))
+, devtype, p)
+int devtype;
+# if (__FreeBSD_version >= 500024)
+struct thread *p;
+# else
+struct proc *p;
+# endif /* __FreeBSD_version >= 500024 */
+#else
+)
+#endif
+#if (__FreeBSD_version >= 502116)
+struct cdev *dev;
+#else
+dev_t dev;
+#endif
+int flags;
+{
+	u_int min = GET_MINOR(dev);
+
+	if (IPL_LOGMAX < min)
+		min = ENXIO;
+	else
+		min = 0;
+	return min;
+}
+
+
+static int iplclose(dev, flags
+#if ((BSD >= 199506) || (__FreeBSD_version >= 220000))
+, devtype, p)
+int devtype;
+# if (__FreeBSD_version >= 500024)
+struct thread *p;
+# else
+struct proc *p;
+# endif /* __FreeBSD_version >= 500024 */
+#else
+)
+#endif
+#if (__FreeBSD_version >= 502116)
+struct cdev *dev;
+#else
+dev_t dev;
+#endif
+int flags;
+{
+	u_int	min = GET_MINOR(dev);
+
+	if (IPL_LOGMAX < min)
+		min = ENXIO;
+	else
+		min = 0;
+	return min;
+}
+
+/*
+ * iplread/ipllog
+ * both of these must operate with at least splnet() lest they be
+ * called during packet processing and cause an inconsistancy to appear in
+ * the filter lists.
+ */
+#if (BSD >= 199306)
+static int iplread(dev, uio, ioflag)
+int ioflag;
+#else
+static int iplread(dev, uio)
+#endif
+#if (__FreeBSD_version >= 502116)
+struct cdev *dev;
+#else
+dev_t dev;
+#endif
+register struct uio *uio;
+{
+	u_int	xmin = GET_MINOR(dev);
+
+	if (xmin < 0)
+		return ENXIO;
+
+# ifdef	IPFILTER_SYNC
+	if (xmin == IPL_LOGSYNC)
+		return ipfsync_read(uio);
+# endif
+
+#ifdef IPFILTER_LOG
+	return ipflog_read(xmin, uio);
+#else
+	return ENXIO;
+#endif
+}
+
+
+/*
+ * iplwrite
+ * both of these must operate with at least splnet() lest they be
+ * called during packet processing and cause an inconsistancy to appear in
+ * the filter lists.
+ */
+#if (BSD >= 199306)
+static int iplwrite(dev, uio, ioflag)
+int ioflag;
+#else
+static int iplwrite(dev, uio)
+#endif
+#if (__FreeBSD_version >= 502116)
+struct cdev *dev;
+#else
+dev_t dev;
+#endif
+register struct uio *uio;
+{
+
+#ifdef	IPFILTER_SYNC
+	if (GET_MINOR(dev) == IPL_LOGSYNC)
+		return ipfsync_write(uio);
+#endif
+	return ENXIO;
+}
