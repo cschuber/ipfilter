@@ -6,13 +6,10 @@
  * conditions, enough of the TCP header is missing for unpredictable
  * results unless the filter is aware that this can happen.
  *
- * Redistribution and use in source and binary forms are permitted
- * provided that this notice is preserved and due credit is given
- * to the original author and the contributors.
+ * See the IPFILTER.LICENCE file for details on licencing.
  */
-#if !defined(lint)
-static const char sccsid[] = "%W% %G% (C)1995 Darren Reed";
-static const char rcsid[] = "@(#)$Id$";
+#ifdef __sgi
+# include <sys/ptimers.h>
 #endif
 #include <stdio.h>
 #include <stdlib.h>
@@ -20,6 +17,7 @@ static const char rcsid[] = "@(#)$Id$";
 #include <netdb.h>
 #include <string.h>
 #include <sys/types.h>
+#include <sys/param.h>
 #include <sys/time.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -33,6 +31,11 @@ static const char rcsid[] = "@(#)$Id$";
 #include <netinet/ip_var.h>
 #endif
 #include "ipsend.h"
+
+#if !defined(lint)
+static const char sccsid[] = "%W% %G% (C)1995 Darren Reed";
+static const char rcsid[] = "@(#)$Id$";
+#endif
 
 
 extern	char	*optarg;

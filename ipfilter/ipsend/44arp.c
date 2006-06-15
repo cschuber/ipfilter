@@ -1,6 +1,9 @@
 /*
  * Based upon 4.4BSD's /usr/sbin/arp
  */
+#ifdef __sgi
+# include <sys/ptimers.h>
+#endif
 #include <unistd.h>
 #include <string.h>
 #include <stdlib.h>
@@ -67,7 +70,7 @@ char	*addr, *eaddr;
 	struct	sockaddr_dl	*sdl;
 
 #ifdef	IPSEND
-	if (arp_getipv4(ip, ether) == 0)
+	if (arp_getipv4(addr, ether) == 0)
 		return 0;
 #endif
 

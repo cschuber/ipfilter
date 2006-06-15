@@ -4,7 +4,7 @@ ipmon \- monitors /dev/ipl for logged packets
 .SH SYNOPSIS
 .B ipmon
 [
-.B \-aDFhnpstvxX
+.B \-abDFhnpstvxX
 ] [
 .B "\-N <device>"
 ] [
@@ -46,7 +46,11 @@ long).
 4. The group and rule number of the rule, e.g., \fB@0:17\fP. These can be
 viewed with \fBipfstat -n\fP.
 .LP
-5. The action: \fBp\fP for passed or \fBb\fP for blocked.
+5. The action: \fBp\fP for passed, \fBb\fP for blocked, \fBS\fP for a short
+packet, \fBn\fP did not match any rules, \fBL\fP for a log rule.  The order
+of precedence in showing flags is: S, p, b, n, L.  A capital \fBP\fP or
+\fBB\fP means that the packet has been logged due to a global logging
+setting, not a particular rule.
 .LP
 6. The addresses.
 This is actually three fields: the source address and port
@@ -75,6 +79,10 @@ In order for \fBipmon\fP to properly work, the kernel option
 .B \-a
 Open all of the device logfiles for reading log entries from.  All entries
 are displayed to the same output 'device' (stderr or syslog).
+.TP
+.B \-b
+For rules which log the body of a packet, generate hex output representing
+the packet contents afte the headers.
 .TP
 .B \-D
 Cause ipmon to turn itself into a daemon.  Using subshells or backgrounding
@@ -118,10 +126,6 @@ or later) or \fI/etc/ipmon.pid\fP for all others.
 Packet information read in will be sent through syslogd rather than
 saved to a file.  The default facility when compiled and installed is
 \fBlocal0\fP.  The following levels are used:
-.TP
-.B "\-S <device>"
-Set the logfile to be opened for reading state log records from to <device>.
-.TP
 .IP
 .B LOG_INFO
 \- packets logged using the "log" keyword as the action rather
@@ -137,6 +141,9 @@ than pass or block.
 \- packets which have been logged and which can be considered
 "short".
 .TP
+.B "\-S <device>"
+Set the logfile to be opened for reading state log records from to <device>.
+.TP
 .B \-t
 read the input file/device in a manner akin to tail(1).
 .TP
@@ -150,7 +157,7 @@ show the packet data in hex.
 show the log header record data in hex.
 .SH DIAGNOSTICS
 \fBipmon\fP expects data that it reads to be consistent with how it should be
-saved and will abort if it fails an assertion which detects an anomoly in the
+saved and will abort if it fails an assertion which detects an anomaly in the
 recorded data.
 .SH FILES
 /dev/ipl

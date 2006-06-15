@@ -1,9 +1,7 @@
 /*
- * Copyright (C) 1993-2000 by Darren Reed.
+ * Copyright (C) 1993-2001 by Darren Reed.
  *
- * Redistribution and use in source and binary forms are permitted
- * provided that this notice is preserved and due credit is given
- * to the original author and the contributors.
+ * See the IPFILTER.LICENCE file for details on licencing.
  * $Id$
  */
 
@@ -17,9 +15,10 @@
 #  define	__P(x)	()
 # endif
 #endif
-extern	int	openkmem __P((void));
+extern	int	openkmem __P((char *, char *));
 extern	int	kmemcpy __P((char *, long, int));
 extern	int	kstrncpy __P((char *, long, int));
+extern	char	*getifname __P((void *));
 
 #if defined(__NetBSD__) || defined(__OpenBSD)
 # include <paths.h>

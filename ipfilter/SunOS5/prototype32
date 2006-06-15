@@ -1,8 +1,7 @@
 i pkginfo
 i copyright=../copyright
-i postinstall=../postinstall
-i depend=../depend
 !default 0755 root root
+i postinstall=../postinstall
 #i preinstall=../preinstall
 i preremove=../preremove
 i postremove=../postremove
@@ -27,10 +26,10 @@ d none /var/db 700 root sys
 d none /var/db/ipf 700 root sys
 d none /usr ? ? ?
 d none /usr/include ? ? ?
-d none /usr/include/ipfilter 755 root bin
+d none /usr/include/netinet ? ? ?
 d none /usr/kernel ? ? ?
 d none /usr/kernel/drv ? ? ?
-f none /usr/kernel/drv/ipf=root/usr/kernel/drv/sparcv7/ipf
+f none /usr/kernel/drv/ipf=root/usr/kernel/drv/sparcv7/ipf 755 root sys
 d none /sbin ? ? ?
 # Moved so we can hardlink against isaexec
 s none /sbin/ipfs=../usr/sbin/ipfs
@@ -70,16 +69,13 @@ f none /opt/ipf/man/man4/ipnat.4=root/opt/ipf/man/man4/ipnat.4
 f none /opt/ipf/man/man5/ipf.5=root/opt/ipf/man/man5/ipf.5
 f none /opt/ipf/man/man5/ipnat.5=root/opt/ipf/man/man5/ipnat.5
 f none /usr/kernel/drv/ipf.conf=root/usr/kernel/drv/ipf.conf
-f none /usr/include/ipfilter/ip_fil.h=root/usr/include/ipfilter/ip_fil.h
-f none /usr/include/ipfilter/ip_auth.h=root/usr/include/ipfilter/ip_auth.h
-f none /usr/include/ipfilter/ip_compat.h=root/usr/include/ipfilter/ip_compat.h
-f none /usr/include/ipfilter/ip_frag.h=root/usr/include/ipfilter/ip_frag.h
-f none /usr/include/ipfilter/ip_htable.h=root/usr/include/ipfilter/ip_htable.h
-f none /usr/include/ipfilter/ip_lookup.h=root/usr/include/ipfilter/ip_lookup.h
-f none /usr/include/ipfilter/ip_nat.h=root/usr/include/ipfilter/ip_nat.h
-f none /usr/include/ipfilter/ip_pool.h=root/usr/include/ipfilter/ip_pool.h
-f none /usr/include/ipfilter/ip_proxy.h=root/usr/include/ipfilter/ip_proxy.h
-f none /usr/include/ipfilter/ip_state.h=root/usr/include/ipfilter/ip_state.h
+f none /usr/include/netinet/ip_fil.h=root/usr/include/netinet/ip_fil.h
+f none /usr/include/netinet/ip_auth.h=root/usr/include/netinet/ip_auth.h
+f none /usr/include/netinet/ip_compat.h=root/usr/include/netinet/ip_compat.h
+f none /usr/include/netinet/ip_frag.h=root/usr/include/netinet/ip_frag.h
+f none /usr/include/netinet/ip_nat.h=root/usr/include/netinet/ip_nat.h
+f none /usr/include/netinet/ip_proxy.h=root/usr/include/netinet/ip_proxy.h
+f none /usr/include/netinet/ip_state.h=root/usr/include/netinet/ip_state.h
 f none /opt/ipf/examples/example.1=root/opt/ipf/examples/example.1
 f none /opt/ipf/examples/example.2=root/opt/ipf/examples/example.2
 f none /opt/ipf/examples/example.3=root/opt/ipf/examples/example.3

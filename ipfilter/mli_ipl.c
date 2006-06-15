@@ -1,10 +1,8 @@
 /*
- * Copyright (C) 1993-2000 by Darren Reed.
+ * Copyright (C) 1993-2001 by Darren Reed.
  * (C)opyright 1997 by Marc Boucher.
  *
- * Redistribution and use in source and binary forms are permitted
- * provided that this notice is preserved and due credit is given
- * to the original authors and the contributors.
+ * See the IPFILTER.LICENCE file for details on licencing.
  */
 
 /* TODO: (MARCXXX)
@@ -49,7 +47,7 @@ unsigned IPL_EXTERN(devflag) = D_MP;
 char *IPL_EXTERN(mversion) = M_VERSION;
 #endif
 
-kmutex_t ipl_mutex, ipf_mutex, ipfi_mutex, ipf_rw, ipf_hostmap;
+kmutex_t ipl_mutex, ipf_mutex, ipfi_mutex, ipf_rw;
 kmutex_t ipf_frag, ipf_state, ipf_nat, ipf_natfrag, ipf_auth;
 
 int     (*fr_checkp) __P((struct ip *, int, void *, int, mb_t **));
@@ -64,7 +62,12 @@ static __psunsigned_t ipfk_code[4];
 typedef	struct	nif	{
 	struct	nif	*nf_next;
 	struct ifnet	*nf_ifp;
+#if IRIX < 605
 	int     (*nf_output)(struct ifnet *, struct mbuf *, struct sockaddr *);
+#else
+	int     (*nf_output)(struct ifnet *, struct mbuf *, struct sockaddr *,
+			     struct rtentry *);
+#endif
 	char	nf_name[IFNAMSIZ];
 	int	nf_unit;
 } nif_t;
@@ -76,7 +79,12 @@ extern int in_interfaces;
 extern ipnat_t *nat_list;
 
 static int
+#if IRIX < 605
 ipl_if_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst)
+#else
+ipl_if_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
+	      struct rtentry *rt)
+#endif
 {
 	nif_t *nif;
 
@@ -114,19 +122,19 @@ ipl_if_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst)
 #if	IPFDEBUG >= 4
 			if (!MBUF_IS_CLUSTER(m) && ((m->m_off < MMINOFF) || (m->m_off > MMAXOFF))) {
 				printf("IP Filter: ipl_if_output: bad m_off m_type=%d m_flags=0x%lx m_off=0x%lx\n", m->m_type, (unsigned long)(m->m_flags), m->m_off);
-				return (*nif->nf_output)(ifp, m, dst);
+				goto done;
 			}
 #endif
 			if (m->m_len < sizeof(char)) {
 				printf("IP Filter: ipl_if_output: mbuf block too small (m_len=%d) for IP vers+hlen, m_type=%d m_flags=0x%lx\n", m->m_len, m->m_type, (unsigned long)(m->m_flags));
-				return (*nif->nf_output)(ifp, m, dst);
+				goto done;
 			}
 			ip = mtod(m, struct ip *);
 			if (ip->ip_v != IPVERSION) {
 #if	IPFDEBUG >= 4
 				printf("IP Filter: ipl_if_output: bad ip_v m_type=%d m_flags=0x%lx m_off=0x%lx\n", m->m_type, (unsigned long)(m->m_flags), m->m_off);
 #endif
-				return (*nif->nf_output)(ifp, m, dst);
+				goto done;
 			}
 
 			hlen = ip->ip_hl << 2;
@@ -144,7 +152,12 @@ ipl_if_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst)
 			break;
 		}
 	}
+done:
+#if IRIX < 605
 	return (*nif->nf_output)(ifp, m, dst);
+#else
+	return (*nif->nf_output)(ifp, m, dst, rt);
+#endif
 }
 
 int
@@ -539,7 +552,6 @@ IPL_EXTERN(unload)(void)
 	LOCK_DEALLOC(ipf_rw.l);
 	LOCK_DEALLOC(ipf_auth.l);
 	LOCK_DEALLOC(ipf_natfrag.l);
-	LOCK_DEALLOC(ipf_hostmap.l);
 	LOCK_DEALLOC(ipf_nat.l);
 	LOCK_DEALLOC(ipf_state.l);
 	LOCK_DEALLOC(ipf_frag.l);
@@ -562,7 +574,6 @@ IPL_EXTERN(init)(void)
 	ipf_frag.l = LOCK_ALLOC((uchar_t)-1, IPF_LOCK_PL, (lkinfo_t *)-1, KM_NOSLEEP);
 	ipf_state.l = LOCK_ALLOC((uchar_t)-1, IPF_LOCK_PL, (lkinfo_t *)-1, KM_NOSLEEP);
 	ipf_nat.l = LOCK_ALLOC((uchar_t)-1, IPF_LOCK_PL, (lkinfo_t *)-1, KM_NOSLEEP);
-	ipf_hostmap.l = LOCK_ALLOC((uchar_t)-1, IPF_LOCK_PL, (lkinfo_t *)-1, KM_NOSLEEP);
 	ipf_natfrag.l = LOCK_ALLOC((uchar_t)-1, IPF_LOCK_PL, (lkinfo_t *)-1, KM_NOSLEEP);
 	ipf_auth.l = LOCK_ALLOC((uchar_t)-1, IPF_LOCK_PL, (lkinfo_t *)-1, KM_NOSLEEP);
 	ipf_rw.l = LOCK_ALLOC((uchar_t)-1, IPF_LOCK_PL, (lkinfo_t *)-1, KM_NOSLEEP);
@@ -570,7 +581,7 @@ IPL_EXTERN(init)(void)
 
 	if (!ipfi_mutex.l || !ipf_mutex.l || !ipf_frag.l || !ipf_state.l ||
 	    !ipf_nat.l || !ipf_natfrag.l || !ipf_auth.l || !ipf_rw.l ||
-	    !ipl_mutex.l || !ipf_hostmap.l)
+	    !ipl_mutex.l)
 		panic("IP Filter: LOCK_ALLOC failed");
 
 #ifdef IPFILTER_LKM

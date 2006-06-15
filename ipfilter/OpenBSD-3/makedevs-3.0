@@ -56,7 +56,7 @@ echo
 echo "Creating IPFilter device files in /dev."
 echo
 echo -n "Platform $platform Major Number $major: "
-for i in ipl ipnat ipstate ipauth ipsync ipscan ippool; do
+for i in ipl ipnat ipstate ipauth; do
 	/bin/rm -f /dev/$i
 	mknod /dev/$i c $major $minor
 	chown root.wheel /dev/$i

@@ -1,13 +1,14 @@
 /*
  * lsock.c (C) 1995-1998 Darren Reed
  *
- * Redistribution and use in source and binary forms are permitted
- * provided that this notice is preserved and due credit is given
- * to the original author and the contributors.
+ * See the IPFILTER.LICENCE file for details on licencing.
  */
 #if !defined(lint)
 static const char sccsid[] = "@(#)lsock.c	1.2 1/11/96 (C)1995 Darren Reed";
 static const char rcsid[] = "@(#)$Id$";
+#endif
+#ifdef __sgi
+# include <sys/ptimers.h>
 #endif
 #include <stdio.h>
 #include <unistd.h>

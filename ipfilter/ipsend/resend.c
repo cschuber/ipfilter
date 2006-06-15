@@ -6,13 +6,10 @@
  * conditions, enough of the TCP header is missing for unpredictable
  * results unless the filter is aware that this can happen.
  *
- * Redistribution and use in source and binary forms are permitted
- * provided that this notice is preserved and due credit is given
- * to the original author and the contributors.
+ * See the IPFILTER.LICENCE file for details on licencing.
  */
-#if !defined(lint)
-static const char sccsid[] = "@(#)resend.c	1.3 1/11/96 (C)1995 Darren Reed";
-static const char rcsid[] = "@(#)$Id$";
+#ifdef __sgi
+# include <sys/ptimers.h>
 #endif
 #include <stdio.h>
 #include <netdb.h>
@@ -38,6 +35,12 @@ static const char rcsid[] = "@(#)$Id$";
 # endif
 #endif
 #include "ipsend.h"
+
+#if !defined(lint)
+static const char sccsid[] = "@(#)resend.c	1.3 1/11/96 (C)1995 Darren Reed";
+static const char rcsid[] = "@(#)$Id$";
+#endif
+
 
 extern	int	opts;
 
@@ -97,6 +100,11 @@ char	*datain;
 
 	ip = (struct ip *)pbuf;
 	eh = (ether_header_t *)malloc(sizeof(*eh));
+	if(!eh)
+	    {
+		perror("malloc failed");
+		return -2;
+	    }
 
 	bzero((char *)A_A eh->ether_shost, sizeof(eh->ether_shost));
 	if (gwip.s_addr && (arp((char *)&gwip, dhost) == -1))
