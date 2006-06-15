@@ -1,13 +1,10 @@
 /*
  * arp.c (C) 1995-1998 Darren Reed
  *
- * Redistribution and use in source and binary forms are permitted
- * provided that this notice is preserved and due credit is given
- * to the original author and the contributors.
+ * See the IPFILTER.LICENCE file for details on licencing.
  */
-#if !defined(lint)
-static const char sccsid[] = "@(#)arp.c	1.4 1/11/96 (C)1995 Darren Reed";
-static const char rcsid[] = "@(#)$Id$";
+#ifdef __sgi
+# include <sys/ptimers.h>
 #endif
 #include <stdio.h>
 #include <errno.h>
@@ -29,6 +26,11 @@ static const char rcsid[] = "@(#)$Id$";
 #include <netinet/tcp.h>
 #include "ipsend.h"
 #include "iplang/iplang.h"
+
+#if !defined(lint)
+static const char sccsid[] = "@(#)arp.c	1.4 1/11/96 (C)1995 Darren Reed";
+static const char rcsid[] = "@(#)$Id$";
+#endif
 
 
 /*

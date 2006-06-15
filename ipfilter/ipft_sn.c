@@ -1,14 +1,15 @@
 /*
- * Copyright (C) 1993-2000 by Darren Reed.
+ * Copyright (C) 1993-2001 by Darren Reed.
  *
- * Redistribution and use in source and binary forms are permitted
- * provided that this notice is preserved and due credit is given
- * to the original author and the contributors.
+ * See the IPFILTER.LICENCE file for details on licencing.
  */
 
 /*
  * Written to comply with the recent RFC 1761 from Sun.
  */
+#ifdef __sgi
+# include <sys/ptimers.h>
+#endif
 #include <stdio.h>
 #include <string.h>
 #if !defined(__SVR4) && !defined(__GNUC__)
@@ -78,6 +79,7 @@ char	*fname;
 {
 	struct	snoophdr sh;
 	int	fd;
+	int s_v;
 
 	if (sfd != -1)
 		return sfd;
@@ -90,16 +92,18 @@ char	*fname;
 	if (read(fd, (char *)&sh, sizeof(sh)) != sizeof(sh))
 		return -2;
 
-	if (sh.s_v != SNOOP_VERSION ||
-	    sh.s_type < 0 || sh.s_type > SDL_MAX) {
+	s_v = (int)ntohl(sh.s_v);
+	s_type = (int)ntohl(sh.s_type);
+
+	if (s_v != SNOOP_VERSION ||
+	    s_type < 0 || s_type > SDL_MAX) {
 		(void) close(fd);
 		return -2;
 	}
 
 	sfd = fd;
-	s_type = sh.s_type;
 	printf("opened snoop file %s:\n", fname);
-	printf("\tid: %8.8s version: %d type: %d\n", sh.s_id, sh.s_v, s_type);
+	printf("\tid: %8.8s version: %d type: %d\n", sh.s_id, s_v, s_type);
 
 	return fd;
 }
@@ -118,20 +122,22 @@ static	int	snoop_close()
 static	int	snoop_read_rec(rec)
 struct	snooppkt *rec;
 {
-	int	n, p;
+	int	n, plen, ilen;
 
 	if (read(sfd, (char *)rec, sizeof(*rec)) != sizeof(*rec))
 		return -2;
 
-	if (rec->sp_ilen > rec->sp_plen || rec->sp_plen < sizeof(*rec))
+	ilen = (int)ntohl(rec->sp_ilen);
+	plen = (int)ntohl(rec->sp_plen);
+	if (ilen > plen || plen < sizeof(*rec))
 		return -2;
 
-	p = rec->sp_plen - sizeof(*rec);
-	n = MIN(p, rec->sp_ilen);
+	plen -= sizeof(*rec);
+	n = MIN(plen, ilen);
 	if (!n || n < 0)
 		return -3;
 
-	return p;
+	return plen;
 }
 
 

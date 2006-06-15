@@ -1,9 +1,7 @@
 /*
  * (C)opyright 1992-1998 Darren Reed. (from tcplog)
  *
- * Redistribution and use in source and binary forms are permitted
- * provided that this notice is preserved and due credit is given
- * to the original author and the contributors.
+ * See the IPFILTER.LICENCE file for details on licencing.
  */
 
 #include <stdio.h>
@@ -58,7 +56,8 @@ int	sport, tout;
 	char	devname[16], *s, buf[256];
 	int	i, fd;
 
-	(void) sprintf(devname, "/dev/%s", device);
+	(void) strcpy(devname, "/dev/");
+	(void) strncat(devname, device, sizeof(devname) - strlen(devname));
 
 	s = devname + 5;
 	while (*s && !isdigit(*s))

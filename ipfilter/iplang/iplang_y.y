@@ -9,6 +9,9 @@
  * $Id$
  */
 
+#ifdef __sgi
+# include <sys/ptimers.h>
+#endif
 #include <stdio.h>
 #include <string.h>
 #include <fcntl.h>
@@ -48,7 +51,8 @@
 #include "ipf.h"
 #include "iplang.h"
 
-#ifndef __NetBSD__
+#if !defined(__NetBSD__) && (!defined(__FreeBSD_version) && \
+    __FreeBSD_version < 400020)
 extern	struct ether_addr *ether_aton __P((char *));
 #endif
 

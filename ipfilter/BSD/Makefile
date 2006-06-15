@@ -7,8 +7,10 @@
 #
 BINDEST=/usr/sbin
 SBINDEST=/sbin
+SEARCHDIRS=$(BINDEST) $(SBINDEST) /bin /usr/bin /sbin /usr/sbin \
+	/usr/local/bin /usr/local/sbin
 MANDIR=/usr/share/man
-CC=cc -Wall -Wuninitialized -Wstrict-prototypes -Werror -O
+CC=cc -Wall -Wstrict-prototypes -Wuninitialized -O
 CFLAGS=-g -I$(TOP)
 #
 # For NetBSD/FreeBSD
@@ -39,35 +41,40 @@ INSTALL=install
 #
 MODOBJS=ip_fil.o fil_k.o ml_ipl.o ip_nat.o ip_frag.o ip_state.o ip_proxy.o \
 	ip_auth.o ip_log.o
-DFLAGS=$(IPFLKM) $(IPFLOG) $(DEF) $(DLKM)
+DFLAGS=$(IPFLKM) $(DEF) $(DLKM)
 IPF=ipf.o parse.o common.o opt.o facpri.o
 IPT=ipt.o parse.o common.o fil.o ipft_sn.o ipft_ef.o ipft_td.o ipft_pc.o \
     opt.o ipft_tx.o misc.o ip_frag_u.o ip_state_u.o ip_nat_u.o ip_proxy_u.o \
-    ip_auth_u.o ipft_hx.o ip_fil_u.o natparse.o facpri.o
-IPNAT=ipnat.o kmem.o natparse.o common.o
-FILS=fils.o parse.o kmem.o opt.o facpri.o common.o
+    ip_auth_u.o ipft_hx.o ip_fil_u.o ip_log_u.o natparse.o facpri.o \
+    printnat.o printstate.o
+IPNAT=ipnat.o kmem.o natparse.o common.o printnat.o
+FILS=fils.o parse.o kmem.o opt.o facpri.o common.o printstate.o
 
 build all: ipf ipfs ipfstat ipftest ipmon ipnat $(LKM)
-
-ipfstat: $(FILS)
-	$(CC) $(DEBUG) $(CFLAGS) $(STATETOP_CFLAGS) $(STATETOP_INC) $(FILS) \
-	-o $@ $(LIBS) $(STATETOP_LIB)
-
-ipf: $(IPF)
-	$(CC) $(DEBUG) $(CFLAGS) $(IPF) -o $@ $(LIBS)
 	/bin/rm -f $(TOP)/ipf
 	ln -s `pwd`/ipf $(TOP)
+	/bin/rm -f $(TOP)/ipftest
+	ln -s `pwd`/ipftest $(TOP)
+	/bin/rm -f $(TOP)/ipmon
+	ln -s `pwd`/ipmon $(TOP)
+	/bin/rm -f $(TOP)/ipnat
+	ln -s `pwd`/ipnat $(TOP)
+
+ipfstat: $(FILS)
+	$(CC) -static $(DEBUG) $(CFLAGS) $(STATETOP_CFLAGS) $(STATETOP_INC) \
+		$(FILS) -o $@ $(LIBS) $(STATETOP_LIB) -lkvm
+
+ipf: $(IPF)
+	$(CC) -static $(DEBUG) $(CFLAGS) $(IPF) -o $@ $(LIBS)
 
 ipftest: $(IPT)
 	$(CC) $(DEBUG) $(CFLAGS) $(IPT) -o $@ $(LIBS)
-	/bin/rm -f $(TOP)/ipftest
-	ln -s `pwd`/ipftest $(TOP)
 
 ipnat: $(IPNAT)
-	$(CC) $(DEBUG) $(CFLAGS) $(IPNAT) -o $@ $(LIBS)
+	$(CC) -static $(DEBUG) $(CFLAGS) $(IPNAT) -o $@ $(LIBS) -lkvm
 
 ipfs: ipfs.o
-	$(CC) $(DEBUG) $(CFLAGS) ipfs.o -o $@ $(LIBS)
+	$(CC) -static $(DEBUG) $(CFLAGS) ipfs.o -o $@ $(LIBS)
 
 tests:
 	(cd test; make )
@@ -84,7 +91,8 @@ ipfs.o: $(TOP)/ipfs.c $(TOP)/ip_fil.h $(TOP)/ipf.h $(TOP)/ip_state.h \
 fil.o: $(TOP)/fil.c $(TOP)/ip_fil.h $(TOP)/ipf.h $(TOP)/ip_compat.h
 	$(CC) $(DEBUG) $(CFLAGS) -c $(TOP)/fil.c -o $@
 
-fil_k.o: $(TOP)/fil.c $(TOP)/ip_fil.h $(TOP)/ipf.h $(TOP)/ip_compat.h
+fil_k.o: $(TOP)/fil.c $(TOP)/ip_fil.h $(TOP)/ipf.h $(TOP)/ip_compat.h \
+	 $(TOP)/ipl.h
 	$(CC) $(DEBUG) $(CFLAGS) $(POLICY) $(DFLAGS) -c $(TOP)/fil.c -o $@
 
 ipf.o: $(TOP)/ipf.c $(TOP)/ip_fil.h $(TOP)/ipf.h
@@ -105,6 +113,14 @@ ipnat.o: $(TOP)/ipnat.c $(TOP)/ip_fil.h $(TOP)/ipf.h $(TOP)/ip_nat.h
 natparse.o: $(TOP)/natparse.c $(TOP)/ip_fil.h $(TOP)/ipf.h $(TOP)/ip_nat.h \
 	$(TOP)/ip_compat.h
 	$(CC) $(DEBUG) $(CFLAGS) -c $(TOP)/natparse.c -o $@
+
+printnat.o: $(TOP)/printnat.c $(TOP)/ip_fil.h $(TOP)/ipf.h $(TOP)/ip_nat.h \
+	$(TOP)/ip_compat.h $(TOP)/ip_proxy.h
+	$(CC) $(DEBUG) $(CFLAGS) -c $(TOP)/printnat.c -o $@
+
+printstate.o: $(TOP)/printstate.c $(TOP)/ip_fil.h $(TOP)/ipf.h \
+	$(TOP)/ip_state.h $(TOP)/ip_compat.h
+	$(CC) $(DEBUG) $(CFLAGS) -c $(TOP)/printstate.c -o $@
 
 ipft_sn.o: $(TOP)/ipft_sn.c $(TOP)/ipt.h $(TOP)/ipf.h $(TOP)/ip_fil.h \
 	$(TOP)/snoop.h
@@ -129,7 +145,8 @@ ip_nat_u.o: $(TOP)/ip_nat.c $(TOP)/ip_nat.h $(TOP)/ip_compat.h $(TOP)/ip_fil.h
 	$(CC) $(DEBUG) $(CFLAGS) -c $(TOP)/ip_nat.c -o $@
 
 ip_proxy_u.o: $(TOP)/ip_proxy.c $(TOP)/ip_proxy.h $(TOP)/ip_compat.h \
-	$(TOP)/ip_fil.h $(TOP)/ip_ftp_pxy.c  $(TOP)/ip_nat.h
+	$(TOP)/ip_fil.h $(TOP)/ip_ftp_pxy.c $(TOP)/ip_rcmd_pxy.c \
+	$(TOP)/ip_raudio_pxy.c $(TOP)/ip_ipsec_pxy.c $(TOP)/ip_nat.h
 	$(CC) $(DEBUG) $(CFLAGS) -c $(TOP)/ip_proxy.c -o $@
 
 ip_frag_u.o: $(TOP)/ip_frag.c $(TOP)/ip_frag.h $(TOP)/ip_compat.h \
@@ -146,6 +163,9 @@ ip_auth_u.o: $(TOP)/ip_auth.c $(TOP)/ip_auth.h $(TOP)/ip_compat.h \
 
 ip_fil_u.o: $(TOP)/$(IPFILC) $(TOP)/ip_fil.h $(TOP)/ip_compat.h
 	$(CC) $(DEBUG) $(CFLAGS) -c $(TOP)/$(IPFILC) -o $@
+
+ip_log_u.o: $(TOP)/ip_log.c $(TOP)/ip_fil.h $(TOP)/ip_compat.h
+	$(CC) $(DEBUG) $(CFLAGS) -c $(TOP)/ip_log.c -o $@
 
 if_ipl.o: $(MODOBJS) 
 	ld -r $(MODOBJS) -o $(LKM)
@@ -169,7 +189,7 @@ ip_state.o: $(TOP)/ip_state.c $(TOP)/ip_state.h $(TOP)/ip_compat.h \
 
 ip_proxy.o: $(TOP)/ip_proxy.c $(TOP)/ip_proxy.h $(TOP)/ip_compat.h \
 	$(TOP)/ip_fil.h $(TOP)/ip_ftp_pxy.c $(TOP)/ip_raudio_pxy.c \
-	$(TOP)/ip_nat.h
+	$(TOP)/ip_rcmd_pxy.c $(TOP)/ip_ipsec_pxy.c $(TOP)/ip_nat.h
 	$(CC) $(DEBUG) $(CFLAGS) $(DFLAGS) -c $(TOP)/ip_proxy.c -o $@
 
 ip_auth.o: $(TOP)/ip_auth.c $(TOP)/ip_auth.h $(TOP)/ip_compat.h \
@@ -211,6 +231,7 @@ clean:
 	${RM} -f *.core *.o ipt fils ipf ipfstat ipftest ipmon if_ipl ipnat \
 	vnode_if.h $(LKM) ioconf.h *.ko setdef1.c setdef0.c setdefs.h \
 	y.tab.? lex.yy.c ipfs
+	${RM} -f ../opt_inet6.h ../ipftest ../ipmon ../ipf ../ipnat
 
 	${MAKE} -f Makefile.ipsend ${MFLAGS} clean
 	-(for i in *; do \
@@ -222,15 +243,31 @@ clean:
 	done)
 
 install:
-	-$(CP) $(TOP)/ip_fil.h /usr/include/netinet/ip_fil.h
-	-$(CHMOD) 444 /usr/include/netinet/ip_fil.h
+	for i in ip_compat.h ip_fil.h ip_nat.h ip_state.h ip_proxy.h \
+		ip_frag.h ip_auth.h; do \
+		/bin/cp $(TOP)/$$i /usr/include/netinet/; \
+		-$(CHMOD) 444 /usr/include/netinet/$$i; \
+	done
 	-if [ -d /lkm -a -f if_ipl.o ] ; then \
 		cp if_ipl.o /lkm; \
 	fi
-	-$(INSTALL) -cs -g wheel -m 755 -o root ipf $(SBINDEST)
-	-$(INSTALL) -cs -g wheel -m 755 -o root ipfs $(SBINDEST)
-	-$(INSTALL) -cs -g wheel -m 755 -o root ipnat $(SBINDEST)
-	-$(INSTALL) -cs -g wheel -m 755 -o root ipfstat $(SBINDEST)
-	-$(INSTALL) -cs -g wheel -m 755 -o root ipmon $(BINDEST)
-	-$(INSTALL) -cs -g wheel -m 755 -o root ipftest $(BINDEST)
+	-if [ -d /modules -a -f ipf.ko ] ; then \
+		cp ipf.ko /modules; \
+	fi
+	@for i in ipf:$(SBINDEST) ipfs:$(SBINDEST) ipnat:$(SBINDEST) \
+	    ipfstat:$(SBINDEST) ipftest:$(SBINDEST) ipmon:$(BINDEST); do \
+		def="`expr $$i : '[^:]*:\(.*\)'`"; \
+		p="`expr $$i : '\([^:]*\):.*'`"; \
+		for d in $(SEARCHDIRS); do \
+			if [ -f $$d/$$p ] ; then \
+				echo "$(INSTALL) -cs -g wheel -m 755 -o root $$p $$d"; \
+				$(INSTALL) -cs -g wheel -m 755 -o root $$p $$d; \
+				dd=$$d; \
+			fi; \
+		done; \
+		if [ -z "$$dd" ] ; then \
+			echo $(INSTALL) -cs -g wheel -m 755 -o root $$p $$def; \
+			$(INSTALL) -cs -g wheel -m 755 -o root $$p $$def; \
+		fi \
+	done
 	(cd $(TOP)/man; make INSTALL=$(INSTALL) MANDIR=$(MANDIR) install; cd $(TOP))

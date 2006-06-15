@@ -52,6 +52,16 @@
  * -
  * --Copyright--
  */
+#ifdef	__STDC__
+# ifndef __P
+#  define	__P(x)	x
+# endif
+#else
+# undef		__P
+# define	__P(x)	()
+# undef		const
+# define	const
+#endif
 
 #if !defined(lint)
 static const char sccsid[] = "@(#)inet_addr.c	8.1 (Berkeley) 6/17/93";
@@ -63,13 +73,6 @@ static const char rcsid[] = "@(#)$Id$";
 #include <arpa/inet.h>
 #include <ctype.h>
 
-#ifndef	__P
-# ifdef	__STDC__
-#  define	__P(x)	x
-# else
-#  define	__P(x)	()
-# endif
-#endif
 int inet_aton __P((const char *, struct in_addr *));
 
 /* 
@@ -179,7 +182,8 @@ inet_aton(cp, addr)
  * Ascii internet address interpretation routine.
  * The value returned is in network order.
  */
-#if defined(SOLARIS2) && (SOLARIS2 > 5)
+#if (defined(SOLARIS2) && (SOLARIS2 > 5)) || \
+    (defined(IRIX) && (IRIX >= 605))
 in_addr_t
 #else
 u_long

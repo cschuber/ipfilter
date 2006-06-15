@@ -1,10 +1,11 @@
 /*
- * Copyright (C) 1995-2000 by Darren Reed.
+ * Copyright (C) 1995-2001 by Darren Reed.
  *
- * Redistribution and use in source and binary forms are permitted
- * provided that this notice is preserved and due credit is given
- * to the original author and the contributors.
+ * See the IPFILTER.LICENCE file for details on licencing.
  */
+#ifdef __sgi
+# include <sys/ptimers.h>
+#endif
 #include <stdio.h>
 #include <ctype.h>
 #include <assert.h>
@@ -93,6 +94,14 @@ int	cnt, *dir;
 	char	line[513];
 	ip_t	*ip;
 
+	/*
+	 * interpret start of line as possibly "[ifname]" or
+	 * "[in/out,ifname]".
+	 */
+	if (ifn)
+		*ifn = NULL;
+	if (dir)
+		*dir = 0;
  	ip = (ip_t *)buf;
 	while (fgets(line, sizeof(line)-1, tfp)) {
 		if ((s = index(line, '\n'))) {
@@ -109,21 +118,14 @@ int	cnt, *dir;
 			fflush(stdout);
 		}
 
-		/*
-		 * interpret start of line as possibly "[ifname]" or
-		 * "[in/out,ifname]".
-		 */
-		if (ifn)
-			*ifn = NULL;
-		if (dir)
-			*dir = 0;
-		if ((*buf == '[') && (s = index(line, ']'))) {
-			t = buf + 1;
-			if (t - s > 0) {
+		if ((*line == '[') && (s = index(line, ']'))) {
+			t = line + 1;
+			if (s - t > 0) {
+				*s++ = '\0';
 				if ((u = index(t, ',')) && (u < s)) {
 					u++;
 					if (ifn)
-						*ifn = u;
+						*ifn = strdup(u);
 					if (dir) {
 						if (*t == 'i')
 							*dir = 0;
@@ -132,7 +134,6 @@ int	cnt, *dir;
 					}
 				} else if (ifn)
 					*ifn = t;
-				*s++ = '\0';
 			}
 		} else
 			s = line;

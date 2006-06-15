@@ -1,9 +1,7 @@
 /*
- * Copyright (C) 1993-2000 by Darren Reed.
+ * Copyright (C) 1993-2001 by Darren Reed.
  *
- * Redistribution and use in source and binary forms are permitted
- * provided that this notice is preserved and due credit is given
- * to the original author and the contributors.
+ * See the IPFILTER.LICENCE file for details on licencing.
  *
  * I hate legaleese, don't you ?
  */
@@ -50,6 +48,7 @@ static const char rcsid[] = "@(#)$Id$";
 #include "ip_nat.h"
 #include "ip_frag.h"
 #include "ip_auth.h"
+#include "ip_proxy.h"
 #include <inet/ip_ire.h>
 #ifndef	MIN
 #define	MIN(a,b)	(((a)<(b))?(a):(b))
@@ -62,9 +61,17 @@ int	fr_running = 0;
 int	ipl_unreach = ICMP_UNREACH_HOST;
 u_long	ipl_frouteok[2] = {0, 0};
 static	int	frzerostats __P((caddr_t));
+#if SOLARIS2 >= 7
+static	u_int	*ip_ttl_ptr;
+static	u_int	*ip_mtudisc;
+#else
+static	u_long	*ip_ttl_ptr;
+static	u_long	*ip_mtudisc;
+#endif
 
 static	int	frrequest __P((minor_t, int, caddr_t, int));
-kmutex_t	ipl_mutex, ipf_authmx, ipf_rw, ipf_hostmap;
+static	int	send_ip __P((fr_info_t *fin, mblk_t *m));
+kmutex_t	ipl_mutex, ipf_authmx, ipf_rw;
 KRWLOCK_T	ipf_mutex, ipfs_mutex, ipf_solaris;
 KRWLOCK_T	ipf_frag, ipf_state, ipf_nat, ipf_natfrag, ipf_auth;
 kcondvar_t	iplwait, ipfauthwait;
@@ -81,14 +88,13 @@ int ipldetach()
 	for (i = IPL_LOGMAX; i >= 0; i--)
 		ipflog_clear(i);
 #endif
-	i = FR_INQUE|FR_OUTQUE;
-	(void) frflush(IPL_LOGIPF, FR_INQUE|FR_OUTQUE);
+	i = frflush(IPL_LOGIPF, FR_INQUE|FR_OUTQUE|FR_INACTIVE);
+	i += frflush(IPL_LOGIPF, FR_INQUE|FR_OUTQUE);
 	ipfr_unload();
 	fr_stateunload();
 	ip_natunload();
 	cv_destroy(&iplwait);
 	cv_destroy(&ipfauthwait);
-	mutex_destroy(&ipf_hostmap);
 	mutex_destroy(&ipf_authmx);
 	mutex_destroy(&ipl_mutex);
 	mutex_destroy(&ipf_rw);
@@ -108,6 +114,8 @@ int ipldetach()
 
 int iplattach __P((void))
 {
+	int i;
+
 #ifdef	IPFDEBUG
 	cmn_err(CE_CONT, "iplattach()\n");
 #endif
@@ -115,7 +123,6 @@ int iplattach __P((void))
 	mutex_init(&ipf_rw, "ipf rw mutex", MUTEX_DRIVER, NULL);
 	mutex_init(&ipl_mutex, "ipf log mutex", MUTEX_DRIVER, NULL);
 	mutex_init(&ipf_authmx, "ipf auth log mutex", MUTEX_DRIVER, NULL);
-	mutex_init(&ipf_hostmap, "ipf hostmap mutex", MUTEX_DRIVER, NULL);
 	RWLOCK_INIT(&ipf_solaris, "ipf filter load/unload mutex", NULL);
 	RWLOCK_INIT(&ipf_mutex, "ipf filter rwlock", NULL);
 	RWLOCK_INIT(&ipfs_mutex, "ipf solaris mutex", NULL);
@@ -135,6 +142,25 @@ int iplattach __P((void))
 		return -1;
 	if (appr_init() == -1)
 		return -1;
+
+	ip_ttl_ptr = NULL;
+	ip_mtudisc = NULL;
+	/*
+	 * XXX - There is no terminator for this array, so it is not possible
+	 * to tell if what we are looking for is missing and go off the end
+	 * of the array.
+	 */
+	for (i = 0; ; i++) {
+		if (strcmp(ip_param_arr[i].ip_param_name, "ip_def_ttl") == 0) {
+			ip_ttl_ptr = &ip_param_arr[i].ip_param_value;
+		} else if (strcmp(ip_param_arr[i].ip_param_name,
+				  "ip_path_mtu_discovery") == 0) {
+			ip_mtudisc = &ip_param_arr[i].ip_param_value;
+		}
+
+		if (ip_mtudisc != NULL && ip_ttl_ptr != NULL)
+			break;
+	}
 	return 0;
 }
 
@@ -148,7 +174,7 @@ caddr_t	data;
 	fr_getstat(&fio);
 	error = IWCOPYPTR((caddr_t)&fio, data, sizeof(fio));
 	if (error)
-		return EFAULT;
+		return error;
 
 	bzero((char *)frstats, sizeof(*frstats) * 2);
 
@@ -182,6 +208,9 @@ int *rp;
 	if (IPL_LOGMAX < unit)
 		return ENXIO;
 
+	if (fr_running == 0 && (cmd != SIOCFRENB || unit != IPL_LOGIPF))
+		return ENODEV;
+
 	if (fr_running <= 0)
 		return 0;
 
@@ -197,7 +226,7 @@ int *rp;
 		return error;
 	}
 	if (unit == IPL_LOGAUTH) {
-		error = fr_auth_ioctl((caddr_t)data, cmd, NULL, NULL);
+		error = fr_auth_ioctl((caddr_t)data, mode, cmd, NULL, NULL);
 		RWLOCK_EXIT(&ipf_solaris);
 		return error;
 	}
@@ -227,6 +256,8 @@ int *rp;
 	case SIOCGETFF :
 		error = IWCOPY((caddr_t)&fr_flags, (caddr_t)data,
 			       sizeof(fr_flags));
+		if (error)
+			error = EFAULT;
 		break;
 	case SIOCINAFR :
 	case SIOCRMAFR :
@@ -254,6 +285,8 @@ int *rp;
 			bzero((char *)frcache, sizeof(frcache[0]) * 2);
 			error = IWCOPY((caddr_t)&fr_active, (caddr_t)data,
 				       sizeof(fr_active));
+			if (error)
+				error = EFAULT;
 			fr_active = 1 - fr_active;
 			RWLOCK_EXIT(&ipf_mutex);
 		}
@@ -286,6 +319,8 @@ int *rp;
 				tmp = frflush(unit, tmp);
 				error = IWCOPY((caddr_t)&tmp, (caddr_t)data,
 					       sizeof(tmp));
+				if (error)
+					error = EFAULT;
 			}
 		}
 		break;
@@ -307,6 +342,8 @@ int *rp;
 			tmp = ipflog_clear(unit);
 			error = IWCOPY((caddr_t)&tmp, (caddr_t)data,
 				       sizeof(tmp));
+			if (error)
+				error = EFAULT;
 		}
 		break;
 #endif /* IPFILTER_LOG */
@@ -319,8 +356,6 @@ int *rp;
 	case SIOCGFRST :
 		error = IWCOPYPTR((caddr_t)ipfr_fragstats(), (caddr_t)data,
 				  sizeof(ipfrstat_t));
-		if (error)
-			error = EFAULT;
 		break;
 	case FIONREAD :
 	{
@@ -328,6 +363,8 @@ int *rp;
 		int copy = (int)iplused[IPL_LOGIPF];
 
 		error = IWCOPY((caddr_t)&copy, (caddr_t)data, sizeof(copy));
+		if (error)
+			error = EFAULT;
 #endif
 		break;
 	}
@@ -369,14 +406,14 @@ caddr_t data;
 {
 	register frentry_t *fp, *f, **fprev;
 	register frentry_t **ftail;
-	frentry_t fr;
-	frdest_t *fdp;
 	frgroup_t *fg = NULL;
-	u_int   *p, *pp;
-	int error = 0, in;
+	int error = 0, in, i;
+	u_int *p, *pp;
+	frdest_t *fdp;
+	frentry_t fr;
 	u_32_t group;
-	ill_t *ill;
 	ipif_t *ipif;
+	ill_t *ill;
 	ire_t *ire;
 
 	fp = &fr;
@@ -400,7 +437,8 @@ caddr_t data;
 	 * Check that the group number does exist and that if a head group
 	 * has been specified, doesn't exist.
 	 */
-	if ((req != SIOCZRLST) && fp->fr_grhead &&
+	if ((req != SIOCZRLST) && ((req == SIOCINAFR) || (req == SIOCINIFR) ||
+	     (req == SIOCADAFR) || (req == SIOCADIFR)) && fp->fr_grhead &&
 	    fr_findgroup(fp->fr_grhead, fp->fr_flags, unit, set, NULL)) {
 		error = EEXIST;
 		goto out;
@@ -431,7 +469,7 @@ caddr_t data;
 	}
 
 	group = fp->fr_group;
-	if (group != NULL) {
+	if (group != 0) {
 		fg = fr_findgroup(group, fp->fr_flags, unit, set, NULL);
 		if (fg == NULL) {
 			error = ESRCH;
@@ -442,14 +480,20 @@ caddr_t data;
 
 	bzero((char *)frcache, sizeof(frcache[0]) * 2);
 
-	if (*fp->fr_ifname) {
-		fp->fr_ifa = (void *)get_unit((char *)fp->fr_ifname,
-					      (int)fp->fr_v);
-		if (!fp->fr_ifa)
-			fp->fr_ifa = (struct ifnet *)-1;
+	for (i = 0; i < 4; i++) {
+		if ((fp->fr_ifnames[i][1] == '\0') &&
+		    ((fp->fr_ifnames[i][0] == '-') ||
+		     (fp->fr_ifnames[i][0] == '*'))) {
+			fp->fr_ifas[i] = NULL;
+		} else if (*fp->fr_ifnames[i]) {
+			fp->fr_ifas[i] = GETUNIT(fp->fr_ifnames[i], fp->fr_v);
+			if (!fp->fr_ifas[i])
+				fp->fr_ifas[i] = (void *)-1;
+		}
 	}
 
 	fdp = &fp->fr_dif;
+	fdp->fd_mp = NULL;
 	fp->fr_flags &= ~FR_DUP;
 	if (*fdp->fd_ifname) {
 		ill = get_unit(fdp->fd_ifname, (int)fp->fr_v);
@@ -483,6 +527,7 @@ caddr_t data;
 	}
 
 	fdp = &fp->fr_tif;
+	fdp->fd_mp = NULL;
 	if (*fdp->fd_ifname) {
 		ill = get_unit(fdp->fd_ifname, (int)fp->fr_v);
 		if (!ill)
@@ -515,7 +560,7 @@ caddr_t data;
 	 * interface pointer in the comparison (fr_next, fr_ifa).
 	 */
 	for (fp->fr_cksum = 0, p = (u_int *)&fp->fr_ip, pp = &fp->fr_cksum;
-	     p != pp; p++)
+	     p < pp; p++)
 		fp->fr_cksum += *p;
 
 	for (; (f = *ftail); ftail = &f->fr_next)
@@ -533,10 +578,8 @@ caddr_t data;
 		}
 		MUTEX_DOWNGRADE(&ipf_mutex);
 		error = IWCOPYPTR((caddr_t)f, data, sizeof(*f));
-		if (error) {
-			error = EFAULT;
+		if (error)
 			goto out;
-		}
 		f->fr_hits = 0;
 		f->fr_bytes = 0;
 		goto out;
@@ -571,16 +614,13 @@ caddr_t data;
 			}
 			if (fg && fg->fg_head)
 				fg->fg_head->fr_ref--;
-			if (unit == IPL_LOGAUTH) {
-				error = fr_auth_ioctl(data, req, fp, ftail);
-				goto out;
-			}
 			if (f->fr_grhead)
 				fr_delgroup(f->fr_grhead, fp->fr_flags,
 					    unit, set);
 			fixskip(fprev, f, -1);
 			*ftail = f->fr_next;
 			f->fr_next = NULL;
+			f->fr_ref--;
 			if (f->fr_ref == 0)
 				KFREE(f);
 		}
@@ -588,10 +628,6 @@ caddr_t data;
 		if (f) {
 			error = EEXIST;
 		} else {
-			if (unit == IPL_LOGAUTH) {
-				error = fr_auth_ioctl(data, req, fp, ftail);
-				goto out;
-			}
 			KMALLOC(f, frentry_t *);
 			if (f != NULL) {
 				if (fg && fg->fg_head)
@@ -605,7 +641,7 @@ caddr_t data;
 					fixskip(fprev, f, 1);
 				f->fr_grp = NULL;
 				group = f->fr_grhead;
-				if (group != NULL)
+				if (group != 0)
 					fg = fr_addgroup(group, f, unit, set);
 			} else
 				error = ENOMEM;
@@ -675,13 +711,12 @@ cred_t *cp;
  * send_reset - this could conceivably be a call to tcp_respond(), but that
  * requires a large amount of setting up and isn't any more efficient.
  */
-int send_reset(fin, oip, qif)
-fr_info_t *fin;
+int send_reset(oip, fin)
 ip_t *oip;
-qif_t *qif;
+fr_info_t *fin;
 {
 	tcphdr_t *tcp, *tcp2;
-	int tlen = 0, hlen;
+	int tlen, hlen;
 	mblk_t *m;
 #ifdef	USE_INET6
 	ip6_t *ip6, *oip6 = (ip6_t *)oip;
@@ -691,8 +726,7 @@ qif_t *qif;
 	tcp = (struct tcphdr *)fin->fin_dp;
 	if (tcp->th_flags & TH_RST)
 		return -1;
-	if (tcp->th_flags & TH_SYN)
-		tlen = 1;
+	tlen = (tcp->th_flags & (TH_SYN|TH_FIN)) ? 1 : 0;
 #ifdef	USE_INET6
 	if (fin->fin_v == 6)
 		hlen = sizeof(ip6_t);
@@ -700,40 +734,40 @@ qif_t *qif;
 #endif
 		hlen = sizeof(ip_t);
 	hlen += sizeof(*tcp2);
-	if ((m = (mblk_t *)allocb(hlen, BPRI_HI)) == NULL)
+	if ((m = (mblk_t *)allocb(hlen + 16, BPRI_HI)) == NULL)
 		return -1;
 
+	m->b_rptr += 16;
 	MTYPE(m) = M_DATA;
-	m->b_wptr += hlen;
+	m->b_wptr = m->b_rptr + hlen;
 	bzero((char *)m->b_rptr, hlen);
 	tcp2 = (struct tcphdr *)(m->b_rptr + hlen - sizeof(*tcp2));
 	tcp2->th_dport = tcp->th_sport;
 	tcp2->th_sport = tcp->th_dport;
-	tcp2->th_ack = htonl(ntohl(tcp->th_seq) + tlen);
-	tcp2->th_seq = tcp->th_ack;
+	if (tcp->th_flags & TH_ACK) {
+		tcp2->th_seq = tcp->th_ack;
+		tcp2->th_flags = TH_RST|TH_ACK;
+	} else {
+		tcp2->th_ack = ntohl(tcp->th_seq);
+		tcp2->th_ack += tlen;
+		tcp2->th_ack = htonl(tcp2->th_ack);
+		tcp2->th_flags = TH_RST;
+	}
 	tcp2->th_off = sizeof(struct tcphdr) >> 2;
-	tcp2->th_x2 = 0;
 	tcp2->th_flags = TH_RST|TH_ACK;
-	tcp2->th_win = 0;
 
 	/*
 	 * This is to get around a bug in the Solaris 2.4/2.5 TCP checksum
 	 * computation that is done by their put routine.
 	 */
 	tcp2->th_sum = htons(0x14);
-	RWLOCK_EXIT(&ipfs_mutex);
-	RWLOCK_EXIT(&ipf_solaris);
 #ifdef	USE_INET6
 	if (fin->fin_v == 6) {
 		ip6 = (ip6_t *)m->b_rptr;
-		ip6->ip6_flow = 0;
-		ip6->ip6_vfc = 0x60;
-		ip6->ip6_hlim = 127;
 		ip6->ip6_src = oip6->ip6_dst;
 		ip6->ip6_dst = oip6->ip6_src;
-		ip6->ip6_plen = sizeof(*tcp);
+		ip6->ip6_plen = htons(sizeof(*tcp));
 		ip6->ip6_nxt = IPPROTO_TCP;
-		ip_wput_v6(qif->qf_ill->ill_wq, m);
 	} else
 #endif
 	{
@@ -741,12 +775,40 @@ qif_t *qif;
 		ip->ip_src.s_addr = oip->ip_dst.s_addr;
 		ip->ip_dst.s_addr = oip->ip_src.s_addr;
 		ip->ip_hl = sizeof(*ip) >> 2;
-		ip->ip_v = IPVERSION;
 		ip->ip_p = IPPROTO_TCP;
 		ip->ip_len = htons(sizeof(*ip) + sizeof(*tcp));
 		ip->ip_tos = oip->ip_tos;
-		ip->ip_ttl = 60;
-		ip_wput(qif->qf_ill->ill_wq, m);
+	}
+	return send_ip(fin, m);
+}
+
+
+int static send_ip(fin, m)
+fr_info_t *fin;
+mblk_t *m;
+{
+	RWLOCK_EXIT(&ipfs_mutex);
+	RWLOCK_EXIT(&ipf_solaris);
+#ifdef	USE_INET6
+	if (fin->fin_v == 6) {
+		extern void ip_wput_v6 __P((queue_t *, mblk_t *));
+		ip6_t *ip6;
+
+		ip6 = (ip6_t *)m->b_rptr;
+		ip6->ip6_flow = 0;
+		ip6->ip6_vfc = 0x60;
+		ip6->ip6_hlim = 127;
+		ip_wput_v6(((qif_t *)fin->fin_qif)->qf_ill->ill_wq, m);
+	} else
+#endif
+	{
+		ip_t *ip;
+
+		ip = (ip_t *)m->b_rptr;
+		ip->ip_v = IPVERSION;
+		ip->ip_ttl = (u_char)(*ip_ttl_ptr);
+		ip->ip_off = htons(*ip_mtudisc ? IP_DF : 0);
+		ip_wput(((qif_t *)fin->fin_qif)->qf_ill->ill_wq, m);
 	}
 	READ_ENTER(&ipf_solaris);
 	READ_ENTER(&ipfs_mutex);
@@ -754,26 +816,28 @@ qif_t *qif;
 }
 
 
-int send_icmp_err(oip, type, code, fin, dst)
+int send_icmp_err(oip, type, fin, dst)
 ip_t *oip;
-int type, code;
+int type;
 fr_info_t *fin;
 int dst;
 {
 	struct in_addr dst4;
 	struct icmp *icmp;
-	qif_t	*qif;
-	u_short sz;
 	mblk_t *m, *mb;
+	int hlen, code;
+	qif_t *qif;
+	u_short sz;
+	ill_t *il;
 #ifdef	USE_INET6
 	ip6_t *ip6, *oip6;
 #endif
 	ip_t *ip;
-	int hlen;
 
 	if ((type < 0) || (type > ICMP_MAXTYPE))
 		return -1;
 
+	code = fin->fin_icode;
 #ifdef USE_INET6
 	if ((code < 0) || (code > sizeof(icmptoicmp6unreach)/sizeof(int)))
 		return -1;
@@ -794,21 +858,40 @@ int dst;
 	} else
 #endif
 	{
+		if ((oip->ip_p == IPPROTO_ICMP) &&
+		    !(fin->fin_fi.fi_fl & FI_SHORT))
+			switch (ntohs(fin->fin_data[0]) >> 8)
+			{
+			case ICMP_ECHO :
+			case ICMP_TSTAMP :
+			case ICMP_IREQ :
+			case ICMP_MASKREQ :
+				break;
+			default :
+				return 0;
+			}
+
 		sz = sizeof(ip_t) * 2;
 		sz += 8;		/* 64 bits of data */
 		hlen = sz;
 	}
 
 	sz += offsetof(struct icmp, icmp_ip);
-	if ((mb = (mblk_t *)allocb((size_t)sz, BPRI_HI)) == NULL)
+	if ((mb = (mblk_t *)allocb((size_t)sz + 16, BPRI_HI)) == NULL)
 		return -1;
 	MTYPE(mb) = M_DATA;
-	mb->b_wptr += sz;
+	mb->b_rptr += 16;
+	mb->b_wptr = mb->b_rptr + sz;
 	bzero((char *)mb->b_rptr, (size_t)sz);
-	icmp = (struct icmp *)(mb->b_rptr + hlen);
+	icmp = (struct icmp *)(mb->b_rptr + sizeof(*ip));
 	icmp->icmp_type = type;
 	icmp->icmp_code = code;
 	icmp->icmp_cksum = 0;
+#ifdef	icmp_nextmtu
+	if (type == ICMP_UNREACH && (il = qif->qf_ill) &&
+	    fin->fin_icode == ICMP_UNREACH_NEEDFRAG)
+		icmp->icmp_nextmtu = htons(il->ill_max_frag);
+#endif
 
 #ifdef	USE_INET6
 	if (oip->ip_v == 6) {
@@ -816,7 +899,7 @@ int dst;
 		int csz;
 
 		if (dst == 0) {
-			if (fr_ifpaddr(6, qif->qf_ill,
+			if (fr_ifpaddr(6, ((qif_t *)fin->fin_qif)->qf_ill,
 				       (struct in_addr *)&dst6) == -1)
 				return -1;
 		} else
@@ -844,11 +927,12 @@ int dst;
 		ip->ip_p = IPPROTO_ICMP;
 		ip->ip_id = oip->ip_id;
 		ip->ip_sum = 0;
-		ip->ip_ttl = 60;
+		ip->ip_ttl = (u_char)(*ip_ttl_ptr);
 		ip->ip_tos = oip->ip_tos;
 		ip->ip_len = (u_short)htons(sz);
 		if (dst == 0) {
-			if (fr_ifpaddr(4, qif->qf_ill, &dst4) == -1)
+			if (fr_ifpaddr(4, ((qif_t *)fin->fin_qif)->qf_ill,
+				       &dst4) == -1)
 				return -1;
 		} else
 			dst4 = oip->ip_dst;
@@ -865,10 +949,5 @@ int dst;
 	 * Need to exit out of these so we don't recursively call rw_enter
 	 * from fr_qout.
 	 */
-	RWLOCK_EXIT(&ipfs_mutex);
-	RWLOCK_EXIT(&ipf_solaris);
-	ip_wput(qif->qf_ill->ill_wq, mb);
-	READ_ENTER(&ipf_solaris);
-	READ_ENTER(&ipfs_mutex);
-	return 0;
+	return send_ip(fin, mb);
 }

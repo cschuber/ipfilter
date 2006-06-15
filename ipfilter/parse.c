@@ -1,10 +1,11 @@
 /*
- * Copyright (C) 1993-2000 by Darren Reed.
+ * Copyright (C) 1993-2001 by Darren Reed.
  *
- * Redistribution and use in source and binary forms are permitted
- * provided that this notice is preserved and due credit is given
- * to the original author and the contributors.
+ * See the IPFILTER.LICENCE file for details on licencing.
  */
+#ifdef __sgi
+# include <sys/ptimers.h>
+#endif
 #include <sys/types.h>
 #if !defined(__SVR4) && !defined(__svr4__)
 #include <strings.h>
@@ -46,9 +47,7 @@ static const char rcsid[] = "@(#)$IPFilter: parse.c,v 2.8 1999/12/28 10:49:46 da
 
 extern	struct	ipopt_names	ionames[], secclass[];
 extern	int	opts;
-#ifdef	USE_INET6
 extern	int	use_inet6;
-#endif
 
 int	addicmp __P((char ***, struct frentry *, int));
 int	extras __P((char ***, struct frentry *, int));
@@ -59,6 +58,7 @@ void	print_toif __P((char *, frdest_t *));
 void	optprint __P((u_short *, u_long, u_long));
 int	loglevel __P((char **, u_int *, int));
 void	printlog __P((frentry_t *));
+void	printifname __P((char *, char *, void *));
 
 extern	char	*proto;
 extern	char	flagset[];
@@ -74,9 +74,10 @@ char	*line;
 int     linenum;
 {
 	static	struct	frentry	fil;
+	char	*cps[31], **cpp, *endptr, *s;
 	struct	protoent	*p = NULL;
-	char	*cps[31], **cpp, *endptr;
 	int	i, cnt = 1, j, ch;
+	u_int	k;
 
 	while (*line && isspace(*line))
 		line++;
@@ -85,11 +86,7 @@ int     linenum;
 
 	bzero((char *)&fil, sizeof(fil));
 	fil.fr_mip.fi_v = 0xf;
-#ifdef	USE_INET6
 	fil.fr_ip.fi_v = use_inet6 ? 6 : 4;
-#else
-	fil.fr_ip.fi_v = 4;
-#endif
 	fil.fr_loglevel = 0xffff;
 
 	/*
@@ -107,10 +104,18 @@ int     linenum;
 	}
 
 	cpp = cps;
+	/*
+	 * The presence of an '@' followed by a number gives the position in
+	 * the current rule list to insert this one.
+	 */
 	if (**cpp == '@')
 		fil.fr_hits = (U_QUAD_T)atoi(*cpp++ + 1) + 1;
 
 
+	/*
+	 * Check the first keyword in the rule and any options that are
+	 * expected to follow it.
+	 */
 	if (!strcasecmp("block", *cpp)) {
 		fil.fr_flags |= FR_BLOCK;
 		if (!strncasecmp(*(cpp+1), "return-icmp-as-dest", 19) &&
@@ -142,7 +147,7 @@ int     linenum;
 				}
 				fil.fr_icode = j;
 			}
-		} else if (!strncasecmp(*(cpp+1), "return-rst", 10)) {
+		} else if (!strcasecmp(*(cpp+1), "return-rst")) {
 			fil.fr_flags |= FR_RETRST;
 			cpp++;
 		}
@@ -150,14 +155,16 @@ int     linenum;
 		fil.fr_flags |= FR_ACCOUNT;
 	} else if (!strcasecmp("pass", *cpp)) {
 		fil.fr_flags |= FR_PASS;
+	} else if (!strcasecmp("nomatch", *cpp)) {
+		fil.fr_flags |= FR_NOMATCH;
 	} else if (!strcasecmp("auth", *cpp)) {
 		 fil.fr_flags |= FR_AUTH;
 	} else if (!strcasecmp("preauth", *cpp)) {
 		 fil.fr_flags |= FR_PREAUTH;
 	} else if (!strcasecmp("skip", *cpp)) {
 		cpp++;
-		if (ratoi(*cpp, &i, 0, UINT_MAX))
-			fil.fr_skip = i;
+		if (ratoui(*cpp, &k, 0, UINT_MAX))
+			fil.fr_skip = k;
 		else {
 			fprintf(stderr, "%d: integer must follow skip\n",
 				linenum);
@@ -195,6 +202,10 @@ int     linenum;
 		return NULL;
 	}
 
+	/*
+	 * Get the direction for filtering.  Impose restrictions on direction
+	 * if blocking with returning ICMP or an RST has been requested.
+	 */
 	if (!strcasecmp("in", *cpp))
 		fil.fr_flags |= FR_INQUE;
 	else if (!strcasecmp("out", *cpp)) {
@@ -253,19 +264,39 @@ int     linenum;
 	}
 
 	if (*cpp && !strcasecmp("quick", *cpp)) {
+		if (fil.fr_skip != 0) {
+			fprintf(stderr, "%d: cannot use skip with quick\n",
+				linenum);
+			return NULL;
+		}
 		cpp++;
 		fil.fr_flags |= FR_QUICK;
 	}
 
+	/*
+	 * Parse rule options that are available if a rule is tied to an
+	 * interface.
+	 */
 	*fil.fr_ifname = '\0';
+	*fil.fr_oifname = '\0';
 	if (*cpp && !strcasecmp(*cpp, "on")) {
 		if (!*++cpp) {
 			fprintf(stderr, "%d: interface name missing\n",
 				linenum);
 			return NULL;
 		}
-		(void)strncpy(fil.fr_ifname, *cpp, IFNAMSIZ-1);
-		fil.fr_ifname[IFNAMSIZ-1] = '\0';
+
+		s = index(*cpp, ',');
+		if (s != NULL) {
+			*s++ = '\0';
+			(void)strncpy(fil.fr_ifnames[1], s, IFNAMSIZ - 1);
+			fil.fr_ifnames[1][IFNAMSIZ - 1] = '\0';
+		} else
+			strcpy(fil.fr_ifnames[1], "*");
+
+		(void)strncpy(fil.fr_ifnames[0], *cpp, IFNAMSIZ - 1);
+		fil.fr_ifnames[0][IFNAMSIZ - 1] = '\0';
+
 		cpp++;
 		if (!*cpp) {
 			if ((fil.fr_flags & FR_RETMASK) == FR_RETRST) {
@@ -300,6 +331,33 @@ int     linenum;
 				cpp++;
 			}
 		}
+
+		/*
+		 * Set the "other" interface name.  Lets you specify both
+		 * inbound and outbound interfaces for state rules.  Do not
+		 * prevent both interfaces from being the same.
+		 */
+		strcpy(fil.fr_ifnames[3], "*");
+		if ((*cpp != NULL) && (*(cpp + 1) != NULL) &&
+		    ((((fil.fr_flags & FR_INQUE) != 0) &&
+		      (strcasecmp(*cpp, "out-via") == 0)) ||
+		     (((fil.fr_flags & FR_OUTQUE) != 0) &&
+		      (strcasecmp(*cpp, "in-via") == 0)))) {
+			cpp++;
+
+			s = index(*cpp, ',');
+			if (s != NULL) {
+				*s++ = '\0';
+				(void)strncpy(fil.fr_ifnames[3], s,
+					      IFNAMSIZ - 1);
+				fil.fr_ifnames[3][IFNAMSIZ - 1] = '\0';
+			}
+
+			(void)strncpy(fil.fr_ifnames[2], *cpp, IFNAMSIZ - 1);
+			fil.fr_ifnames[2][IFNAMSIZ - 1] = '\0';
+			cpp++;
+		} else
+			strcpy(fil.fr_ifnames[2], "*");
 	}
 	if (*cpp && !strcasecmp(*cpp, "tos")) {
 		if (!*++cpp) {
@@ -341,6 +399,10 @@ int     linenum;
 		if (!strcasecmp(proto, "tcp/udp")) {
 			fil.fr_ip.fi_fl |= FI_TCPUDP;
 			fil.fr_mip.fi_fl |= FI_TCPUDP;
+		} else if (use_inet6 && !strcasecmp(proto, "icmp")) {
+			fprintf(stderr,
+"%d: use proto ipv6-icmp with IPv6 (or use proto 1 if you really mean icmp)\n",
+				linenum);
 		} else {
 			if (!(p = getprotobyname(proto)) && !isdigit(*proto)) {
 				fprintf(stderr,
@@ -393,7 +455,15 @@ int     linenum;
 				linenum);
 			return NULL;
 		}
-		if (**cpp == '!') {
+		if (!strcmp(*cpp, "!")) {
+			fil.fr_flags |= FR_NOTSRCIP;
+			if (!*++cpp) {
+				fprintf(stderr,
+					"%d: missing host after from\n",
+					linenum);
+				return NULL;
+			}
+		} else if (**cpp == '!') {
 			fil.fr_flags |= FR_NOTSRCIP;
 			(*cpp)++;
 		}
@@ -401,6 +471,15 @@ int     linenum;
 		if (hostmask(&cpp, (u_32_t *)&fil.fr_src,
 			     (u_32_t *)&fil.fr_smsk, &fil.fr_sport, &ch,
 			     &fil.fr_stop, linenum)) {
+			return NULL;
+		}
+
+		if ((ch != 0) && (fil.fr_proto != IPPROTO_TCP) &&
+		    (fil.fr_proto != IPPROTO_UDP) &&
+		    !(fil.fr_ip.fi_fl & FI_TCPUDP)) {
+			fprintf(stderr,
+				"%d: cannot use port and neither tcp or udp\n",
+				linenum);
 			return NULL;
 		}
 
@@ -423,7 +502,15 @@ int     linenum;
 			return NULL;
 		}
 		ch = 0;
-		if (**cpp == '!') {
+		if (!strcmp(*cpp, "!")) {
+			fil.fr_flags |= FR_NOTDSTIP;
+			if (!*++cpp) {
+				fprintf(stderr,
+					"%d: missing host after from\n",
+					linenum);
+				return NULL;
+			}
+		} else if (**cpp == '!') {
 			fil.fr_flags |= FR_NOTDSTIP;
 			(*cpp)++;
 		}
@@ -432,6 +519,15 @@ int     linenum;
 			     &fil.fr_dtop, linenum)) {
 			return NULL;
 		}
+		if ((ch != 0) && (fil.fr_proto != IPPROTO_TCP) &&
+		    (fil.fr_proto != IPPROTO_UDP) &&
+		    !(fil.fr_ip.fi_fl & FI_TCPUDP)) {
+			fprintf(stderr,
+				"%d: cannot use port and neither tcp or udp\n",
+				linenum);
+			return NULL;
+		}
+
 		fil.fr_dcmp = ch;
 	}
 
@@ -474,7 +570,8 @@ int     linenum;
 	 * icmp types for use with the icmp protocol
 	 */
 	if (*cpp && !strcasecmp(*cpp, "icmp-type")) {
-		if (fil.fr_proto != IPPROTO_ICMP) {
+		if (fil.fr_proto != IPPROTO_ICMP &&
+		    fil.fr_proto != IPPROTO_ICMPV6) {
 			fprintf(stderr,
 				"%d: icmp with wrong protocol (%d)\n",
 				linenum, fil.fr_proto);
@@ -494,15 +591,33 @@ int     linenum;
 			return NULL;
 
 	/*
+	 * This is here to enforce the old interface binding behaviour.
+	 * That is, "on X" is equivalent to "<dir> on X <!dir>-via -,X"
+	 */
+	if (fil.fr_flags & FR_KEEPSTATE) {
+		if (*fil.fr_ifnames[0] && !*fil.fr_ifnames[3]) {
+			bcopy(fil.fr_ifnames[0], fil.fr_ifnames[3],
+			      sizeof(fil.fr_ifnames[3]));
+			strncpy(fil.fr_ifnames[2], "*",
+				sizeof(fil.fr_ifnames[3]));
+		}
+	}
+
+	/*
 	 * head of a new group ?
 	 */
 	if (*cpp && !strcasecmp(*cpp, "head")) {
+		if (fil.fr_skip != 0) {
+			fprintf(stderr, "%d: cannot use skip with head\n",
+				linenum);
+			return NULL;
+		}
 		if (!*++cpp) {
 			fprintf(stderr, "%d: head without group #\n", linenum);
 			return NULL;
 		}
-		if (ratoi(*cpp, &i, 0, UINT_MAX))
-			fil.fr_grhead = (u_32_t)i;
+		if (ratoui(*cpp, &k, 0, UINT_MAX))
+			fil.fr_grhead = (u_32_t)k;
 		else {
 			fprintf(stderr, "%d: invalid group (%s)\n",
 				linenum, *cpp);
@@ -520,8 +635,8 @@ int     linenum;
 				linenum);
 			return NULL;
 		}
-		if (ratoi(*cpp, &i, 0, UINT_MAX))
-			fil.fr_group = i;
+		if (ratoui(*cpp, &k, 0, UINT_MAX))
+			fil.fr_group = k;
 		else {
 			fprintf(stderr, "%d: invalid group (%s)\n",
 				linenum, *cpp);
@@ -643,6 +758,15 @@ frdest_t *fdp;
 {
 	printf("%s %s%s", tag, fdp->fd_ifname,
 		     (fdp->fd_ifp || (long)fdp->fd_ifp == -1) ? "" : "(!)");
+#ifdef	USE_INET6
+	if (use_inet6 && IP6_NOTZERO(&fdp->fd_ip6.in6)) {
+		char ipv6addr[80];
+
+		inet_ntop(AF_INET6, &fdp->fd_ip6, ipv6addr,
+			  sizeof(fdp->fd_ip6));
+		printf(":%s", ipv6addr);
+	} else
+#endif
 	if (fdp->fd_ip.s_addr)
 		printf(":%s", inet_ntoa(fdp->fd_ip));
 	putchar(' ');
@@ -670,9 +794,9 @@ int     linenum;
 		return -1;
 
 	while (**cp && (!strncasecmp(**cp, "ipopt", 5) ||
-	       !strncasecmp(**cp, "not", 3) || !strncasecmp(**cp, "opt", 4) ||
-	       !strncasecmp(**cp, "frag", 3) || !strncasecmp(**cp, "no", 2) ||
-	       !strncasecmp(**cp, "short", 5))) {
+	       !strcasecmp(**cp, "not") || !strncasecmp(**cp, "opt", 3) ||
+	       !strncasecmp(**cp, "frag", 4) || !strcasecmp(**cp, "no") ||
+	       !strcasecmp(**cp, "short"))) {
 		if (***cp == 'n' || ***cp == 'N') {
 			notopt = 1;
 			(*cp)++;
@@ -811,7 +935,6 @@ u_long optmsk, optbits;
 	u_short secmsk = sec[0], secbits = sec[1];
 	struct ipopt_names *io, *so;
 	char *s;
-	int secflag = 0;
 
 	s = " opt ";
 	for (io = ionames; io->on_name; io++)
@@ -823,8 +946,7 @@ u_long optmsk, optbits;
 				if (io->on_value == IPOPT_SECURITY)
 					io++;
 				s = ",";
-			} else
-				secflag = 1;
+			}
 		}
 
 
@@ -884,10 +1006,10 @@ char	*icmptypes[] = {
 /*
  * set the icmp field to the correct type if "icmp" word is found
  */
-int	addicmp(cp, fp, linenum)
-char	***cp;
-struct	frentry	*fp;
-int     linenum;
+int addicmp(cp, fp, linenum)
+char ***cp;
+struct frentry	*fp;
+int linenum;
 {
 	char	**t;
 	int	i;
@@ -895,8 +1017,7 @@ int     linenum;
 	(*cp)++;
 	if (!**cp)
 		return -1;
-	if (!fp->fr_proto)	/* to catch lusers */
-		fp->fr_proto = IPPROTO_ICMP;
+
 	if (isdigit(***cp)) {
 		if (!ratoi(**cp, &i, 0, 255)) {
 			fprintf(stderr,
@@ -904,6 +1025,10 @@ int     linenum;
 				linenum, **cp);
 			return -1;
 		}
+	} else if (fp->fr_proto == IPPROTO_ICMPV6) {
+		fprintf(stderr, "%d: Unknown ICMPv6 type (%s) specified, %s",
+			linenum, **cp, "(use numeric value instead\n");
+		return -1;
 	} else {
 		for (t = icmptypes, i = 0; ; t++, i++) {
 			if (!*t)
@@ -938,24 +1063,30 @@ int     linenum;
 				linenum, **cp);
 			return -1;
 		}
-		fp->fr_icmp |= (u_short)i;
-		fp->fr_icmpm = (u_short)0xffff;
-		(*cp)++;
-		return 0;
+	} else {
+		i = icmpcode(**cp);
+		if (i == -1) {
+			fprintf(stderr, 
+				"%d: Invalid icmp code (%s) specified\n",
+				linenum, **cp);
+			return -1;
+		}
 	}
-	fprintf(stderr, "%d: Invalid icmp code (%s) specified\n",
-		linenum, **cp);
-	return -1;
+	i &= 0xff;
+	fp->fr_icmp |= (u_short)i;
+	fp->fr_icmpm = (u_short)0xffff;
+	(*cp)++;
+	return 0;
 }
 
 
 #define	MAX_ICMPCODE	15
 
 char	*icmpcodes[] = {
-	"net-unr", "host-unr", "proto-unr", "port-unr", "needfrag", "srcfail",
-	"net-unk", "host-unk", "isolate", "net-prohib", "host-prohib",
-	"net-tos", "host-tos", "filter-prohib", "host-preced", "preced-cutoff", 
-	NULL };
+	"net-unr", "host-unr", "proto-unr", "port-unr", "needfrag",
+	"srcfail", "net-unk", "host-unk", "isolate", "net-prohib",
+	"host-prohib", "net-tos", "host-tos", "filter-prohib", "host-preced",
+	"preced-cutoff", NULL };
 /*
  * Return the number for the associated ICMP unreachable code.
  */
@@ -965,9 +1096,8 @@ char *str;
 	char	*s;
 	int	i, len;
 
-	if (!(s = strrchr(str, ')')))
-		return -1;
-	*s = '\0';
+	if ((s = strrchr(str, ')')))
+		*s = '\0';
 	if (isdigit(*str)) {
 		if (!ratoi(str, &i, 0, 255))
 			return -1;
@@ -986,47 +1116,73 @@ char *str;
 /*
  * set the icmp field to the correct type if "icmp" word is found
  */
-int	addkeep(cp, fp, linenum)
-char	***cp;
-struct	frentry	*fp;
-int     linenum; 
+int addkeep(cp, fp, linenum)
+char ***cp;
+struct frentry	*fp;
+int linenum; 
 {
-	if (fp->fr_proto != IPPROTO_TCP && fp->fr_proto != IPPROTO_UDP &&
-#ifdef	USE_INET6
-	    fp->fr_proto != IPPROTO_ICMPV6 &&
-#endif
-	    fp->fr_proto != IPPROTO_ICMP && !(fp->fr_ip.fi_fl & FI_TCPUDP)) {
-		fprintf(stderr, "%d: Can only use keep with UDP/ICMP/TCP\n",
+	char *s;
+
+	(*cp)++;
+	if (!**cp) {
+		fprintf(stderr, "%d: Missing keyword after keep\n",
 			linenum);
 		return -1;
 	}
 
-	(*cp)++;
-	if (!**cp) {
-		fprintf(stderr, "%d: Missing state/frag after keep\n",
-			linenum);
-		return -1;
-	}
-	if (strcasecmp(**cp, "state") && strcasecmp(**cp, "frags")) {
+	if (strcasecmp(**cp, "state") == 0)
+		fp->fr_flags |= FR_KEEPSTATE;
+	else if (strncasecmp(**cp, "frag", 4) == 0)
+		fp->fr_flags |= FR_KEEPFRAG;
+	else if (strcasecmp(**cp, "state-age") == 0) {
+		if (fp->fr_ip.fi_p == IPPROTO_TCP) {
+			fprintf(stderr, "%d: cannot use state-age with tcp\n",
+				linenum);
+			return -1;
+		}
+		if ((fp->fr_flags & FR_KEEPSTATE) == 0) {
+			fprintf(stderr, "%d: state-age with no 'keep state'\n",
+				linenum);
+			return -1;
+		}
+		(*cp)++;
+		if (!**cp) {
+			fprintf(stderr, "%d: state-age with no arg\n",
+				linenum);
+			return -1;
+		}
+		fp->fr_age[0] = atoi(**cp);
+		s = index(**cp, '/');
+		if (s != NULL) {
+			s++;
+			fp->fr_age[1] = atoi(s);
+		} else
+			fp->fr_age[1] = fp->fr_age[0];
+	} else {
 		fprintf(stderr, "%d: Unrecognised state keyword \"%s\"\n",
 			linenum, **cp);
 		return -1;
 	}
-
-	if (***cp == 's' || ***cp == 'S')
-		fp->fr_flags |= FR_KEEPSTATE;
-	else if (***cp == 'f' || ***cp == 'F')
-		fp->fr_flags |= FR_KEEPFRAG;
 	(*cp)++;
 	return 0;
+}
+
+
+void printifname(format, name, ifp)
+char *format, *name;
+void *ifp;
+{
+	printf("%s%s", format, name);
+	if ((ifp == NULL) && strcmp(name, "-") && strcmp(name, "*"))
+		printf("(!)");
 }
 
 
 /*
  * print the filter structure in a useful way
  */
-void	printfr(fp)
-struct	frentry	*fp;
+void printfr(fp)
+struct frentry	*fp;
 {
 	struct protoent	*p;
 	u_short	sec[2];
@@ -1036,6 +1192,8 @@ struct	frentry	*fp;
 
 	if (fp->fr_flags & FR_PASS)
 		printf("pass");
+	if (fp->fr_flags & FR_NOMATCH)
+		printf("nomatch");
 	else if (fp->fr_flags & FR_BLOCK) {
 		printf("block");
 		if (fp->fr_flags & FR_RETICMP) {
@@ -1078,8 +1236,11 @@ struct	frentry	*fp;
 		printf("quick ");
 
 	if (*fp->fr_ifname) {
-		printf("on %s%s ", fp->fr_ifname,
-			(fp->fr_ifa || (long)fp->fr_ifa == -1) ? "" : "(!)");
+		printifname("on ", fp->fr_ifname, fp->fr_ifa);
+		if (*fp->fr_ifnames[1] && strcmp(fp->fr_ifnames[1], "*"))
+			printifname(",", fp->fr_ifnames[1], fp->fr_ifas[1]);
+		putchar(' ');
+
 		if (*fp->fr_dif.fd_ifname)
 			print_toif("dup-to", &fp->fr_dif);
 		if (*fp->fr_tif.fd_ifname)
@@ -1087,7 +1248,26 @@ struct	frentry	*fp;
 		if (fp->fr_flags & FR_FASTROUTE)
 			printf("fastroute ");
 
+		if ((*fp->fr_ifnames[2] && strcmp(fp->fr_ifnames[2], "*")) ||
+		    (*fp->fr_ifnames[3] && strcmp(fp->fr_ifnames[3], "*"))) {
+			if (fp->fr_flags & FR_OUTQUE)
+				printf("in-via ");
+			else
+				printf("out-via ");
+
+			if (*fp->fr_ifnames[2]) {
+				printifname("", fp->fr_ifnames[2],
+					    fp->fr_ifas[2]);
+				putchar(',');
+			}
+
+			if (*fp->fr_ifnames[3])
+				printifname("", fp->fr_ifnames[3],
+					    fp->fr_ifas[3]);
+			putchar(' ');
+		}
 	}
+
 	if (fp->fr_mip.fi_tos)
 		printf("tos %#x ", fp->fr_tos);
 	if (fp->fr_mip.fi_ttl)
@@ -1141,7 +1321,7 @@ struct	frentry	*fp;
 			printf(" frag");
 		}
 	}
-	if (fp->fr_proto == IPPROTO_ICMP && fp->fr_icmpm) {
+	if (fp->fr_proto == IPPROTO_ICMP && fp->fr_icmpm != 0) {
 		int	type = fp->fr_icmp, code;
 
 		type = ntohs(fp->fr_icmp);
@@ -1152,7 +1332,17 @@ struct	frentry	*fp;
 			printf(" icmp-type %s", icmptypes[type]);
 		else
 			printf(" icmp-type %d", type);
-		if (code)
+		if (ntohs(fp->fr_icmpm) & 0xff)
+			printf(" code %d", code);
+	}
+	if (fp->fr_proto == IPPROTO_ICMPV6 && fp->fr_icmpm != 0) {
+		int	type = fp->fr_icmp, code;
+
+		type = ntohs(fp->fr_icmp);
+		code = type & 0xff;
+		type /= 256;
+		printf(" icmp-type %d", type);
+		if (ntohs(fp->fr_icmpm) & 0xff)
 			printf(" code %d", code);
 	}
 	if (fp->fr_proto == IPPROTO_TCP && (fp->fr_tcpf || fp->fr_tcpfm)) {
@@ -1178,6 +1368,8 @@ struct	frentry	*fp;
 		printf(" keep state");
 	if (fp->fr_flags & FR_KEEPFRAG)
 		printf(" keep frags");
+	if (fp->fr_age[0] != 0 || fp->fr_age[1]!= 0)
+		printf(" state-age %u/%u", fp->fr_age[0], fp->fr_age[1]);
 	if (fp->fr_grhead)
 		printf(" head %d", fp->fr_grhead);
 	if (fp->fr_group)

@@ -1,9 +1,7 @@
 /*
- * Copyright (C) 1993-2000 by Darren Reed.
+ * Copyright (C) 1993-2001 by Darren Reed.
  *
- * Redistribution and use in source and binary forms are permitted
- * provided that this notice is preserved and due credit is given
- * to the original author and the contributors.
+ * See the IPFILTER.LICENCE file for details on licencing.
  */
 
 /*
@@ -19,6 +17,9 @@ etherfind -n -t
  0.32    91   04    131.170.1.10  128.250.133.13
  0.33   566  udp  128.250.37.155   128.250.133.3        901        901
 */
+#ifdef __sgi
+# include <sys/ptimers.h>
+#endif
 #include <stdio.h>
 #include <string.h>
 #if !defined(__SVR4) && !defined(__GNUC__)
@@ -96,7 +97,7 @@ int	cnt, *dir;
 	struct	protoent *p = NULL;
 	char	src[16], dst[16], sprt[16], dprt[16];
 	char	lbuf[128], len[8], prot[8], time[8], *s;
-	int	slen, extra = 0, i, n;
+	int	slen, extra = 0, i;
 
 	if (!fgets(lbuf, sizeof(lbuf) - 1, efp))
 		return 0;
@@ -107,10 +108,10 @@ int	cnt, *dir;
 
 	bzero(&pkt, sizeof(pkt));
 
-	if ((n = sscanf(lbuf, "%s %s %s %s %s %s", len, prot, src, dst,
-			sprt, dprt)) != 6)
-		if ((n = sscanf(lbuf, "%s %s %s %s %s %s %s", time,
-				len, prot, src, dst, sprt, dprt)) != 7)
+	if (sscanf(lbuf, "%s %s %s %s %s %s", len, prot, src, dst,
+		   sprt, dprt) != 6)
+		if (sscanf(lbuf, "%s %s %s %s %s %s %s", time,
+			   len, prot, src, dst, sprt, dprt) != 7)
 			return -1;
 
 	ip->ip_p = atoi(prot);

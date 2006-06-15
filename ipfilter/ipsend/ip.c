@@ -1,13 +1,10 @@
 /*
  * ip.c (C) 1995-1998 Darren Reed
  *
- * Redistribution and use in source and binary forms are permitted
- * provided that this notice is preserved and due credit is given
- * to the original author and the contributors.
+ * See the IPFILTER.LICENCE file for details on licencing.
  */
-#if !defined(lint)
-static const char sccsid[] = "%W% %G% (C)1995";
-static const char rcsid[] = "@(#)$Id$";
+#ifdef __sgi
+# include <sys/ptimers.h>
 #endif
 #include <errno.h>
 #include <stdio.h>
@@ -33,6 +30,10 @@ static const char rcsid[] = "@(#)$Id$";
 #endif
 #include "ipsend.h"
 
+#if !defined(lint)
+static const char sccsid[] = "%W% %G% (C)1995";
+static const char rcsid[] = "@(#)$Id$";
+#endif
 
 static	char	*ipbuf = NULL, *ethbuf = NULL;
 
@@ -99,7 +100,15 @@ int	frag;
 	int	err, iplen;
 
 	if (!ipbuf)
+	  {
 		ipbuf = (char *)malloc(65536);
+		if(!ipbuf) 
+		  {
+			perror("malloc failed");
+			return -2;
+		  }
+	  }
+
 	eh = (ether_header_t *)ipbuf;
 
 	bzero((char *)A_A eh->ether_shost, sizeof(eh->ether_shost));

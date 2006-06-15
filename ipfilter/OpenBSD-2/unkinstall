@@ -16,7 +16,7 @@ archdir="/sys/arch/$karch"
 confdir="$archdir/conf"
 
 case "$dir" in
-*/OpenBSD )
+*/OpenBSD-2 )
 	 cd ..
 	 ;;
 esac
@@ -36,7 +36,7 @@ fi
 echo
 
 echo "Unpatching /sys/conf/files ..."
-cat OpenBSD/files.diffs | (cd /sys/conf; patch -R)
+cat OpenBSD-2/files.diffs | (cd /sys/conf; patch -R)
 
 echo -n "Kernel configuration to update [GENERIC] "
 read newconfig junk

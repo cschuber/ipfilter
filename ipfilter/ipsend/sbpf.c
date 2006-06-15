@@ -1,9 +1,7 @@
 /*
  * (C)opyright 1995-1998 Darren Reed. (from tcplog)
  *
- * Redistribution and use in source and binary forms are permitted
- * provided that this notice is preserved and due credit is given
- * to the original author and the contributors.
+ * See the IPFILTER.LICENCE file for details on licencing.
  */
 #include <stdio.h>
 #include <netdb.h>
@@ -62,6 +60,8 @@ int	sport, tout;
 	struct	ifreq ifr;
 	char	bpfname[16];
 	int	fd, i;
+
+	fd = -1;
 
 	for (i = 0; i < 16; i++)
 	    {
