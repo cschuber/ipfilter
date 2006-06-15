@@ -1,9 +1,7 @@
 /*
- * Copyright (C) 1993-2000 by Darren Reed.
+ * Copyright (C) 1993-2001 by Darren Reed.
  *
- * Redistribution and use in source and binary forms are permitted
- * provided that this notice is preserved and due credit is given
- * to the original author and the contributors.
+ * See the IPFILTER.LICENCE file for details on licencing.
  */
 #include <stdio.h>
 #include <string.h>
@@ -17,6 +15,10 @@
 #include <stddef.h>
 #include <syslog.h>
 #include "facpri.h"
+
+#ifndef __STDC__
+# define	const
+#endif
 
 #if !defined(lint)
 static const char rcsid[] = "@(#)$Id$";
@@ -54,6 +56,9 @@ table_t	facs[] = {
 	{ "cron", LOG_CRON2 },
 #else
 	{ "cron2", LOG_CRON2 },
+#endif
+#ifdef	LOG_SECURITY
+	{ "security", LOG_SECURITY },
 #endif
 	{ "local0", LOG_LOCAL0 },	{ "local1", LOG_LOCAL1 },
 	{ "local2", LOG_LOCAL2 },	{ "local3", LOG_LOCAL3 },

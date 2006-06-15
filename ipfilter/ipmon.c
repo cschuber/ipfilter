@@ -1,19 +1,15 @@
 /*
- * Copyright (C) 1993-2000 by Darren Reed.
+ * Copyright (C) 1993-2002 by Darren Reed.
  *
- * Redistribution and use in source and binary forms are permitted
- * provided that this notice is preserved and due credit is given
- * to the original author and the contributors.
+ * See the IPFILTER.LICENCE file for details on licencing.
  */
-#if !defined(lint)
-static const char sccsid[] = "@(#)ipmon.c	1.21 6/5/96 (C)1993-2000 Darren Reed";
-static const char rcsid[] = "@(#)$Id$";
-#endif
-
 #ifndef SOLARIS
 #define SOLARIS (defined(__SVR4) || defined(__svr4__)) && defined(sun)
 #endif
 
+#ifdef __sgi
+# include <sys/ptimers.h>
+#endif
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/param.h>
@@ -37,7 +33,9 @@ static const char rcsid[] = "@(#)$Id$";
 # include <sys/filio.h>
 # include <sys/byteorder.h>
 #endif
-#include <strings.h>
+#if !defined(__SVR4) && !defined(__GNUC__)
+# include <strings.h>
+#endif
 #include <signal.h>
 #include <stdlib.h>
 #include <stddef.h>
@@ -51,7 +49,6 @@ static const char rcsid[] = "@(#)$Id$";
 #include <arpa/nameser.h>
 #include <resolv.h>
 
-#include <sys/uio.h>
 #ifndef linux
 # include <sys/protosw.h>
 # include <netinet/ip_var.h>
@@ -66,9 +63,13 @@ static const char rcsid[] = "@(#)$Id$";
 #include "netinet/ip_compat.h"
 #include <netinet/tcpip.h>
 #include "netinet/ip_fil.h"
-#include "netinet/ip_proxy.h"
 #include "netinet/ip_nat.h"
 #include "netinet/ip_state.h"
+
+#if !defined(lint)
+static const char sccsid[] = "@(#)ipmon.c	1.21 6/5/96 (C)1993-2000 Darren Reed";
+static const char rcsid[] = "@(#)$Id$";
+#endif
 
 
 #if	defined(sun) && !defined(SOLARIS2)
@@ -84,6 +85,23 @@ struct	flags {
 	char	flag;
 };
 
+
+typedef	struct	icmp_subtype {
+	int	ist_val;
+	char	*ist_name;
+} icmp_subtype_t;
+
+typedef	struct	icmp_type {
+	int	it_val;
+	struct	icmp_subtype *it_subtable;
+	size_t	it_stsize;
+	char	*it_name;
+} icmp_type_t;
+
+
+#define	IST_SZ(x)	(sizeof(x)/sizeof(icmp_subtype_t))
+
+
 struct	flags	tcpfl[] = {
 	{ TH_ACK, 'A' },
 	{ TH_RST, 'R' },
@@ -91,6 +109,8 @@ struct	flags	tcpfl[] = {
 	{ TH_FIN, 'F' },
 	{ TH_URG, 'U' },
 	{ TH_PUSH,'P' },
+	{ TH_ECN, 'E' },
+	{ TH_CWR, 'C' },
 	{ 0, '\0' }
 };
 
@@ -119,6 +139,10 @@ static	void	print_statelog __P((FILE *, char *, int));
 static	void	dumphex __P((FILE *, u_char *, int));
 static	int	read_log __P((int, int *, char *, int));
 static	void	write_pid __P((char *));
+static	char	*icmpname __P((u_int, u_int));
+static	char	*icmpname6 __P((u_int, u_int));
+static	icmp_type_t *find_icmptype __P((int, icmp_type_t *, size_t));
+static	icmp_subtype_t *find_icmpsubtype __P((int, icmp_subtype_t *, size_t));
 
 char	*hostname __P((int, int, u_32_t *));
 char	*portname __P((int, char *, u_int));
@@ -132,7 +156,6 @@ static	char	**protocols = NULL;
 static	char	**udp_ports = NULL;
 static	char	**tcp_ports = NULL;
 
-
 #define	OPT_SYSLOG	0x001
 #define	OPT_RESOLVE	0x002
 #define	OPT_HEXBODY	0x004
@@ -144,6 +167,7 @@ static	char	**tcp_ports = NULL;
 #define	OPT_FILTER	0x200
 #define	OPT_PORTNUM	0x400
 #define	OPT_LOGALL	(OPT_NAT|OPT_STATE|OPT_FILTER)
+#define	OPT_LOGBODY	0x800
 
 #define	HOSTNAME_V4(a,b)	hostname((a), 4, (u_32_t *)&(b))
 
@@ -152,7 +176,200 @@ static	char	**tcp_ports = NULL;
 #endif
 
 
-void handlehup(sig)
+static icmp_subtype_t icmpunreachnames[] = {
+	{ ICMP_UNREACH_NET,		"net" },
+	{ ICMP_UNREACH_HOST,		"host" },
+	{ ICMP_UNREACH_PROTOCOL,	"protocol" },
+	{ ICMP_UNREACH_PORT,		"port" },
+	{ ICMP_UNREACH_NEEDFRAG,	"needfrag" },
+	{ ICMP_UNREACH_SRCFAIL,		"srcfail" },
+	{ ICMP_UNREACH_NET_UNKNOWN,	"net_unknown" },
+	{ ICMP_UNREACH_HOST_UNKNOWN,	"host_unknown" },
+	{ ICMP_UNREACH_NET,		"isolated" },
+	{ ICMP_UNREACH_NET_PROHIB,	"net_prohib" },
+	{ ICMP_UNREACH_NET_PROHIB,	"host_prohib" },
+	{ ICMP_UNREACH_TOSNET,		"tosnet" },
+	{ ICMP_UNREACH_TOSHOST,		"toshost" },
+	{ ICMP_UNREACH_ADMIN_PROHIBIT,	"admin_prohibit" },
+	{ -2,				NULL }
+};
+
+static icmp_subtype_t redirectnames[] = {
+	{ ICMP_REDIRECT_NET,		"net" },
+	{ ICMP_REDIRECT_HOST,		"host" },
+	{ ICMP_REDIRECT_TOSNET,		"tosnet" },
+	{ ICMP_REDIRECT_TOSHOST,	"toshost" },
+	{ -2,				NULL }
+};
+
+static icmp_subtype_t timxceednames[] = {
+	{ ICMP_TIMXCEED_INTRANS,	"transit" },
+	{ ICMP_TIMXCEED_REASS,		"reassem" },
+	{ -2,				NULL }
+};
+
+static icmp_subtype_t paramnames[] = {
+	{ ICMP_PARAMPROB_ERRATPTR,	"errata_pointer" },
+	{ ICMP_PARAMPROB_OPTABSENT,	"optmissing" },
+	{ ICMP_PARAMPROB_LENGTH,	"length" },
+	{ -2,				NULL }
+};
+
+static icmp_type_t icmptypes[] = {
+	{ ICMP_ECHOREPLY,	NULL,	0,		"echoreply" },
+	{ -1,			NULL,	0,		NULL },
+	{ -1,			NULL,	0,		NULL },
+	{ ICMP_UNREACH,		icmpunreachnames,
+				IST_SZ(icmpunreachnames),"unreach" },
+	{ ICMP_SOURCEQUENCH,	NULL,	0,		"sourcequench" },
+	{ ICMP_REDIRECT,	redirectnames,
+				IST_SZ(redirectnames),	"redirect" },
+	{ -1,			NULL,	0,		NULL },
+	{ -1,			NULL,	0,		NULL },
+	{ ICMP_ECHO,		NULL,	0,		"echo" },
+	{ ICMP_ROUTERADVERT,	NULL,	0,		"routeradvert" },
+	{ ICMP_ROUTERSOLICIT,	NULL,	0,		"routersolicit" },
+	{ ICMP_TIMXCEED,	timxceednames,
+				IST_SZ(timxceednames),	"timxceed" },
+	{ ICMP_PARAMPROB,	paramnames,
+				IST_SZ(paramnames),	"paramprob" },
+	{ ICMP_TSTAMP,		NULL,	0,		"timestamp" },
+	{ ICMP_TSTAMPREPLY,	NULL,	0,		"timestampreply" },
+	{ ICMP_IREQ,		NULL,	0,		"inforeq" },
+	{ ICMP_IREQREPLY,	NULL,	0,		"inforeply" },
+	{ ICMP_MASKREQ,		NULL,	0,		"maskreq" },
+	{ ICMP_MASKREPLY,	NULL,	0,		"maskreply" },
+	{ -2,			NULL,	0,		NULL }
+};
+
+static icmp_subtype_t icmpredirect6[] = {
+	{ ICMP6_DST_UNREACH_NOROUTE,		"noroute" },
+	{ ICMP6_DST_UNREACH_ADMIN,		"admin" },
+	{ ICMP6_DST_UNREACH_NOTNEIGHBOR,	"neighbour" },
+	{ ICMP6_DST_UNREACH_ADDR,		"address" },
+	{ ICMP6_DST_UNREACH_NOPORT,		"noport" },
+	{ -2,					NULL }
+};
+
+static icmp_subtype_t icmptimexceed6[] = {
+	{ ICMP6_TIME_EXCEED_TRANSIT,		"intransit" },
+	{ ICMP6_TIME_EXCEED_REASSEMBLY,		"reassem" },
+	{ -2,					NULL }
+};
+
+static icmp_subtype_t icmpparamprob6[] = {
+	{ ICMP6_PARAMPROB_HEADER,		"header" },
+	{ ICMP6_PARAMPROB_NEXTHEADER,		"nextheader" },
+	{ ICMP6_PARAMPROB_OPTION,		"option" },
+	{ -2,					NULL }
+};
+
+static icmp_subtype_t icmpquerysubject6[] = {
+	{ ICMP6_NI_SUBJ_IPV6,			"ipv6" },
+	{ ICMP6_NI_SUBJ_FQDN,			"fqdn" },
+	{ ICMP6_NI_SUBJ_IPV4,			"ipv4" },
+	{ -2,					NULL },
+};
+
+static icmp_subtype_t icmpnodeinfo6[] = {
+	{ ICMP6_NI_SUCCESS,			"success" },
+	{ ICMP6_NI_REFUSED,			"refused" },
+	{ ICMP6_NI_UNKNOWN,			"unknown" },
+	{ -2,					NULL }
+};
+
+static icmp_subtype_t icmprenumber6[] = {
+	{ ICMP6_ROUTER_RENUMBERING_COMMAND,		"command" },
+	{ ICMP6_ROUTER_RENUMBERING_RESULT,		"result" },
+	{ ICMP6_ROUTER_RENUMBERING_SEQNUM_RESET,	"seqnum_reset" },
+	{ -2,						NULL }
+};
+
+static icmp_type_t icmptypes6[] = {
+	{ 0,			NULL,	0,		NULL },
+	{ ICMP6_DST_UNREACH,	icmpredirect6,
+			IST_SZ(icmpredirect6),		"unreach" },
+	{ ICMP6_PACKET_TOO_BIG,	NULL,	0,		"toobig" },
+	{ ICMP6_TIME_EXCEEDED,	icmptimexceed6,
+			IST_SZ(icmptimexceed6),		"timxceed" },
+	{ ICMP6_PARAM_PROB,	icmpparamprob6,
+			IST_SZ(icmpparamprob6),		"paramprob" },
+	{ ICMP6_ECHO_REQUEST,	NULL,	0,		"echo" },
+	{ ICMP6_ECHO_REPLY,	NULL,	0,		"echoreply" },
+	{ ICMP6_MEMBERSHIP_QUERY, icmpquerysubject6,
+			IST_SZ(icmpquerysubject6),	"groupmemberquery" },
+	{ ICMP6_MEMBERSHIP_REPORT,NULL,	0,		"groupmemberreport" },
+	{ ICMP6_MEMBERSHIP_REDUCTION,NULL,	0,	"groupmemberterm" },
+	{ ND_ROUTER_SOLICIT,	NULL,	0,		"routersolicit" },
+	{ ND_ROUTER_ADVERT,	NULL,	0,		"routeradvert" },
+	{ ND_NEIGHBOR_SOLICIT,	NULL,	0,		"neighborsolicit" },
+	{ ND_NEIGHBOR_ADVERT,	NULL,	0,		"neighboradvert" },
+	{ ND_REDIRECT,		NULL,	0,		"redirect" },
+	{ ICMP6_ROUTER_RENUMBERING,	icmprenumber6,
+			IST_SZ(icmprenumber6),		"routerrenumber" },
+	{ ICMP6_WRUREQUEST,	NULL,	0,		"whoareyourequest" },
+	{ ICMP6_WRUREPLY,	NULL,	0,		"whoareyoureply" },
+	{ ICMP6_FQDN_QUERY,	NULL,	0,		"fqdnquery" },
+	{ ICMP6_FQDN_REPLY,	NULL,	0,		"fqdnreply" },
+	{ ICMP6_NI_QUERY,	icmpnodeinfo6,
+			IST_SZ(icmpnodeinfo6),		"nodeinforequest" },
+	{ ICMP6_NI_REPLY,	NULL,	0,		"nodeinforeply" },
+	{ MLD6_MTRACE_RESP,	NULL,	0,		"mtraceresponse" },
+	{ MLD6_MTRACE,		NULL,	0,		"mtracerequest" },
+	{ -2,			NULL,	0,		NULL }
+};
+
+static icmp_subtype_t *find_icmpsubtype(type, table, tablesz)
+int type;
+icmp_subtype_t *table;
+size_t tablesz;
+{
+	icmp_subtype_t *ist;
+	int i;
+
+	if (tablesz < 2)
+		return NULL;
+
+	if ((type < 0) || (type > table[tablesz - 2].ist_val))
+		return NULL;
+
+	i = type;
+	if (table[type].ist_val == type)
+		return table + type;
+
+	for (i = 0, ist = table; ist->ist_val != -2; i++, ist++)
+		if (ist->ist_val == type)
+			return ist;
+	return NULL;
+}
+
+
+static icmp_type_t *find_icmptype(type, table, tablesz)
+int type;
+icmp_type_t *table;
+size_t tablesz;
+{
+	icmp_type_t *it;
+	int i;
+
+	if (tablesz < 2)
+		return NULL;
+
+	if ((type < 0) || (type > table[tablesz - 2].it_val))
+		return NULL;
+
+	i = type;
+	if (table[type].it_val == type)
+		return table + type;
+
+	for (i = 0, it = table; it->it_val != -2; i++, it++)
+		if (it->it_val == type)
+			return it;
+	return NULL;
+}
+
+
+static void handlehup(sig)
 int sig;
 {
 	FILE	*fp;
@@ -183,7 +400,7 @@ static void init_tabs()
 		setprotoent(1);
 		while ((p = getprotoent()) != NULL)
 			if (p->p_proto >= 0 && p->p_proto <= 255 &&
-			    p->p_name != NULL)
+			    p->p_name != NULL && protocols[p->p_proto] == NULL)
 				protocols[p->p_proto] = strdup(p->p_name);
 		endprotoent();
 	}
@@ -209,11 +426,11 @@ static void init_tabs()
 		if (s->s_proto == NULL)
 			continue;
 		else if (!strcmp(s->s_proto, "tcp")) {
-			port = s->s_port;
+			port = ntohs(s->s_port);
 			name = s->s_name;
 			tab = tcp_ports;
 		} else if (!strcmp(s->s_proto, "udp")) {
-			port = s->s_port;
+			port = ntohs(s->s_port);
 			name = s->s_name;
 			tab = udp_ports;
 		} else
@@ -262,6 +479,8 @@ char	*hostname(res, v, ip)
 int	res, v;
 u_32_t	*ip;
 {
+# define MAX_INETA	16
+	static char hname[MAXHOSTNAMELEN + MAX_INETA + 3];
 #ifdef	USE_INET6
 	static char hostbuf[MAXHOSTNAMELEN+1];
 #endif
@@ -272,11 +491,12 @@ u_32_t	*ip;
 		ipa.s_addr = *ip;
 		if (!res)
 			return inet_ntoa(ipa);
-		hp = gethostbyaddr((char *)ip, sizeof(ip), AF_INET);
+		hp = gethostbyaddr((char *)ip, sizeof(*ip), AF_INET);
 		if (!hp)
 			return inet_ntoa(ipa);
-		return hp->h_name;
-
+		sprintf(hname, "%.*s[%s]", MAXHOSTNAMELEN, hp->h_name,
+			inet_ntoa(ipa));
+		return hname;
 	}
 #ifdef	USE_INET6
 	(void) inet_ntop(AF_INET6, ip, hostbuf, sizeof(hostbuf) - 1);
@@ -312,6 +532,69 @@ u_int	port;
 }
 
 
+static	char	*icmpname(type, code)
+u_int	type;
+u_int	code;
+{
+	static char name[80];
+	icmp_subtype_t *ist;
+	icmp_type_t *it;
+	char *s;
+
+	s = NULL;
+	it = find_icmptype(type, icmptypes, sizeof(icmptypes) / sizeof(*it));
+	if (it != NULL)
+		s = it->it_name;
+
+	if (s == NULL)
+		sprintf(name, "icmptype(%d)/", type);
+	else
+		sprintf(name, "%s/", s);
+
+	ist = NULL;
+	if (it != NULL && it->it_subtable != NULL)
+		ist = find_icmpsubtype(code, it->it_subtable, it->it_stsize);
+
+	if (ist != NULL && ist->ist_name != NULL)
+		strcat(name, ist->ist_name);
+	else
+		sprintf(name + strlen(name), "%d", code);
+
+	return name;
+}
+
+static	char	*icmpname6(type, code)
+u_int	type;
+u_int	code;
+{
+	static char name[80];
+	icmp_subtype_t *ist;
+	icmp_type_t *it;
+	char *s;
+
+	s = NULL;
+	it = find_icmptype(type, icmptypes6, sizeof(icmptypes6) / sizeof(*it));
+	if (it != NULL)
+		s = it->it_name;
+
+	if (s == NULL)
+		sprintf(name, "icmpv6type(%d)/", type);
+	else
+		sprintf(name, "%s/", s);
+
+	ist = NULL;
+	if (it != NULL && it->it_subtable != NULL)
+		ist = find_icmpsubtype(code, it->it_subtable, it->it_stsize);
+
+	if (ist != NULL && ist->ist_name != NULL)
+		strcat(name, ist->ist_name);
+	else
+		sprintf(name + strlen(name), "%d", code);
+
+	return name;
+}
+
+
 static	void	dumphex(log, buf, len)
 FILE	*log;
 u_char	*buf;
@@ -320,6 +603,10 @@ int	len;
 	char	line[80];
 	int	i, j, k;
 	u_char	*s = buf, *t = (u_char *)line;
+
+	if (len == 0 || buf == 0)
+		return;
+	*line = '\0';
 
 	for (i = len, j = 0; i; i--, j++, s++) {
 		if (j && !(j & 0xf)) {
@@ -380,7 +667,7 @@ int	blen;
 	int	res, i, len;
 	char	*proto;
 
-	nl = (struct natlog *)((char *)ipl + sizeof(*ipl));
+	nl = (struct natlog *)((char *)ipl + IPLOG_SIZE);
 	res = (opts & OPT_RESOLVE) ? 1 : 0;
 	tm = localtime((time_t *)&ipl->ipl_sec);
 	len = sizeof(line);
@@ -401,6 +688,12 @@ int	blen;
 		strcpy(t, "NAT:RDR ");
 	else if (nl->nl_type == NL_EXPIRE)
 		strcpy(t, "NAT:EXPIRE ");
+	else if (nl->nl_type == NL_FLUSH)
+		strcpy(t, "NAT:FLUSH ");
+	else if (nl->nl_type == NL_NEWBIMAP)
+		strcpy(t, "NAT:BIMAP ");
+	else if (nl->nl_type == NL_NEWBLOCK)
+		strcpy(t, "NAT:MAPBLOCK ");
 	else
 		sprintf(t, "Type: %d ", nl->nl_type);
 	t += strlen(t);
@@ -448,7 +741,7 @@ int	blen;
 	struct	tm	*tm;
 	int	res, i, len;
 
-	sl = (struct ipslog *)((char *)ipl + sizeof(*ipl));
+	sl = (struct ipslog *)((char *)ipl + IPLOG_SIZE);
 	res = (opts & OPT_RESOLVE) ? 1 : 0;
 	tm = localtime((time_t *)&ipl->ipl_sec);
 	len = sizeof(line);
@@ -495,6 +788,13 @@ int	blen;
 						     (u_32_t *)&sl->isl_src));
 		t += strlen(t);
 		(void) sprintf(t, "%s PR icmp %d",
+			hostname(res, sl->isl_v, (u_32_t *)&sl->isl_dst),
+			sl->isl_itype);
+	} else if (sl->isl_p == IPPROTO_ICMPV6) {
+		(void) sprintf(t, "%s -> ", hostname(res, sl->isl_v,
+						     (u_32_t *)&sl->isl_src));
+		t += strlen(t);
+		(void) sprintf(t, "%s PR icmpv6 %d",
 			hostname(res, sl->isl_v, (u_32_t *)&sl->isl_dst),
 			sl->isl_itype);
 	}
@@ -577,6 +877,7 @@ int	blen;
 {
 	tcphdr_t	*tp;
 	struct	icmp	*ic;
+	struct	icmp	*icmp;
 	struct	tm	*tm;
 	char	*t, *proto;
 	int	i, v, lvl, res, len, off, plen, ipoff;
@@ -590,7 +891,7 @@ int	blen;
 #endif
 
 	ipl = (iplog_t *)buf;
-	ipf = (ipflog_t *)((char *)buf + sizeof(*ipl));
+	ipf = (ipflog_t *)((char *)buf + IPLOG_SIZE);
 	ip = (ip_t *)((char *)ipf + sizeof(*ipf));
 	v = ip->ip_v;
 	res = (opts & OPT_RESOLVE) ? 1 : 0;
@@ -620,13 +921,20 @@ int	blen;
 #if (SOLARIS || \
 	(defined(NetBSD) && (NetBSD <= 1991011) && (NetBSD >= 199603)) || \
 	(defined(OpenBSD) && (OpenBSD >= 199603))) || defined(linux)
-	len = (int)sizeof(ipf->fl_ifname);
-	(void) sprintf(t, "%*.*s", len, len, ipf->fl_ifname);
+	{
+	char	ifname[sizeof(ipf->fl_ifname) + 1];
+
+	strncpy(ifname, (char *)ipf->fl_ifname, sizeof(ipf->fl_ifname));
+	ifname[sizeof(ipf->fl_ifname)] = '\0';
+	(void) sprintf(t, "%s", ifname);
 	t += strlen(t);
 # if SOLARIS
-	if (isalpha(*(t - 1)))
-		*t++ = '0' + ipf->fl_unit;
+	if (isalpha(*(t - 1))) {
+		sprintf(t, "%d", ipf->fl_unit);
+		t += strlen(t);
+	}
 # endif
+	}
 #else
 	for (len = 0; len < 3; len++)
 		if (ipf->fl_ifname[len] == '\0')
@@ -636,20 +944,28 @@ int	blen;
 	(void) sprintf(t, "%*.*s%u", len, len, ipf->fl_ifname, ipf->fl_unit);
 	t += strlen(t);
 #endif
-	(void) sprintf(t, " @%hu:%hu ", ipf->fl_group, ipf->fl_rule + 1);
+	if (ipf->fl_group == 0xffffffff)
+		strcat(t, " @-1:");
+	else
+		(void) sprintf(t, " @%u:", ipf->fl_group);
+	t += strlen(t);
+	if (ipf->fl_rule == 0xffffffff)
+		strcat(t, "-1 ");
+	else
+		(void) sprintf(t, "%u ", ipf->fl_rule + 1);
 	t += strlen(t);
 
  	if (ipf->fl_flags & FF_SHORT) {
 		*t++ = 'S';
 		lvl = LOG_ERR;
 	} else if (ipf->fl_flags & FR_PASS) {
-		if (ipf->fl_flags & FR_LOGP)
+		if (ipf->fl_flags & FR_LOG)
 			*t++ = 'p';
 		else
 			*t++ = 'P';
 		lvl = LOG_NOTICE;
 	} else if (ipf->fl_flags & FR_BLOCK) {
-		if (ipf->fl_flags & FR_LOGB)
+		if (ipf->fl_flags & FR_LOG)
 			*t++ = 'b';
 		else
 			*t++ = 'B';
@@ -687,7 +1003,7 @@ int	blen;
 		p = (u_short)ip->ip_p;
 		s = (u_32_t *)&ip->ip_src;
 		d = (u_32_t *)&ip->ip_dst;
-		plen = ntohs(ip->ip_len);
+		plen = ip->ip_len;
 	} else {
 		goto printipflog;
 	}
@@ -695,17 +1011,18 @@ int	blen;
 
 	if ((p == IPPROTO_TCP || p == IPPROTO_UDP) && !off) {
 		tp = (tcphdr_t *)((char *)ip + hl);
-		if (!(ipf->fl_flags & (FI_SHORT << 16))) {
+		if (!(ipf->fl_flags & FF_SHORT)) {
 			(void) sprintf(t, "%s,%s -> ", hostname(res, v, s),
 				portname(res, proto, (u_int)tp->th_sport));
 			t += strlen(t);
-			(void) sprintf(t, "%s,%s PR %s len %hu %hu ",
+			(void) sprintf(t, "%s,%s PR %s len %hu %hu",
 				hostname(res, v, d),
 				portname(res, proto, (u_int)tp->th_dport),
 				proto, hl, plen);
 			t += strlen(t);
 
 			if (p == IPPROTO_TCP) {
+				*t++ = ' ';
 				*t++ = '-';
 				for (i = 0; tcpfl[i].value; i++)
 					if (tp->th_flags & tcpfl[i].value)
@@ -725,32 +1042,76 @@ int	blen;
 			(void) sprintf(t, "%s PR %s len %hu %hu",
 				hostname(res, v, d), proto, hl, plen);
 		}
+	} else if ((p == IPPROTO_ICMPV6) && !off && (v == 6)) {
+		ic = (struct icmp *)((char *)ip + hl);
+		(void) sprintf(t, "%s -> ", hostname(res, v, s));
+		t += strlen(t);
+		(void) sprintf(t, "%s PR icmpv6 len %hu %hu icmpv6 %s",
+			hostname(res, v, d), hl, plen,
+			icmpname6(ic->icmp_type, ic->icmp_code));
 	} else if ((p == IPPROTO_ICMP) && !off && (v == 4)) {
 		ic = (struct icmp *)((char *)ip + hl);
 		(void) sprintf(t, "%s -> ", hostname(res, v, s));
 		t += strlen(t);
-		(void) sprintf(t, "%s PR icmp len %hu %hu icmp %d/%d",
+		(void) sprintf(t, "%s PR icmp len %hu %hu icmp %s",
 			hostname(res, v, d), hl, plen,
-			ic->icmp_type, ic->icmp_code);
+			icmpname(ic->icmp_type, ic->icmp_code));
 		if (ic->icmp_type == ICMP_UNREACH ||
 		    ic->icmp_type == ICMP_SOURCEQUENCH ||
 		    ic->icmp_type == ICMP_PARAMPROB ||
 		    ic->icmp_type == ICMP_REDIRECT ||
 		    ic->icmp_type == ICMP_TIMXCEED) {
 			ipc = &ic->icmp_ip;
-			tp = (tcphdr_t *)((char *)ipc + hl);
-
+			i = ntohs(ipc->ip_len);
+			ipoff = ntohs(ipc->ip_off);
 			proto = getproto(ipc->ip_p);
 
-			t += strlen(t);
-			(void) sprintf(t, " for %s,%s -",
-				HOSTNAME_V4(res, ipc->ip_src),
-				portname(res, proto, (u_int)tp->th_sport));
-			t += strlen(t);
-			(void) sprintf(t, " %s,%s PR %s len %hu %hu",
-				HOSTNAME_V4(res, ipc->ip_dst),
-				portname(res, proto, (u_int)tp->th_dport),
-				proto, ipc->ip_hl << 2, ipc->ip_len);
+			if (!(ipoff & IP_OFFMASK) &&
+			    ((ipc->ip_p == IPPROTO_TCP) ||
+			     (ipc->ip_p == IPPROTO_UDP))) {
+				tp = (tcphdr_t *)((char *)ipc + hl);
+				t += strlen(t);
+				(void) sprintf(t, " for %s,%s -",
+					HOSTNAME_V4(res, ipc->ip_src),
+					portname(res, proto,
+						 (u_int)tp->th_sport));
+				t += strlen(t);
+				(void) sprintf(t, " %s,%s PR %s len %hu %hu",
+					HOSTNAME_V4(res, ipc->ip_dst),
+					portname(res, proto,
+						 (u_int)tp->th_dport),
+					proto, ipc->ip_hl << 2, i);
+			} else if (!(ipoff & IP_OFFMASK) &&
+				   (ipc->ip_p == IPPROTO_ICMP)) {
+				icmp = (icmphdr_t *)((char *)ipc + hl);
+
+				t += strlen(t);
+				(void) sprintf(t, " for %s -",
+					HOSTNAME_V4(res, ipc->ip_src));
+				t += strlen(t);
+				(void) sprintf(t,
+					" %s PR icmp len %hu %hu icmp %d/%d",
+					HOSTNAME_V4(res, ipc->ip_dst),
+					ipc->ip_hl << 2, i,
+					icmp->icmp_type, icmp->icmp_code);
+
+			} else {
+				t += strlen(t);
+				(void) sprintf(t, " for %s -",
+						HOSTNAME_V4(res, ipc->ip_src));
+				t += strlen(t);
+				(void) sprintf(t, " %s PR %s len %hu (%hu)",
+					HOSTNAME_V4(res, ipc->ip_dst), proto,
+					ipc->ip_hl << 2, i);
+				t += strlen(t);
+				if (ipoff & IP_OFFMASK) {
+					(void) sprintf(t, " frag %s%s%hu@%hu",
+						ipoff & IP_MF ? "+" : "",
+						ipoff & IP_DF ? "-" : "",
+						i - (ipc->ip_hl<<2),
+						(ipoff & IP_OFFMASK) << 3);
+				}
+			}
 		}
 	} else {
 		(void) sprintf(t, "%s -> ", hostname(res, v, s));
@@ -776,9 +1137,9 @@ int	blen;
 		t += strlen(t);
 	}
 
-	if (ipf->fl_flags & FR_INQUE)
+	if (ipf->fl_dir == 0)
 		strcpy(t, " IN");
-	else if (ipf->fl_flags & FR_OUTQUE)
+	else if (ipf->fl_dir == 1)
 		strcpy(t, " OUT");
 	t += strlen(t);
 printipflog:
@@ -792,6 +1153,8 @@ printipflog:
 		dumphex(log, (u_char *)buf, sizeof(iplog_t) + sizeof(*ipf));
 	if (opts & OPT_HEXBODY)
 		dumphex(log, (u_char *)ip, ipf->fl_plen + ipf->fl_hlen);
+	else if ((opts & OPT_LOGBODY) && (ipf->fl_flags & FR_LOGBODY))
+		dumphex(log, (u_char *)ip + ipf->fl_hlen, ipf->fl_plen);
 }
 
 
@@ -829,8 +1192,9 @@ FILE *log;
 	int	fd, flushed = 0;
 
 	if ((fd = open(file, O_RDWR)) == -1) {
-		(void) fprintf(stderr, "%s: open: %s\n", file,STRERROR(errno));
-		exit(-1);
+		(void) fprintf(stderr, "%s: open: %s\n",
+			       file, STRERROR(errno));
+		exit(1);
 	}
 
 	if (ioctl(fd, SIOCIPFFB, &flushed) == 0) {
@@ -888,14 +1252,15 @@ int main(argc, argv)
 int argc;
 char *argv[];
 {
-	struct	stat	sb;
-	FILE	*log = stdout;
-	int	fd[3], doread, n, i;
-	int	tr, nr, regular[3], c;
 	int	fdt[3], devices = 0, make_daemon = 0;
-	char	buf[512], *iplfile[3], *s;
-	extern	int	optind;
+	char	buf[IPLLOGSIZE], *iplfile[3], *s;
+	int	fd[3], doread, n, i;
 	extern	char	*optarg;
+	extern	int	optind;
+	int	regular[3], c;
+	FILE	*log = stdout;
+	struct	stat	sb;
+	size_t	nr, tr;
 
 	fd[0] = fd[1] = fd[2] = -1;
 	fdt[0] = fdt[1] = fdt[2] = -1;
@@ -903,7 +1268,7 @@ char *argv[];
 	iplfile[1] = IPNAT_NAME;
 	iplfile[2] = IPSTATE_NAME;
 
-	while ((c = getopt(argc, argv, "?aDf:FhnN:o:O:pP:sS:tvxX")) != -1)
+	while ((c = getopt(argc, argv, "?abDf:FhnN:o:O:pP:sS:tvxX")) != -1)
 		switch (c)
 		{
 		case 'a' :
@@ -911,6 +1276,9 @@ char *argv[];
 			fdt[0] = IPL_LOGIPF;
 			fdt[1] = IPL_LOGNAT;
 			fdt[2] = IPL_LOGSTATE;
+			break;
+		case 'b' :
+			opts |= OPT_LOGBODY;
 			break;
 		case 'D' :
 			make_daemon = 1;
@@ -956,8 +1324,8 @@ char *argv[];
 			else
 				s++;
 			openlog(s, LOG_NDELAY|LOG_PID, LOGFAC);
-			s = NULL;
 			opts |= OPT_SYSLOG;
+			log = NULL;
 			break;
 		case 'S' :
 			opts |= OPT_STATE;
@@ -1000,13 +1368,14 @@ char *argv[];
 				(void) fprintf(stderr,
 					       "%s: open: %s\n", iplfile[i],
 					       STRERROR(errno));
-				exit(-1);
+				exit(1);
+				/* NOTREACHED */
 			}
-
 			if (fstat(fd[i], &sb) == -1) {
-				(void) fprintf(stderr, "%d: fstat: %s\n",fd[i],
-					       STRERROR(errno));
-				exit(-1);
+				(void) fprintf(stderr, "%d: fstat: %s\n",
+					       fd[i], STRERROR(errno));
+				exit(1);
+				/* NOTREACHED */
 			}
 			if (!(regular[i] = !S_ISCHR(sb.st_mode)))
 				devices++;
@@ -1017,25 +1386,36 @@ char *argv[];
 		logfile = argv[optind];
 		log = logfile ? fopen(logfile, "a") : stdout;
 		if (log == NULL) {
-			
-			(void) fprintf(stderr, "%s: fopen: %s\n", argv[optind],
-				STRERROR(errno));
-			exit(-1);
+			(void) fprintf(stderr, "%s: fopen: %s\n",
+				       argv[optind], STRERROR(errno));
+			exit(1);
+			/* NOTREACHED */
 		}
 		setvbuf(log, NULL, _IONBF, 0);
 	} else
 		log = NULL;
 
 	if (make_daemon && ((log != stdout) || (opts & OPT_SYSLOG))) {
-		if (fork() > 0)
+#if BSD
+		daemon(0, !(opts & OPT_SYSLOG));
+#else
+		int pid;
+		if ((pid = fork()) > 0)
 			exit(0);
-		write_pid(pidfile);
+		if (pid < 0) {
+			(void) fprintf(stderr, "%s: fork() failed: %s\n",
+				       argv[0], STRERROR(errno));
+			exit(1);
+			/* NOTREACHED */
+		}
+		setsid();
+		if ((opts & OPT_SYSLOG))
+			close(2);
+#endif /* !BSD */
 		close(0);
 		close(1);
-		close(2);
-		setsid();
-	} else
-		write_pid(pidfile);
+	}
+	write_pid(pidfile);
 
 	signal(SIGHUP, handlehup);
 
@@ -1048,8 +1428,13 @@ char *argv[];
 				continue;
 			if (!regular[i]) {
 				if (ioctl(fd[i], FIONREAD, &tr) == -1) {
-					perror("ioctl(FIONREAD)");
-					exit(-1);
+					if (opts & OPT_SYSLOG)
+						syslog(LOG_CRIT,
+						       "ioctl(FIONREAD): %m");
+					else
+						perror("ioctl(FIONREAD)");
+					exit(1);
+					/* NOTREACHED */
 				}
 			} else {
 				tr = (lseek(fd[i], 0, SEEK_CUR) < sb.st_size);
@@ -1074,14 +1459,14 @@ char *argv[];
 			{
 			case -1 :
 				if (opts & OPT_SYSLOG)
-					syslog(LOG_ERR, "read: %m\n");
+					syslog(LOG_CRIT, "read: %m\n");
 				else
 					perror("read");
 				doread = 0;
 				break;
 			case 1 :
 				if (opts & OPT_SYSLOG)
-					syslog(LOG_ERR, "aborting logging\n");
+					syslog(LOG_CRIT, "aborting logging\n");
 				else
 					fprintf(log, "aborting logging\n");
 				doread = 0;

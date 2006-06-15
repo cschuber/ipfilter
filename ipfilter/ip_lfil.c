@@ -1,9 +1,7 @@
 /*
- * Copyright (C) 1993-2000 by Darren Reed.
+ * Copyright (C) 1993-2001 by Darren Reed.
  *
- * Redistribution and use in source and binary forms are permitted
- * provided that this notice is preserved and due credit is given
- * to the original author and the contributors.
+ * See the IPFILTER.LICENCE file for details on licencing.
  */
 #if !defined(lint)
 static const char rcsid[] = "@(#)$Id$";
@@ -18,7 +16,6 @@ static const char rcsid[] = "@(#)$Id$";
 #include <sys/file.h>
 #include <sys/ioctl.h>
 #include <sys/time.h>
-#include <sys/uio.h>
 #include <sys/dir.h>
 #include <sys/socket.h>
 #ifndef	_KERNEL
@@ -44,8 +41,8 @@ static const char rcsid[] = "@(#)$Id$";
 #include "netinet/ip_compat.h"
 #include <netinet/tcpip.h>
 #include "netinet/ip_fil.h"
-#include "netinet/ip_proxy.h"
 #include "netinet/ip_nat.h"
+#include "netinet/ip_proxy.h"
 #include "netinet/ip_frag.h"
 #include "netinet/ip_state.h"
 #include "netinet/ip_auth.h"
@@ -337,7 +334,7 @@ int iplioctl(dev_t dev, int cmd, caddr_t data, int mode)
 			break;
 		}
 	case SIOCATHST :
-		error = fr_auth_ioctl(data, cmd, NULL, NULL);
+		error = fr_auth_ioctl(data, mode, cmd, NULL, NULL);
 		break;
 	case SIOCFRSYN :
 		if (!(mode & FWRITE))
@@ -484,7 +481,7 @@ caddr_t data;
 			if (fg && fg->fg_head)
 				fg->fg_head->fr_ref--;
 			if (unit == IPL_LOGAUTH)
-				return fr_auth_ioctl(data, req, f, ftail);
+				return fr_auth_ioctl(data, mode, req, f, ftail);
 			if (f->fr_grhead)
 				fr_delgroup((u_int)f->fr_grhead, fp->fr_flags,
 					    unit, set);
@@ -497,7 +494,7 @@ caddr_t data;
 			error = EEXIST;
 		else {
 			if (unit == IPL_LOGAUTH)
-				return fr_auth_ioctl(data, req, f, ftail);
+				return fr_auth_ioctl(data, mode, req, f, ftail);
 			KMALLOC(f, frentry_t *);
 			if (f != NULL) {
 				if (fg && fg->fg_head)

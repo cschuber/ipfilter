@@ -1,9 +1,7 @@
 /*
- * Copyright (C) 1993-2000 by Darren Reed.
+ * Copyright (C) 1993-2001 by Darren Reed.
  *
- * Redistribution and use in source and binary forms are permitted
- * provided that this notice is preserved and due credit is given
- * to the original author and the contributors.
+ * See the IPFILTER.LICENCE file for details on licencing.
  */
 
 /*
@@ -28,6 +26,9 @@ tcpdump -nqte
 8:0:20:f:65:f7 0:0:c:1:8a:c5 81: 128.250.133.13.23 > 128.250.20.20.2419: tcp 27
 
 */
+#ifdef __sgi
+# include <sys/ptimers.h>
+#endif
 #include <stdio.h>
 #include <string.h>
 #if !defined(__SVR4) && !defined(__GNUC__)
@@ -119,7 +120,7 @@ int	cnt, *dir;
 	struct	protoent *p;
 	char	src[32], dst[32], misc[256], time[32], link1[32], link2[32];
 	char	lbuf[160], *s;
-	int	n, dots, slen, extra = 0;
+	int	n, slen, extra = 0;
 
 	if (!fgets(lbuf, sizeof(lbuf) - 1, tfp))
 		return 0;
@@ -141,7 +142,7 @@ int	cnt, *dir;
 					return -1;
 			}
 
-	if ((dots = count_dots(dst)) == 4) {
+	if (count_dots(dst) == 4) {
 		s = strrchr(src, '.');
 		*s++ = '\0';
 		(void) inet_aton(src, &ip->ip_src);
