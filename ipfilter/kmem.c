@@ -8,7 +8,7 @@
  * returns 0 on success, -1 on error.
  */
 
-#ifdef __sgi
+#if defined(__sgi) && (IRIX > 602)
 # include <sys/ptimers.h>
 #endif
 #include <stdio.h>
@@ -53,7 +53,7 @@ static const char rcsid[] = "@(#)$Id$";
 typedef	int 	kvm_t;
 
 static	int	kvm_fd = -1;
-static	char	*kvm_errstr;
+static	char	*kvm_errstr = NULL;
 
 kvm_t *kvm_open(kernel, core, swap, mode, errstr)
 char *kernel, *core, *swap;
@@ -79,8 +79,10 @@ size_t size;
 	int r;
 
 	if (lseek(*kvm, pos, 0) == -1) {
-		fprintf(stderr, "%s", kvm_errstr);
-		perror("lseek");
+		if (kvm_errstr != NULL) {
+			fprintf(stderr, "%s:", kvm_errstr);
+			perror("lseek");
+		}
 		return -1;
 	}
 
@@ -103,7 +105,7 @@ char	*kern, *core;
 		kvm_t *uk;
 	} k;
 
-	kvm_f = kvm_open(kern, core, NULL, O_RDONLY, "");
+	kvm_f = kvm_open(kern, core, NULL, O_RDONLY, NULL);
 	if (kvm_f == NULL)
 	    {
 		perror("openkmem:open");
@@ -204,7 +206,8 @@ void *ptr;
 	return ifname;
 #else
 # if defined(NetBSD) && (NetBSD >= 199905) && (NetBSD < 1991011) || \
-    defined(__OpenBSD__)
+    defined(__OpenBSD__) || \
+    (defined(__FreeBSD__) && (__FreeBSD_version >= 501113))
 #else
 	char buf[32];
 	int len;
@@ -219,7 +222,8 @@ void *ptr;
 	if (kmemcpy((char *)&netif, (u_long)ptr, sizeof(netif)) == -1)
 		return "X";
 # if defined(NetBSD) && (NetBSD >= 199905) && (NetBSD < 1991011) || \
-    defined(__OpenBSD__)
+    defined(__OpenBSD__) || \
+    (defined(__FreeBSD__) && (__FreeBSD_version >= 501113))
 	return strdup(netif.if_xname);
 # else
 	if (kstrncpy(buf, (u_long)netif.if_name, sizeof(buf)) == -1)

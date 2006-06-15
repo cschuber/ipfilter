@@ -12,7 +12,7 @@
 #  endif
 # endif
 #endif
-#ifdef __sgi
+#if defined(__sgi) && (IRIX > 602)
 # define _KMEMUSER
 # include <sys/ptimers.h>
 #endif
@@ -72,7 +72,7 @@ extern	struct frentry	*ipfilter[2][2];
 extern	struct ipread	snoop, etherf, tcpd, pcap, iptext, iphex;
 extern	struct ifnet	*get_unit __P((char *, int));
 extern	void	init_ifp __P((void));
-extern	ipnat_t	*natparse __P((char *, int));
+extern	ipnat_t	*natparse __P((char *, int, int *));
 extern	int	fr_running;
 
 int	opts = 0;
@@ -92,6 +92,7 @@ char *argv[];
 {
 	char	*datain, *iface, *ifname, *packet, *logout;
 	int	fd, i, dir, c, loaded, dump, hlen;
+	struct	in_addr	src;
 	struct	ifnet	*ifp;
 	struct	ipread	*r;
 	u_long	buf[2048];
@@ -103,6 +104,7 @@ char *argv[];
 	r = &iptext;
 	iface = NULL;
 	logout = NULL;
+	src.s_addr = 0;
 	ifname = "anon0";
 	datain = NULL;
 
@@ -112,7 +114,7 @@ char *argv[];
 	ipflog_init();
 	fr_running = 1;
 
-	while ((c = getopt(argc, argv, "6bdDEHi:I:l:NoPr:RSTvxX")) != -1)
+	while ((c = getopt(argc, argv, "6bdDEHi:I:l:NoPr:Rs:STvxX")) != -1)
 		switch (c)
 		{
 		case '6' :
@@ -148,6 +150,9 @@ char *argv[];
 			if (loadrules(optarg) == -1)
 				return -1;
 			loaded = 1;
+			break;
+		case 's' :
+			src.s_addr = inet_addr(optarg);
 			break;
 		case 'v' :
 			opts |= OPT_VERBOSE;
@@ -208,11 +213,21 @@ char *argv[];
 			ip->ip_off = ntohs(ip->ip_off);
 			ip->ip_len = ntohs(ip->ip_len);
 			hlen = ip->ip_hl << 2;
+			if (src.s_addr != 0) {
+				if (src.s_addr == ip->ip_src.s_addr)
+					dir = 1;
+				else if (src.s_addr == ip->ip_dst.s_addr)
+					dir = 0;
+			}
 		}
 #ifdef	USE_INET6
 		else
 			hlen = sizeof(ip6_t);
 #endif
+		if (opts & OPT_VERBOSE) {
+			printf("%s on [%s]: ", dir ? "out" : "in",
+				(iface && *iface) ? iface : "??");
+		}
 		packet = (char *)buf;
 		/* ipfr_slowtimer(); */
 		i = fr_check(ip, hlen, ifp, dir, (mb_t **)&packet);
@@ -295,6 +310,7 @@ char *file;
 	int     linenum, i;
 	void	*fr;
 	FILE	*fp;
+	int	parsestatus;
 
 	if (!strcmp(file, "-"))
 		fp = stdin;
@@ -331,7 +347,21 @@ char *file;
 		/* fake an `ioctl' call :) */
 
 		if ((opts & OPT_NAT) != 0) {
-			if (!(fr = natparse(line, linenum)))
+			parsestatus = 1;
+			fr = natparse(line, linenum, &parsestatus);
+			if (parsestatus != 0) {
+				if (*line) {
+					fprintf(stderr,
+					    "%d: syntax error in \"%s\"\n",
+					    linenum, line);
+				}
+				fprintf(stderr, "%s: %s error (%d), quitting\n",
+				    file,
+				    ((parsestatus < 0)? "parse": "internal"),
+				    parsestatus);
+				exit(1);
+			}
+			if (!fr)
 				continue;
 
 			if (rremove == 0) {
@@ -352,8 +382,19 @@ char *file;
 						fr, i);
 			}
 		} else {
-			if (!(fr = parse(line, linenum)))
+			fr = parse(line, linenum, &parsestatus);
+
+			if (parsestatus != 0) {
+			    fprintf(stderr, "%s: %s error (%d), quitting\n",
+				file,
+				((parsestatus < 0)? "parse": "internal"),
+				parsestatus);
+			    exit(1);
+			}
+
+			if (!fr) {
 				continue;
+			}
 
 			if (rremove == 0) {
 				i = IPL_EXTERN(ioctl)(0, SIOCADAFR,
@@ -428,7 +469,8 @@ char *getifname(ptr)
 void *ptr;
 {
 #if defined(NetBSD) && (NetBSD >= 199905) && (NetBSD < 1991011) || \
-    defined(__OpenBSD__)
+    defined(__OpenBSD__) || \
+    (defined(__FreeBSD__) && (__FreeBSD_version >= 501113))
 #else
 	char buf[32], *s;
 	int len;
@@ -443,7 +485,8 @@ void *ptr;
 	if (kmemcpy((char *)&netif, (u_long)ptr, sizeof(netif)) == -1)
 		return "X";
 #if defined(NetBSD) && (NetBSD >= 199905) && (NetBSD < 1991011) || \
-    defined(__OpenBSD__)
+    defined(__OpenBSD__) || \
+    (defined(__FreeBSD__) && (__FreeBSD_version >= 501113))
 	return strdup(netif.if_xname);
 #else
 	if (kmemcpy(buf, (u_long)netif.if_name, sizeof(buf)) == -1)

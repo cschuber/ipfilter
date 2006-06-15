@@ -4,10 +4,11 @@ ROBJS=ipresend.o ip.o resend.o $(IPFTO) inet_addr.o opt.o
 TOBJS=iptest.o iptests.o ip.o
 UNIXOBJS=sirix.o arp.o
 LIBS=
+SGIREV=-DIRIX=$(SGI)
 
 CC=cc
 CFLAGS=-g -I$(TOP)
-CCARGS=$(DEBUG) $(CFLAGS) -D_KMEMUSER
+CCARGS=$(DEBUG) $(CFLAGS) -D_KMEMUSER -DIRIX=$(SGI)
 #-D_STANDALONE
 
 all build irix : ipsend ipresend iptest
@@ -31,7 +32,7 @@ iptest: $(TOBJS) $(UNIXOBJS)
 	$(CC) $(DEBUG) $(TOBJS) $(UNIXOBJS) -o $@ $(LIBS)
 
 clean:
-	rm -rf *.o core a.out ipsend ipresend iptest
+	rm -rf *.o core a.out ipsend ipresend iptest lex.yy.c y.tab.?
 
 ipsend.o: $(TOP)/ipsend/ipsend.c
 	$(CC) $(CCARGS) -c $(TOP)/ipsend/ipsend.c -o $@

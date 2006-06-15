@@ -63,6 +63,7 @@ extern	char	*index __P((const char *, int));
 #endif
 
 extern	char	*optarg;
+extern	int	optind;
 
 int	main __P((int, char *[]));
 void	usage __P((void));
@@ -77,19 +78,27 @@ int	setlock __P((int, int));
 int	writeall __P((char *));
 int	readall __P((char *));
 int	writenat __P((int, char *));
+char	*concat __P((char *, char *));
 
 int	opts = 0;
+char	*progname;
 
 
 void usage()
 {
-	fprintf(stderr, "usage: ipfs [-nv] -l\n");
-	fprintf(stderr, "usage: ipfs [-nv] -u\n");
-	fprintf(stderr, "usage: ipfs [-nv] [-d <dir>] -R\n");
-	fprintf(stderr, "usage: ipfs [-nv] [-d <dir>] -W\n");
-	fprintf(stderr, "usage: ipfs [-nNSv] [-f <file>] -r\n");
-	fprintf(stderr, "usage: ipfs [-nNSv] [-f <file>] -w\n");
-	fprintf(stderr, "usage: ipfs [-nNSv] -f <filename> -i <if1>,<if2>\n");
+	fprintf(stderr, "\
+usage: %s [-nv] -l\n\
+usage: %s [-nv] -u\n\
+usage: %s [-nv] [-d <dir>] -R\n\
+usage: %s [-nv] [-d <dir>] -W\n\
+usage: %s [-nv] -N [-f <file> | -d <dir>] -r\n\
+usage: %s [-nv] -S [-f <file> | -d <dir>] -r\n\
+usage: %s [-nv] -N [-f <file> | -d <dir>] -w\n\
+usage: %s [-nv] -S [-f <file> | -d <dir>] -w\n\
+usage: %s [-nv] -N [-f <filename> | -d <dir> ] -i <if1>,<if2>\n\
+usage: %s [-nv] -S [-f <filename> | -d <dir> ] -i <if1>,<if2>\n\
+", progname, progname, progname, progname, progname, progname,
+		progname, progname, progname, progname);
 	exit(1);
 }
 
@@ -208,6 +217,8 @@ char *argv[];
 	int c, lock = -1, devfd = -1, err = 0, rw = -1, ns = -1, set = 0;
 	char *dirname = NULL, *filename = NULL, *ifs = NULL;
 
+	progname = argv[0];
+
 	while ((c = getopt(argc, argv, "d:f:i:lNnSRruvWw")) != -1)
 		switch (c)
 		{
@@ -218,7 +229,7 @@ char *argv[];
 				usage();
 			break;
 		case 'f' :
-			if ((set == 0) && !dirname && !filename)
+			if ((set == 1) && !dirname && !filename && !(rw & 2))
 				filename = optarg;
 			else
 				usage();
@@ -243,12 +254,14 @@ char *argv[];
 			set = 1;
 			break;
 		case 'r' :
-			if ((ns >= 0) || dirname || (rw != -1))
+			if (dirname || (rw != -1) || (ns == -1))
 				usage();
 			rw = 0;
 			set = 1;
 			break;
 		case 'R' :
+			if (filename || (ns != -1))
+				usage();
 			rw = 2;
 			set = 1;
 			break;
@@ -274,6 +287,8 @@ char *argv[];
 			set = 1;
 			break;
 		case 'W' :
+			if (filename || (ns != -1))
+				usage();
 			rw = 3;
 			set = 1;
 			break;
@@ -281,6 +296,25 @@ char *argv[];
 		default :
 			usage();
 		}
+
+	if (optind < 2)
+		usage();
+
+	if (filename == NULL) {
+		if (ns == 0) {
+			if (dirname == NULL)
+				dirname = IPF_SAVEDIR;
+			if (dirname[strlen(dirname) - 1] != '/')
+				dirname = concat(dirname, "/");
+			filename = concat(dirname, IPF_NATFILE);
+		} else if (ns == 1) {
+			if (dirname == NULL)
+				dirname = IPF_SAVEDIR;
+			if (dirname[strlen(dirname) - 1] != '/')
+				dirname = concat(dirname, "/");
+			filename = concat(dirname, IPF_STATEFILE);
+		}
+	}
 
 	if (ifs) {
 		if (!filename || ns < 0)
@@ -328,6 +362,20 @@ char *argv[];
 		}
 	}
 	return err;
+}
+
+
+char *concat(base, append)
+char *base, *append;
+{
+	char *str;
+
+	str = malloc(strlen(base) + strlen(append) + 1);
+	if (str != NULL) {
+		strcpy(str, base);
+		strcat(str, append);
+	}
+	return str;
 }
 
 
@@ -521,9 +569,11 @@ int readnat(fd, file)
 int fd;
 char *file;
 {
-	nat_save_t ipn, *in, *ipnhead = NULL, *in1, *ipntail = NULL, *ipnp;
+	nat_save_t ipn, *in, *ipnhead = NULL, *in1, *ipntail = NULL;
 	int nfd = -1, i;
 	nat_t *nat;
+	char *s;
+	int n;
 
 	if (!file)
 		file = IPF_NATFILE;
@@ -536,7 +586,6 @@ char *file;
 	}
 
 	bzero((char *)&ipn, sizeof(ipn));
-	ipnp = &ipn;
 
 	/*
 	 * 1. Read all state information in.
@@ -558,30 +607,35 @@ char *file;
 		}
 
 		if (ipn.ipn_dsize > 0) {
-			char *s = ipnp->ipn_data;
-			int n = ipnp->ipn_dsize;
+			n = ipn.ipn_dsize;
 
-			n -= sizeof(ipnp->ipn_data);
+			if (n > sizeof(ipn.ipn_data))
+				n -= sizeof(ipn.ipn_data);
+			else
+				n = 0;
 			in = malloc(sizeof(*in) + n);
 			if (!in)
 				break;
 
-			s += sizeof(ipnp->ipn_data);
-			i = read(nfd, s, n);
-			if (i == 0)
-				break;
-			if (i != n) {
-				fprintf(stderr, "incomplete read: %d != %d\n",
-					i, n);
-				close(nfd);
-				return 1;
+			if (n > 0) {
+				s = in->ipn_data + sizeof(in->ipn_data);
+				i = read(nfd, s, n);
+				if (i == 0)
+					break;
+				if (i != n) {
+					fprintf(stderr,
+						"incomplete read: %d != %d\n",
+						i, n);
+					close(nfd);
+					return 1;
+				}
 			}
 		} else
 			in = (nat_save_t *)malloc(sizeof(*in));
-		bcopy((char *)ipnp, (char *)in, sizeof(ipn));
+		bcopy((char *)&ipn, (char *)in, sizeof(ipn));
 
 		/*
-		 * Check to see if this is the first state entry that will
+		 * Check to see if this is the first NAT entry that will
 		 * reference a particular rule and if so, flag it as such
 		 * else just adjust the rule pointer to become a pointer to
 		 * the other.  We do this so we have a means later for tracking
@@ -611,6 +665,7 @@ char *file;
 	} while (1);
 
 	close(nfd);
+	nfd = -1;
 
 	for (in = ipnhead; in; in = in->ipn_next) {
 		if (opts & OPT_VERBOSE)
@@ -719,6 +774,7 @@ char *dirname;
 		dirname = IPF_SAVEDIR;
 
 	if (chdir(dirname)) {
+		fprintf(stderr, "IPF_SAVEDIR=%s: ", dirname);
 		perror("chdir(IPF_SAVEDIR)");
 		return 1;
 	}

@@ -5,7 +5,7 @@
  *
  * Added redirect stuff and a variety of bug fixes. (mcn@EnGarde.com)
  */
-#ifdef __sgi
+#if defined(__sgi) && (IRIX > 602)
 # include <sys/ptimers.h>
 #endif
 #include <stdio.h>
@@ -145,14 +145,18 @@ int opts;
 		ftp.ftp_side[0].ftps_buf[FTP_BUFSZ - 1] = '\0';
 		ftp.ftp_side[1].ftps_buf[FTP_BUFSZ - 1] = '\0';
 		printf("\tClient:\n");
-		printf("\t\tseq %x len %d junk %d cmds %d\n",
-			ftp.ftp_side[0].ftps_seq, ftp.ftp_side[0].ftps_len,
+		printf("\t\tseq %08x%08x len %d junk %d cmds %d\n",
+			ftp.ftp_side[0].ftps_seq[1],
+			ftp.ftp_side[0].ftps_seq[0],
+			ftp.ftp_side[0].ftps_len,
 			ftp.ftp_side[0].ftps_junk, ftp.ftp_side[0].ftps_cmds);
 		printf("\t\tbuf [");
 		printbuf(ftp.ftp_side[0].ftps_buf, FTP_BUFSZ, 1);
 		printf("]\n\tServer:\n");
-		printf("\t\tseq %x len %d junk %d cmds %d\n",
-			ftp.ftp_side[1].ftps_seq, ftp.ftp_side[1].ftps_len,
+		printf("\t\tseq %08x%08x len %d junk %d cmds %d\n",
+			ftp.ftp_side[1].ftps_seq[1],
+			ftp.ftp_side[1].ftps_seq[0],
+			ftp.ftp_side[1].ftps_len,
 			ftp.ftp_side[1].ftps_junk, ftp.ftp_side[1].ftps_cmds);
 		printf("\t\tbuf [");
 		printbuf(ftp.ftp_side[1].ftps_buf, FTP_BUFSZ, 1);
@@ -387,13 +391,14 @@ int opts;
 			printf(" frag");
 		if (np->in_age[0])
 			printf(" age %d/%d", np->in_age[0], np->in_age[1]);
+		if (np->in_mssclamp)
+			printf(" mssclamp %u", np->in_mssclamp);
 		printf("\n");
 		if (opts & OPT_DEBUG)
 			printf("\tspc %lu flg %#x max %u use %d\n",
 			       np->in_space, np->in_flags,
 			       np->in_pmax, np->in_use);
 	} else {
-		np->in_nextip.s_addr = htonl(np->in_nextip.s_addr);
 		if (!(np->in_flags & IPN_FILTER)) {
 			printf("%s/", inet_ntoa(np->in_in[0]));
 			bits = countbits(np->in_in[1].s_addr);
@@ -416,6 +421,8 @@ int opts;
 		}
 		if (*np->in_plabel) {
 			printf(" proxy port");
+			if (np->in_dcmp != 0)
+				np->in_dport = htons(np->in_dport);
 			if (np->in_dport != 0) {
 				if (pr != NULL)
 					sv = getservbyport(np->in_dport,
@@ -467,8 +474,12 @@ int opts;
 			printf(" age %d/%d", np->in_age[0], np->in_age[1]);
 		printf("\n");
 		if (opts & OPT_DEBUG) {
+			struct in_addr nip;
+
+			nip.s_addr = htonl(np->in_nextip.s_addr);
+
 			printf("\tspace %lu nextip %s pnext %d", np->in_space,
-			       inet_ntoa(np->in_nextip), np->in_pnext);
+			       inet_ntoa(nip), np->in_pnext);
 			printf(" flags %x use %u\n",
 			       np->in_flags, np->in_use);
 		}

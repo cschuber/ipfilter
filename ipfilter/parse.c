@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  */
-#ifdef __sgi
+#if defined(__sgi) && (IRIX > 602)
 # include <sys/ptimers.h>
 #endif
 #include <sys/types.h>
@@ -68,10 +68,16 @@ extern	u_char	flags[];
 /* parse()
  *
  * parse a line read from the input filter rule file
+ *
+ * status:
+ *	< 0	error
+ *	= 0	OK
+ *	> 0	programmer error
  */
-struct	frentry	*parse(line, linenum)
+struct	frentry	*parse(line, linenum, status)
 char	*line;
 int     linenum;
+int	*status;	/* good, bad, or indifferent */
 {
 	static	struct	frentry	fil;
 	char	*cps[31], **cpp, *endptr, *s;
@@ -79,10 +85,14 @@ int     linenum;
 	int	i, cnt = 1, j, ch;
 	u_int	k;
 
+	*status = 100;	/* default to error */
+
 	while (*line && isspace(*line))
 		line++;
-	if (!*line)
+	if (!*line) {
+		*status = 0;
 		return NULL;
+	}
 
 	bzero((char *)&fil, sizeof(fil));
 	fil.fr_mip.fi_v = 0xf;
@@ -100,6 +110,7 @@ int     linenum;
 
 	if (cnt < 3) {
 		fprintf(stderr, "%d: not enough segments in line\n", linenum);
+		*status = -1;
 		return NULL;
 	}
 
@@ -143,6 +154,7 @@ int     linenum;
 					fprintf(stderr,
 					"%d: unrecognised icmp code %s\n",
 						linenum, *cpp + 20);
+					*status = -1;
 					return NULL;
 				}
 				fil.fr_icode = j;
@@ -158,7 +170,11 @@ int     linenum;
 	} else if (!strcasecmp("nomatch", *cpp)) {
 		fil.fr_flags |= FR_NOMATCH;
 	} else if (!strcasecmp("auth", *cpp)) {
-		 fil.fr_flags |= FR_AUTH;
+		fil.fr_flags |= FR_AUTH;
+		if (!strncasecmp(*(cpp+1), "return-rst", 10)) {
+			fil.fr_flags |= FR_RETRST;
+			cpp++;
+		}
 	} else if (!strcasecmp("preauth", *cpp)) {
 		 fil.fr_flags |= FR_PREAUTH;
 	} else if (!strcasecmp("skip", *cpp)) {
@@ -168,6 +184,7 @@ int     linenum;
 		else {
 			fprintf(stderr, "%d: integer must follow skip\n",
 				linenum);
+			*status = -1;
 			return NULL;
 		}
 	} else if (!strcasecmp("log", *cpp)) {
@@ -186,8 +203,11 @@ int     linenum;
 		}
 		if (!strcasecmp(*(cpp+1), "level")) {
 			cpp++;
-			if (loglevel(cpp, &fil.fr_loglevel, linenum) == -1)
+			if (loglevel(cpp, &fil.fr_loglevel, linenum) == -1) {
+				/* NB loglevel prints its own error message */
+				*status = -1;
 				return NULL;
+			}
 			cpp++;
 		}
 	} else {
@@ -195,10 +215,12 @@ int     linenum;
 		 * Doesn't start with one of the action words
 		 */
 		fprintf(stderr, "%d: unknown keyword (%s)\n", linenum, *cpp);
+		*status = -1;
 		return NULL;
 	}
 	if (!*++cpp) {
 		fprintf(stderr, "%d: missing 'in'/'out' keyword\n", linenum);
+		*status = -1;
 		return NULL;
 	}
 
@@ -214,16 +236,19 @@ int     linenum;
 			fprintf(stderr,
 				"%d: Can only use return-icmp with 'in'\n",
 				linenum);
+			*status = -1;
 			return NULL;
 		} else if (fil.fr_flags & FR_RETRST) {
 			fprintf(stderr,
 				"%d: Can only use return-rst with 'in'\n", 
 				linenum);
+			*status = -1;
 			return NULL;
 		}
 	}
 	if (!*++cpp) {
 		fprintf(stderr, "%d: missing source specification\n", linenum);
+		*status = -1;
 		return NULL;
 	}
 
@@ -231,6 +256,7 @@ int     linenum;
 		if (!*++cpp) {
 			fprintf(stderr, "%d: missing source specification\n",
 				linenum);
+			*status = -1;
 			return NULL;
 		}
 		if (fil.fr_flags & FR_PASS)
@@ -250,14 +276,17 @@ int     linenum;
 				fprintf(stderr,
 					"%d: or-block must be used with pass\n",
 					linenum);
+				*status = -1;
 				return NULL;
 			}
 			fil.fr_flags |= FR_LOGORBLOCK;
 			cpp++;
 		}
 		if (*cpp && !strcasecmp(*cpp, "level")) {
-			if (loglevel(cpp, &fil.fr_loglevel, linenum) == -1)
+			if (loglevel(cpp, &fil.fr_loglevel, linenum) == -1) {
+				*status = -1;
 				return NULL;
+			}
 			cpp++;
 			cpp++;
 		}
@@ -267,6 +296,7 @@ int     linenum;
 		if (fil.fr_skip != 0) {
 			fprintf(stderr, "%d: cannot use skip with quick\n",
 				linenum);
+			*status = -1;
 			return NULL;
 		}
 		cpp++;
@@ -283,6 +313,7 @@ int     linenum;
 		if (!*++cpp) {
 			fprintf(stderr, "%d: interface name missing\n",
 				linenum);
+			*status = -1;
 			return NULL;
 		}
 
@@ -303,28 +334,35 @@ int     linenum;
 				fprintf(stderr,
 					"%d: %s can only be used with TCP\n",
 					linenum, "return-rst");
+				*status = -1;
 				return NULL;
 			}
+			*status = 0;
 			return &fil;
 		}
 
 		if (*cpp) {
 			if (!strcasecmp(*cpp, "dup-to") && *(cpp + 1)) {
 				cpp++;
-				if (to_interface(&fil.fr_dif, *cpp, linenum))
+				if (to_interface(&fil.fr_dif, *cpp, linenum)) {
+					*status = -1;
 					return NULL;
+				}
 				cpp++;
 			}
 			if (*cpp && !strcasecmp(*cpp, "to") && *(cpp + 1)) {
 				cpp++;
-				if (to_interface(&fil.fr_tif, *cpp, linenum))
+				if (to_interface(&fil.fr_tif, *cpp, linenum)) {
+					*status = -1;
 					return NULL;
+				}
 				cpp++;
 			} else if (*cpp && !strcasecmp(*cpp, "fastroute")) {
 				if (!(fil.fr_flags & FR_INQUE)) {
 					fprintf(stderr,
 						"can only use %s with 'in'\n",
 						"fastroute");
+					*status = -1;
 					return NULL;
 				}
 				fil.fr_flags |= FR_FASTROUTE;
@@ -362,6 +400,7 @@ int     linenum;
 	if (*cpp && !strcasecmp(*cpp, "tos")) {
 		if (!*++cpp) {
 			fprintf(stderr, "%d: tos missing value\n", linenum);
+			*status = -1;
 			return NULL;
 		}
 		fil.fr_tos = strtol(*cpp, NULL, 0);
@@ -373,6 +412,7 @@ int     linenum;
 		if (!*++cpp) {
 			fprintf(stderr, "%d: ttl missing hopcount value\n",
 				linenum);
+			*status = -1;
 			return NULL;
 		}
 		if (ratoi(*cpp, &i, 0, 255))
@@ -380,6 +420,7 @@ int     linenum;
 		else {
 			fprintf(stderr, "%d: invalid ttl (%s)\n",
 				linenum, *cpp);
+			*status = -1;
 			return NULL;
 		}
 		fil.fr_mip.fi_ttl = 0xff;
@@ -393,6 +434,7 @@ int     linenum;
 	if (*cpp && !strcasecmp(*cpp, "proto")) {
 		if (!*++cpp) {
 			fprintf(stderr, "%d: protocol name missing\n", linenum);
+			*status = -1;
 			return NULL;
 		}
 		proto = *cpp++;
@@ -408,6 +450,7 @@ int     linenum;
 				fprintf(stderr,
 					"%d: unknown protocol (%s)\n",
 					linenum, proto);
+				*status = -1;
 				return NULL;
 			}
 			if (p)
@@ -418,6 +461,7 @@ int     linenum;
 					fprintf(stderr,
 						"%d: unknown protocol (%s)\n",
 						linenum, proto);
+					*status = -1;
 					return NULL;		
 				}
 				fil.fr_proto = i;
@@ -429,6 +473,7 @@ int     linenum;
 	    ((fil.fr_flags & FR_RETMASK) == FR_RETRST)) {
 		fprintf(stderr, "%d: %s can only be used with TCP\n",
 			linenum, "return-rst");
+		*status = -1;
 		return NULL;
 	}
 
@@ -438,21 +483,26 @@ int     linenum;
 
 	if (!*cpp) {
 		fprintf(stderr, "%d: missing source specification\n", linenum);
+		*status = -1;
 		return NULL;
 	}
 	if (!strcasecmp(*cpp, "all")) {
 		cpp++;
-		if (!*cpp)
+		if (!*cpp) {
+			*status = 0;
 			return &fil;
+		}
 	} else {
 		if (strcasecmp(*cpp, "from")) {
 			fprintf(stderr, "%d: unexpected keyword (%s) - from\n",
 				linenum, *cpp);
+			*status = -1;
 			return NULL;
 		}
 		if (!*++cpp) {
 			fprintf(stderr, "%d: missing host after from\n",
 				linenum);
+			*status = -1;
 			return NULL;
 		}
 		if (!strcmp(*cpp, "!")) {
@@ -461,6 +511,7 @@ int     linenum;
 				fprintf(stderr,
 					"%d: missing host after from\n",
 					linenum);
+				*status = -1;
 				return NULL;
 			}
 		} else if (**cpp == '!') {
@@ -471,6 +522,7 @@ int     linenum;
 		if (hostmask(&cpp, (u_32_t *)&fil.fr_src,
 			     (u_32_t *)&fil.fr_smsk, &fil.fr_sport, &ch,
 			     &fil.fr_stop, linenum)) {
+			*status = -1;
 			return NULL;
 		}
 
@@ -480,12 +532,14 @@ int     linenum;
 			fprintf(stderr,
 				"%d: cannot use port and neither tcp or udp\n",
 				linenum);
+			*status = -1;
 			return NULL;
 		}
 
 		fil.fr_scmp = ch;
 		if (!*cpp) {
 			fprintf(stderr, "%d: missing to fields\n", linenum);
+			*status = -1;
 			return NULL;
 		}
 
@@ -495,10 +549,12 @@ int     linenum;
 		if (strcasecmp(*cpp, "to")) {
 			fprintf(stderr, "%d: unexpected keyword (%s) - to\n",
 				linenum, *cpp);
+			*status = -1;
 			return NULL;
 		}
 		if (!*++cpp) {
 			fprintf(stderr, "%d: missing host after to\n", linenum);
+			*status = -1;
 			return NULL;
 		}
 		ch = 0;
@@ -508,6 +564,7 @@ int     linenum;
 				fprintf(stderr,
 					"%d: missing host after from\n",
 					linenum);
+				*status = -1;
 				return NULL;
 			}
 		} else if (**cpp == '!') {
@@ -517,6 +574,7 @@ int     linenum;
 		if (hostmask(&cpp, (u_32_t *)&fil.fr_dst,
 			     (u_32_t *)&fil.fr_dmsk, &fil.fr_dport, &ch,
 			     &fil.fr_dtop, linenum)) {
+			*status = -1;
 			return NULL;
 		}
 		if ((ch != 0) && (fil.fr_proto != IPPROTO_TCP) &&
@@ -525,6 +583,7 @@ int     linenum;
 			fprintf(stderr,
 				"%d: cannot use port and neither tcp or udp\n",
 				linenum);
+			*status = -1;
 			return NULL;
 		}
 
@@ -538,20 +597,25 @@ int     linenum;
 	if (fil.fr_proto && (fil.fr_dcmp || fil.fr_scmp) &&
 	    fil.fr_proto != IPPROTO_TCP && fil.fr_proto != IPPROTO_UDP) {
 		fprintf(stderr, "%d: port operation on non tcp/udp\n", linenum);
+		*status = -1;
 		return NULL;
 	}
 	if (fil.fr_icmp && fil.fr_proto != IPPROTO_ICMP) {
 		fprintf(stderr, "%d: icmp comparisons on wrong protocol\n",
 			linenum);
+		*status = -1;
 		return NULL;
 	}
 
-	if (!*cpp)
+	if (!*cpp) {
+		*status = 0;
 		return &fil;
+	}
 
 	if (*cpp && !strcasecmp(*cpp, "flags")) {
 		if (!*++cpp) {
 			fprintf(stderr, "%d: no flags present\n", linenum);
+			*status = -1;
 			return NULL;
 		}
 		fil.fr_tcpf = tcp_flags(*cpp, &fil.fr_tcpfm, linenum);
@@ -563,8 +627,10 @@ int     linenum;
 	 */
 	if ((fil.fr_v == 4) && *cpp && (!strcasecmp(*cpp, "with") ||
 	     !strcasecmp(*cpp, "and")))
-		if (extras(&cpp, &fil, linenum))
+		if (extras(&cpp, &fil, linenum)) {
+			*status = -1;
 			return NULL;
+		}
 
 	/*
 	 * icmp types for use with the icmp protocol
@@ -575,10 +641,13 @@ int     linenum;
 			fprintf(stderr,
 				"%d: icmp with wrong protocol (%d)\n",
 				linenum, fil.fr_proto);
+			*status = -1;
 			return NULL;
 		}
-		if (addicmp(&cpp, &fil, linenum))
+		if (addicmp(&cpp, &fil, linenum)) {
+			*status = -1;
 			return NULL;
+		}
 		fil.fr_icmp = htons(fil.fr_icmp);
 		fil.fr_icmpm = htons(fil.fr_icmpm);
 	}
@@ -587,8 +656,10 @@ int     linenum;
 	 * Keep something...
 	 */
 	while (*cpp && !strcasecmp(*cpp, "keep"))
-		if (addkeep(&cpp, &fil, linenum))
+		if (addkeep(&cpp, &fil, linenum)) {
+			*status = -1;
 			return NULL;
+		}
 
 	/*
 	 * This is here to enforce the old interface binding behaviour.
@@ -610,10 +681,12 @@ int     linenum;
 		if (fil.fr_skip != 0) {
 			fprintf(stderr, "%d: cannot use skip with head\n",
 				linenum);
+			*status = -1;
 			return NULL;
 		}
 		if (!*++cpp) {
 			fprintf(stderr, "%d: head without group #\n", linenum);
+			*status = -1;
 			return NULL;
 		}
 		if (ratoui(*cpp, &k, 0, UINT_MAX))
@@ -621,6 +694,7 @@ int     linenum;
 		else {
 			fprintf(stderr, "%d: invalid group (%s)\n",
 				linenum, *cpp);
+			*status = -1;
 			return NULL;
 		}
 		cpp++;
@@ -633,6 +707,7 @@ int     linenum;
 		if (!*++cpp) {
 			fprintf(stderr, "%d: group without group #\n",
 				linenum);
+			*status = -1;
 			return NULL;
 		}
 		if (ratoui(*cpp, &k, 0, UINT_MAX))
@@ -640,6 +715,7 @@ int     linenum;
 		else {
 			fprintf(stderr, "%d: invalid group (%s)\n",
 				linenum, *cpp);
+			*status = -1;
 			return NULL;
 		}
 		cpp++;
@@ -653,6 +729,7 @@ int     linenum;
 		for (; *cpp; cpp++)
 			fprintf(stderr, "%s ", *cpp);
 		fprintf(stderr, "]\n");
+		*status = -1;
 		return NULL;
 	}
 
@@ -661,6 +738,7 @@ int     linenum;
 	 */
 	if ((fil.fr_tcpf || fil.fr_tcpfm) && fil.fr_proto != IPPROTO_TCP) {
 		fprintf(stderr, "%d: TCP protocol not specified\n", linenum);
+		*status = -1;
 		return NULL;
 	}
 	if (!(fil.fr_ip.fi_fl & FI_TCPUDP) && (fil.fr_proto != IPPROTO_TCP) &&
@@ -672,6 +750,7 @@ int     linenum;
 			fprintf(stderr,
 				"%d: port comparisons for non-TCP/UDP\n",
 				linenum);
+			*status = -1;
 			return NULL;
 		}
 	}
@@ -681,9 +760,11 @@ int     linenum;
 		fprintf(stderr,
 			"%d: must use 'with frags' with 'keep frags'\n",
 			linenum);
+		*status = -1;
 		return NULL;
 	}
 */
+	*status = 0;
 	return &fil;
 }
 
@@ -1027,7 +1108,7 @@ int linenum;
 		}
 	} else if (fp->fr_proto == IPPROTO_ICMPV6) {
 		fprintf(stderr, "%d: Unknown ICMPv6 type (%s) specified, %s",
-			linenum, **cp, "(use numeric value instead\n");
+			linenum, **cp, "(use numeric value instead)\n");
 		return -1;
 	} else {
 		for (t = icmptypes, i = 0; ; t++, i++) {
@@ -1214,9 +1295,11 @@ struct frentry	*fp;
 		printlog(fp);
 	} else if (fp->fr_flags & FR_ACCOUNT)
 		printf("count");
-	else if (fp->fr_flags & FR_AUTH)
+	else if (fp->fr_flags & FR_AUTH) {
 		printf("auth");
-	else if (fp->fr_flags & FR_PREAUTH)
+		if ((fp->fr_flags & FR_RETMASK) == FR_RETRST)
+			printf(" return-rst");
+	} else if (fp->fr_flags & FR_PREAUTH)
 		printf("preauth");
 	else if (fp->fr_skip)
 		printf("skip %hu", fp->fr_skip);

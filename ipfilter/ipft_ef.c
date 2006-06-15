@@ -17,7 +17,7 @@ etherfind -n -t
  0.32    91   04    131.170.1.10  128.250.133.13
  0.33   566  udp  128.250.37.155   128.250.133.3        901        901
 */
-#ifdef __sgi
+#if defined(__sgi) && (IRIX > 602)
 # include <sys/ptimers.h>
 #endif
 #include <stdio.h>
@@ -108,9 +108,9 @@ int	cnt, *dir;
 
 	bzero(&pkt, sizeof(pkt));
 
-	if (sscanf(lbuf, "%s %s %s %s %s %s", len, prot, src, dst,
+	if (sscanf(lbuf, "%7s %7s %15s %15s %15s %15s", len, prot, src, dst,
 		   sprt, dprt) != 6)
-		if (sscanf(lbuf, "%s %s %s %s %s %s %s", time,
+		if (sscanf(lbuf, "%7s %7s %7s %15s %15s %15s %15s", time,
 			   len, prot, src, dst, sprt, dprt) != 7)
 			return -1;
 

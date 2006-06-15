@@ -26,7 +26,7 @@ tcpdump -nqte
 8:0:20:f:65:f7 0:0:c:1:8a:c5 81: 128.250.133.13.23 > 128.250.20.20.2419: tcp 27
 
 */
-#ifdef __sgi
+#if defined(__sgi) && (IRIX > 602)
 # include <sys/ptimers.h>
 #endif
 #include <stdio.h>
@@ -131,12 +131,13 @@ int	cnt, *dir;
 
 	bzero(&pkt, sizeof(pkt));
 
-	if ((n = sscanf(lbuf, "%s > %s: %s", src, dst, misc)) != 3)
-		if ((n = sscanf(lbuf, "%s %s > %s: %s",
+	if ((n = sscanf(lbuf, "%31s > %31s: %255s", src, dst, misc)) != 3)
+		if ((n = sscanf(lbuf, "%31s %31s > %31s: %255s",
 				time, src, dst, misc)) != 4)
-			if ((n = sscanf(lbuf, "%s %s: %s > %s: %s",
+			if ((n = sscanf(lbuf, "%31s %31s: %31s > %31s: %255s",
 					link1, link2, src, dst, misc)) != 5) {
-				n = sscanf(lbuf, "%s %s %s: %s > %s: %s",
+				n = sscanf(lbuf,
+					   "%31s %31s %31s: %31s > %31s: %255s",
 					   time, link1, link2, src, dst, misc);
 				if (n != 6)
 					return -1;

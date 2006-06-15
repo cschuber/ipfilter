@@ -12,7 +12,7 @@
 #  endif
 # endif
 #endif
-#ifdef __sgi
+#if defined(__sgi) && (IRIX > 602)
 # include <sys/ptimers.h>
 #endif
 #include <stdio.h>
@@ -32,8 +32,13 @@
      (!defined(__FreeBSD_version) || (__FreeBSD_version < 430000))
 #  undef STATETOP
 # endif
-# if defined(__NetBSD_Version__) && (__NetBSD_Version__ < 105000000)
-#  undef STATETOP
+# if defined(__NetBSD_Version__)
+#  if (__NetBSD_Version__ < 105000000)
+#   undef STATETOP
+#  else
+#   include <poll.h>
+#   define USE_POLL
+#  endif
 # endif
 # if defined(sun)
 #  if defined(__svr4__) || defined(__SVR4)
@@ -104,13 +109,17 @@ extern	int	optind;
 #define	FPRINTF	(void)fprintf
 #define	F_IN	0
 #define	F_OUT	1
-#define	F_AC	2
+#define	F_ACIN	2
+#define	F_ACOUT	3
 static	char	*filters[4] = { "ipfilter(in)", "ipfilter(out)",
 				"ipacct(in)", "ipacct(out)" };
 
 int	opts = 0;
 int	use_inet6 = 0;
 int	live_kernel = 1;
+int	state_fd = -1;
+int	auth_fd = -1;
+int	ipf_fd = -1;
 
 #ifdef STATETOP
 #define	STSTRSIZE 	80
@@ -229,6 +238,21 @@ char *argv[];
 			break;
 		}
 	optind = myoptind;
+
+	if (live_kernel == 1) {
+		if ((state_fd = open(IPL_STATE, O_RDONLY)) == -1) {
+			perror("open");
+			exit(-1);
+		}
+		if ((auth_fd = open(IPL_AUTH, O_RDONLY)) == -1) {
+			perror("open");
+			exit(-1);
+		}
+		if ((ipf_fd = open(device, O_RDONLY)) == -1) {
+			perror("open");
+			exit(-1);
+		}
+	}
 
 	if (kern != NULL || memf != NULL)
 	{
@@ -398,32 +422,20 @@ ipfrstat_t **ifrstpp;
 fr_authstat_t **frauthstpp;
 u_32_t *frfp;
 {
-	int fd;
 
-	if ((fd = open(device, O_RDONLY)) < 0) {
-		perror("open");
-		exit(-1);
-	}
-
-	if (!(opts & OPT_AUTHSTATS) && ioctl(fd, SIOCGETFS, fiopp) == -1) {
+	if (!(opts & OPT_AUTHSTATS) && ioctl(ipf_fd, SIOCGETFS, fiopp) == -1) {
 		perror("ioctl(ipf:SIOCGETFS)");
 		exit(-1);
 	}
 
 	if ((opts & OPT_IPSTATES)) {
-		int	sfd = open(IPL_STATE, O_RDONLY);
-
-		if (sfd == -1) {
-			perror("open");
-			exit(-1);
-		}
-		if ((ioctl(sfd, SIOCGETFS, ipsstpp) == -1)) {
+		if ((ioctl(state_fd, SIOCGETFS, ipsstpp) == -1)) {
 			perror("ioctl(state:SIOCGETFS)");
 			exit(-1);
 		}
-		close(sfd);
 	}
-	if ((opts & OPT_FRSTATES) && (ioctl(fd, SIOCGFRST, ifrstpp) == -1)) {
+	if ((opts & OPT_FRSTATES) &&
+	    (ioctl(ipf_fd, SIOCGFRST, ifrstpp) == -1)) {
 		perror("ioctl(SIOCGFRST)");
 		exit(-1);
 	}
@@ -432,15 +444,15 @@ u_32_t *frfp;
 		PRINTF("opts %#x name %s\n", opts, device);
 
 	if ((opts & OPT_AUTHSTATS) &&
-	    (ioctl(fd, SIOCATHST, frauthstpp) == -1)) {
+	    (ioctl(auth_fd, SIOCATHST, frauthstpp) == -1)) {
 		perror("ioctl(SIOCATHST)");
 		exit(-1);
 	}
 
-	if (ioctl(fd, SIOCGETFF, frfp) == -1)
+	if (ioctl(ipf_fd, SIOCGETFF, frfp) == -1)
 		perror("ioctl(SIOCGETFF)");
 
-	return fd;
+	return ipf_fd;
 }
 
 
@@ -685,10 +697,10 @@ u_32_t frf;
 			fp->f_st[0].fr_pkl, fp->f_st[1].fr_pkl);
 	PRINTF(" log failures:\t\tinput %lu output %lu\n",
 			fp->f_st[0].fr_skip, fp->f_st[1].fr_skip);
-	PRINTF("fragment state(in):\tkept %lu\tlost %lu\n",
-			fp->f_st[0].fr_nfr, fp->f_st[0].fr_bnfr);
-	PRINTF("fragment state(out):\tkept %lu\tlost %lu\n",
-			fp->f_st[1].fr_nfr, fp->f_st[1].fr_bnfr);
+	PRINTF("fragment state(in):\tkept %lu\tlost %lu\tnot fragmented %lu\n",
+			fp->f_st[0].fr_nfr, fp->f_st[0].fr_bnfr, fp->f_st[0].fr_cfr);
+	PRINTF("fragment state(out):\tkept %lu\tlost %lu\tnot fragmented %lu\n",
+			fp->f_st[1].fr_nfr, fp->f_st[1].fr_bnfr, fp->f_st[1].fr_cfr);
 	PRINTF("packet state(in):\tkept %lu\tlost %lu\n",
 			fp->f_st[0].fr_ads, fp->f_st[0].fr_bads);
 	PRINTF("packet state(out):\tkept %lu\tlost %lu\n",
@@ -773,13 +785,22 @@ struct	friostat	*fiop;
 	if (opts & OPT_INACTIVE)
 		set = 1 - set;
 	if (opts & OPT_ACCNT) {
-		i = F_AC;
+#ifdef USE_INET6
+		if ((use_inet6) && (opts & OPT_OUTQUE)) {
+			i = F_ACOUT;
+			fp = (struct frentry *)fiop->f_acctout6[set];
+		} else if ((use_inet6) && (opts & OPT_INQUE)) {
+			i = F_ACIN;
+			fp = (struct frentry *)fiop->f_acctin6[set];
+		} else
+#endif
 		if (opts & OPT_OUTQUE) {
+			i = F_ACOUT;
 			fp = (struct frentry *)fiop->f_acctout[set];
-			i++;
-		} else if (opts & OPT_INQUE)
+		} else if (opts & OPT_INQUE) {
+			i = F_ACIN;
 			fp = (struct frentry *)fiop->f_acctin[set];
-		else {
+		} else {
 			FPRINTF(stderr, "No -i or -o given with -a\n");
 			return;
 		}
@@ -807,7 +828,7 @@ struct	friostat	*fiop;
 
 	if (opts & OPT_VERBOSE)
 		PRINTF("fp %p set %d\n", fp, set);
-	if (!fp) {
+	if (fp == NULL) {
 		FPRINTF(stderr, "empty list for %s%s\n",
 			(opts & OPT_INACTIVE) ? "inactive " : "", filters[i]);
 		return;
@@ -834,6 +855,8 @@ ips_stat_t *ipsp;
 			ipsp->iss_miss);
 		PRINTF("\t%lu maximum\n\t%lu no memory\n\t%lu bkts in use\n",
 			ipsp->iss_max, ipsp->iss_nomem, ipsp->iss_inuse);
+		PRINTF("\t%lu logged\n\t%lu log failures\n",
+			ipsp->iss_logged, ipsp->iss_logfail);
 		PRINTF("\t%lu active\n\t%lu expired\n\t%lu closed\n",
 			ipsp->iss_active, ipsp->iss_expire, ipsp->iss_fin);
 		return;
@@ -860,7 +883,7 @@ void showqiflist(kern)
 char *kern;
 {
 	struct nlist qifnlist[2] = {
-		{ "qif_head" },
+		{ "_qif_head" },
 		{ NULL }
 	};
 	qif_t qif, *qf;
@@ -911,22 +934,20 @@ int topclosed;
 {
 	char str1[STSTRSIZE], str2[STSTRSIZE], str3[STSTRSIZE], str4[STSTRSIZE];
 	int maxtsentries = 0, reverse = 0, sorting = STSORT_DEFAULT;
-	int i, j, sfd, winx, tsentry, maxx, maxy, redraw = 0;
+	int i, j, winx, tsentry, maxx, maxy, redraw = 0;
 	ipstate_t *istab[IPSTATE_SIZE], ips;
 	ips_stat_t ipsst, *ipsstp = &ipsst;
 	statetop_t *tstable = NULL, *tp;
-	struct timeval selecttimeout; 
 	char hostnm[HOSTNMLEN];
 	struct protoent *proto;
-	fd_set readfd;
 	int c = 0;
 	time_t t;
-
-	/* open state device */
-	if ((sfd = open(IPL_STATE, O_RDONLY)) == -1) {
-		perror("open");
-		exit(-1);
-	}
+#ifdef USE_POLL
+	struct pollfd set[1];
+#else
+	struct timeval selecttimeout; 
+	fd_set readfd;
+#endif
 
 	/* init ncurses stuff */
   	initscr();
@@ -942,7 +963,7 @@ int topclosed;
 
 		/* get state table */
 		bzero((char *)&ipsst, sizeof(&ipsst));
-		if ((ioctl(sfd, SIOCGETFS, &ipsstp) == -1)) {
+		if ((ioctl(state_fd, SIOCGETFS, &ipsstp) == -1)) {
 			perror("ioctl(SIOCGETFS)");
 			exit(-1);
 		}
@@ -1188,6 +1209,14 @@ int topclosed;
 		}
 
 		/* wait for key press or a 1 second time out period */
+#ifdef USE_POLL
+		set[0].fd = 0;
+		set[0].events = POLLIN;
+		poll(set, 1, refreshtime * 1000);
+
+		/* if key pressed, read all waiting keys */
+		if (set[0].revents & POLLIN)
+#else
 		selecttimeout.tv_sec = refreshtime;
 		selecttimeout.tv_usec = 0;
 		FD_ZERO(&readfd);
@@ -1195,7 +1224,10 @@ int topclosed;
 		select(1, &readfd, NULL, NULL, &selecttimeout);
 
 		/* if key pressed, read all waiting keys */
-		if (FD_ISSET(0, &readfd)) {
+		if (FD_ISSET(0, &readfd))
+#endif
+
+		{
 			c = wgetch(stdscr);
 			if (c == ERR)
 				continue;
@@ -1215,8 +1247,6 @@ int topclosed;
 			}
 		}
 	} /* while */
-
-	close(sfd);
 
 	printw("\n");
 	nocbreak();
@@ -1249,6 +1279,7 @@ ipfrstat_t *ifsp;
 	/*
 	 * Print out the contents (if any) of the fragment cache table.
 	 */
+	PRINTF("\n");
 	for (i = 0; i < IPFT_SIZE; i++)
 		while (ipfrtab[i]) {
 			if (kmemcpy((char *)&ifr, (u_long)ipfrtab[i],
@@ -1257,11 +1288,11 @@ ipfrstat_t *ifsp;
 			PRINTF("%s -> ", hostname(4, &ifr.ipfr_src));
 			if (kmemcpy((char *)&fr, (u_long)ifr.ipfr_rule,
 				    sizeof(fr)) == -1)
-				break;
-			PRINTF("%s %d %d %d %#02x = %#x\n",
-				hostname(4, &ifr.ipfr_dst), ifr.ipfr_id,
-				ifr.ipfr_ttl, ifr.ipfr_p, ifr.ipfr_tos,
-				fr.fr_flags);
+				break; 
+			PRINTF("%s id %d ttl %d pr %d seen0 %d ifp %p tos %#02x = fl %#x\n",
+				hostname(4, &ifr.ipfr_dst), ntohs(ifr.ipfr_id),
+				ifr.ipfr_ttl, ifr.ipfr_p, ifr.ipfr_seen0, 
+				ifr.ipfr_ifp, ifr.ipfr_tos, fr.fr_flags);
 			ipfrtab[i] = ifr.ipfr_next;
 		}
 	if (kmemcpy((char *)ipfrtab, (u_long)ifsp->ifs_nattab,sizeof(ipfrtab)))

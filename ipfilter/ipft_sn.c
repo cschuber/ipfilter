@@ -7,7 +7,7 @@
 /*
  * Written to comply with the recent RFC 1761 from Sun.
  */
-#ifdef __sgi
+#if defined(__sgi) && (IRIX > 602)
 # include <sys/ptimers.h>
 #endif
 #include <stdio.h>

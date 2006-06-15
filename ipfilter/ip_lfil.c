@@ -327,15 +327,6 @@ int iplioctl(dev_t dev, int cmd, caddr_t data, int mode)
 		error = IWCOPYPTR((caddr_t)ipfr_fragstats(), data,
 			       sizeof(ipfrstat_t));
 		break;
-	case SIOCAUTHW :
-	case SIOCAUTHR :
-		if (!(mode & FWRITE)) {
-			error = EPERM;
-			break;
-		}
-	case SIOCATHST :
-		error = fr_auth_ioctl(data, mode, cmd, NULL, NULL);
-		break;
 	case SIOCFRSYN :
 		if (!(mode & FWRITE))
 			error = EPERM;
