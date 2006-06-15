@@ -51,6 +51,9 @@ STATETOP_LIB=-lcurses
 #
 #INET6=-DUSE_INET6
 #
+# Enable pfil support for FreeBSD 5+
+ENABLE_PFIL=yes
+#
 # For packets which don't match any pass rules or any block rules, set either
 # FR_PASS or FR_BLOCK (respectively).  It defaults to FR_PASS if left
 # undefined.  This is ignored for ipftest, which can thus return three
@@ -124,6 +127,22 @@ freebsd22: include
 		ln -s `uname -v|sed -e 's@^.*:\(/[^: ]*\).*@\1@'`/ioconf.h BSD/$(CPU) ; \
 	fi
 	make freebsd20
+
+freebsd5: include
+	if [ x$(INET6) = x ] ; then \
+		echo "#undef INET6" > opt_inet6.h; \
+	else \
+		echo "#define INET6" > opt_inet6.h; \
+	fi
+	if [ x$(ENABLE_PFIL) = x ] ; then \
+		echo "#undef PFIL_HOOKS" > opt_pfil.h; \
+	else \
+		echo "#define PFIL_HOOKS" > opt_pfil.h; \
+	fi
+
+	make setup "TARGOS=BSD" "CPUDIR=$(CPUDIR)"
+	(cd BSD/$(CPUDIR); make build TOP=../.. $(MFLAGS) "ML=mlfk_ipl.c" "MLD=mlfk_ipl.c" "LKM=ipf.ko.5" "DLKM=-DKLD_MODULE"; cd ..)
+	(cd BSD/$(CPUDIR); make -f Makefile.ipsend build TOP=../.. $(MFLAGS1); cd ..)
 
 freebsd4: include
 	if [ x$INET6 = x ] ; then \

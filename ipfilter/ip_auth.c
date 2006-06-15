@@ -108,7 +108,7 @@ static const char rcsid[] = "@(#)$Id$";
 #endif
 
 
-#if (SOLARIS || defined(__sgi)) && defined(_KERNEL)
+#ifdef USE_MUTEX
 extern KRWLOCK_T ipf_auth, ipf_mutex;
 extern kmutex_t ipf_authmx;
 # if SOLARIS
@@ -314,9 +314,10 @@ int cmd;
 #endif
 {
 	mb_t *m;
-#if defined(_KERNEL) && !SOLARIS && \
-    (!defined(__FreeBSD_version) || (__FreeBSD_version < 501000))
+#if defined(_KERNEL) && !SOLARIS
+# if (!defined(__FreeBSD_version) || (__FreeBSD_version < 501000))
 	struct ifqueue *ifq;
+# endif
 	int s;
 #endif
 	frauth_t auth, *au = &auth, *fra;
@@ -343,6 +344,14 @@ int cmd;
 	case SIOCADAFR :
 		/* These commands go via request to fr_preauthcmd */
 		error = EINVAL;
+		break;
+	case SIOCIPFFL :
+		SPL_NET(s);
+		WRITE_ENTER(&ipf_auth);
+		error = fr_authflush();
+		RWLOCK_EXIT(&ipf_auth);
+		SPL_X(s);
+		error = IWCOPYPTR((char *)&error, data, sizeof(error));
 		break;
 	case SIOCATHST:
 		fr_authstats.fas_faelist = fae_list;
@@ -439,7 +448,12 @@ fr_authioctlloop:
 			error = (fr_qin(fra->fra_q, m) == 0) ? EINVAL : 0;
 # else /* SOLARIS */
 #  if __FreeBSD_version >= 501104
-			netisr_dispatch(NETISR_IP, m);
+#   if __FreeBSD_version >= 502000
+			if (! netisr_queue(NETISR_IP, m))
+#   else
+			if (! netisr_dispatch(NETISR_IP, m))
+#   endif
+				error = ENOBUFS;
 #  else
 			ifq = &ipintrq;
 			if (IF_QFULL(ifq)) {
@@ -663,4 +677,39 @@ frentry_t *fr, **frptr;
 	} else
 		error = EINVAL;
 	return error;
+}
+
+/*
+ * Flush held packets.
+ * Must already be properly SPL'ed and Locked on &ipf_auth.
+ *
+ */
+int fr_authflush()
+{
+	register int i, num_flushed;
+	mb_t *m;
+
+	if (fr_auth_lock)
+		return -1;
+
+	num_flushed = 0;
+
+	for (i = 0 ; i < fr_authsize; i++) {
+		m = fr_authpkts[i];
+		if (m != NULL) {
+			FREE_MB_T(m);
+			fr_authpkts[i] = NULL;
+			fr_auth[i].fra_index = -1;
+			/* perhaps add & use a flush counter inst.*/
+			fr_authstats.fas_expire++;
+			fr_authused--;
+			num_flushed++;
+		}
+	}
+
+	fr_authstart = 0;
+	fr_authend = 0;
+	fr_authnext = 0;
+
+	return num_flushed;
 }

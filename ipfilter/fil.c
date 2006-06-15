@@ -113,10 +113,10 @@ extern	int	opts;
 # define	FR_VERBOSE(verb_pr)
 # define	FR_DEBUG(verb_pr)
 # define	IPLLOG(a, c, d, e)		ipflog(a, c, d, e)
-# if SOLARIS || defined(__sgi)
+# ifdef USE_MUTEX
 extern	KRWLOCK_T	ipf_mutex, ipf_auth, ipf_nat;
 extern	kmutex_t	ipf_rw;
-# endif /* SOLARIS || __sgi */
+# endif /* USE_MUTEX */
 #endif /* _KERNEL */
 
 
@@ -144,7 +144,7 @@ fr_info_t	frcache[2];
 
 static	int	frflushlist __P((int, minor_t, int *, frentry_t **));
 #ifdef	_KERNEL
-static	void	frsynclist __P((frentry_t *));
+static	void	frsynclist __P((frentry_t *, void *));
 # ifndef __sgi
 static	void	*ipf_pullup __P((mb_t *, fr_info_t *, int, void *));
 # endif
@@ -1373,8 +1373,11 @@ logit:
 
 		if (((pass & FR_FASTROUTE) && !out) ||
 		    (fdp->fd_ifp && fdp->fd_ifp != (struct ifnet *)-1)) {
-			(void) ipfr_fastroute(m, mp, fin, fdp);
 			m = *mp;
+			if (m != NULL) {
+				(void) ipfr_fastroute(m, mp, fin, fdp);
+				m = *mp;
+			}
 		}
 
 		if (mc != NULL)
@@ -2078,24 +2081,19 @@ struct in_addr *inp;
 }
 
 
-static void frsynclist(fr)
+static void frsynclist(fr, ifp)
 register frentry_t *fr;
+void *ifp;
 {
 	frdest_t *fdp;
 	int i;
 
 	for (; fr; fr = fr->fr_next) {
 		for (i = 0; i < 4; i++) {
-			if ((fr->fr_ifnames[i][1] == '\0') &&
-			    ((fr->fr_ifnames[i][0] == '-') ||
-			     (fr->fr_ifnames[i][0] == '*'))) {
-				fr->fr_ifas[i] = NULL;
-			} else if (*fr->fr_ifnames[i]) {
-				fr->fr_ifas[i] = GETUNIT(fr->fr_ifnames[i],
-							 fr->fr_v);
-				if (!fr->fr_ifas[i])
-					fr->fr_ifas[i] = (void *)-1;
-			}
+			if ((ifp != NULL) && (ifp != fr->fr_ifas[i]))
+				continue;
+			fr->fr_ifas[i] = fr_resolvenic(fr->fr_ifnames[i],
+						       fr->fr_v);
 		}
 
 		fdp = &fr->fr_dif;
@@ -2116,49 +2114,27 @@ register frentry_t *fr;
 		}
 
 		if (fr->fr_grp)
-			frsynclist(fr->fr_grp);
+			frsynclist(fr->fr_grp, ifp);
 	}
 }
 
 
-void frsync()
+void frsync(ifp)
+void *ifp;
 {
-# if !SOLARIS
-	register struct ifnet *ifp;
-
-#  if defined(__OpenBSD__) || ((NetBSD >= 199511) && (NetBSD < 1991011)) || \
-     (defined(__FreeBSD_version) && (__FreeBSD_version >= 300000))
-#   if (NetBSD >= 199905) || defined(__OpenBSD__)
-	for (ifp = ifnet.tqh_first; ifp; ifp = ifp->if_list.tqe_next)
-#   elif defined(__FreeBSD_version) && (__FreeBSD_version >= 500043)
-	IFNET_RLOCK();
-	TAILQ_FOREACH(ifp, &ifnet, if_link);
-#   else
-	for (ifp = ifnet.tqh_first; ifp; ifp = ifp->if_link.tqe_next)
-#   endif
-#  else
-	for (ifp = ifnet; ifp; ifp = ifp->if_next)
-#  endif
-	{
-		ip_natsync(ifp);
-		ip_statesync(ifp);
-	}
-	ip_natsync((struct ifnet *)-1);
-#  if defined(__FreeBSD_version) && (__FreeBSD_version >= 500043)
-	IFNET_RUNLOCK();
-#  endif
-# endif /* !SOLARIS */
+	ip_statesync(ifp);
+	ip_natsync(ifp);
 
 	WRITE_ENTER(&ipf_mutex);
-	frsynclist(ipacct[0][fr_active]);
-	frsynclist(ipacct[1][fr_active]);
-	frsynclist(ipfilter[0][fr_active]);
-	frsynclist(ipfilter[1][fr_active]);
+	frsynclist(ipacct[0][fr_active], ifp);
+	frsynclist(ipacct[1][fr_active], ifp);
+	frsynclist(ipfilter[0][fr_active], ifp);
+	frsynclist(ipfilter[1][fr_active], ifp);
 #ifdef	USE_INET6
-	frsynclist(ipacct6[0][fr_active]);
-	frsynclist(ipacct6[1][fr_active]);
-	frsynclist(ipfilter6[0][fr_active]);
-	frsynclist(ipfilter6[1][fr_active]);
+	frsynclist(ipacct6[0][fr_active], ifp);
+	frsynclist(ipacct6[1][fr_active], ifp);
+	frsynclist(ipfilter6[0][fr_active], ifp);
+	frsynclist(ipfilter6[1][fr_active], ifp);
 #endif
 	RWLOCK_EXIT(&ipf_mutex);
 }
@@ -2421,7 +2397,12 @@ void *ipin;
 		ATOMIC_INCL(frstats[out].fr_pull[0]);
 		qf->qf_data = MTOD(m, char *) + ipoff;
 # else
-		m = m_pullup(m, len);
+#  if (__FreeBSD_version >= 490000)
+		if ((len > MHLEN) && ((m->m_flags & M_PKTHDR) != 0))
+			m = m_defrag(m, M_DONTWAIT);
+		else
+#  endif
+			m = m_pullup(m, len);
 		*fin->fin_mp = m;
 		if (m == NULL) {
 			ATOMIC_INCL(frstats[out].fr_pull[1]);
@@ -2436,3 +2417,23 @@ void *ipin;
 	return ip;
 }
 #endif /* _KERNEL */
+
+
+void *fr_resolvenic(name, v)
+char *name;
+int v;
+{
+	void *nic;
+
+	if (name[0] == '\0')
+		return NULL;
+
+	if ((name[1] == '\0') && ((name[0] == '-') || (name[0] == '*'))) {
+		return NULL;
+	}
+
+	nic = GETUNIT(name, v);
+	if (nic == NULL)
+			nic = (void *)-1;
+	return nic;
+}

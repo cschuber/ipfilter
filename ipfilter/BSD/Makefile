@@ -171,6 +171,10 @@ if_ipl.o: $(MODOBJS)
 	ld -r $(MODOBJS) -o $(LKM)
 	${RM} -f if_ipl
 
+ipf.ko.5 ipl.ko.5: $(MODOBJS)
+	ld -warn-common -r -d -o $(.TARGET:S/.ko/.kld/) $(MODOBJS)
+	ld -Bshareable -d -warn-common -o $(LKM:S/.5$//) $(.TARGET:S/.ko/.kld/)
+
 ipf.ko ipl.ko: $(MODOBJS) 
 	gensetdefs $(MODOBJS)
 	$(CC) $(DEBUG) $(CFLAGS) -c setdef0.c

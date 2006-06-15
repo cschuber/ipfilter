@@ -24,13 +24,12 @@
 #include <arpa/inet.h>
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
-#include <netinet/ip_var.h>
 #include <netinet/tcp.h>
 #include <netinet/udp.h>
-#include <netinet/udp_var.h>
 #include <netinet/ip_icmp.h>
 #ifndef	linux
-#include <netinet/ip_var.h>
+# include <netinet/ip_var.h>
+# include <netinet/udp_var.h>
 #endif
 #include "ipsend.h"
 

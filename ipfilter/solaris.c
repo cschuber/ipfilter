@@ -70,7 +70,6 @@ extern	int	fr_flags;
 
 extern ipnat_t *nat_list;
 
-static	qif_t	*_qif_head = NULL;
 static	int	ipf_getinfo __P((dev_info_t *, ddi_info_cmd_t,
 				 void *, void **));
 static	int	ipf_probe __P((dev_info_t *));
@@ -98,6 +97,7 @@ static	int	synctimeoutid = 0;
 #endif
 int	ipf_debug = 0;
 int	ipf_debug_verbose = 0;
+qif_t	*_qif_head = NULL;
 
 /* #undef	IPFDEBUG	1 */
 /* #undef	IPFDEBUG_VERBOSE	1 */
@@ -254,8 +254,11 @@ struct modinfo *modinfop;
 		cmn_err(CE_NOTE, "IP Filter: _info(%x) = %x",
 			modinfop, ipfinst);
 #endif
-	if (fr_running > 0)
+	if (fr_running > 0) {
+		WRITE_ENTER(&ipf_solaris);
 		ipfsync();
+		RWLOCK_EXIT(&ipf_solaris);
+	}
 	return ipfinst;
 }
 
@@ -370,7 +373,6 @@ ddi_attach_cmd_t cmd;
 			goto attach_failed;
 		}
 		ipf_dev_info = dip;
-		sync();
 		/*
 		 * Initialize mutex's
 		 */
@@ -385,7 +387,6 @@ ddi_attach_cmd_t cmd;
 		RWLOCK_EXIT(&ipf_solaris);
 		cmn_err(CE_CONT, "%s, attaching complete.\n",
 			ipfilter_version);
-		sync();
 		if (fr_running == 0)
 			fr_running = 1;
 		if (ipfr_timer_id == 0)
@@ -459,7 +460,6 @@ ddi_detach_cmd_t cmd;
 		ddi_prop_remove_all(dip);
 		i = ddi_get_instance(dip);
 		ddi_remove_minor_node(dip, NULL);
-		sync();
 		i = solipdrvdetach();
 		if (i > 0) {
 			cmn_err(CE_CONT, "IP Filter: still attached (%d)\n", i);
@@ -716,7 +716,7 @@ tryagain:
 	}
 
 	mlen = msgdsize(m);
-	sap = qif->qf_ill->ill_sap;
+	sap = qif->qf_sap;
 
 	if (sap == 0x800) {
 		u_short tlen;
@@ -1432,9 +1432,9 @@ void solattach()
 	static int first_run = 1;
 	queue_t *in, *out;
 	struct frentry *f;
+	size_t len, illen;
 	qif_t *qif, *qf2;
 	ipnat_t *np;
-	size_t len;
 	ill_t *il;
 #if SOLARIS2 >= 10
 	ill_walk_context_t ctx;
@@ -1570,7 +1570,6 @@ void solattach()
 		 */
 		if (il->ill_type == IFT_ETHER && !il->ill_bcast_addr_length)
 			qif->qf_hl = 0;
-                        qif->qf_hl = 0;
 
 		/*
 		 * Tunnels are special; they have a 32 byte header followed
@@ -1591,21 +1590,22 @@ void solattach()
 		/*
 		 * Activate any rules directly associated with this interface
 		 */
+		illen = (size_t)il->ill_name_length;
 		WRITE_ENTER(&ipf_mutex);
 		for (f = ipfilter[0][fr_active]; f; f = f->fr_next) {
 			if ((f->fr_ifa == (struct ifnet *)-1)) {
-				len = strlen(f->fr_ifname) + 1;
+				len = strlen(f->fr_ifname);
 				if ((len != 0) &&
-				    (len == (size_t)il->ill_name_length) &&
+				    (len + 1 == illen) &&
 				    !strncmp(il->ill_name, f->fr_ifname, len))
 					f->fr_ifa = il;
 			}
 		}
 		for (f = ipfilter[1][fr_active]; f; f = f->fr_next) {
 			if ((f->fr_ifa == (struct ifnet *)-1)) {
-				len = strlen(f->fr_ifname) + 1;
+				len = strlen(f->fr_ifname);
 				if ((len != 0) &&
-				    (len == (size_t)il->ill_name_length) &&
+				    (len + 1 == illen) &&
 				    !strncmp(il->ill_name, f->fr_ifname, len))
 					f->fr_ifa = il;
 			}
@@ -1613,18 +1613,18 @@ void solattach()
 #if SOLARIS2 >= 8
 		for (f = ipfilter6[0][fr_active]; f; f = f->fr_next) {
 			if ((f->fr_ifa == (struct ifnet *)-1)) {
-				len = strlen(f->fr_ifname) + 1;
+				len = strlen(f->fr_ifname);
 				if ((len != 0) &&
-				    (len == (size_t)il->ill_name_length) &&
+				    (len + 1 == illen) &&
 				    !strncmp(il->ill_name, f->fr_ifname, len))
 					f->fr_ifa = il;
 			}
 		}
 		for (f = ipfilter6[1][fr_active]; f; f = f->fr_next) {
 			if ((f->fr_ifa == (struct ifnet *)-1)) {
-				len = strlen(f->fr_ifname) + 1;
+				len = strlen(f->fr_ifname);
 				if ((len != 0) &&
-				    (len == (size_t)il->ill_name_length) &&
+				    (len + 1 == illen) &&
 				    !strncmp(il->ill_name, f->fr_ifname, len))
 					f->fr_ifa = il;
 			}
@@ -1634,9 +1634,9 @@ void solattach()
 		WRITE_ENTER(&ipf_nat);
 		for (np = nat_list; np; np = np->in_next) {
 			if ((np->in_ifp == (struct ifnet *)-1)) {
-				len = strlen(np->in_ifname) + 1;
+				len = strlen(np->in_ifname);
 				if ((len != 0) &&
-				    (len == (size_t)il->ill_name_length) &&
+				    (len + 1 == illen) &&
 				    !strncmp(il->ill_name, np->in_ifname, len))
 					np->in_ifp = il;
 			}
@@ -1698,6 +1698,7 @@ int ipfsync()
 	ill_walk_context_t ctx;
 #endif
 	queue_t *in, *out;
+	void *ifp;
 
 	WRITE_ENTER(&ipfs_mutex);
 	for (qp = &_qif_head; (qif = *qp); ) {
@@ -1707,22 +1708,26 @@ int ipfsync()
 #else
 		for (il = ill_g_head; il; il = il->ill_next)
 #endif
-			if ((qif->qf_ill == il) &&
+			if ((qif->qf_sap == il->ill_sap) &&
 			    !strcmp(qif->qf_name, il->ill_name)) {
 #if SOLARIS2 < 8
 				mblk_t	*m = il->ill_hdr_mp;
 
 				qif->qf_hl = il->ill_hdr_length;
-				if (m && qif->qf_hl != (m->b_wptr - m->b_rptr))
+				if ((m != NULL) &&
+				    (qif->qf_hl != (m->b_wptr - m->b_rptr)))
 					cmn_err(CE_NOTE,
 						"IP Filter: ILL Header Length Mismatch\n");
 #endif
+				qif->qf_ill = il;
 				break;
 			}
+
 		if (il) {
 			qp = &qif->qf_next;
 			continue;
 		}
+
 		cmn_err(CE_CONT, "IP Filter: detaching [%s] - %s\n",
 			qif->qf_name,
 #if SOLARIS2 >= 8
@@ -1732,28 +1737,30 @@ int ipfsync()
 #endif
 			);
 		*qp = qif->qf_next;
+		ifp = qif->qf_ill;
+		qif->qf_ill = (void *)-1;
 
 		/*
 		 * Disable any rules directly associated with this interface
 		 */
 		WRITE_ENTER(&ipf_nat);
 		for (np = nat_list; np; np = np->in_next)
-			if (np->in_ifp == (void *)qif->qf_ill)
+			if (np->in_ifp == ifp)
 				np->in_ifp = (struct ifnet *)-1;
 		RWLOCK_EXIT(&ipf_nat);
 		WRITE_ENTER(&ipf_mutex);
 		for (f = ipfilter[0][fr_active]; f; f = f->fr_next)
-			if (f->fr_ifa == (void *)qif->qf_ill)
+			if (f->fr_ifa == ifp)
 				f->fr_ifa = (struct ifnet *)-1;
 		for (f = ipfilter[1][fr_active]; f; f = f->fr_next)
-			if (f->fr_ifa == (void *)qif->qf_ill)
+			if (f->fr_ifa == ifp)
 				f->fr_ifa = (struct ifnet *)-1;
 #if SOLARIS2 >= 8
 		for (f = ipfilter6[0][fr_active]; f; f = f->fr_next)
-			if (f->fr_ifa == (void *)qif->qf_ill)
+			if (f->fr_ifa == ifp)
 				f->fr_ifa = (struct ifnet *)-1;
 		for (f = ipfilter6[1][fr_active]; f; f = f->fr_next)
-			if (f->fr_ifa == (void *)qif->qf_ill)
+			if (f->fr_ifa == ifp)
 				f->fr_ifa = (struct ifnet *)-1;
 #endif
 
@@ -1795,19 +1802,10 @@ int ipfsync()
 	RWLOCK_EXIT(&ipfs_mutex);
 	solattach();
 
-	frsync();
 	/*
 	 * Resync. any NAT `connections' using this interface and its IP #.
 	 */
-#if SOLARIS2 >= 10
-	for (il = ILL_START_WALK_ALL(&ctx); il; il = ill_next(&ctx, il))
-#else
-	for (il = ill_g_head; il; il = il->ill_next)
-#endif
-	{
-		ip_natsync((void *)il);
-		ip_statesync((void *)il);
-	}
+	frsync(NULL);
 	return 0;
 }
 

@@ -106,7 +106,7 @@ static ipstate_t **ips_table = NULL;
 static int	ips_num = 0;
 static int	ips_wild = 0;
 static ips_stat_t ips_stats;
-#if	(SOLARIS || defined(__sgi)) && defined(_KERNEL)
+#ifdef USE_MUTEX
 extern	KRWLOCK_T	ipf_state, ipf_mutex;
 extern	kmutex_t	ipf_rw;
 #endif
@@ -489,21 +489,12 @@ caddr_t data;
 			 */
 			for (i = 0; i < 4; i++) {
 				name = fr->fr_ifnames[i];
-				if ((name[1] == '\0') &&
-				    ((name[0] == '-') || (name[0] == '*'))) {
-					fr->fr_ifas[i] = NULL;
-				} else if (*name != '\0') {
-					fr->fr_ifas[i] = GETUNIT(name,
-								 fr->fr_v);
-					if (fr->fr_ifas[i] == NULL)
-						fr->fr_ifas[i] = (void *)-1;
-					else {
-						strncpy(isn->is_ifname[i],
-							IFNAME(fr->fr_ifas[i]),
-							IFNAMSIZ);
-					}
-				}
-				isn->is_ifp[out] = fr->fr_ifas[i];
+				name[sizeof(fr->fr_ifnames[i]) - 1] = '\0';
+				fr->fr_ifas[i] = fr_resolvenic(name, fr->fr_v);
+
+				name = isn->is_ifname[i];
+				name[sizeof(isn->is_ifname[i]) - 1] = '\0';
+				isn->is_ifp[i] = fr_resolvenic(name, is->is_v);
 			}
 
 			/*
@@ -538,7 +529,6 @@ void fr_stinsert(is)
 register ipstate_t *is;
 {
 	register u_int hv = is->is_hv;
-	char *name;
 	int i;
 
 	MUTEX_INIT(&is->is_lock, "ipf state entry", NULL);
@@ -546,17 +536,8 @@ register ipstate_t *is;
 	/*
 	 * Look up all the interface names in the state entry.
 	 */
-	for (i = 0; i < 4; i++) {
-		name = is->is_ifname[i];
-		if ((name[1] == '\0') &&
-		    ((name[0] == '-') || (name[0] == '*'))) {
-			is->is_ifp[0] = NULL;
-		} else if (*name != '\0') {
-			is->is_ifp[i] = GETUNIT(name, is->is_v);
-			if (is->is_ifp[i] == NULL)
-				is->is_ifp[i] = (void *)-1;
-		}
-	}
+	for (i = 0; i < 4; i++)
+		is->is_ifp[i] = fr_resolvenic(is->is_ifname[i], is->is_v);
 
 
 	/*
@@ -766,22 +747,12 @@ u_int flags;
 		if (is->is_frage[0] != 0)
 			is->is_age = is->is_frage[0];
 
-		is->is_ifp[(out << 1) + 1] = is->is_rule->fr_ifas[1];
-		is->is_ifp[(1 - out) << 1] = is->is_rule->fr_ifas[2];
-		is->is_ifp[((1 - out) << 1) + 1] = is->is_rule->fr_ifas[3];
-
-		if (((ifp = is->is_rule->fr_ifas[1]) != NULL) &&
-		    (ifp != (void *)-1))
-			strncpy(is->is_ifname[(out << 1) + 1],
-				IFNAME(ifp), IFNAMSIZ);
-		if (((ifp = is->is_rule->fr_ifas[2]) != NULL) &&
-		    (ifp != (void *)-1))
-			strncpy(is->is_ifname[(1 - out) << 1],
-				IFNAME(ifp), IFNAMSIZ);
-		if (((ifp = is->is_rule->fr_ifas[3]) != NULL) &&
-		    (ifp != (void *)-1))
-			strncpy(is->is_ifname[((1 - out) << 1) + 1],
-				IFNAME(ifp), IFNAMSIZ);
+		strncpy(is->is_ifname[(out << 1) + 1],
+			is->is_rule->fr_ifnames[1], IFNAMSIZ);
+		strncpy(is->is_ifname[(1 - out) << 1],
+			is->is_rule->fr_ifnames[2], IFNAMSIZ);
+		strncpy(is->is_ifname[((1 - out) << 1) + 1],
+			is->is_rule->fr_ifnames[3], IFNAMSIZ);
 	} else
 		pass = fr_flags;
 
@@ -1701,12 +1672,10 @@ void *ifp;
 	WRITE_ENTER(&ipf_state);
 	for (is = ips_list; is; is = is->is_next) {
 		for (i = 0; i < 4; i++) {
-			if (is->is_ifp[i] == ifp) {
-				is->is_ifp[i] = GETUNIT(is->is_ifname[i],
-							is->is_v);
-				if (!is->is_ifp[i])
-					is->is_ifp[i] = (void *)-1;
-			}
+			if ((ifp != NULL) && (is->is_ifp[i] != ifp))
+				continue;
+			is->is_ifp[i] = fr_resolvenic(is->is_ifname[i],
+						      is->is_v);
 		}
 	}
 	RWLOCK_EXIT(&ipf_state);

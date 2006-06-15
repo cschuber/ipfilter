@@ -494,8 +494,9 @@ typedef	struct	ipflog	{
  * with this!
  */
 #if (defined(NetBSD) && (NetBSD > 199609) && (NetBSD <= 1991011)) || \
-    (defined(NetBSD1_2) && NetBSD1_2 > 1)
-# if (NetBSD >= 199905)
+    (defined(NetBSD1_2) && NetBSD1_2 > 1) || (defined(__FreeBSD_version) && \
+    (__FreeBSD_version >= 500011))
+# if (NetBSD >= 199905) || (__FreeBSD_version >= 503000)
 #  define PFIL_HOOKS
 # endif
 # ifdef PFIL_HOOKS
@@ -617,7 +618,7 @@ extern	int	ipllog __P((int, fr_info_t *, void **, size_t *, int *, int));
 extern	int	ipflog_read __P((minor_t, struct uio *));
 
 extern	int	frflush __P((minor_t, int, int));
-extern	void	frsync __P((void));
+extern	void	frsync __P((void *));
 extern	frgroup_t *fr_addgroup __P((u_32_t, frentry_t *, minor_t, int));
 extern	void	fr_delgroup __P((u_32_t, u_32_t, minor_t, int));
 extern	frgroup_t *fr_findgroup __P((u_32_t, u_32_t, minor_t, int,
@@ -633,6 +634,7 @@ extern	u_short	fr_tcpsum __P((mb_t *, ip_t *, tcphdr_t *));
 extern	int	fr_scanlist __P((u_32_t, ip_t *, fr_info_t *, void *));
 extern	int	fr_tcpudpchk __P((frtuc_t *, fr_info_t *));
 extern	int	fr_verifysrc __P((struct in_addr, void *));
+extern	void	*fr_resolvenic __P((char *, int));
 
 extern	int	ipl_unreach;
 extern	int	fr_running;
