@@ -4,7 +4,7 @@ set dir=`pwd`
 if ($dir =~ */SunOS4) cd ..
 echo -n "Installing "
 foreach i (ip_fil.[ch] ip_nat.[ch] ip_frag.[ch] ip_state.[ch] ip_auth.[ch] \
-	   ip_proxy.[ch] ip_*_pxy.c fil.c ip_compat.h ip_log.c)
+	   ip_proxy.[ch] ip_*_pxy.c fil.c ip_compat.h ip_log.c ipl.h)
 	echo -n "$i "
 	cp $i /sys/netinet
 	chmod 644 /sys/netinet/$i
@@ -15,6 +15,7 @@ foreach i (ip_fil.[ch] ip_nat.[ch] ip_frag.[ch] ip_state.[ch] ip_auth.[ch] \
 		breaksw
 	endsw
 end
+echo
 echo "Installing ip_input.c and ip_output.c"
 cp SunOS4/{ip_input.c,ip_output.c} /sys/netinet
 chmod 644 /sys/netinet/{ip_input.c,ip_output.c}

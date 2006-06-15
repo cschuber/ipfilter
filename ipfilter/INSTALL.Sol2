@@ -17,7 +17,7 @@ file called "ipf.pkg" in the SunOS5 directory and then start the
 installation using pkgadd.
 
 As part of the postinstall script, it will install loadable kernel module
-as part of Solaris 2 (using add_drv) making it available for immeadiate use.
+as part of Solaris 2 (using add_drv) making it available for immediate use.
 
 IP Filter will be installed into /opt/ipf (programs, manual pages and
 examples) and create a directory /etc/opt/ipf with a null body file

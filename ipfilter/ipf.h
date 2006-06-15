@@ -62,7 +62,7 @@ struct nat;
 extern	char	*strdup __P((char *));
 #endif
 
-extern	struct	frentry	*parse __P((char *, int));
+extern	struct	frentry	*parse __P((char *, int, int *));
 
 extern	void	printfr __P((struct frentry *));
 extern	void	binprint __P((struct frentry *)), initparse __P((void));

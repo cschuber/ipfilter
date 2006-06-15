@@ -34,26 +34,39 @@
 			 * a setup with 1000-2000 networks to NAT.
 			 */
 #ifndef	NAT_SIZE
-# define	NAT_SIZE	127
+# ifdef	LARGE_NAT
+#  define	NAT_SIZE	2047
+# else
+#  define	NAT_SIZE	127
+# endif
 #endif
 #ifndef	RDR_SIZE
-# define	RDR_SIZE	127
+# ifdef	LARGE_NAT
+#  define	RDR_SIZE	2047
+# else
+#  define	RDR_SIZE	127
+# endif
 #endif
 #ifndef	HOSTMAP_SIZE
-# define	HOSTMAP_SIZE	127
+# ifdef	LARGE_NAT
+#  define	HOSTMAP_SIZE	8191
+# else
+#  define	HOSTMAP_SIZE	2047
+# endif
+#endif
+#ifndef NAT_TABLE_MAX
+# ifdef	LARGE_NAT
+#  define	NAT_TABLE_MAX	180000
+# else
+#  define	NAT_TABLE_MAX	30000
+# endif
 #endif
 #ifndef	NAT_TABLE_SZ
-# define	NAT_TABLE_SZ	127
-#endif
-#ifdef	LARGE_NAT
-#undef	NAT_SIZE
-#undef	RDR_SIZE
-#undef	NAT_TABLE_SZ
-#undef	HOSTMAP_SIZE	127
-#define	NAT_SIZE	2047
-#define	RDR_SIZE	2047
-#define	NAT_TABLE_SZ	16383
-#define	HOSTMAP_SIZE	8191
+# ifdef	LARGE_NAT
+#  define	NAT_TABLE_SZ	16383
+# else
+#  define	NAT_TABLE_SZ	2047
+# endif
 #endif
 #ifndef	APR_LABELLEN
 #define	APR_LABELLEN	16
@@ -84,6 +97,7 @@ typedef	struct	nat	{
 	u_short	nat_use;
 	u_char	nat_tcpstate[2];
 	u_char	nat_p;			/* protocol for NAT */
+	u_32_t	nat_mssclamp;	/* if != zero clamp MSS to this */
 	struct	ipnat	*nat_ptr;	/* pointer back to the rule */
 	struct	hostmap	*nat_hm;
 	struct	nat	*nat_next;
@@ -113,6 +127,7 @@ typedef	struct	ipnat	{
 	u_short	in_pnext;
 	u_short	in_ippip;	/* IP #'s per IP# */
 	u_32_t	in_flags;	/* From here to in_dport must be reflected */
+	u_32_t	in_mssclamp;	/* if != zero clamp MSS to this */
 	u_short	in_spare;
 	u_short	in_ppip;	/* ports per IP */
 	u_short	in_port[2];	/* correctly in IPN_CMPSIZ */

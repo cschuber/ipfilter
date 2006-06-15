@@ -276,7 +276,7 @@ $(CPUDIR)/ipf.pkg: $(CPUDIR)/ipf.pkg.common
 	    $(MAKE) CPUDIR=$(CPUDIR) OBJ=. BITS=${BITS} $(CPUDIR)/ipf.pkg.bin;\
 	fi
 	touch $(CPUDIR)/ipf.pkg
-	pkgtrans -s $(TMP) $(CPUDIR)/ipf.pkg `ls $(TMP)`
+	pkgtrans -s $(TMP) $(CPUDIR)/ipf.pkg `ls -r $(TMP)`
 	rm -rf $(TMP)/ipf*
 	    
 
@@ -318,7 +318,7 @@ $(CPUDIR)/ipf.pkg.common:
 # is smaller and only contains the 64 bit specific and not the common stuff.
 #
 $(CPUDIR)/ipf.pkg.bin:
-	mkdir -p $(PKGBIN) $(ROOT)/$(SBINDEST) $(ROOT)/usr/kernel/drv/$(OBJ)
+	-mkdir -p $(PKGBIN) $(ROOT)/$(SBINDEST) $(ROOT)/usr/kernel/drv/$(OBJ)
 	-$(INSTALL) -c -s $(OBJDIR)/ipftest $(PKGBIN)/ipftest
 	-$(INSTALL) -c -s $(OBJDIR)/ipmon $(PKGBIN)/ipmon
 	-$(INSTALL) -c -s $(OBJDIR)/ipsend $(PKGBIN)/ipsend
@@ -348,7 +348,9 @@ package install:
 		$(MAKE) "CPUDIR=$(CPUDIR)" make$@; \
 	fi
 
-makepackage makeinstall: $(CPUDIR)/ipf.pkg
+makepackage: $(CPUDIR)/ipf.pkg
+
+makeinstall: $(CPUDIR)/ipf.pkg
 	@if [ `id|sed -e 's/^.[^(]*(\([^)]*\)).*/\1/'` != root ] ; then \
 		echo "Can only install if root"; \
 		exit 1; \

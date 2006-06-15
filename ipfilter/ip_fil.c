@@ -24,7 +24,7 @@
 #  include <osreldate.h>
 # endif
 #endif
-#ifdef __sgi
+#if defined(__sgi) && (IRIX > 602)
 # define _KMEMUSER
 # include <sys/ptimers.h>
 #endif
@@ -117,6 +117,10 @@
 # include <sys/kernel.h>
 extern	int	ip_optcopy __P((struct ip *, struct ip *));
 #endif
+#if defined(OpenBSD) && (OpenBSD >= 200211) && defined(_KERNEL)
+extern	int	ip6_getpmtu(struct route_in6 *, struct route_in6 *,
+			    struct ifnet *, struct in6_addr *, u_long *);
+#endif
 
 #if !defined(lint)
 static const char sccsid[] = "@(#)ip_fil.c	2.41 6/5/96 (C) 1993-2000 Darren Reed";
@@ -190,6 +194,15 @@ struct timeout ipfr_slowtimer_ch;
 #endif
 #if defined(__sgi) && defined(_KERNEL)
 toid_t ipfr_slowtimer_ch;
+#endif
+
+#if defined(__NetBSD__) && (__NetBSD_Version__ >= 106080000) && \
+    defined(_KERNEL)
+# include <sys/conf.h>
+const struct cdevsw ipl_cdevsw = {
+	iplopen, iplclose, iplread, nowrite, iplioctl,
+	nostop, notty, nopoll, nommap,
+};
 #endif
 
 #if (_BSDI_VERSION >= 199510) && defined(_KERNEL)
@@ -319,7 +332,7 @@ int count;
 # endif
 
 
-# if defined(__NetBSD__)
+# if defined(__NetBSD__) || defined(__OpenBSD__)
 int ipl_enable()
 # else
 int iplattach()
@@ -363,10 +376,13 @@ int iplattach()
 # ifdef NETBSD_PF
 #  if (__NetBSD_Version__ >= 104200000) || (__FreeBSD_version >= 500011)
 #   if __NetBSD_Version__ >= 105110000
-	if (
-	    !(ph_inet = pfil_head_get(PFIL_TYPE_AF, AF_INET))
+	ph_inet = pfil_head_get(PFIL_TYPE_AF, AF_INET);
 #    ifdef USE_INET6
-	    && !(ph_inet6 = pfil_head_get(PFIL_TYPE_AF, AF_INET6))
+	ph_inet6 = pfil_head_get(PFIL_TYPE_AF, AF_INET6);
+#    endif
+	if (ph_inet == NULL
+#    ifdef USE_INET6
+	    && ph_inet6 == NULL
 #    endif
 	   )
 		return ENODEV;
@@ -484,12 +500,13 @@ int ipldetach()
 # endif
 {
 	int s, i;
-#if defined(NETBSD_PF) && (__NetBSD_Version__ >= 104200000)
+#if defined(NETBSD_PF) && \
+    ((__NetBSD_Version__ >= 104200000) || (__FreeBSD_version >= 500011))
 	int error = 0;
 # if __NetBSD_Version__ >= 105150000
-        struct pfil_head *ph_inet = pfil_head_get(PFIL_TYPE_AF, AF_INET);
+	struct pfil_head *ph_inet = pfil_head_get(PFIL_TYPE_AF, AF_INET);
 #  ifdef USE_INET6
-        struct pfil_head *ph_inet6 = pfil_head_get(PFIL_TYPE_AF, AF_INET6);
+	struct pfil_head *ph_inet6 = pfil_head_get(PFIL_TYPE_AF, AF_INET6);
 #  endif
 # endif
 #endif
@@ -524,8 +541,8 @@ int ipldetach()
 	printf("%s unloaded\n", ipfilter_version);
 
 	fr_checkp = fr_savep;
-	i = frflush(IPL_LOGIPF, FR_INQUE|FR_OUTQUE|FR_INACTIVE);
-	i += frflush(IPL_LOGIPF, FR_INQUE|FR_OUTQUE);
+	i = frflush(IPL_LOGIPF, 0, FR_INQUE|FR_OUTQUE|FR_INACTIVE);
+	i += frflush(IPL_LOGIPF, 0, FR_INQUE|FR_OUTQUE);
 	fr_running = 0;
 
 # ifdef NETBSD_PF
@@ -634,7 +651,7 @@ int mode;
 	int error = 0, unit = 0, tmp;
 
 #if (BSD >= 199306) && defined(_KERNEL)
-	if ((securelevel >= 2) && (mode & FWRITE))
+	if ((securelevel >= 3) && (mode & FWRITE))
 		return EPERM;
 #endif
 #ifdef	_KERNEL
@@ -670,7 +687,16 @@ int mode;
 		if (!fr_running)
 			error = EIO;
 		else
-			error = fr_auth_ioctl(data, mode, cmd, NULL, NULL);
+			if ((cmd == SIOCADAFR) || (cmd == SIOCRMAFR)) {
+				if (!(mode & FWRITE))  {
+					error = EPERM;
+				} else {
+					error = frrequest(unit, cmd, data,
+							  fr_active);
+				}
+			} else {
+				error = fr_auth_ioctl(data, mode, cmd);
+			}
 		SPL_X(s);
 		return error;
 	}
@@ -694,7 +720,7 @@ int mode;
 			if (error)
 				break;
 			if (enable)
-# if defined(__NetBSD__)
+# if defined(__NetBSD__) || defined(__OpenBSD__)
 				error = ipl_enable();
 # else
 				error = iplattach();
@@ -767,12 +793,26 @@ int mode;
 		else {
 			error = IRCOPY(data, (caddr_t)&tmp, sizeof(tmp));
 			if (!error) {
-				tmp = frflush(unit, tmp);
+				tmp = frflush(unit, 4, tmp);
 				error = IWCOPY((caddr_t)&tmp, data,
 					       sizeof(tmp));
 			}
 		}
 		break;
+#ifdef	USE_INET6
+	case	SIOCIPFL6 :
+		if (!(mode & FWRITE))
+			error = EPERM;
+		else {
+			error = IRCOPY(data, (caddr_t)&tmp, sizeof(tmp));
+			if (!error) {
+				tmp = frflush(unit, 6, tmp);
+				error = IWCOPY((caddr_t)&tmp, data,
+					       sizeof(tmp));
+			}
+		}
+		break;
+#endif
 	case SIOCSTLCK :
 		error = IRCOPY(data, (caddr_t)&tmp, sizeof(tmp));
 		if (!error) {
@@ -797,12 +837,6 @@ int mode;
 		if (error)
 			error = EFAULT;
 		break;
-	case SIOCAUTHW :
-	case SIOCAUTHR :
-		if (!(mode & FWRITE)) {
-			error = EPERM;
-			break;
-		}
 	case SIOCFRSYN :
 		if (!(mode & FWRITE))
 			error = EPERM;
@@ -986,8 +1020,8 @@ caddr_t data;
 			while ((f = *ftail))
 				ftail = &f->fr_next;
 		else {
+			ftail = fprev;
 			if (fp->fr_hits) {
-				ftail = fprev;
 				while (--fp->fr_hits && (f = *ftail))
 					ftail = &f->fr_next;
 			}
@@ -1008,6 +1042,9 @@ caddr_t data;
 				return EBUSY;
 			if (fg && fg->fg_head)
 				fg->fg_head->fr_ref--;
+			if (unit == IPL_LOGAUTH) {
+				return fr_preauthcmd(req, f, ftail);
+			}
 			if (f->fr_grhead)
 				fr_delgroup((u_int)f->fr_grhead, fp->fr_flags,
 					    unit, set);
@@ -1022,6 +1059,9 @@ caddr_t data;
 		if (f)
 			error = EEXIST;
 		else {
+			if (unit == IPL_LOGAUTH) {
+				return fr_preauthcmd(req, fp, ftail);
+			}
 			KMALLOC(f, frentry_t *);
 			if (f != NULL) {
 				if (fg && fg->fg_head)
@@ -1235,7 +1275,7 @@ struct mbuf **mp;
 	frn.fin_ifp = fin->fin_ifp;
 	frn.fin_v = fin->fin_v;
 	frn.fin_out = fin->fin_out;
-	frn.fin_mp = fin->fin_mp;
+	frn.fin_mp = mp;
 
 	ip = mtod(m, ip_t *);
 	hlen = sizeof(*ip);
@@ -1247,7 +1287,8 @@ struct mbuf **mp;
 		ip->ip_tos = oip->ip_tos;
 		ip->ip_id = oip->ip_id;
 
-# if defined(__NetBSD__) || defined(__OpenBSD__)
+# if defined(__NetBSD__) || \
+     (defined(__OpenBSD__) && (OpenBSD >= 200012))
 		if (ip_mtudisc != 0)
 			ip->ip_off = IP_DF;
 # else
@@ -1278,9 +1319,10 @@ struct mbuf **mp;
 	m->m_pkthdr.rcvif = NULL;
 # endif
 
-	fr_makefrip(hlen, ip, &frn);
-
-	error = ipfr_fastroute(m, mp, &frn, NULL);
+	if (fr_makefrip(hlen, ip, &frn) == 0)
+		error = ipfr_fastroute(m, mp, &frn, NULL);
+	else
+		error = EINVAL;
 	return error;
 }
 
@@ -1413,7 +1455,13 @@ int dst;
 #endif
 
 	if (avail) {
+		slen = oip->ip_len;
+		oip->ip_len = htons(oip->ip_len);
+		soff = oip->ip_off;
+		oip->ip_off = htons(oip->ip_off);
 		bcopy((char *)oip, (char *)&icmp->icmp_ip, MIN(ohlen, avail));
+		oip->ip_len = slen;
+		oip->ip_off = soff;
 		avail -= MIN(ohlen, avail);
 	}
 
@@ -1434,10 +1482,6 @@ int dst;
 	} else
 #endif
 	{
-		slen = oip->ip_len;
-		oip->ip_len = htons(oip->ip_len);
-		soff = oip->ip_off;
-		oip->ip_off = htons(ip->ip_off);
 
 		ip->ip_src.s_addr = dst4.s_addr;
 		ip->ip_dst.s_addr = oip->ip_src.s_addr;
@@ -1457,13 +1501,7 @@ int dst;
 	fin->fin_hlen = hlen;
 	err = send_ip(oip, fin, &m);
 	fin->fin_hlen = shlen;
-#ifdef	USE_INET6
-	if (fin->fin_v == 4)
-#endif
-	{
-		oip->ip_len = slen;
-		oip->ip_off = soff;
-	}
+
 	return err;
 }
 
@@ -1482,7 +1520,7 @@ void
 iplinit()
 {
 
-#  if defined(__NetBSD__)
+#  if defined(__NetBSD__) || defined(__OpenBSD__)
 	if (ipl_enable() != 0)
 #  else
 	if (iplattach() != 0)
@@ -1521,7 +1559,7 @@ frdest_t *fdp;
 	register struct ip *ip, *mhip;
 	register struct mbuf *m = m0;
 	register struct route *ro;
-	int len, off, error = 0, hlen, code;
+	int len, off, error = 0, hlen, code, sout;
 	struct ifnet *ifp, *sifp;
 	struct sockaddr_in *dst;
 	struct route iproute;
@@ -1587,7 +1625,7 @@ frdest_t *fdp;
 	/*
 	 * Route packet.
 	 */
-#ifdef	__sgi
+#if (defined(IRIX) && (IRIX >= 605))
 	ROUTE_RDLOCK();
 #endif
 	bzero((caddr_t)ro, sizeof (*ro));
@@ -1606,8 +1644,12 @@ frdest_t *fdp;
 	 * check that we're going in the correct direction.
 	 */
 	if ((fr != NULL) && (fin->fin_rev != 0)) {
-		if ((ifp != NULL) && (fdp == &fr->fr_tif))
+		if ((ifp != NULL) && (fdp == &fr->fr_tif)) {
+# if (defined(IRIX) && (IRIX >= 605))
+			ROUTE_UNLOCK();
+# endif
 			return 0;
+		}
 	} else if (fdp != NULL) {
 		if (fdp->fd_ip.s_addr != 0)
 			dst->sin_addr = fdp->fd_ip;
@@ -1627,13 +1669,12 @@ frdest_t *fdp;
 	rtalloc(ro);
 # endif
 
-#ifdef	__sgi
-	ROUTE_UNLOCK();
-#endif
-
 	if (!ifp) {
 		if (!fr || !(fr->fr_flags & FR_FASTROUTE)) {
 			error = -2;
+# if (defined(IRIX) && (IRIX >= 605))
+			ROUTE_UNLOCK();
+# endif
 			goto bad;
 		}
 	}
@@ -1646,17 +1687,24 @@ frdest_t *fdp;
 			error = EHOSTUNREACH;
 		else
 			error = ENETUNREACH;
+# if (defined(IRIX) && (IRIX >= 605))
+			ROUTE_UNLOCK();
+# endif
 		goto bad;
 	}
 
 	if (ro->ro_rt->rt_flags & RTF_GATEWAY) {
-#if BSD >= 199306
+#if (BSD >= 199306) || (defined(IRIX) && (IRIX >= 605))
 		dst = (struct sockaddr_in *)ro->ro_rt->rt_gateway;
 #else
 		dst = (struct sockaddr_in *)&ro->ro_rt->rt_gateway;
 #endif
 	}
 	ro->ro_rt->rt_use++;
+
+#if (defined(IRIX) && (IRIX > 602))
+	ROUTE_UNLOCK();
+#endif
 
 	/*
 	 * For input packets which are being "fastrouted", they won't
@@ -1665,6 +1713,7 @@ frdest_t *fdp;
 	 */
 	if (fin->fin_out == 0) {
 		sifp = fin->fin_ifp;
+		sout = fin->fin_out;
 		fin->fin_ifp = ifp;
 		fin->fin_out = 1;
 		if ((fin->fin_fr = ipacct[1][fr_active]) &&
@@ -1674,10 +1723,25 @@ frdest_t *fdp;
 		fin->fin_fr = NULL;
 		if (!fr || !(fr->fr_flags & FR_RETMASK))
 			(void) fr_checkstate(ip, fin);
-		(void) ip_natout(ip, fin);
+
+		switch (ip_natout(ip, fin))
+		{
+		case 0 :
+			break;
+		case 1 :
+			ip->ip_sum = 0;
+			break;
+		case -1 :
+			error = EINVAL;
+			goto done;
+			break;
+		}
+
 		fin->fin_ifp = sifp;
+		fin->fin_out = sout;
 	} else
 		ip->ip_sum = 0;
+
 	/*
 	 * If small enough for interface, can just send directly.
 	 */
@@ -1707,8 +1771,14 @@ frdest_t *fdp;
 			ip->ip_sum = in_cksum(m, hlen);
 # endif /* __NetBSD__ && M_CSUM_IPv4 */
 # if	(BSD >= 199306) || (defined(IRIX) && (IRIX >= 605))
+#  ifdef IRIX
+		IFNET_UPPERLOCK(ifp);
+#  endif
 		error = (*ifp->if_output)(ifp, m, (struct sockaddr *)dst,
 					  ro->ro_rt);
+#  ifdef IRIX
+		IFNET_UPPERUNLOCK(ifp);
+#  endif
 # else
 		error = (*ifp->if_output)(ifp, m, (struct sockaddr *)dst);
 # endif
@@ -1854,7 +1924,7 @@ void *ifp;
 	dst->sin_family = AF_INET;
 	dst->sin_addr = ipa;
 # if    (BSD >= 199306) && !defined(__NetBSD__) && !defined(__bsdi__) && \
-        !defined(__OpenBSD__)
+	!defined(__OpenBSD__)
 #  ifdef        RTF_CLONING
 	rtalloc_ign(&iproute, RTF_CLONING);
 #  else
@@ -1898,19 +1968,26 @@ frdest_t *fdp;
 	struct route_in6 *ro;
 	struct ifnet *ifp;
 	frentry_t *fr;
+#if defined(OpenBSD) && (OpenBSD >= 200211)
+	struct route_in6 *ro_pmtu = NULL;
+	struct in6_addr finaldst;
+	ip6_t *ip6;
+#endif
+	u_long mtu;
 	int error;
 
-	ifp = NULL;
 	ro = &ip6route;
 	fr = fin->fin_fr;
 	bzero((caddr_t)ro, sizeof(*ro));
 	dst6 = (struct sockaddr_in6 *)&ro->ro_dst;
 	dst6->sin6_family = AF_INET6;
 	dst6->sin6_len = sizeof(struct sockaddr_in6);
-	dst6->sin6_addr = fin->fin_fi.fi_src.in6;
+	dst6->sin6_addr = fin->fin_fi.fi_dst.in6;
 
 	if (fdp != NULL)
 		ifp = fdp->fd_ifp;
+	else
+		ifp = fin->fin_ifp;
 
 	if ((fr != NULL) && (fin->fin_rev != 0)) {
 		if ((ifp != NULL) && (fdp == &fr->fr_tif))
@@ -1919,9 +1996,14 @@ frdest_t *fdp;
 		if (IP6_NOTZERO(&fdp->fd_ip6))
 			dst6->sin6_addr = fdp->fd_ip6.in6;
 	}
-	if ((ifp == NULL) && ((fr == NULL) || !(fr->fr_flags & FR_FASTROUTE)))
+	if (ifp == NULL)
 		return -2;
 
+#if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)
+	/* KAME */
+	if (IN6_IS_ADDR_LINKLOCAL(&dst6->sin6_addr))
+		dst6->sin6_addr.s6_addr16[1] = htons(ifp->if_index);
+#endif
 	rtalloc((struct route *)ro);
 
 	if ((ifp == NULL) && (ro->ro_rt != NULL))
@@ -1935,11 +2017,31 @@ frdest_t *fdp;
 			dst6 = (struct sockaddr_in6 *)ro->ro_rt->rt_gateway;
 		ro->ro_rt->rt_use++;
 
-		if (m0->m_pkthdr.len <= nd_ifinfo[ifp->if_index].linkmtu)
-			error = nd6_output(ifp, fin->fin_ifp, m0, dst6,
-					   ro->ro_rt);
-		else
-			error = EMSGSIZE;
+#if defined(OpenBSD) && (OpenBSD >= 200211)
+		ip6 = mtod(m0, ip6_t *);
+		ro_pmtu = ro;
+		finaldst = ip6->ip6_dst;
+		error = ip6_getpmtu(ro_pmtu, ro, ifp, &finaldst, &mtu);
+		if (error == 0) {
+#else
+# ifdef IN6_LINKMTU
+			mtu = IN6_LINKMTU(ifp);
+# else
+#  ifdef ND_IFINFO
+			mtu = ND_IFINFO(ifp)->linkmtu;
+#  else
+			mtu = nd_ifinfo[ifp->if_index].linkmtu;
+#  endif
+# endif
+#endif
+			if (m0->m_pkthdr.len <= mtu)
+				error = nd6_output(ifp, fin->fin_ifp, m0,
+						   dst6, ro->ro_rt);
+			else
+				error = EMSGSIZE;
+#if defined(OpenBSD) && (OpenBSD >= 200211)
+		}
+#endif
 	}
 
 	if (ro->ro_rt != NULL) {

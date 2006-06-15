@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  */
-#ifdef __sgi
+#if defined(__sgi) && (IRIX > 602)
 # include <sys/ptimers.h>
 #endif
 #include <sys/param.h>
@@ -98,7 +98,10 @@ char *class;
 			len += val;
 		} else
 			*op++ = io->on_siz;
-		*op++ = IPOPT_MINOFF;
+		if (io->on_value == IPOPT_TS)
+			*op++ = IPOPT_MINOFF + 1;
+		else
+			*op++ = IPOPT_MINOFF;
 
 		while (class && *class) {
 			t = NULL;

@@ -99,6 +99,9 @@
 # include <netinet/tcp.h>
 # include <netinet/udp.h>
 # include <netinet/ip_icmp.h>
+# ifdef USE_INET6
+#  include <netinet/icmp6.h>
+# endif
 # include <netinet/ip_var.h>
 # ifndef _KERNEL
 #  include <syslog.h>
@@ -211,6 +214,26 @@ mb_t *m;
 				break;
 			}
 		}
+#ifdef USE_INET6
+		else if (p == IPPROTO_ICMPV6) {
+			struct icmp6_hdr *icmp;
+
+			icmp = (struct icmp6_hdr *)fin->fin_dp;
+	 
+			/*
+			 * For ICMPV6, if the packet is an error packet, also
+			 * include the information about the packet which
+			 * caused the error.
+			 */
+			if (icmp->icmp6_type < 128) {
+				hlen += MIN(sizeof(struct icmp6_hdr) + 8,
+					    fin->fin_dlen);
+			} else {
+				hlen += MIN(sizeof(struct icmp6_hdr),
+					    fin->fin_dlen);
+			}
+		}
+#endif
 	}
 	/*
 	 * Get the interface number and name to which this packet is
@@ -218,16 +241,17 @@ mb_t *m;
 	 */
 	bzero((char *)ipfl.fl_ifname, sizeof(ipfl.fl_ifname));
 # if SOLARIS && defined(_KERNEL)
-	ipfl.fl_unit = (u_char)ifp->ill_ppa;
+	ipfl.fl_unit = (u_int)ifp->ill_ppa;
 	bcopy(ifp->ill_name, ipfl.fl_ifname,
 	      MIN(ifp->ill_name_length, sizeof(ipfl.fl_ifname)));
 	mlen = (flags & FR_LOGBODY) ? MIN(msgdsize(m) - hlen, 128) : 0;
 # else
 #  if (defined(NetBSD) && (NetBSD <= 1991011) && (NetBSD >= 199603)) || \
-	(defined(OpenBSD) && (OpenBSD >= 199603))
+      (defined(OpenBSD) && (OpenBSD >= 199603)) || \
+      (defined(__FreeBSD__) && (__FreeBSD_version >= 501113))
 	strncpy(ipfl.fl_ifname, ifp->if_xname, IFNAMSIZ);
 #  else
-	ipfl.fl_unit = (u_char)ifp->if_unit;
+	ipfl.fl_unit = (u_int)ifp->if_unit;
 	strncpy(ipfl.fl_ifname, ifp->if_name, MIN(sizeof(ipfl.fl_ifname),
 						  sizeof(ifp->if_name)));
 #  endif
@@ -289,7 +313,7 @@ int *types, cnt;
 	 * rather than create a new one.
 	 */
 	MUTEX_ENTER(&ipl_mutex);
-	if (fin != NULL) {
+	if ((fin != NULL) && (fin->fin_off == 0)) {
 		if ((ipll[dev] != NULL) &&
 		    bcmp((char *)fin, (char *)&iplcrc[dev], FI_LCSIZE) == 0) {
 			ipll[dev]->ipl_count++;
@@ -334,10 +358,10 @@ int *types, cnt;
 	ipl->ipl_dsize = len;
 # ifdef _KERNEL
 #  if SOLARIS || defined(sun)
-	uniqtime((struct timeval *)&ipl->ipl_sec);
+	uniqtime(&ipl->ipl_tv);
 #  else
 #   if BSD >= 199306 || defined(__FreeBSD__) || defined(__sgi)
-	microtime((struct timeval *)&ipl->ipl_sec);
+	microtime(&ipl->ipl_tv);
 #   endif
 #  endif
 # else
@@ -405,7 +429,7 @@ struct uio *uio;
 	SPL_NET(s);
 	MUTEX_ENTER(&ipl_mutex);
 
-	while (!iplused[unit] || !iplt[unit]) {
+	while (iplt[unit] == NULL) {
 # if SOLARIS && defined(_KERNEL)
 		if (!cv_wait_sig(&iplwait, &ipl_mutex)) {
 			MUTEX_EXIT(&ipl_mutex);

@@ -49,6 +49,7 @@ MFLAGS="BINDEST=$(BINDEST)" "SBINDEST=$(SBINDEST)" "MANDIR=$(MANDIR)" \
 	"CPUDIR=$(CPUDIR)"
 #
 CKFLAGS=$(SGIREV) -O2 -I$(TOP) $(IPFLOG) -D_KMEMUSER
+#-D_STANDALONE
 CCARGS=$(SGIREV) -D_KMEMUSER $(DEBUG) $(CFLAGS) $(IPFLOG)
 #-D_STANDALONE
 #
@@ -234,7 +235,7 @@ printstate.o: $(TOP)/printstate.c $(TOP)/ip_compat.h $(TOP)/ip_fil.h \
 	$(CC) $(CCARGS) -c $(TOP)/printstate.c -o $@
 
 clean:
-	${RM} -f *.core *.o ipt fils ipf ipfstat ipftest ipmon ipnat $(LKM)
+	${RM} -f *.core *.o ipt fils ipf ipfs ipfstat ipftest ipmon ipnat $(LKM)
 	${MAKE} -f Makefile.ipsend ${MFLAGS} clean
 	-(for i in *; do \
 		if [ -d $${i} -a -f $${i}/Makefile ] ; then \

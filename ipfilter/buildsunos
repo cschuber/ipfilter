@@ -58,7 +58,10 @@ if [ $rev = 5 ] ; then
 	*gcc*)	# gcc
 		case `uname -p` in
 		sparc)
-			XARCH32="-m32"
+			gcc -m32 -E /dev/null >/dev/null 2>&1
+			if [ $? -eq 0 ] ; then
+				XARCH32="-m32"
+			fi
 			;;
 		*)
 			XARCH32=""

@@ -1,6 +1,10 @@
 #!/bin/sh
 #
-PIDFILE=/etc/opt/ipf/ipmon.pid
+if [ -d /var/run ] ; then
+	PIDFILE=/var/run/ipmon.pid
+else
+	PIDFILE=/etc/opt/ipf/ipmon.pid
+fi
 
 id=`/usr/sbin/modinfo 2>&1 | awk '/ipf/ { print $1 } ' - 2>/dev/null`
 if [ -f $PIDFILE ] ; then
@@ -88,6 +92,7 @@ case "$1" in
 			modunload -i $id 2>/dev/null
 		fi
 		modload /usr/kernel/drv/ipf
+		ipf -y
 		load_ipf_config
 		load_ipnat_config
 		ipmon -Ds

@@ -8,7 +8,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  */
-#ifdef __sgi
+#if defined(__sgi) && (IRIX > 602)
 # include <sys/ptimers.h>
 #endif
 #include <stdio.h>

@@ -61,6 +61,7 @@ int	solipdrvdetach __P((void));
 void	solattach __P((void));
 int	soldetach __P((void));
 
+extern	struct	streamtab ipinfo;
 extern	struct	filterstats	frstats[];
 extern	KRWLOCK_T	ipf_mutex, ipfs_mutex, ipf_nat, ipf_solaris;
 extern	kmutex_t	ipf_rw;
@@ -69,11 +70,13 @@ extern	int	fr_flags;
 
 extern ipnat_t *nat_list;
 
-static	qif_t	*qif_head = NULL;
+static	qif_t	*_qif_head = NULL;
 static	int	ipf_getinfo __P((dev_info_t *, ddi_info_cmd_t,
 				 void *, void **));
 static	int	ipf_probe __P((dev_info_t *));
+#if SOLARIS2 < 10
 static	int	ipf_identify __P((dev_info_t *));
+#endif
 static	int	ipf_attach __P((dev_info_t *, ddi_attach_cmd_t));
 static	int	ipf_detach __P((dev_info_t *, ddi_detach_cmd_t));
 static	qif_t	*qif_from_queue __P((queue_t *));
@@ -133,7 +136,11 @@ static struct dev_ops ipf_ops = {
 	DEVO_REV,
 	0,
 	ipf_getinfo,
+#if SOLARIS2 >= 10
+	nulldev,
+#else
 	ipf_identify,
+#endif
 	ipf_probe,
 	ipf_attach,
 	ipf_detach,
@@ -266,6 +273,7 @@ dev_info_t *dip;
 }
 
 
+#if SOLARIS2 < 10
 static int ipf_identify(dip)
 dev_info_t *dip;
 {
@@ -277,6 +285,7 @@ dev_info_t *dip;
 		return (DDI_IDENTIFIED);
 	return (DDI_NOT_IDENTIFIED);
 }
+#endif
 
 
 static void ipf_ire_walk(ire, arg)
@@ -324,6 +333,22 @@ ddi_attach_cmd_t cmd;
 	if (ipf_debug)
 		cmn_err(CE_NOTE, "IP Filter: attach ipf instance %d", instance);
 #endif
+#ifdef DDI_NO_AUTODETACH
+		if (ddi_prop_update_int(DDI_DEV_T_NONE, dip,
+					DDI_NO_AUTODETACH, 1) !=
+		    DDI_PROP_SUCCESS) {
+			cmn_err(CE_WARN, "!updating DDI_NO_AUTODETACH failed");
+			return DDI_FAILURE;
+		}
+#else
+		if (ddi_prop_update_int(DDI_DEV_T_NONE, dip,
+					"ddi-no-autodetach", 1) !=
+		    DDI_PROP_SUCCESS) {
+			cmn_err(CE_WARN, "!updating ddi-no-autodetach failed");
+			return DDI_FAILURE;
+		}
+#endif  
+
 		if (ddi_create_minor_node(dip, "ipf", S_IFCHR, IPL_LOGIPF,
 					  DDI_PSEUDO, 0) == DDI_FAILURE) {
 			ddi_remove_minor_node(dip, NULL);
@@ -502,7 +527,7 @@ queue_t *q;
 {
 	qif_t *qif;
 
-	for (qif = qif_head; qif; qif = qif->qf_next)
+	for (qif = _qif_head; qif; qif = qif->qf_next)
 		if ((qif->qf_iptr == q->q_ptr) || (qif->qf_optr == q->q_ptr))
 			break;
 	return qif;
@@ -870,6 +895,7 @@ fixalign:
 	 * Make hlen the total size of the IP header plus TCP/UDP/ICMP header
 	 * (if it is one of these three).
 	 */
+	hlen = iphlen;
 	if (sap == 0)
 		p = ip->ip_p;
 #if SOLARIS2 >= 8
@@ -892,6 +918,9 @@ fixalign:
 			/* 76 bytes is enough for a complete ICMP error. */
 			hlen += 76 + sizeof(icmphdr_t);
 			break;
+		case IPPROTO_ESP :
+			hlen += 8;
+			break;
 		default :
 			break;
 		}
@@ -899,8 +928,8 @@ fixalign:
 	woff = 0;
 	if (hlen > mlen) {
 		hlen = mlen;
-	} else if (m->b_wptr - m->b_rptr > plen) {
-		woff = m->b_wptr - m->b_rptr - plen;
+	} else if ((char *)m->b_wptr - (char *)ip > plen) {
+		woff = (char *)m->b_wptr - (char *)ip - plen;
 		m->b_wptr -= woff;
 	}
 
@@ -909,7 +938,7 @@ fixalign:
 	 * enough (above), then copy some more.
 	 */
 	if ((hlen > len)) {
-		if (!pullupmsg(m, (int)hlen)) {
+		if (!pullupmsg(m, (int)hlen + off)) {
 			cmn_err(CE_NOTE, "pullupmsg failed");
 			frstats[out].fr_pull[1]++;
 			return -1;
@@ -917,6 +946,7 @@ fixalign:
 		frstats[out].fr_pull[0]++;
 		ip = (ip_t *)ALIGN32(m->b_rptr);
 	}
+	qif->qf_data = ip;
 	qif->qf_m = m;
 	qif->qf_q = q;
 	qif->qf_off = off;
@@ -932,29 +962,27 @@ fixalign:
 	 * we can't be sure that the ip pointer is still correct!
 	 */
 	if (*mp != NULL) {
-		if (*mp == mt) {
+		if ((*mp == mt) && ((void *)ip == (void *)qif->qf_data)) {
 			m->b_wptr += woff;
 			m->b_rptr -= off;
+		}
+		ip = qif->qf_data;
 #ifndef	sparc
 # if SOLARIS2 >= 8
-			if (sap == IP6_DL_SAP) {
-				ip6->ip6_plen = htons(plen - sizeof(*ip6));
-			} else {
+		if (sap == IP6_DL_SAP) {
+			ip6->ip6_plen = htons(plen - sizeof(*ip6));
+		} else {
 # endif
-				__ipoff = (u_short)ip->ip_off;
-				/*
-				 * plen is useless because of NAT.
-				 */
-				ip->ip_len = htons(ip->ip_len);
-				ip->ip_off = htons(__ipoff);
+			__ipoff = (u_short)ip->ip_off;
+			/*
+			 * plen is useless because of NAT.
+			 */
+			ip->ip_len = htons(ip->ip_len);
+			ip->ip_off = htons(__ipoff);
 # if SOLARIS2 >= 8
-			}
+		}
 # endif
 #endif
-		} else
-			cmn_err(CE_NOTE,
-				"!IP Filter: *mp %p mt %p %s", *mp, mt,
-				"mblk changed, cannot revert ip_len, ip_off");
 	}
 	return err;
 }
@@ -1041,7 +1069,7 @@ again:
 	}
 	READ_ENTER(&ipfs_mutex);
 	if (!(qif = qif_from_queue(q))) {
-		for (qif = qif_head; qif; qif = qif->qf_next)
+		for (qif = _qif_head; qif; qif = qif->qf_next)
 			if (&qif->qf_rqinit == q->q_qinfo && qif->qf_rqinfo &&
 					qif->qf_rqinfo->qi_putp) {
 				pnext = qif->qf_rqinfo->qi_putp;
@@ -1183,7 +1211,7 @@ again:
 	}
 	READ_ENTER(&ipfs_mutex);
 	if (!(qif = qif_from_queue(q))) {
-		for (qif = qif_head; qif; qif = qif->qf_next)
+		for (qif = _qif_head; qif; qif = qif->qf_next)
 			if (&qif->qf_wqinit == q->q_qinfo && qif->qf_wqinfo &&
 					qif->qf_wqinfo->qi_putp) {
 				pnext = qif->qf_wqinfo->qi_putp;
@@ -1297,13 +1325,15 @@ static int ipf_ip_qin(q, mb)
 queue_t *q;
 mblk_t *mb;
 {
+	int (*func) __P((queue_t *, mblk_t *));
 	struct iocblk *ioc;
 	int ret;
 
 	if (fr_running <= 0) {
-		mb->b_prev = NULL;
-		freemsg(mb);
-		return 0;
+		func = ipf_ip_inp;
+		if (func == NULL)	/* already restored ? */
+			return (*ipinfo.st_wrinit->qi_putp)(q,mb);
+		return (*func)(q, mb);
 	}
 
 	if (MTYPE(mb) != M_IOCTL)
@@ -1312,9 +1342,10 @@ mblk_t *mb;
 	READ_ENTER(&ipf_solaris);
 	if (fr_running <= 0) {
 		RWLOCK_EXIT(&ipf_solaris);
-		mb->b_prev = NULL;
-		freemsg(mb);
-		return 0;
+		func = ipf_ip_inp;
+		if (func == NULL)	/* already restored ? */
+			return (*ipinfo.st_wrinit->qi_putp)(q,mb);
+		return (*func)(q, mb);
 	}
 	ioc = (struct iocblk *)mb->b_rptr;
 
@@ -1350,7 +1381,6 @@ mblk_t *mb;
 }
 
 static int ipdrvattcnt = 0;
-extern struct streamtab ipinfo;
 
 void solipdrvattach()
 {
@@ -1399,14 +1429,21 @@ int solipdrvdetach()
  */
 void solattach()
 {
+	static int first_run = 1;
 	queue_t *in, *out;
 	struct frentry *f;
 	qif_t *qif, *qf2;
 	ipnat_t *np;
 	size_t len;
 	ill_t *il;
+#if SOLARIS2 >= 10
+	ill_walk_context_t ctx;
 
-	for (il = ill_g_head; il; il = il->ill_next) {
+	for (il = ILL_START_WALK_ALL(&ctx); il; il = ill_next(&ctx, il))
+#else
+	for (il = ill_g_head; il; il = il->ill_next)
+#endif
+	{
 		in = il->ill_rq;
 		if (!in || !il->ill_wq)
 			continue;
@@ -1417,7 +1454,7 @@ void solattach()
 		/*
 		 * Look for entry already setup for this device
 		 */
-		for (qif = qif_head; qif; qif = qif->qf_next)
+		for (qif = _qif_head; qif; qif = qif->qf_next)
 			if (qif->qf_iptr == in->q_ptr &&
 			    qif->qf_optr == out->q_ptr)
 				break;
@@ -1442,7 +1479,7 @@ void solattach()
 		}
 
 		if (in->q_qinfo->qi_putp == fr_qin) {
-			for (qf2 = qif_head; qf2; qf2 = qf2->qf_next)
+			for (qf2 = _qif_head; qf2; qf2 = qf2->qf_next)
 				if (&qf2->qf_rqinit == in->q_qinfo) {
 					qif->qf_rqinfo = qf2->qf_rqinfo;
 					break;
@@ -1463,7 +1500,7 @@ void solattach()
 			qif->qf_rqinfo = in->q_qinfo;
 
 		if (out->q_qinfo->qi_putp == fr_qout) {
-			for (qf2 = qif_head; qf2; qf2 = qf2->qf_next)
+			for (qf2 = _qif_head; qf2; qf2 = qf2->qf_next)
 				if (&qf2->qf_wqinit == out->q_qinfo) {
 					qif->qf_wqinfo = qf2->qf_wqinfo;
 					break;
@@ -1548,8 +1585,8 @@ void solattach()
 		strncpy(qif->qf_name, il->ill_name, sizeof(qif->qf_name));
 		qif->qf_name[sizeof(qif->qf_name) - 1] = '\0';
 
-		qif->qf_next = qif_head;
-		qif_head = qif;
+		qif->qf_next = _qif_head;
+		_qif_head = qif;
 
 		/*
 		 * Activate any rules directly associated with this interface
@@ -1628,7 +1665,8 @@ void solattach()
 #endif
 		out->q_qinfo = &qif->qf_wqinit;
 
-		ire_walk(ipf_ire_walk, (char *)qif);
+		if (first_run == 1)
+			ire_walk(ipf_ire_walk, (char *)qif);
 		RWLOCK_EXIT(&ipfs_mutex);
 		cmn_err(CE_CONT, "IP Filter: attach to [%s,%d] - %s\n",
 			qif->qf_name, il->ill_ppa,
@@ -1639,7 +1677,8 @@ void solattach()
 #endif
 			);
 	}
-	if (!qif_head)
+	first_run = 0;
+	if (!_qif_head)
 		cmn_err(CE_CONT, "IP Filter: not attached to any interfaces\n");
 	return;
 }
@@ -1655,11 +1694,19 @@ int ipfsync()
 	register ipnat_t *np;
 	register qif_t *qif, **qp;
 	register ill_t *il;
+#if SOLARIS2 >= 10
+	ill_walk_context_t ctx;
+#endif
 	queue_t *in, *out;
 
 	WRITE_ENTER(&ipfs_mutex);
-	for (qp = &qif_head; (qif = *qp); ) {
+	for (qp = &_qif_head; (qif = *qp); ) {
+#if SOLARIS2 >= 10
+		il = ILL_START_WALK_ALL(&ctx);
+		for (; il; il = ill_next(&ctx, il))
+#else
 		for (il = ill_g_head; il; il = il->ill_next)
+#endif
 			if ((qif->qf_ill == il) &&
 			    !strcmp(qif->qf_name, il->ill_name)) {
 #if SOLARIS2 < 8
@@ -1752,7 +1799,12 @@ int ipfsync()
 	/*
 	 * Resync. any NAT `connections' using this interface and its IP #.
 	 */
-	for (il = ill_g_head; il; il = il->ill_next) {
+#if SOLARIS2 >= 10
+	for (il = ILL_START_WALK_ALL(&ctx); il; il = ill_next(&ctx, il))
+#else
+	for (il = ill_g_head; il; il = il->ill_next)
+#endif
+	{
 		ip_natsync((void *)il);
 		ip_statesync((void *)il);
 	}
@@ -1768,14 +1820,22 @@ int soldetach()
 	queue_t *in, *out;
 	qif_t *qif, **qp;
 	ill_t *il;
+#if SOLARIS2 >= 10
+	ill_walk_context_t ctx;
+#endif
 
 	WRITE_ENTER(&ipfs_mutex);
 	/*
 	 * Make two passes, first get rid of all the unknown devices, next
 	 * unlink known devices.
 	 */
-	for (qp = &qif_head; (qif = *qp); ) {
+	for (qp = &_qif_head; (qif = *qp); ) {
+#if SOLARIS2 >= 10
+		il = ILL_START_WALK_ALL(&ctx);
+		for (; il; il = ill_next(&ctx, il))
+#else
 		for (il = ill_g_head; il; il = il->ill_next)
+#endif
 			if (qif->qf_ill == il)
 				break;
 		if (il) {
@@ -1787,9 +1847,14 @@ int soldetach()
 		KFREE(qif);
 	}
 
-	while ((qif = qif_head)) {
-		qif_head = qif->qf_next;
+	while ((qif = _qif_head)) {
+		_qif_head = qif->qf_next;
+#if SOLARIS2 >= 10
+		il = ILL_START_WALK_ALL(&ctx);
+		for (; il; il = ill_next(&ctx, il))
+#else
 		for (il = ill_g_head; il; il = il->ill_next)
+#endif
 			if (qif->qf_ill == il)
 				break;
 		if (il) {

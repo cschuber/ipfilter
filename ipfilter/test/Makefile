@@ -28,7 +28,7 @@ intests: in1 in2 in3 in4
 
 logtests: l1
 
-ipv6: ipv6.1 ipv6.2
+ipv6: ipv6.1 ipv6.2 ipv6.3
 
 0:
 	@(cd ..; make ipftest; )
@@ -51,7 +51,7 @@ i1 i2 i3 i4 i5 i6 i7 i8 i9 i10 i11 i12:
 n1 n2 n3 n4 n5 n6 n7:
 	@/bin/sh ./nattest $@
 
-ni1 ni2 ni3 ni4 ni5:
+ni1 ni2 ni3 ni4 ni5 ni7 ni8 ni10 ni11:
 	@/bin/sh ./natipftest $@
 
 in1 in2 in3 in4:
@@ -60,7 +60,7 @@ in1 in2 in3 in4:
 l1:
 	@/bin/sh ./logtest $@
 
-ipv6.1 ipv6.2:
+ipv6.1 ipv6.2 ipv6.3:
 	@/bin/sh ./dotest6 $@
 
 clean:
@@ -70,5 +70,5 @@ clean:
 	/bin/rm -f ni1 ni2 ni3 ni4 ni5
 	/bin/rm -f in1 in2 in3 in4
 	/bin/rm -f l1
-	/bin/rm -f ipv6.1 ipv6.2
+	/bin/rm -f ipv6.1 ipv6.2 ipv6.3
 	/bin/rm -f results/*

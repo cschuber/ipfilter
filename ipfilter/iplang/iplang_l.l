@@ -318,5 +318,6 @@ void swallow()
 		while ((c != '\n') && (c != EOF))
 			c = input();
 	}
-	unput(c);
+	if (c != EOF)
+		unput(c);
 }

@@ -88,9 +88,6 @@ nat_t *nat;
 	u_short sp;
 	nat_t *ipn;
 	mb_t *m;
-#if	SOLARIS
-	mb_t *m1;
-#endif
 
 	tcp = (tcphdr_t *)fin->fin_dp;
 
@@ -143,6 +140,7 @@ nat_t *nat;
 		tcp2->th_sport = htons(sp);
 		tcp2->th_dport = 0; /* XXX - don't specify remote port */
 		tcp2->th_off = 5;
+		tcp2->th_flags = TH_SYN;
 		fi.fin_data[1] = 0;
 		fi.fin_dp = (char *)tcp2;
 		fi.fin_dlen = sizeof(*tcp2);

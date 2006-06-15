@@ -84,14 +84,13 @@ all:
 	@echo "solaris	- auto-selects SunOS4.1.x/Solaris 2.3-6/Solaris2.4-6x86"
 	@echo "netbsd	- compile for NetBSD"
 	@echo "openbsd	- compile for OpenBSD"
-	@echo "freebsd	- compile for FreeBSD 2.0, 2.1 or earlier"
+	@echo "freebsd20	- compile for FreeBSD 2.0, 2.1 or earlier"
 	@echo "freebsd22	- compile for FreeBSD-2.2 or greater"
 	@echo "freebsd3	- compile for FreeBSD-3.x"
 	@echo "freebsd4	- compile for FreeBSD-4.x"
 	@echo "bsd	- compile for generic 4.4BSD systems"
 	@echo "bsdi	- compile for BSD/OS"
 	@echo "irix	- compile for SGI IRIX"
-	@echo "linux	- compile for Linux 2.0.31+"
 	@echo ""
 
 tests:
@@ -124,7 +123,7 @@ freebsd22: include
 	else \
 		ln -s `uname -v|sed -e 's@^.*:\(/[^: ]*\).*@\1@'`/ioconf.h BSD/$(CPU) ; \
 	fi
-	make freebsd
+	make freebsd20
 
 freebsd4: include
 	if [ x$INET6 = x ] ; then \
@@ -151,7 +150,7 @@ openbsd openbsd21: include
 	(cd BSD/$(CPUDIR); make build TOP=../.. $(MFLAGS) 'DLKM=-D_LKM' "ML=mln_ipl.c"; cd ..)
 	(cd BSD/$(CPUDIR); make -f Makefile.ipsend TOP=../.. $(MFLAGS); cd ..)
 
-freebsd freebsd20 freebsd21: include
+freebsd20 freebsd21: include
 	make setup "TARGOS=BSD" "CPUDIR=$(CPUDIR)"
 	(cd BSD/$(CPUDIR); make build TOP=../.. $(MFLAGS) "ML=mlf_ipl.c"; cd ..)
 	(cd BSD/$(CPUDIR); make -f Makefile.ipsend TOP=../.. $(MFLAGS); cd ..)
@@ -237,15 +236,15 @@ get:
 		fi \
 	done
 
-sunos4 solaris1:
+sunos4 solaris1: null
 	(cd SunOS4; make build TOP=.. "CC=$(CC)" $(DEST) $(MFLAGS); cd ..)
 	(cd SunOS4; make -f Makefile.ipsend "CC=$(CC)" TOP=.. $(DEST) $(MFLAGS); cd ..)
 
-sunos5 solaris2:
+sunos5 solaris2: null
 	(cd SunOS5/$(CPUDIR); make build TOP=../.. "CC=$(CC)" $(DEST) $(MFLAGS) "SOLARIS2=$(SOLARIS2)" "CPU=-Dsparc -D__sparc__"; cd ..)
 	(cd SunOS5/$(CPUDIR); make -f Makefile.ipsend TOP=../.. "CC=$(CC)" $(DEST) $(MFLAGS); cd ..)
 
-sunos5x86 solaris2x86:
+sunos5x86 solaris2x86: null
 	(cd SunOS5/$(CPUDIR); make build TOP=../.. "CC=$(CC)" $(DEST) $(MFLAGS) "SOLARIS2=$(SOLARIS2)" "CPU=-Di86pc -Di386 -D__i386__"; cd ..)
 	(cd SunOS5/$(CPUDIR); make -f Makefile.ipsend TOP=../.. "CC=$(CC)" $(DEST) $(MFLAGS); cd ..)
 
@@ -282,3 +281,34 @@ rcsget:
 do-cvs:
 	find . -type d -name CVS -print | xargs /bin/rm -rf
 	find . -type f -name .cvsignore -print | xargs /bin/rm -f
+
+null:
+	-@if [ "`$(MAKE) -v 2>&1 | sed -ne 's/GNU.*/GNU/p'`" = "GNU" ] ; then \
+		echo 'Do not use GNU make (gmake) to compile IPFilter'; \
+		exit 1; \
+	fi
+	-@echo make ok
+
+test-solaris test-sunos4 test-sunos5: solaris
+	(cd test && make clean && make)
+
+test-freebsd: freebsd
+	(cd test && make clean && make)
+
+test-freebsd22: freebsd22
+	(cd test && make clean && make)
+
+test-freebsd3: freebsd3
+	(cd test && make clean && make)
+
+test-freebsd4: freebsd4
+	(cd test && make clean && make)
+
+test-netbsd: netbsd
+	(cd test && make clean && make)
+
+test-openbsd: openbsd
+	(cd test && make clean && make)
+
+test-irix: irix
+	(cd test && make clean && make)

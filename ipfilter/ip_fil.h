@@ -63,6 +63,7 @@
 # define	SIOCSTGET	_IOWR('r', 81, struct ipstate_save *)
 # define	SIOCSTGSZ	_IOWR('r', 82, struct natget)
 # define	SIOCGFRST	_IOWR('r', 83, struct ipfrstat *)
+# define	SIOCIPFL6	_IOWR('r', 84, int)
 #else
 # define	SIOCADAFR	_IOW(r, 60, struct frentry *)
 # define	SIOCRMAFR	_IOW(r, 61, struct frentry *)
@@ -88,6 +89,7 @@
 # define	SIOCSTGET	_IOWR(r, 81, struct ipstate_save *)
 # define	SIOCSTGSZ	_IOWR(r, 82, struct natget)
 # define	SIOCGFRST	_IOWR(r, 83, struct ipfrstat *)
+# define	SIOCIPFL6	_IOWR(r, 84, int)
 #endif
 #define	SIOCADDFR	SIOCADAFR
 #define	SIOCDELFR	SIOCRMAFR
@@ -149,7 +151,7 @@ typedef	struct	fr_info	{
 	u_short	fin_dlen;		/* length of data portion of packet */
 	u_short	fin_id;			/* IP packet id field */
 	u_int	fin_misc;
-	void	*fin_mp;		/* pointer to pointer to mbuf */
+	mb_t	**fin_mp;		/* pointer to pointer to mbuf */
 #if SOLARIS
 	void	*fin_qfm;		/* pointer to mblk where pkt starts */
 	void	*fin_qif;
@@ -412,13 +414,15 @@ typedef	struct frgroup {
  * structure which is then followed by any packet data.
  */
 typedef	struct	iplog	{
-	u_32_t	ipl_magic;
-	u_int	ipl_count;
-	u_long	ipl_sec;
-	u_long	ipl_usec;
-	size_t	ipl_dsize;
+	u_32_t		ipl_magic;
+	u_int		ipl_count;
+	struct	timeval	ipl_tv;
+	size_t		ipl_dsize;
 	struct	iplog	*ipl_next;
 } iplog_t;
+
+#define	ipl_sec		ipl_tv.tv_sec
+#define	ipl_usec	ipl_tv.tv_usec
 
 #define IPL_MAGIC	0x49504c4d /* 'IPLM' */
 #define	IPLOG_SIZE	sizeof(iplog_t)
@@ -612,7 +616,7 @@ extern	int	ipflog __P((u_int, ip_t *, fr_info_t *, mb_t *));
 extern	int	ipllog __P((int, fr_info_t *, void **, size_t *, int *, int));
 extern	int	ipflog_read __P((minor_t, struct uio *));
 
-extern	int	frflush __P((minor_t, int));
+extern	int	frflush __P((minor_t, int, int));
 extern	void	frsync __P((void));
 extern	frgroup_t *fr_addgroup __P((u_32_t, frentry_t *, minor_t, int));
 extern	void	fr_delgroup __P((u_32_t, u_32_t, minor_t, int));
@@ -624,7 +628,7 @@ extern	void	fr_forgetifp __P((void *));
 extern	void	fr_getstat __P((struct friostat *));
 extern	int	fr_ifpaddr __P((int, void *, struct in_addr *));
 extern	int	fr_lock __P((caddr_t, int *));
-extern  void	fr_makefrip __P((int, ip_t *, fr_info_t *));
+extern  int	fr_makefrip __P((int, ip_t *, fr_info_t *));
 extern	u_short	fr_tcpsum __P((mb_t *, ip_t *, tcphdr_t *));
 extern	int	fr_scanlist __P((u_32_t, ip_t *, fr_info_t *, void *));
 extern	int	fr_tcpudpchk __P((frtuc_t *, fr_info_t *));

@@ -7,7 +7,7 @@
 static const char sccsid[] = "@(#)lsock.c	1.2 1/11/96 (C)1995 Darren Reed";
 static const char rcsid[] = "@(#)$Id$";
 #endif
-#ifdef __sgi
+#if defined(__sgi) && (IRIX > 602)
 # include <sys/ptimers.h>
 #endif
 #include <stdio.h>

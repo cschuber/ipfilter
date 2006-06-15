@@ -3,6 +3,9 @@ IP Filter has been mostly tested under IRIX 6.2 and 6.5.
 Under IRIX 5.3, it has been successfully compiled and linked in the kernel,
 but not tested.
 
+To compile it under IRIX 6.2, you may need to uncomment (and join the
+lines) with "-D_STANDALONE" in the Makefiles in the IRIX directory.
+
 To build a kernel with the IP filter and install it on your system,
 follow these steps:
 
