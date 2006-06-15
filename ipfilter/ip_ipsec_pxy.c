@@ -16,7 +16,7 @@ int ippr_ipsec_init __P((void));
 void ippr_ipsec_fini __P((void));
 int ippr_ipsec_new __P((fr_info_t *, ap_session_t *, nat_t *));
 void ippr_ipsec_del __P((ap_session_t *));
-int ippr_ipsec_out __P((fr_info_t *, ap_session_t *, nat_t *));
+int ippr_ipsec_inout __P((fr_info_t *, ap_session_t *, nat_t *));
 int ippr_ipsec_match __P((fr_info_t *, ap_session_t *, nat_t *));
 
 static	frentry_t	ipsecfr;
@@ -80,7 +80,7 @@ nat_t *nat;
 	fr_info_t fi;
 	ipnat_t *ipn;
 	char *ptr;
-	int p, off, dlen;
+	int p, off, dlen, ttl;
 	mb_t *m;
 	ip_t *ip;
 
@@ -112,13 +112,14 @@ nat_t *nat;
 	 * describe ESP but UDP instead.
 	 */
 	ipn = &ipsec->ipsc_rule;
-	ipn->in_tqehead[0] = ipsecnattqe;
-	ipn->in_tqehead[1] = ipsecnattqe;
+	ttl = IPF_TTLVAL(ipsecnattqe->ifq_ttl);
+	ipn->in_tqehead[0] = fr_addtimeoutqueue(&nat_utqe, ttl);
+	ipn->in_tqehead[1] = fr_addtimeoutqueue(&nat_utqe, ttl);
 	ipn->in_ifps[0] = fin->fin_ifp;
 	ipn->in_apr = NULL;
 	ipn->in_use = 1;
 	ipn->in_hits = 1;
-	ipn->in_nip = nat->nat_outip.s_addr;
+	ipn->in_nip = ntohl(nat->nat_outip.s_addr);
 	ipn->in_ippip = 1;
 	ipn->in_inip = nat->nat_inip.s_addr;
 	ipn->in_inmsk = 0xffffffff;
@@ -173,7 +174,7 @@ nat_t *nat;
  * For outgoing IKE packets.  refresh timeouts for NAT & state entries, if
  * we can.  If they have disappeared, recreate them.
  */
-int ippr_ipsec_out(fin, aps, nat)
+int ippr_ipsec_inout(fin, aps, nat)
 fr_info_t *fin;
 ap_session_t *aps;
 nat_t *nat;
@@ -183,19 +184,29 @@ nat_t *nat;
 	ip_t *ip;
 	int p;
 
-	ip = fin->fin_ip;
-	bcopy((char *)fin, (char *)&fi, sizeof(fi));
-	fi.fin_fi.fi_p = IPPROTO_ESP;
-	fi.fin_fr = &ipsecfr;
-	fi.fin_data[0] = 0;
-	fi.fin_data[1] = 0;
-	p = ip->ip_p;
-	ip->ip_p = IPPROTO_ESP;
-	fi.fin_flx &= ~FI_TCPUDP;
-	fi.fin_flx |= FI_IGNORE;
+	if ((fin->fin_out == 1) && (nat->nat_dir == NAT_INBOUND))
+		return 0;
+
+	if ((fin->fin_out == 0) && (nat->nat_dir == NAT_OUTBOUND))
+		return 0;
 
 	ipsec = aps->aps_data;
+
 	if (ipsec != NULL) {
+		ip = fin->fin_ip;
+		p = ip->ip_p;
+
+		if ((ipsec->ipsc_nat == NULL) || (ipsec->ipsc_state == NULL)) {
+			bcopy((char *)fin, (char *)&fi, sizeof(fi));
+			fi.fin_fi.fi_p = IPPROTO_ESP;
+			fi.fin_fr = &ipsecfr;
+			fi.fin_data[0] = 0;
+			fi.fin_data[1] = 0;
+			ip->ip_p = IPPROTO_ESP;
+			fi.fin_flx &= ~FI_TCPUDP;
+			fi.fin_flx |= FI_IGNORE;
+		}
+
 		/*
 		 * Update NAT timeout/create NAT if missing.
 		 */
@@ -205,7 +216,7 @@ nat_t *nat;
 			ipsec->ipsc_nat = nat_new(&fi, &ipsec->ipsc_rule,
 						  &ipsec->ipsc_nat,
 						  NAT_SLAVE|SI_WILDP,
-						  NAT_OUTBOUND);
+						  nat->nat_dir);
 			if (ipsec->ipsc_nat != NULL) {
 				(void) nat_proto(&fi, ipsec->ipsc_nat, 0);
 				nat_update(&fi, ipsec->ipsc_nat,
@@ -229,8 +240,8 @@ nat_t *nat;
 							&ipsec->ipsc_state,
 							SI_WILDP);
 		}
+		ip->ip_p = p;
 	}
-	ip->ip_p = p & 0xff;
 	return 0;
 }
 
@@ -294,18 +305,14 @@ ap_session_t *aps;
 
 	if (ipsec != NULL) {
 		/*
-		 * Don't delete it from here, just schedule it to be
-		 * deleted ASAP.
+		 * Don't bother changing any of the NAT structure details,
+		 * *_del() is on a callback from aps_free(), from nat_delete()
 		 */
-		if (ipsec->ipsc_nat != NULL) {
-			ipsec->ipsc_nat->nat_age = fr_ticks + 1;
-			ipsec->ipsc_nat->nat_ptr = NULL;
-			fr_queuefront(&ipsec->ipsc_nat->nat_tqe);
-		}
 
 		READ_ENTER(&ipf_state);
 		if (ipsec->ipsc_state != NULL) {
 			ipsec->ipsc_state->is_die = fr_ticks + 1;
+			ipsec->ipsc_state->is_me = NULL;
 			fr_queuefront(&ipsec->ipsc_state->is_sti);
 		}
 		RWLOCK_EXIT(&ipf_state);

@@ -864,6 +864,13 @@ int	blen;
 		(void) sprintf(t, "%s PR icmpv6 %d",
 			hostname(res, sl->isl_v, (u_32_t *)&sl->isl_dst),
 			sl->isl_itype);
+	} else {
+		(void) sprintf(t, "%s -> ",
+			hostname(res, sl->isl_v, (u_32_t *)&sl->isl_src));
+		t += strlen(t);
+		(void) sprintf(t, "%s PR %s",
+			hostname(res, sl->isl_v, (u_32_t *)&sl->isl_dst),
+			proto);
 	}
 	t += strlen(t);
 	if (sl->isl_tag != FR_NOLOGTAG) {
@@ -873,7 +880,14 @@ int	blen;
 	if (sl->isl_type != ISL_NEW) {
 		sprintf(t,
 #ifdef	USE_QUAD_T
+#ifdef	PRId64
+			" Forward: Pkts in %" PRId64 " Bytes in %" PRId64
+			" Pkts out %" PRId64 " Bytes out %" PRId64
+			" Backward: Pkts in %" PRId64 " Bytes in %" PRId64
+			" Pkts out %" PRId64 " Bytes out %" PRId64,
+#else
 			" Forward: Pkts in %qd Bytes in %qd Pkts out %qd Bytes out %qd Backward: Pkts in %qd Bytes in %qd Pkts out %qd Bytes out %qd",
+#endif /* PRId64 */
 #else
 			" Forward: Pkts in %ld Bytes in %ld Pkts out %ld Bytes out %ld Backward: Pkts in %ld Bytes in %ld Pkts out %ld Bytes out %ld",
 #endif
@@ -928,25 +942,16 @@ int	logtype, blen;
 		}
 
 		if (logtype == IPL_LOGIPF) {
-			if (ipl->ipl_magic != IPL_MAGIC) {
-				/* invalid data or out of sync */
-				break;
-			}
-			print_ipflog(log, buf, psize);
+			if (ipl->ipl_magic == IPL_MAGIC)
+				print_ipflog(log, buf, psize);
 
 		} else if (logtype == IPL_LOGNAT) {
-			if (ipl->ipl_magic != IPL_MAGIC_NAT) {
-				/* invalid data or out of sync */
-				break;
-			}
-			print_natlog(log, buf, psize);
+			if (ipl->ipl_magic == IPL_MAGIC_NAT)
+				print_natlog(log, buf, psize);
 
 		} else if (logtype == IPL_LOGSTATE) {
-			if (ipl->ipl_magic != IPL_MAGIC_STATE) {
-				/* invalid data or out of sync */
-				break;
-			}
-			print_statelog(log, buf, psize);
+			if (ipl->ipl_magic == IPL_MAGIC_STATE)
+				print_statelog(log, buf, psize);
 		}
 
 		blen -= psize;
@@ -1087,7 +1092,7 @@ int	blen;
 		p = (u_short)ip6->ip6_nxt;
 		s = (u_32_t *)&ip6->ip6_src;
 		d = (u_32_t *)&ip6->ip6_dst;
-		plen = ntohs(ip6->ip6_plen);
+		plen = hl + ntohs(ip6->ip6_plen);
 #else
 		sprintf(t, "ipv6");
 		goto printipflog;
@@ -1206,11 +1211,13 @@ int	blen;
 					IP_HL(ipc) << 2, i);
 				t += strlen(t);
 				if (ipoff & IP_OFFMASK) {
-					(void) sprintf(t, " frag %s%s%hu@%hu",
-						ipoff & IP_MF ? "+" : "",
-						ipoff & IP_DF ? "-" : "",
+					(void) sprintf(t,
+						"(frag %d:%hu@%hu%s%s)",
+						ntohs(ipc->ip_id),
 						i - (IP_HL(ipc) << 2),
-						(ipoff & IP_OFFMASK) << 3);
+						(ipoff & IP_OFFMASK) << 3,
+						ipoff & IP_MF ? "+" : "",
+						ipoff & IP_DF ? "-" : "");
 				}
 			}
 
@@ -1222,10 +1229,11 @@ int	blen;
 			hostname(res, v, d), proto, hl, plen);
 		t += strlen(t);
 		if (off & IP_OFFMASK)
-			(void) sprintf(t, " frag %s%s%hu@%hu",
+			(void) sprintf(t, " (frag %d:%hu@%hu%s%s)",
+				ntohs(ip->ip_id),
+				plen - hl, (off & IP_OFFMASK) << 3,
 				ipoff & IP_MF ? "+" : "",
-				ipoff & IP_DF ? "-" : "",
-				plen - hl, (off & IP_OFFMASK) << 3);
+				ipoff & IP_DF ? "-" : "");
 	}
 	t += strlen(t);
 

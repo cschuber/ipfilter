@@ -54,8 +54,14 @@ ipfrule_modevent(module_t mod, int type, void *unused)
 }
 
 static moduledata_t ipfrulemod = {
-	IPL_VERSION,
+	"ipfrule",
 	ipfrule_modevent,
         0
 };
 DECLARE_MODULE(ipfrule, ipfrulemod, SI_SUB_PROTO_DOMAIN, SI_ORDER_ANY);
+#ifdef	MODULE_DEPEND
+MODULE_DEPEND(ipfrule, ipfilter, 1, 1, 1);
+#endif
+#ifdef	MODULE_VERSION
+MODULE_VERSION(ipfrule, 1);
+#endif

@@ -180,7 +180,6 @@ static int ipfilter_init(void)
 		printf("unable to get major for ipf devs\n");
 		return -EINVAL;
 	}
-	printk("IPFilter got cdev major #%d\n", ipfmajor);
 
 #ifdef	CONFIG_DEVFS_FS
 	for (i = 0; ipf_devfiles[i] != NULL; i++) {
@@ -212,7 +211,8 @@ static int ipfilter_init(void)
 		else
 			defpass = "no-match -> block";
 
-		printf("%s initialized.  Default = %s all, Logging = %s%s\n",
+		printk(KERN_INFO "%s initialized.  Default = %s all, "
+		       "Logging = %s%s\n",
 			ipfilter_version, defpass,
 #ifdef IPFILTER_LOG
 			"enabled",
@@ -242,11 +242,16 @@ static int ipfilter_fini(void)
 	int i;
 #endif
 
-	result = ipldetach();
-	if (result != 0) {
-		if (result > 0)
-			result = -result;
-		return result;
+	if (fr_refcnt)
+		return EBUSY;
+
+	if (fr_running >= 0) {
+		result = ipldetach();
+		if (result != 0) {
+			if (result > 0)
+				result = -result;
+			return result;
+		}
 	}
 
 	fr_running = -2;
@@ -263,7 +268,7 @@ static int ipfilter_fini(void)
 	}
 #endif
 	unregister_chrdev(ipfmajor, "ipf");
-	printf("%s unloaded\n", ipfilter_version);
+	printk(KERN_INFO "%s unloaded\n", ipfilter_version);
 
 	return 0;
 }

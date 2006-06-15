@@ -12,10 +12,8 @@ int proto;
 		return htons(atoi(name) & 65535);
 
 	p = getprotobynumber(proto);
-	if (p != NULL) {
-		s = getservbyname(name, p->p_name);
-		if (s != NULL)
-			return s->s_port;
-	}
+	s = getservbyname(name, p ? p->p_name : NULL);
+	if (s != NULL)
+		return s->s_port;
 	return 0;
 }

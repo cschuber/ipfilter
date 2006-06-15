@@ -12,12 +12,6 @@ static const char rcsid[] = "@(#)$Id$";
 #define	SOLARIS	(defined(sun) && (defined(__svr4__) || defined(__SVR4)))
 #endif
 
-#if defined(KERNEL) || defined(_KERNEL)
-# undef KERNEL
-# undef _KERNEL
-# define        KERNEL	1
-# define        _KERNEL	1
-#endif
 #include <sys/param.h>
 #if defined(__FreeBSD__) && !defined(__FreeBSD_version)
 # if defined(IPFILTER_LKM)
@@ -36,11 +30,13 @@ static const char rcsid[] = "@(#)$Id$";
 #endif
 #include <sys/types.h>
 #define _KERNEL
+#define KERNEL
 #ifdef __OpenBSD__
 struct file;
 #endif
 #include <sys/uio.h>
 #undef _KERNEL
+#undef KERNEL
 #include <sys/file.h>
 #include <sys/ioctl.h>
 #ifdef __sgi
@@ -83,6 +79,9 @@ struct file;
 #include <sys/hashing.h>
 # endif
 #endif
+#if defined(__FreeBSD__)
+# include "radix_ipf.h"
+#endif
 #include <net/route.h>
 #include <netinet/in.h>
 #if !(defined(__sgi) && !defined(IFF_DRVRLOCK)) /* IRIX < 6 */ && \
@@ -99,7 +98,7 @@ struct file;
 # include <netinet/tcp_timer.h>
 #endif
 #if defined(__osf__) || defined(__hpux) || defined(__sgi)
-# include "radix_ipf.h"
+# include "radix_ipf_local.h"
 # define _RADIX_H_
 #endif
 #include <netinet/udp.h>
@@ -360,11 +359,24 @@ int mode;
 		else {
 			error = COPYIN(data, &tmp, sizeof(tmp));
 			if (!error) {
-				tmp = frflush(unit, tmp);
+				tmp = frflush(unit, 4, tmp);
 				error = COPYOUT(&tmp, data, sizeof(tmp));
 			}
 		}
 		break;
+#ifdef	USE_INET6
+	case	SIOCIPFL6 :
+		if (!(mode & FWRITE))
+			error = EPERM;
+		else {
+			error = COPYIN(data, &tmp, sizeof(tmp));
+			if (!error) {
+				tmp = frflush(unit, 6, tmp);
+				error = COPYOUT(&tmp, data, sizeof(tmp));
+			}
+		}
+		break;
+#endif
 	case SIOCSTLCK :
 		error = COPYIN(data, &tmp, sizeof(tmp));
 		if (error == 0) {
@@ -482,7 +494,7 @@ struct sockaddr *s;
 	ip = MTOD(mb, ip_t *);
 
 #if (defined(NetBSD) && (NetBSD <= 1991011) && (NetBSD >= 199606)) || \
-    (defined(OpenBSD) && (OpenBSD >= 199603)) || \
+    (defined(OpenBSD) && (OpenBSD >= 199603)) || defined(linux) || \
     (defined(__FreeBSD__) && (__FreeBSD_version >= 501113))
 	sprintf(fname, "/tmp/%s", ifp->if_xname);
 #else
@@ -505,7 +517,7 @@ int v;
 {
 	struct ifnet *ifp, **ifa, **old_ifneta;
 #if (defined(NetBSD) && (NetBSD <= 1991011) && (NetBSD >= 199606)) || \
-    (defined(OpenBSD) && (OpenBSD >= 199603)) || \
+    (defined(OpenBSD) && (OpenBSD >= 199603)) || defined(linux) || \
     (defined(__FreeBSD__) && (__FreeBSD_version >= 501113))
 
 	if (name == NULL)
@@ -559,7 +571,7 @@ int v;
 	ifp = ifneta[nifs - 1];
 
 #if (defined(NetBSD) && (NetBSD <= 1991011) && (NetBSD >= 199606)) || \
-    (defined(OpenBSD) && (OpenBSD >= 199603)) || \
+    (defined(OpenBSD) && (OpenBSD >= 199603)) || defined(linux) || \
     (defined(__FreeBSD__) && (__FreeBSD_version >= 501113))
 	(void) strncpy(ifp->if_xname, name, sizeof(ifp->if_xname));
 #else
@@ -585,7 +597,7 @@ struct ifnet *ifp;
 {
 	static char ifname[LIFNAMSIZ];
 
-#if defined(__OpenBSD__) || defined(__NetBSD__) || \
+#if defined(__OpenBSD__) || defined(__NetBSD__) || defined(linux) || \
     (defined(__FreeBSD__) && (__FreeBSD_version >= 501113))
 	sprintf(ifname, "%s", ifp->if_xname);
 #else
@@ -603,7 +615,7 @@ void init_ifp()
 	int fd;
 
 #if (defined(NetBSD) && (NetBSD <= 1991011) && (NetBSD >= 199606)) || \
-    (defined(OpenBSD) && (OpenBSD >= 199603)) || \
+    (defined(OpenBSD) && (OpenBSD >= 199603)) || defined(linux) || \
     (defined(__FreeBSD__) && (__FreeBSD_version >= 501113))
 	for (ifa = ifneta; ifa && (ifp = *ifa); ifa++) {
 		ifp->if_output = write_output;
@@ -668,7 +680,7 @@ int type;
 fr_info_t *fin;
 int dst;
 {
-	verbose("- TCP RST sent\n");
+	verbose("- ICMP unreachable sent\n");
 	return 0;
 }
 

@@ -220,7 +220,8 @@ ippr_rpcb_in(fin, aps, nat)
 	rs = (rpcb_session_t *)aps->aps_data;
 
 	m = fin->fin_m;
-	off = (char *)fin->fin_dp - MTOD(m, char *) + sizeof(udphdr_t);
+	off = (char *)fin->fin_dp - (char *)fin->fin_ip;
+	off += sizeof(udphdr_t) + fin->fin_ipoff;
 	dlen = fin->fin_dlen - sizeof(udphdr_t);
 
 	/* Disallow packets outside legal range for supported requests. */
@@ -291,7 +292,8 @@ ippr_rpcb_out(fin, aps, nat)
 	rs = (rpcb_session_t *)aps->aps_data;
 
 	m = fin->fin_m;
-	off = (char *)fin->fin_dp - MTOD(m, char *) + sizeof(udphdr_t);
+	off = (char *)fin->fin_dp - (char *)fin->fin_ip;
+	off += sizeof(udphdr_t) + fin->fin_ipoff;
 	dlen = fin->fin_dlen - sizeof(udphdr_t);
 	diff = 0;
 

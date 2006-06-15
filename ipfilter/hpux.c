@@ -341,6 +341,9 @@ static int ipf_detach()
 {
 	int i;
 
+	if (fr_refcnt)
+		return EBUSY;
+
 	/*
 	 * Make sure we're the only one's modifying things.  With
 	 * this lock others should just fall out of the loop.

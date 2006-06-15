@@ -23,10 +23,6 @@
 #include <unistd.h>
 #include <stddef.h>
 #include <sys/socket.h>
-#if defined(__osf__)
-# define radix_node ipf_radix_node
-# define radix_node_head ipf_radix_node_head
-#endif
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>

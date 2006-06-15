@@ -66,19 +66,19 @@ ipfrwlock_t	ipf_frag, ipf_state, ipf_nat, ipf_natfrag, ipf_auth;
 kcondvar_t	iplwait, ipfauthwait;
 #if SOLARIS2 >= 7
 timeout_id_t	fr_timer_id;
-u_int		*ip_ttl_ptr;
-u_int		*ip_mtudisc;
+u_int		*ip_ttl_ptr = NULL;
+u_int		*ip_mtudisc = NULL;
 # if SOLARIS2 >= 8
-int		*ip_forwarding;
-u_int		*ip6_forwarding;
+int		*ip_forwarding = NULL;
+u_int		*ip6_forwarding = NULL;
 # else
-u_int		*ip_forwarding;
+u_int		*ip_forwarding = NULL;
 # endif
 #else
 int		fr_timer_id;
-u_long		*ip_ttl_ptr;
-u_long		*ip_mtudisc;
-u_long		*ip_forwarding;
+u_long		*ip_ttl_ptr = NULL;
+u_long		*ip_mtudisc = NULL;
+u_long		*ip_forwarding = NULL;
 #endif
 int		ipf_locks_done = 0;
 
@@ -99,13 +99,12 @@ int ipldetach()
 
 	ASSERT(rw_read_locked(&ipf_global.ipf_lk) == 0);
 
-	if (fr_refcnt)
-		return EBUSY;
-
 	if (fr_control_forwarding & 2) {
-		*ip_forwarding = 0;
+		if (ip_forwarding != NULL)
+			*ip_forwarding = 0;
 #if SOLARIS2 >= 8
-		*ip6_forwarding = 0;
+		if (ip6_forwarding != NULL)
+			*ip6_forwarding = 0;
 #endif
 	}
 
@@ -115,8 +114,8 @@ int ipldetach()
 
 	fr_deinitialise();
 
-	(void) frflush(IPL_LOGIPF, FR_INQUE|FR_OUTQUE|FR_INACTIVE);
-	(void) frflush(IPL_LOGIPF, FR_INQUE|FR_OUTQUE);
+	(void) frflush(IPL_LOGIPF, 0, FR_INQUE|FR_OUTQUE|FR_INACTIVE);
+	(void) frflush(IPL_LOGIPF, 0, FR_INQUE|FR_OUTQUE);
 
 	if (ipf_locks_done == 1) {
 		MUTEX_DESTROY(&ipf_timeoutlock);
@@ -144,7 +143,7 @@ int iplattach __P((void))
 	RWLOCK_INIT(&ipf_ipidfrag, "ipf IP NAT-Frag rwlock");
 	ipf_locks_done = 1;
 
-	if (fr_initialise() == -1)
+	if (fr_initialise() < 0)
 		return -1;
 
 #if SOLARIS2 >= 8
@@ -156,6 +155,7 @@ int iplattach __P((void))
 	 * of the array.
 	 */
 
+#if SOLARIS2 <= 8
 	for (i = 0; ; i++) {
 		if (!strcmp(ip_param_arr[i].ip_param_name, "ip_def_ttl")) {
 			ip_ttl_ptr = &ip_param_arr[i].ip_param_value;
@@ -182,11 +182,14 @@ int iplattach __P((void))
 		    ip_forwarding != NULL)
 			break;
 	}
+#endif
 
 	if (fr_control_forwarding & 1) {
-		*ip_forwarding = 1;
+		if (ip_forwarding != NULL)
+			*ip_forwarding = 1;
 #if SOLARIS2 >= 8
-		*ip6_forwarding = 1;
+		if (ip6_forwarding != NULL)
+			*ip6_forwarding = 1;
 #endif
 	}
 
@@ -227,7 +230,8 @@ int *rp;
 		if (unit != IPL_LOGIPF)
 			return EIO;
 		if (cmd != SIOCIPFGETNEXT && cmd != SIOCIPFGET &&
-		    cmd != SIOCIPFSET && cmd != SIOCFRENB && cmd != SIOCGETFS)
+		    cmd != SIOCIPFSET && cmd != SIOCFRENB &&
+		    cmd != SIOCGETFS && cmd != SIOCGETFF)
 			return EIO;
 	}
 
@@ -351,7 +355,7 @@ int *rp;
 			error = COPYIN((caddr_t)data, (caddr_t)&tmp,
 				       sizeof(tmp));
 			if (!error) {
-				tmp = frflush(unit, tmp);
+				tmp = frflush(unit, 4, tmp);
 				error = COPYOUT((caddr_t)&tmp, (caddr_t)data,
 					       sizeof(tmp));
 				if (error != 0)
@@ -360,6 +364,24 @@ int *rp;
 				error = EFAULT;
 		}
 		break;
+#ifdef USE_INET6
+	case	SIOCIPFL6 :
+		if (!(mode & FWRITE))
+			error = EPERM;
+		else {
+			error = COPYIN((caddr_t)data, (caddr_t)&tmp,
+				       sizeof(tmp));
+			if (!error) {
+				tmp = frflush(unit, 6, tmp);
+				error = COPYOUT((caddr_t)&tmp, (caddr_t)data,
+					       sizeof(tmp));
+				if (error != 0)
+					error = EFAULT;
+			} else
+				error = EFAULT;
+		}
+		break;
+#endif
 	case SIOCSTLCK :
 		error = COPYIN((caddr_t)data, (caddr_t)&tmp, sizeof(tmp));
 		if (error == 0) {
@@ -575,10 +597,8 @@ fr_info_t *fin;
 	}
 	tcp2->th_off = sizeof(struct tcphdr) >> 2;
 
-	/*
-	 * This is to get around a bug in the Solaris 2.4/2.5 TCP checksum
-	 * computation that is done by their put routine.
-	 */
+	ip = (ip_t *)m->b_rptr;
+	ip->ip_v = fin->fin_v;
 #ifdef	USE_INET6
 	if (fin->fin_v == 6) {
 		ip6 = (ip6_t *)m->b_rptr;
@@ -589,7 +609,6 @@ fr_info_t *fin;
 	} else
 #endif
 	{
-		ip = (ip_t *)m->b_rptr;
 		ip->ip_src.s_addr = fin->fin_daddr;
 		ip->ip_dst.s_addr = fin->fin_saddr;
 		ip->ip_id = fr_nextipid(fin);
@@ -624,9 +643,14 @@ mblk_t *m;
 		ip_t *ip;
 
 		ip = (ip_t *)m->b_rptr;
-		ip->ip_v = IPVERSION;
-		ip->ip_ttl = (u_char)(*ip_ttl_ptr);
-		ip->ip_off = htons(*ip_mtudisc ? IP_DF : 0);
+		if (ip_ttl_ptr != NULL)
+			ip->ip_ttl = (u_char)(*ip_ttl_ptr);
+		else
+			ip->ip_ttl = 63;
+		if (ip_mtudisc != NULL)
+			ip->ip_off = htons(*ip_mtudisc ? IP_DF : 0);
+		else
+			ip->ip_off = htons(IP_DF);
 		ip->ip_sum = ipf_cksum((u_short *)ip, sizeof(*ip));
 	}
 	i = fr_fastroute(m, &m, fin, NULL);
@@ -707,6 +731,8 @@ int dst;
 	m->b_rptr += 64;
 	m->b_wptr = m->b_rptr + sz;
 	bzero((char *)m->b_rptr, (size_t)sz);
+	ip = (ip_t *)m->b_rptr;
+	ip->ip_v = fin->fin_v;
 	icmp = (struct icmp *)(m->b_rptr + hlen);
 	icmp->icmp_type = type & 0xff;
 	icmp->icmp_code = code & 0xff;
@@ -722,7 +748,7 @@ int dst;
 		int csz;
 
 		if (dst == 0) {
-			if (fr_ifpaddr(6, FRI_NORMAL, qpi->qpi_ill,
+			if (fr_ifpaddr(6, FRI_NORMAL, qpi->qpi_real,
 				       (struct in_addr *)&dst6, NULL) == -1) {
 				FREE_MB_T(m);
 				return -1;
@@ -743,14 +769,13 @@ int dst;
 	} else
 #endif
 	{
-		ip = (ip_t *)m->b_rptr;
 		ip->ip_hl = sizeof(*ip) >> 2;
 		ip->ip_p = IPPROTO_ICMP;
 		ip->ip_id = fin->fin_ip->ip_id;
 		ip->ip_tos = fin->fin_ip->ip_tos;
 		ip->ip_len = htons((u_short)sz);
 		if (dst == 0) {
-			if (fr_ifpaddr(4, FRI_NORMAL, qpi->qpi_ill,
+			if (fr_ifpaddr(4, FRI_NORMAL, qpi->qpi_real,
 				       &dst4, NULL) == -1) {
 				FREE_MB_T(m);
 				return -1;
@@ -779,9 +804,9 @@ int dst;
  * return the first IP Address associated with an interface
  */
 /*ARGSUSED*/
-int fr_ifpaddr(v, atype, ifptr, inp, inpmask)
+int fr_ifpaddr(v, atype, qifptr, inp, inpmask)
 int v, atype;
-void *ifptr;
+void *qifptr;
 struct in_addr *inp, *inpmask;
 {
 #ifdef	USE_INET6
@@ -790,7 +815,10 @@ struct in_addr *inp, *inpmask;
 	struct sockaddr_in sin, mask;
 	qif_t *qif;
 
-	qif = ifptr;
+	if ((qifptr == NULL) || (qifptr == (void *)-1))
+		return -1;
+
+	qif = qifptr;
 
 #ifdef	USE_INET6
 	if (v == 6) {
@@ -1176,7 +1204,19 @@ frdest_t *fdp;
 			fin->fin_fr = NULL;
 			if (!fr || !(fr->fr_flags & FR_RETMASK))
 				(void) fr_checkstate(fin, &pass);
-			(void) fr_checknatout(fin, NULL);
+
+			switch (fr_checknatout(fin, NULL))
+			{
+			case 0 :
+				break;
+			case 1 :
+				ip->ip_sum = 0;
+				break;
+			case -1 :
+				goto bad_fastroute;
+				break;
+			}
+
 			fin->fin_out = 0;
 			fin->fin_ifp = saveifp;
 		}

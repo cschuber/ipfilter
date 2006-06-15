@@ -86,11 +86,12 @@ struct file;
 #endif
 
 #include "netinet/ip_ftp_pxy.c"
+#include "netinet/ip_rcmd_pxy.c"
 #if defined(_KERNEL)
 # include "netinet/ip_irc_pxy.c"
-# include "netinet/ip_rcmd_pxy.c"
 # include "netinet/ip_raudio_pxy.c"
 # include "netinet/ip_h323_pxy.c"
+# include "netinet/ip_pptp_pxy.c"
 # ifdef	IPFILTER_PRO
 #  include "netinet/ip_msnrpc_pxy.c"
 # endif
@@ -140,7 +141,12 @@ aproxy_t	ap_proxies[] = {
 #ifdef	IPF_IPSEC_PROXY
 	{ NULL, "ipsec", (char)IPPROTO_UDP, 0, 0,
 	  ippr_ipsec_init, ippr_ipsec_fini, ippr_ipsec_new, ippr_ipsec_del,
-	  NULL, ippr_ipsec_out, NULL, NULL },
+	  ippr_ipsec_inout, ippr_ipsec_inout, ippr_ipsec_match, NULL },
+#endif
+#ifdef	IPF_PPTP_PROXY
+	{ NULL, "pptp", (char)IPPROTO_TCP, 0, 0,
+	  ippr_pptp_init, ippr_pptp_fini, ippr_pptp_new, ippr_pptp_del,
+	  ippr_pptp_inout, ippr_pptp_inout, ippr_pptp_match, NULL },
 #endif
 #ifdef  IPF_H323_PROXY
 	{ NULL, "h323", (char)IPPROTO_TCP, 0, 0, ippr_h323_init, ippr_h323_fini,
@@ -311,6 +317,12 @@ nat_t *nat;
 	aproxy_t *apr;
 	ipnat_t *ipn;
 
+#if PROXY_DEBUG
+	printf("appr_match(%lx,%lx)\n", fin, nat);
+#endif
+	if ((fin->fin_flx & (FI_SHORT|FI_BAD)) != 0)
+		return -1;
+
 	ipn = nat->nat_ptr;
 	if (ipn == NULL)
 		return -1;
@@ -337,6 +349,9 @@ nat_t *nat;
 	register ap_session_t *aps;
 	aproxy_t *apr;
 
+#if PROXY_DEBUG
+	printf("appr_new(%lx,%lx)\n", fin, nat);
+#endif
 	if ((nat->nat_ptr == NULL) || (nat->nat_aps != NULL))
 		return -1;
 
@@ -404,7 +419,7 @@ nat_t *nat;
 #ifndef IPFILTER_CKSUM
 	if ((fin->fin_out == 0) && (fr_checkl4sum(fin) == -1)) {
 # if PROXY_DEBUG || !defined(_KERNEL)
-		printf("proxy l4 checksum failure\n");
+		printf("proxy l4 checksum failure on %p\n", fin);
 # endif
 		if (fin->fin_p == IPPROTO_TCP)
 			frstats[fin->fin_out].fr_tcpbad++;
@@ -418,9 +433,11 @@ nat_t *nat;
 		 * If there is data in this packet to be proxied then try and
 		 * get it all into the one buffer, else drop it.
 		 */
+#if defined(MENTAT) || defined(HAVE_M_PULLDOWN)
 		if ((fin->fin_dlen > 0) && !(fin->fin_flx & FI_COALESCE))
 			if (fr_coalesce(fin) == -1)
 				return -1;
+#endif
 		ip = fin->fin_ip;
 
 		switch (fin->fin_p)
@@ -460,13 +477,14 @@ nat_t *nat;
 		rv = APR_EXIT(err);
 		if (rv == 1) {
 #if PROXY_DEBUG || !defined(_KERNEL)
-			printf("proxy says bad packet received\n");
+			printf("%d:proxy says bad packet received (%x)\n",
+				fin->fin_out, err);
 #endif
 			return -1;
 		}
 		if (rv == 2) {
 #if PROXY_DEBUG || !defined(_KERNEL)
-			printf("proxy says free app proxy data\n");
+			printf("proxy says free app proxy data (%x)\n", err);
 #endif
 			appr_free(apr);
 			nat->nat_aps = NULL;
@@ -534,6 +552,10 @@ u_int pr;
 char *name;
 {
 	aproxy_t *ap;
+
+#if PROXY_DEBUG
+	printf("appr_lookup(%d,%s)\n", pr, name);
+#endif
 
 	for (ap = ap_proxies; ap->apr_p; ap++)
 		if ((ap->apr_p == pr) &&

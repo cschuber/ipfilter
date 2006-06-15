@@ -150,7 +150,9 @@ char *argv[];
 			if (s != NULL)
 				*s = '\0';
 			ipset = 1;
+			node.ipn_addr.adf_len = sizeof(node.ipn_addr);
 			node.ipn_addr.adf_addr.in4.s_addr = inet_addr(optarg);
+			node.ipn_mask.adf_len = sizeof(node.ipn_mask);
 			node.ipn_mask.adf_addr.in4.s_addr = mask.s_addr;
 			break;
 		case 'm' :
@@ -171,6 +173,9 @@ char *argv[];
 			opts |= OPT_VERBOSE;
 			break;
 		}
+
+	if (opts & OPT_DEBUG)
+		fprintf(stderr, "poolnodecommand: opts = %#x\n", opts);
 
 	if (ipset == 0)
 		return -1;
@@ -242,6 +247,9 @@ char *argv[];
 			break;
 		}
 
+	if (opts & OPT_DEBUG)
+		fprintf(stderr, "poolcommand: opts = %#x\n", opts);
+
 	if (poolname == NULL) {
 		fprintf(stderr, "poolname not given with add/remove pool\n");
 		return -1;
@@ -290,7 +298,7 @@ char *argv[], *infile;
 
 	infile = optarg;
 
-	while ((c = getopt(argc, argv, "dnrRv")) != -1)
+	while ((c = getopt(argc, argv, "dnRuv")) != -1)
 		switch (c)
 		{
 		case 'd' :
@@ -300,16 +308,19 @@ char *argv[], *infile;
 		case 'n' :
 			opts |= OPT_DONOTHING;
 			break;
-		case 'r' :
-			opts |= OPT_REMOVE;
-			break;
 		case 'R' :
 			opts |= OPT_NORESOLVE;
+			break;
+		case 'u' :
+			opts |= OPT_REMOVE;
 			break;
 		case 'v' :
 			opts |= OPT_VERBOSE;
 			break;
 		}
+
+	if (opts & OPT_DEBUG)
+		fprintf(stderr, "loadpoolfile: opts = %#x\n", opts);
 
 	if (!(opts & OPT_DONOTHING) && (fd == -1)) {
 		fd = open(IPLOOKUP_NAME, O_RDWR);
@@ -332,6 +343,8 @@ char *argv[];
 	char *kernel, *core, *poolname;
 	int c, role, type, live_kernel;
 	ip_pool_stat_t *plstp, plstat;
+	iphtstat_t *htstp, htstat;
+	iphtable_t *hptr;
 	iplookupop_t op;
 	ip_pool_t *ptr;
 
@@ -381,6 +394,9 @@ char *argv[];
 			break;
 		}
 
+	if (opts & OPT_DEBUG)
+		fprintf(stderr, "poollist: opts = %#x\n", opts);
+
 	if (!(opts & OPT_DONOTHING) && (fd == -1)) {
 		fd = open(IPLOOKUP_NAME, O_RDWR);
 		if (fd == -1) {
@@ -394,31 +410,68 @@ char *argv[];
 		strncpy(op.iplo_name, poolname, sizeof(op.iplo_name));
 		op.iplo_name[sizeof(op.iplo_name) - 1] = '\0';
 	}
-	op.iplo_type = type;
 	op.iplo_unit = role;
-	op.iplo_size = sizeof(plstat);
-	op.iplo_struct = &plstat;
-	plstp = &plstat;
-
-	c = ioctl(fd, SIOCLOOKUPSTAT, &op);
-	if (c == -1) {
-		perror("ioctl(SIOCLOOKUPSTAT)");
-		return -1;
-	}
 
 	if (openkmem(kernel, core) == -1)
 		exit(-1);
 
-	if (role != IPL_LOGALL) {
-		ptr = plstp->ipls_list[role];
-		while (ptr != NULL) {
-			ptr = printpool(ptr, kmemcpywrap, opts);
+	if (type == IPLT_ALL || type == IPLT_POOL) {
+		plstp = &plstat;
+		op.iplo_type = IPLT_POOL;
+		op.iplo_size = sizeof(plstat);
+		op.iplo_struct = &plstat;
+		c = ioctl(fd, SIOCLOOKUPSTAT, &op);
+		if (c == -1) {
+			perror("ioctl(SIOCLOOKUPSTAT)");
+			return -1;
 		}
-	} else {
-		for (role = 0; role <= IPL_LOGMAX; role++) {
+
+		if (role != IPL_LOGALL) {
 			ptr = plstp->ipls_list[role];
 			while (ptr != NULL) {
 				ptr = printpool(ptr, kmemcpywrap, opts);
+			}
+		} else {
+			for (role = 0; role <= IPL_LOGMAX; role++) {
+				ptr = plstp->ipls_list[role];
+				while (ptr != NULL) {
+					ptr = printpool(ptr, kmemcpywrap,
+							opts);
+				}
+			}
+			role = IPL_LOGALL;
+		}
+	}
+	if (type == IPLT_ALL || type == IPLT_HASH) {
+		htstp = &htstat;
+		op.iplo_type = IPLT_HASH;
+		op.iplo_size = sizeof(htstat);
+		op.iplo_struct = &htstat;
+		c = ioctl(fd, SIOCLOOKUPSTAT, &op);
+		if (c == -1) {
+			perror("ioctl(SIOCLOOKUPSTAT)");
+			return -1;
+		}
+
+		if (role != IPL_LOGALL) {
+			hptr = htstp->iphs_tables;
+			while (hptr != NULL) {
+				hptr = printhash(hptr, kmemcpywrap, opts);
+			}
+		} else {
+			for (role = 0; role <= IPL_LOGMAX; role++) {
+				hptr = htstp->iphs_tables;
+				while (hptr != NULL) {
+					hptr = printhash(hptr, kmemcpywrap,
+							 opts);
+				}
+
+				op.iplo_unit = role;
+				c = ioctl(fd, SIOCLOOKUPSTAT, &op);
+				if (c == -1) {
+					perror("ioctl(SIOCLOOKUPSTAT)");
+					return -1;
+				}
 			}
 		}
 	}
@@ -433,6 +486,7 @@ char *argv[];
 	int c, type, role, live_kernel;
 	ip_pool_stat_t plstat;
 	char *kernel, *core;
+	iphtstat_t htstat;
 	iplookupop_t op;
 
 	core = NULL;
@@ -442,8 +496,6 @@ char *argv[];
 	role = IPL_LOGALL;
 
 	bzero((char *)&op, sizeof(op));
-	op.iplo_struct = &plstat;
-	op.iplo_size = sizeof(plstat);
 
 	while ((c = getopt(argc, argv, "dM:N:o:t:v")) != -1)
 		switch (c)
@@ -479,6 +531,9 @@ char *argv[];
 			break;
 		}
 
+	if (opts & OPT_DEBUG)
+		fprintf(stderr, "poolstats: opts = %#x\n", opts);
+
 	if (!(opts & OPT_DONOTHING) && (fd == -1)) {
 		fd = open(IPLOOKUP_NAME, O_RDWR);
 		if (fd == -1) {
@@ -487,15 +542,35 @@ char *argv[];
 		}
 	}
 
-	if (!(opts & OPT_DONOTHING)) {
-		c = ioctl(fd, SIOCLOOKUPSTAT, &op);
-		if (c == -1) {
-			perror("ioctl(SIOCLOOKUPSTAT)");
-			return -1;
+	if (type == IPLT_ALL || type == IPLT_POOL) {
+		op.iplo_type = IPLT_POOL;
+		op.iplo_struct = &plstat;
+		op.iplo_size = sizeof(plstat);
+		if (!(opts & OPT_DONOTHING)) {
+			c = ioctl(fd, SIOCLOOKUPSTAT, &op);
+			if (c == -1) {
+				perror("ioctl(SIOCLOOKUPSTAT)");
+				return -1;
+			}
+			printf("Pools:\t%lu\n", plstat.ipls_pools);
+			printf("Nodes:\t%lu\n", plstat.ipls_nodes);
 		}
-		printf("Pools:\t%lu\n", plstat.ipls_pools);
-		printf("Hash Tables:\t%lu\n", plstat.ipls_tables);
-		printf("Nodes:\t%lu\n", plstat.ipls_nodes);
+	}
+
+	if (type == IPLT_ALL || type == IPLT_HASH) {
+		op.iplo_type = IPLT_HASH;
+		op.iplo_struct = &htstat;
+		op.iplo_size = sizeof(htstat);
+		if (!(opts & OPT_DONOTHING)) {
+			c = ioctl(fd, SIOCLOOKUPSTAT, &op);
+			if (c == -1) {
+				perror("ioctl(SIOCLOOKUPSTAT)");
+				return -1;
+			}
+			printf("Hash Tables:\t%lu\n", htstat.iphs_numtables);
+			printf("Nodes:\t%lu\n", htstat.iphs_numnodes);
+			printf("Out of Memory:\t%lu\n", htstat.iphs_nomem);
+		}
 	}
 	return 0;
 }
@@ -536,6 +611,9 @@ char *argv[];
 			opts |= OPT_VERBOSE;
 			break;
 		}
+
+	if (opts & OPT_DEBUG)
+		fprintf(stderr, "poolflush: opts = %#x\n", opts);
 
 	if (!(opts & OPT_DONOTHING) && (fd == -1)) {
 		fd = open(IPLOOKUP_NAME, O_RDWR);
@@ -601,7 +679,7 @@ u_int *minor;
 {
 	int type;
 
-	if (!strcasecmp(optarg, "pool")) {
+	if (!strcasecmp(optarg, "tree")) {
 		type = IPLT_POOL;
 	} else if (!strcasecmp(optarg, "hash")) {
 		type = IPLT_HASH;

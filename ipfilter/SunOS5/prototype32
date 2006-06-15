@@ -37,10 +37,12 @@ s none /sbin/ipfs=../usr/sbin/ipfs
 s none /sbin/ipfstat=../usr/sbin/ipfstat
 s none /sbin/ipf=../usr/sbin/ipf
 s none /sbin/ipnat=../usr/sbin/ipnat
+s none /sbin/ippool=../usr/sbin/ippool
 l none /usr/sbin/ipfs=../../usr/lib/isaexec
 l none /usr/sbin/ipfstat=../../usr/lib/isaexec
 l none /usr/sbin/ipf=../../usr/lib/isaexec
 l none /usr/sbin/ipnat=../../usr/lib/isaexec
+l none /usr/sbin/ippool=../../usr/lib/isaexec
 l none /usr/sbin/ipmon=../../usr/lib/isaexec
 d none /usr/sbin ? ? ?
 d none /usr/sbin/sparcv7 ? ? ?
@@ -48,6 +50,7 @@ f none /usr/sbin/sparcv7/ipfs=root/sbin/sparcv7/ipfs
 f none /usr/sbin/sparcv7/ipfstat=root/sbin/sparcv7/ipfstat
 f none /usr/sbin/sparcv7/ipf=root/sbin/sparcv7/ipf
 f none /usr/sbin/sparcv7/ipnat=root/sbin/sparcv7/ipnat
+f none /usr/sbin/sparcv7/ippool=root/sbin/sparcv7/ippool
 f none /usr/sbin/sparcv7/ipmon=root/opt/ipf/bin/sparcv7/ipmon
 d none /etc ? ? ?
 d none /etc/init.d ? ? ?
@@ -62,6 +65,7 @@ f none /opt/ipf/man/man8/ipmon.8=root/opt/ipf/man/man8/ipmon.8
 f none /opt/ipf/man/man8/ipf.8=root/opt/ipf/man/man8/ipf.8
 f none /opt/ipf/man/man8/ipfs.8=root/opt/ipf/man/man8/ipfs.8
 f none /opt/ipf/man/man8/ipnat.8=root/opt/ipf/man/man8/ipnat.8
+f none /opt/ipf/man/man8/ippool.8=root/opt/ipf/man/man8/ippool.8
 f none /opt/ipf/man/man1/ipftest.1=root/opt/ipf/man/man1/ipftest.1
 f none /opt/ipf/man/man1/mkfilters.1=root/opt/ipf/man/man1/mkfilters.1
 f none /opt/ipf/man/man4/ipf.4=root/opt/ipf/man/man4/ipf.4
@@ -69,6 +73,7 @@ f none /opt/ipf/man/man4/ipl.4=root/opt/ipf/man/man4/ipl.4
 f none /opt/ipf/man/man4/ipnat.4=root/opt/ipf/man/man4/ipnat.4
 f none /opt/ipf/man/man5/ipf.5=root/opt/ipf/man/man5/ipf.5
 f none /opt/ipf/man/man5/ipnat.5=root/opt/ipf/man/man5/ipnat.5
+f none /opt/ipf/man/man5/ippool.5=root/opt/ipf/man/man5/ippool.5
 f none /usr/kernel/drv/ipf.conf=root/usr/kernel/drv/ipf.conf
 f none /usr/include/ipfilter/ip_fil.h=root/usr/include/ipfilter/ip_fil.h
 f none /usr/include/ipfilter/ip_auth.h=root/usr/include/ipfilter/ip_auth.h

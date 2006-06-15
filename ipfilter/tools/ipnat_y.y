@@ -87,7 +87,7 @@ static	void	setnatproto __P((int));
 %token	IPNY_ROUNDROBIN IPNY_FRAG IPNY_AGE IPNY_ICMPIDMAP IPNY_PROXY
 %token	IPNY_TCP IPNY_UDP IPNY_TCPUDP IPNY_STICKY IPNY_MSSCLAMP IPNY_TAG
 %token	IPNY_TLATE
-%type	<num> hexnumber numports compare range proto
+%type	<num> hexnumber compare range proto portspec
 %type	<ipa> hostname ipv4
 %type	<ipp> addr nummask rhaddr
 %type	<pc> portstuff
@@ -122,9 +122,12 @@ assigning:
 xx:					{ newnatrule(); }
 	;
 
-rule:	map
-	| mapblock
-	| redir
+rule:	map eol
+	| mapblock eol
+	| redir eol
+	;
+
+eol:	| ';'
 	;
 
 map:	mapit ifnames addr IPNY_TLATE rhaddr proxy mapoptions
@@ -151,7 +154,7 @@ map:	mapit ifnames addr IPNY_TLATE rhaddr proxy mapoptions
 					strncpy(nat->in_ifnames[1],
 						nat->in_ifnames[0],
 						sizeof(nat->in_ifnames[0]));
-				  if ((nat->in_flags & IPN_TCPUDP) == 0)
+				  if ((nat->in_flags & IPN_TCPUDPICMPQ) == 0)
 					setnatproto(nat->in_p);
 				  if (((nat->in_redir & NAT_MAPBLK) != 0) ||
 				      ((nat->in_flags & IPN_AUTOPORTMAP) != 0))
@@ -177,7 +180,7 @@ map:	mapit ifnames addr IPNY_TLATE rhaddr proxy mapoptions
 					strncpy(nat->in_ifnames[1],
 						nat->in_ifnames[0],
 						sizeof(nat->in_ifnames[0]));
-				  if ((nat->in_flags & IPN_TCPUDP) == 0)
+				  if ((nat->in_flags & IPN_TCPUDPICMPQ) == 0)
 					setnatproto(nat->in_p);
 				  if (((nat->in_redir & NAT_MAPBLK) != 0) ||
 				      ((nat->in_flags & IPN_AUTOPORTMAP) != 0))
@@ -275,6 +278,8 @@ rhaddr:	addr				{ $$.a = $1.a; $$.m = $1.m; }
 	| IPNY_RANGE ipv4 '-' ipv4
 					{ $$.a = $2; $$.m = $4;
 					  nat->in_flags |= IPN_IPRANGE; }
+	;
+
 dip:
 	ipv4				{ nat->in_inip = $1.s_addr;
 					  nat->in_inmsk = 0xffffffff; }
@@ -283,16 +288,26 @@ dip:
 					  nat->in_inmsk = $3.s_addr; }
 	;
 
-dport:	| IPNY_PORT YY_NUMBER			{ nat->in_pmin = htons($2);
+portspec:
+	YY_NUMBER			{ $$ = $1; }
+	| YY_STR			{ $$ = getport(NULL, $1); }
+	;
+
+dport:	| IPNY_PORT portspec			{ nat->in_pmin = htons($2);
 						  nat->in_pmax = htons($2); }
-	| IPNY_PORT YY_NUMBER '-' YY_NUMBER	{ nat->in_pmin = htons($2);
+	| IPNY_PORT portspec '-' portspec	{ nat->in_pmin = htons($2);
+						  nat->in_pmax = htons($4); }
+	| IPNY_PORT portspec ':' portspec	{ nat->in_pmin = htons($2);
 						  nat->in_pmax = htons($4); }
 	;
 
-nport:	IPNY_PORT YY_NUMBER			{ nat->in_pnext = htons($2); }
+nport:	IPNY_PORT portspec		{ nat->in_pnext = htons($2); }
+	| IPNY_PORT '=' portspec	{ nat->in_pnext = htons($3);
+					  nat->in_flags |= IPN_FIXEDDPORT;
+					}
 	;
 
-ports:	| IPNY_PORTS numports		{ nat->in_pmin = $2; }
+ports:	| IPNY_PORTS YY_NUMBER		{ nat->in_pmin = $2; }
 	| IPNY_PORTS IPNY_AUTO		{ nat->in_flags |= IPN_AUTOPORTMAP; }
 	;
 
@@ -327,26 +342,40 @@ ifnames:
 	| ifname ',' otherifname
 	;
 
-ifname:	YY_STR				{ strncpy(nat->in_ifnames[0], $1,
-						  sizeof(nat->in_ifnames[0]));
-					  free($1);
-					}
+ifname:	YY_STR			{ strncpy(nat->in_ifnames[0], $1,
+					  sizeof(nat->in_ifnames[0]));
+				  nat->in_ifnames[0][LIFNAMSIZ - 1] = '\0';
+				  free($1);
+				}
 	;
 
 otherifname:
-	YY_STR				{ strncpy(nat->in_ifnames[1], $1,
-						  sizeof(nat->in_ifnames[1]));
-					  free($1);
-					}
+	YY_STR			{ strncpy(nat->in_ifnames[1], $1,
+					  sizeof(nat->in_ifnames[1]));
+				  nat->in_ifnames[1][LIFNAMSIZ - 1] = '\0';
+				  free($1);
+				}
 	;
 
 mapport:
-	IPNY_PORTMAP tcpudp YY_NUMBER ':' YY_NUMBER
-					{ nat->in_pmin = htons($3);
-					  nat->in_pmax = htons($5); }
-	| IPNY_PORTMAP tcpudp IPNY_AUTO	{ nat->in_flags |= IPN_AUTOPORTMAP;
-					  nat->in_pmin = htons(1024);
-					  nat->in_pmax = htons(65535); }
+	IPNY_PORTMAP tcpudp portspec ':' portspec
+			{ nat->in_pmin = htons($3);
+			  nat->in_pmax = htons($5);
+			}
+	| IPNY_PORTMAP tcpudp IPNY_AUTO
+			{ nat->in_flags |= IPN_AUTOPORTMAP;
+			  nat->in_pmin = htons(1024);
+			  nat->in_pmax = htons(65535);
+			}
+	| IPNY_ICMPIDMAP YY_STR portspec ':' portspec
+			{ if (strcmp($2, "icmp") != 0) {
+				yyerror("icmpidmap not followed by icmp");
+			  }
+			  free($2);
+			  nat->in_flags = IPN_ICMPQUERY;
+			  nat->in_pmin = htons($3);
+			  nat->in_pmax = htons($5);
+			}
 	;
 
 sobject:
@@ -407,8 +436,8 @@ nummask:
 	;
 
 portstuff:
-	compare YY_NUMBER		{ $$.pc = $1; $$.p1 = $2; }
-	| YY_NUMBER range YY_NUMBER	{ $$.pc = $2; $$.p1 = $1; $$.p1 = $3; }
+	compare portspec		{ $$.pc = $1; $$.p1 = $2; }
+	| portspec range portspec	{ $$.pc = $2; $$.p1 = $1; $$.p1 = $3; }
 	;
 
 mapoptions:
@@ -458,7 +487,7 @@ tcpudp:	| IPNY_TCP			{ setnatproto(IPPROTO_TCP); }
 	;
 
 rdrproxy:
-	| IPNY_PROXY YY_STR
+	IPNY_PROXY YY_STR
 					{ strncpy(nat->in_plabel, $2,
 						  sizeof(nat->in_plabel));
 					  nat->in_dport = nat->in_pnext;
@@ -470,10 +499,6 @@ rdrproxy:
 						  nat->in_pnext = nat->in_pmin;
 					  }
 					}
-	;
-
-numports:
-	YY_NUMBER			{ $$ = $1; }
 	;
 
 proto:	YY_NUMBER			{ $$ = $1; }
@@ -535,6 +560,7 @@ static	wordtab_t	yywords[] = {
 	{ "mask",	IPNY_MASK },
 	{ "map",	IPNY_MAP },
 	{ "map-block",	IPNY_MAPBLOCK },
+	{ "mssclamp",	IPNY_MSSCLAMP },
 	{ "port",	IPNY_PORT },
 	{ "portmap",	IPNY_PORTMAP },
 	{ "ports",	IPNY_PORTS },
@@ -679,8 +705,8 @@ int fd;
 ioctlfunc_t ioctlfunc;
 void *ptr;
 {
+	ioctlcmd_t add, del;
 	ipfobj_t obj;
-	int add, del;
 	ipnat_t *ipn;
 
 	ipn = ptr;

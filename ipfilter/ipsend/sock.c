@@ -54,6 +54,9 @@ static const char rcsid[] = "@(#)$Id$";
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
 #include <net/if.h>
+#if defined(__FreeBSD__)
+# include "radix_ipf.h"
+#endif
 #include <net/route.h>
 #include <netinet/ip_var.h>
 #include <netinet/in_pcb.h>

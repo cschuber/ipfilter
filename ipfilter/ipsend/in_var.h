@@ -173,5 +173,5 @@ struct in_multistep {
 }
 
 struct in_multi *in_addmulti();
-#endif KERNEL
+#endif /* KERNEL */
 #endif /*!_netinet_in_var_h*/

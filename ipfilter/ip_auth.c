@@ -154,7 +154,7 @@ int fr_authinit()
 	if (fr_authpkts != NULL)
 		bzero((char *)fr_authpkts, fr_authsize * sizeof(*fr_authpkts));
 	else
-		return -1;
+		return -2;
 
 	MUTEX_INIT(&ipf_authmx, "ipf auth log mutex");
 	RWLOCK_INIT(&ipf_auth, "ipf IP User-Auth rwlock");
@@ -381,7 +381,7 @@ int mode;
 			error = EPERM;
 			break;
 		}
-		error = fr_lock(data, &fr_auth_lock);
+		fr_lock(data, &fr_auth_lock);
 		break;
 
 	case SIOCATHST:

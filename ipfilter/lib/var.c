@@ -46,7 +46,7 @@ int line;
 		}
 	} else if (isalpha(*s)) {
 		for (t = s + 1; *t != '\0'; t++)
-			if (!isalpha(*t) && !isdigit(*t))
+			if (!isalpha(*t) && !isdigit(*t) && (*t != '_'))
 				break;
 	} else {
 		fprintf(stderr, "%d: variables cannot start with '%c'\n",

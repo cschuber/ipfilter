@@ -28,6 +28,9 @@
 
 #ifndef _NET_RADIX_H_
 #define	_NET_RADIX_H_
+#ifndef _RADIX_H_
+#define	_RADIX_H_
+#endif /* _RADIX_H_ */
 
 #ifndef __P
 # ifdef __STDC__
@@ -35,6 +38,12 @@
 # else
 #  define	__P(x)  ()
 # endif
+#endif
+
+#ifdef __sgi
+# define	radix_mask	ipf_radix_mask
+# define	radix_node	ipf_radix_node
+# define	radix_node_head	ipf_radix_node_head
 #endif
 
 /*
@@ -95,7 +104,6 @@ struct radix_mask {
 #define rm_mask rm_rmu.rmu_mask
 #define rm_leaf rm_rmu.rmu_leaf		/* extra field would make 32 bytes */
 
-#if !defined(_RADIX_H_)
 #define MKGet(m) {\
 	if (rn_mkfreelist) {\
 		m = rn_mkfreelist; \
@@ -104,7 +112,6 @@ struct radix_mask {
 		R_Malloc(m, struct radix_mask *, sizeof (*(m))); }\
 
 #define MKFree(m) { (m)->rm_mklist = rn_mkfreelist; rn_mkfreelist = (m);}
-#endif
 
 struct radix_node_head {
 	struct	radix_node *rnh_treetop;
@@ -144,11 +151,9 @@ struct radix_node_head {
 # define Bcopy(a, b, n)	bcopy(((caddr_t)(a)), ((caddr_t)(b)), (unsigned)(n))
 #endif
 #define Bzero(p, n)		bzero((caddr_t)(p), (unsigned)(n));
-#if !defined(_RADIX_H_)
 #define R_Malloc(p, t, n)	KMALLOCS(p, t, n)
 #define FreeS(p, z)		KFREES(p, z)
 #define Free(p)			KFREE(p)
-#endif
 
 #if (defined(__osf__) || (IRIX >= 60516)) && defined(_KERNEL)
 # define	rn_init		ipf_rn_init
@@ -168,6 +173,13 @@ struct radix_node_head {
 # define	rn_search	ipf_rn_search
 # define	rn_search_m	ipf_rn_search_m
 # define	max_keylen	ipf_maxkeylen
+# define	rn_mkfreelist	ipf_rn_mkfreelist
+# define	rn_zeros	ipf_rn_zeros
+# define	rn_ones		ipf_rn_ones
+# define	rn_satisfies_leaf	ipf_rn_satisfies_leaf
+# define	rn_lexobetter	ipf_rn_lexobetter
+# define	rn_new_radix_mask	ipf_rn_new_radix_mask
+# define	rn_freenode	ipf_rn_freenode
 #endif
 
 void	 rn_init __P((void));

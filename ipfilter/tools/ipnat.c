@@ -325,6 +325,8 @@ int opts;
 			if (kmemcpy((char *)&nat, (long)np, sizeof(nat)))
 				break;
 			printactivenat(&nat, opts);
+			if (nat.nat_aps)
+				printaps(nat.nat_aps, opts);
 		}
 
 		if (opts & OPT_VERBOSE)

@@ -27,8 +27,8 @@ int opts;
 		PRINTF("\tAddress: %s",
 			inet_ntoa(ipe.ipe_addr.in4));
 		printmask((u_32_t *)&ipe.ipe_mask.in4_addr);
-		PRINTF("\tRef. Count: %d\tValue: %d\n", ipe.ipe_ref,
-			ipe.ipe_value);
+		PRINTF("\tRef. Count: %d\tGroup: %s\n", ipe.ipe_ref,
+			ipe.ipe_group);
 	} else {
 		putchar(' ');
 		printip((u_32_t *)&ipe.ipe_addr.in4_addr);
@@ -37,8 +37,10 @@ int opts;
 			switch (iph->iph_type & ~IPHASH_ANON)
 			{
 			case IPHASH_GROUPMAP :
-				PRINTF(", group = %s", ipe.ipe_group);
-					break;
+				if (strncmp(ipe.ipe_group, iph->iph_name,
+					    FR_GROUPLEN))
+					PRINTF(", group = %s", ipe.ipe_group);
+				break;
 			}
 		}
 		putchar(';');

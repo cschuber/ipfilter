@@ -200,8 +200,8 @@ hashopts:
 	;
 
 addrlist:
-	range ',' addrlist		{ $1->ipn_next = $3; $$ = $1; }
-	| range				{ $$ = $1; }
+	range ';' addrlist		{ $1->ipn_next = $3; $$ = $1; }
+	| range ';'			{ $$ = $1; }
 	;
 
 grouplist:
@@ -247,12 +247,16 @@ groupentry:
 
 range:	addrmask	{ $$ = calloc(1, sizeof(*$$));
 			  $$->ipn_info = 0;
+			  $$->ipn_addr.adf_len = sizeof($$->ipn_addr);
 			  $$->ipn_addr.adf_addr.in4.s_addr = $1[0].s_addr;
+			  $$->ipn_mask.adf_len = sizeof($$->ipn_mask);
 			  $$->ipn_mask.adf_addr.in4.s_addr = $1[1].s_addr;
 			}
 	| '!' addrmask	{ $$ = calloc(1, sizeof(*$$));
 			  $$->ipn_info = 1;
+			  $$->ipn_addr.adf_len = sizeof($$->ipn_addr);
 			  $$->ipn_addr.adf_addr.in4.s_addr = $2[0].s_addr;
+			  $$->ipn_mask.adf_len = sizeof($$->ipn_mask);
 			  $$->ipn_mask.adf_addr.in4.s_addr = $2[1].s_addr;
 			}
 

@@ -13,7 +13,7 @@ CFLAGS=-g -I$(TOP)
 # For Tru64 5.1
 #
 CPU=`uname -m`
-MACHASSERT=`find /usr/sys -name mach_assert.h -print`
+MACHASSERT=`/bin/ls -1 /usr/sys/*/mach_assert.h -print | head -1`
 KDIR=`dirname ${MACHASSERT}`
 INC=-I/usr/include -I$(KDIR) -I/usr/sys/include
 DEFX=-DLANGUAGE_C -DUERF -DOSF -DMACH -DRT_SEM -DKERNEL -D_KERNEL -D_BSD -D_USE_KERNEL_PROTOS -compress -MD -no_excpt -nointrinsics -Wg,-unroll,1 -Wb,-static -Wco,-nofloat -msg_enable cvtdiftypes,warnimplfunc,macroredef,lvaluecast,uselesstyped -msg_inform cvtdiftypes,warnimplfunc,macroredef,lvaluecast,uselesstyped -msg_enable uninit1,falloffend,intrinsicint,outtoomany,outtoofew,questcompare,storclsdcl,tentredef -msg_warn uninit1,falloffend,intrinsicint,outtoomany,outtoofew,questcompare,storclsdcl,tentredef -msg_enable othermember -msg_error othermember -Umips -UMIPS -U__intel__ -D__alpha -D__digital__ -D__arch64__ -DUNIX_LOCKS=1
@@ -35,8 +35,8 @@ MFLAGS="BINDEST=$(BINDEST)" "SBINDEST=$(SBINDEST)" "MANDIR=$(MANDIR)" \
 LIBS=-L. -lipf
 CCARGS=$(DEBUG) $(CFLAGS) -I. -DTRU64=$(TRU64)
 EXTRA=$(ALLOPTS)
-FIXRADIX=-Dradix_node=ipf_radix_node -Dradix_node_head=ipf_radix_node_head \
- -Drn_inithead=ipf_rn_inithead -Drn_walktree=ipf_rn_walktree
+#FIXRADIX=-Dradix_node=ipf_radix_node -Dradix_node_head=ipf_radix_node_head \
+# -Drn_inithead=ipf_rn_inithead -Drn_walktree=ipf_rn_walktree
 #
 ########## ########## ########## ########## ########## ########## ##########
 #
@@ -67,7 +67,7 @@ TOOL=$(TOP)/tools
 
 include $(TOP)/lib/Makefile
 
-build all: radix_ipf.h ./libipf.a ipf ipfs ipfstat ipftest ipmon ipnat \
+build all: radix_ipf_local.h ./libipf.a ipf ipfs ipfstat ipftest ipmon ipnat \
 	ippool ipscan ipsyncm ipsyncs $(LKM)
 	-sh -c 'for i in ipf ipftest ipmon ippool ipnat ipscan ipsyncm ipsyncs; do /bin/rm -f $(TOP)/$$i; ln -s `pwd`/$$i $(TOP); done'
 
@@ -152,6 +152,16 @@ ipnat_y.h ipnat_y.c: $(TOOL)/ipnat_y.y $(TOP)/ip_nat.h
 ipnat_l.c ipnat_l.h: $(TOOL)/lexer.c $(TOP)/ip_nat.h
 	(cd $(TOOL); make "DEST=../$(HERE)" ../$(HERE)/$@)
 
+ip_rules.c: $(TOP)/rules/ip_rules $(TOP)/tools/ipfcomp.c ipf
+	./ipf -cc -nf $(TOP)/rules/ip_rules
+
+$(TOP)/ip_rules.h: ip_rules.c
+	if [ ! -f $(TOP)/ip_rules.h ] ; then \
+		/bin/mv -f ip_rules.h $(TOP); \
+	else \
+		touch $(TOP)/ip_rules.h; \
+	fi
+
 ip_nat_u.o: $(TOP)/ip_nat.c $(TOP)/ip_nat.h $(TOP)/ip_compat.h $(TOP)/ip_fil.h
 	$(CC) $(CCARGS) $(EXTRA) -c $(TOP)/ip_nat.c -o $@
 
@@ -184,9 +194,8 @@ ip_sync_u.o: $(TOP)/ip_sync.c $(TOP)/ip_compat.h $(TOP)/ip_fil.h \
 	$(TOP)/ip_sync.h
 	$(CC) $(CCARGS) $(EXTRA) -c $(TOP)/ip_sync.c -o $@
 
-ip_rules_u.o: $(TOP)/ip_rules.c $(TOP)/ip_compat.h $(TOP)/ip_fil.h \
-	$(TOP)/ip_rules.h
-	$(CC) $(CCARGS) $(EXTRA) -c $(TOP)/ip_rules.c -o $@
+ip_rules_u.o: ip_rules.c $(TOP)/ip_compat.h $(TOP)/ip_fil.h $(TOP)/ip_rules.h
+	$(CC) $(CCARGS) $(EXTRA) -c ip_rules.c -o $@
 
 ip_log_u.o: $(TOP)/ip_log.c $(TOP)/ip_compat.h $(TOP)/ip_fil.h
 	$(CC) $(CCARGS) $(EXTRA) -c $(TOP)/ip_log.c -o $@
@@ -209,18 +218,12 @@ bpf_filter_u.o: $(TOP)/bpf_filter.c $(TOP)/pcap-ipf.h $(TOP)/bpf-ipf.h
 md5_u.o: $(TOP)/md5.c $(TOP)/md5.h
 	$(CC) $(CCARGS) -c $(TOP)/md5.c -o $@
 
-radix_u.o: $(TOP)/radix.c $(TOP)/radix.h
+radix_u.o: $(TOP)/radix.c $(TOP)/radix_ipf.h
 	$(CC) $(CCARGS) -c $(TOP)/radix.c -o $@
 
 if_ipl.o: $(MODOBJS) 
 	ld -r -dc $(MODOBJS) -o $(LKM)
 	${RM} -f if_ipl
-
-ipf.ko ipl.ko: $(MODOBJS) 
-	gensetdefs $(MODOBJS)
-	$(CC) $(CCARGS) -c setdef0.c
-	$(CC) $(CCARGS) -c setdef1.c
-	ld -Bshareable -o $(LKM) setdef0.o $(MODOBJS) setdef1.o
 
 fil.o: $(TOP)/fil.c $(TOP)/ip_fil.h $(TOP)/ipf.h $(TOP)/ip_compat.h $(TOP)/ipl.h
 	$(CC) $(POLICY) $(DFLAGS) $(IPFBPF) -c $(TOP)/fil.c -o $@
@@ -257,11 +260,11 @@ ip_scan.o: $(TOP)/ip_scan.c $(TOP)/ip_compat.h $(TOP)/ip_fil.h $(TOP)/ip_scan.h
 ip_sync.o: $(TOP)/ip_sync.c $(TOP)/ip_compat.h $(TOP)/ip_fil.h $(TOP)/ip_sync.h
 	$(CC) $(DFLAGS) -c $(TOP)/ip_sync.c -o $@
 
-radix.o: $(TOP)/radix.c $(TOP)/radix.h
+radix.o: $(TOP)/radix.c radix_ipf_local.h
 	$(CC) $(DFLAGS) -c $(TOP)/radix.c -o $@
 
 ip_pool.o: $(TOP)/ip_pool.c $(TOP)/ip_compat.h $(TOP)/ip_fil.h \
-	$(TOP)/ip_pool.h radix_ipf.h
+	$(TOP)/ip_pool.h radix_ipf_local.h
 	$(CC) $(DFLAGS) $(FIXRADIX) -c $(TOP)/ip_pool.c -o $@
 
 ip_htable.o: $(TOP)/ip_htable.c $(TOP)/ip_compat.h $(TOP)/ip_fil.h \
@@ -272,9 +275,11 @@ ip_lookup.o: $(TOP)/ip_lookup.c $(TOP)/ip_compat.h $(TOP)/ip_fil.h \
 	$(TOP)/ip_lookup.h
 	$(CC) $(DFLAGS) $(FIXRADIX) -c $(TOP)/ip_lookup.c -o $@
 
-ip_rules.o: $(TOP)/ip_rules.c $(TOP)/ip_compat.h $(TOP)/ip_fil.h \
-	$(TOP)/ip_rules.h
-	$(CC) -I. $(DFLAGS) -c $(TOP)/ip_rules.c -o $@
+ip_rules.o: ip_rules.c $(TOP)/ip_compat.h $(TOP)/ip_fil.h $(TOP)/ip_rules.h
+	$(CC) -I. $(DFLAGS) -c ip_rules.c -o $@
+
+ip_rulesx.o: ip_rules.c $(TOP)/ip_compat.h $(TOP)/ip_fil.h $(TOP)/ip_rules.h
+	$(CC) -I. -DIPFILTER_COMPILED $(DFLAGS) -c ip_rules.c -o $@
 
 tru64.o: $(TOP)/tru64.c $(TOP)/ip_compat.h $(TOP)/ip_fil.h
 	$(CC) $(DFLAGS) -c $(TOP)/tru64.c -o $@
@@ -333,10 +338,10 @@ ippool_y.h ippool_y.c: $(TOOL)/ippool_y.y $(TOP)/ip_pool.h
 ippool_l.c ippool_l.h: $(TOOL)/lexer.c $(TOP)/ip_pool.h
 	(cd $(TOOL); make "DEST=../$(HERE)" ../$(HERE)/$@)
 
-radix_ipf.h radix.h: $(TOP)/radix.h Makefile
+radix_ipf_local.h: $(TOP)/radix_ipf.h Makefile
 	sed -e 's/radix_node/ipf_radix_node/g' \
 	    -e 's/radix_mask/ipf_radix_mask/g' \
-	    $(TOP)/radix.h > $@
+	    $(TOP)/radix_ipf.h > $@
 
 .y.c:
 
@@ -345,7 +350,7 @@ radix_ipf.h radix.h: $(TOP)/radix.h Makefile
 clean:
 	${RM} -f ../ipf ../ipnat ../ipmon ../ippool ../ipftest
 	${RM} -f ../ipscan ../ipsyncm ../ipsyncs
-	${RM} -f *.core *.o *.a *.o.d radix_ipf.h
+	${RM} -f *.core *.o *.a *.o.d radix_ipf_local.h
 	${RM} -f fils ipf ipfstat ipftest ipmon if_ipl ipnat
 	${RM} -f $(LKM) ioconf.h *.ko setdef1.c setdef0.c setdefs.h
 	${RM} -f ip_fil.c ipf_l.c ipf_y.c ipf_y.h ipf_l.h
@@ -354,7 +359,7 @@ clean:
 	${RM} -f ipnat_y.c ipnat_y.h ipnat_l.c ipnat_l.h
 	${RM} -f ipmon_y.c ipmon_y.h ipmon_l.c ipmon_l.h
 	${RM} -f ipscan ipscan_y.c ipscan_y.h ipscan_l.c y.tab.? lex.yy.c ipfs
-	${RM} -f ipsyncm ipsyncs
+	${RM} -f ipsyncm ipsyncs ip_rules.c ip_rules.h
 
 	${MAKE} -f Makefile.ipsend ${MFLAGS} clean
 	-(for i in *; do \
@@ -372,8 +377,14 @@ install:
 	echo /usr/sys/io/ipfilter: > /usr/sys/conf/ipfilter.list
 	/bin/rm -f /var/subsys/ipfilter.mth
 	ln -s ../../../subsys/device.mth /var/subsys/ipfilter.mth
-	-$(INSTALL) -c -g system -m 755 -o root if_ipl.o /var/subsys/ipfilter.mod
-	-$(INSTALL) -c -g system -m 755 -o root ../sysconfigtab /usr/sys/io/ipfilter
+	-$(INSTALL) -c -g system -m 755 -o root if_ipl.o /sys/BINARY/ipfilter.mod
+	/bin/rm -f /var/subsys/ipfilter.mod
+	ln -s ../../../sys/BINARY/ipfilter.mod /var/subsys/ipfilter.mod
+	mkdir -p /usr/sys/io/ipfilter
+	chmod 755 /usr/sys/io/ipfilter
+	/bin/rm -f sysconfigtab
+	/bin/ln -s ../sysconfigtab .
+	-$(INSTALL) -c -g system -m 755 -o root sysconfigtab /usr/sys/io/ipfilter/
 	-for i in ipf ipfs ipnat ipscan ipfstat; do \
 		$(INSTALL) -s -c -g system -m 755 -o root $$i $(SBINDEST); \
 	done

@@ -171,12 +171,16 @@ struct	vdstat	*vds;
 
 static	int	unload()
 {
+	int err = 0, i;
 	char *name;
-	int err, i;
 
-	err = ipldetach();
+	if (fr_refcnt != 0)
+		err = EBUSY;
+	else if (fr_running >= 0)
+		err = ipldetach();
 	if (err)
 		return err;
+
 	fr_running = -2;
 	for (i = 0; (name = ipf_devfiles[i]); i++)
 		(void) vn_remove(name, UIO_SYSSPACE, FILE);

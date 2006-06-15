@@ -56,24 +56,38 @@ static const char rcsid[] = "@(#)$Id$";
 
 #ifdef	IPFILTER_LOOKUP
 static iphtent_t *fr_iphmfind __P((iphtable_t *, struct in_addr *));
+static	u_long	ipht_nomem[IPL_LOGSIZE] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+static	u_long	ipf_nhtables[IPL_LOGSIZE] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+static	u_long	ipf_nhtnodes[IPL_LOGSIZE] = { 0, 0, 0, 0, 0, 0, 0, 0 };
 
-iphtable_t *ipf_htables[IPL_LOGSIZE] = { NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL };
+iphtable_t *ipf_htables[IPL_LOGSIZE] = { NULL, NULL, NULL, NULL,
+					 NULL, NULL, NULL, NULL };
 
 
 void fr_htable_unload()
 {
 	iplookupflush_t fop;
-	iphtable_t *iph;
-	int unit;
 
-	for (unit = 0; unit < IPL_LOGMAX; unit++) {
-		fop.iplf_unit = unit;
-		while ((iph = ipf_htables[unit]) != NULL) {
-			(void)strncpy(fop.iplf_name, iph->iph_name,
-				      sizeof(fop.iplf_name));
-			(void)fr_flushhtable(&fop);
-		}
-	}
+	fop.iplf_unit = IPL_LOGALL;
+	(void)fr_flushhtable(&fop);
+}
+
+
+int fr_gethtablestat(op)
+iplookupop_t *op;
+{
+	iphtstat_t stats;
+
+	if (op->iplo_size != sizeof(stats))
+		return EINVAL;
+
+	stats.iphs_tables = ipf_htables[op->iplo_unit];
+	stats.iphs_numtables = ipf_nhtables[op->iplo_unit];
+	stats.iphs_numnodes = ipf_nhtnodes[op->iplo_unit];
+	stats.iphs_nomem = ipht_nomem[op->iplo_unit];
+
+	return COPYOUT(&stats, op->iplo_struct, sizeof(stats));
+
 }
 
 
@@ -136,6 +150,7 @@ iplookupop_t *op;
 		 iph->iph_size * sizeof(*iph->iph_table));
 	if (iph->iph_table == NULL) {
 		KFREE(iph);
+		ipht_nomem[unit]++;
 		return ENOMEM;
 	}
 
@@ -147,6 +162,9 @@ iplookupop_t *op;
 	if (ipf_htables[unit] != NULL)
 		ipf_htables[unit]->iph_pnext = &iph->iph_next;
 	ipf_htables[unit] = iph;
+
+	ipf_nhtables[unit]++;
+
 	return 0;
 }
 
@@ -180,13 +198,24 @@ iplookupop_t *op;
 void fr_delhtable(iph)
 iphtable_t *iph;
 {
+	iphtent_t *ipe;
+	int i;
+
+	for (i = 0; i < iph->iph_size; i++)
+		while ((ipe = iph->iph_table[i]) != NULL)
+			if (fr_delhtent(iph, ipe) != 0)
+				return;
 
 	*iph->iph_pnext = iph->iph_next;
 	if (iph->iph_next != NULL)
 		iph->iph_next->iph_pnext = iph->iph_pnext;
 
-	KFREES(iph->iph_table, iph->iph_size * sizeof(*iph->iph_table));
-	KFREE(iph);
+	ipf_nhtables[iph->iph_unit]--;
+
+	if (iph->iph_ref == 0) {
+		KFREES(iph->iph_table, iph->iph_size * sizeof(*iph->iph_table));
+		KFREE(iph);
+	}
 }
 
 
@@ -216,40 +245,19 @@ size_t fr_flushhtable(op)
 iplookupflush_t *op;
 {
 	iphtable_t *iph;
-	size_t i, freed;
-	iphtent_t *ipe;
-
-	iph = fr_findhtable(op->iplf_unit, op->iplf_name);
-	if (iph == NULL) {
-		return 0;
-	}
+	size_t freed;
+	int i;
 
 	freed = 0;
-	*iph->iph_pnext = iph->iph_next;
-	if (iph->iph_next != NULL)
-		iph->iph_next->iph_pnext = iph->iph_pnext;
 
-	for (i = 0; i < iph->iph_size; i++)
-		while ((ipe = iph->iph_table[i]) != NULL) {
-			*ipe->ipe_pnext = ipe->ipe_next;
-			if (ipe->ipe_next != NULL)
-				ipe->ipe_next->ipe_pnext = ipe->ipe_pnext;
-
-			switch (iph->iph_type & ~IPHASH_ANON)
-			{
-			case IPHASH_GROUPMAP :
-				if (ipe->ipe_ptr != NULL)
-					fr_delgroup(ipe->ipe_group,
-						    IPL_LOGIPF, fr_active);
-				break;
+	for (i = 0; i <= IPL_LOGMAX; i++) {
+		if (op->iplf_unit == i || op->iplf_unit == IPL_LOGALL) {
+			while ((iph = ipf_htables[i]) != NULL) {
+				fr_delhtable(iph);
+				freed++;
 			}
-			/* ipe_ref */
-			KFREE(ipe);
-			freed++;
 		}
-
-	KFREES(iph->iph_table, iph->iph_size * sizeof(*iph->iph_table));
-	KFREE(iph);
+	}
 
 	return freed;
 }
@@ -302,6 +310,8 @@ iphtent_t *ipeo;
 		break;
 	}
 
+	ipf_nhtnodes[iph->iph_unit]++;
+
 	return 0;
 }
 
@@ -336,6 +346,8 @@ iphtent_t *ipe;
 	}
 
 	KFREE(ipe);
+
+	ipf_nhtnodes[iph->iph_unit]--;
 
 	return 0;
 }

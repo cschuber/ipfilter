@@ -21,10 +21,13 @@ static const char rcsid[] = "@(#)$Id$";
 #include <string.h>
 #include <netinet/ip.h>
 #ifndef	linux
-#include <netinet/ip_var.h>
+# include <netinet/ip_var.h>
 #endif
 #include "ipsend.h"
 #include "ipf.h"
+#ifndef	linux
+# include <netinet/udp_var.h>
+#endif
 
 
 extern	char	*optarg;
@@ -58,6 +61,7 @@ char	default_device[] = "le0";
 
 static	void	usage __P((char *));
 static	void	do_icmp __P((ip_t *, char *));
+void udpcksum(ip_t *, struct udphdr *, int);
 int	main __P((int, char **));
 
 
@@ -153,6 +157,37 @@ struct in_addr gwip;
 	return send_packet(wfd, mtu, ip, gwip);
 }
 
+void
+udpcksum(ip_t *ip, struct udphdr *udp, int len)
+{
+	union pseudoh {
+		struct hdr {
+			u_short len;
+			u_char ttl;
+			u_char proto;
+			u_32_t src;
+			u_32_t dst;
+		} h;
+		u_short w[6];
+	} ph;
+	u_32_t temp32;
+	u_short cksum, *opts;
+
+	ph.h.len = htons(len);
+	ph.h.ttl = 0;
+	ph.h.proto = IPPROTO_UDP;
+	ph.h.src = ip->ip_src.s_addr;
+	ph.h.dst = ip->ip_dst.s_addr;
+	temp32 = 0;
+	opts = &ph.w[0];
+	temp32 += opts[0] + opts[1] + opts[2] + opts[3] + opts[4] + opts[5];
+	temp32 = (temp32 >> 16) + (temp32 & 65535);
+	temp32 += (temp32 >> 16);
+	udp->uh_sum = temp32 & 65535;
+	udp->uh_sum = chksum((u_short *)udp, len);
+	if (udp->uh_sum == 0)
+		udp->uh_sum = 0xffff;
+}
 
 int main(argc, argv)
 int	argc;
@@ -161,6 +196,7 @@ char	**argv;
 	FILE	*langfile = NULL;
 	struct	in_addr	gwip;
 	tcphdr_t	*tcp;
+	udphdr_t	*udp;
 	ip_t	*ip;
 	char	*name =  argv[0], host[MAXHOSTNAMELEN + 1];
 	char	*gateway = NULL, *dev = NULL;
@@ -172,6 +208,7 @@ char	**argv;
 	 */
 	ip = (ip_t *)calloc(1, 65536);
 	tcp = (tcphdr_t *)(ip + 1);
+	udp = (udphdr_t *)tcp;
 	ip->ip_len = sizeof(*ip);
 	IP_HL_A(ip, sizeof(*ip) >> 2);
 
@@ -328,18 +365,30 @@ char	**argv;
 
 	if (olen)
 	    {
-		caddr_t	ipo = (caddr_t)ip;
+		int hlen;
+		char *p;
 
 		printf("Options: %d\n", olen);
-		ip = (struct ip *)malloc(olen + ip->ip_len);
-		bcopy((char *)ipo, (char *)ip, sizeof(*ip));
-		IP_HL_A(ip, (olen >> 2));
-		bcopy(options, (char *)(ip + 1), olen);
-		bcopy((char *)tcp, (char *)(ip + 1) + olen, sizeof(*tcp));
+		hlen = sizeof(*ip) + olen;
+		IP_HL_A(ip, hlen >> 2);
 		ip->ip_len += olen;
-		bcopy((char *)ip, (char *)ipo, ip->ip_len);
-		ip = (ip_t *)ipo;
-		tcp = (tcphdr_t *)((char *)(ip + 1) + olen);
+		p = (char *)malloc(65536);
+		if (p == NULL)
+		    {
+			fprintf(stderr, "malloc failed\n");
+			exit(2);
+		    }
+
+		bcopy(ip, p, sizeof(*ip));
+		bcopy(options, p + sizeof(*ip), olen);
+		bcopy(ip + 1, p + hlen, ip->ip_len - hlen);
+		ip = (ip_t *)p;
+
+		if (ip->ip_p == IPPROTO_TCP) {
+			tcp = (tcphdr_t *)(p + hlen);
+		} else if (ip->ip_p == IPPROTO_UDP) {
+			udp = (udphdr_t *)(p + hlen);
+		}
 	    }
 
 	if (ip->ip_p == IPPROTO_TCP)
@@ -376,8 +425,12 @@ char	**argv;
 		printf("Flags:   %#x\n", tcp->th_flags);
 	printf("mtu:     %d\n", mtu);
 
+	if (ip->ip_p == IPPROTO_UDP) {
+		udp->uh_sum = 0;
+		udpcksum(ip, udp, ip->ip_len - (IP_HL(ip) << 2));
+	}
 #ifdef	DOSOCKET
-	if (tcp->th_dport)
+	if (ip->ip_p == IPPROTO_TCP && tcp->th_dport)
 		return do_socket(dev, mtu, ip, gwip);
 #endif
 	return send_packets(dev, mtu, ip, gwip);

@@ -23,14 +23,14 @@ set_device_files() {
 	set $input
 	major=$3
 	/bin/rm -f /dev/ipl /dev/ipnat /dev/ipstate /dev/ipauth
-	/bin/rm -f /dev/ipsync /dev/ipscan /dev/ippool
+	/bin/rm -f /dev/ipsync /dev/ipscan /dev/iplookup
 	mknod /dev/ipl c $major 0
 	mknod /dev/ipnat c $major 1
 	mknod /dev/ipstate c $major 2
 	mknod /dev/ipauth c $major 3
 	mknod /dev/ipsync c $major 4
 	mknod /dev/ipscan c $major 5
-	mknod /dev/ippool c $major 6
+	mknod /dev/iplookup c $major 6
 }
 
 case "$1" in
