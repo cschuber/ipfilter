@@ -1,0 +1,31 @@
+/*
+ * Copyright (C) 1993-2001 by Darren Reed.
+ *
+ * See the IPFILTER.LICENCE file for details on licencing.
+ *
+ * $Id$
+ */
+
+#include "ipf.h"
+
+
+void printlookup(addr, mask)
+i6addr_t *addr, *mask;
+{
+	switch (addr->iplookuptype)
+	{
+	case IPLT_POOL :
+		printf("pool/");
+		break;
+	case IPLT_HASH :
+		printf("hash/");
+		break;
+	default :
+		printf("lookup(%x)=", addr->iplookuptype);
+		break;
+	}
+
+	printf("%u", addr->iplookupnum);
+	if (mask->iplookupptr == NULL)
+		printf("(!)");
+}
