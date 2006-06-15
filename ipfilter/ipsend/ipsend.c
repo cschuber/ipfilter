@@ -1,24 +1,12 @@
 /*
  * ipsend.c (C) 1995-1998 Darren Reed
  *
- * This was written to test what size TCP fragments would get through
- * various TCP/IP packet filters, as used in IP firewalls.  In certain
- * conditions, enough of the TCP header is missing for unpredictable
- * results unless the filter is aware that this can happen.
- *
- * Redistribution and use in source and binary forms are permitted
- * provided that this notice is preserved and due credit is given
- * to the original author and the contributors.
+ * See the IPFILTER.LICENCE file for details on licencing.
  */
 #if !defined(lint)
 static const char sccsid[] = "@(#)ipsend.c	1.5 12/10/95 (C)1995 Darren Reed";
 static const char rcsid[] = "@(#)$Id$";
 #endif
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <netdb.h>
-#include <string.h>
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/time.h>
@@ -26,10 +14,12 @@ static const char rcsid[] = "@(#)$Id$";
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netinet/in_systm.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <netdb.h>
+#include <string.h>
 #include <netinet/ip.h>
-#include <netinet/tcp.h>
-#include <netinet/udp.h>
-#include <netinet/ip_icmp.h>
 #ifndef	linux
 #include <netinet/ip_var.h>
 #endif
@@ -43,27 +33,27 @@ extern	void	iplang __P((FILE *));
 
 char	options[68];
 int	opts;
-#ifdef	linux
+#ifdef linux
 char	default_device[] = "eth0";
 #else
-# ifdef	sun
-char	default_device[] = "le0";
-# else
-#  ifdef	ultrix
+# ifdef ultrix
 char	default_device[] = "ln0";
-#  else
-#   ifdef	__bsdi__
+# else
+#  ifdef __bsdi__
 char	default_device[] = "ef0";
-#   else
-#    ifdef	__sgi
+#  else
+#   ifdef __sgi
 char	default_device[] = "ec0";
-#    else
+#   else
+#    ifdef __hpux
 char	default_device[] = "lan0";
-#    endif
-#   endif
-#  endif
-# endif
-#endif
+#    else
+char	default_device[] = "le0";
+#    endif /* __hpux */
+#   endif /* __sgi */
+#  endif /* __bsdi__ */
+# endif /* ultrix */
+#endif /* linux */
 
 
 static	void	usage __P((char *));
@@ -157,13 +147,9 @@ int mtu;
 ip_t *ip;
 struct in_addr gwip;
 {
-	u_short	sport = 0;
-	int	wfd;
+	int wfd;
 
-	if (ip->ip_p == IPPROTO_TCP || ip->ip_p == IPPROTO_UDP)
-		sport = ((struct tcpiphdr *)ip)->ti_sport;
-	wfd = initdevice(dev, sport, 5);
-
+	wfd = initdevice(dev, 5);
 	return send_packet(wfd, mtu, ip, gwip);
 }
 
@@ -173,7 +159,6 @@ int	argc;
 char	**argv;
 {
 	FILE	*langfile = NULL;
-	struct	tcpiphdr *ti;
 	struct	in_addr	gwip;
 	tcphdr_t	*tcp;
 	ip_t	*ip;
@@ -186,12 +171,11 @@ char	**argv;
 	 * 65535 is maximum packet size...you never know...
 	 */
 	ip = (ip_t *)calloc(1, 65536);
-	ti = (struct tcpiphdr *)ip;
-	tcp = (tcphdr_t *)&ti->ti_sport;
+	tcp = (tcphdr_t *)(ip + 1);
 	ip->ip_len = sizeof(*ip);
-	ip->ip_hl = sizeof(*ip) >> 2;
+	IP_HL_A(ip, sizeof(*ip) >> 2);
 
-	while ((c = getopt(argc, argv, "I:L:P:TUdf:i:g:m:o:s:t:vw:")) != -1)
+	while ((c = getopt(argc, argv, "I:L:P:TUdf:i:g:m:o:s:t:vw:")) != -1) {
 		switch (c)
 		{
 		case 'I' :
@@ -285,7 +269,7 @@ char	**argv;
 			break;
 		case 'o' :
 			nonl++;
-			olen = buildopts(optarg, options, (ip->ip_hl - 5) << 2);
+			olen = buildopts(optarg, options, (IP_HL(ip) - 5) << 2);
 			break;
 		case 's' :
 			nonl++;
@@ -310,6 +294,7 @@ char	**argv;
 			fprintf(stderr, "Unknown option \"%c\"\n", c);
 			usage(name);
 		}
+	}
 
 	if (argc - optind < 1)
 		usage(name);
@@ -346,10 +331,9 @@ char	**argv;
 		caddr_t	ipo = (caddr_t)ip;
 
 		printf("Options: %d\n", olen);
-		ti = (struct tcpiphdr *)malloc(olen + ip->ip_len);
-		bcopy((char *)ip, (char *)ti, sizeof(*ip));
-		ip = (ip_t *)ti;
-		ip->ip_hl = (olen >> 2);
+		ip = (struct ip *)malloc(olen + ip->ip_len);
+		bcopy((char *)ipo, (char *)ip, sizeof(*ip));
+		IP_HL_A(ip, (olen >> 2));
 		bcopy(options, (char *)(ip + 1), olen);
 		bcopy((char *)tcp, (char *)(ip + 1) + olen, sizeof(*tcp));
 		ip->ip_len += olen;
@@ -394,7 +378,7 @@ char	**argv;
 
 #ifdef	DOSOCKET
 	if (tcp->th_dport)
-		return do_socket(dev, mtu, ti, gwip);
+		return do_socket(dev, mtu, ip, gwip);
 #endif
-	return send_packets(dev, mtu, (ip_t *)ti, gwip);
+	return send_packets(dev, mtu, ip, gwip);
 }

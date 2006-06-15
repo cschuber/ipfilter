@@ -2,9 +2,7 @@
 /*
  * Copyright (C) 1997-1998 by Darren Reed.
  *
- * Redistribution and use in source and binary forms are permitted
- * provided that this notice is preserved and due credit is given
- * to the original author and the contributors.
+ * See the IPFILTER.LICENCE file for details on licencing.
  *
  * $Id$
  */
@@ -17,8 +15,7 @@
 #include <sys/types.h>
 #include <netinet/in_systm.h>
 #include <netinet/in.h>
-#include "y.tab.h"
-#include "ip_compat.h"
+#include "iplang_y.h"
 #include "ipf.h"
 
 #ifndef	__P
@@ -43,13 +40,13 @@ int	save_token __P((void));
 void	swallow __P((void));
 int	yylex __P((void));
 
-struct	wordtab	{
+struct	lwordtab	{
 	char	*word;
 	int	state;
 	int	next;
 };
 
-struct	wordtab	words[] = {
+struct	lwordtab	words[] = {
 	{ "interface",	IL_INTERFACE,		-1 },
 	{ "iface",	IL_INTERFACE,		-1 },
 	{ "name",	IL_IFNAME,		IL_TOKEN },
@@ -217,7 +214,7 @@ void pop_proto()
 int save_token()
 {
 
-	yylval.str = strdup(yytext);
+	yylval.str = strdup((char *)yytext);
 	return IL_TOKEN;
 }
 
@@ -225,7 +222,7 @@ int save_token()
 int next_item(nstate)
 int nstate;
 {
-	struct	wordtab	*wt;
+	struct	lwordtab	*wt;
 
 	if (opts & OPT_DEBUG)
 		printf("text=[%s] id=%d next=%d\n", yytext, nstate, next);
@@ -236,13 +233,13 @@ int nstate;
 	token++;
 
 	for (wt = words; wt->word; wt++)
-		if (!strcasecmp(wt->word, yytext))
+		if (!strcasecmp(wt->word, (char *)yytext))
 			return next_state(wt->state, wt->next);
 	if (opts & OPT_DEBUG)
 		printf("unknown keyword=[%s]\n", yytext);
 	next = -1;
 	if (nstate == IL_NUMBER)
-		yylval.num = atoi(yytext);
+		yylval.num = atoi((char *)yytext);
 	token++;
 	return nstate;
 }
@@ -318,5 +315,6 @@ void swallow()
 		while ((c != '\n') && (c != EOF))
 			c = input();
 	}
-	unput(c);
+	if (c != EOF)
+		unput(c);
 }

@@ -54,11 +54,7 @@ struct ipovly {
  */
 struct tcpiphdr {
 	struct 	ipovly ti_i;		/* overlaid ip structure */
-#ifdef	linux
-	tcphdr_t	ti_t;
-#else
 	struct	tcphdr ti_t;		/* tcp header */
-#endif
 };
 #ifdef notyet
 /*

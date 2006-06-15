@@ -1,9 +1,7 @@
 /*
- * Copyright (C) 1993-2000 by Darren Reed.
+ * Copyright (C) 1993-2001 by Darren Reed.
  *
- * Redistribution and use in source and binary forms are permitted
- * provided that this notice is preserved and due credit is given
- * to the original author and the contributors.
+ * See the IPFILTER.LICENCE file for details on licencing.
  */
 /*
  * 29/12/94 Added code from Marc Huber <huber@fzi.de> to allow it to allocate
@@ -57,11 +55,12 @@ extern int nodev __P((void));
 static	int	unload __P((void));
 static	int	ipl_attach __P((void));
 int	xxxinit __P((u_int, struct vddrv *, caddr_t, struct vdstat *));
-static	char	*ipf_devfiles[] = { IPL_NAME, IPL_NAT, IPL_STATE, IPL_AUTH,
-				    NULL };
+static	char	*ipf_devfiles[] = { IPL_NAME, IPNAT_NAME, IPSTATE_NAME,
+				    IPAUTH_NAME, IPSYNC_NAME, IPSCAN_NAME,
+				    IPLOOKUP_NAME, NULL };
 
 
-struct	cdevsw	ipldevsw = 
+struct	cdevsw	ipldevsw =
 {
 	iplopen, iplclose, iplread, nulldev,
 	iplioctl, nulldev, nulldev, nulldev,
@@ -69,7 +68,7 @@ struct	cdevsw	ipldevsw =
 };
 
 
-struct	dev_ops	ipl_ops = 
+struct	dev_ops	ipl_ops =
 {
 	1,
 	iplidentify,
@@ -89,7 +88,7 @@ struct	dev_ops	ipl_ops =
 int	ipl_major = 0;
 
 #ifdef sun4m
-struct	vdldrv	vd = 
+struct	vdldrv	vd =
 {
 	VDMAGIC_PSEUDO,
 	IPL_VERSION,
@@ -178,8 +177,10 @@ static	int	unload()
 	err = ipldetach();
 	if (err)
 		return err;
+	fr_running = -2;
 	for (i = 0; (name = ipf_devfiles[i]); i++)
 		(void) vn_remove(name, UIO_SYSSPACE, FILE);
+	printf("%s unloaded\n", ipfilter_version);
 	return 0;
 }
 
@@ -209,6 +210,32 @@ static	int	ipl_attach()
 		} else {
 			VN_RELE(vp);
 		}
+	}
+
+	if (error == 0) {
+		char *defpass;
+
+		if (FR_ISPASS(fr_pass))
+			defpass = "pass";
+		else if (FR_ISBLOCK(fr_pass))
+			defpass = "block";
+		else                
+			defpass = "no-match -> block";
+
+		printf("%s initialized.  Default = %s all, Logging = %s%s\n",
+			ipfilter_version, defpass,
+#ifdef IPFILTER_LOG
+			"enabled",
+#else             
+			"disabled",
+#endif 
+#ifdef IPFILTER_COMPILED
+			" (COMPILED)"
+#else 
+			""
+#endif
+			);            
+		fr_running = 1;
 	}
 	return error;
 }

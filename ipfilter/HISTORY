@@ -20,6 +20,123 @@
 # and especially those who have found the time to port IP Filter to new
 # platforms.
 #
+
+4.0-BETA1 20 August 2003
+
+support 0/32 and 0/0 on the RHS in redirect rules
+
+where LHS and RHS netmasks are the same size for redirect, do 1:1 mapping
+for bimap rules.
+
+allow NAT rule to match 'all' interfaces with * as interface name
+
+do mapping of ICMP sequence id#'s in pings
+
+allow default age for NAT entries to be set per NAT rule
+
+provide round robin selection of destination addresses for redirect
+
+ipmon can load a configuration file with instructions on actions
+to take when a matching log entry is received
+
+now requires pfil to work on Solaris & HP-UX
+
+supports mapping outbound connections to a specific address/port
+
+support toggling of logging per ipfilter 'device'
+
+use queues to expire data rather than lists
+
+add MSN RPC proxy
+
+add IRC proxy
+
+support rules with dynamic ip addresses
+
+add ability to define a pool of addresses & networks which can then
+be placed in a single rule
+
+support passing entire packet back to user program for authentication
+
+support master/slave for state information sharing
+
+reorganise generic code into a lib directory and make libipf.a
+
+user programs enforce version matching with the kernel
+
+supports window scaling if seen at TCP session setup
+
+generates C code from filter rules to compile in or load as native
+machine code.
+
+supports loading rules comprised of BPF bytecode statements
+
+HP-UX 11 port completed
+
+and packets-per-second filtering
+
+add numerical tags to rules for filtering and display in ipmon output
+
+3.4.4 23/05/2000 - Released
+
+don't add TCP state if it is an RST packet and (attempt) to send out
+RST/ICMP packets in a manner that bypasses IP Filter.
+
+add patch to work with 4.0_STABLE delayed checksums
+
+3.4.3 20/05/2000 - Released
+
+fix ipmon -F
+
+don't truncate IPv6 packets on Solaris
+
+fix keep state for ICMP ECHO
+
+add some NAT stats and use def_nat_age rather than DEF_NAT_AGE
+
+don't make ftp proxy drop packets
+
+use MCLISREFERENCED() in tandem with M_EXT to check if IP fields need to be
+swapped back.
+
+fix up RST generation for non-Solaris
+
+get "short" flag right for IPv6
+
+3.4.2 - 10/5/2000 - Released
+
+Fix bug in dealing with "hlen == 1 and opt > 1" - Itojun
+
+ignore previous NAT mappings for 0/0 and 0/32 rules
+
+bring in a completely new ftp proxy
+
+allow NAT to cause packets to be dropped.
+
+add NetBSD callout support for 1.4-current
+
+3.4.1 - 30/4/2000 - Released
+
+add ratoui() and fix parsing of group numbers to allow 0 - UINT_MAX
+
+don't include opt_inet6.h for FreeBSD if KLD_MODULE is defined
+
+Solaris must use copyin() for all types of ioctl() args
+
+fix up screen/tty when leaving "top mode" of ipfstat
+
+linked list for maptable not setup correctly in nat_hostmap()
+
+check for maptable rather than nat_table[1] to see if malloc for maptable
+succeeded in nat_init
+
+fix handling of map NAT rules with "from/to" host specs
+
+fix printout out of source address when using "from/to" with map rules
+
+convert ip_len back to network byte order, not plen, for solaris as ip_len
+may have been changed by NAT and plen won't reflect this
+
 3.4 - 27/4/2000 - Released
 
 source address spoofing can be turned on (fr_chksrc) without using
