@@ -10,6 +10,14 @@ static const char rcsid[] = "@(#)$Id$";
 #endif
 #include <sys/param.h>
 #include <sys/types.h>
+#if defined(__NetBSD__) && defined(__vax__)
+/*
+ * XXX need to declare boolean_t for _KERNEL <sys/files.h>
+ * which ends up including <sys/device.h> for vax.  See PR#32907
+ * for further details.
+ */
+typedef	int	boolean_t;
+#endif
 #include <sys/time.h>
 #if !defined(__osf__)
 # define _KERNEL
@@ -134,7 +142,10 @@ int	ptest;
 	u->uh_ulen = htons(sizeof(*u) + 4);
 	ip->ip_len = sizeof(*ip) + ntohs(u->uh_ulen);
 	len = ip->ip_len;
+
 	nfd = initdevice(dev, 1);
+	if (nfd == -1)
+		return;
 
 	if (!ptest || (ptest == 1)) {
 		/*
@@ -468,11 +479,14 @@ int	ptest;
 	int	nfd;
 	u_char	*s;
 
-	s = (u_char *)(ip + 1);
+
 	nfd = initdevice(dev, 1);
+	if (nfd == -1)
+		return;
 
 	IP_HL_A(ip, 6);
 	ip->ip_len = IP_HL(ip) << 2;
+	s = (u_char *)(ip + 1);
 	s[IPOPT_OPTVAL] = IPOPT_NOP;
 	s++;
 	if (!ptest || (ptest == 1)) {
@@ -572,7 +586,10 @@ int	ptest;
 	ip->ip_sum = 0;
 	ip->ip_len = sizeof(*ip) + sizeof(*icp);
 	icp = (struct icmp *)((char *)ip + (IP_HL(ip) << 2));
+
 	nfd = initdevice(dev, 1);
+	if (nfd == -1)
+		return;
 
 	if (!ptest || (ptest == 1)) {
 		/*
@@ -771,7 +788,10 @@ int	ptest;
 	u->uh_sport = htons(1);
 	u->uh_dport = htons(1);
 	u->uh_ulen = htons(sizeof(*u) + 4);
+
 	nfd = initdevice(dev, 1);
+	if (nfd == -1)
+		return;
 
 	if (!ptest || (ptest == 1)) {
 		/*
@@ -934,7 +954,10 @@ int	ptest;
 	t->th_seq = htonl(1);
 	t->th_ack = 0;
 	ip->ip_len = sizeof(ip_t) + sizeof(tcphdr_t);
+
 	nfd = initdevice(dev, 1);
+	if (nfd == -1)
+		return;
 
 	if (!ptest || (ptest == 1)) {
 		/*
@@ -1279,6 +1302,9 @@ int	ptest;
 	u->uh_sum = 0;
 
 	nfd = initdevice(dev, 1);
+	if (nfd == -1)
+		return;
+
 	u->uh_ulen = htons(7168);
 
 	printf("6. Exhaustive mbuf test.\n");
@@ -1348,6 +1374,9 @@ int	ptest;
 	u_char	*s;
 
 	nfd = initdevice(dev, 1);
+	if (nfd == -1)
+		return;
+
 	pip = (ip_t *)tbuf;
 
 	srand(time(NULL) ^ (getpid() * getppid()));

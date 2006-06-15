@@ -210,7 +210,7 @@ char *argv[];
 	ip = MTOD(m, ip_t *);
 	while ((i = (*r->r_readip)(MTOD(m, char *), sizeof(m->mb_buf),
 				    &iface, &dir)) > 0) {
-		if (iface == NULL || *iface == '\0')
+		if ((iface == NULL) || (*iface == '\0'))
 			iface = ifname;
 		ifp = get_unit(iface, IP_V(ip));
 		if (!use_inet6) {
@@ -249,7 +249,10 @@ char *argv[];
 				(void)printf("pass");
 				break;
 			case 1 :
-				(void)printf("nomatch");
+				if (m == NULL)
+					(void)printf("bad-packet");
+				else
+					(void)printf("nomatch");
 				break;
 			case 3 :
 				(void)printf("block return-rst");
@@ -797,6 +800,6 @@ ip_t *ip;
 	}
 	if (hdr != NULL) {
 		*csump = 0;
-		*(u_short *)csump = fr_cksum(m, ip, ip->ip_p, hdr);
+		*(u_short *)csump = fr_cksum(m, ip, ip->ip_p, hdr, ip->ip_len);
 	}
 }

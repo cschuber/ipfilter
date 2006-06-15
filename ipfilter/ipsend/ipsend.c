@@ -154,6 +154,8 @@ struct in_addr gwip;
 	int wfd;
 
 	wfd = initdevice(dev, 5);
+	if (wfd == -1)
+		return -1;
 	return send_packet(wfd, mtu, ip, gwip);
 }
 

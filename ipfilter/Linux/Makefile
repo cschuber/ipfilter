@@ -18,7 +18,7 @@ CFLAGS=-g -I$(TOP)
 # For Linux
 #
 CPUTYPE:=`uname -m | sed -e s/i.86/i386/ -e s/sun4u/sparc64/ -e s/arm.*/arm/ -e s/sa110/arm/`
-ARCH:=$(shell uname -m)
+ARCH:=$(shell uname -i)
 OBJ=.
 TOP=..
 TOOL=$(TOP)/tools

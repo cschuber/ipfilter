@@ -11,6 +11,15 @@ if [ -d /usr/ccs/bin ] ; then
 	export PATH
 fi
 
+testcc()
+{
+	if echo '' | $1 -E - >/dev/null 2>&1 ; then
+		CC=$1
+		return 0
+	fi
+	return 1
+}
+
 if [ $rev = 5 ] ; then
 	if [ ! -d ../pfil ] ; then
 		cat << __EOF__
@@ -42,15 +51,30 @@ __EOF__
 	# Default C compiler is "cc", override on make commandline
 	#
 	if [ "x$CC" = "x" ] ; then
-		if echo '' | cc -E - >/dev/null 2>&1 ; then
-			CC=cc
-		else
-			if echo '' | gcc -E - >/dev/null 2>&1 ; then
-				CC=gcc
-			else
-				echo "No working compiler found"
+		testcc cc
+		if [ $? -ne 0 ] ; then
+			testcc gcc
+			if [ $? -ne 0 ] ; then
+				echo 'No working compiler found'
 				exit 1
 			fi
+		fi
+	else
+		testcc $CC
+		if [ $? -ne 0 ] ; then
+			case $CC in
+			*gcc*)
+				echo 'No working compiler found'
+				exit 1
+				;;
+			*)
+				testcc gcc
+				if [ $? -ne 0 ] ; then
+					echo 'No working compiler found'
+					exit 1
+				fi
+				;;
+			esac
 		fi
 	fi
 	v=`echo '__GNUC__' | 2>&1 ${CC} -E - | 2>&1 sed -ne '/^[0-9]* *$/p'`

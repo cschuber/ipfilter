@@ -73,36 +73,15 @@ int	*resolved;
 static	u_short	tx_portnum(name)
 char	*name;
 {
-	struct	servent	*sp, *sp2;
-	u_short	p1 = 0;
+	struct	servent	*sp;
 
 	if (ISDIGIT(*name))
 		return (u_short)atoi(name);
-	if (!tx_proto)
-		tx_proto = "tcp/udp";
-	if (strcasecmp(tx_proto, "tcp/udp")) {
-		sp = getservbyname(name, tx_proto);
-		if (sp)
-			return ntohs(sp->s_port);
-		(void) fprintf(stderr, "unknown service \"%s\".\n", name);
-		return 0;
-	}
-	sp = getservbyname(name, "tcp");
+	sp = getservbyname(name, tx_proto);
 	if (sp)
-		p1 = sp->s_port;
-	sp2 = getservbyname(name, "udp");
-	if (!sp || !sp2) {
-		(void) fprintf(stderr, "unknown tcp/udp service \"%s\".\n",
-			name);
-		return 0;
-	}
-	if (p1 != sp2->s_port) {
-		(void) fprintf(stderr, "%s %d/tcp is a different port to ",
-			name, p1);
-		(void) fprintf(stderr, "%s %d/udp\n", name, sp->s_port);
-		return 0;
-	}
-	return ntohs(p1);
+		return ntohs(sp->s_port);
+	(void) fprintf(stderr, "unknown service \"%s\".\n", name);
+	return 0;
 }
 
 
@@ -148,6 +127,7 @@ int	cnt, *dir;
 {
 	register char *s;
 	char	line[513];
+	ip_t	*ip;
 
 	*ifn = NULL;
 	while (fgets(line, sizeof(line)-1, tfp)) {
@@ -163,12 +143,10 @@ int	cnt, *dir;
 			printf("input: %s\n", line);
 		*ifn = NULL;
 		*dir = 0;
-		if (!parseline(line, (ip_t *)buf, ifn, dir))
-#if 0
-			return sizeof(ip_t) + sizeof(tcphdr_t);
-#else
-			return sizeof(ip_t);
-#endif
+		if (!parseline(line, (ip_t *)buf, ifn, dir)) {
+			ip = (ip_t *)buf;
+			return ntohs(ip->ip_len);
+		}
 	}
 	if (feof(tfp))
 		return 0;

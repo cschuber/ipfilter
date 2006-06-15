@@ -145,12 +145,6 @@ static const char rcsid[] = "@(#)$Id$";
 # include "ipt.h"
 # include "bpf-ipf.h"
 extern	int	opts;
-
-# define	FR_VERBOSE(verb_pr)			verbose verb_pr
-# define	FR_DEBUG(verb_pr)			debug verb_pr
-#else /* #ifndef _KERNEL */
-# define	FR_VERBOSE(verb_pr)
-# define	FR_DEBUG(verb_pr)
 #endif /* _KERNEL */
 
 
@@ -236,7 +230,7 @@ static	INLINE int	frpr_udpcommon __P((fr_info_t *));
 static	int		fr_updateipid __P((fr_info_t *));
 #ifdef	IPFILTER_LOOKUP
 static	int		fr_grpmapinit __P((frentry_t *fr));
-static	INLINE void	*fr_resolvelookup __P((u_int, u_int, lookupfunc_t *));
+static	INLINE void	*fr_resolvelookup __P((u_int, u_int, i6addr_t *, lookupfunc_t *));
 #endif
 static	void		frsynclist __P((frentry_t *, void *));
 static	ipftuneable_t	*fr_findtunebyname __P((const char *));
@@ -703,7 +697,7 @@ fr_info_t *fin;
 	int minicmpsz = sizeof(struct icmp6_hdr);
 	struct icmp6_hdr *icmp6;
 
-	if (frpr_pullup(fin, ICMP6ERR_MINPKTLEN + 8 - sizeof(ip6_t)) == -1)
+	if (frpr_pullup(fin, ICMP6ERR_MINPKTLEN - sizeof(ip6_t)) == -1)
 		return;
 
 	if (fin->fin_dlen > 1) {
@@ -863,18 +857,26 @@ static INLINE int frpr_pullup(fin, plen)
 fr_info_t *fin;
 int plen;
 {
-#if defined(_KERNEL)
 	if (fin->fin_m != NULL) {
 		if (fin->fin_dp != NULL)
 			plen += (char *)fin->fin_dp -
 				((char *)fin->fin_ip + fin->fin_hlen);
 		plen += fin->fin_hlen;
 		if (M_LEN(fin->fin_m) < plen) {
+#if defined(_KERNEL)
 			if (fr_pullup(fin->fin_m, fin, plen) == NULL)
 				return -1;
+#else
+			/*
+			 * Fake fr_pullup failing
+			 */
+			*fin->fin_mp = NULL;
+			fin->fin_m = NULL;
+			fin->fin_ip = NULL;
+			return -1;
+#endif
 		}
 	}
-#endif
 	return 0;
 }
 
@@ -1681,7 +1683,7 @@ int portcmp;
 	 */
 	i = ((*lip & *lm) != *ld);
 	FR_DEBUG(("0. %#08x & %#08x != %#08x\n",
-		   *lip, *lm, *ld));
+		   ntohl(*lip), ntohl(*lm), ntohl(*ld)));
 	if (i)
 		return 1;
 
@@ -1692,7 +1694,7 @@ int portcmp;
 	lip++, lm++, ld++;
 	i |= ((*lip & *lm) != *ld);
 	FR_DEBUG(("1. %#08x & %#08x != %#08x\n",
-		   *lip, *lm, *ld));
+		   ntohl(*lip), ntohl(*lm), ntohl(*ld)));
 	if (i)
 		return 1;
 
@@ -1715,20 +1717,20 @@ int portcmp;
 #endif
 		i = ((*lip & *lm) != *ld);
 		FR_DEBUG(("2a. %#08x & %#08x != %#08x\n",
-			   *lip, *lm, *ld));
+			   ntohl(*lip), ntohl(*lm), ntohl(*ld)));
 		if (fi->fi_v == 6) {
 			lip++, lm++, ld++;
 			i |= ((*lip & *lm) != *ld);
 			FR_DEBUG(("2b. %#08x & %#08x != %#08x\n",
-				   *lip, *lm, *ld));
+				   ntohl(*lip), ntohl(*lm), ntohl(*ld)));
 			lip++, lm++, ld++;
 			i |= ((*lip & *lm) != *ld);
 			FR_DEBUG(("2c. %#08x & %#08x != %#08x\n",
-				   *lip, *lm, *ld));
+				   ntohl(*lip), ntohl(*lm), ntohl(*ld)));
 			lip++, lm++, ld++;
 			i |= ((*lip & *lm) != *ld);
 			FR_DEBUG(("2d. %#08x & %#08x != %#08x\n",
-				   *lip, *lm, *ld));
+				   ntohl(*lip), ntohl(*lm), ntohl(*ld)));
 		} else {
 			lip += 3;
 			lm += 3;
@@ -1757,20 +1759,20 @@ int portcmp;
 #endif
 		i = ((*lip & *lm) != *ld);
 		FR_DEBUG(("3a. %#08x & %#08x != %#08x\n",
-			   *lip, *lm, *ld));
+			   ntohl(*lip), ntohl(*lm), ntohl(*ld)));
 		if (fi->fi_v == 6) {
 			lip++, lm++, ld++;
 			i |= ((*lip & *lm) != *ld);
 			FR_DEBUG(("3b. %#08x & %#08x != %#08x\n",
-				   *lip, *lm, *ld));
+				   ntohl(*lip), ntohl(*lm), ntohl(*ld)));
 			lip++, lm++, ld++;
 			i |= ((*lip & *lm) != *ld);
 			FR_DEBUG(("3c. %#08x & %#08x != %#08x\n",
-				   *lip, *lm, *ld));
+				   ntohl(*lip), ntohl(*lm), ntohl(*ld)));
 			lip++, lm++, ld++;
 			i |= ((*lip & *lm) != *ld);
 			FR_DEBUG(("3d. %#08x & %#08x != %#08x\n",
-				   *lip, *lm, *ld));
+				   ntohl(*lip), ntohl(*lm), ntohl(*ld)));
 		} else {
 			lip += 3;
 			lm += 3;
@@ -1972,24 +1974,23 @@ u_32_t pass;
 		 * it, except for increasing the hit counter.
 		 */
 		if ((passt & FR_CALLNOW) != 0) {
+			frentry_t *frs;
+
 			ATOMIC_INC64(fr->fr_hits);
 			if ((fr->fr_func != NULL) &&
-			    (fr->fr_func != (ipfunc_t)-1)) {
-				frentry_t *frs;
+			    (fr->fr_func == (ipfunc_t)-1))
+				continue;
 
-				frs = fin->fin_fr;
-				fin->fin_fr = fr;
-				fr = (*fr->fr_func)(fin, &passt);
-				if (fr == NULL) {
-					fin->fin_fr = frs;
-					continue;
-				}
-				passt = fr->fr_flags;
-				fin->fin_fr = fr;
-			}
-		} else {
+			frs = fin->fin_fr;
 			fin->fin_fr = fr;
+			fr = (*fr->fr_func)(fin, &passt);
+			if (fr == NULL) {
+				fin->fin_fr = frs;
+				continue;
+			}
+			passt = fr->fr_flags;
 		}
+		fin->fin_fr = fr;
 
 #ifdef  IPFILTER_LOG
 		/*
@@ -2021,18 +2022,20 @@ u_32_t pass;
 		(void) strncpy(fin->fin_group, fr->fr_group, FR_GROUPLEN);
 		if (fr->fr_grp != NULL) {
 			fin->fin_fr = *fr->fr_grp;
-			pass = fr_scanlist(fin, pass);
+			passt = fr_scanlist(fin, pass);
 			if (fin->fin_fr == NULL) {
 				fin->fin_rule = rulen;
 				(void) strncpy(fin->fin_group, fr->fr_group,
 					       FR_GROUPLEN);
 				fin->fin_fr = fr;
+				passt = pass;
 			}
 			if (fin->fin_flx & FI_DONTCACHE)
 				logged = 1;
+			pass = passt;
 		}
 
-		if (pass & FR_QUICK) {
+		if (passt & FR_QUICK) {
 			/*
 			 * Finally, if we've asked to track state for this
 			 * packet, set it up.  Add state for "quick" rules
@@ -2044,6 +2047,7 @@ u_32_t pass;
 			    !(fin->fin_flx & FI_STATE)) {
 				int out = fin->fin_out;
 
+				fin->fin_fr = fr;
 				if (fr_addstate(fin, NULL, 0) != NULL) {
 					ATOMIC_INCL(frstats[out].fr_ads);
 				} else {
@@ -2193,7 +2197,8 @@ u_32_t *passp;
 	if (FR_ISAUTH(pass)) {
 		if (fr_newauth(fin->fin_m, fin) != 0) {
 #ifdef	_KERNEL
-			fin->fin_m = *fin->fin_mp = NULL;
+			if ((pass & FR_RETMASK) == 0)
+				fin->fin_m = *fin->fin_mp = NULL;
 #else
 			;
 #endif
@@ -2230,21 +2235,6 @@ u_32_t *passp;
 			}
 		} else {
 			ATOMIC_INCL(frstats[out].fr_cfr);
-		}
-	}
-
-	/*
-	 * Finally, if we've asked to track state for this packet, set it up.
-	 */
-	if ((pass & FR_KEEPSTATE) && !(fin->fin_flx & FI_STATE)) {
-		if (fr_addstate(fin, NULL, 0) != NULL) {
-			ATOMIC_INCL(frstats[out].fr_ads);
-		} else {
-			ATOMIC_INCL(frstats[out].fr_bads);
-			if (FR_ISPASS(pass)) {
-				pass &= ~FR_CMDMASK;
-				pass |= FR_BLOCK;
-			}
 		}
 	}
 
@@ -2313,8 +2303,6 @@ int out;
 #ifdef USE_INET6
 	ip6_t *ip6;
 #endif
-	SPL_INT(s);
-
 	/*
 	 * The first part of fr_check() deals with making sure that what goes
 	 * into the filtering engine makes some sense.  Information about the
@@ -2328,6 +2316,8 @@ int out;
 
 	if ((u_int)ip & 0x3)
 		return 2;
+# else
+	SPL_INT(s);
 # endif
 
 	READ_ENTER(&ipf_global);
@@ -2493,6 +2483,23 @@ int out;
 	if ((pass & FR_NOMATCH) || (fr == NULL))
 		fr = fr_firewall(fin, &pass);
 
+	/*
+	 * If we've asked to track state for this packet, set it up.
+	 * Here rather than fr_firewall because fr_checkauth may decide
+	 * to return a packet for "keep state"
+	 */
+	if ((pass & FR_KEEPSTATE) && !(fin->fin_flx & FI_STATE)) {
+		if (fr_addstate(fin, NULL, 0) != NULL) {
+			ATOMIC_INCL(frstats[out].fr_ads);
+		} else {
+			ATOMIC_INCL(frstats[out].fr_bads);
+			if (FR_ISPASS(pass)) {
+				pass &= ~FR_CMDMASK;
+				pass |= FR_BLOCK;
+			}
+		}
+	}
+
 	fin->fin_fr = fr;
 
 	/*
@@ -2547,7 +2554,7 @@ int out;
 
 	RWLOCK_EXIT(&ipf_mutex);
 
-	if (pass & (FR_RETRST|FR_RETICMP)) {
+	if ((pass & FR_RETMASK) != 0) {
 		/*
 		 * Should we return an ICMP packet to indicate error
 		 * status passing through the packet filter ?
@@ -2572,6 +2579,14 @@ int out;
 				    (fr_send_reset(fin) == 0)) {
 					ATOMIC_INCL(frstats[1].fr_ret);
 				}
+			}
+
+			/*
+			 * When using return-* with auth rules, the auth code
+			 * takes over disposing of this packet.
+			 */
+			if (FR_ISAUTH(pass) && (fin->fin_m != NULL)) {
+				fin->fin_m = *fin->fin_mp = NULL;
 			}
 		} else {
 			if (pass & FR_RETRST)
@@ -2786,10 +2801,10 @@ int len;
 /*                                                                          */
 /* Expects ip_len to be in host byte order when called.                     */
 /* ------------------------------------------------------------------------ */
-u_short fr_cksum(m, ip, l4proto, l4hdr)
+u_short fr_cksum(m, ip, l4proto, l4hdr, l3len)
 mb_t *m;
 ip_t *ip;
-int l4proto;
+int l4proto, l3len;
 void *l4hdr;
 {
 	u_short *sp, slen, sumsave, l4hlen, *csump;
@@ -2814,7 +2829,7 @@ void *l4hdr;
 	if (IP_V(ip) == 4) {
 #endif
 		hlen = IP_HL(ip) << 2;
-		slen = ip->ip_len - hlen;
+		slen = l3len - hlen;
 		sum = htons((u_short)l4proto);
 		sum += htons(slen);
 		sp = (u_short *)&ip->ip_src;
@@ -2826,9 +2841,9 @@ void *l4hdr;
 	} else if (IP_V(ip) == 6) {
 		ip6 = (ip6_t *)ip;
 		hlen = sizeof(*ip6);
-		slen = ntohs(ip6->ip6_plen);
+		slen = ntohs(l3len);
 		sum = htons((u_short)l4proto);
-		sum += htons(slen);
+		sum += slen;
 		sp = (u_short *)&ip6->ip6_src;
 		sum += *sp++;	/* ip6_src */
 		sum += *sp++;
@@ -3472,7 +3487,7 @@ int proto, flags;
 char *memstr(src, dst, slen, dlen)
 const char *src;
 char *dst;
-int slen, dlen;
+size_t slen, dlen;
 {
 	char *s = NULL;
 
@@ -3650,13 +3665,15 @@ void *ifp;
 		if (fr->fr_type == FR_T_IPF && fr->fr_satype == FRI_LOOKUP &&
 		    fr->fr_srcptr == NULL) {
 			fr->fr_srcptr = fr_resolvelookup(fr->fr_srctype,
-							 fr->fr_srcnum,
+							 fr->fr_srcsubtype,
+							 &fr->fr_slookup,
 							 &fr->fr_srcfunc);
 		}
 		if (fr->fr_type == FR_T_IPF && fr->fr_datype == FRI_LOOKUP &&
 		    fr->fr_dstptr == NULL) {
 			fr->fr_dstptr = fr_resolvelookup(fr->fr_dsttype,
-							 fr->fr_dstnum,
+							 fr->fr_dstsubtype,
+							 &fr->fr_dlookup,
 							 &fr->fr_dstfunc);
 		}
 #endif
@@ -3760,13 +3777,7 @@ size_t size;
 	caddr_t ca;
 	int err;
 
-# if SOLARIS
-	err = COPYIN(dst, (caddr_t)&ca, sizeof(ca));
-	if (err != 0)
-		return err;
-# else
 	bcopy(dst, (caddr_t)&ca, sizeof(ca));
-# endif
 	err = COPYOUT(src, ca, size);
 	return err;
 }
@@ -3944,7 +3955,8 @@ int rev;
 /* Function:    fr_resolvelookup                                            */
 /* Returns:     void * - NULL = failure, else success.                      */
 /* Parameters:  type(I)     - type of lookup these parameters are for.      */
-/*              number(I)   - table number to use when searching            */
+/*              subtype(I)  - whether the info below contains number/name   */
+/*              info(I)     - pointer to name/number of the lookup data     */
 /*              funcptr(IO) - pointer to pointer for storing IP address     */
 /*                           searching function.                            */
 /*                                                                          */
@@ -3953,20 +3965,35 @@ int rev;
 /* call to do the IP address search will be change, regardless of whether   */
 /* or not the "table" number exists.                                        */
 /* ------------------------------------------------------------------------ */
-static void *fr_resolvelookup(type, number, funcptr)
-u_int type, number;
+static void *fr_resolvelookup(type, subtype, info, funcptr)
+u_int type, subtype;
+i6addr_t *info;
 lookupfunc_t *funcptr;
 {
-	char name[FR_GROUPLEN];
+	char label[FR_GROUPLEN], *name;
 	iphtable_t *iph;
 	ip_pool_t *ipo;
 	void *ptr;
 
+	if (subtype == 0) {
 #if defined(SNPRINTF) && defined(_KERNEL)
-	SNPRINTF(name, sizeof(name), "%u", number);
+		SNPRINTF(label, sizeof(label), "%u", info->iplookupnum);
 #else
-	(void) sprintf(name, "%u", number);
+		(void) sprintf(label, "%u", info->iplookupnum);
 #endif
+		name = label;
+	} else if (subtype == 1) {
+		/*
+		 * Because iplookupname is currently only a 12 character
+		 * string and FR_GROUPLEN is 16, copy all of it into the
+		 * label buffer and add on a NULL at the end.
+		 */
+		strncpy(label, info->iplookupname, sizeof(info->iplookupname));
+		label[sizeof(info->iplookupname)] = '\0';
+		name = label;
+	} else {
+		return NULL;
+	}
 
 	READ_ENTER(&ip_poolrw);
 
@@ -4215,8 +4242,11 @@ caddr_t data;
 #ifdef	IPFILTER_LOOKUP
 		case FRI_LOOKUP :
 			fp->fr_srcptr = fr_resolvelookup(fp->fr_srctype,
-							 fp->fr_srcnum,
+							 fp->fr_srcsubtype,
+							 &fp->fr_slookup,
 							 &fp->fr_srcfunc);
+			if (fp->fr_srcptr == NULL)
+				return ESRCH;
 			break;
 #endif
 		default :
@@ -4240,8 +4270,11 @@ caddr_t data;
 #ifdef	IPFILTER_LOOKUP
 		case FRI_LOOKUP :
 			fp->fr_dstptr = fr_resolvelookup(fp->fr_dsttype,
-							 fp->fr_dstnum,
+							 fp->fr_dstsubtype,
+							 &fp->fr_dlookup,
 							 &fp->fr_dstfunc);
+			if (fp->fr_dstptr == NULL)
+				return ESRCH;
 			break;
 #endif
 		default :
@@ -4886,7 +4919,7 @@ ipftq_t *ifq;
 		ifq->ifq_next->ifq_pnext = ifq->ifq_pnext;
 
 	MUTEX_DESTROY(&ifq->ifq_lock);
-	fr_userifqs--;
+	ATOMIC_DEC(fr_userifqs);
 	KFREE(ifq);
 }
 
@@ -4908,8 +4941,6 @@ ipftqent_t *tqe;
 	ipftq_t *ifq;
 
 	ifq = tqe->tqe_ifq;
-	if (ifq == NULL)
-		return;
 
 	MUTEX_ENTER(&ifq->ifq_lock);
 
@@ -4981,24 +5012,21 @@ ipftqent_t *tqe;
 	tqe->tqe_die = fr_ticks + ifq->ifq_ttl;
 
 	MUTEX_ENTER(&ifq->ifq_lock);
-	if (tqe->tqe_next == NULL) {		/* at the end already ? */
-		MUTEX_EXIT(&ifq->ifq_lock);
-		return;
+	if (tqe->tqe_next != NULL) {		/* at the end already ? */
+		/*
+		 * Remove from list
+		 */
+		*tqe->tqe_pnext = tqe->tqe_next;
+		tqe->tqe_next->tqe_pnext = tqe->tqe_pnext;
+
+		/*
+		 * Make it the last entry.
+		 */
+		tqe->tqe_next = NULL;
+		tqe->tqe_pnext = ifq->ifq_tail;
+		*ifq->ifq_tail = tqe;
+		ifq->ifq_tail = &tqe->tqe_next;
 	}
-
-	/*
-	 * Remove from list
-	 */
-	*tqe->tqe_pnext = tqe->tqe_next;
-	tqe->tqe_next->tqe_pnext = tqe->tqe_pnext;
-
-	/*
-	 * Make it the last entry.
-	 */
-	tqe->tqe_next = NULL;
-	tqe->tqe_pnext = ifq->ifq_tail;
-	*ifq->ifq_tail = tqe;
-	ifq->ifq_tail = &tqe->tqe_next;
 	MUTEX_EXIT(&ifq->ifq_lock);
 }
 
@@ -5050,46 +5078,44 @@ ipftq_t *oifq, *nifq;
 	 * Is the operation here going to be a no-op ?
 	 */
 	MUTEX_ENTER(&oifq->ifq_lock);
-	if (oifq == nifq && *oifq->ifq_tail == tqe) {
-		MUTEX_EXIT(&oifq->ifq_lock);
-		return;
+	if ((oifq != nifq) || (*oifq->ifq_tail != tqe)) {
+		/*
+		 * Remove from the old queue
+		 */
+		*tqe->tqe_pnext = tqe->tqe_next;
+		if (tqe->tqe_next)
+			tqe->tqe_next->tqe_pnext = tqe->tqe_pnext;
+		else
+			oifq->ifq_tail = tqe->tqe_pnext;
+		tqe->tqe_next = NULL;
+
+		/*
+		 * If we're moving from one queue to another, release the
+		 * lock on the old queue and get a lock on the new queue.
+		 * For user defined queues, if we're moving off it, call
+		 * delete in case it can now be freed.
+		 */
+		if (oifq != nifq) {
+			tqe->tqe_ifq = NULL;
+
+			(void) fr_deletetimeoutqueue(oifq);
+
+			MUTEX_EXIT(&oifq->ifq_lock);
+
+			MUTEX_ENTER(&nifq->ifq_lock);
+
+			tqe->tqe_ifq = nifq;
+			nifq->ifq_ref++;
+		}
+
+		/*
+		 * Add to the bottom of the new queue
+		 */
+		tqe->tqe_die = fr_ticks + nifq->ifq_ttl;
+		tqe->tqe_pnext = nifq->ifq_tail;
+		*nifq->ifq_tail = tqe;
+		nifq->ifq_tail = &tqe->tqe_next;
 	}
-
-	/*
-	 * Remove from the old queue
-	 */
-	*tqe->tqe_pnext = tqe->tqe_next;
-	if (tqe->tqe_next)
-		tqe->tqe_next->tqe_pnext = tqe->tqe_pnext;
-	else
-		oifq->ifq_tail = tqe->tqe_pnext;
-	tqe->tqe_next = NULL;
-
-	/*
-	 * If we're moving from one queue to another, release the lock on the
-	 * old queue and get a lock on the new queue.  For user defined queues,
-	 * if we're moving off it, call delete in case it can now be freed.
-	 */
-	if (oifq != nifq) {
-		tqe->tqe_ifq = NULL;
-
-		(void) fr_deletetimeoutqueue(oifq);
-
-		MUTEX_EXIT(&oifq->ifq_lock);
-
-		MUTEX_ENTER(&nifq->ifq_lock);
-
-		tqe->tqe_ifq = nifq;
-		nifq->ifq_ref++;
-	}
-
-	/*
-	 * Add to the bottom of the new queue
-	 */
-	tqe->tqe_die = fr_ticks + nifq->ifq_ttl;
-	tqe->tqe_pnext = nifq->ifq_tail;
-	*nifq->ifq_tail = tqe;
-	nifq->ifq_tail = &tqe->tqe_next;
 	MUTEX_EXIT(&nifq->ifq_lock);
 }
 
@@ -5227,19 +5253,9 @@ void *data;
 			error = EIO;
 		break;
 	case IPL_LOGAUTH :
-		if (fr_running > 0) {
-			if ((cmd == (ioctlcmd_t)SIOCADAFR) ||
-			    (cmd == (ioctlcmd_t)SIOCRMAFR)) {
-				if (!(mode & FWRITE)) {
-					error = EPERM;
-				} else {
-					error = frrequest(unit, cmd, data,
-							  fr_active, 1);
-				}
-			} else {
-				error = fr_auth_ioctl(data, cmd, mode);
-			}
-		} else
+		if (fr_running > 0)
+			error = fr_auth_ioctl(data, cmd, mode);
+		else
 			error = EIO;
 		break;
 	case IPL_LOGSYNC :
@@ -5573,7 +5589,7 @@ fr_info_t *fin;
 
 		if (dosum)
 			sum = fr_cksum(fin->fin_m, fin->fin_ip,
-				       fin->fin_p, fin->fin_dp);
+				       fin->fin_p, fin->fin_dp, fin->fin_plen);
 #if SOLARIS && defined(_KERNEL) && (SOLARIS2 >= 6) && defined(ICK_VALID)
 	}
 #endif
@@ -6281,7 +6297,7 @@ caddr_t	data;
 	int error;
 
 	fr_getstat(&fio);
-	error = copyoutptr(&fio, data, sizeof(fio));
+	error = fr_outobj(data, &fio, IPFOBJ_IPFSTAT);
 	if (error)
 		return EFAULT;
 

@@ -53,6 +53,7 @@
 #include "netinet/ip_auth.h"
 #include "netinet/ip_state.h"
 
+struct pollhead iplpollhead[IPL_LOGSIZE];
 
 extern	struct	filterstats	frstats[];
 extern	int	fr_running;
@@ -70,6 +71,7 @@ static	int	ipf_attach __P((dev_info_t *, ddi_attach_cmd_t));
 static	int	ipf_detach __P((dev_info_t *, ddi_detach_cmd_t));
 static	int	fr_qifsync __P((ip_t *, int, void *, int, void *, mblk_t **));
 static	int	ipf_property_update __P((dev_info_t *));
+static 	int	iplpoll __P((dev_t, short, int, short *, struct pollhead **));
 static	char	*ipf_devfiles[] = { IPL_NAME, IPNAT_NAME, IPSTATE_NAME,
 				    IPAUTH_NAME, IPSYNC_NAME, IPSCAN_NAME,
 				    IPLOOKUP_NAME, NULL };
@@ -94,7 +96,7 @@ static struct cb_ops ipf_cb_ops = {
 	nodev,		/* devmap */
 	nodev,		/* mmap */
 	nodev,		/* segmap */
-	nochpoll,	/* poll */
+	iplpoll,	/* poll */
 	ddi_prop_op,
 	NULL,
 	D_MTSAFE,
@@ -568,4 +570,56 @@ dev_info_t *dip;
 	}
 
 	return err;
+}
+
+
+static int iplpoll(dev, events, anyyet, reventsp, phpp)
+dev_t dev;
+short events;
+int anyyet;
+short *reventsp;
+struct pollhead **phpp;
+{
+	u_int xmin = getminor(dev);
+	int revents = 0;
+
+	if (xmin < 0 || xmin > IPL_LOGMAX)
+		return ENXIO;
+
+	switch (xmin) 
+	{
+	case IPL_LOGIPF :
+	case IPL_LOGNAT :
+	case IPL_LOGSTATE :
+#ifdef IPFILTER_LOG
+		if ((events & (POLLIN | POLLRDNORM)) && ipflog_canread(xmin))
+			revents |= events & (POLLIN | POLLRDNORM);
+#endif  
+		break;
+	case IPL_LOGAUTH :
+		if ((events & (POLLIN | POLLRDNORM)) && fr_auth_waiting())
+			revents |= events & (POLLIN | POLLRDNORM);
+		break; 
+	case IPL_LOGSYNC :
+#ifdef IPFILTER_SYNC
+		if ((events & (POLLIN | POLLRDNORM)) && ipfsync_canread())
+			revents |= events & (POLLIN | POLLRDNORM);
+		if ((events & (POLLOUT | POLLWRNORM)) && ipfsync_canwrite())
+			revents |= events & (POLLOUT | POLLOUTNORM);
+#endif
+		break;
+	case IPL_LOGSCAN :
+	case IPL_LOGLOOKUP :
+	default :
+		break;
+	}
+
+	if (revents) {
+		*reventsp = revents;
+	} else {
+		*reventsp = 0;
+		if (!anyyet)
+			*phpp = &iplpollhead[xmin];
+	}
+	return 0;
 }

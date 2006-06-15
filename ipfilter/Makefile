@@ -134,6 +134,7 @@ all:
 	@echo "freebsd3	- compile for FreeBSD-3.x"
 	@echo "freebsd4	- compile for FreeBSD-4.x"
 	@echo "freebsd5 - compile for FreeBSD-5.x"
+	@echo "freebsd6 - compile for FreeBSD-6.x"
 	@echo "bsd	- compile for generic 4.4BSD systems"
 	@echo "bsdi	- compile for BSD/OS"
 	@echo "irix	- compile for SGI IRIX"
@@ -186,7 +187,7 @@ freebsd22: include
 	fi
 	make freebsd20
 
-freebsd5: include
+freebsd5 freebsd6: include
 	if [ x$(INET6) = x ] ; then \
 		echo "#undef INET6" > opt_inet6.h; \
 	else \

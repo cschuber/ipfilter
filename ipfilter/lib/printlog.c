@@ -26,14 +26,11 @@ frentry_t *fp;
 	if (fp->fr_loglevel != 0xffff) {
 		printf(" level ");
 		s = fac_toname(fp->fr_loglevel);
-		if (s == NULL)
+		if (s == NULL || *s == '\0')
 			s = "!!!";
 		u = pri_toname(fp->fr_loglevel);
-		if (u == NULL)
+		if (u == NULL || *u == '\0')
 			u = "!!!";
-		if (*s)
-			printf("%s.%s", s, u);
-		else
-			printf("%s", u);
+		printf("%s.%s", s, u);
 	}
 }

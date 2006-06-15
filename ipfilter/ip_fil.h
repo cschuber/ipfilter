@@ -111,6 +111,11 @@ typedef	union	i6addr	{
 	struct	in6_addr in6;
 	void	*vptr[2];
 	lookupfunc_t	lptr[2];
+	struct {
+		u_short	type;
+		u_short	subtype;
+		char	label[12];
+	} i6un;
 } i6addr_t;
 #else
 typedef	union	i6addr	{
@@ -118,12 +123,19 @@ typedef	union	i6addr	{
 	struct	in_addr	in4;
 	void	*vptr[2];
 	lookupfunc_t	lptr[2];
+	struct {
+		u_short	type;
+		u_short	subtype;
+		char	label[12];
+	} i6un;
 } i6addr_t;
 #endif
 
 #define in4_addr	in4.s_addr
-#define	iplookupnum	i6[0]
-#define	iplookuptype	i6[1]
+#define	iplookupnum	i6[1]
+#define	iplookupname	i6un.label
+#define	iplookuptype	i6un.type
+#define	iplookupsubtype	i6un.subtype
 /*
  * NOTE: These DO overlap the above on 64bit systems and this IS recognised.
  */
@@ -249,8 +261,12 @@ typedef	struct	fr_ip	{
 #define	fi_daddr	fi_dst.in4.s_addr
 #define	fi_srcnum	fi_src.iplookupnum
 #define	fi_dstnum	fi_dst.iplookupnum
+#define	fi_srcname	fi_src.iplookupname
+#define	fi_dstname	fi_dst.iplookupname
 #define	fi_srctype	fi_src.iplookuptype
 #define	fi_dsttype	fi_dst.iplookuptype
+#define	fi_srcsubtype	fi_src.iplookupsubtype
+#define	fi_dstsubtype	fi_dst.iplookupsubtype
 #define	fi_srcptr	fi_src.iplookupptr
 #define	fi_dstptr	fi_dst.iplookupptr
 #define	fi_srcfunc	fi_src.iplookupfunc
@@ -305,6 +321,7 @@ typedef	struct	fr_info	{
 #ifdef	MENTAT
 	mb_t	*fin_qfm;		/* pointer to mblk where pkt starts */
 	void	*fin_qpi;
+	char	fin_ifname[LIFNAMSIZ];
 #endif
 #ifdef	__sgi
 	void	*fin_hbuf;
@@ -439,9 +456,13 @@ typedef	struct	fripf	{
 	int	fri_difpidx;		/* index into fr_ifps[] to use when */
 } fripf_t;
 
-#define	fri_dstnum	fri_ip.fi_dstnum
+#define	fri_dlookup	fri_mip.fi_dst
+#define	fri_slookup	fri_mip.fi_src
+#define	fri_dstnum	fri_mip.fi_dstnum
 #define	fri_srcnum	fri_mip.fi_srcnum
-#define	fri_dstptr	fri_ip.fi_dstptr
+#define	fri_dstname	fri_mip.fi_dstname
+#define	fri_srcname	fri_mip.fi_srcname
+#define	fri_dstptr	fri_mip.fi_dstptr
 #define	fri_srcptr	fri_mip.fi_srcptr
 
 #define	FRI_NORMAL	0	/* Normal address */
@@ -553,8 +574,14 @@ typedef	struct	frentry {
 #define	fr_smask	fr_mip.fi_src.in4.s_addr
 #define	fr_dstnum	fr_ip.fi_dstnum
 #define	fr_srcnum	fr_ip.fi_srcnum
+#define	fr_dlookup	fr_ip.fi_dst
+#define	fr_slookup	fr_ip.fi_src
+#define	fr_dstname	fr_ip.fi_dstname
+#define	fr_srcname	fr_ip.fi_srcname
 #define	fr_dsttype	fr_ip.fi_dsttype
 #define	fr_srctype	fr_ip.fi_srctype
+#define	fr_dstsubtype	fr_ip.fi_dstsubtype
+#define	fr_srcsubtype	fr_ip.fi_srcsubtype
 #define	fr_dstptr	fr_mip.fi_dstptr
 #define	fr_srcptr	fr_mip.fi_srcptr
 #define	fr_dstfunc	fr_mip.fi_dstfunc
@@ -1133,6 +1160,17 @@ typedef	struct	ipftune	{
 # endif
 #endif
 
+#ifdef _KERNEL
+# define	FR_VERBOSE(verb_pr)
+# define	FR_DEBUG(verb_pr)
+#else
+extern	void	debug __P((char *, ...));
+extern	void	verbose __P((char *, ...));
+# define	FR_VERBOSE(verb_pr)	verbose verb_pr
+# define	FR_DEBUG(verb_pr)	debug verb_pr
+#endif
+
+
 #ifndef	_KERNEL
 extern	int	fr_check __P((struct ip *, int, void *, int, mb_t **));
 extern	int	(*fr_checkp) __P((ip_t *, int, void *, int, mb_t **));
@@ -1148,6 +1186,7 @@ extern	int	iplioctl __P((int, ioctlcmd_t, caddr_t, int));
 extern	int	iplopen __P((dev_t, int));
 extern	int	iplclose __P((dev_t, int));
 extern	void	m_freem __P((mb_t *));
+extern	int	bcopywrap __P((void *, void *, size_t));
 #else /* #ifndef _KERNEL */
 # if defined(__NetBSD__) && defined(PFIL_HOOKS)
 extern	void	ipfilterattach __P((int));
@@ -1259,7 +1298,7 @@ extern	ipfrwlock_t	ipf_mutex, ipf_global, ip_poolrw, ipf_ipidfrag;
 extern	ipfrwlock_t	ipf_frag, ipf_state, ipf_nat, ipf_natfrag, ipf_auth;
 extern	ipfrwlock_t	ipf_frcache;
 
-extern	char	*memstr __P((const char *, char *, int, int));
+extern	char	*memstr __P((const char *, char *, size_t, size_t));
 extern	int	count4bits __P((u_32_t));
 extern	int	frrequest __P((int, ioctlcmd_t, caddr_t, int, int));
 extern	char	*getifname __P((struct ifnet *));
@@ -1316,6 +1355,7 @@ extern	void	fr_delgroup __P((char *, minor_t, int));
 extern	frgroup_t *fr_findgroup __P((char *, minor_t, int, frgroup_t ***));
 
 extern	int	fr_loginit __P((void));
+extern	int	ipflog_canread __P((int));
 extern	int	ipflog_clear __P((minor_t));
 extern	int	ipflog_read __P((minor_t, uio_t *));
 extern	int	ipflog __P((fr_info_t *, u_int));
@@ -1324,7 +1364,7 @@ extern	void	fr_logunload __P((void));
 
 extern	frentry_t	*fr_acctpkt __P((fr_info_t *, u_32_t *));
 extern	int		fr_copytolog __P((int, char *, int));
-extern	u_short		fr_cksum __P((mb_t *, ip_t *, int, void *));
+extern	u_short		fr_cksum __P((mb_t *, ip_t *, int, void *, int));
 extern	void		fr_deinitialise __P((void));
 extern	frentry_t 	*fr_dolog __P((fr_info_t *, u_32_t *));
 extern	frentry_t 	*fr_dstgrpmap __P((fr_info_t *, u_32_t *));

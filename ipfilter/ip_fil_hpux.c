@@ -514,7 +514,7 @@ fr_info_t *fin;
 		ip->ip_p = IPPROTO_TCP;
 		ip->ip_len = sizeof(*ip) + sizeof(*tcp);
 		ip->ip_tos = fin->fin_ip->ip_tos;
-		tcp2->th_sum = fr_cksum(m, ip, IPPROTO_TCP, tcp2);
+		tcp2->th_sum = fr_cksum(m, ip, IPPROTO_TCP, tcp2, ip->ip_len);
 	}
 	return fr_send_ip(fin, m);
 }

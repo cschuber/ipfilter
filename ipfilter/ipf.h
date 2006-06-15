@@ -182,7 +182,6 @@ extern	struct ipopt_names v6ionames[];
 extern int addicmp __P((char ***, struct frentry *, int));
 extern int addipopt __P((char *, struct ipopt_names *, int, char *));
 extern int addkeep __P((char ***, struct frentry *, int));
-extern int bcopywrap __P((void *, void *, size_t));
 extern void binprint __P((void *, size_t));
 extern void initparse __P((void));
 extern u_32_t buildopts __P((char *, char *, int));

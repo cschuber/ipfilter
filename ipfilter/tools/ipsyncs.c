@@ -19,7 +19,7 @@ static const char rcsid[] = "@(#)$Id$";
 #include <stdio.h>
 #include <stdlib.h>
 #include <fcntl.h>
-#include <strings.h>
+#include <string.h>
 #include <unistd.h>
 #include <syslog.h>
 #include <errno.h>
@@ -32,6 +32,7 @@ static const char rcsid[] = "@(#)$Id$";
 #include "netinet/ip_sync.h"
 
 int	main __P((int, char *[]));
+void	usage __P((const char *progname));
 
 int	terminate = 0;
 
@@ -41,11 +42,12 @@ void usage(const char *progname) {
 		progname);
 }
 
+#if 0
 static void handleterm(int sig)
 {
 	terminate = sig;
-
 }
+#endif
 
 #define BUFFERLEN 1400
 
@@ -130,8 +132,7 @@ char *argv[];
 			goto tryagain;
 		}
 
-		syslog(LOG_INFO, "Established connection to %s",
-		       inet_ntoa(sin.sin_addr));
+		syslog(LOG_INFO, "Listening to %s", inet_ntoa(sin.sin_addr));
 	
 		inbuf = 0;	
 		while (1) {
@@ -223,14 +224,15 @@ moreinbuf:
 			n2 = sizeof(*sh) + len;
 			n3 = write(lfd, buff, n2);
 			if (n3 <= 0) {
-				syslog(LOG_ERR, "Write error: %m");
+				syslog(LOG_ERR, "%s: Write error: %m",
+				       IPSYNC_NAME);
 				goto tryagain;
 			}
 
 			
 			if (n3 != n2) {
-				syslog(LOG_ERR, "Incomplete write (%d/%d)",
-				       n3, n2);
+				syslog(LOG_ERR, "%s: Incomplete write (%d/%d)",
+				       IPSYNC_NAME, n3, n2);
 				goto tryagain;
 			}
 

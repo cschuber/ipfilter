@@ -442,7 +442,7 @@ fr_info_t *fin;
 		ip->ip_dst.s_addr = fin->fin_saddr;
 		ip->ip_p = IPPROTO_TCP;
 		ip->ip_len = sizeof(*ip) + sizeof(*tcp);
-		tcp2->th_sum = fr_cksum(m, ip, IPPROTO_TCP, tcp2);
+		tcp2->th_sum = fr_cksum(m, ip, IPPROTO_TCP, tcp2, ip->ip_len);
 	}
 	return fr_send_ip(fin, m, &m);
 }
@@ -705,18 +705,8 @@ frdest_t *fdp;
 		goto bad;
 	}
 
-	/*
-	 * In case we're here due to "to <if>" being used with "keep state",
-	 * check that we're going in the correct direction.
-	 */
-	if ((fr != NULL) && (fin->fin_rev != 0)) {
-		if ((ifp != NULL) && (fdp == &fr->fr_tif))
-			return -1;
-	}
-	if (fdp != NULL) {
-		if (fdp->fd_ip.s_addr)
-			dip = fdp->fd_ip;
-	}
+	if ((fdp != NULL) && (fdp->fd_ip.s_addr))
+		dip = fdp->fd_ip;
 
 	switch (fin->fin_v)
 	{
