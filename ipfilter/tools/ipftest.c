@@ -620,8 +620,11 @@ void dumpnat()
 	for (ipn = nat_list; ipn != NULL; ipn = ipn->in_next)
 		printnat(ipn, opts & (OPT_DEBUG|OPT_VERBOSE));
 	printf("\nList of active sessions:\n");
-	for (nat = nat_instances; nat; nat = nat->nat_next)
+	for (nat = nat_instances; nat; nat = nat->nat_next) {
 		printactivenat(nat, opts);
+		if (nat->nat_aps)
+			printaps(nat->nat_aps, opts);
+	}
 }
 
 
@@ -634,7 +637,8 @@ void dumpstate()
 
 	printf("List of active state sessions:\n");
 	for (ips = ips_list; ips != NULL; )
-		ips = printstate(ips, opts & (OPT_DEBUG|OPT_VERBOSE));
+		ips = printstate(ips, opts & (OPT_DEBUG|OPT_VERBOSE),
+				 fr_ticks);
 }
 
 
@@ -701,7 +705,7 @@ char *filename;
 	struct iovec iov;
 	struct uio uio;
 	size_t resid;
-	int fd;
+	int fd, i;
 
 	fd = open(filename, O_CREAT|O_TRUNC|O_WRONLY, 0644);
 	if (fd == -1) {
@@ -709,26 +713,27 @@ char *filename;
 		return;
 	}
 
-	while (1) {
-		bzero((char *)&iov, sizeof(iov));
-		iov.iov_base = buffer;
-		iov.iov_len = sizeof(buffer);
+	for (i = 0; i <= IPL_LOGMAX; i++)
+		while (1) {
+			bzero((char *)&iov, sizeof(iov));
+			iov.iov_base = buffer;
+			iov.iov_len = sizeof(buffer);
 
-		bzero((char *)&uio, sizeof(uio));
-		uio.uio_iov = &iov;
-		uio.uio_iovcnt = 1;
-		uio.uio_resid = iov.iov_len;
-		resid = uio.uio_resid;
+			bzero((char *)&uio, sizeof(uio));
+			uio.uio_iov = &iov;
+			uio.uio_iovcnt = 1;
+			uio.uio_resid = iov.iov_len;
+			resid = uio.uio_resid;
 
-		if (ipflog_read(0, &uio) == 0) {
-			/*
-			 * If nothing was read then break out.
-			 */
-			if (uio.uio_resid == resid)
+			if (ipflog_read(i, &uio) == 0) {
+				/*
+				 * If nothing was read then break out.
+				 */
+				if (uio.uio_resid == resid)
+					break;
+				write(fd, buffer, resid - uio.uio_resid);
+			} else
 				break;
-			write(fd, buffer, resid - uio.uio_resid);
-		} else
-			break;
 	}
 
 	close(fd);

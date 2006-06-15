@@ -196,11 +196,14 @@ ipnat_l.h: $(TOOL)/lexer.h
 $(OBJ)/mlso_rule.o: $(TOP)/mlso_rule.c
 	$(CC) -I$(TOP) $(DFLAGS) -c $(TOP)/mlso_rule.c -o $@
 
-$(OBJ)/ip_rules.o: $(TOP)/ip_rules.c $(TOP)/ip_rules.h
-	$(CC) -I$(TOP) $(DFLAGS) -c $(TOP)/ip_rules.c -o $@
+$(OBJ)/ip_rules.o: $(OBJ)/ip_rules.c $(TOP)/ip_rules.h
+	$(CC) -I$(TOP) $(DFLAGS) -c $(OBJ)/ip_rules.c -o $@
 
-$(OBJ)/ipfrule: $(OBJ)/ip_rules.o $(OBJ)/mlso_rule.o
-	ld -r $(OBJ)/ip_rules.o $(OBJ)/mlso_rule.o -o $@
+$(OBJ)/ip_rulesx.o: $(OBJ)/ip_rules.c $(TOP)/ip_rules.h
+	$(CC) -I$(TOP) -DIPFILTER_COMPILED $(DFLAGS) -c $(OBJ)/ip_rules.c -o $@
+
+$(OBJ)/ipfrule: $(OBJ)/ip_rulesx.o $(OBJ)/mlso_rule.o
+	ld -r $(OBJ)/ip_rulesx.o $(OBJ)/mlso_rule.o -o $@
 
 $(OBJ)/ipf: $(MODOBJS)
 	ld -dy -Ndrv/ip -Ndrv/pfil -Nmisc/md5 -r $(MODOBJS) -o $@
@@ -208,7 +211,7 @@ $(OBJ)/ipf: $(MODOBJS)
 $(OBJ)/md5.o: $(TOP)/md5.c $(TOP)/md5.h
 	$(CC) -I$(TOP) $(DFLAGS) -c $(TOP)/md5.c -o $@
 
-$(OBJ)/radix.o: $(TOP)/md5.c $(TOP)/radix.h
+$(OBJ)/radix.o: $(TOP)/md5.c $(TOP)/radix_ipf.h
 	$(CC) -I$(TOP) $(DFLAGS) -c $(TOP)/radix.c -o $@
 
 $(OBJ)/ip_nat.o: $(TOP)/ip_nat.c $(TOP)/ip_nat.h $(TOP)/ip_compat.h
@@ -260,7 +263,7 @@ $(OBJ)/bpf_filter_u.o: $(TOP)/bpf_filter.c
 $(OBJ)/md5_u.o: $(TOP)/md5.c $(TOP)/md5.h
 	$(CC) $(CCARGS) $(EXTRA) -c $(TOP)/md5.c -o $@
 
-$(OBJ)/radix_u.o: $(TOP)/radix.c $(TOP)/radix.h
+$(OBJ)/radix_u.o: $(TOP)/radix.c $(TOP)/radix_ipf.h
 	$(CC) $(CCARGS) $(EXTRA) -c $(TOP)/radix.c -o $@
 
 $(OBJ)/ip_nat_u.o: $(TOP)/ip_nat.c $(TOP)/ip_nat.h $(TOP)/ip_compat.h
@@ -303,8 +306,17 @@ $(OBJ)/ip_proxy_u.o: $(TOP)/ip_proxy.c $(TOP)/ip_proxy.h $(TOP)/ip_compat.h \
 	$(TOP)/ip_fil.h
 	$(CC) $(CCARGS) $(EXTRA) -c $(TOP)/ip_proxy.c -o $@
 
-$(OBJ)/ip_rules_u.o: $(TOP)/ip_rules.c $(TOP)/ip_fil.h $(TOP)/ip_rules.h
-	$(CC) $(CCARGS) $(EXTRA) -c $(TOP)/ip_rules.c -o $@
+$(OBJ)/ip_rules.c: $(OBJ)/ipf.exe $(TOP)/tools/ipfcomp.c $(TOP)/rules/ip_rules
+	$(OBJ)/ipf.exe -cc -nf $(TOP)/rules/ip_rules
+	-/bin/mv -f ip_rules.c $(OBJ)
+
+$(TOP)/ip_rules.h: $(OBJ)/ip_rules.c
+	if [ -f ip_rules.h ] ; then \
+		/bin/mv -f ip_rules.h $(TOP) ; \
+	fi
+
+$(OBJ)/ip_rules_u.o: $(OBJ)/ip_rules.c $(TOP)/ip_fil.h $(TOP)/ip_rules.h
+	$(CC) $(CCARGS) $(EXTRA) -c $(OBJ)/ip_rules.c -o $@
 
 $(OBJ)/ip_fil_u.o: $(TOP)/ip_fil.c $(TOP)/ip_fil.h
 	$(CC) $(CCARGS) $(EXTRA) -c $(TOP)/ip_fil.c -o $@
@@ -407,7 +419,7 @@ clean:
 		${RM} -f ip_fil.c ipf_l.c ipf_y.c ipf_y.h ipf_l.h; \
 		${RM} -f ipscan ipscan_y.c ipscan_y.h ipscan_l.c; \
 		${RM} -f ippool ippool_y.c ippool_y.h ippool_l.c; \
-		${RM} -f ipscan_l.h ippool_l.h; \
+		${RM} -f ipscan_l.h ippool_l.h ip_rules.c ip_rules.h; \
 		${RM} -f ipnat_y.c ipnat_y.h ipnat_l.c ipnat_l.h; \
 		${RM} -f ipmon_y.c ipmon_y.h ipmon_l.c ipmon_l.h; \
 		${RM} -f ipsyncm ipsyncs ipfs; \
@@ -455,9 +467,11 @@ $(CPUDIR)/ipf.pkg.common:
 	-$(INSTALL) ipl.4 $(PKGMAN)/man4
 	-$(INSTALL) ipf.5 $(PKGMAN)/man5
 	-$(INSTALL) ipnat.5 $(PKGMAN)/man5
+	-$(INSTALL) ippool.5 $(PKGMAN)/man5
 	-$(INSTALL) ipfilter.5 $(PKGMAN)/man5
 	-$(INSTALL) ipfstat.8 $(PKGMAN)/man8
 	-$(INSTALL) ipmon.8 $(PKGMAN)/man8
+	-$(INSTALL) ippool.8 $(PKGMAN)/man8
 	-cp $(TOP)/rules/* $(PKGDIR)/examples
 	-cp $(TOP)/ip_fil.h $(TOP)/ip_compat.h $(TOP)/ip_state.h .
 	-cp $(TOP)/ip_nat.h $(TOP)/ip_frag.h $(TOP)/ip_proxy.h .
@@ -488,6 +502,7 @@ ipf.pkg.bin:
 	-$(INSTALL) -c $(TOP)/mkfilters $(PKGBIN)/mkfilters
 	-$(INSTALL) -c $(OBJDIR)/ipf $(ROOT)/usr/kernel/drv/$(OBJ)/ipf
 	-$(INSTALL) -c -s $(OBJDIR)/ipnat $(ROOT)/$(SBINDEST)/ipnat
+	-$(INSTALL) -c -s $(OBJDIR)/ippool $(ROOT)/$(SBINDEST)/ippool
 	-$(INSTALL) -c -s $(OBJDIR)/ipf.exe $(ROOT)/$(SBINDEST)/ipf
 	-$(INSTALL) -c -s $(OBJDIR)/ipfs $(ROOT)/$(SBINDEST)/ipfs
 	-$(INSTALL) -c -s $(OBJDIR)/ipfstat $(ROOT)/$(SBINDEST)/ipfstat
@@ -503,6 +518,7 @@ ipf.pkg.bin:
 
 
 package install: $(CPUDIR)/ipf.pkg
+	/bin/rm -f ipf.pkg
 	ln -s $(CPUDIR)/ipf.pkg ipf.pkg
 	@if [ `id|sed -e 's/^.[^(]*(\([^)]*\)).*/\1/'` != root ] ; then \
 		echo "Can only install if root"; \

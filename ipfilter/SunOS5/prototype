@@ -34,6 +34,7 @@ f none /sbin/ipfs=root/sbin/ipfs
 f none /sbin/ipfstat=root/sbin/ipfstat
 f none /sbin/ipf=root/sbin/ipf
 f none /sbin/ipnat=root/sbin/ipnat
+f none /sbin/ippool=root/sbin/ippool
 d none /etc
 d none /etc/init.d
 f none /etc/init.d/ipfboot=root/etc/init.d/ipfboot
@@ -47,6 +48,7 @@ f none /opt/ipf/man/man8/ipmon.8=root/opt/ipf/man/man8/ipmon.8
 f none /opt/ipf/man/man8/ipf.8=root/opt/ipf/man/man8/ipf.8
 f none /opt/ipf/man/man8/ipfs.8=root/opt/ipf/man/man8/ipfs.8
 f none /opt/ipf/man/man8/ipnat.8=root/opt/ipf/man/man8/ipnat.8
+f none /opt/ipf/man/man8/ippool.8=root/opt/ipf/man/man8/ippool.8
 f none /opt/ipf/man/man1/ipftest.1=root/opt/ipf/man/man1/ipftest.1
 f none /opt/ipf/man/man1/mkfilters.1=root/opt/ipf/man/man1/mkfilters.1
 f none /opt/ipf/man/man4/ipf.4=root/opt/ipf/man/man4/ipf.4
@@ -54,6 +56,7 @@ f none /opt/ipf/man/man4/ipl.4=root/opt/ipf/man/man4/ipl.4
 f none /opt/ipf/man/man4/ipnat.4=root/opt/ipf/man/man4/ipnat.4
 f none /opt/ipf/man/man5/ipf.5=root/opt/ipf/man/man5/ipf.5
 f none /opt/ipf/man/man5/ipnat.5=root/opt/ipf/man/man5/ipnat.5
+f none /opt/ipf/man/man5/ippool.5=root/opt/ipf/man/man5/ippool.5
 f none /usr/kernel/drv/ipf.conf=root/usr/kernel/drv/ipf.conf
 f none /usr/include/ipfilter/ip_fil.h=root/usr/include/ipfilter/ip_fil.h
 f none /usr/include/ipfilter/ip_auth.h=root/usr/include/ipfilter/ip_auth.h

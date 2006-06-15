@@ -37,11 +37,13 @@
 # include <stdlib.h>
 # include <ctype.h>
 # define _KERNEL
-#ifdef __OpenBSD__
+# define KERNEL
+# ifdef __OpenBSD__
 struct file;
-#endif
+# endif
 # include <sys/uio.h>
 # undef _KERNEL
+# undef KERNEL
 #endif
 #if __FreeBSD_version >= 220000 && defined(_KERNEL)
 # include <sys/fcntl.h>
@@ -316,15 +318,15 @@ u_int flags;
 	 * currently associated.
 	 */
 # if (SOLARIS || defined(__hpux)) && defined(_KERNEL)
-	ipfl.fl_unit = (u_char)ifp->qf_ppa;
+	ipfl.fl_unit = (u_int)ifp->qf_ppa;
 	COPYIFNAME(ifp, ipfl.fl_ifname);
 # else
 #  if (defined(NetBSD) && (NetBSD <= 1991011) && (NetBSD >= 199603)) || \
-      (defined(OpenBSD) && (OpenBSD >= 199603)) || \
+      (defined(OpenBSD) && (OpenBSD >= 199603)) || defined(linux) || \
       (defined(__FreeBSD__) && (__FreeBSD_version >= 501113))
 	COPYIFNAME(ifp, ipfl.fl_ifname);
 #  else
-	ipfl.fl_unit = (u_char)ifp->if_unit;
+	ipfl.fl_unit = (u_int)ifp->if_unit;
 #   if defined(_KERNEL)
 	if ((ipfl.fl_ifname[0] = ifp->if_name[0]))
 		if ((ipfl.fl_ifname[1] = ifp->if_name[1]))
@@ -407,10 +409,13 @@ void **items;
 size_t *itemsz;
 int *types, cnt;
 {
-	caddr_t buf, s;
+	caddr_t buf, ptr;
 	iplog_t *ipl;
 	size_t len;
 	int i;
+# if defined(_KERNEL) && !defined(MENTAT) && defined(USE_SPL)
+	int s;
+# endif
 
 	/*
 	 * Check to see if this log record has a CRC which matches the last
@@ -419,7 +424,7 @@ int *types, cnt;
 	 */
 	if (ipl_suppress) {
 		MUTEX_ENTER(&ipl_mutex);
-		if (fin != NULL) {
+		if ((fin != NULL) && (fin->fin_off == 0)) {
 			if ((ipll[dev] != NULL) &&
 			    bcmp((char *)fin, (char *)&iplcrc[dev],
 				 FI_LCSIZE) == 0) {
@@ -446,14 +451,17 @@ int *types, cnt;
 	KMALLOCS(buf, caddr_t, len);
 	if (buf == NULL)
 		return -1;
+	SPL_NET(s);
 	MUTEX_ENTER(&ipl_mutex);
 	if ((iplused[dev] + len) > IPFILTER_LOGSIZE) {
 		MUTEX_EXIT(&ipl_mutex);
+		SPL_X(s);
 		KFREES(buf, len);
 		return -1;
 	}
 	iplused[dev] += len;
 	MUTEX_EXIT(&ipl_mutex);
+	SPL_X(s);
 
 	/*
 	 * advance the log pointer to the next empty record and deduct the
@@ -475,14 +483,15 @@ int *types, cnt;
 	 * Loop through all the items to be logged, copying each one to the
 	 * buffer.  Use bcopy for normal data or the mb_t copyout routine.
 	 */
-	for (i = 0, s = buf + sizeof(*ipl); i < cnt; i++) {
+	for (i = 0, ptr = buf + sizeof(*ipl); i < cnt; i++) {
 		if (types[i] == 0) {
-			bcopy(items[i], s, itemsz[i]);
+			bcopy(items[i], ptr, itemsz[i]);
 		} else if (types[i] == 1) {
-			COPYDATA(items[i], 0, itemsz[i], s);
+			COPYDATA(items[i], 0, itemsz[i], ptr);
 		}
-		s += itemsz[i];
+		ptr += itemsz[i];
 	}
+	SPL_NET(s);
 	MUTEX_ENTER(&ipl_mutex);
 	ipll[dev] = ipl;
 	*iplh[dev] = ipl;
@@ -499,6 +508,7 @@ int *types, cnt;
 	MUTEX_EXIT(&ipl_mutex);
 	WAKEUP(iplh,dev);
 # endif
+	SPL_X(s);
 # ifdef	IPL_SELECT
 	iplog_input_ready(dev);
 # endif
@@ -639,7 +649,11 @@ minor_t unit;
 {
 	iplog_t *ipl;
 	int used;
+# if defined(_KERNEL) && !defined(MENTAT) && defined(USE_SPL)
+	int s;
+# endif
 
+	SPL_NET(s);
 	MUTEX_ENTER(&ipl_mutex);
 	while ((ipl = iplt[unit]) != NULL) {
 		iplt[unit] = ipl->ipl_next;
@@ -651,6 +665,7 @@ minor_t unit;
 	iplused[unit] = 0;
 	bzero((char *)&iplcrc[unit], FI_CSIZE);
 	MUTEX_EXIT(&ipl_mutex);
+	SPL_X(s);
 	return used;
 }
 #endif /* IPFILTER_LOG */

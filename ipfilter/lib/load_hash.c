@@ -57,11 +57,13 @@ ioctlfunc_t iocfunc;
 	iph.iph_table = NULL;
 	iph.iph_ref = 0;
 
-	if ((*iocfunc)(hashfd, SIOCLOOKUPADDTABLE, &op))
-		if ((opts & OPT_DONOTHING) == 0) {
-			perror("load_hash:SIOCLOOKUPADDTABLE");
-			return -1;
-		}
+	if ((opts & OPT_REMOVE) == 0) {
+		if ((*iocfunc)(hashfd, SIOCLOOKUPADDTABLE, &op))
+			if ((opts & OPT_DONOTHING) == 0) {
+				perror("load_hash:SIOCLOOKUPADDTABLE");
+				return -1;
+			}
+	}
 
 	strncpy(op.iplo_name, iph.iph_name, sizeof(op.iplo_name));
 	strncpy(iphp->iph_name, iph.iph_name, sizeof(op.iplo_name));
@@ -92,5 +94,12 @@ ioctlfunc_t iocfunc;
 	for (a = list; a != NULL; a = a->ipe_next)
 		load_hashnode(iphp->iph_unit, iph.iph_name, a, iocfunc);
 
+	if ((opts & OPT_REMOVE) != 0) {
+		if ((*iocfunc)(hashfd, SIOCLOOKUPDELTABLE, &op))
+			if ((opts & OPT_DONOTHING) == 0) {
+				perror("load_hash:SIOCLOOKUPDELTABLE");
+				return -1;
+			}
+	}
 	return 0;
 }

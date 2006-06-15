@@ -3,14 +3,6 @@
 # validate the IPv4 header checksum.
 # $bytes[] is an array of 16bit values, with $cnt elements in the array.
 #
-sub dump {
-	print "\n";
-	for ($i = 0; $i < $#bytes; $i++) {
-		printf "%04x ", $bytes[$i];
-	}
-	print "\n";
-}
-
 sub dosum {
 	local($seed) = $_[0];
 	local($start) = $_[1];
@@ -87,28 +79,14 @@ sub tcpcheck {
 	local($thl) = $bytes[$base + $hl + 6] >> 8;
 	$thl &= 0xf0;
 	$thl >>= 2;
-
-	$x = $bytes[$base + 1];
-	$y = ($cnt - $base) * 2;
-	$z = 0;
 	if ($bytes[$base + 1] > ($cnt - $base) * 2) {
-		print "[cnt=$cnt base=$base]";
-		$x = $bytes[$base + 1];
-		$y = ($cnt - $base) * 2;
-		$z = 1;
+		print " TCP: missing data(1)";
+		return;
 	} elsif (($cnt - $base) * 2 < $hl + 20) {
-		$x = ($cnt - $base) * 2;
-		$y = $hl + 20;
-		$z = 2;
+		print " TCP: missing data(2)";
+		return;
 	} elsif (($cnt - $base) * 2 < $hl + $thl) {
-		$x = ($cnt - $base) * 2;
-		$y = $hl + $thl;
-		$z = 3;
-	}
-
-	if ($z) {
-		print " TCP: missing data($x $y $z) $hl";
-#		&dump();
+		print " TCP: missing data(3)";
 		return;
 	}
 
@@ -121,7 +99,7 @@ sub tcpcheck {
 		$bytes[$tcpat + 8] = $osum;
 		printf " TCP: (%x) %x != %x", $hs, $osum, $hs2;
 	} else {
-		print " TCP: ok ($x $y)";
+		print " TCP: ok";
 	}
 }
 

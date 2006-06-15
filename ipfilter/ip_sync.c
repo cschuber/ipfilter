@@ -18,11 +18,13 @@
 # include <stdlib.h>
 # include <string.h>
 # define _KERNEL
+# define KERNEL
 # ifdef __OpenBSD__
 struct file;
 # endif
 # include <sys/uio.h>
 # undef _KERNEL
+# undef KERNEL
 #else
 # include <sys/systm.h>
 # if !defined(__SVR4) && !defined(__svr4__)

@@ -13,6 +13,8 @@ typedef	struct pptp_pxy {
 	ipnat_t		pptp_rule;
 	nat_t		*pptp_nat;
 	ipstate_t	*pptp_state;
+	int		pptp_seencookie;
+	u_32_t		pptp_cookie;
 } pptp_pxy_t;
 
 
@@ -20,7 +22,8 @@ int ippr_pptp_init __P((void));
 void ippr_pptp_fini __P((void));
 int ippr_pptp_new __P((fr_info_t *, ap_session_t *, nat_t *));
 void ippr_pptp_del __P((ap_session_t *));
-int ippr_pptp_out __P((fr_info_t *, ap_session_t *, nat_t *));
+int ippr_pptp_inout __P((fr_info_t *, ap_session_t *, nat_t *));
+int ippr_pptp_match __P((fr_info_t *, ap_session_t *, nat_t *));
 
 static	frentry_t	pptpfr;
 
@@ -60,14 +63,13 @@ ap_session_t *aps;
 nat_t *nat;
 {
 	pptp_pxy_t *pptp;
-	int p, off, dlen;
 	fr_info_t fi;
 	ipnat_t *ipn;
-	nat_t *nat;
-	char *ptr;
+	nat_t *nat2;
+	int p, off;
 	ip_t *ip;
-	mb_t *m;
 
+	ip = fin->fin_ip;
 	off = fin->fin_hlen + sizeof(udphdr_t);
 
 	if (nat_outlookup(fin, 0, IPPROTO_GRE, nat->nat_inip,
@@ -93,7 +95,7 @@ nat_t *nat;
 	ipn->in_apr = NULL;
 	ipn->in_use = 1;
 	ipn->in_hits = 1;
-	ipn->in_nip = nat->nat_outip.s_addr;
+	ipn->in_nip = ntohl(nat->nat_outip.s_addr);
 	ipn->in_ippip = 1;
 	ipn->in_inip = nat->nat_inip.s_addr;
 	ipn->in_inmsk = 0xffffffff;
@@ -116,11 +118,11 @@ nat_t *nat;
 	fi.fin_flx &= ~FI_TCPUDP;
 	fi.fin_flx |= FI_IGNORE;
 
-	nat = nat_new(&fi, ipn, &pptp->pptp_nat, 0, NAT_OUTBOUND);
-	pptp->pptp_nat = nat;
-	if (nat != NULL) {
-		(void) nat_proto(&fi, nat, nflags);
-		nat_update(&fi, nat, nat->nat_ptr);
+	nat2 = nat_new(&fi, ipn, &pptp->pptp_nat, 0, NAT_OUTBOUND);
+	pptp->pptp_nat = nat2;
+	if (nat2 != NULL) {
+		(void) nat_proto(&fi, nat2, 0);
+		nat_update(&fi, nat2, nat2->nat_ptr);
 
 		fi.fin_data[0] = 0;
 		fi.fin_data[1] = 0;
@@ -135,41 +137,52 @@ nat_t *nat;
  * For outgoing PPTP packets.  refresh timeouts for NAT & state entries, if
  * we can.  If they have disappeared, recreate them.
  */
-int ippr_pptp_out(fin, ip, aps, nat)
+int ippr_pptp_inout(fin, aps, nat)
 fr_info_t *fin;
-ip_t *ip;
 ap_session_t *aps;
 nat_t *nat;
 {
 	pptp_pxy_t *pptp;
 	fr_info_t fi;
-	nat_t *nat;
+	nat_t *nat2;
+	ip_t *ip;
 	int p;
 
-	bcopy((char *)fin, (char *)&fi, sizeof(fi));
-	fi.fin_fi.fi_p = IPPROTO_GRE;
-	fi.fin_fr = &pptpfr;
-	fi.fin_data[0] = 0;
-	fi.fin_data[1] = 0;
-	p = ip->ip_p;
-	ip->ip_p = IPPROTO_GRE;
-	fi.fin_flx &= ~FI_TCPUDP;
-	fi.fin_flx |= FI_IGNORE;
+	if ((fin->fin_out == 1) && (nat->nat_dir == NAT_INBOUND))
+		return 0;
+
+	if ((fin->fin_out == 0) && (nat->nat_dir == NAT_OUTBOUND))
+		return 0;
 
 	pptp = aps->aps_data;
+
 	if (pptp != NULL) {
+		ip = fin->fin_ip;
+		p = ip->ip_p;
+
+		if ((pptp->pptp_nat == NULL) || (pptp->pptp_state == NULL)) {
+			bcopy((char *)fin, (char *)&fi, sizeof(fi));
+			fi.fin_fi.fi_p = IPPROTO_GRE;
+			fi.fin_fr = &pptpfr;
+			fi.fin_data[0] = 0;
+			fi.fin_data[1] = 0;
+			ip->ip_p = IPPROTO_GRE;
+			fi.fin_flx &= ~FI_TCPUDP;
+			fi.fin_flx |= FI_IGNORE;
+		}
+
 		/*
 		 * Update NAT timeout/create NAT if missing.
 		 */
 		if (pptp->pptp_nat != NULL)
 			fr_queueback(&pptp->pptp_nat->nat_tqe);
 		else {
-			nat = nat_new(&fi, &pptp->pptp_rule, &pptp->pptp_nat,
-				      0, NAT_OUTBOUND);
-			pptp->pptp_nat = nat;
-			if (nat != NULL) {
-				(void) nat_proto(&fi, nat, nflags);
-				nat_update(&fi, nat, nat->nat_ptr);
+			nat2 = nat_new(&fi, &pptp->pptp_rule, &pptp->pptp_nat,
+				       NAT_SLAVE, nat->nat_dir);
+			pptp->pptp_nat = nat2;
+			if (nat2 != NULL) {
+				(void) nat_proto(&fi, nat2, 0);
+				nat_update(&fi, nat2, nat2->nat_ptr);
 			}
 		}
 
@@ -187,8 +200,8 @@ nat_t *nat;
 			pptp->pptp_state = fr_addstate(&fi, &pptp->pptp_state,
 						       0);
 		}
+		ip->ip_p = p;
 	}
-	ip->ip_p = p;
 	return 0;
 }
 
@@ -205,18 +218,14 @@ ap_session_t *aps;
 
 	if (pptp != NULL) {
 		/*
-		 * Don't delete it from here, just schedule it to be
-		 * deleted ASAP.
+		 * Don't bother changing any of the NAT structure details,
+		 * *_del() is on a callback from aps_free(), from nat_delete()
 		 */
-		if (pptp->pptp_nat != NULL) {
-			pptp->pptp_nat->nat_age = fr_ticks + 1;
-			pptp->pptp_nat->nat_ptr = NULL;
-			fr_queuefront(&pptp->pptp_nat->nat_tqe);
-		}
 
 		READ_ENTER(&ipf_state);
 		if (pptp->pptp_state != NULL) {
 			pptp->pptp_state->is_die = fr_ticks + 1;
+			pptp->pptp_state->is_me = NULL;
 			fr_queuefront(&pptp->pptp_state->is_sti);
 		}
 		RWLOCK_EXIT(&ipf_state);
@@ -224,4 +233,37 @@ ap_session_t *aps;
 		pptp->pptp_state = NULL;
 		pptp->pptp_nat = NULL;
 	}
+}
+
+
+int ippr_pptp_match(fin, aps, nat)
+fr_info_t *fin;
+ap_session_t *aps;
+nat_t *nat;
+{
+	pptp_pxy_t *pptp;
+	tcphdr_t *tcp;
+	u_32_t cookie;
+
+	pptp = aps->aps_data;
+	tcp = fin->fin_dp;
+
+	if ((pptp != NULL) && (fin->fin_dlen - (TCP_OFF(tcp) << 2) >= 8)) {
+		u_char *cs;
+
+		cs = (u_char *)tcp + (TCP_OFF(tcp) << 2) + 4;
+
+		if (pptp->pptp_seencookie == 0) {
+			pptp->pptp_seencookie = 1;
+			pptp->pptp_cookie = (cs[0] << 24) | (cs[1] << 16) |
+					    (cs[2] << 8) | cs[3];
+		} else {
+			cookie = (cs[0] << 24) | (cs[1] << 16) |
+				 (cs[2] << 8) | cs[3];
+			if (cookie != pptp->pptp_cookie)
+				return -1;
+		}
+
+	}
+	return 0;
 }

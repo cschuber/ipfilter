@@ -69,6 +69,7 @@ LIBOBJS=$(DEST)/addicmp.o \
      $(DEST)/printpool.o \
      $(DEST)/printpoolnode.o \
      $(DEST)/printfr.o \
+     $(DEST)/printfraginfo.o \
      $(DEST)/printhostmap.o \
      $(DEST)/printifname.o \
      $(DEST)/printhostmask.o \
@@ -116,7 +117,7 @@ $(DEST)/buildopts.o: $(LIBSRC)/buildopts.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/buildopts.c -o $@
 $(DEST)/count6bits.o: $(LIBSRC)/count6bits.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/count6bits.c -o $@
-$(DEST)/checkrev.o: $(LIBSRC)/checkrev.c $(INCDEP)
+$(DEST)/checkrev.o: $(LIBSRC)/checkrev.c $(INCDEP) $(TOP)/ipl.h
 	$(CC) $(CCARGS) -c $(LIBSRC)/checkrev.c -o $@
 $(DEST)/count4bits.o: $(LIBSRC)/count4bits.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/count4bits.c -o $@
@@ -231,6 +232,8 @@ $(DEST)/printbuf.o: $(LIBSRC)/printbuf.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/printbuf.c -o $@
 $(DEST)/printfr.o: $(LIBSRC)/printfr.c $(TOP)/ip_fil.h
 	$(CC) $(CCARGS) -c $(LIBSRC)/printfr.c -o $@
+$(DEST)/printfraginfo.o: $(LIBSRC)/printfraginfo.c $(TOP)/ip_fil.h
+	$(CC) $(CCARGS) -c $(LIBSRC)/printfraginfo.c -o $@
 $(DEST)/printhash.o: $(LIBSRC)/printhash.c $(TOP)/ip_fil.h $(TOP)/ip_htable.h
 	$(CC) $(CCARGS) -c $(LIBSRC)/printhash.c -o $@
 $(DEST)/printhashnode.o: $(LIBSRC)/printhashnode.c $(TOP)/ip_fil.h \

@@ -23,6 +23,7 @@ ioctlfunc_t iocfunc;
 {
 	iplookupop_t op;
 	iphtent_t ipe;
+	int err;
 
 	if ((hashfd == -1) && ((opts & OPT_DONOTHING) == 0))
 		hashfd = open(IPLOOKUP_NAME, O_RDWR);
@@ -44,9 +45,14 @@ ioctlfunc_t iocfunc;
 	bcopy((char *)&node->ipe_group, (char *)&ipe.ipe_group,
 	      sizeof(ipe.ipe_group));
 
-	if ((*iocfunc)(hashfd, SIOCLOOKUPADDNODE, &op))
+	if ((opts & OPT_REMOVE) == 0)
+		err = (*iocfunc)(hashfd, SIOCLOOKUPADDNODE, &op);
+	else
+		err = (*iocfunc)(hashfd, SIOCLOOKUPDELNODE, &op);
+
+	if (err != 0)
 		if (!(opts & OPT_DONOTHING)) {
-			perror("load_hash:SIOCLOOKUPADDNODE");
+			perror("load_hash:SIOCLOOKUP*NODE");
 			return -1;
 		}
 	return 0;

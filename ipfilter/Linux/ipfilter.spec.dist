@@ -12,7 +12,7 @@ Packet Filtering and NAT for firewall applications
 %files
 %defattr(-,root,root)
 
-/lib/modules/KERNELBUILD/kernel/net/ipv4/ipfilter.MODEXT
+/lib/modules/KERNELBUILD/kernel/net/ipv4/ipfilter.o
 /etc/init.d/ipfilter
 /etc/sysconfig/ipfilter
 /sbin/ipf
@@ -89,7 +89,6 @@ fi
 %post
 /sbin/chkconfig --add ipfilter
 /sbin/chkconfig TURNONIPFILTER
-/sbin/depmod -A
 
 %preun
 /etc/init.d/ipfilter stop

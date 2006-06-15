@@ -68,8 +68,6 @@ int		*ip_forwarding;
 int ipldetach()
 {
 
-	if (fr_refcnt)
-		return EBUSY;
 	if (fr_control_forwarding & 2)
 		ip_forwarding = 0;
 #ifdef	IPFDEBUG
@@ -77,8 +75,8 @@ int ipldetach()
 #endif
 	fr_deinitialise();
 
-	(void) frflush(IPL_LOGIPF, FR_INQUE|FR_OUTQUE|FR_INACTIVE);
-	(void) frflush(IPL_LOGIPF, FR_INQUE|FR_OUTQUE);
+	(void) frflush(IPL_LOGIPF, 0, FR_INQUE|FR_OUTQUE|FR_INACTIVE);
+	(void) frflush(IPL_LOGIPF, 0, FR_INQUE|FR_OUTQUE);
 
 	RW_DESTROY(&ipf_ipidfrag);
 	RW_DESTROY(&ipf_mutex);
@@ -107,7 +105,7 @@ int iplattach __P((void))
 	RWLOCK_INIT(&ipf_mutex, "ipf filter rwlock");
 	RWLOCK_INIT(&ipf_ipidfrag, "ipf IP NAT-Frag rwlock");
 
-	if (fr_initialise() == -1)
+	if (fr_initialise() < 0)
 		return -1;
 
 	/*
@@ -167,7 +165,8 @@ int flags;
 		if (unit != IPL_LOGIPF)
 			return EIO;
 		if (cmd != SIOCIPFGETNEXT && cmd != SIOCIPFGET &&
-		    cmd != SIOCIPFSET && cmd != SIOCFRENB && cmd != SIOCGETFS)
+		    cmd != SIOCIPFSET && cmd != SIOCFRENB &&
+		    cmd != SIOCGETFS && cmd != SIOCGETFF)
 			return EIO;
 	}
 
@@ -278,11 +277,24 @@ int flags;
 		else {
 			error = BCOPYIN(data, &tmp, sizeof(tmp));
 			if (!error) {
-				tmp = frflush(unit, tmp);
+				tmp = frflush(unit, 4, tmp);
 				error = BCOPYOUT(&tmp, data, sizeof(tmp));
 			}
 		}
 		break;
+#ifdef USE_INET6
+	case	SIOCIPFL6 :
+		if (!(flags & FWRITE))
+			error = EPERM;
+		else {
+			error = COPYIN(data, &tmp, sizeof(tmp));
+			if (!error) {
+				tmp = frflush(unit, 6, tmp);
+				error = COPYOUT(&tmp, data, sizeof(tmp));
+			}
+		}
+		break;
+#endif
 	case SIOCSTLCK :
 		error = BCOPYIN(data, &tmp, sizeof(tmp));
 		if (error == 0) {
@@ -461,6 +473,8 @@ fr_info_t *fin;
 	MTYPE(m) = M_DATA;
 	m->b_wptr = m->b_rptr + hlen;
 	bzero((char *)m->b_rptr, hlen);
+	ip = (ip_t *)m->b_rptr;
+	ip->ip_v = fin->fin_v;
 	tcp2 = (struct tcphdr *)(m->b_rptr + hlen - sizeof(*tcp2));
 	tcp2->th_dport = tcp->th_sport;
 	tcp2->th_sport = tcp->th_dport;
@@ -489,7 +503,6 @@ fr_info_t *fin;
 	} else
 #endif
 	{
-		ip = (ip_t *)m->b_rptr;
 		ip->ip_src.s_addr = fin->fin_daddr;
 		ip->ip_dst.s_addr = fin->fin_saddr;
 		ip->ip_id = fr_nextipid(fin);
@@ -602,6 +615,8 @@ int dst;
 	m->b_rptr += 16;
 	m->b_wptr = m->b_rptr + sz;
 	bzero((char *)m->b_rptr, (size_t)sz);
+	ip = (ip_t *)m->b_rptr;
+	ip->ip_v = fin->fin_v;
 	icmp = (struct icmp *)(m->b_rptr + hlen);
 	icmp->icmp_type = type;
 	icmp->icmp_code = code;
@@ -612,7 +627,7 @@ int dst;
 		int csz;
 
 		if (dst == 0) {
-			if (fr_ifpaddr(6, FRI_NORMAL, qpi->qpi_ill,
+			if (fr_ifpaddr(6, FRI_NORMAL, qpi->qpi_real,
 				       (struct in_addr *)&dst6, NULL) == -1) {
 				FREE_MB_T(m);
 				return -1;
@@ -633,14 +648,13 @@ int dst;
 	} else
 #endif
 	{
-		ip = (ip_t *)m->b_rptr;
 		ip->ip_hl = sizeof(*ip) >> 2;
 		ip->ip_p = IPPROTO_ICMP;
 		ip->ip_id = fin->fin_ip->ip_id;
 		ip->ip_tos = fin->fin_ip->ip_tos;
 		ip->ip_len = htons((u_short)sz);
 		if (dst == 0) {
-			if (fr_ifpaddr(4, FRI_NORMAL, qpi->qpi_ill,
+			if (fr_ifpaddr(4, FRI_NORMAL, qpi->qpi_real,
 				       &dst4, NULL) == -1) {
 				FREE_MB_T(m);
 				return -1;
@@ -668,16 +682,19 @@ int dst;
 /*
  * return the first IP Address associated with an interface
  */
-int fr_ifpaddr(v, atype, ifptr, inp, inpmask)
+int fr_ifpaddr(v, atype, qifptr, inp, inpmask)
 int v, atype;
-void *ifptr;
+void *qifptr;
 struct in_addr *inp, *inpmask;
 {
 #ifdef	USE_INET6
 	struct sockaddr_in6 sin6, mask6;
 #endif
 	struct sockaddr_in sin, mask;
-	qif_t *qif = ifptr;
+	qif_t *qif = qifptr;
+
+	if ((qifptr == NULL) || (qifptr == (void *)-1))
+		return -1;
 
 #ifdef	USE_INET6
 	if (v == 6) {
@@ -830,7 +847,7 @@ INLINE void fr_checkv6sum(fin)
 fr_info_t *fin;
 {
 # ifdef IPFILTER_CKSUM
-	if (fr_checkl6sum(fin) == -1)
+	if (fr_checkl4sum(fin) == -1)
 		fin->fin_flx |= FI_BAD;
 # endif
 }

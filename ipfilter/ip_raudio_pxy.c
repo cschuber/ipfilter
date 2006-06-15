@@ -94,16 +94,21 @@ nat_t *nat;
 
 	m = fin->fin_m;
 	tcp = (tcphdr_t *)fin->fin_dp;
-	off = (char *)tcp - MTOD(m, char *) + (TCP_OFF(tcp) << 2);
-	bzero((char *)membuf, sizeof(membuf));
+	off = (char *)tcp - (char *)fin->fin_ip;
+	off += (TCP_OFF(tcp) << 2) + fin->fin_ipoff;
 
+#ifdef __sgi
+	dlen = fin->fin_plen - off;
+#else
 	dlen = MSGDSIZE(m) - off;
+#endif
 	if (dlen <= 0)
 		return 0;
 
 	if (dlen > sizeof(membuf))
 		dlen = sizeof(membuf);
 
+	bzero((char *)membuf, sizeof(membuf));
 	COPYDATA(m, off, dlen, (char *)membuf);
 	/*
 	 * In all the startup parsing, ensure that we don't go outside
@@ -179,8 +184,8 @@ nat_t *nat;
 	unsigned char membuf[IPF_MAXPORTLEN + 1], *s;
 	tcphdr_t *tcp, tcph, *tcp2 = &tcph;
 	raudio_t *rap = aps->aps_data;
-	int off, dlen, slen, clen;
 	struct in_addr swa, swb;
+	int off, dlen, slen;
 	int a1, a2, a3, a4;
 	u_short sp, dp;
 	fr_info_t fi;
@@ -199,11 +204,15 @@ nat_t *nat;
 		return 0;
 
 	m = fin->fin_m;
-	ip = fin->fin_ip;
 	tcp = (tcphdr_t *)fin->fin_dp;
-	off = (char *)tcp - MTOD(m, char *) + (TCP_OFF(tcp) << 2);
+	off = (char *)tcp - (char *)fin->fin_ip;
+	off += (TCP_OFF(tcp) << 2) + fin->fin_ipoff;
 
+#ifdef __sgi
+	dlen = fin->fin_plen - off;
+#else
 	dlen = MSGDSIZE(m) - off;
+#endif
 	if (dlen <= 0)
 		return 0;
 
@@ -211,8 +220,7 @@ nat_t *nat;
 		dlen = sizeof(membuf);
 
 	bzero((char *)membuf, sizeof(membuf));
-	clen = MIN(sizeof(membuf), dlen);
-	COPYDATA(m, off, clen, (char *)membuf);
+	COPYDATA(m, off, dlen, (char *)membuf);
 
 	seq = ntohl(tcp->th_seq);
 	/*
@@ -220,7 +228,7 @@ nat_t *nat;
 	 * We only care for the first 19 bytes coming back from the server.
 	 */
 	if (rap->rap_sseq == 0) {
-		s = (u_char *)memstr("PNA", (char *)membuf, 3, clen);
+		s = (u_char *)memstr("PNA", (char *)membuf, 3, dlen);
 		if (s == NULL)
 			return 0;
 		a1 = s - membuf;
@@ -255,6 +263,7 @@ nat_t *nat;
 		rap->rap_srport = (*s << 8) | *(s + 1);
 	}
 
+	ip = fin->fin_ip;
 	swp = ip->ip_p;
 	swa = ip->ip_src;
 	swb = ip->ip_dst;

@@ -77,7 +77,7 @@ void panic __P((char *str));
 #include "netinet/ip_compat.h"
 #include "netinet/ip_fil.h"
 /* END OF INCLUDES */
-#include "radix.h"
+#include "radix_ipf.h"
 #ifndef min
 # define	min	MIN
 #endif
@@ -1115,7 +1115,7 @@ main(int argc, char *argv[])
 {
 	struct radix_node_head *rnh;
 	struct radix_node *rn;
-	addrfamily_t af;
+	addrfamily_t af, mf;
 	myst_t st1, st2, *stp;
 
 	memset(&st1, 0, sizeof(st1));
@@ -1145,7 +1145,18 @@ main(int argc, char *argv[])
 	af.adf_addr.in4.s_addr = inet_addr("127.0.1.0");
 	rn = rnh->rnh_matchaddr(&af, rnh);
 	if (rn != NULL) {
-		printf("lookup = %p key %p mask %p\n", rn, rn->rn_key, rn->rn_mask);
+		printf("1.lookup = %p key %p mask %p\n", rn, rn->rn_key, rn->rn_mask);
+		stp = rn->rn_key;
+		printf("%s/", inet_ntoa(stp->dst.adf_addr.in4));
+		stp = rn->rn_mask;
+		printf("%s\n", inet_ntoa(stp->dst.adf_addr.in4));
+	}
+
+	mf.adf_len = sizeof(mf);
+	mf.adf_addr.in4.s_addr = inet_addr("255.255.255.0");
+	rn = rnh->rnh_lookup(&af, &mf, rnh);
+	if (rn != NULL) {
+		printf("2.lookup = %p key %p mask %p\n", rn, rn->rn_key, rn->rn_mask);
 		stp = rn->rn_key;
 		printf("%s/", inet_ntoa(stp->dst.adf_addr.in4));
 		stp = rn->rn_mask;
@@ -1156,7 +1167,7 @@ main(int argc, char *argv[])
 	af.adf_addr.in4.s_addr = inet_addr("126.0.0.1");
 	rn = rnh->rnh_matchaddr(&af, rnh);
 	if (rn != NULL) {
-		printf("lookup = %p key %p mask %p\n", rn, rn->rn_key, rn->rn_mask);
+		printf("3.lookup = %p key %p mask %p\n", rn, rn->rn_key, rn->rn_mask);
 		stp = rn->rn_key;
 		printf("%s/", inet_ntoa(stp->dst.adf_addr.in4));
 		stp = rn->rn_mask;

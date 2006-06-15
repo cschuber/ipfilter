@@ -242,7 +242,7 @@ extern	void	fr_timeoutstate __P((void));
 extern	int	fr_tcp_age __P((struct ipftqent *, struct fr_info *,
 				struct ipftq *, int));
 extern	int	fr_tcpinwindow __P((struct fr_info *, struct tcpdata *,
-				    struct tcpdata *, struct tcphdr *, int));
+				    struct tcpdata *, tcphdr_t *, int));
 extern	void	fr_stateunload __P((void));
 extern	void	ipstate_log __P((struct ipstate *, u_int));
 extern	int	fr_state_ioctl __P((caddr_t, ioctlcmd_t, int));

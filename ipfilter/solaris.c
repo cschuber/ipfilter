@@ -351,6 +351,9 @@ ddi_detach_cmd_t cmd;
 #endif
 	switch (cmd) {
 	case DDI_DETACH:
+		if (fr_refcnt != 0)
+			return DDI_FAILURE;
+
 		if (fr_running == -2 || fr_running == 0)
 			break;
 		/*

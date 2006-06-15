@@ -181,17 +181,9 @@ inet_aton(cp, addr)
  * Ascii internet address interpretation routine.
  * The value returned is in network order.
  */
-#if !defined(__hpux)
-# if (defined(SOLARIS2) && (SOLARIS2 > 5)) || \
-    defined(__osf__) || (defined(IRIX) && (IRIX >= 60500)) || \
-    (defined(__FreeBSD__) && (__FreeBSD__ >= 4)) || \
-    defined(__OpenBSD__) || defined(linux)
-in_addr_t
-# else
-u_long
-# endif
+#if 0
 inet_addr(cp)
-	register const char *cp;
+	const char *cp;
 {
 	struct in_addr val;
 

@@ -59,7 +59,7 @@ static	ioctlfunc_t	iocfunctions[IPL_LOGSIZE] = { ioctl, ioctl, ioctl,
 static void usage()
 {
 	fprintf(stderr, "usage: ipf [-6AdDEInoPrRsvVyzZ] %s %s %s\n",
-		"[-l block|pass|nomatch|state|nat]", "[-F i|o|a|s|S|u]",
+		"[-l block|pass|nomatch|state|nat]", "[-cc] [-F i|o|a|s|S|u]",
 		"[-f filename] [-T <tuneopts>]");
 	exit(1);
 }
@@ -74,7 +74,7 @@ char *argv[];
 	if (argc < 2)
 		usage();
 
-	while ((c = getopt(argc, argv, "6ACdDEf:F:Il:noPrRsT:vVyzZ")) != -1) {
+	while ((c = getopt(argc, argv, "6Ac:dDEf:F:Il:noPrRsT:vVyzZ")) != -1) {
 		switch (c)
 		{
 		case '?' :
@@ -88,8 +88,9 @@ char *argv[];
 		case 'A' :
 			opts &= ~OPT_INACTIVE;
 			break;
-		case 'C' :
-			outputc = 1;
+		case 'c' :
+			if (strcmp(optarg, "c") == 0)
+				outputc = 1;
 			break;
 		case 'E' :
 			set_state((u_int)1);
@@ -349,9 +350,22 @@ char	*arg;
 		rem = fl;
 
 		closedevice();
-		if (opendevice(IPSTATE_NAME, 1) != -2 &&
-		    ioctl(fd, SIOCIPFFL, &fl) == -1)
-			perror("ioctl(SIOCIPFFL)");
+		if (opendevice(IPSTATE_NAME, 1) == -2)
+			exit(1);
+
+		if (!(opts & OPT_DONOTHING)) {
+			if (use_inet6) {
+				if (ioctl(fd, SIOCIPFL6, &fl) == -1) {
+					perror("ioctl(SIOCIPFL6)");
+					exit(1);
+				}
+			} else {
+				if (ioctl(fd, SIOCIPFFL, &fl) == -1) {
+					perror("ioctl(SIOCIPFFL)");
+					exit(1);
+				}
+			}
+		}
 		if ((opts & (OPT_DONOTHING|OPT_VERBOSE)) == OPT_VERBOSE) {
 			printf("remove flags %s (%d)\n", arg, rem);
 			printf("removed %d filter rules\n", fl);
@@ -387,8 +401,23 @@ char	*arg;
 		fl |= FR_INACTIVE;
 	rem = fl;
 
-	if (opendevice(ipfname, 1) != -2 && ioctl(fd, SIOCIPFFL, &fl) == -1)
-		perror("ioctl(SIOCIPFFL)");
+	if (opendevice(ipfname, 1) == -2)
+		exit(1);
+
+	if (!(opts & OPT_DONOTHING)) {
+		if (use_inet6) {
+			if (ioctl(fd, SIOCIPFL6, &fl) == -1) {
+				perror("ioctl(SIOCIPFL6)");
+				exit(1);
+			}
+		} else {
+			if (ioctl(fd, SIOCIPFFL, &fl) == -1) {
+				perror("ioctl(SIOCIPFFL)");
+				exit(1);
+			}
+		}
+	}
+
 	if ((opts & (OPT_DONOTHING|OPT_VERBOSE)) == OPT_VERBOSE) {
 		printf("remove flags %s%s (%d)\n", (rem & FR_INQUE) ? "I" : "",
 			(rem & FR_OUTQUE) ? "O" : "", rem);

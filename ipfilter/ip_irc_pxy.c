@@ -268,9 +268,13 @@ nat_t *nat;
 	ip = fin->fin_ip;
 	tcp = (tcphdr_t *)fin->fin_dp;
 	bzero(ctcpbuf, sizeof(ctcpbuf));
-	off = (char *)tcp - MTOD(m, char *) + (TCP_OFF(tcp) << 2);
+	off = (char *)tcp - (char *)ip + (TCP_OFF(tcp) << 2) + fin->fin_ipoff;
 
+#ifdef __sgi
+	dlen = fin->fin_plen - off;
+#else
 	dlen = MSGDSIZE(m) - off;
+#endif
 	if (dlen <= 0)
 		return 0;
 	COPYDATA(m, off, MIN(sizeof(ctcpbuf), dlen), ctcpbuf);

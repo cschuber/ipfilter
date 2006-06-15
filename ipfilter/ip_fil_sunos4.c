@@ -86,7 +86,7 @@ int iplattach()
 		return EBUSY;
 	}
 
-	if (fr_initialise() == -1) {
+	if (fr_initialise() < 0) {
 		SPL_X(s);
 		return EIO;
 	}
@@ -112,8 +112,6 @@ int ipldetach()
 {
 	int s;
 
-	if (fr_refcnt != 0)
-		return EBUSY;
 	SPL_NET(s);
 
 	untimeout(fr_slowtimer, NULL);
@@ -127,8 +125,8 @@ int ipldetach()
 		fr_checkp = fr_savep;
 	fr_savep = NULL;
 
-	(void) frflush(IPL_LOGIPF, FR_INQUE|FR_OUTQUE|FR_INACTIVE);
-	(void) frflush(IPL_LOGIPF, FR_INQUE|FR_OUTQUE);
+	(void) frflush(IPL_LOGIPF, 0, FR_INQUE|FR_OUTQUE|FR_INACTIVE);
+	(void) frflush(IPL_LOGIPF, 0, FR_INQUE|FR_OUTQUE);
 
 	SPL_X(s);
 
@@ -157,7 +155,8 @@ int mode;
 		if (unit != IPL_LOGIPF)
 			return EIO;
 		if (cmd != SIOCIPFGETNEXT && cmd != SIOCIPFGET &&
-		    cmd != SIOCIPFSET && cmd != SIOCFRENB && cmd != SIOCGETFS)
+		    cmd != SIOCIPFSET && cmd != SIOCFRENB &&
+		    cmd != SIOCGETFS && cmd != SIOCGETFF)
 			return EIO;
 	}
 
@@ -264,11 +263,24 @@ int mode;
 		else {
 			error = COPYIN(data, &tmp, sizeof(tmp));
 			if (!error) {
-				tmp = frflush(unit, tmp);
+				tmp = frflush(unit, 4, tmp);
 				error = COPYOUT(&tmp, data, sizeof(tmp));
 			}
 		}
 		break;
+#ifdef USE_INET6
+	case	SIOCIPFL6 :
+		if (!(mode & FWRITE))
+			error = EPERM;
+		else {
+			error = COPYIN(data, &tmp, sizeof(tmp));
+			if (!error) {
+				tmp = frflush(unit, 6, tmp);
+				error = COPYOUT(&tmp, data, sizeof(tmp));
+			}
+		}
+		break;
+#endif
 	case SIOCSTLCK :
 		error = COPYIN(data, &tmp, sizeof(tmp));
 		if (error == 0) {
@@ -398,34 +410,39 @@ fr_info_t *fin;
 		return -1;
 #endif
 
-	m = m_get(M_DONTWAIT, MT_HEADER);
-	if (m == NULL)
-		return ENOBUFS;
-	if (m == NULL)
-		return -1;
-
 	tlen = fin->fin_dlen - (TCP_OFF(tcp) << 2) +
 		((tcp->th_flags & TH_SYN) ? 1 : 0) +
 		((tcp->th_flags & TH_FIN) ? 1 : 0);
 
+	MGET(m, M_DONTWAIT, MT_HEADER);
+	if (m == NULL)
+		return -1;
+
 	hlen = sizeof(ip_t);
 	m->m_len = sizeof(*tcp2) + hlen;
 	ip = mtod(m, struct ip *);
-	bzero((char *)ip, sizeof(*tcp2) + hlen);
-	tcp2 = (struct tcphdr *)((char *)ip + hlen);
 
+	tcp2 = (struct tcphdr *)((char *)ip + hlen);
 	tcp2->th_sport = tcp->th_dport;
 	tcp2->th_dport = tcp->th_sport;
+
 	if (tcp->th_flags & TH_ACK) {
 		tcp2->th_seq = tcp->th_ack;
 		tcp2->th_flags = TH_RST;
+		tcp2->th_ack = 0;
 	} else {
+		tcp2->th_seq = 0;
 		tcp2->th_ack = ntohl(tcp->th_seq);
 		tcp2->th_ack += tlen;
 		tcp2->th_ack = htonl(tcp2->th_ack);
 		tcp2->th_flags = TH_RST|TH_ACK;
 	}
-	TCP_OFF_A(tcp2, sizeof(*tcp2) >> 2);
+	tcp2->th_off = sizeof(*tcp2) >> 2;;
+	tcp2->th_x2 = 0;
+	tcp2->th_win = tcp->th_win;
+	tcp2->th_sum = 0;
+	tcp2->th_urp = 0;
+
 	ip->ip_p = IPPROTO_TCP;
 	ip->ip_len = htons(sizeof(struct tcphdr));
 	ip->ip_src.s_addr = fin->fin_daddr;
@@ -482,6 +499,10 @@ int dst;
 	if (fr_checkl4sum(fin) == -1)
 		return -1;
 #endif
+	MGET(m, M_DONTWAIT, MT_HEADER);
+	if (m == NULL)
+		return -1;
+	avail = MLEN;
 
 	code = fin->fin_icode;
 
@@ -501,11 +522,6 @@ int dst;
 			default :
 				return 0;
 			}
-
-		avail = MLEN;
-		m = m_get(M_DONTWAIT, MT_HEADER);
-		if (m == NULL)
-			return ENOBUFS;
 
 		if (dst == 0) {
 			if (fr_ifpaddr(4, FRI_NORMAL, ifp,
@@ -530,8 +546,8 @@ int dst;
 		xtra = avail;
 	iclen += xtra;
 	if (avail < 0) {
-		m_freem(m);
-		return ENOBUFS;
+		FREE_MB_T(m);
+		return -1;
 	}
 	m->m_len = iclen;
 	ip = mtod(m, ip_t *);
@@ -664,17 +680,33 @@ frdest_t *fdp;
 	 * go back through output filtering and miss their chance to get
 	 * NAT'd and counted.
 	 */
-	fin->fin_ifp = ifp;
 	if (fin->fin_out == 0) {
 		u_32_t pass;
 
+		sifp = fin->fin_ifp;
+		fin->fin_ifp = ifp;
 		fin->fin_out = 1;
 		fr_acctpkt(fin, &pass);
 
 		fin->fin_fr = NULL;
 		if (!fr || !(fr->fr_flags & FR_RETMASK))
 			(void) fr_checkstate(fin, &pass);
-		(void) fr_checknatout(fin, NULL);
+
+		switch (fr_checknatout(fin, NULL))
+		{
+		case 0 :
+			break;
+		case 1 :
+			ip->ip_sum = 0;
+			break;
+		case -1 :
+			error = -1;
+			goto done;
+			break;
+		}
+
+		fin->fin_ifp = sifp;
+		fin->fin_out = 0;
 	} else
 		ip->ip_sum = 0;
 	/*
@@ -716,6 +748,7 @@ frdest_t *fdp;
 	for (off = hlen + len; off < ip->ip_len; off += len) {
 		MGET(m, M_DONTWAIT, MT_HEADER);
 		if (m == 0) {
+			m = m0;
 			error = ENOBUFS;
 			goto bad;
 		}
@@ -761,7 +794,7 @@ sendorfree:
 			error = (*ifp->if_output)(ifp, m,
 			    (struct sockaddr *)dst);
 		else
-			m_freem(m);
+			FREE_MB_T(m);
 	}
     }	
 done:
@@ -784,7 +817,7 @@ bad:
 		fin->fin_ifp = sifp;
 		fin->fin_icode = code;
 	}
-	m_freem(m);
+	FREE_MB_T(m);
 	goto done;
 }
 
@@ -820,6 +853,9 @@ struct in_addr *inp, *inpmask;
 	struct sockaddr_in *sin, *mask;
 	struct in_ifaddr *ia;
 	struct ifnet *ifp;
+
+	if ((ifptr == NULL) || (ifptr == (void *)-1))
+		return -1;
 
 	ifp = ifptr;
 	if (ifp == NULL)

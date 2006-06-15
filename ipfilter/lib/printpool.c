@@ -87,10 +87,7 @@ int opts;
 		ipnp = printpoolnode(ipnp, opts);
 
 		if ((opts & OPT_DEBUG) == 0) {
-			if (ipnp == NULL)
-				putchar(';');
-			else
-				putchar(',');
+			putchar(';');
 		}
 	}
 

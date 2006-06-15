@@ -20,7 +20,8 @@ struct ipfr *ifr;
 	if (kmemcpy((char *)&fr, (u_long)ifr->ipfr_rule,
 		    sizeof(fr)) == -1)
 		return;
-	printf("%s id %u ttl %d pr %d seen0 %d ifp %p = %#x\n",
+	printf("%s id %d ttl %d pr %d seen0 %d ifp %p tos %#02x = %#x\n",
 		hostname(4, &ifr->ipfr_dst), ifr->ipfr_id, ifr->ipfr_seen0,
-		ifr->ipfr_ttl, ifr->ipfr_p, ifr->ipfr_ifp, fr.fr_flags);
+		ifr->ipfr_ttl, ifr->ipfr_p, ifr->ipfr_ifp, ifr->ipfr_tos,
+		fr.fr_flags);
 }

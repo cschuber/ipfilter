@@ -121,6 +121,7 @@ static struct cdevsw ipl_cdevsw = {
 static char *ipf_devfiles[] = {	IPL_NAME, IPNAT_NAME, IPSTATE_NAME, IPAUTH_NAME,
 				IPSCAN_NAME, IPSYNC_NAME, IPLOOKUP_NAME, NULL };
 
+
 static int
 ipfilter_modevent(module_t mod, int type, void *unused)
 {
@@ -197,9 +198,15 @@ ipf_modunload()
 {
 	int error, i;
 
-	error = ipldetach();
-	if (error != 0)
-		return error;
+	if (fr_refcnt)
+		return EBUSY;
+
+	if (fr_running >= 0) {
+		error = ipldetach();
+		if (error != 0)
+			return error;
+	} else
+		error = 0;
 
 	fr_running = -2;
 
@@ -215,13 +222,16 @@ ipf_modunload()
 
 
 static moduledata_t ipfiltermod = {
-	IPL_VERSION,
+	"ipfilter",
 	ipfilter_modevent,
 	0
 };
 
 
 DECLARE_MODULE(ipfilter, ipfiltermod, SI_SUB_PROTO_DOMAIN, SI_ORDER_ANY);
+#ifdef	MODULE_VERSION
+MODULE_VERSION(ipfilter, 1);
+#endif
 
 
 #ifdef SYSCTL_IPF

@@ -132,7 +132,7 @@ char	*kern, *core;
 		perror("openkmem:open");
 		return -1;
 	    }
-	return (int)kvm_f;
+	return kvm_f != NULL;
 }
 
 int	kmemcpy(buf, pos, n)

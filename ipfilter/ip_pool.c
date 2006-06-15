@@ -54,7 +54,10 @@ struct file;
 #endif
 
 #if (defined(__osf__) || defined(__hpux) || defined(__sgi)) && defined(_KERNEL)
-# include "radix_ipf.h"
+# ifdef __osf__
+#  include <net/radix.h>
+# endif
+# include "radix_ipf_local.h"
 # define _RADIX_H_
 #endif
 #include <net/if.h>
@@ -64,8 +67,9 @@ struct file;
 #include "netinet/ip_fil.h"
 #include "netinet/ip_pool.h"
 
-#if defined(_KERNEL) && !defined(__osf__) && !defined(__hpux) && \
-    !(defined(sun) && (defined(__svr4__) || defined(__SVR4)))
+#if defined(IPFILTER_LOOKUP) && defined(_KERNEL) && \
+      ((BSD >= 198911) && !defined(__osf__) && \
+      !defined(__hpux) && !defined(__sgi))
 static int rn_freenode __P((struct radix_node *, void *));
 #endif
 
@@ -77,6 +81,13 @@ static const char rcsid[] = "@(#)$Id$";
 #endif
 
 #ifdef IPFILTER_LOOKUP
+
+# ifndef RADIX_NODE_HEAD_LOCK
+#  define RADIX_NODE_HEAD_LOCK(x)	;
+# endif
+# ifndef RADIX_NODE_HEAD_UNLOCK
+#  define RADIX_NODE_HEAD_UNLOCK(x)	;
+# endif
 
 ip_pool_stat_t ipoolstat;
 ipfrwlock_t ip_poolrw;
@@ -229,6 +240,8 @@ ip_pool_t *ipo;
 int ip_pool_init()
 {
 
+	bzero((char *)&ipoolstat, sizeof(ipoolstat));
+
 #if (!defined(_KERNEL) || (BSD < 199306))
 	rn_init();
 #endif
@@ -270,6 +283,39 @@ void ip_pool_fini()
 
 
 /* ------------------------------------------------------------------------ */
+/* Function:    ip_pool_statistics                                          */
+/* Returns:     int     - 0 = success, else error                           */
+/* Parameters:  op(I)   - pointer to lookup operation arguments             */
+/*                                                                          */
+/* Copy the current statistics out into user space, collecting pool list    */
+/* pointers as appropriate for later use.                                   */
+/* ------------------------------------------------------------------------ */
+int ip_pool_statistics(op)
+iplookupop_t *op;
+{
+	ip_pool_stat_t stats;
+	int unit, i, err = 0;
+
+	if (op->iplo_size != sizeof(ipoolstat))
+		return EINVAL;
+
+	bcopy((char *)&ipoolstat, (char *)&stats, sizeof(stats));
+	unit = op->iplo_unit;
+	if (unit == IPL_LOGALL) {
+		for (i = 0; i < IPL_LOGSIZE; i++)
+			stats.ipls_list[i] = ip_pool_list[i];
+	} else if (unit >= 0 && unit < IPL_LOGSIZE) {
+		stats.ipls_list[unit] = ip_pool_list[unit];
+	} else
+		err = EINVAL;
+	if (err == 0)
+		err = COPYOUT(&stats, op->iplo_struct, sizeof(stats));
+	return err;
+}
+
+
+
+/* ------------------------------------------------------------------------ */
 /* Function:    ip_pool_find                                                */
 /* Returns:     int     - 0 = success, else error                           */
 /* Parameters:  ipo(I)  - pointer to the pool getting the new node.         */
@@ -294,18 +340,25 @@ char *name;
 /* Function:    ip_pool_findeq                                              */
 /* Returns:     int     - 0 = success, else error                           */
 /* Parameters:  ipo(I)  - pointer to the pool getting the new node.         */
-/*              addr(I) -                                                   */
+/*              addr(I) - pointer to address information to delete          */
 /*              mask(I) -                                                   */
 /*                                                                          */
 /* Searches for an exact match of an entry in the pool.                     */
 /* ------------------------------------------------------------------------ */
 ip_pool_node_t *ip_pool_findeq(ipo, addr, mask)
 ip_pool_t *ipo;
-struct in_addr *addr, *mask;
+addrfamily_t *addr, *mask;
 {
 	struct radix_node *n;
+#ifdef USE_SPL
+	int s;
 
+	SPL_NET(s);
+#endif
+	RADIX_NODE_HEAD_LOCK(ipo->ipo_head);
 	n = ipo->ipo_head->rnh_lookup(addr, mask, ipo->ipo_head);
+	RADIX_NODE_HEAD_UNLOCK(ipo->ipo_head);
+	SPL_X(s);
 	return (ip_pool_node_t *)n;
 }
 
@@ -354,9 +407,11 @@ void *dptr;
 
 	READ_ENTER(&ip_poolrw);
 
+	RADIX_NODE_HEAD_LOCK(ipo->ipo_head);
 	rn = ipo->ipo_head->rnh_matchaddr(&v, ipo->ipo_head);
+	RADIX_NODE_HEAD_UNLOCK(ipo->ipo_head);
 
-	if (rn != NULL) {
+	if ((rn != NULL) && ((rn->rn_flags & RNF_ROOT) == 0)) {
 		m = (ip_pool_node_t *)rn;
 		ipo->ipo_hits++;
 		m->ipn_hits++;
@@ -404,8 +459,10 @@ int info;
 	bcopy(mask, &x->ipn_mask.adf_addr, sizeof(*mask));
 	x->ipn_mask.adf_len = sizeof(x->ipn_mask);
 
+	RADIX_NODE_HEAD_LOCK(ipo->ipo_head);
 	rn = ipo->ipo_head->rnh_addaddr(&x->ipn_addr, &x->ipn_mask,
 					ipo->ipo_head, x->ipn_nodes);
+	RADIX_NODE_HEAD_UNLOCK(ipo->ipo_head);
 #ifdef	DEBUG_POOL
 	printf("Added %p at %p\n", x, rn);
 #endif
@@ -420,6 +477,8 @@ int info;
 	if (ipo->ipo_list != NULL)
 		ipo->ipo_list->ipn_pnext = &x->ipn_next;
 	ipo->ipo_list = x;
+
+	ipoolstat.ipls_nodes++;
 
 	return 0;
 }
@@ -496,7 +555,9 @@ iplookupop_t *op;
 		ip_pool_list[unit]->ipo_pnext = &h->ipo_next;
 	h->ipo_pnext = &ip_pool_list[unit];
 	ip_pool_list[unit] = h;
+
 	ipoolstat.ipls_pools++;
+
 	return 0;
 }
 
@@ -531,9 +592,14 @@ ip_pool_node_t *ipe;
 	if (n == NULL)
 		return ENOENT;
 
+	RADIX_NODE_HEAD_LOCK(ipo->ipo_head);
 	ipo->ipo_head->rnh_deladdr(&n->ipn_addr, &n->ipn_mask,
 				   ipo->ipo_head);
+	RADIX_NODE_HEAD_UNLOCK(ipo->ipo_head);
 	KFREE(n);
+
+	ipoolstat.ipls_nodes--;
+
 	return 0;
 }
 
@@ -569,6 +635,47 @@ iplookupop_t *op;
 
 
 /* ------------------------------------------------------------------------ */
+/* Function:    ip_pool_flush                                               */
+/* Returns:     int    - number of pools deleted                            */
+/* Parameters:  fp(I)  - which pool(s) to flush                             */
+/* Locks:       WRITE(ip_poolrw) or WRITE(ipf_global)                       */
+/*                                                                          */
+/* Free all pools associated with the device that matches the unit number   */
+/* passed in with operation.                                                */
+/*                                                                          */
+/* NOTE: Because this function is called out of ipldetach() where ip_poolrw */
+/* may not be initialised, we can't use an ASSERT to enforce the locking    */
+/* assertion that one of the two (ip_poolrw,ipf_global) is held.            */
+/* ------------------------------------------------------------------------ */
+int ip_pool_flush(fp)
+iplookupflush_t *fp;
+{
+	int i, num = 0, unit, err;
+	ip_pool_t *p, *q;
+	iplookupop_t op;
+
+	unit = fp->iplf_unit;
+
+	for (i = 0; i <= IPL_LOGMAX; i++) {
+		if (unit != IPLT_ALL && i != unit)
+			continue;
+		for (q = ip_pool_list[i]; (p = q) != NULL; ) {
+			op.iplo_unit = i;
+			(void)strncpy(op.iplo_name, p->ipo_name,
+				sizeof(op.iplo_name));
+			q = p->ipo_next;
+			err = ip_pool_destroy(&op);
+			if (err == 0)
+				num++;
+			else
+				break;
+		}
+	}
+	return num;
+}
+
+
+/* ------------------------------------------------------------------------ */
 /* Function:    ip_pool_free                                                */
 /* Returns:     void                                                        */
 /* Parameters:  ipo(I) -  pointer to pool structure                         */
@@ -587,14 +694,20 @@ ip_pool_t *ipo;
 {
 	ip_pool_node_t *n;
 
+	RADIX_NODE_HEAD_LOCK(ipo->ipo_head);
 	while ((n = ipo->ipo_list) != NULL) {
 		ipo->ipo_head->rnh_deladdr(&n->ipn_addr, &n->ipn_mask,
 					   ipo->ipo_head);
+
 		*n->ipn_pnext = n->ipn_next;
 		if (n->ipn_next)
 			n->ipn_next->ipn_pnext = n->ipn_pnext;
+
 		KFREE(n);
+
+		ipoolstat.ipls_nodes--;
 	}
+	RADIX_NODE_HEAD_UNLOCK(ipo->ipo_head);
 
 	ipo->ipo_list = NULL;
 	if (ipo->ipo_next != NULL)
@@ -602,6 +715,8 @@ ip_pool_t *ipo;
 	*ipo->ipo_pnext = ipo->ipo_next;
 	rn_freehead(ipo->ipo_head);
 	KFREE(ipo);
+
+	ipoolstat.ipls_pools--;
 }
 
 
@@ -647,6 +762,7 @@ rn_freehead(rnh)
       struct radix_node_head *rnh;
 {
 
+	RADIX_NODE_HEAD_LOCK(rnh);
 	(*rnh->rnh_walktree)(rnh, rn_freenode, rnh);
 
 	rnh->rnh_addaddr = NULL;
@@ -654,6 +770,7 @@ rn_freehead(rnh)
 	rnh->rnh_matchaddr = NULL;
 	rnh->rnh_lookup = NULL;
 	rnh->rnh_walktree = NULL;
+	RADIX_NODE_HEAD_UNLOCK(rnh);
 
 	Free(rnh);
 }

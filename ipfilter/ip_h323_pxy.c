@@ -23,7 +23,9 @@
 # include <sys/fcntl.h>
 # include <sys/filio.h>
 #else
-# include <sys/ioctl.h>
+# ifndef linux
+#  include <sys/ioctl.h>
+# endif
 #endif
 
 #define IPF_H323_PROXY

@@ -25,7 +25,7 @@ logit() {
 }
 
 start() {
-	modprobe ipfilter
+	/sbin/insmod -s ipfilter
 	echo -n $"Starting IPFilter: "
 
 	minor=0
@@ -51,7 +51,7 @@ start() {
 		logit $RETVAL ippool "$msg"
 	fi
 	if [ $RETVAL -eq 0 ] ; then
-		/usr/bin/ipmon -Das
+		/sbin/ipmon -Das
 		RETVAL=$?
 	fi
 	if [ $RETVAL -eq 0 ] ; then

@@ -16,6 +16,9 @@ fi
 if [ x"`grep minor=ipauth ${DEVLINK}`" = x ] ; then
 	echo "type=ddi_pseudo;name=ipf;minor=ipauth	\M0" >> ${DEVLINK}
 fi
+if [ x"`grep minor=iplookup ${DEVLINK}`" = x ] ; then
+	echo "type=ddi_pseudo;name=ipf;minor=iplookup	\M0" >> ${DEVLINK}
+fi
 if [ x"`grep minor=ipsync ${DEVLINK}`" = x ] ; then
 	echo "type=ddi_pseudo;name=ipf;minor=ipsync	\M0" >> ${DEVLINK}
 fi

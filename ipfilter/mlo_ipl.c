@@ -173,9 +173,12 @@ static int ipl_unload()
 	 * Unloading - remove the filter rule check from the IP
 	 * input/output stream.
 	 */
-	error = ipldetach();
+        if (fr_refcnt)
+                error = EBUSY;
+	else if (fr_running >= 0)
+		error = ipldetach();
 
-	if (!error) {
+	if (error == 0) {
 		fr_running = -2;
 		error = ipl_remove();
 		printf("%s unloaded\n", ipfilter_version);

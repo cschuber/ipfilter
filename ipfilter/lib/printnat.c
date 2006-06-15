@@ -97,7 +97,10 @@ int opts;
 		printf(" -> %s", inet_ntoa(np->in_in[0].in4));
 		if (np->in_flags & IPN_SPLIT)
 			printf(",%s", inet_ntoa(np->in_in[1].in4));
-		printf(" port %d", ntohs(np->in_pnext));
+		if ((np->in_flags & IPN_FIXEDDPORT) != 0)
+			printf(" port = %d", ntohs(np->in_pnext));
+		else
+			printf(" port %d", ntohs(np->in_pnext));
 		if ((np->in_flags & IPN_TCPUDP) == IPN_TCPUDP)
 			printf(" tcp/udp");
 		else if ((np->in_flags & IPN_TCP) == IPN_TCP)
@@ -176,13 +179,19 @@ int opts;
 			if (opts & OPT_DEBUG)
 				printf("\n\tip modulous %d", np->in_pmax);
 		} else if (np->in_pmin || np->in_pmax) {
-			printf(" portmap");
+			if (np->in_flags & IPN_ICMPQUERY) {
+				printf(" icmpidmap");
+			} else {
+				printf(" portmap");
+			}
 			if ((np->in_flags & IPN_TCPUDP) == IPN_TCPUDP)
 				printf(" tcp/udp");
 			else if (np->in_flags & IPN_TCP)
 				printf(" tcp");
 			else if (np->in_flags & IPN_UDP)
 				printf(" udp");
+			else if (np->in_flags & IPN_ICMPQUERY)
+				printf(" icmp");
 			if (np->in_flags & IPN_AUTOPORTMAP) {
 				printf(" auto");
 				if (opts & OPT_DEBUG)
@@ -200,6 +209,10 @@ int opts;
 		if (np->in_age[0] != 0 || np->in_age[1] != 0) {
 			printf(" age %d/%d", np->in_age[0], np->in_age[1]);
 		}
+		if (np->in_mssclamp != 0)
+			printf(" mssclamp %d", np->in_mssclamp);
+		if (np->in_tag.ipt_tag[0] != '\0')
+			printf(" tag %s", np->in_tag.ipt_tag);
 		printf("\n");
 		if (opts & OPT_DEBUG) {
 			struct in_addr nip;

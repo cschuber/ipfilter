@@ -7,8 +7,9 @@ The format for files accepted by ipnat is described by the following grammar:
 .nf
 ipmap :: = mapblock | redir | map .
 
-map ::= mapit ifname lhs "->" dstipmask [ mapport | mapproxy ] mapoptions.
-mapblock ::= "map-block" ifname lhs "->" ipmask [ ports ] mapoptions.
+map ::= mapit ifname lhs "->" dstipmask [ mapicmp | mapport | mapproxy ]
+        mapoptions .
+mapblock ::= "map-block" ifname lhs "->" ipmask [ ports ] mapoptions .
 redir ::= "rdr" ifname ipmask dport "->" ip [ "," ip ] rdrport rdroptions .
 
 lhs ::= ipmask | fromto .
@@ -19,6 +20,7 @@ mapit ::= "map" | "bimap" .
 fromto ::= "from" object "to" object .
 ipmask ::= ip "/" bits | ip "/" mask | ip "netmask" mask .
 dstipmask ::= ipmask | "range" ip "-" ip .
+mapicmp ::= "icmpidmap" "icmp" number ":" number .
 mapport ::= "portmap" tcpudp portspec .
 mapoptions ::= [ tcpudp ] [ "frag" ] [ age ] [ clamp ] .
 rdroptions ::= rdrproto [ rr ] [ "frag" ] [ age ] [ clamp ] [ rdrproxy ] .
@@ -106,7 +108,7 @@ with all NAT rules.
 .SH TRANSLATION
 .PP
 To the right of the "->" is the address and port specification which will be
-written into the packet providing it has already successful matched the
+written into the packet providing it has already successfully matched the
 prior constraints.  The case of redirections (\fBrdr\fP) is the simplest:
 the new destination address is that specified in the rule.  For \fBmap\fP
 rules, the destination address will be one for which the tuple combining
@@ -120,7 +122,7 @@ the packet will not be translated.  The \fBmap-block\fP is more limited in
 how it searches for a new, free and unique tuple, in that it will used an
 algorithm to determine what the new source address should be, along with the
 range of available ports - the IP address is never changed and nor does the
-port number ever exceed its alloted range.
+port number ever exceed its allotted range.
 .SH ICMPIDMAP
 .PP
 ICMP messages can be divided into two groups: "errors" and "queries". ICMP

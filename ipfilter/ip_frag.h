@@ -81,4 +81,4 @@ extern	void	fr_slowtimer __P((void *));
 extern	int	fr_slowtimer __P((void));
 #endif
 
-#endif	/* __IP_FIL_H__ */
+#endif	/* __IP_FRAG_H__ */

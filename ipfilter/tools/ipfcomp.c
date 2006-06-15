@@ -121,6 +121,8 @@ frentry_t *fr;
 		fprintf(fp, "#ifndef _KERNEL\n");
 		fprintf(fp, "# include <string.h>\n");
 		fprintf(fp, "#endif /* _KERNEL */\n");
+		fprintf(fp, "\n");
+		fprintf(fp, "#ifdef IPFILTER_COMPILED\n");
 	}
 
 	addrule(fp, fr);
@@ -320,7 +322,9 @@ frentry_t *fr;
 			}
 		}
 		emittail();
+		fprintf(cfile, "#endif /* IPFILTER_COMPILED */\n");
 	}
+
 }
 
 
@@ -1289,6 +1293,9 @@ int ipfrule_add_%s_%s()\n", instr, group);
 	fp->fr_flags = FR_%sQUE|FR_NOMATCH;\n\
 	fp->fr_data = (void *)ipf_rules_%s_%s[0];\n",
 		(in != 0) ? "IN" : "OUT", instr, group);
+	fprintf(fp, "\
+	fp->fr_dsize = sizeof(ipf_rules_%s_%s[0]);\n",
+		instr, group);
 
 	fprintf(fp, "\
 	fp->fr_v = 4;\n\

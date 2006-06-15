@@ -10,9 +10,10 @@
 #define	PRINTF	(void)printf
 #define	FPRINTF	(void)fprintf
 
-ipstate_t *printstate(sp, opts)
+ipstate_t *printstate(sp, opts, now)
 ipstate_t *sp;
 int opts;
+u_long now;
 {
 	ipstate_t ips;
 
@@ -23,7 +24,7 @@ int opts;
 	PRINTF("%s pass %#x pr %d state %d/%d bkt %d\n",
 		hostname(ips.is_v, &ips.is_dst.in4), ips.is_pass, ips.is_p,
 		ips.is_state[0], ips.is_state[1], ips.is_hv);
-	PRINTF("\ttag %u ttl %lu", ips.is_tag, ips.is_die - ips.is_touched);
+	PRINTF("\ttag %u ttl %lu", ips.is_tag, ips.is_die - now);
 
 	if (ips.is_p == IPPROTO_TCP) {
 		PRINTF("\n\t%hu -> %hu %x:%x %hu<<%d:%hu<<%d\n",
@@ -57,7 +58,7 @@ int opts;
 			ntohs(ips.is_icmp.ici_seq), ips.is_icmp.ici_type);
 
 #ifdef        USE_QUAD_T
-	PRINTF("\tforward: pkts in %qd bytes in %qd pkts out %qd bytes out %qd\n\tbackward: pkts in %qd bytes in %qd pkts out %qd bytes out %qd",
+	PRINTF("\tforward: pkts in %qd bytes in %qd pkts out %qd bytes out %qd\n\tbackward: pkts in %qd bytes in %qd pkts out %qd bytes out %qd\n",
 		ips.is_pkts[0], ips.is_bytes[0],
 		ips.is_pkts[1], ips.is_bytes[1],
 		ips.is_pkts[2], ips.is_bytes[2],

@@ -23,6 +23,7 @@ ioctlfunc_t iocfunc;
 {
 	ip_pool_node_t pn;
 	iplookupop_t op;
+	int err;
 
 	if ((poolfd == -1) && ((opts & OPT_DONOTHING) == 0))
 		poolfd = open(IPLOOKUP_NAME, O_RDWR);
@@ -44,9 +45,14 @@ ioctlfunc_t iocfunc;
 	pn.ipn_info = node->ipn_info;
 	strncpy(pn.ipn_name, node->ipn_name, sizeof(pn.ipn_name));
 
-	if ((*iocfunc)(poolfd, SIOCLOOKUPADDNODE, &op)) {
+	if ((opts & OPT_REMOVE) == 0)
+		err = (*iocfunc)(poolfd, SIOCLOOKUPADDNODE, &op);
+	else
+		err = (*iocfunc)(poolfd, SIOCLOOKUPDELNODE, &op);
+
+	if (err != 0) {
 		if ((opts & OPT_DONOTHING) == 0) {
-			perror("load_pool:SIOCLOOKUPADDNODE");
+			perror("load_pool:SIOCLOOKUP*NODE");
 			return -1;
 		}
 	}
