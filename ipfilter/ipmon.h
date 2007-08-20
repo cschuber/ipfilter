@@ -15,6 +15,8 @@ typedef	struct	ipmon_action	{
 	int	ac_syslog;	/* = 1 to syslog rules. */
 	char	*ac_savefile;	/* filename to save log records to */
 	FILE	*ac_savefp;
+	int	ac_logfac;
+	int	ac_logpri;
 	int	ac_direction;
 	char	ac_group[FR_GROUPLEN];
 	char	ac_nattag[16];

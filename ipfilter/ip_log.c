@@ -14,7 +14,11 @@
 #endif
 #if defined(__NetBSD__) && (NetBSD >= 199905) && !defined(IPFILTER_LKM) && \
     defined(_KERNEL)
-# include "opt_ipfilter_log.h"
+# if (__NetBSD_Version__ < 399001400)
+#  include "opt_ipfilter_log.h"
+# else
+#  include "opt_ipfilter.h"
+# endif
 #endif
 #if defined(__FreeBSD__) && !defined(IPFILTER_LKM)
 # if defined(_KERNEL)
@@ -147,7 +151,7 @@ extern int selwait;
 # if defined(linux) && defined(_KERNEL)
 wait_queue_head_t	iplh_linux[IPL_LOGSIZE];
 # endif
-# if SOLARIS
+# if SOLARIS && defined(_KERNEL)
 extern	kcondvar_t	iplwait;
 extern	struct pollhead	iplpollhead[IPL_LOGSIZE];
 # endif
@@ -156,7 +160,6 @@ iplog_t	**iplh[IPL_LOGSIZE], *iplt[IPL_LOGSIZE], *ipll[IPL_LOGSIZE];
 int	iplused[IPL_LOGSIZE];
 static fr_info_t	iplcrc[IPL_LOGSIZE];
 int	ipl_suppress = 1;
-int	ipl_buffer_sz;
 int	ipl_logmax = IPL_LOGMAX;
 int	ipl_logall = 0;
 int	ipl_log_init = 0;
@@ -167,14 +170,15 @@ int	ipl_magic[IPL_LOGSIZE] = { IPL_MAGIC, IPL_MAGIC_NAT, IPL_MAGIC_STATE,
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_loginit                                                  */
+/* Function:    ipf_log_init                                                */
 /* Returns:     int - 0 == success (always returned)                        */
 /* Parameters:  Nil                                                         */
 /*                                                                          */
 /* Initialise log buffers & pointers.  Also iniialised the CRC to a local   */
 /* secret for use in calculating the "last log checksum".                   */
 /* ------------------------------------------------------------------------ */
-int fr_loginit()
+int
+ipf_log_init()
 {
 	int	i;
 
@@ -205,13 +209,14 @@ int fr_loginit()
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_logunload                                                */
+/* Function:    ipf_log_unload                                              */
 /* Returns:     Nil                                                         */
 /* Parameters:  Nil                                                         */
 /*                                                                          */
 /* Clean up any log data that has accumulated without being read.           */
 /* ------------------------------------------------------------------------ */
-void fr_logunload()
+void
+ipf_log_unload()
 {
 	int i;
 
@@ -219,7 +224,7 @@ void fr_logunload()
 		return;
 
 	for (i = IPL_LOGMAX; i >= 0; i--)
-		(void) ipflog_clear(i);
+		(void) ipf_log_clear(i);
 
 # if SOLARIS && defined(_KERNEL)
 	cv_destroy(&iplwait);
@@ -231,7 +236,7 @@ void fr_logunload()
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    ipflog                                                      */
+/* Function:    ipf_log_pkt                                                 */
 /* Returns:     int - 0 == success, -1 == failure                           */
 /* Parameters:  fin(I)   - pointer to packet information                    */
 /*              flags(I) - flags from filter rules                          */
@@ -242,9 +247,10 @@ void fr_logunload()
 /* how much data to copy into the log, including part of the data body if   */
 /* requested.                                                               */
 /* ------------------------------------------------------------------------ */
-int ipflog(fin, flags)
-fr_info_t *fin;
-u_int flags;
+int
+ipf_log_pkt(fin, flags)
+	fr_info_t *fin;
+	u_int flags;
 {
 	register size_t hlen;
 	int types[2], mlen;
@@ -259,10 +265,14 @@ u_int flags;
 	struct ifnet *ifp;
 # endif /* SOLARIS || __hpux */
 
-	ipfl.fl_nattag.ipt_num[0] = 0;
 	m = fin->fin_m;
+	if (m == NULL)
+		return -1;
+
+	ipfl.fl_nattag.ipt_num[0] = 0;
 	ifp = fin->fin_ifp;
-	hlen = fin->fin_hlen;
+	hlen = (char *)fin->fin_dp - (char *)fin->fin_ip;
+
 	/*
 	 * calculate header size.
 	 */
@@ -367,6 +377,7 @@ u_int flags;
 		bcopy(fin->fin_nattag, (void *)&ipfl.fl_nattag,
 		      sizeof(ipfl.fl_nattag));
 	ipfl.fl_flags = flags;
+	ipfl.fl_breason = (fin->fin_reason & 0xff);
 	ipfl.fl_dir = fin->fin_out;
 	ipfl.fl_lflags = fin->fin_flx;
 	ptrs[0] = (void *)&ipfl;
@@ -390,12 +401,12 @@ u_int flags;
 	sizes[1] = hlen + mlen;
 	types[1] = 1;
 # endif /* MENTAT */
-	return ipllog(IPL_LOGIPF, fin, ptrs, sizes, types, 2);
+	return ipf_log_items(IPL_LOGIPF, fin, ptrs, sizes, types, 2);
 }
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    ipllog                                                      */
+/* Function:    ipf_log_items                                               */
 /* Returns:     int - 0 == success, -1 == failure                           */
 /* Parameters:  dev(I)    - device that owns this log record                */
 /*              fin(I)    - pointer to packet information                   */
@@ -408,12 +419,13 @@ u_int flags;
 /* miscellaneous packet information, as well as packet data, for reading    */
 /* from the log device.                                                     */
 /* ------------------------------------------------------------------------ */
-int ipllog(dev, fin, items, itemsz, types, cnt)
-int dev;
-fr_info_t *fin;
-void **items;
-size_t *itemsz;
-int *types, cnt;
+int
+ipf_log_items(dev, fin, items, itemsz, types, cnt)
+	int dev;
+	fr_info_t *fin;
+	void **items;
+	size_t *itemsz;
+	int *types, cnt;
 {
 	caddr_t buf, ptr;
 	iplog_t *ipl;
@@ -523,7 +535,7 @@ int *types, cnt;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    ipflog_read                                                 */
+/* Function:    ipf_log_read                                                */
 /* Returns:     int    - 0 == success, else error value.                    */
 /* Parameters:  unit(I) - device we are reading from                        */
 /*              uio(O)  - pointer to information about where to store data  */
@@ -534,9 +546,10 @@ int *types, cnt;
 /* NOTE: This function will block and wait for a signal to return data if   */
 /* there is none present.  Asynchronous I/O is not implemented.             */
 /* ------------------------------------------------------------------------ */
-int ipflog_read(unit, uio)
-minor_t unit;
-struct uio *uio;
+int
+ipf_log_read(unit, uio)
+	minor_t unit;
+	struct uio *uio;
 {
 	size_t dlen, copied;
 	int error = 0;
@@ -547,13 +560,21 @@ struct uio *uio;
 	 * Sanity checks.  Make sure the minor # is valid and we're copying
 	 * a valid chunk of data.
 	 */
-	if (IPL_LOGMAX < unit)
+	if (IPL_LOGMAX < unit) {
+		ipf_interror = 40001;
 		return ENXIO;
+	}
 	if (uio->uio_resid == 0)
 		return 0;
-	if ((uio->uio_resid < sizeof(iplog_t)) ||
-	    (uio->uio_resid > ipl_logsize))
+
+	if (uio->uio_resid < sizeof(iplog_t)) {
+		ipf_interror = 40002;
 		return EINVAL;
+	}
+	if (uio->uio_resid > ipl_logsize) {
+		ipf_interror = 40005;
+		return EINVAL;
+	}
 
 	/*
 	 * Lock the log so we can snapshot the variables.  Wait for a signal
@@ -566,6 +587,7 @@ struct uio *uio;
 # if SOLARIS && defined(_KERNEL)
 		if (!cv_wait_sig(&iplwait, &ipl_mutex.ipf_lk)) {
 			MUTEX_EXIT(&ipl_mutex);
+			ipf_interror = 40003;
 			return EINTR;
 		}
 # else
@@ -594,8 +616,10 @@ struct uio *uio;
 		error = SLEEP(unit + iplh, "ipl sleep");
 #   endif /* __osf__ */
 #  endif /* __hpux */
-		if (error)
+		if (error) {
+			ipf_interror = 40004;
 			return error;
+		}
 		SPL_NET(s);
 		MUTEX_ENTER(&ipl_mutex);
 # endif /* SOLARIS */
@@ -616,10 +640,11 @@ struct uio *uio;
 		iplused[unit] -= dlen;
 		MUTEX_EXIT(&ipl_mutex);
 		SPL_X(s);
-		error = UIOMOVE((caddr_t)ipl, dlen, UIO_READ, uio);
+		error = UIOMOVE(ipl, dlen, UIO_READ, uio);
 		if (error) {
 			SPL_NET(s);
 			MUTEX_ENTER(&ipl_mutex);
+			ipf_interror = 40006;
 			ipl->ipl_next = iplt[unit];
 			iplt[unit] = ipl;
 			iplused[unit] += dlen;
@@ -642,14 +667,15 @@ struct uio *uio;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    ipflog_clear                                                */
+/* Function:    ipf_log_clear                                               */
 /* Returns:     int    - number of log bytes cleared.                       */
 /* Parameters:  unit(I) - device we are reading from                        */
 /*                                                                          */
 /* Deletes all queued up log records for a given output device.             */
 /* ------------------------------------------------------------------------ */
-int ipflog_clear(unit)
-minor_t unit;
+int
+ipf_log_clear(unit)
+	minor_t unit;
 {
 	iplog_t *ipl;
 	int used;
@@ -673,15 +699,16 @@ minor_t unit;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    ipflog_canread                                              */
+/* Function:    ipf_log_canread                                             */
 /* Returns:     int    - 0 == no data to read, 1 = data present             */
 /* Parameters:  unit(I) - device we are reading from                        */
 /*                                                                          */
 /* Returns an indication of whether or not there is data present in the     */
 /* current buffer for the selected ipf device.                              */
 /* ------------------------------------------------------------------------ */
-int ipflog_canread(unit)
-int unit;
+int
+ipf_log_canread(unit)
+	int unit;
 {
 	return iplt[unit] != NULL;
 }

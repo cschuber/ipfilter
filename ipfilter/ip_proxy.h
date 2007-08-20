@@ -73,6 +73,7 @@ typedef	struct ap_session {
 
 typedef	struct	ap_control {
 	char	apc_label[APR_LABELLEN];
+	char	apc_config[APR_LABELLEN];
 	u_char	apc_p;
 	/*
 	 * The following fields are upto the proxy's apr_ctl routine to deal
@@ -90,6 +91,9 @@ typedef	struct	ap_control {
 	size_t	apc_dsize;
 } ap_ctl_t;
 
+#define	APC_CMD_ADD	0
+#define	APC_CMD_DEL	1
+
 
 typedef	struct	aproxy	{
 	struct	aproxy	*apr_next;
@@ -105,6 +109,8 @@ typedef	struct	aproxy	{
 	int	(* apr_outpkt) __P((fr_info_t *, ap_session_t *, struct nat *));
 	int	(* apr_match) __P((fr_info_t *, ap_session_t *, struct nat *));
 	int	(* apr_ctl) __P((struct aproxy *, struct ap_control *));
+	int	(* apr_clear) __P((struct aproxy *));
+	int	(* apr_flush) __P((struct aproxy *, int));
 } aproxy_t;
 
 #define	APR_DELETE	1
@@ -176,6 +182,25 @@ typedef	struct	ircinfo {
 	u_32_t	irc_ipnum;
 	u_short	irc_port;
 } ircinfo_t;
+
+
+/*
+ * For the rcmd proxy.
+ */
+typedef	struct rcmdinfo	{
+	ipnat_t	rcmd_rule;	/* Template rule for back connection */
+	u_32_t	rcmd_port;	/* Port number seen */
+	u_32_t	rcmd_portseq;	/* Sequence number where port is first seen */
+} rcmdinfo_t;
+
+/*
+ * For the DNS "proxy"
+ */
+typedef struct dnsinfo {
+        ipfmutex_t	dnsi_lock;
+	u_short		dnsi_id;
+	u_char		dnsi_buffer[512];
+} dnsinfo_t;
 
 
 /*
@@ -435,19 +460,21 @@ extern	ap_session_t	*ap_sess_tab[AP_SESS_SIZE];
 extern	ap_session_t	*ap_sess_list;
 extern	aproxy_t	ap_proxies[];
 extern	int		ippr_ftp_pasvonly;
+extern	int		ipf_proxy_debug;
 
 extern	int	appr_add __P((aproxy_t *));
+extern	int	appr_check __P((fr_info_t *, struct nat *));
 extern	int	appr_ctl __P((ap_ctl_t *));
 extern	int	appr_del __P((aproxy_t *));
-extern	int	appr_init __P((void));
-extern	void	appr_unload __P((void));
-extern	int	appr_ok __P((fr_info_t *, tcphdr_t *, struct ipnat *));
-extern	int	appr_match __P((fr_info_t *, struct nat *));
+extern	void	appr_flush __P((int));
 extern	void	appr_free __P((aproxy_t *));
-extern	void	aps_free __P((ap_session_t *));
-extern	int	appr_check __P((fr_info_t *, struct nat *));
+extern	int	appr_init __P((void));
+extern	int	appr_ioctl __P((caddr_t, ioctlcmd_t, int, void *));
 extern	aproxy_t	*appr_lookup __P((u_int, char *));
+extern	int	appr_match __P((fr_info_t *, struct nat *));
 extern	int	appr_new __P((fr_info_t *, struct nat *));
-extern	int	appr_ioctl __P((caddr_t, ioctlcmd_t, int));
+extern	int	appr_ok __P((fr_info_t *, tcphdr_t *, struct ipnat *));
+extern	void	appr_unload __P((void));
+extern	void	aps_free __P((ap_session_t *));
 
 #endif /* __IP_PROXY_H__ */

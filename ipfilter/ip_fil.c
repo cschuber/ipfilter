@@ -62,7 +62,6 @@ struct file;
 #include <stdlib.h>
 #include <ctype.h>
 #include <fcntl.h>
-#include <arpa/inet.h>
 
 #ifdef __hpux
 # define _NET_ROUTE_INCLUDED
@@ -83,7 +82,9 @@ struct file;
 #if defined(__FreeBSD__)
 # include "radix_ipf.h"
 #endif
-#include <net/route.h>
+#ifndef __osf__
+# include <net/route.h>
+#endif
 #include <netinet/in.h>
 #if !(defined(__sgi) && !defined(IFF_DRVRLOCK)) /* IRIX < 6 */ && \
     !defined(__hpux) && !defined(linux)
@@ -107,6 +108,7 @@ struct file;
 #include <netinet/ip_icmp.h>
 #include <unistd.h>
 #include <syslog.h>
+#include <arpa/inet.h>
 #ifdef __hpux
 # undef _NET_ROUTE_INCLUDED
 #endif
@@ -144,8 +146,7 @@ extern	struct	protosw	inetsw[];
 static	struct	ifnet **ifneta = NULL;
 static	int	nifs = 0;
 
-static	int	frzerostats __P((caddr_t));
-static	void	fr_setifpaddr __P((struct ifnet *, char *));
+static	void	ipf_setifpaddr __P((struct ifnet *, char *));
 void	init_ifp __P((void));
 #if defined(__sgi) && (IRIX < 60500)
 static int 	no_output __P((struct ifnet *, struct mbuf *,
@@ -167,33 +168,18 @@ static int	write_output __P((struct ifnet *, struct mbuf *,
 #endif
 
 
-int iplattach()
+int
+ipfattach()
 {
-	fr_running = 1;
+	ipf_running = 1;
 	return 0;
 }
 
 
-int ipldetach()
+int
+ipfdetach()
 {
-	fr_running = -1;
-	return 0;
-}
-
-
-static	int	frzerostats(data)
-caddr_t	data;
-{
-	friostat_t fio;
-	int error;
-
-	fr_getstat(&fio);
-	error = copyoutptr(&fio, data, sizeof(fio));
-	if (error)
-		return EFAULT;
-
-	bzero((char *)frstats, sizeof(*frstats) * 2);
-
+	ipf_running = -1;
 	return 0;
 }
 
@@ -201,264 +187,89 @@ caddr_t	data;
 /*
  * Filter ioctl interface.
  */
-int iplioctl(dev, cmd, data, mode)
-int dev;
-ioctlcmd_t cmd;
-caddr_t data;
-int mode;
+int
+ipfioctl(dev, cmd, data, mode)
+	int dev;
+	ioctlcmd_t cmd;
+	caddr_t data;
+	int mode;
 {
-	int error = 0, unit = 0, tmp;
-	friostat_t fio;
+	int error = 0, unit = 0, uid;
 
+	uid = getuid();
 	unit = dev;
 
 	SPL_NET(s);
 
-	if (unit == IPL_LOGNAT) {
-		if (fr_running > 0)
-			error = fr_nat_ioctl(data, cmd, mode);
-		else
-			error = EIO, ipf_interror;
+	error = ipf_ioctlswitch(unit, data, cmd, mode, uid, NULL);
+	if (error != -1) {
 		SPL_X(s);
 		return error;
-	}
-	if (unit == IPL_LOGSTATE) {
-		if (fr_running > 0)
-			error = fr_state_ioctl(data, cmd, mode);
-		else
-			error = EIO;
-		SPL_X(s);
-		return error;
-	}
-	if (unit == IPL_LOGAUTH) {
-		if (fr_running > 0) {
-			if ((cmd == (ioctlcmd_t)SIOCADAFR) ||
-			    (cmd == (ioctlcmd_t)SIOCRMAFR)) {
-				if (!(mode & FWRITE)) {
-					error = EPERM;
-				} else {
-					error = frrequest(unit, cmd, data,
-							  fr_active, 1);
-				}
-			} else {
-				error = fr_auth_ioctl(data, mode, cmd);
-			}
-		} else
-			error = EIO;
-		SPL_X(s);
-		return error;
-	}
-	if (unit == IPL_LOGSYNC) {
-#ifdef	IPFILTER_SYNC
-		if (fr_running > 0)
-			error = fr_sync_ioctl(data, cmd, mode);
-		else
-#endif
-			error = EIO;
-		SPL_X(s);
-		return error;
-	}
-	if (unit == IPL_LOGSCAN) {
-#ifdef	IPFILTER_SCAN
-		if (fr_running > 0)
-			error = fr_scan_ioctl(data, cmd, mode);
-		else
-#endif
-			error = EIO;
-		SPL_X(s);
-		return error;
-	}
-	if (unit == IPL_LOGLOOKUP) {
-		if (fr_running > 0)
-			error = ip_lookup_ioctl(data, cmd, mode);
-		else
-			error = EIO;
-		SPL_X(s);
-		return error;
-	}
-
-	switch (cmd)
-	{
-	case FIONREAD :
-#ifdef IPFILTER_LOG
-		error = COPYOUT(&iplused[IPL_LOGIPF], (caddr_t)data,
-			       sizeof(iplused[IPL_LOGIPF]));
-#endif
-		break;
-	case SIOCFRENB :
-		if (!(mode & FWRITE))
-			error = EPERM;
-		else {
-			error = COPYIN(data, &tmp, sizeof(tmp));
-			if (error)
-				break;
-			if (tmp)
-				error = iplattach();
-			else
-				error = ipldetach();
-		}
-		break;
-	case SIOCIPFSET :
-		if (!(mode & FWRITE)) {
-			error = EPERM;
-			break;
-		}
-	case SIOCIPFGETNEXT :
-	case SIOCIPFGET :
-		error = fr_ipftune(cmd, (void *)data);
-		break;
-	case SIOCSETFF :
-		if (!(mode & FWRITE))
-			error = EPERM;
-		else
-			error = COPYIN(data, &ipf_flags, sizeof(ipf_flags));
-		break;
-	case SIOCGETFF :
-		error = COPYOUT(&ipf_flags, data, sizeof(ipf_flags));
-		break;
-	case SIOCFUNCL :
-		error = fr_resolvefunc(data);
-		break;
-	case SIOCINAFR :
-	case SIOCRMAFR :
-	case SIOCADAFR :
-	case SIOCZRLST :
-		if (!(mode & FWRITE))
-			error = EPERM;
-		else
-			error = frrequest(unit, cmd, data, fr_active, 1);
-		break;
-	case SIOCINIFR :
-	case SIOCRMIFR :
-	case SIOCADIFR :
-		if (!(mode & FWRITE))
-			error = EPERM;
-		else
-			error = frrequest(unit, cmd, data, 1 - fr_active, 1);
-		break;
-	case SIOCSWAPA :
-		if (!(mode & FWRITE))
-			error = EPERM;
-		else {
-			bzero((char *)frcache, sizeof(frcache[0]) * 2);
-			*(u_int *)data = fr_active;
-			fr_active = 1 - fr_active;
-		}
-		break;
-	case SIOCGETFS :
-		fr_getstat(&fio);
-		error = fr_outobj(data, &fio, IPFOBJ_IPFSTAT);
-		break;
-	case	SIOCFRZST :
-		if (!(mode & FWRITE))
-			error = EPERM;
-		else
-			error = frzerostats(data);
-		break;
-	case	SIOCIPFFL :
-		if (!(mode & FWRITE))
-			error = EPERM;
-		else {
-			error = COPYIN(data, &tmp, sizeof(tmp));
-			if (!error) {
-				tmp = frflush(unit, tmp);
-				error = COPYOUT(&tmp, data, sizeof(tmp));
-			}
-		}
-		break;
-	case SIOCSTLCK :
-		error = COPYIN(data, &tmp, sizeof(tmp));
-		if (error == 0) {
-			fr_state_lock = tmp;
-			fr_nat_lock = tmp;
-			fr_frag_lock = tmp;
-			fr_auth_lock = tmp;
-		} else
-			error = EFAULT;
-		break;
-#ifdef	IPFILTER_LOG
-	case	SIOCIPFFB :
-		if (!(mode & FWRITE))
-			error = EPERM;
-		else
-			*(int *)data = ipflog_clear(unit);
-		break;
-#endif /* IPFILTER_LOG */
-	case SIOCGFRST :
-		error = fr_outobj(data, fr_fragstats(), IPFOBJ_FRAGSTAT);
-		break;
-	case SIOCFRSYN :
-		if (!(mode & FWRITE))
-			error = EPERM;
-		else {
-			frsync(NULL);
-		}
-		break;
-	default :
-		error = EINVAL;
-		break;
 	}
 	SPL_X(s);
 	return error;
 }
 
 
-void fr_forgetifp(ifp)
-void *ifp;
+void
+ipf_forgetifp(ifp)
+	void *ifp;
 {
 	register frentry_t *f;
 
 	WRITE_ENTER(&ipf_mutex);
-	for (f = ipacct[0][fr_active]; (f != NULL); f = f->fr_next)
+	for (f = ipf_acct[0][ipf_active]; (f != NULL); f = f->fr_next)
 		if (f->fr_ifa == ifp)
 			f->fr_ifa = (void *)-1;
-	for (f = ipacct[1][fr_active]; (f != NULL); f = f->fr_next)
+	for (f = ipf_acct[1][ipf_active]; (f != NULL); f = f->fr_next)
 		if (f->fr_ifa == ifp)
 			f->fr_ifa = (void *)-1;
-	for (f = ipfilter[0][fr_active]; (f != NULL); f = f->fr_next)
+	for (f = ipf_rules[0][ipf_active]; (f != NULL); f = f->fr_next)
 		if (f->fr_ifa == ifp)
 			f->fr_ifa = (void *)-1;
-	for (f = ipfilter[1][fr_active]; (f != NULL); f = f->fr_next)
+	for (f = ipf_rules[1][ipf_active]; (f != NULL); f = f->fr_next)
 		if (f->fr_ifa == ifp)
 			f->fr_ifa = (void *)-1;
 	RWLOCK_EXIT(&ipf_mutex);
-	fr_natsync(ifp);
+	ipf_nat_sync(ifp);
 }
 
 
+static int
 #if defined(__sgi) && (IRIX < 60500)
-static int no_output(ifp, m, s)
+no_output(ifp, m, s)
 #else
 # if TRU64 >= 1885
-static int no_output (ifp, m, s, rt, cp)
+no_output (ifp, m, s, rt, cp)
 char *cp;
 # else
-static int no_output(ifp, m, s, rt)
+no_output(ifp, m, s, rt)
 # endif
-struct rtentry *rt;
+	struct rtentry *rt;
 #endif
-struct ifnet *ifp;
-struct mbuf *m;
-struct sockaddr *s;
+	struct ifnet *ifp;
+	struct mbuf *m;
+	struct sockaddr *s;
 {
 	return 0;
 }
 
 
+static int
 #if defined(__sgi) && (IRIX < 60500)
-static int write_output(ifp, m, s)
+write_output(ifp, m, s)
 #else
 # if TRU64 >= 1885
-static int write_output (ifp, m, s, rt, cp)
+write_output (ifp, m, s, rt, cp)
 char *cp;
 # else
-static int write_output(ifp, m, s, rt)
+write_output(ifp, m, s, rt)
 # endif
-struct rtentry *rt;
+	struct rtentry *rt;
 #endif
-struct ifnet *ifp;
-struct mbuf *m;
-struct sockaddr *s;
+	struct ifnet *ifp;
+	struct mbuf *m;
+	struct sockaddr *s;
 {
 	char fname[32];
 	mb_t *mb;
@@ -486,9 +297,10 @@ struct sockaddr *s;
 }
 
 
-static void fr_setifpaddr(ifp, addr)
-struct ifnet *ifp;
-char *addr;
+static void
+ipf_setifpaddr(ifp, addr)
+	struct ifnet *ifp;
+	char *addr;
 {
 #ifdef __sgi
 	struct in_ifaddr *ifa;
@@ -532,9 +344,10 @@ char *addr;
 	}
 }
 
-struct ifnet *get_unit(name, v)
-char *name;
-int v;
+struct ifnet *
+get_unit(name, v)
+	char *name;
+	int v;
 {
 	struct ifnet *ifp, **ifpp, **old_ifneta;
 	char *addr;
@@ -552,7 +365,7 @@ int v;
 	for (ifpp = ifneta; ifpp && (ifp = *ifpp); ifpp++) {
 		if (!strcmp(name, ifp->if_xname)) {
 			if (addr != NULL)
-				fr_setifpaddr(ifp, addr);
+				ipf_setifpaddr(ifp, addr);
 			return ifp;
 		}
 	}
@@ -570,7 +383,7 @@ int v;
 		COPYIFNAME(ifp, ifname);
 		if (!strcmp(name, ifname)) {
 			if (addr != NULL)
-				fr_setifpaddr(ifp, addr);
+				ipf_setifpaddr(ifp, addr);
 			return ifp;
 		}
 	}
@@ -606,6 +419,9 @@ int v;
 	}
 	ifp = ifneta[nifs - 1];
 
+#if defined(__NetBSD__) || defined(__OpenBSD__) || defined(__FreeBSD__)
+	TAILQ_INIT(&ifp->if_addrlist);
+#endif
 #if (defined(NetBSD) && (NetBSD <= 1991011) && (NetBSD >= 199606)) || \
     (defined(OpenBSD) && (OpenBSD >= 199603)) || defined(linux) || \
     (defined(__FreeBSD__) && (__FreeBSD_version >= 501113))
@@ -623,18 +439,19 @@ int v;
 		ifp->if_unit = -1;
 	}
 #endif
-	ifp->if_output = no_output;
+	ifp->if_output = (void *)no_output;
 
 	if (addr != NULL) {
-		fr_setifpaddr(ifp, addr);
+		ipf_setifpaddr(ifp, addr);
 	}
 
 	return ifp;
 }
 
 
-char *get_ifname(ifp)
-struct ifnet *ifp;
+char *
+get_ifname(ifp)
+	struct ifnet *ifp;
 {
 	static char ifname[LIFNAMSIZ];
 
@@ -649,7 +466,8 @@ struct ifnet *ifp;
 
 
 
-void init_ifp()
+void
+init_ifp()
 {
 	struct ifnet *ifp, **ifpp;
 	char fname[32];
@@ -659,7 +477,7 @@ void init_ifp()
     (defined(OpenBSD) && (OpenBSD >= 199603)) || defined(linux) || \
     (defined(__FreeBSD__) && (__FreeBSD_version >= 501113))
 	for (ifpp = ifneta; ifpp && (ifp = *ifpp); ifpp++) {
-		ifp->if_output = write_output;
+		ifp->if_output = (void *)write_output;
 		sprintf(fname, "/tmp/%s", ifp->if_xname);
 		fd = open(fname, O_WRONLY|O_CREAT|O_EXCL|O_TRUNC, 0600);
 		if (fd == -1)
@@ -670,7 +488,7 @@ void init_ifp()
 #else
 
 	for (ifpp = ifneta; ifpp && (ifp = *ifpp); ifpp++) {
-		ifp->if_output = write_output;
+		ifp->if_output = (void *)write_output;
 		sprintf(fname, "/tmp/%s%d", ifp->if_name, ifp->if_unit);
 		fd = open(fname, O_WRONLY|O_CREAT|O_EXCL|O_TRUNC, 0600);
 		if (fd == -1)
@@ -682,10 +500,11 @@ void init_ifp()
 }
 
 
-int fr_fastroute(m, mpp, fin, fdp)
-mb_t *m, **mpp;
-fr_info_t *fin;
-frdest_t *fdp;
+int
+ipf_fastroute(m, mpp, fin, fdp)
+	mb_t *m, **mpp;
+	fr_info_t *fin;
+	frdest_t *fdp;
 {
 	struct ifnet *ifp = fdp->fd_ifp;
 	ip_t *ip = fin->fin_ip;
@@ -703,15 +522,15 @@ frdest_t *fdp;
 		sifp = fin->fin_ifp;
 		fin->fin_ifp = ifp;
 		fin->fin_out = 1;
-		(void) fr_acctpkt(fin, NULL);
+		(void) ipf_acctpkt(fin, NULL);
 		fin->fin_fr = NULL;
 		if (!fr || !(fr->fr_flags & FR_RETMASK)) {
 			u_32_t pass;
 
-			(void) fr_checkstate(fin, &pass);
+			(void) ipf_state_check(fin, &pass);
 		}
 
-		switch (fr_checknatout(fin, NULL))
+		switch (ipf_nat_checkout(fin, NULL))
 		{
 		case 0 :
 			break;
@@ -741,51 +560,57 @@ done:
 }
 
 
-int fr_send_reset(fin)
-fr_info_t *fin;
+int
+ipf_send_reset(fin)
+	fr_info_t *fin;
 {
 	verbose("- TCP RST sent\n");
 	return 0;
 }
 
 
-int fr_send_icmp_err(type, fin, dst)
-int type;
-fr_info_t *fin;
-int dst;
+int
+ipf_send_icmp_err(type, fin, dst)
+	int type;
+	fr_info_t *fin;
+	int dst;
 {
 	verbose("- ICMP unreachable sent\n");
 	return 0;
 }
 
 
-void frsync(ifp)
-void *ifp;
+int
+ipf_sync(ptr)
+	void *ptr;
+{
+	return 0;
+}
+
+
+void
+m_freem(m)
+	mb_t *m;
 {
 	return;
 }
 
 
-void m_freem(m)
-mb_t *m;
-{
-	return;
-}
-
-
-void m_copydata(m, off, len, cp)
-mb_t *m;
-int off, len;
-caddr_t cp;
+void
+m_copydata(m, off, len, cp)
+	mb_t *m;
+	int off, len;
+	caddr_t cp;
 {
 	bcopy((char *)m + off, cp, len);
 }
 
 
-int ipfuiomove(buf, len, rwflag, uio)
-caddr_t buf;
-int len, rwflag;
-struct uio *uio;
+int
+ipfuiomove(buf, len, rwflag, uio)
+	caddr_t buf;
+	int len, rwflag;
+	struct uio *uio;
 {
 	int left, ioc, num, offset;
 	struct iovec *io;
@@ -822,8 +647,9 @@ struct uio *uio;
 }
 
 
-u_32_t fr_newisn(fin)
-fr_info_t *fin;
+u_32_t
+ipf_newisn(fin)
+	fr_info_t *fin;
 {
 	static int iss_seq_off = 0;
 	u_char hash[16];
@@ -862,14 +688,15 @@ fr_info_t *fin;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_nextipid                                                 */
+/* Function:    ipf_nextipid                                                */
 /* Returns:     int - 0 == success, -1 == error (packet should be droppped) */
 /* Parameters:  fin(I) - pointer to packet information                      */
 /*                                                                          */
 /* Returns the next IPv4 ID to use for this packet.                         */
 /* ------------------------------------------------------------------------ */
-INLINE u_short fr_nextipid(fin)
-fr_info_t *fin;
+INLINE u_short
+ipf_nextipid(fin)
+	fr_info_t *fin;
 {
 	static u_short ipid = 0;
 	u_short id;
@@ -882,19 +709,21 @@ fr_info_t *fin;
 }
 
 
-INLINE void fr_checkv4sum(fin)
-fr_info_t *fin;
+INLINE void
+ipf_checkv4sum(fin)
+	fr_info_t *fin;
 {
-	if (fr_checkl4sum(fin) == -1)
+	if (ipf_checkl4sum(fin) == -1)
 		fin->fin_flx |= FI_BAD;
 }
 
 
 #ifdef	USE_INET6
-INLINE void fr_checkv6sum(fin)
-fr_info_t *fin;
+INLINE void
+ipf_checkv6sum(fin)
+	fr_info_t *fin;
 {
-	if (fr_checkl4sum(fin) == -1)
+	if (ipf_checkl4sum(fin) == -1)
 		fin->fin_flx |= FI_BAD;
 }
 #endif
@@ -903,9 +732,10 @@ fr_info_t *fin;
 /*
  * See above for description, except that all addressing is in user space.
  */
-int copyoutptr(src, dst, size)
-void *src, *dst;
-size_t size;
+int
+copyoutptr(src, dst, size)
+	void *src, *dst;
+	size_t size;
 {
 	caddr_t ca;
 
@@ -918,9 +748,10 @@ size_t size;
 /*
  * See above for description, except that all addressing is in user space.
  */
-int copyinptr(src, dst, size)
-void *src, *dst;
-size_t size;
+int
+copyinptr(src, dst, size)
+	void *src, *dst;
+	size_t size;
 {
 	caddr_t ca;
 
@@ -933,10 +764,11 @@ size_t size;
 /*
  * return the first IP Address associated with an interface
  */
-int fr_ifpaddr(v, atype, ifptr, inp, inpmask)
-int v, atype;
-void *ifptr;
-i6addr_t *inp, *inpmask;
+int
+ipf_ifpaddr(v, atype, ifptr, inp, inpmask)
+	int v, atype;
+	void *ifptr;
+	i6addr_t *inp, *inpmask;
 {
 	struct ifnet *ifp = ifptr;
 #ifdef __sgi
@@ -965,8 +797,27 @@ i6addr_t *inp, *inpmask;
 		sin = (struct sockaddr_in *)&ifa->ifa_addr;
 #endif
 
-		return fr_ifpfillv4addr(atype, sin, &mask,
+		return ipf_ifpfillv4addr(atype, sin, &mask,
 					&inp->in4, &inpmask->in4);
 	}
 	return 0;
+}
+
+
+int
+ipf_random(range)
+	int range;
+{
+	static int seeded = 0;
+
+	/*
+	 * For predictability and reproducability with the test suite,
+	 * always use the same seed.
+	 */
+	if (seeded == 0) {
+		srand(0);
+		seeded = 1;
+	}
+
+	return rand() % range;
 }

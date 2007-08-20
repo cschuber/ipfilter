@@ -48,11 +48,12 @@ int	h323_proxy_init = 0;
 static int find_port __P((int, caddr_t, int datlen, int *, u_short *));
 
 
-static int find_port(ipaddr, data, datlen, off, port)
-int ipaddr;
-caddr_t data;
-int datlen, *off;
-unsigned short *port;
+static int
+find_port(ipaddr, data, datlen, off, port)
+	int ipaddr;
+	caddr_t data;
+	int datlen, *off;
+	unsigned short *port;
 {
 	u_32_t addr, netaddr;
 	u_char *dp;
@@ -81,7 +82,8 @@ unsigned short *port;
 /*
  * Initialize local structures.
  */
-int ippr_h323_init()
+int
+ippr_h323_init()
 {
 	bzero((char *)&h323_fr, sizeof(h323_fr));
 	h323_fr.fr_ref = 1;
@@ -93,7 +95,8 @@ int ippr_h323_init()
 }
 
 
-void ippr_h323_fini()
+void
+ippr_h323_fini()
 {
 	if (h323_proxy_init == 1) {
 		MUTEX_DESTROY(&h323_fr.fr_lock);
@@ -102,10 +105,11 @@ void ippr_h323_fini()
 }
 
 
-int ippr_h323_new(fin, aps, nat)
-fr_info_t *fin;
-ap_session_t *aps;
-nat_t *nat;
+int
+ippr_h323_new(fin, aps, nat)
+	fr_info_t *fin;
+	ap_session_t *aps;
+	nat_t *nat;
 {
 	fin = fin;	/* LINT */
 	nat = nat;	/* LINT */
@@ -117,8 +121,9 @@ nat_t *nat;
 }
 
 
-void ippr_h323_del(aps)
-ap_session_t *aps;
+void
+ippr_h323_del(aps)
+	ap_session_t *aps;
 {
 	int i;
 	ipnat_t *ipn;
@@ -134,8 +139,8 @@ ap_session_t *aps;
 			 * We are lucky here because this function is not
 			 * called with ipf_nat locked.
 			 */
-			if (fr_nat_ioctl((caddr_t)ipn, SIOCRMNAT, NAT_SYSSPACE|
-				         NAT_LOCKHELD|FWRITE) == -1) {
+			if (ipf_nat_ioctl((caddr_t)ipn, SIOCRMNAT, NAT_SYSSPACE|
+				         NAT_LOCKHELD|FWRITE, 0, NULL) == -1) {
 				/*EMPTY*/;
 				/* log the error */
 			}
@@ -149,10 +154,11 @@ ap_session_t *aps;
 }
 
 
-int ippr_h323_in(fin, aps, nat)
-fr_info_t *fin;
-ap_session_t *aps;
-nat_t *nat;
+int
+ippr_h323_in(fin, aps, nat)
+	fr_info_t *fin;
+	ap_session_t *aps;
+	nat_t *nat;
 {
 	int ipaddr, off, datlen;
 	unsigned short port;
@@ -182,9 +188,11 @@ nat_t *nat;
 		bcopy((caddr_t)nat->nat_ptr, (caddr_t)ipn, sizeof(ipnat_t));
 		(void) strncpy(ipn->in_plabel, "h245", APR_LABELLEN);
 		
-		ipn->in_inip = nat->nat_inip.s_addr;
-		ipn->in_inmsk = 0xffffffff;
-		ipn->in_dport = htons(port);
+		ipn->in_osrcip = nat->nat_osrcip;
+		ipn->in_osrcmsk = 0xffffffff;
+		ipn->in_odstip = nat->nat_odstip;
+		ipn->in_odstmsk = 0xffffffff;
+		ipn->in_odport = htons(port);
 		/*
 		 * we got a problem here. we need to call fr_nat_ioctl() to add
 		 * the h245 proxy rule, but since we already hold (READ locked)
@@ -198,8 +206,8 @@ nat_t *nat;
 		 * of calling fr_nat_ioctl(), we add the nat rule ourself.
 		 */
 		RWLOCK_EXIT(&ipf_nat);
-		if (fr_nat_ioctl((caddr_t)ipn, SIOCADNAT,
-				 NAT_SYSSPACE|FWRITE) == -1) {
+		if (ipf_nat_ioctl((caddr_t)ipn, SIOCADNAT,
+				 NAT_SYSSPACE|FWRITE, 0, NULL) == -1) {
 			READ_ENTER(&ipf_nat);
 			return -1;
 		}
@@ -215,10 +223,11 @@ nat_t *nat;
 }
 
 
-int ippr_h245_new(fin, aps, nat)
-fr_info_t *fin;
-ap_session_t *aps;
-nat_t *nat;
+int
+ippr_h245_new(fin, aps, nat)
+	fr_info_t *fin;
+	ap_session_t *aps;
+	nat_t *nat;
 {
 	fin = fin;	/* LINT */
 	nat = nat;	/* LINT */
@@ -229,10 +238,11 @@ nat_t *nat;
 }
 
 
-int ippr_h245_out(fin, aps, nat)
-fr_info_t *fin;
-ap_session_t *aps;
-nat_t *nat;
+int
+ippr_h245_out(fin, aps, nat)
+	fr_info_t *fin;
+	ap_session_t *aps;
+	nat_t *nat;
 {
 	int ipaddr, off, datlen;
 	tcphdr_t *tcp;
@@ -244,7 +254,7 @@ nat_t *nat;
 
 	ip = fin->fin_ip;
 	tcp = (tcphdr_t *)fin->fin_dp;
-	ipaddr = nat->nat_inip.s_addr;
+	ipaddr = nat->nat_osrcaddr;
 	data = (caddr_t)tcp + (TCP_OFF(tcp) << 2);
 	datlen = fin->fin_plen - fin->fin_hlen - (TCP_OFF(tcp) << 2);
 	if (find_port(ipaddr, data, datlen, &off, &port) == 0) {
@@ -252,8 +262,8 @@ nat_t *nat;
 		nat_t     *nat2;
 
 /*		port = htons(port); */
-		nat2 = nat_outlookup(fin->fin_ifp, IPN_UDP, IPPROTO_UDP,
-				    ip->ip_src, ip->ip_dst);
+		nat2 = ipf_nat_outlookup(fin, IPN_UDP, IPPROTO_UDP,
+					 ip->ip_src, ip->ip_dst);
 		if (nat2 == NULL) {
 			struct ip newip;
 			struct udphdr udp;
@@ -261,31 +271,33 @@ nat_t *nat;
 			bcopy((caddr_t)ip, (caddr_t)&newip, sizeof(newip));
 			newip.ip_len = htons(fin->fin_hlen + sizeof(udp));
 			newip.ip_p = IPPROTO_UDP;
-			newip.ip_src = nat->nat_inip;
+			newip.ip_src = nat->nat_osrcip;
 			
 			bzero((char *)&udp, sizeof(udp));
 			udp.uh_sport = port;
 			
 			bcopy((caddr_t)fin, (caddr_t)&fi, sizeof(fi));
+			fi.fin_state = NULL;
+			fi.fin_nat = NULL;
 			fi.fin_fi.fi_p = IPPROTO_UDP;
 			fi.fin_data[0] = port;
 			fi.fin_data[1] = 0;
 			fi.fin_dp = (char *)&udp;
 
-			nat2 = nat_new(&fi, nat->nat_ptr, NULL,
+			nat2 = ipf_nat_add(&fi, nat->nat_ptr, NULL,
 				       NAT_SLAVE|IPN_UDP|SI_W_DPORT,
 				       NAT_OUTBOUND);
 			if (nat2 != NULL) {
-				(void) nat_proto(&fi, nat2, IPN_UDP);
-				nat_update(&fi, nat2, nat2->nat_ptr);
+				(void) ipf_nat_proto(&fi, nat2, IPN_UDP);
+				ipf_nat_update(&fi, nat2, nat2->nat_ptr);
 
 				nat2->nat_ptr->in_hits++;
 #ifdef	IPFILTER_LOG
-				nat_log(nat2, (u_int)(nat->nat_ptr->in_redir));
+				ipf_nat_log(nat2, (u_int)(nat->nat_ptr->in_redir));
 #endif
 				bcopy((caddr_t)&ip->ip_src.s_addr,
 				      data + off, 4);
-				bcopy((caddr_t)&nat2->nat_outport,
+				bcopy((caddr_t)&nat2->nat_osport,
 				      data + off + 4, 2);
 			}
 		}

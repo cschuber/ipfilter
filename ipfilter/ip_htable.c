@@ -55,9 +55,9 @@ static const char rcsid[] = "@(#)$Id$";
 #endif
 
 #ifdef	IPFILTER_LOOKUP
-static iphtent_t *fr_iphmfind __P((iphtable_t *, struct in_addr *));
+static iphtent_t *ipf_iphmfind __P((iphtable_t *, struct in_addr *));
 # ifdef USE_INET6
-static iphtent_t *fr_iphmfind6 __P((iphtable_t *, i6addr_t *));
+static iphtent_t *ipf_iphmfind6 __P((iphtable_t *, i6addr_t *));
 # endif
 static	u_long	ipht_nomem[IPL_LOGSIZE] = { 0, 0, 0, 0, 0, 0, 0, 0 };
 static	u_long	ipf_nhtables[IPL_LOGSIZE] = { 0, 0, 0, 0, 0, 0, 0, 0 };
@@ -67,29 +67,37 @@ iphtable_t *ipf_htables[IPL_LOGSIZE] = { NULL, NULL, NULL, NULL,
 					 NULL, NULL, NULL, NULL };
 
 
-void fr_htable_unload()
+void
+ipf_htable_unload()
 {
 	iplookupflush_t fop;
 
 	fop.iplf_unit = IPL_LOGALL;
-	(void)fr_flushhtable(&fop);
+	ipf_htable_flush(&fop);
 }
 
 
-int fr_gethtablestat(op)
-iplookupop_t *op;
+int
+ipf_htable_getstats(op)
+	iplookupop_t *op;
 {
 	iphtstat_t stats;
 
-	if (op->iplo_size != sizeof(stats))
+	if (op->iplo_size != sizeof(stats)) {
+		ipf_interror = 30001;
 		return EINVAL;
+	}
 
 	stats.iphs_tables = ipf_htables[op->iplo_unit];
 	stats.iphs_numtables = ipf_nhtables[op->iplo_unit];
 	stats.iphs_numnodes = ipf_nhtnodes[op->iplo_unit];
 	stats.iphs_nomem = ipht_nomem[op->iplo_unit];
 
-	return COPYOUT(&stats, op->iplo_struct, sizeof(stats));
+	if (COPYOUT(&stats, op->iplo_struct, sizeof(stats)) != 0) {
+		ipf_interror = 30013;
+		return EFAULT;
+	}
+	return 0;
 
 }
 
@@ -97,37 +105,46 @@ iplookupop_t *op;
 /*
  * Create a new hash table using the template passed.
  */
-int fr_newhtable(op)
-iplookupop_t *op;
+int
+ipf_htable_create(op)
+	iplookupop_t *op;
 {
 	iphtable_t *iph, *oiph;
 	char name[FR_GROUPLEN];
 	int err, i, unit;
 
+	unit = op->iplo_unit;
+	if ((op->iplo_arg & IPHASH_ANON) == 0) {
+		iph = ipf_htable_exists(unit, op->iplo_name);
+		if (iph != NULL) {
+			if ((iph->iph_flags & IPHASH_DELETE) == 0) {
+				ipf_interror = 30004;
+				return EEXIST;
+			}
+			iph->iph_flags &= ~IPHASH_DELETE;
+			return 0;
+		}
+	}
+
 	KMALLOC(iph, iphtable_t *);
 	if (iph == NULL) {
 		ipht_nomem[op->iplo_unit]++;
+		ipf_interror = 30002;
 		return ENOMEM;
 	}
-
 	err = COPYIN(op->iplo_struct, iph, sizeof(*iph));
 	if (err != 0) {
 		KFREE(iph);
+		ipf_interror = 30003;
 		return EFAULT;
 	}
 
-	unit = op->iplo_unit;
 	if (iph->iph_unit != unit) {
-		KFREE(iph);
+		ipf_interror = 30005;
 		return EINVAL;
 	}
 
-	if ((op->iplo_arg & IPHASH_ANON) == 0) {
-		if (fr_findhtable(op->iplo_unit, op->iplo_name) != NULL) {
-			KFREE(iph);
-			return EEXIST;
-		}
-	} else {
+	if ((op->iplo_arg & IPHASH_ANON) != 0) {
 		i = IPHASH_ANON;
 		do {
 			i++;
@@ -153,6 +170,7 @@ iplookupop_t *op;
 	if (iph->iph_table == NULL) {
 		KFREE(iph);
 		ipht_nomem[unit]++;
+		ipf_interror = 30006;
 		return ENOMEM;
 	}
 
@@ -161,7 +179,9 @@ iplookupop_t *op;
 	iph->iph_maskset[1] = 0;
 	iph->iph_maskset[2] = 0;
 	iph->iph_maskset[3] = 0;
+	iph->iph_list = NULL;
 
+	iph->iph_ref = 1;
 	iph->iph_next = ipf_htables[unit];
 	iph->iph_pnext = &ipf_htables[unit];
 	if (ipf_htables[unit] != NULL)
@@ -176,66 +196,144 @@ iplookupop_t *op;
 
 /*
  */
-int fr_removehtable(op)
-iplookupop_t *op;
+int
+ipf_htable_destroy(unit, name)
+	int unit;
+	char *name;
 {
 	iphtable_t *iph;
 
-
-	iph = fr_findhtable(op->iplo_unit, op->iplo_name);
-	if (iph == NULL)
+	iph = ipf_htable_find(unit, name);
+	if (iph == NULL) {
+		ipf_interror = 30007;
 		return ESRCH;
+	}
 
-	if (iph->iph_unit != op->iplo_unit) {
+	if (iph->iph_unit != unit) {
+		ipf_interror = 30008;
 		return EINVAL;
 	}
 
 	if (iph->iph_ref != 0) {
-		return EBUSY;
+		ipf_htable_clear(iph);
+		iph->iph_flags |= IPHASH_DELETE;
+		return 0;
 	}
 
-	fr_delhtable(iph);
+	ipf_htable_remove(iph);
 
 	return 0;
 }
 
 
-void fr_delhtable(iph)
-iphtable_t *iph;
+int
+ipf_htable_clear(iph)
+	iphtable_t *iph;
 {
 	iphtent_t *ipe;
-	int i;
 
-	for (i = 0; i < iph->iph_size; i++)
-		while ((ipe = iph->iph_table[i]) != NULL)
-			if (fr_delhtent(iph, ipe) != 0)
-				return;
+	while ((ipe = iph->iph_list) != NULL)
+		if (ipf_htent_remove(iph, ipe) != 0)
+			return 1;
+	return 0;
+}
 
-	*iph->iph_pnext = iph->iph_next;
+
+int
+ipf_htable_remove(iph)
+	iphtable_t *iph;
+{
+
+	if (ipf_htable_clear(iph) != 0)
+		return 1;
+
+	if (iph->iph_pnext != NULL)
+		*iph->iph_pnext = iph->iph_next;
 	if (iph->iph_next != NULL)
 		iph->iph_next->iph_pnext = iph->iph_pnext;
 
 	ipf_nhtables[iph->iph_unit]--;
 
+	return ipf_htable_deref(iph);
+}
+
+
+/*
+ * Delete an entry from a hash table.
+ */
+int
+ipf_htent_remove(iph, ipe)
+	iphtable_t *iph;
+	iphtent_t *ipe;
+{
+
+	if (ipe->ipe_phnext != NULL)
+		*ipe->ipe_phnext = ipe->ipe_hnext;
+	if (ipe->ipe_hnext != NULL)
+		ipe->ipe_hnext->ipe_phnext = ipe->ipe_phnext;
+
+	if (ipe->ipe_pnext != NULL)
+		*ipe->ipe_pnext = ipe->ipe_next;
+	if (ipe->ipe_next != NULL)
+		ipe->ipe_next->ipe_pnext = ipe->ipe_pnext;
+
+	switch (iph->iph_type & ~IPHASH_ANON)
+	{
+	case IPHASH_GROUPMAP :
+		if (ipe->ipe_group != NULL)
+			ipf_group_del(ipe->ipe_group, IPL_LOGIPF, ipf_active);
+		break;
+
+	default :
+		ipe->ipe_ptr = NULL;
+		ipe->ipe_value = 0;
+		break;
+	}
+
+	return ipf_htent_deref(ipe);
+}
+
+
+int
+ipf_htable_deref(iph)
+	iphtable_t *iph;
+{
+	int refs;
+
+	iph->iph_ref--;
+	refs = iph->iph_ref;
+
 	if (iph->iph_ref == 0) {
 		KFREES(iph->iph_table, iph->iph_size * sizeof(*iph->iph_table));
 		KFREE(iph);
 	}
+
+	return refs;
 }
 
 
-void fr_derefhtable(iph)
-iphtable_t *iph;
+int
+ipf_htent_deref(ipe)
+	iphtent_t *ipe;
 {
-	iph->iph_ref--;
-	if (iph->iph_ref == 0)
-		fr_delhtable(iph);
+
+	ipe->ipe_ref--;
+	if (ipe->ipe_ref == 0) {
+		ipf_nhtnodes[ipe->ipe_unit]--;
+
+		KFREE(ipe);
+
+		return 0;
+	}
+
+	return ipe->ipe_ref;
 }
 
 
-iphtable_t *fr_findhtable(unit, name)
-int unit;
-char *name;
+iphtable_t *
+ipf_htable_exists(unit, name)
+	int unit;
+	char *name;
 {
 	iphtable_t *iph;
 
@@ -246,8 +344,24 @@ char *name;
 }
 
 
-size_t fr_flushhtable(op)
-iplookupflush_t *op;
+iphtable_t *
+ipf_htable_find(unit, name)
+	int unit;
+	char *name;
+{
+	iphtable_t *iph;
+
+	iph = ipf_htable_exists(unit, name);
+	if ((iph != NULL) && (iph->iph_flags & IPHASH_DELETE) == 0)
+		return iph;
+
+	return NULL;
+}
+
+
+size_t
+ipf_htable_flush(op)
+	iplookupflush_t *op;
 {
 	iphtable_t *iph;
 	size_t freed;
@@ -258,8 +372,11 @@ iplookupflush_t *op;
 	for (i = 0; i <= IPL_LOGMAX; i++) {
 		if (op->iplf_unit == i || op->iplf_unit == IPL_LOGALL) {
 			while ((iph = ipf_htables[i]) != NULL) {
-				fr_delhtable(iph);
-				freed++;
+				if (ipf_htable_remove(iph) == 0) {
+					freed++;
+				} else {
+					iph->iph_flags |= IPHASH_DELETE;
+				}
 			}
 		}
 	}
@@ -271,9 +388,10 @@ iplookupflush_t *op;
 /*
  * Add an entry to a hash table.
  */
-int fr_addhtent(iph, ipeo)
-iphtable_t *iph;
-iphtent_t *ipeo;
+int
+ipf_htent_insert(iph, ipeo)
+	iphtable_t *iph;
+	iphtent_t *ipeo;
 {
 	iphtent_t *ipe;
 	u_int hv;
@@ -312,12 +430,19 @@ iphtent_t *ipeo;
 #endif
 		return -1;
 
-	ipe->ipe_ref = 0;
-	ipe->ipe_next = iph->iph_table[hv];
-	ipe->ipe_pnext = iph->iph_table + hv;
+	ipe->ipe_ref = 1;
+	ipe->ipe_hnext = iph->iph_table[hv];
+	ipe->ipe_phnext = iph->iph_table + hv;
 
 	if (iph->iph_table[hv] != NULL)
-		iph->iph_table[hv]->ipe_pnext = &ipe->ipe_next;
+		iph->iph_table[hv]->ipe_phnext = &ipe->ipe_hnext;
+
+	ipe->ipe_next = iph->iph_list;
+	ipe->ipe_pnext = &iph->iph_list;
+	if (ipe->ipe_next != NULL)
+		ipe->ipe_next->ipe_pnext = &ipe->ipe_next;
+	iph->iph_list = ipe;
+
 	iph->iph_table[hv] = ipe;
 	if (ipe->ipe_family == AF_INET) {
 		if ((bits >= 0) && (bits != 32))
@@ -341,9 +466,9 @@ iphtent_t *ipeo;
 	switch (iph->iph_type & ~IPHASH_ANON)
 	{
 	case IPHASH_GROUPMAP :
-		ipe->ipe_ptr = fr_addgroup(ipe->ipe_group, NULL,
+		ipe->ipe_ptr = ipf_group_add(ipe->ipe_group, NULL,
 					   iph->iph_flags, IPL_LOGIPF,
-					   fr_active);
+					   ipf_active);
 		break;
 
 	default :
@@ -352,44 +477,8 @@ iphtent_t *ipeo;
 		break;
 	}
 
-	ipf_nhtnodes[iph->iph_unit]++;
-
-	return 0;
-}
-
-
-/*
- * Delete an entry from a hash table.
- */
-int fr_delhtent(iph, ipe)
-iphtable_t *iph;
-iphtent_t *ipe;
-{
-
-	if (ipe->ipe_ref != 0)
-		return EBUSY;
-
-
-	*ipe->ipe_pnext = ipe->ipe_next;
-	if (ipe->ipe_next != NULL)
-		ipe->ipe_next->ipe_pnext = ipe->ipe_pnext;
-
-	switch (iph->iph_type & ~IPHASH_ANON)
-	{
-	case IPHASH_GROUPMAP :
-		if (ipe->ipe_group != NULL)
-			fr_delgroup(ipe->ipe_group, IPL_LOGIPF, fr_active);
-		break;
-
-	default :
-		ipe->ipe_ptr = NULL;
-		ipe->ipe_value = 0;
-		break;
-	}
-
-	KFREE(ipe);
-
-	ipf_nhtnodes[iph->iph_unit]--;
+	ipe->ipe_unit = iph->iph_unit;
+	ipf_nhtnodes[ipe->ipe_unit]++;
 
 	return 0;
 }
@@ -397,40 +486,42 @@ iphtent_t *ipe;
 
 /* search a hash table for a matching entry and return the pointer stored in */
 /* it for use as the next group of rules to search.                          */
-void *fr_iphmfindgroup(tptr, aptr)
-void *tptr, *aptr;
+void *
+ipf_iphmfindgroup(tptr, aptr)
+	void *tptr, *aptr;
 {
 	struct in_addr *addr;
 	iphtable_t *iph;
 	iphtent_t *ipe;
 	void *rval;
 
-	READ_ENTER(&ip_poolrw);
+	READ_ENTER(&ipf_poolrw);
 	iph = tptr;
 	addr = aptr;
 
-	ipe = fr_iphmfind(iph, addr);
+	ipe = ipf_iphmfind(iph, addr);
 	if (ipe != NULL)
 		rval = ipe->ipe_ptr;
 	else
 		rval = NULL;
-	RWLOCK_EXIT(&ip_poolrw);
+	RWLOCK_EXIT(&ipf_poolrw);
 	return rval;
 }
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_iphmfindip                                               */
+/* Function:    ipf_iphmfindip                                              */
 /* Returns:     int     - 0 == +ve match, -1 == error, 1 == -ve/no match    */
-/* Parameters:  tptr(I)    - pointer to the pool to search                  */
-/*              version(I) - IP protocol version (4 or 6)                   */
-/*              aptr(I)    - pointer to address information                 */
+/* Parameters:  tptr(I)      - pointer to the pool to search                */
+/*              ipversion(I) - IP protocol version (4 or 6)                 */
+/*              aptr(I)      - pointer to address information               */
 /*                                                                          */
 /* Search the hash table for a given address and return a search result.    */
 /* ------------------------------------------------------------------------ */
-int fr_iphmfindip(tptr, version, aptr)
-void *tptr, *aptr;
-int version;
+int
+ipf_iphmfindip(tptr, ipversion, aptr)
+	void *tptr, *aptr;
+	int ipversion;
 {
 	struct in_addr *addr;
 	iphtable_t *iph;
@@ -443,12 +534,12 @@ int version;
 	iph = tptr;
 	addr = aptr;
 
-	READ_ENTER(&ip_poolrw);
-	if (version == 4) {
-		ipe = fr_iphmfind(iph, addr);
+	READ_ENTER(&ipf_poolrw);
+	if (ipversion == 4) {
+		ipe = ipf_iphmfind(iph, addr);
 #ifdef USE_INET6
-	} else if (version == 6) {
-		ipe = fr_iphmfind6(iph, (i6addr_t *)addr);
+	} else if (ipversion == 6) {
+		ipe = ipf_iphmfind6(iph, (i6addr_t *)addr);
 #endif
 	} else {
 		ipe = NULL;
@@ -458,15 +549,16 @@ int version;
 		rval = 0;
 	else
 		rval = 1;
-	RWLOCK_EXIT(&ip_poolrw);
+	RWLOCK_EXIT(&ipf_poolrw);
 	return rval;
 }
 
 
-/* Locks:  ip_poolrw */
-static iphtent_t *fr_iphmfind(iph, addr)
-iphtable_t *iph;
-struct in_addr *addr;
+/* Locks:  ipf_poolrw */
+static iphtent_t *
+ipf_iphmfind(iph, addr)
+	iphtable_t *iph;
+	struct in_addr *addr;
 {
 	u_32_t hmsk, msk, ips;
 	iphtent_t *ipe;
@@ -477,7 +569,7 @@ struct in_addr *addr;
 maskloop:
 	ips = ntohl(addr->s_addr) & msk;
 	hv = IPE_V4_HASH_FN(ips, msk, iph->iph_size);
-	for (ipe = iph->iph_table[hv]; (ipe != NULL); ipe = ipe->ipe_next) {
+	for (ipe = iph->iph_table[hv]; (ipe != NULL); ipe = ipe->ipe_hnext) {
 		if ((ipe->ipe_family != AF_INET) ||
 		    (ipe->ipe_mask.in4_addr != msk) ||
 		    (ipe->ipe_addr.in4_addr != ips)) {
@@ -502,11 +594,151 @@ maskloop:
 }
 
 
+int
+ipf_htable_getnext(token, ilp)
+	ipftoken_t *token;
+	ipflookupiter_t *ilp;
+{
+	iphtent_t *node, zn, *nextnode;
+	iphtable_t *iph, zp, *nextiph;
+	int err;
+
+	err = 0;
+	iph = NULL;
+	node = NULL;
+	nextiph = NULL;
+	nextnode = NULL;
+
+	READ_ENTER(&ipf_poolrw);
+
+	switch (ilp->ili_otype)
+	{
+	case IPFLOOKUPITER_LIST :
+		iph = token->ipt_data;
+		if (iph == NULL) {
+			nextiph = ipf_htables[(int)ilp->ili_unit];
+		} else {
+			nextiph = iph->iph_next;
+		}
+
+		if (nextiph != NULL) {
+			ATOMIC_INC(nextiph->iph_ref);
+			if (nextiph->iph_next == NULL)
+				token->ipt_alive = 0;
+		} else {
+			bzero((char *)&zp, sizeof(zp));
+			nextiph = &zp;
+		}
+		break;
+
+	case IPFLOOKUPITER_NODE :
+		node = token->ipt_data;
+		if (node == NULL) {
+			iph = ipf_htable_find(ilp->ili_unit, ilp->ili_name);
+			if (iph == NULL) {
+				ipf_interror = 30009;
+				err = ESRCH;
+			} else {
+				nextnode = iph->iph_list;
+			}
+		} else {
+			nextnode = node->ipe_next;
+		}
+
+		if (nextnode != NULL) {
+			ATOMIC_INC(nextnode->ipe_ref);
+			if (nextnode->ipe_next == NULL)
+				token->ipt_alive = 0;
+		} else {
+			bzero((char *)&zn, sizeof(zn));
+			nextnode = &zn;
+		}
+		break;
+	default :
+		ipf_interror = 30010;
+		err = EINVAL;
+		break;
+	}
+
+	RWLOCK_EXIT(&ipf_poolrw);
+	if (err != 0)
+		return err;
+
+	switch (ilp->ili_otype)
+	{
+	case IPFLOOKUPITER_LIST :
+		if (iph != NULL) {
+			WRITE_ENTER(&ipf_poolrw);
+			ipf_htable_deref(iph);
+			RWLOCK_EXIT(&ipf_poolrw);
+		}
+
+		token->ipt_data = nextiph;
+		err = COPYOUT(nextiph, ilp->ili_data, sizeof(*nextiph));
+		if (err != 0) {
+			ipf_interror = 30011;
+			err = EFAULT;
+		}
+		break;
+
+	case IPFLOOKUPITER_NODE :
+		if (node != NULL) {
+			WRITE_ENTER(&ipf_poolrw);
+			ipf_htent_deref(node);
+			RWLOCK_EXIT(&ipf_poolrw);
+		}
+
+		token->ipt_data = nextnode;
+		err = COPYOUT(nextnode, ilp->ili_data, sizeof(*nextnode));
+		if (err != 0) {
+			ipf_interror = 30012;
+			err = EFAULT;
+		}
+		break;
+	}
+
+	return err;
+}
+
+
+void
+ipf_htable_iterderef(otype, unit, data)
+	u_int otype;
+	int unit;
+	void *data;
+{
+
+	if (data == NULL)
+		return;
+
+	if (unit < 0 || unit > IPL_LOGMAX)
+		return;
+
+	switch (otype)
+	{
+	case IPFLOOKUPITER_LIST :
+		WRITE_ENTER(&ipf_poolrw);
+		ipf_htable_deref((iphtable_t *)data);
+		RWLOCK_EXIT(&ipf_poolrw);
+		break;
+
+	case IPFLOOKUPITER_NODE :
+		WRITE_ENTER(&ipf_poolrw);
+		ipf_htent_deref((iphtent_t *)data);
+		RWLOCK_EXIT(&ipf_poolrw);
+		break;
+	default :
+		break;
+	}
+}
+
+
 # ifdef USE_INET6
-/* Locks:  ip_poolrw */
-static iphtent_t *fr_iphmfind6(iph, addr)
-iphtable_t *iph;
-i6addr_t *addr;
+/* Locks:  ipf_poolrw */
+static iphtent_t *
+ipf_iphmfind6(iph, addr)
+	iphtable_t *iph;
+	i6addr_t *addr;
 {
 	i6addr_t msk, ips;
 	iphtent_t *ipe;

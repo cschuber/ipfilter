@@ -148,12 +148,12 @@ int cmd;
 
 		err = ipfrule_load(lkmtp, cmd);
 		if (!err)
-			fr_refcnt++;
+			ipf_refcnt++;
 		break;
 	case LKM_E_UNLOAD :
 		err = ipfrule_unload(lkmtp, cmd);
 		if (!err)
-			fr_refcnt--;
+			ipf_refcnt--;
 		break;
 	case LKM_E_STAT :
 		break;

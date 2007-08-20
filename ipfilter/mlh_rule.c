@@ -86,7 +86,7 @@ static int ipf_load(void *arg)
 
 	i = ipfrule_add();
 	if (!i)
-		fr_refcnt--;
+		ipf_refcnt--;
 #ifdef	IPFDEBUG
 	printf("IP Filter Rules: ipfrule_add() = %d\n", i);
 #endif
@@ -102,7 +102,7 @@ static int ipf_unload(void *arg)
 
 	i = ipfrule_remove();
 	if (!i)
-		fr_refcnt--;
+		ipf_refcnt--;
 #ifdef	IPFDEBUG
 	printf("IP Filter Rules: ipfrule_remove() = %d\n", i);
 #endif

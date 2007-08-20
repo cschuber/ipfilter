@@ -23,7 +23,8 @@ int	raudio_proxy_init = 0;
 /*
  * Real Audio application proxy initialization.
  */
-int ippr_raudio_init()
+int
+ippr_raudio_init()
 {
 	bzero((char *)&raudiofr, sizeof(raudiofr));
 	raudiofr.fr_ref = 1;
@@ -35,7 +36,8 @@ int ippr_raudio_init()
 }
 
 
-void ippr_raudio_fini()
+void
+ippr_raudio_fini()
 {
 	if (raudio_proxy_init == 1) {
 		MUTEX_DESTROY(&raudiofr.fr_lock);
@@ -47,10 +49,11 @@ void ippr_raudio_fini()
 /*
  * Setup for a new proxy to handle Real Audio.
  */
-int ippr_raudio_new(fin, aps, nat)
-fr_info_t *fin;
-ap_session_t *aps;
-nat_t *nat;
+int
+ippr_raudio_new(fin, aps, nat)
+	fr_info_t *fin;
+	ap_session_t *aps;
+	nat_t *nat;
 {
 	raudio_t *rap;
 
@@ -70,10 +73,11 @@ nat_t *nat;
 
 
 
-int ippr_raudio_out(fin, aps, nat)
-fr_info_t *fin;
-ap_session_t *aps;
-nat_t *nat;
+int
+ippr_raudio_out(fin, aps, nat)
+	fr_info_t *fin;
+	ap_session_t *aps;
+	nat_t *nat;
 {
 	raudio_t *rap = aps->aps_data;
 	unsigned char membuf[512 + 1], *s;
@@ -176,10 +180,11 @@ nat_t *nat;
 }
 
 
-int ippr_raudio_in(fin, aps, nat)
-fr_info_t *fin;
-ap_session_t *aps;
-nat_t *nat;
+int
+ippr_raudio_in(fin, aps, nat)
+	fr_info_t *fin;
+	ap_session_t *aps;
+	nat_t *nat;
 {
 	unsigned char membuf[IPF_MAXPORTLEN + 1], *s;
 	tcphdr_t *tcp, tcph, *tcp2 = &tcph;
@@ -269,8 +274,8 @@ nat_t *nat;
 	swb = ip->ip_dst;
 
 	ip->ip_p = IPPROTO_UDP;
-	ip->ip_src = nat->nat_inip;
-	ip->ip_dst = nat->nat_oip;
+	ip->ip_src = nat->nat_ndstip;
+	ip->ip_dst = nat->nat_odstip;
 
 	bcopy((char *)fin, (char *)&fi, sizeof(fi));
 	bzero((char *)tcp2, sizeof(*tcp2));
@@ -295,16 +300,16 @@ nat_t *nat;
 		fi.fin_data[0] = dp;
 		fi.fin_data[1] = sp;
 		fi.fin_out = 0;
-		nat2 = nat_new(&fi, nat->nat_ptr, NULL,
+		nat2 = ipf_nat_add(&fi, nat->nat_ptr, NULL,
 			       NAT_SLAVE|IPN_UDP | (sp ? 0 : SI_W_SPORT),
 			       NAT_OUTBOUND);
 		if (nat2 != NULL) {
-			(void) nat_proto(&fi, nat2, IPN_UDP);
-			nat_update(&fi, nat2, nat2->nat_ptr);
+			(void) ipf_nat_proto(&fi, nat2, IPN_UDP);
+			ipf_nat_update(&fi, nat2, nat2->nat_ptr);
 
-			(void) fr_addstate(&fi, NULL, (sp ? 0 : SI_W_SPORT));
+			(void) ipf_state_add(&fi, NULL, (sp ? 0 : SI_W_SPORT));
 			if (fi.fin_state != NULL)
-				fr_statederef(&fi, (ipstate_t **)&fi.fin_state);
+				ipf_state_deref((ipstate_t **)&fi.fin_state);
 		}
 	}
 
@@ -315,16 +320,16 @@ nat_t *nat;
 		fi.fin_data[0] = sp;
 		fi.fin_data[1] = 0;
 		fi.fin_out = 1;
-		nat2 = nat_new(&fi, nat->nat_ptr, NULL,
+		nat2 = ipf_nat_add(&fi, nat->nat_ptr, NULL,
 			       NAT_SLAVE|IPN_UDP|SI_W_DPORT,
 			       NAT_OUTBOUND);
 		if (nat2 != NULL) {
-			(void) nat_proto(&fi, nat2, IPN_UDP);
-			nat_update(&fi, nat2, nat2->nat_ptr);
+			(void) ipf_nat_proto(&fi, nat2, IPN_UDP);
+			ipf_nat_update(&fi, nat2, nat2->nat_ptr);
 
-			(void) fr_addstate(&fi, NULL, SI_W_DPORT);
+			(void) ipf_state_add(&fi, NULL, SI_W_DPORT);
 			if (fi.fin_state != NULL)
-				fr_statederef(&fi, (ipstate_t **)&fi.fin_state);
+				ipf_state_deref((ipstate_t **)&fi.fin_state);
 		}
 	}
 

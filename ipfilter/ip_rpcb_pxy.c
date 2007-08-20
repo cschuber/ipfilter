@@ -39,7 +39,6 @@
  *
  *	$Id$
  */
-
 #define	IPF_RPCB_PROXY
 
 /*
@@ -290,6 +289,7 @@ ippr_rpcb_out(fin, aps, nat)
 
 	/* Perform basic variable initialization. */
 	rs = (rpcb_session_t *)aps->aps_data;
+	rx = NULL;
 
 	m = fin->fin_m;
 	off = (char *)fin->fin_dp - (char *)fin->fin_ip;
@@ -306,6 +306,8 @@ ippr_rpcb_out(fin, aps, nat)
 	bzero((char *)rm, sizeof(*rm));
 	COPYDATA(m, off, dlen, (caddr_t)&rm->rm_msgbuf);
 	rm->rm_buflen = dlen;
+
+	rx = NULL;		/* XXX gcc */
 
 	/* Send off to decode reply. */
 	rv = ippr_rpcb_decoderep(fin, nat, rs, rm, &rx);
@@ -331,7 +333,7 @@ ippr_rpcb_out(fin, aps, nat)
 		 * same.  (i.e., this box is either a router or rpcbind
 		 * only listens on loopback.)
 		 */
-		if (nat->nat_inip.s_addr != nat->nat_outip.s_addr) {
+		if (nat->nat_odstaddr != nat->nat_ndstaddr) {
 			if (rx->rx_type == RPCB_RES_STRING)
 				diff = ippr_rpcb_modv3(fin, nat, rm, m, off);
 			else if (rx->rx_type == RPCB_RES_LIST)
@@ -489,13 +491,13 @@ ippr_rpcb_decodereq(fin, nat, rs, rm)
 			return(-1);
 
 		/* Are the target address & port valid? */
-		if ((ra->ra_maddr.xu_ip != nat->nat_outip.s_addr) ||
-		    (ra->ra_maddr.xu_port != nat->nat_outport))
+		if ((ra->ra_maddr.xu_ip != nat->nat_ndstaddr) ||
+		    (ra->ra_maddr.xu_port != nat->nat_ndport))
 		    	return(-1);
 
 		/* Do we need to rewrite this packet? */
-		if ((nat->nat_outip.s_addr != nat->nat_inip.s_addr) ||
-		    (nat->nat_outport != nat->nat_inport))
+		if ((nat->nat_ndstaddr != nat->nat_odstaddr) ||
+		    (nat->nat_ndport != nat->nat_odport))
 		    	mod = 1;
 		break;
 	default:
@@ -776,8 +778,8 @@ ippr_rpcb_modreq(fin, nat, rm, m, off)
 	int diff;
 
 	ra = &rm->rm_call.rc_rpcbargs;
-	i = (char *)&nat->nat_inip.s_addr;
-	p = (char *)&nat->nat_inport;
+	i = (char *)&nat->nat_odstaddr;
+	p = (char *)&nat->nat_odport;
 
 	/* Form new string. */
 	bzero(uaddr, sizeof(uaddr)); /* Just in case we need padding. */
@@ -948,7 +950,7 @@ ippr_rpcb_decoderep(fin, nat, rs, rm, rxp)
 			return(-1);
 
 		/* Validate the IP address and port contained. */
-		if (nat->nat_inip.s_addr != rr->rr_v3.xu_ip)
+		if (nat->nat_odstaddr != rr->rr_v3.xu_ip)
 			return(-1);
 
 		/* Create NAT & state table entries. */
@@ -1156,13 +1158,17 @@ ippr_rpcb_getnat(fin, nat, proto, port)
 
 	/* Generate dummy fr_info */
 	bcopy((char *)fin, (char *)&fi, sizeof(fi));
+	fi.fin_state = NULL;
+	fi.fin_nat = NULL;
 	fi.fin_out = 0;
 	fi.fin_src = fin->fin_dst;
-	fi.fin_dst = nat->nat_outip;
+	fi.fin_dst = nat->nat_ndstip;
 	fi.fin_p = proto;
 	fi.fin_sport = 0;
 	fi.fin_dport = port & 0xffff;
 	fi.fin_flx |= FI_IGNORE;
+	fi.fin_saddr = nat->nat_osrcaddr;
+	fi.fin_daddr = nat->nat_odstaddr;
 
 	bzero((char *)&tcp, sizeof(tcp));
 	tcp.th_dport = htons(port);
@@ -1190,14 +1196,15 @@ ippr_rpcb_getnat(fin, nat, proto, port)
 	 * If successful, fr_stlookup returns with ipf_state locked.  We have
 	 * no use for this lock, so simply unlock it if necessary.
 	 */
-	is = fr_stlookup(&fi, &tcp, NULL);
-	if (is != NULL)
+	is = ipf_state_lookup(&fi, &tcp, NULL);
+	if (is != NULL) {
 		RWLOCK_EXIT(&ipf_state);
+	}
 
 	RWLOCK_EXIT(&ipf_nat);
 
 	WRITE_ENTER(&ipf_nat);
-	natl = nat_inlookup(&fi, nflags, proto, fi.fin_src, fi.fin_dst);
+	natl = ipf_nat_inlookup(&fi, nflags, proto, fi.fin_src, fi.fin_dst);
 
 	if ((natl != NULL) && (is != NULL)) {
 		MUTEX_DOWNGRADE(&ipf_nat);
@@ -1222,10 +1229,11 @@ ippr_rpcb_getnat(fin, nat, proto, port)
 		bcopy((char *)ipn, (char *)&ipnat, sizeof(ipnat));
 		ipn->in_flags = nflags & IPN_TCPUDP;
 		ipn->in_apr = NULL;
-		ipn->in_p = proto;
-		ipn->in_pmin = htons(fi.fin_dport);
-		ipn->in_pmax = htons(fi.fin_dport);
-		ipn->in_pnext = htons(fi.fin_dport);
+		ipn->in_pr[0] = proto;
+		ipn->in_pr[1] = proto;
+		ipn->in_dpmin = fi.fin_dport;
+		ipn->in_dpmax = fi.fin_dport;
+		ipn->in_dpnext = fi.fin_dport;
 		ipn->in_space = 1;
 		ipn->in_ippip = 1;
 		if (ipn->in_flags & IPN_FILTER) {
@@ -1235,7 +1243,7 @@ ippr_rpcb_getnat(fin, nat, proto, port)
 		*ipn->in_plabel = '\0';
 
 		/* Create NAT entry.  return NULL if this fails. */
-		natl = nat_new(&fi, ipn, NULL, nflags|SI_CLONE|NAT_SLAVE,
+		natl = ipf_nat_add(&fi, ipn, NULL, nflags|SI_CLONE|NAT_SLAVE,
 			       NAT_INBOUND);
 
 		bcopy((char *)&ipnat, (char *)ipn, sizeof(ipnat));
@@ -1246,21 +1254,21 @@ ippr_rpcb_getnat(fin, nat, proto, port)
 		}
 
 		ipn->in_use++;
-		(void) nat_proto(&fi, natl, nflags);
-		nat_update(&fi, natl, natl->nat_ptr);
+		(void) ipf_nat_proto(&fi, natl, nflags);
+		ipf_nat_update(&fi, natl, natl->nat_ptr);
 	}
 	MUTEX_DOWNGRADE(&ipf_nat);
 
 	if (is == NULL) {
 		/* Create state entry.  Return NULL if this fails. */
-		fi.fin_dst = nat->nat_inip;
+		fi.fin_dst = nat->nat_odstip;
 		fi.fin_nat = (void *)natl;
 		fi.fin_flx |= FI_NATED;
 		fi.fin_flx &= ~FI_STATE;
 		nflags &= NAT_TCPUDP;
 		nflags |= SI_W_SPORT|SI_CLONE;
 
-		is = fr_addstate(&fi, NULL, nflags);
+		is = ipf_state_add(&fi, NULL, nflags);
 		if (is == NULL) {
 			/*
 			 * XXX nat_delete is private to ip_nat.c.  Should
@@ -1271,7 +1279,7 @@ ippr_rpcb_getnat(fin, nat, proto, port)
 			return(-1);
 		}
 		if (fi.fin_state != NULL)
-			fr_statederef(&fi, (ipstate_t **)&fi.fin_state);
+			ipf_state_deref((ipstate_t **)&fi.fin_state);
 	}
 
 	return(0);
@@ -1304,7 +1312,7 @@ ippr_rpcb_modv3(fin, nat, rm, m, off)
 	int diff;
 
 	rr = &rm->rm_resp;
-	i = (char *)&nat->nat_outip.s_addr;
+	i = (char *)&nat->nat_ndstaddr;
 	p = (char *)&rr->rr_v3.xu_port;
 
 	/* Form new string. */
@@ -1375,7 +1383,7 @@ ippr_rpcb_modv4(fin, nat, rm, m, off)
 	rr = &rm->rm_resp;
 	rl = &rr->rr_v4;
 
-	i = (char *)&nat->nat_outip.s_addr;
+	i = (char *)&nat->nat_ndstaddr;
 
 	/* Determine mbuf offset to write to. */
 	re = &rl->rl_entries[0];

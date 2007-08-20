@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2003 by Darren Reed.
+ * Copyright (C) 2002-2006 by Darren Reed.
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  */
@@ -39,6 +39,7 @@ int		yytext[YYBUFSIZ+1];
 int		yylineNum = 1;
 int		yypos = 0;
 int		yylast = -1;
+int		yydictfixed = 0;
 int		yyexpectaddr = 0;
 int		yybreakondot = 0;
 int		yyvarnext = 0;
@@ -283,8 +284,9 @@ nextchar:
 				yypos++;
 			}
 		} while (n != c);
-		yyunputc(n);
-		break;
+		rval = YY_STR;
+		goto done;
+		/* NOTREACHED */
 
 	case EOF :
 		yylineNum = 1;
@@ -294,6 +296,8 @@ nextchar:
 		yybreakondot = 0;
 		yyvarnext = 0;
 		yytokentype = 0;
+		if (yydebug)
+			fprintf(stderr, "reset at EOF\n");
 		return 0;
 	}
 
@@ -465,6 +469,9 @@ nextchar:
 done:
 	yystr = yytexttostr(0, yypos);
 
+	if (yydebug)
+		printf("isbuilding %d yyvarnext %d nokey %d fixed %d\n",
+		       isbuilding, yyvarnext, nokey, yydictfixed);
 	if (isbuilding == 1) {
 		wordtab_t *w;
 
@@ -473,7 +480,7 @@ done:
 
 		if ((yyvarnext == 0) && (nokey == 0)) {
 			w = yyfindkey(yystr);
-			if (w == NULL && yywordtab != NULL) {
+			if (w == NULL && yywordtab != NULL && !yydictfixed) {
 				yyresetdict();
 				w = yyfindkey(yystr);
 			}
@@ -485,14 +492,14 @@ done:
 			rval = YY_STR;
 	}
 
-	if (rval == YY_STR && yysavedepth > 0)
+	if (rval == YY_STR && yysavedepth > 0 && !yydictfixed)
 		yyresetdict();
 
 	yytokentype = rval;
 
 	if (yydebug)
-		printf("lexed(%s) [%d,%d,%d] => %d\n", yystr, string_start,
-			string_end, pos, rval);
+		printf("lexed(%s) [%d,%d,%d] => %d @%d\n", yystr, string_start,
+			string_end, pos, rval, yysavedepth);
 
 	switch (rval)
 	{
@@ -591,9 +598,31 @@ char *msg;
 }
 
 
+void yysetfixeddict(newdict)
+wordtab_t *newdict;
+{
+	if (yydebug)
+		printf("yysetfixeddict(%lx)\n", (u_long)newdict);
+
+	if (yysavedepth == sizeof(yysavewords)/sizeof(yysavewords[0])) {
+		fprintf(stderr, "%d: at maximum dictionary depth\n",
+			yylineNum);
+		return;
+	}
+
+	yysavewords[yysavedepth++] = yysettab(newdict);
+	if (yydebug)
+		printf("yysavedepth++ => %d\n", yysavedepth);
+	yydictfixed = 1;
+}
+
+
 void yysetdict(newdict)
 wordtab_t *newdict;
 {
+	if (yydebug)
+		printf("yysetdict(%lx)\n", (u_long)newdict);
+
 	if (yysavedepth == sizeof(yysavewords)/sizeof(yysavewords[0])) {
 		fprintf(stderr, "%d: at maximum dictionary depth\n",
 			yylineNum);
@@ -607,11 +636,14 @@ wordtab_t *newdict;
 
 void yyresetdict()
 {
+	if (yydebug)
+		printf("yyresetdict(%d)\n", yysavedepth);
 	if (yysavedepth > 0) {
 		yysettab(yysavewords[--yysavedepth]);
 		if (yydebug)
 			printf("yysavedepth-- => %d\n", yysavedepth);
 	}
+	yydictfixed = 0;
 }
 
 

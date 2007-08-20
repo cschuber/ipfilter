@@ -77,7 +77,7 @@ int _init()
 		if (fr_running >= 0) {
 			ipfruleinst = ipfrule_add();
 			if (!ipfruleinst)
-				fr_refcnt++;
+				ipf_refcnt++;
 			else {
 				cmn_err(CE_NOTE,
 					"IP Filter Rules: ipfrule_add failed");
@@ -103,7 +103,7 @@ int _fini(void)
 	if (ipfruleinst == 0) {
 		ipfruleinst = ipfrule_remove();
 		if (!ipfruleinst)
-			fr_refcnt--;
+			ipf_refcnt--;
 		else
 			ipfruleinst = -1;
 	}

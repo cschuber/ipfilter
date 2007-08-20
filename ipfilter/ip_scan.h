@@ -94,13 +94,13 @@ typedef	struct	ipscanstat	{
 } ipscanstat_t;
 
 
-extern	int fr_scan_ioctl __P((caddr_t, ioctlcmd_t, int));
-extern	int ipsc_init __P((void));
-extern	int ipsc_attachis __P((struct ipstate *));
-extern	int ipsc_attachfr __P((struct frentry *));
-extern	int ipsc_detachis __P((struct ipstate *));
-extern	int ipsc_detachfr __P((struct frentry *));
-extern	int ipsc_packet __P((struct fr_info *, struct ipstate *));
-extern	void fr_scanunload __P((void));
+extern	int ipf_scan_ioctl __P((caddr_t, ioctlcmd_t, int, int, void *));
+extern	int ipf_scan_init __P((void));
+extern	int ipf_scan_attachis __P((struct ipstate *));
+extern	int ipf_scan_attachfr __P((struct frentry *));
+extern	int ipf_scan_detachis __P((struct ipstate *));
+extern	int ipf_scan_detachfr __P((struct frentry *));
+extern	int ipf_scan_packet __P((struct fr_info *, struct ipstate *));
+extern	void ipf_scan_unload __P((void));
 
 #endif /* __IP_SCAN_H__ */

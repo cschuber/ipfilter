@@ -251,7 +251,11 @@ static int ipfilter_init(void)
 	}
 #endif
 
-	i = iplattach();
+	RWLOCK_INIT(&ipf_global, "ipf global rwlock");
+	RWLOCK_INIT(&ipf_mutex, "ipf global mutex rwlock");
+	RWLOCK_INIT(&ipf_frcache, "ipf cache mutex rwlock");
+
+	i = ipfattach();
 
 #ifdef	CONFIG_PROC_FS
 	if (i == 0) {
@@ -291,6 +295,12 @@ static int ipfilter_init(void)
 	printf("IPFilter: device major number: %d\n", ipfmajor);
 #endif /* CONFIG_PROC_FS */
 
+	if (i != 0) {
+		RW_DESTROY(&ipf_global);
+		RW_DESTROY(&ipf_mutex);
+		RW_DESTROY(&ipf_frcache);
+	}
+
 	return i;
 }
 
@@ -303,17 +313,21 @@ static int ipfilter_fini(void)
 	int i;
 #endif
 
-	if (fr_refcnt)
+	if (ipf_refcnt)
 		return EBUSY;
 
 	if (fr_running >= 0) {
-		result = ipldetach();
+		result = ipfdetach();
 		if (result != 0) {
 			if (result > 0)
 				result = -result;
 			return result;
 		}
 	}
+
+	RW_DESTROY(&ipf_global);
+	RW_DESTROY(&ipf_mutex);
+	RW_DESTROY(&ipf_frcache);
 
 	fr_running = -2;
 #ifdef CONFIG_PROC_FS

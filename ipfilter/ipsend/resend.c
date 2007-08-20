@@ -12,6 +12,9 @@ static const char rcsid[] = "@(#)$Id$";
 #include <sys/types.h>
 #include <sys/time.h>
 #include <sys/socket.h>
+#ifdef __osf__
+# include "radix_ipf_local.h"
+#endif
 #include <net/if.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -34,10 +37,10 @@ static const char rcsid[] = "@(#)$Id$";
 extern	int	opts;
 
 static	u_char	pbuf[65536];	/* 1 big packet */
-void	printpacket __P((ip_t *));
+void	dumppacket __P((ip_t *));
 
 
-void printpacket(ip)
+void dumppacket(ip)
 ip_t	*ip;
 {
 	tcphdr_t *t;
@@ -126,7 +129,7 @@ char	*datain;
 						    IP_HL(ip) << 2);
 			bcopy(ip, (char *)(eh + 1), len);
 			len += sizeof(*eh);
-			printpacket(ip);
+			dumppacket(ip);
 		} else {
 			eh = (ether_header_t *)pbuf;
 			len = i;

@@ -1,3 +1,11 @@
+/*
+ * Copyright (C) 2002-2004 by Darren Reed.
+ * 
+ * See the IPFILTER.LICENCE file for details on licencing.  
+ *   
+ * $Id$ 
+ */     
+
 #include "ipf.h"
 
 #include "kmem.h"
@@ -6,6 +14,7 @@
  * Given a pointer to an interface in the kernel, return a pointer to a
  * string which is the interface name.
  */
+#if 0
 char *getifname(ptr)
 struct ifnet *ptr;
 {
@@ -72,3 +81,10 @@ struct ifnet *ptr;
 # endif
 #endif
 }
+#else
+char *getifname(ptr)
+struct ifnet *ptr;
+{
+	return "X";
+}
+#endif

@@ -1,3 +1,8 @@
+/*
+ * Copyright (C) 2001-2004 by Darren Reed.
+ *
+ * See the IPFILTER.LICENCE file for details on licencing.
+ */
 %{
 #include "ipf.h"
 #include <syslog.h>
@@ -22,6 +27,8 @@ typedef	struct	opt	{
 	int		o_num;
 	char		*o_str;
 	struct in_addr	o_ip;
+	int		o_logfac;
+	int		o_logpri;
 } opt_t;
 
 static	void	build_action __P((struct opt *));
@@ -51,12 +58,12 @@ static	ipmon_action_t	*alist = NULL;
 %token	IPM_PACKET IPM_PACKETS IPM_POOL IPM_PROTOCOL IPM_RESULT IPM_RULE
 %token	IPM_SECOND IPM_SECONDS IPM_SRCIP IPM_SRCPORT IPM_LOGTAG IPM_WITH
 %token	IPM_DO IPM_SAVE IPM_SYSLOG IPM_NOTHING IPM_RAW IPM_TYPE IPM_NAT
-%token	IPM_STATE IPM_NATTAG IPM_IPF
+%token	IPM_STATE IPM_NATTAG IPM_IPF IPM_FACILITY IPM_PRIORITY
 %type	<addr> ipv4
 %type	<opt> direction dstip dstport every execute group interface
 %type	<opt> protocol result rule srcip srcport logtag matching
 %type	<opt> matchopt nattag type doopt doing save syslog nothing
-%type	<num> saveopts saveopt typeopt
+%type	<num> saveopts saveopt typeopt syslogopts
 
 %%
 file:	line
@@ -75,6 +82,7 @@ assign:	YY_STR assigning YY_STR ';'		{ set_variable($1, $3);
 						  resetlexer();
 						  free($1);
 						  free($3);
+						  yyvarnext = 0;
 						} 
 	;
 
@@ -222,11 +230,43 @@ saveopt:
 	IPM_RAW					{ $$ = IPMDO_SAVERAW; }
 	;
 
-syslog:	IPM_SYSLOG				{ $$ = new_opt(IPM_SYSLOG); }
+syslog:	IPM_SYSLOG syslogopts	{ $$ = new_opt(IPM_SYSLOG);
+				  $$->o_logfac = $2 & 0xff;
+				  if ($2 >= 0) {
+					  $$->o_logpri = ($2 >> 8);
+					  $$->o_logpri &= 0xff;
+				  }
+				}
 	;
 
-nothing:
-	IPM_NOTHING				{ $$ = 0; }
+syslogopts:			{ $$ = -1; }
+	| IPM_FACILITY YY_STR	{ int i = fac_findname($2);
+				  if (i == -1)
+					i = 0;
+				  $$ = i;
+				}
+	| IPM_PRIORITY YY_STR	{ int i = pri_findname($2);
+				  if (i == -1) {
+					yyerror("unknown syslog priority");
+					$$ = -1;
+				  } else {
+					$$ = i << 8;
+				  }
+				}
+	| IPM_FACILITY YY_STR '.' YY_STR
+				{ int i, j;
+				  i = fac_findname($2);
+				  if (i != -1) {
+					j = pri_findname($4);
+					if (j != -1) {
+						$$ = i | (j << 8);
+					} else {
+						$$ = -1;
+					}
+				  } else {
+					$$ = -1;
+				  }
+				}
 	;
 
 ipv4:   YY_NUMBER '.' YY_NUMBER '.' YY_NUMBER '.' YY_NUMBER
@@ -237,6 +277,10 @@ ipv4:   YY_NUMBER '.' YY_NUMBER '.' YY_NUMBER '.' YY_NUMBER
 		  $$.s_addr = ($1 << 24) | ($3 << 16) | ($5 << 8) | $7;
 		  $$.s_addr = htonl($$.s_addr);
 		}
+
+nothing:
+	IPM_NOTHING				{ $$ = 0; }
+	;
 %%
 static	struct	wordtab	yywords[] = {
 	{ "body",	IPM_BODY },
@@ -246,6 +290,7 @@ static	struct	wordtab	yywords[] = {
 	{ "dstport",	IPM_DSTPORT },
 	{ "every",	IPM_EVERY },
 	{ "execute",	IPM_EXECUTE },
+	{ "facility",	IPM_FACILITY },
 	{ "group",	IPM_GROUP },
 	{ "in",		IPM_IN },
 	{ "interface",	IPM_INTERFACE },
@@ -259,6 +304,7 @@ static	struct	wordtab	yywords[] = {
 	{ "out",	IPM_OUT },
 	{ "packet",	IPM_PACKET },
 	{ "packets",	IPM_PACKETS },
+	{ "priority",	IPM_PRIORITY },
 	{ "protocol",	IPM_PROTOCOL },
 	{ "result",	IPM_RESULT },
 	{ "rule",	IPM_RULE },
@@ -304,6 +350,8 @@ int type;
 	o->o_num = 0;
 	o->o_str = (char *)0;
 	o->o_next = NULL;
+	o->o_logfac = -1;
+	o->o_logpri = -1;
 	return o;
 }
 
@@ -425,6 +473,8 @@ opt_t *olist;
 				break;
 			}
 			a->ac_syslog = 1;
+			a->ac_logfac = o->o_logfac;
+			a->ac_logpri = o->o_logpri;
 			break;
 		case IPM_TYPE :
 			a->ac_type = o->o_num;
@@ -581,7 +631,19 @@ int opts, lvl;
 		 * It matched so now execute the command
 		 */
 		if (a->ac_syslog != 0) {
-			syslog(lvl, "%s", log);
+			int facpri;
+
+			if (a->ac_logfac >= 0)
+				facpri = a->ac_logfac;
+			else
+				facpri = 0;
+
+			if (a->ac_logpri == -1)
+				facpri |= lvl;
+			else
+				facpri |= a->ac_logpri;
+
+			syslog(facpri, "%s", log);
 		}
 
 		if (a->ac_savefp != NULL) {

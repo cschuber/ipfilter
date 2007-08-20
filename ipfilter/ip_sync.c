@@ -122,21 +122,22 @@ int		ipf_sync_debug = 0;
 
 
 # if !defined(sparc) && !defined(__hppa)
-void ipfsync_tcporder __P((int, struct tcpdata *));
-void ipfsync_natorder __P((int, struct nat *));
-void ipfsync_storder __P((int, struct ipstate *));
+void ipf_sync_tcporder __P((int, struct tcpdata *));
+void ipf_sync_natorder __P((int, struct nat *));
+void ipf_sync_storder __P((int, struct ipstate *));
 # endif
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    ipfsync_init                                                */
+/* Function:    ipf_sync_init                                               */
 /* Returns:     int - 0 == success, -1 == failure                           */
 /* Parameters:  Nil                                                         */
 /*                                                                          */
 /* Initialise all of the locks required for the sync code and initialise    */
 /* any data structures, as required.                                        */
 /* ------------------------------------------------------------------------ */
-int ipfsync_init()
+int
+ipf_sync_init()
 {
 	RWLOCK_INIT(&ipf_syncstate, "add things to state sync table");
 	RWLOCK_INIT(&ipf_syncnat, "add things to nat sync table");
@@ -155,7 +156,7 @@ int ipfsync_init()
 
 # if !defined(sparc) && !defined(__hppa)
 /* ------------------------------------------------------------------------ */
-/* Function:    ipfsync_tcporder                                            */
+/* Function:    ipf_sync_tcporder                                           */
 /* Returns:     Nil                                                         */
 /* Parameters:  way(I) - direction of byte order conversion.                */
 /*              td(IO) - pointer to data to be converted.                   */
@@ -163,9 +164,10 @@ int ipfsync_init()
 /* Do byte swapping on values in the TCP state information structure that   */
 /* need to be used at both ends by the host in their native byte order.     */
 /* ------------------------------------------------------------------------ */
-void ipfsync_tcporder(way, td)
-int way;
-tcpdata_t *td;
+void
+ipf_sync_tcporder(way, td)
+	int way;
+	tcpdata_t *td;
 {
 	if (way) {
 		td->td_maxwin = htons(td->td_maxwin);
@@ -180,7 +182,7 @@ tcpdata_t *td;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    ipfsync_natorder                                            */
+/* Function:    ipf_sync_natorder                                           */
 /* Returns:     Nil                                                         */
 /* Parameters:  way(I)  - direction of byte order conversion.               */
 /*              nat(IO) - pointer to data to be converted.                  */
@@ -188,9 +190,10 @@ tcpdata_t *td;
 /* Do byte swapping on values in the NAT data structure that need to be     */
 /* used at both ends by the host in their native byte order.                */
 /* ------------------------------------------------------------------------ */
-void ipfsync_natorder(way, n)
-int way;
-nat_t *n;
+void
+ipf_sync_natorder(way, n)
+	int way;
+	nat_t *n;
 {
 	if (way) {
 		n->nat_age = htonl(n->nat_age);
@@ -209,7 +212,7 @@ nat_t *n;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    ipfsync_storder                                             */
+/* Function:    ipf_sync_storder                                            */
 /* Returns:     Nil                                                         */
 /* Parameters:  way(I)  - direction of byte order conversion.               */
 /*              ips(IO) - pointer to data to be converted.                  */
@@ -217,12 +220,13 @@ nat_t *n;
 /* Do byte swapping on values in the IP state data structure that need to   */
 /* be used at both ends by the host in their native byte order.             */
 /* ------------------------------------------------------------------------ */
-void ipfsync_storder(way, ips)
-int way;
-ipstate_t *ips;
+void
+ipf_sync_storder(way, ips)
+	int way;
+	ipstate_t *ips;
 {
-	ipfsync_tcporder(way, &ips->is_tcp.ts_data[0]);
-	ipfsync_tcporder(way, &ips->is_tcp.ts_data[1]);
+	ipf_sync_tcporder(way, &ips->is_tcp.ts_data[0]);
+	ipf_sync_tcporder(way, &ips->is_tcp.ts_data[1]);
 
 	if (way) {
 		ips->is_hv = htonl(ips->is_hv);
@@ -261,24 +265,25 @@ ipstate_t *ips;
 	}
 }
 # else /* !defined(sparc) && !defined(__hppa) */
-#  define	ipfsync_tcporder(x,y)
-#  define	ipfsync_natorder(x,y)
-#  define	ipfsync_storder(x,y)
+#  define	ipf_sync_tcporder(x,y)
+#  define	ipf_sync_natorder(x,y)
+#  define	ipf_sync_storder(x,y)
 # endif /* !defined(sparc) && !defined(__hppa) */
 
 /* enable this for debugging */
 
 # ifdef _KERNEL
 /* ------------------------------------------------------------------------ */
-/* Function:    ipfsync_write                                               */
+/* Function:    ipf_sync_write                                              */
 /* Returns:     int    - 0 == success, else error value.                    */
 /* Parameters:  uio(I) - pointer to information about data to write         */
 /*                                                                          */
 /* Moves data from user space into the kernel and uses it for updating data */
 /* structures in the state/NAT tables.                                      */
 /* ------------------------------------------------------------------------ */
-int ipfsync_write(uio)
-struct uio *uio;
+int
+ipf_sync_write(uio)
+	struct uio *uio;
 {
 	synchdr_t sh;
 
@@ -299,7 +304,7 @@ struct uio *uio;
 
 		if (uio->uio_resid >= sizeof(sh)) {
 
-			err = UIOMOVE((caddr_t)&sh, sizeof(sh), UIO_WRITE, uio);
+			err = UIOMOVE(&sh, sizeof(sh), UIO_WRITE, uio);
 
 			if (err) {
 				if (ipf_sync_debug > 2)
@@ -321,8 +326,9 @@ struct uio *uio;
 
 			if (sh.sm_magic != SYNHDRMAGIC) {
 				if (ipf_sync_debug > 2)
-					printf("uiomove(header) invalud %s\n",
+					printf("uiomove(header) invalid %s\n",
 						"magic");
+				ipf_interror = 110001;
 				return EINVAL;
 			}
 
@@ -330,6 +336,7 @@ struct uio *uio;
 				if (ipf_sync_debug > 2)
 					printf("uiomove(header) invalid %s\n",
 						"protocol");
+				ipf_interror = 110002;
 				return EINVAL;
 			}
 
@@ -337,6 +344,7 @@ struct uio *uio;
 				if (ipf_sync_debug > 2)
 					printf("uiomove(header) invalid %s\n",
 						"command");
+				ipf_interror = 110003;
 				return EINVAL;
 			}
 
@@ -345,6 +353,7 @@ struct uio *uio;
 				if (ipf_sync_debug > 2)
 					printf("uiomove(header) invalid %s\n",
 						"table");
+				ipf_interror = 110004;
 				return EINVAL;
 			}
 
@@ -352,6 +361,7 @@ struct uio *uio;
 			/* unsufficient data, wait until next call */
 			if (ipf_sync_debug > 2)
 				printf("uiomove(header) insufficient data");
+			ipf_interror = 110005;
 			return EAGAIN;
 	 	}
 
@@ -366,12 +376,13 @@ struct uio *uio;
 			if (ipf_sync_debug > 2)
 				printf("uiomove(data zero length %s\n",
 					"not supported");
+			ipf_interror = 110006;
 			return EINVAL;
 		}
 
 		if (uio->uio_resid >= sh.sm_len) {
 
-			err = UIOMOVE((caddr_t)data, sh.sm_len, UIO_WRITE, uio);
+			err = UIOMOVE(data, sh.sm_len, UIO_WRITE, uio);
 
 			if (err) {
 				if (ipf_sync_debug > 2)
@@ -385,9 +396,9 @@ struct uio *uio;
 					sh.sm_len);
 
 			if (sh.sm_table == SMC_STATE)
-				err = ipfsync_state(&sh, data);
+				err = ipf_sync_state(&sh, data);
 			else if (sh.sm_table == SMC_NAT)
-				err = ipfsync_nat(&sh, data);
+				err = ipf_sync_nat(&sh, data);
 			if (ipf_sync_debug > 7)
 				printf("[%d] Finished with error %d\n",
 					sh.sm_num, err);
@@ -398,6 +409,7 @@ struct uio *uio;
 				printf("uiomove(data) %s %d bytes, got %d\n",
 					"insufficient data, need",
 					sh.sm_len, uio->uio_resid);
+			ipf_interror = 110007;
 			return EAGAIN;
 		}
 	}	 
@@ -408,7 +420,7 @@ struct uio *uio;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    ipfsync_read                                                */
+/* Function:    ipf_sync_read                                               */
 /* Returns:     int    - 0 == success, else error value.                    */
 /* Parameters:  uio(O) - pointer to information about where to store data   */
 /*                                                                          */
@@ -416,15 +428,18 @@ struct uio *uio;
 /* for pending state/NAT updates.  If no data is available, the caller is   */
 /* put to sleep, pending a wakeup from the "lower half" of this code.       */
 /* ------------------------------------------------------------------------ */
-int ipfsync_read(uio)
-struct uio *uio;
+int
+ipf_sync_read(uio)
+	struct uio *uio;
 {
 	syncupdent_t *su;
 	synclogent_t *sl;
 	int err = 0;
 
-	if ((uio->uio_resid & 3) || (uio->uio_resid < 8))
+	if ((uio->uio_resid & 3) || (uio->uio_resid < 8)) {
+		ipf_interror = 110008;
 		return EINVAL;
+	}
 
 #  if (BSD >= 199306) || defined(__FreeBSD__) || defined(__osf__)
 	uio->uio_rw = UIO_READ;
@@ -435,6 +450,7 @@ struct uio *uio;
 #  if SOLARIS && defined(_KERNEL)
 		if (!cv_wait_sig(&ipslwait, &ipsl_mutex)) {
 			MUTEX_EXIT(&ipsl_mutex);
+			ipf_interror = 110009;
 			return EINTR;
 		}
 #  else
@@ -446,6 +462,7 @@ struct uio *uio;
 		err = sleep(&sl_tail, PZERO+1);
 		if (err) {
 			MUTEX_EXIT(&ipsl_mutex);
+			ipf_interror = 110010;
 			return EINTR;
 		}
 		spinunlock(l);
@@ -454,13 +471,17 @@ struct uio *uio;
 #    ifdef __osf__
 		err = mpsleep(&sl_tail, PSUSP|PCATCH,  "ipl sleep", 0,
 			      &ipsl_mutex, MS_LOCK_SIMPLE);
-		if (err)
+		if (err) {
+			ipf_interror = 110011;
 			return EINTR;
+		}
 #    else
 		MUTEX_EXIT(&ipsl_mutex);
 		err = SLEEP(&sl_tail, "ipl sleep");
-		if (err)
+		if (err) {
+			ipf_interror = 110012;
 			return EINTR;
+		}
 		MUTEX_ENTER(&ipsl_mutex);
 #    endif /* __osf__ */
 #   endif /* __hpux */
@@ -471,7 +492,7 @@ struct uio *uio;
 	READ_ENTER(&ipf_syncstate);
 	while ((sl_tail < sl_idx)  && (uio->uio_resid > sizeof(*sl))) {
 		sl = synclog + sl_tail++;
-		err = UIOMOVE((caddr_t)sl, sizeof(*sl), UIO_READ, uio);
+		err = UIOMOVE(sl, sizeof(*sl), UIO_READ, uio);
 		if (err != 0)
 			break;
 	}
@@ -479,7 +500,7 @@ struct uio *uio;
 	while ((su_tail < su_idx)  && (uio->uio_resid > sizeof(*su))) {
 		su = syncupd + su_tail;
 		su_tail++;
-		err = UIOMOVE((caddr_t)su, sizeof(*su), UIO_READ, uio);
+		err = UIOMOVE(su, sizeof(*su), UIO_READ, uio);
 		if (err != 0)
 			break;
 		if (su->sup_hdr.sm_sl != NULL)
@@ -498,7 +519,7 @@ struct uio *uio;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    ipfsync_state                                               */
+/* Function:    ipf_sync_state                                              */
 /* Returns:     int    - 0 == success, else error value.                    */
 /* Parameters:  sp(I)  - pointer to sync packet data header                 */
 /*              uio(I) - pointer to user data for further information       */
@@ -509,9 +530,10 @@ struct uio *uio;
 /* create a new state entry or update one.  Deletion is left to the state   */
 /* structures being timed out correctly.                                    */
 /* ------------------------------------------------------------------------ */
-int ipfsync_state(sp, data)
-synchdr_t *sp;
-void *data;
+int
+ipf_sync_state(sp, data)
+	synchdr_t *sp;
+	void *data;
 {
 	synctcp_update_t su;
 	ipstate_t *is, sn;
@@ -529,12 +551,14 @@ void *data;
 		bcopy(data, &sn, sizeof(sn));
 		KMALLOC(is, ipstate_t *);
 		if (is == NULL) {
+			ipf_interror = 110013;
 			err = ENOMEM;
 			break;
 		}
 
 		KMALLOC(sl, synclist_t *);
 		if (sl == NULL) {
+			ipf_interror = 110014;
 			err = ENOMEM;
 			KFREE(is);
 			break;
@@ -543,7 +567,7 @@ void *data;
 		bzero((char *)is, offsetof(ipstate_t, is_die));
 		bcopy((char *)&sn.is_die, (char *)&is->is_die,
 		      sizeof(*is) - offsetof(ipstate_t, is_die));
-		ipfsync_storder(0, is);
+		ipf_sync_storder(0, is);
 
 		/*
 		 * We need to find the same rule on the slave as was used on
@@ -606,6 +630,7 @@ void *data;
 				printf("[%d] State not found - can't update\n",
 					sp->sm_num);
 			RWLOCK_EXIT(&ipf_syncstate);
+			ipf_interror = 110015;
 			err = ENOENT;
 			break;
 		}
@@ -647,6 +672,7 @@ void *data;
 		break;
 
 	default :
+		ipf_interror = 110016;
 		err = EINVAL;
 		break;
 	}
@@ -666,14 +692,15 @@ void *data;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    ipfsync_del                                                 */
+/* Function:    ipf_sync_del                                                */
 /* Returns:     Nil                                                         */
 /* Parameters:  sl(I) - pointer to synclist object to delete                */
 /*                                                                          */
 /* Deletes an object from the synclist table and free's its memory.         */
 /* ------------------------------------------------------------------------ */
-void ipfsync_del(sl)
-synclist_t *sl;
+void
+ipf_sync_del(sl)
+	synclist_t *sl;
 {
 	WRITE_ENTER(&ipf_syncstate);
 	*sl->sl_pnext = sl->sl_next;
@@ -687,7 +714,7 @@ synclist_t *sl;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    ipfsync_nat                                                 */
+/* Function:    ipf_sync_nat                                                */
 /* Returns:     int    - 0 == success, else error value.                    */
 /* Parameters:  sp(I)  - pointer to sync packet data header                 */
 /*              uio(I) - pointer to user data for further information       */
@@ -698,9 +725,10 @@ synclist_t *sl;
 /* create a new NAT entry or update one.  Deletion is left to the NAT       */
 /* structures being timed out correctly.                                    */
 /* ------------------------------------------------------------------------ */
-int ipfsync_nat(sp, data)
-synchdr_t *sp;
-void *data;
+int
+ipf_sync_nat(sp, data)
+	synchdr_t *sp;
+	void *data;
 {
 	syncupdent_t su;
 	nat_t *n, *nat;
@@ -715,12 +743,14 @@ void *data;
 	case SMC_CREATE :
 		KMALLOC(n, nat_t *);
 		if (n == NULL) {
+			ipf_interror = 110017;
 			err = ENOMEM;
 			break;
 		}
 
 		KMALLOC(sl, synclist_t *);
 		if (sl == NULL) {
+			ipf_interror = 110018;
 			err = ENOMEM;
 			KFREE(n);
 			break;
@@ -730,7 +760,7 @@ void *data;
 		bzero((char *)n, offsetof(nat_t, nat_age));
 		bcopy((char *)&nat->nat_age, (char *)&n->nat_age,
 		      sizeof(*n) - offsetof(nat_t, nat_age));
-		ipfsync_natorder(0, n);
+		ipf_sync_natorder(0, n);
 		n->nat_sync = sl;
 
 		sl->sl_idx = -1;
@@ -743,7 +773,7 @@ void *data;
 		if (syncstatetab[hv] != NULL)
 			syncstatetab[hv]->sl_pnext = &sl->sl_next;
 		syncstatetab[hv] = sl;
-		nat_insert(n, sl->sl_rev);
+		ipf_nat_insert(n, sl->sl_rev);
 		RWLOCK_EXIT(&ipf_nat);
 		break;
 
@@ -755,6 +785,7 @@ void *data;
 			if (sl->sl_hdr.sm_num == sp->sm_num)
 				break;
 		if (sl == NULL) {
+			ipf_interror = 110019;
 			err = ENOENT;
 			break;
 		}
@@ -764,7 +795,7 @@ void *data;
 		nat = sl->sl_ipn;
 
 		MUTEX_ENTER(&nat->nat_lock);
-		fr_setnatqueue(nat, sl->sl_rev);
+		ipf_nat_setqueue(nat, sl->sl_rev);
 		MUTEX_EXIT(&nat->nat_lock);
 
 		RWLOCK_EXIT(&ipf_nat);
@@ -772,6 +803,7 @@ void *data;
 		break;
 
 	default :
+		ipf_interror = 110020;
 		err = EINVAL;
 		break;
 	}
@@ -782,7 +814,7 @@ void *data;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    ipfsync_new                                                 */
+/* Function:    ipf_sync_new                                                */
 /* Returns:     synclist_t* - NULL == failure, else pointer to new synclist */
 /*                            data structure.                               */
 /* Parameters:  tab(I) - type of synclist_t to create                       */
@@ -792,10 +824,11 @@ void *data;
 /* Creates a new sync table entry and notifies any sleepers that it's there */
 /* waiting to be processed.                                                 */
 /* ------------------------------------------------------------------------ */
-synclist_t *ipfsync_new(tab, fin, ptr)
-int tab;
-fr_info_t *fin;
-void *ptr;
+synclist_t *
+ipf_sync_new(tab, fin, ptr)
+	int tab;
+	fr_info_t *fin;
+	void *ptr;
 {
 	synclist_t *sl, *ss;
 	synclogent_t *sle;
@@ -875,9 +908,9 @@ void *ptr;
 	if (ptr != NULL) {
 		bcopy((char *)ptr, (char *)&sle->sle_un, sz);
 		if (tab == SMC_STATE) {
-			ipfsync_storder(1, &sle->sle_un.sleu_ips);
+			ipf_sync_storder(1, &sle->sle_un.sleu_ips);
 		} else if (tab == SMC_NAT) {
-			ipfsync_natorder(1, &sle->sle_un.sleu_ipn);
+			ipf_sync_natorder(1, &sle->sle_un.sleu_ipn);
 		}
 	}
 	MUTEX_EXIT(&ipf_syncadd);
@@ -899,7 +932,7 @@ void *ptr;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    ipfsync_update                                              */
+/* Function:    ipf_sync_update                                             */
 /* Returns:     Nil                                                         */
 /* Parameters:  tab(I) - type of synclist_t to create                       */
 /*              fin(I) - pointer to packet information                      */
@@ -908,10 +941,11 @@ void *ptr;
 /* For outbound packets, only, create an sync update record for the user    */
 /* process to read.                                                         */
 /* ------------------------------------------------------------------------ */
-void ipfsync_update(tab, fin, sl)
-int tab;
-fr_info_t *fin;
-synclist_t *sl;
+void
+ipf_sync_update(tab, fin, sl)
+	int tab;
+	fr_info_t *fin;
+	synclist_t *sl;
 {
 	synctcp_update_t *st;
 	syncupdent_t *slu;
@@ -986,7 +1020,7 @@ synclist_t *sl;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_sync_ioctl                                               */
+/* Function:    ipf_sync_ioctl                                              */
 /* Returns:     int - 0 == success, != 0 == failure                         */
 /* Parameters:  data(I) - pointer to ioctl data                             */
 /*              cmd(I)  - ioctl command integer                             */
@@ -995,22 +1029,27 @@ synclist_t *sl;
 /* This function currently does not handle any ioctls and so just returns   */
 /* EINVAL on all occasions.                                                 */
 /* ------------------------------------------------------------------------ */
-int fr_sync_ioctl(data, cmd, mode)
-caddr_t data;
-ioctlcmd_t cmd;
-int mode;
+int
+ipf_sync_ioctl(data, cmd, mode, uid, ctx)
+	caddr_t data;
+	ioctlcmd_t cmd;
+	int mode, uid;
+	void *ctx;
 {
+	ipf_interror = 110021;
 	return EINVAL;
 }
 
 
-int ipfsync_canread()
+int
+ipf_sync_canread()
 {
 	return !((sl_tail == sl_idx) && (su_tail == su_idx));
 }
 
 
-int ipfsync_canwrite()
+int
+ipf_sync_canwrite()
 {
 	return 1;
 }

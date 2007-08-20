@@ -27,7 +27,8 @@ int	irc_proxy_init = 0;
 /*
  * Initialize local structures.
  */
-int ippr_irc_init()
+int
+ippr_irc_init()
 {
 	bzero((char *)&ircnatfr, sizeof(ircnatfr));
 	ircnatfr.fr_ref = 1;
@@ -39,7 +40,8 @@ int ippr_irc_init()
 }
 
 
-void ippr_irc_fini()
+void
+ippr_irc_fini()
 {
 	if (irc_proxy_init == 1) {
 		MUTEX_DESTROY(&ircnatfr.fr_lock);
@@ -64,10 +66,11 @@ const char *ippr_irc_dcctypes[] = {
  */
 
 
-int ippr_irc_complete(ircp, buf, len)
-ircinfo_t *ircp;
-char *buf;
-size_t len;
+int
+ippr_irc_complete(ircp, buf, len)
+	ircinfo_t *ircp;
+	char *buf;
+	size_t len;
 {
 	register char *s, c;
 	register size_t i;
@@ -222,10 +225,11 @@ size_t len;
 }
 
 
-int ippr_irc_new(fin, aps, nat)
-fr_info_t *fin;
-ap_session_t *aps;
-nat_t *nat;
+int
+ippr_irc_new(fin, aps, nat)
+	fr_info_t *fin;
+	ap_session_t *aps;
+	nat_t *nat;
 {
 	ircinfo_t *irc;
 
@@ -244,9 +248,10 @@ nat_t *nat;
 }
 
 
-int ippr_irc_send(fin, nat)
-fr_info_t *fin;
-nat_t *nat;
+int
+ippr_irc_send(fin, nat)
+	fr_info_t *fin;
+	nat_t *nat;
 {
 	char ctcpbuf[IPF_IRCBUFSZ], newbuf[IPF_IRCBUFSZ];
 	tcphdr_t *tcp, tcph, *tcp2 = &tcph;
@@ -289,10 +294,10 @@ nat_t *nat;
 		return 0;
 
 	/*
-	 * check that IP address in the PORT/PASV reply is the same as the
-	 * sender of the command - prevents using PORT for port scanning.
+	 * check that IP address in the DCC reply is the same as the
+	 * sender of the command - prevents use for port scanning.
 	 */
-	if (irc->irc_ipnum != ntohl(nat->nat_inip.s_addr))
+	if (irc->irc_ipnum != ntohl(nat->nat_osrcaddr))
 		return 0;
 
 	a5 = irc->irc_port;
@@ -391,7 +396,7 @@ nat_t *nat;
 	bcopy((caddr_t)fin, (caddr_t)&fi, sizeof(fi));
 	fi.fin_data[0] = sp;
 	fi.fin_data[1] = fin->fin_data[1];
-	nat2 = nat_outlookup(fin, IPN_TCP, nat->nat_p, nat->nat_inip,
+	nat2 = ipf_nat_outlookup(fin, IPN_TCP, nat->nat_pr[1], nat->nat_nsrcip,
 			     ip->ip_dst);
 	if (nat2 == NULL) {
 		bcopy((caddr_t)fin, (caddr_t)&fi, sizeof(fi));
@@ -408,16 +413,16 @@ nat_t *nat;
 		fi.fin_dlen = sizeof(*tcp2);
 		fi.fin_plen = fi.fin_hlen + sizeof(*tcp2);
 		swip = ip->ip_src;
-		ip->ip_src = nat->nat_inip;
-		nat2 = nat_new(&fi, nat->nat_ptr, NULL,
+		ip->ip_src = nat->nat_nsrcip;
+		nat2 = ipf_nat_add(&fi, nat->nat_ptr, NULL,
 			       NAT_SLAVE|IPN_TCP|SI_W_DPORT, NAT_OUTBOUND);
 		if (nat2 != NULL) {
-			(void) nat_proto(&fi, nat2, 0);
-			nat_update(&fi, nat2, nat2->nat_ptr);
+			(void) ipf_nat_proto(&fi, nat2, 0);
+			ipf_nat_update(&fi, nat2, nat2->nat_ptr);
 
-			(void) fr_addstate(&fi, NULL, SI_W_DPORT);
+			(void) ipf_state_add(&fi, NULL, SI_W_DPORT);
 			if (fi.fin_state != NULL)
-				fr_statederef(&fi, (ipstate_t **)&fi.fin_state);
+				ipf_state_deref((ipstate_t **)&fi.fin_state);
 		}
 		ip->ip_src = swip;
 	}
@@ -425,10 +430,11 @@ nat_t *nat;
 }
 
 
-int ippr_irc_out(fin, aps, nat)
-fr_info_t *fin;
-ap_session_t *aps;
-nat_t *nat;
+int
+ippr_irc_out(fin, aps, nat)
+	fr_info_t *fin;
+	ap_session_t *aps;
+	nat_t *nat;
 {
 	aps = aps;	/* LINT */
 	return ippr_irc_send(fin, nat);

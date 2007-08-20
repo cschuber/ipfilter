@@ -1,3 +1,10 @@
+/*
+ * Copyright (C) 2002-2003 by Darren Reed.
+ * 
+ * See the IPFILTER.LICENCE file for details on licencing.  
+ *   
+ * $Id$ 
+ */     
 
 #include "ipf.h"
 
@@ -9,6 +16,8 @@ void *ip;
 	struct hostent *hp;
 	struct in_addr ipa;
 	struct netent *np;
+
+	memset(&ipa, 0, sizeof(ipa));	/* XXX gcc */
 
 	if (v == 4) {
 		ipa.s_addr = *(u_32_t *)ip;

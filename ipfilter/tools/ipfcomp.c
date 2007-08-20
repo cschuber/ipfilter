@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 1993-2001 by Darren Reed.
+ * Copyright (C) 2001-2005 by Darren Reed.
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  */
@@ -92,11 +92,22 @@ frentry_t *fr;
  		fprintf(fp, "* to the original author and the contributors.\n");
  		fprintf(fp, "*/\n\n");
 
+		fprintf(fp, "#include <sys/param.h>\n");
 		fprintf(fp, "#include <sys/types.h>\n");
 		fprintf(fp, "#include <sys/time.h>\n");
 		fprintf(fp, "#include <sys/socket.h>\n");
-		fprintf(fp, "#if !defined(__FreeBSD__) && !defined(__OpenBSD__) && !defined(__sgi)\n");
-		fprintf(fp, "# include <sys/systm.h>\n");
+		fprintf(fp, "#if (__FreeBSD_version >= 40000)\n");
+		fprintf(fp, "# if defined(_KERNEL)\n");
+		fprintf(fp, "#  include <sys/libkern.h>\n");
+		fprintf(fp, "# else\n");
+		fprintf(fp, "#  include <sys/unistd.h>\n");
+		fprintf(fp, "# endif\n");
+		fprintf(fp, "#endif\n");
+		fprintf(fp, "#if (__NetBSD_Version__ >= 399000000)\n");
+		fprintf(fp, "#else\n");
+		fprintf(fp, "# if !defined(__FreeBSD__) && !defined(__OpenBSD__) && !defined(__sgi)\n");
+		fprintf(fp, "#  include <sys/systm.h>\n");
+		fprintf(fp, "# endif\n");
 		fprintf(fp, "#endif\n");
 		fprintf(fp, "#include <sys/errno.h>\n");
 		fprintf(fp, "#include <sys/param.h>\n");
@@ -491,7 +502,8 @@ u_int incount, outcount;
 	/*
 	 * Output the array of pointers to rules for this group.
 	 */
-	if (num == -2 && dir == 0 && header[0] == 0 && incount != 0) {
+	if (g != NULL && num == -2 && dir == 0 && header[0] == 0 &&
+	    incount != 0) {
 		fprintf(fp, "\nfrentry_t *ipf_rules_in_%s[%d] = {",
 			group, incount);
 		for (f = g->fg_start, i = 0; f != NULL; f = f->fr_next) {
@@ -510,7 +522,8 @@ u_int incount, outcount;
 		fprintf(fp, "\n};\n");
 	}
 
-	if (num == -2 && dir == 1 && header[1] == 0 && outcount != 0) {
+	if (g != NULL && num == -2 && dir == 1 && header[0] == 0 &&
+	    outcount != 0) {
 		fprintf(fp, "\nfrentry_t *ipf_rules_out_%s[%d] = {",
 			group, outcount);
 		for (f = g->fg_start, i = 0; f != NULL; f = f->fr_next) {
@@ -539,7 +552,7 @@ u_int incount, outcount;
 	/*
 	 * If the function header has not been printed then print it now.
 	 */
-	if (header[dir] == 0) {
+	if (g != NULL && header[dir] == 0) {
 		int pdst = 0, psrc = 0;
 
 		openfunc = 1;
@@ -1300,7 +1313,7 @@ int ipfrule_add_%s_%s()\n", instr, group);
 	fprintf(fp, "\
 	fp->fr_v = 4;\n\
 	fp->fr_func = (ipfunc_t)ipfrule_match_%s_%s;\n\
-	err = frrequest(IPL_LOGIPF, SIOCADDFR, (caddr_t)fp, fr_active, 0);\n",
+	err = frrequest(IPL_LOGIPF, SIOCADDFR, (caddr_t)fp, ipf_active, 0);\n",
 			instr, group);
 	fprintf(fp, "\treturn err;\n}\n");
 
@@ -1334,7 +1347,7 @@ int ipfrule_remove_%s_%s()\n", instr, group);
 	}\n\
 	if (err == 0)\n\
 		err = frrequest(IPL_LOGIPF, SIOCDELFR,\n\
-				(caddr_t)&ipfrule_%s_%s, fr_active, 0);\n",
+				(caddr_t)&ipfrule_%s_%s, ipf_active, 0);\n",
 		instr, group, instr, group, instr, group);
 	fprintf(fp, "\
 	if (err)\n\

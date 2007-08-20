@@ -65,7 +65,9 @@ typedef int     boolean_t;
 #if defined(__FreeBSD__)
 # include "radix_ipf.h"
 #endif
-#include <net/route.h>
+#ifndef __osf__
+# include <net/route.h>
+#endif
 #include <netinet/ip_var.h>
 #include <netinet/in_pcb.h>
 #include <netinet/tcp_timer.h>
@@ -293,11 +295,14 @@ struct	tcpiphdr *ti;
 		return NULL;
 
 	fd = (struct filedesc *)malloc(sizeof(*fd));
+	if (fd == NULL)
+		return NULL;
 #if defined( __FreeBSD_version) && __FreeBSD_version >= 500013
 	if (KMCPY(fd, p->ki_fd, sizeof(*fd)) == -1)
 	    {
 		fprintf(stderr, "read(%#lx,%#lx) failed\n",
 			(u_long)p, (u_long)p->ki_fd);
+		free(fd);
 		return NULL;
 	    }
 #else
@@ -305,6 +310,7 @@ struct	tcpiphdr *ti;
 	    {
 		fprintf(stderr, "read(%#lx,%#lx) failed\n",
 			(u_long)p, (u_long)p->kp_proc.p_fd);
+		free(fd);
 		return NULL;
 	    }
 #endif

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005 by Darren Reed.
+ * Copyright (C) 2005-2006 by Darren Reed.
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
@@ -55,6 +55,15 @@
 # undef		ICMP6_FQDN_REPLY
 # define	ICMP6_FQDN_REPLY	0
 #else
+# if !defined(MLD_LISTENER_QUERY)
+#  define	MLD_LISTENER_QUERY	130
+# endif
+# if !defined(MLD_LISTENER_REPORT)
+#  define	MLD_LISTENER_REPORT	131
+# endif
+# if !defined(MLD_LISTENER_DONE)
+#  define	MLD_LISTENER_DONE	132
+# endif
 # if defined(MLD_LISTENER_REDUCTION) && !defined(MLD_LISTENER_DONE)
 #  define	MLD_LISTENER_DONE	MLD_LISTENER_REDUCTION
 # endif

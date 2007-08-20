@@ -45,7 +45,6 @@ struct uio;
 #undef	untimeout
 #undef	IPFDEBUG
 
-extern	struct	filterstats	frstats[];
 extern	int	fr_running;
 extern	int	ipf_flags;
 extern	int	fr_check __P(());
@@ -287,12 +286,17 @@ static int ipf_attach()
 {
 	char *defpass;
 
+	RWLOCK_INIT(&ipf_global, "ipf filter load/unload mutex");
+	RWLOCK_INIT(&ipf_mutex, "ipf filter rwlock");
+	RWLOCK_INIT(&ipf_frcache, "ipf cache rwlock");
+
 	sync();
 	/*
 	 * Initialize mutex's
 	 */
-	if (iplattach() == -1)
-		return -1;
+	if (ipfattach() == -1)
+		goto attachfailed;
+
 	/*
 	 * Lock people out while we set things up.
 	 */
@@ -331,6 +335,10 @@ static int ipf_attach()
 		fr_timer_id = mp_timeout(fr_slowtimer, NULL, hz/2);
 	if (fr_running == 1)
 		return 0;
+attachfailed:
+	RW_DESTROY(&ipf_global);
+	RW_DESTROY(&ipf_mutex);
+	RW_DESTROY(&ipf_frcache);
 	return -1;
 }
 
@@ -339,7 +347,7 @@ static int ipf_detach()
 {
 	int i;
 
-	if (fr_refcnt)
+	if (ipf_refcnt)
 		return EBUSY;
 
 	/*
@@ -374,9 +382,15 @@ static int ipf_detach()
 			"IP Filter: pfil_remove_hook(pfh_sync) failed");
 	while (fr_timer_id != NULL)
 		sched_yield();
-	i = ipldetach();
+	i = ipfdetach();
+
+	if (i == 0) {
+		RW_DESTROY(&ipf_global);
+		RW_DESTROY(&ipf_mutex);
+		RW_DESTROY(&ipf_frcache);
+	}
 #ifdef	IPFDEBUG
-	printf("IP Filter: ipldetach() = %d\n", i);
+	printf("IP Filter: ipfdetach() = %d\n", i);
 #endif
 	return i;
 }
@@ -485,159 +499,6 @@ irinfo_t *iri;
 #endif
 
 
-int fr_fastroute(mb, mpp, fin, fdp)
-mblk_t *mb, **mpp;
-fr_info_t *fin;
-frdest_t *fdp;
-{
-#ifdef	USE_INET6
-	ip6_t *ip6 = (ip6_t *)fin->fin_ip;
-#endif
-	struct in_addr dst, src;
-	ifinfo_t *ifp, *sifp;
-	mblk_t *mp, **mps;
-	size_t hlen = 0;
-	qpktinfo_t *qpi;
-	frentry_t *fr;
-	irinfo_t ir;
-	queue_t *q;
-	u_char *s;
-	ip_t *ip;
-	int p, i;
-
-	ip = fin->fin_ip;
-	qpi = fin->fin_qpi;
-	/*
-	 * If this is a duplicate mblk then we want ip to point at that
-	 * data, not the original, if and only if it is already pointing at
-	 * the current mblk data.
-	 */
-	if (ip == (ip_t *)qpi->qpi_m->b_rptr && qpi->qpi_m != mb)
-		ip = (ip_t *)mb->b_rptr;
-
-	/*
-	 * If there is another M_PROTO, we don't want it
-	 */
-	if (*mpp != mb) {
-		mp = *mpp;
-		(void) unlinkb(mp);
-		mp = (*mpp)->b_cont;
-		(*mpp)->b_cont = NULL;
-		(*mpp)->b_prev = NULL;
-		freemsg(*mpp);
-		*mpp = mp;
-	}
-
-	ifp = (ifinfo_t *)fdp->fd_ifp;
-	if (fdp && fdp->fd_ip.s_addr)
-		dst = fdp->fd_ip;
-	else
-		dst.s_addr = fin->fin_fi.fi_daddr;
-
-	src.s_addr = 0;
-	bzero((char *)&ir, sizeof(ir));
-	i = ir_lookup(&ir, &dst.s_addr, &src.s_addr,
-		      ~(IR_ROUTE|IR_ROUTE_ASSOC|IR_ROUTE_REDIRECT), 4);
-	mp = ir.ir_ll_hdr_mp;
-	hlen = ir.ir_ll_hdr_length;
-	if (!mp || !hlen || (i == 0))
-		goto bad_fastroute;
-
-	fr = fin->fin_fr;
-	if ((ifp || (fr && (fr->fr_flags & FR_FASTROUTE)))) {
-		if (ifp && (ir_to_ill(&ir) != ifp))
-			goto bad_fastroute;
-		/*
-		 * In case we're here due to "to <if>" being used with
-		 * "keep state", check that we're going in the correct
-		 * direction.
-		 */
-		if ((fr != NULL) && (ifp != NULL) &&
-		    (fin->fin_rev != 0) && (fdp == &fr->fr_tif))
-			goto bad_fastroute;
-
-		sifp = fin->fin_ifp;
-		fin->fin_ifp = ir_to_ill(&ir);
-		if (fin->fin_out == 0) {
-			u_32_t pass;
-
-			fin->fin_fr = ipacct[1][fr_active];
-			if ((fin->fin_fr != NULL) &&
-			    (fr_scanlist(fin, FR_NOMATCH) & FR_ACCOUNT)) {
-				ATOMIC_INCL(frstats[1].fr_acct);
-			}
-			fin->fin_fr = NULL;
-			if (!fr || !(fr->fr_flags & FR_RETMASK)) {
-
-				(void) fr_checkstate(fin, &pass);
-			}
-			(void) fr_checknatout(fin, &pass);
-		}
-		fin->fin_ifp = sifp;
-
-		s = mb->b_rptr;
-		if ((hlen && (s - mb->b_datap->db_base) >= hlen)) {
-			s -= hlen;
-			mb->b_rptr = (u_char *)s;
-			bcopy((char *)mp->b_rptr, (char *)s, hlen);
-			freeb(mp);
-			mp = NULL;
-		} else {
-			mblk_t	*mp2;
-
-			linkb(mp, *mpp);
-			*mpp = mp;
-			mb = mp;
-			mp = NULL;
-		}
-
-		q = NULL;
-		if (ir.ir_stq)
-			q = ir.ir_stq;
-		else if (ir.ir_rfq)
-			q = WR(ir.ir_rfq);
-		if (q)
-			q = q->q_next;
-		if (q) {
-			mb->b_prev = NULL;
-			RWLOCK_EXIT(&ipf_global);
-			putnext(q, mb);
-			READ_ENTER(&ipf_global);
-			fr_frouteok[0]++;
-			return 0;
-		}
-	}
-bad_fastroute:
-	if (mp)
-		freeb(mp);
-	mb->b_prev = NULL;
-	freemsg(*mpp);
-	*mpp = NULL;
-	fr_frouteok[1]++;
-	return -1;
-}
-
-
-int fr_verifysrc(fin)
-fr_info_t *fin;
-{
-	struct in_addr ips, ipa;
-	irinfo_t ir, *dir, *gw;
-	qif_t *qif;
-	int i;
-
-	ips.s_addr = 0;
-	ipa = fin->fin_src;
-
-	if (ir_lookup(&ir, (uint32_t *)&ipa, (uint32_t *)&ips, 0, 4) == 0)
-		return 1;
-	i = (ir_to_ill(&ir) == fin->fin_ifp);
-	if (ir.ir_ll_hdr_mp)
-		freeb(ir.ir_ll_hdr_mp);
-	return i;
-}
-
-
 int ipfsync()
 {
 	char name[8];
@@ -709,6 +570,10 @@ int mode;
 #ifdef  IPFDEBUG
 	cmn_err(CE_CONT, "iplclose(%x,%x,%x)\n", dev, flag, mode);
 #endif
+
+	if (fr_running < 1)
+		return EIO;
+
 	min = (IPL_LOGMAX < min) ? ENXIO : 0;
 	return min;
 }
@@ -728,6 +593,10 @@ register struct uio *uio;
 #ifdef	IPFDEBUG
 	cmn_err(CE_CONT, "iplread(%x,%x)\n", dev, uio);
 #endif
+
+	if (fr_running < 1)
+		return EIO;
+
 	return ipflog_read(getminor(dev), uio);
 }
 #endif /* IPFILTER_LOG */
@@ -748,6 +617,10 @@ cred_t *cp;
 #ifdef	IPFDEBUG
 	cmn_err(CE_CONT, "iplwrite(%x,%x,%x)\n", dev, uio, cp);
 #endif
+
+	if (fr_running < 1)
+		return EIO;
+
 	if (getminor(dev) != IPL_LOGSYNC)
 		return ENXIO;
 	return ipfsync_write(uio);

@@ -625,12 +625,12 @@ ipfilter_attach(void)
 	RWLOCK_INIT(&ipf_frcache, 1);
 	ipftru64_inited = 1;
 
-	status = iplattach();
+	status = ipfattach();
 #ifdef	IPFDEBUG
-	printf("iplattach() = %d\n", status);
+	printf("ipfattach() = %d\n", status);
 #endif
 	if (status != ESUCCESS) {
-		(void) ipldetach();
+		(void) ipfdetach();
 		return status;
 	}
 
@@ -775,9 +775,9 @@ ipfilter_detach(void)
 	}
 
 	if ((status == ESUCCESS) && (ipfilter_registered > 0)) {
-		status = ipldetach();
+		status = ipfdetach();
 #ifdef	IPFDEBUG
-		printf("ipldetach() = %d\n", status);
+		printf("ipfdetach() = %d\n", status);
 #endif
 		ipfilter_registered = 0;
 	}
@@ -1235,6 +1235,10 @@ static int iplread(dev, uio)
 dev_t dev;
 register struct uio *uio;
 {
+
+	if (fr_running < 1)
+		return EIO;
+
 #ifdef IPFILTER_LOG
 	return ipflog_read(minor(dev), uio);
 #else

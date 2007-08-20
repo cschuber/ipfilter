@@ -1,3 +1,11 @@
+/*
+ * Copyright (C) 2003-2005 by Darren Reed.
+ * 
+ * See the IPFILTER.LICENCE file for details on licencing.  
+ *   
+ * $Id$ 
+ */     
+
 #include "ipf.h"
 #include "netinet/ipl.h"
 #include <sys/ioctl.h>

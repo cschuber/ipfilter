@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 1993-2001 by Darren Reed.
+ * Copyright (C) 2000-2006 by Darren Reed.
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
@@ -20,7 +20,6 @@ ioctlfunc_t	iocfunc;
 	u_short	sec[2];
 	u_32_t type;
 	int pr, af;
-	u_char *t;
 	char *s;
 
 	pr = -2;
@@ -76,7 +75,7 @@ ioctlfunc_t	iocfunc;
 
 	if (fp->fr_flags & FR_OUTQUE)
 		printf(" out ");
-	else
+	else if (fp->fr_flags & FR_INQUE)
 		printf(" in ");
 
 	if (((fp->fr_flags & FR_LOGB) == FR_LOGB) ||
@@ -149,9 +148,13 @@ ioctlfunc_t	iocfunc;
 		}
 	}
 
-	if (type == FR_T_NONE) {
+	switch (type)
+	{
+	case FR_T_NONE :
 		printf("all");
-	} else if (type == FR_T_IPF) {
+		break;
+
+	case FR_T_IPF :
 		printf("from %s", fp->fr_flags & FR_NOTSRCIP ? "!" : "");
 		printaddr(af, fp->fr_satype, fp->fr_ifname,
 			  &fp->fr_src.s_addr, &fp->fr_smsk.s_addr);
@@ -183,24 +186,12 @@ ioctlfunc_t	iocfunc;
 		if ((fp->fr_proto == IPPROTO_TCP) &&
 		    (fp->fr_tcpf || fp->fr_tcpfm)) {
 			printf(" flags ");
-			if (fp->fr_tcpf & ~TCPF_ALL)
-				printf("0x%x", fp->fr_tcpf);
-			else
-				for (s = flagset, t = flags; *s; s++, t++)
-					if (fp->fr_tcpf & *t)
-						(void)putchar(*s);
-			if (fp->fr_tcpfm) {
-				(void)putchar('/');
-				if (fp->fr_tcpfm & ~TCPF_ALL)
-					printf("0x%x", fp->fr_tcpfm);
-				else
-					for (s = flagset, t = flags; *s;
-					     s++, t++)
-						if (fp->fr_tcpfm & *t)
-							(void)putchar(*s);
-			}
+			printtcpflags(fp->fr_tcpf, fp->fr_tcpfm);
 		}
-	} else if (type == FR_T_BPFOPC) {
+		break;
+
+	case FR_T_BPFOPC :
+	    {
 		fakebpf_t *fb;
 		int i;
 
@@ -212,12 +203,25 @@ ioctlfunc_t	iocfunc;
 			       fb->fb_f, fb->fb_k);
 
 		printf("\" }");
-	} else if (type == FR_T_COMPIPF) {
-		;
-	} else if (type == FR_T_CALLFUNC) {
+		break;
+	    }
+
+	case FR_T_COMPIPF :
+		break;
+
+	case FR_T_CALLFUNC :
 		printf("call function at %p", fp->fr_data);
-	} else {
+		break;
+
+	case FR_T_IPFEXPR :
+		printf("exp { \"");
+		printipfexpr(fp->fr_data);
+		printf("\" } ");
+		break;
+
+	default :
 		printf("[unknown filter type %#x]", fp->fr_type);
+		break;
 	}
 
 	if ((type == FR_T_IPF) &&
@@ -340,7 +344,8 @@ ioctlfunc_t	iocfunc;
 
 	if (fp->fr_flags & FR_KEEPSTATE) {
 		printf(" keep state");
-		if ((fp->fr_flags & (FR_STSTRICT|FR_NEWISN|FR_NOICMPERR|FR_STATESYNC)) ||
+		if ((fp->fr_flags & (FR_STSTRICT|FR_NEWISN|
+				     FR_NOICMPERR|FR_STATESYNC)) ||
 		    (fp->fr_statemax != 0) || (fp->fr_age[0] != 0)) {
 			char *comma = "";
 			printf(" (");
@@ -404,7 +409,12 @@ ioctlfunc_t	iocfunc;
 		}
 		printf(")");
 	}
+
 	if (fp->fr_pps)
 		printf(" pps %d", fp->fr_pps);
+
+	if ((fp->fr_flags & FR_KEEPSTATE) && (opts & OPT_VERBOSE)) {
+		printf(" # count %d", fp->fr_statecnt);
+	}
 	(void)putchar('\n');
 }

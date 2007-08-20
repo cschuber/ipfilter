@@ -15,7 +15,11 @@
 #include <sys/time.h>
 #if defined(__NetBSD__)
 # if (NetBSD >= 199905) && !defined(IPFILTER_LKM) && defined(_KERNEL)
-#  include "opt_ipfilter_log.h"
+#  if (__NetBSD_Version__ < 399001400)
+#   include "opt_ipfilter_log.h"
+#  else
+#   include "opt_ipfilter.h"
+#  endif
 # endif
 #endif
 #if defined(_KERNEL) && defined(__FreeBSD_version) && \
@@ -31,6 +35,9 @@
 # include <sys/filio.h>
 #else
 # include <sys/ioctl.h>
+#endif
+#if (defined(__SVR4) || defined(__svr4__)) && defined(sun)
+# include <sys/filio.h>
 #endif
 #if !defined(_AIX51)
 # include <sys/fcntl.h>
@@ -79,7 +86,11 @@ struct file;
 # endif
 # include "radix_ipf.h"
 #endif
-#include <net/route.h>
+#ifdef __osf__
+# include "radix_ipf.h"
+#else
+# include <net/route.h>
+#endif
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
@@ -97,6 +108,9 @@ struct file;
 #endif
 #ifdef __hpux
 # undef _NET_ROUTE_INCLUDED
+#endif
+#ifdef __osf__
+# undef _RADIX_H_
 #endif
 #include "netinet/ip_compat.h"
 #ifdef	USE_INET6
@@ -145,41 +159,42 @@ static const char rcsid[] = "@(#)$Id$";
 # include "ipt.h"
 # include "bpf-ipf.h"
 extern	int	opts;
+extern	int	blockreason;
 #endif /* _KERNEL */
 
 
-fr_info_t	frcache[2][8];
-struct	filterstats frstats[2] = { { 0, 0, 0, 0, 0 }, { 0, 0, 0, 0, 0 } };
-struct	frentry	*ipfilter[2][2] = { { NULL, NULL }, { NULL, NULL } },
-		*ipacct[2][2] = { { NULL, NULL }, { NULL, NULL } };
-struct	frgroup *ipfgroups[IPL_LOGSIZE][2];
+fr_info_t	ipf_cache[2][8];
+ipf_statistics_t ipf_stats[2];
+frentry_t	*ipf_rules[2][2] = { { NULL, NULL }, { NULL, NULL } },
+		*ipf_acct[2][2] = { { NULL, NULL }, { NULL, NULL } };
+struct	frgroup *ipf_groups[IPL_LOGSIZE][2];
 char	ipfilter_version[] = IPL_VERSION;
-int	fr_refcnt = 0;
+int	ipf_refcnt = 0;
 /*
- * For fr_running:
+ * For ipf_running:
  * 0 == loading, 1 = running, -1 = disabled, -2 = unloading
  */
-int	fr_running = 0;
+int	ipf_running = 0;
 int	ipf_flags = IPF_LOGGING;
-int	fr_active = 0;
-int	fr_control_forwarding = 0;
-int	fr_update_ipid = 0;
-u_short	fr_ip_id = 0;
-int	fr_chksrc = 0;	/* causes a system crash if enabled */
-int	fr_minttl = 4;
-int	fr_icmpminfragmtu = 68;
-u_long	fr_frouteok[2] = {0, 0};
-u_long	fr_userifqs = 0;
-u_long	fr_badcoalesces[2] = {0, 0};
+int	ipf_active = 0;
+int	ipf_control_forwarding = 0;
+int	ipf_update_ipid = 0;
+u_short	ipf_ip_id = 0;
+int	ipf_chksrc = 0;	/* causes a system crash if enabled */
+int	ipf_minttl = 4;
+int	ipf_icmpminfragmtu = 68;
+u_long	ipf_frouteok[2] = {0, 0};
+u_long	ipf_userifqs = 0;
+u_long	ipf_badcoalesces[2] = {0, 0};
 u_char	ipf_iss_secret[32];
-int	fr_specfuncref[3][2] = {{0,0}, {0,0}, {0,0}};
+int	ipf_specfuncref[3][2] = {{0,0}, {0,0}, {0,0}};
 #if defined(IPFILTER_DEFAULT_BLOCK)
-int	fr_pass = FR_BLOCK|FR_NOMATCH;
+int	ipf_pass = FR_BLOCK|FR_NOMATCH;
 #else
-int	fr_pass = (IPF_DEFAULT_PASS)|FR_NOMATCH;
+int	ipf_pass = (IPF_DEFAULT_PASS)|FR_NOMATCH;
 #endif
 int	ipf_interror = 0;
-int	fr_features = 0
+int	ipf_features = 0
 #ifdef	IPFILTER_LKM
 		| IPF_FEAT_LKM
 #endif
@@ -209,34 +224,39 @@ int	fr_features = 0
 #endif
 	;
 
-static	INLINE int	fr_ipfcheck __P((fr_info_t *, frentry_t *, int));
-static	int		fr_portcheck __P((frpcmp_t *, u_short *));
-static	int		frflushlist __P((int, minor_t, int *, frentry_t **));
-static	ipfunc_t	fr_findfunc __P((ipfunc_t));
-static	frentry_t	*fr_firewall __P((fr_info_t *, u_32_t *));
-static	int		fr_funcinit __P((frentry_t *fr));
-static	INLINE int	frpr_ah __P((fr_info_t *));
-static	INLINE void	frpr_esp __P((fr_info_t *));
-static	INLINE void	frpr_gre __P((fr_info_t *));
-static	INLINE void	frpr_udp __P((fr_info_t *));
-static	INLINE void	frpr_tcp __P((fr_info_t *));
-static	INLINE void	frpr_icmp __P((fr_info_t *));
-static	INLINE void	frpr_ipv4hdr __P((fr_info_t *));
-static	INLINE int	frpr_pullup __P((fr_info_t *, int));
-static	INLINE void	frpr_short __P((fr_info_t *, int));
-static	INLINE int	frpr_tcpcommon __P((fr_info_t *));
-static	INLINE int	frpr_udpcommon __P((fr_info_t *));
-static	int		fr_updateipid __P((fr_info_t *));
+static	INLINE int	ipf_check_ipf __P((fr_info_t *, frentry_t *, int));
+static	u_32_t		ipf_checkcipso __P((fr_info_t *, u_char *, int));
+static	u_32_t		ipf_checkripso __P((u_char *));
+static	void		ipf_checkrulefunc __P((void *, int, int));
+static	u_32_t		ipf_decaps __P((fr_info_t *, u_32_t, int));
+static	int		ipf_deliverlocal __P((int, void *, void *));
+static	frentry_t	*ipf_dolog __P((fr_info_t *, u_32_t *));
+static	int		ipf_flushlist __P((int, minor_t, int *, frentry_t **));
+static	ipfunc_t	ipf_findfunc __P((ipfunc_t));
+static	frentry_t	*ipf_firewall __P((fr_info_t *, u_32_t *));
+static	int		ipf_fr_matcharray __P((fr_info_t *, int *));
+static	int		ipf_frruleiter __P((void *, int, void *));
+static	int		ipf_funcinit __P((frentry_t *fr));
+static	int		ipf_geniter __P((ipftoken_t *, ipfgeniter_t *));
 #ifdef	IPFILTER_LOOKUP
-static	int		fr_grpmapinit __P((frentry_t *fr));
+static	int		ipf_grpmapinit __P((frentry_t *fr));
 #endif
-static	void		frsynclist __P((frentry_t *, void *));
-static	u_32_t		fr_checkripso __P((char *));
-static	u_32_t		fr_checkcipso __P((fr_info_t *, char *, int));
-static	u_32_t		fr_decaps __P((fr_info_t *, u_32_t, int));
-static	void		fr_checkrulefunc __P((void *, int, int));
-static	ipftuneable_t	*fr_findtunebyname __P((const char *));
-static	ipftuneable_t	*fr_findtunebycookie __P((void *, void **));
+static	int		ipf_portcheck __P((frpcmp_t *, u_32_t));
+static	INLINE int	ipf_pr_ah __P((fr_info_t *));
+static	INLINE void	ipf_pr_esp __P((fr_info_t *));
+static	INLINE void	ipf_pr_gre __P((fr_info_t *));
+static	INLINE void	ipf_pr_udp __P((fr_info_t *));
+static	INLINE void	ipf_pr_tcp __P((fr_info_t *));
+static	INLINE void	ipf_pr_icmp __P((fr_info_t *));
+static	INLINE void	ipf_pr_ipv4hdr __P((fr_info_t *));
+static	INLINE void	ipf_pr_short __P((fr_info_t *, int));
+static	INLINE int	ipf_pr_tcpcommon __P((fr_info_t *));
+static	INLINE int	ipf_pr_udpcommon __P((fr_info_t *));
+static	void		ipf_synclist __P((frentry_t *, void *));
+static	ipftuneable_t	*ipf_tune_findbyname __P((const char *));
+static	ipftuneable_t	*ipf_tune_findbycookie __P((void *, void **));
+static	void		ipf_unlinktoken __P((ipftoken_t *));
+static	int		ipf_updateipid __P((fr_info_t *));
 
 
 /*
@@ -245,7 +265,7 @@ static	ipftuneable_t	*fr_findtunebycookie __P((void *, void **));
  * hand side to allow for binary searching of the array and include a trailer
  * with a 0 for the bitmask for linear searches to easily find the end with.
  */
-const	struct	optlist	ipopts[20] = {
+static const	struct	optlist	ipopts[20] = {
 	{ IPOPT_NOP,	0x000001 },
 	{ IPOPT_RR,	0x000002 },
 	{ IPOPT_ZSU,	0x000004 },
@@ -269,7 +289,7 @@ const	struct	optlist	ipopts[20] = {
 };
 
 #ifdef USE_INET6
-struct optlist ip6exthdr[] = {
+static struct optlist ip6exthdr[] = {
 	{ IPPROTO_HOPOPTS,		0x000001 },
 	{ IPPROTO_IPV6,			0x000002 },
 	{ IPPROTO_ROUTING,		0x000004 },
@@ -283,20 +303,10 @@ struct optlist ip6exthdr[] = {
 };
 #endif
 
-struct optlist tcpopts[] = {
-	{ TCPOPT_NOP,			0x000001 },
-	{ TCPOPT_MAXSEG,		0x000002 },
-	{ TCPOPT_WINDOW,		0x000004 },
-	{ TCPOPT_SACK_PERMITTED,	0x000008 },
-	{ TCPOPT_SACK,			0x000010 },
-	{ TCPOPT_TIMESTAMP,		0x000020 },
-	{ 0,				0x000000 }
-};
-
 /*
  * bit values for identifying presence of individual IP security options
  */
-const	struct	optlist	secopt[8] = {
+static const	struct	optlist	secopt[8] = {
 	{ IPSO_CLASS_RES4,	0x01 },
 	{ IPSO_CLASS_TOPS,	0x02 },
 	{ IPSO_CLASS_SECR,	0x04 },
@@ -311,14 +321,14 @@ const	struct	optlist	secopt[8] = {
 /*
  * Table of functions available for use with call rules.
  */
-static ipfunc_resolve_t fr_availfuncs[] = {
+static ipfunc_resolve_t ipf_availfuncs[] = {
 #ifdef	IPFILTER_LOOKUP
-	{ "fr_srcgrpmap", fr_srcgrpmap, fr_grpmapinit, NULL },
-	{ "fr_dstgrpmap", fr_dstgrpmap, fr_grpmapinit, NULL },
+	{ "srcgrpmap", ipf_srcgrpmap, ipf_grpmapinit, NULL },
+	{ "dstgrpmap", ipf_dstgrpmap, ipf_grpmapinit, NULL },
 #endif
-	{ "fr_checkstate", fr_checkstate, NULL, fr_specfuncref[0] },
-	{ "fr_ipfnatin", fr_ipfnatin, NULL, fr_specfuncref[1] },
-	{ "fr_ipfnatout", fr_ipfnatout, NULL, fr_specfuncref[2] },
+	{ "checkstate", ipf_state_check, NULL, ipf_specfuncref[0] },
+	{ "natin", ipf_nat_ipfin, NULL, ipf_specfuncref[1] },
+	{ "natout", ipf_nat_ipfout, NULL, ipf_specfuncref[2] },
 	{ "", NULL }
 };
 
@@ -329,28 +339,28 @@ static ipfunc_resolve_t fr_availfuncs[] = {
  * current packet.  There are different routines for the same protocol
  * for each of IPv4 and IPv6.  Adding a new protocol, for which there
  * will "special" inspection for setup, is now more easily done by adding
- * a new routine and expanding the frpr_ipinit*() function rather than by
+ * a new routine and expanding the ipf_pr_ipinit*() function rather than by
  * adding more code to a growing switch statement.
  */
 #ifdef USE_INET6
-static	INLINE int	frpr_ah6 __P((fr_info_t *));
-static	INLINE void	frpr_esp6 __P((fr_info_t *));
-static	INLINE void	frpr_gre6 __P((fr_info_t *));
-static	INLINE void	frpr_udp6 __P((fr_info_t *));
-static	INLINE void	frpr_tcp6 __P((fr_info_t *));
-static	INLINE void	frpr_icmp6 __P((fr_info_t *));
-static	INLINE int	frpr_ipv6hdr __P((fr_info_t *));
-static	INLINE void	frpr_short6 __P((fr_info_t *, int));
-static	INLINE int	frpr_hopopts6 __P((fr_info_t *));
-static	INLINE int	frpr_mobility6 __P((fr_info_t *));
-static	INLINE int	frpr_routing6 __P((fr_info_t *));
-static	INLINE int	frpr_dstopts6 __P((fr_info_t *));
-static	INLINE int	frpr_fragment6 __P((fr_info_t *));
-static	INLINE struct ip6_ext	*frpr_ipv6exthdr __P((fr_info_t *, int, int));
+static	INLINE int	ipf_pr_ah6 __P((fr_info_t *));
+static	INLINE void	ipf_pr_esp6 __P((fr_info_t *));
+static	INLINE void	ipf_pr_gre6 __P((fr_info_t *));
+static	INLINE void	ipf_pr_udp6 __P((fr_info_t *));
+static	INLINE void	ipf_pr_tcp6 __P((fr_info_t *));
+static	INLINE void	ipf_pr_icmp6 __P((fr_info_t *));
+static	INLINE int	ipf_pr_ipv6hdr __P((fr_info_t *));
+static	INLINE void	ipf_pr_short6 __P((fr_info_t *, int));
+static	INLINE int	ipf_pr_hopopts6 __P((fr_info_t *));
+static	INLINE int	ipf_pr_mobility6 __P((fr_info_t *));
+static	INLINE int	ipf_pr_routing6 __P((fr_info_t *));
+static	INLINE int	ipf_pr_dstopts6 __P((fr_info_t *));
+static	INLINE int	ipf_pr_fragment6 __P((fr_info_t *));
+static	INLINE struct ip6_ext	*ipf_pr_ipv6exthdr __P((fr_info_t *, int, int));
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    frpr_short6                                                 */
+/* Function:    ipf_pr_short6                                               */
 /* Returns:     void                                                        */
 /* Parameters:  fin(I)  - pointer to packet information                     */
 /*              xmin(I) - minimum header size                               */
@@ -358,11 +368,12 @@ static	INLINE struct ip6_ext	*frpr_ipv6exthdr __P((fr_info_t *, int, int));
 /* IPv6 Only                                                                */
 /* This is function enforces the 'is a packet too short to be legit' rule   */
 /* for IPv6 and marks the packet with FI_SHORT if so.  See function comment */
-/* for frpr_short() for more details.                                       */
+/* for ipf_pr_short() for more details.                                     */
 /* ------------------------------------------------------------------------ */
-static INLINE void frpr_short6(fin, xmin)
-fr_info_t *fin;
-int xmin;
+static INLINE void
+ipf_pr_short6(fin, xmin)
+	fr_info_t *fin;
+	int xmin;
 {
 
 	if (fin->fin_dlen < xmin)
@@ -371,7 +382,7 @@ int xmin;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    frpr_ipv6hdr                                                */
+/* Function:    ipf_pr_ipv6hdr                                              */
 /* Returns:     int    - 0 == packet ok, -1 = bad packet, drop it           */
 /* Parameters:  fin(I) - pointer to packet information                      */
 /*                                                                          */
@@ -381,8 +392,9 @@ int xmin;
 /* analyzer may pullup or free the packet itself so we need to be vigiliant */
 /* of that possibility arising.                                             */
 /* ------------------------------------------------------------------------ */
-static INLINE int frpr_ipv6hdr(fin)
-fr_info_t *fin;
+static INLINE int
+ipf_pr_ipv6hdr(fin)
+	fr_info_t *fin;
 {
 	ip6_t *ip6 = (ip6_t *)fin->fin_ip;
 	int p, go = 1, i, hdrcount;
@@ -406,47 +418,47 @@ fr_info_t *fin;
 		switch (p)
 		{
 		case IPPROTO_UDP :
-			frpr_udp6(fin);
+			ipf_pr_udp6(fin);
 			go = 0;
 			break;
 
 		case IPPROTO_TCP :
-			frpr_tcp6(fin);
+			ipf_pr_tcp6(fin);
 			go = 0;
 			break;
 
 		case IPPROTO_ICMPV6 :
-			frpr_icmp6(fin);
+			ipf_pr_icmp6(fin);
 			go = 0;
 			break;
 
 		case IPPROTO_GRE :
-			frpr_gre6(fin);
+			ipf_pr_gre6(fin);
 			go = 0;
 			break;
 
 		case IPPROTO_HOPOPTS :
-			p = frpr_hopopts6(fin);
+			p = ipf_pr_hopopts6(fin);
 			break;
 
 		case IPPROTO_MOBILITY :
-			p = frpr_mobility6(fin);
+			p = ipf_pr_mobility6(fin);
 			break;
 
 		case IPPROTO_DSTOPTS :
-			p = frpr_dstopts6(fin);
+			p = ipf_pr_dstopts6(fin);
 			break;
 
 		case IPPROTO_ROUTING :
-			p = frpr_routing6(fin);
+			p = ipf_pr_routing6(fin);
 			break;
 
 		case IPPROTO_AH :
-			p = frpr_ah6(fin);
+			p = ipf_pr_ah6(fin);
 			break;
 
 		case IPPROTO_ESP :
-			frpr_esp6(fin);
+			ipf_pr_esp6(fin);
 			go = 0;
 			break;
 
@@ -464,7 +476,7 @@ fr_info_t *fin;
 			break;
 
 		case IPPROTO_FRAGMENT :
-			p = frpr_fragment6(fin);
+			p = ipf_pr_fragment6(fin);
 			/*
 			 * Given that the only fragments we want to let through
 			 * (where fin_off != 0) are those where the non-first
@@ -491,16 +503,16 @@ fr_info_t *fin;
 		 * header.
 		 */
 		if ((go != 0) && (p != IPPROTO_NONE) &&
-		    (frpr_pullup(fin, 0) == -1)) {
+		    (ipf_pr_pullup(fin, 0) == -1)) {
 			p = IPPROTO_NONE;
 			break;
 		}
 	}
 
 	/*
-	 * Some of the above functions, like frpr_esp6(), can call fr_pullup
+	 * Some of the above functions, like ipf_pr_esp6(), can call ipf_pullup
 	 * and destroy whatever packet was here.  The caller of this function
-	 * expects us to return -1 if there is a problem with fr_pullup.
+	 * expects us to return -1 if there is a problem with ipf_pullup.
 	 */
 	if (fin->fin_m == NULL)
 		return -1;
@@ -508,11 +520,12 @@ fr_info_t *fin;
 	fi->fi_p = p;
 
 	/*
-	 * IPv6 fragment case 1 - see comment for frpr_fragment6().
+	 * IPv6 fragment case 1 - see comment for ipf_pr_fragment6().
 	 * "go != 0" imples the above loop hasn't arrived at a layer 4 header.
 	 */
 	if ((go != 0) && (fin->fin_flx & FI_FRAG) && (fin->fin_off == 0)) {
 		fin->fin_flx |= FI_BAD;
+		ATOMIC_INCL(ipf_stats[fin->fin_out].fr_v6_badfrag);
 		return -1;
 	}
 	return 0;
@@ -520,8 +533,9 @@ fr_info_t *fin;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    frpr_ipv6exthdr                                             */
-/* Returns:     int    - value of the next header or IPPROTO_NONE if error  */
+/* Function:    ipf_pr_ipv6exthdr                                           */
+/* Returns:     struct ip6_ext * - pointer to the start of the next header  */
+/*                                 or NULL if there is a prolblem.          */
 /* Parameters:  fin(I)      - pointer to packet information                 */
 /*              multiple(I) - flag indicating yes/no if multiple occurances */
 /*                            of this extension header are allowed.         */
@@ -533,9 +547,10 @@ fr_info_t *fin;
 /* big enough for it to be in, checking if it is repeated and setting a     */
 /* flag to indicate its presence.                                           */
 /* ------------------------------------------------------------------------ */
-static INLINE struct ip6_ext *frpr_ipv6exthdr(fin, multiple, proto)
-fr_info_t *fin;
-int multiple, proto;
+static INLINE struct ip6_ext *
+ipf_pr_ipv6exthdr(fin, multiple, proto)
+	fr_info_t *fin;
+	int multiple, proto;
 {
 	struct ip6_ext *hdr;
 	u_short shift;
@@ -546,15 +561,28 @@ int multiple, proto;
 				/* 8 is default length of extension hdr */
 	if ((fin->fin_dlen - 8) < 0) {
 		fin->fin_flx |= FI_SHORT;
+		ATOMIC_INCL(ipf_stats[fin->fin_out].fr_v6_ext_short);
 		return NULL;
 	}
 
-	if (frpr_pullup(fin, 8) == -1)
+	if (ipf_pr_pullup(fin, 8) == -1) {
+		ATOMIC_INCL(ipf_stats[fin->fin_out].fr_v6_ext_pullup);
 		return NULL;
+	}
 
 	hdr = fin->fin_dp;
-	shift = 8 + (hdr->ip6e_len << 3);
+	switch (proto)
+	{
+	case IPPROTO_FRAGMENT :
+		shift = 8;
+		break;
+	default :
+		shift = 8 + (hdr->ip6e_len << 3);
+		break;
+	}
+
 	if (shift > fin->fin_dlen) {	/* Nasty extension header length? */
+		ATOMIC_INCL(ipf_stats[fin->fin_out].fr_v6_ext_hlen);
 		fin->fin_flx |= FI_BAD;
 		return NULL;
 	}
@@ -588,19 +616,20 @@ int multiple, proto;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    frpr_hopopts6                                               */
+/* Function:    ipf_pr_hopopts6                                             */
 /* Returns:     int    - value of the next header or IPPROTO_NONE if error  */
 /* Parameters:  fin(I) - pointer to packet information                      */
 /*                                                                          */
 /* IPv6 Only                                                                */
 /* This is function checks pending hop by hop options extension header      */
 /* ------------------------------------------------------------------------ */
-static INLINE int frpr_hopopts6(fin)
-fr_info_t *fin;
+static INLINE int
+ipf_pr_hopopts6(fin)
+	fr_info_t *fin;
 {
 	struct ip6_ext *hdr;
 
-	hdr = frpr_ipv6exthdr(fin, 0, IPPROTO_HOPOPTS);
+	hdr = ipf_pr_ipv6exthdr(fin, 0, IPPROTO_HOPOPTS);
 	if (hdr == NULL)
 		return IPPROTO_NONE;
 	return hdr->ip6e_nxt;
@@ -608,19 +637,20 @@ fr_info_t *fin;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    frpr_mobility6                                              */
+/* Function:    ipf_pr_mobility6                                            */
 /* Returns:     int    - value of the next header or IPPROTO_NONE if error  */
 /* Parameters:  fin(I) - pointer to packet information                      */
 /*                                                                          */
 /* IPv6 Only                                                                */
 /* This is function checks the IPv6 mobility extension header               */
 /* ------------------------------------------------------------------------ */
-static INLINE int frpr_mobility6(fin)
-fr_info_t *fin;
+static INLINE int
+ipf_pr_mobility6(fin)
+	fr_info_t *fin;
 {
 	struct ip6_ext *hdr;
 
-	hdr = frpr_ipv6exthdr(fin, 0, IPPROTO_MOBILITY);
+	hdr = ipf_pr_ipv6exthdr(fin, 0, IPPROTO_MOBILITY);
 	if (hdr == NULL)
 		return IPPROTO_NONE;
 	return hdr->ip6e_nxt;
@@ -628,19 +658,20 @@ fr_info_t *fin;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    frpr_routing6                                               */
+/* Function:    ipf_pr_routing6                                             */
 /* Returns:     int    - value of the next header or IPPROTO_NONE if error  */
 /* Parameters:  fin(I) - pointer to packet information                      */
 /*                                                                          */
 /* IPv6 Only                                                                */
 /* This is function checks pending routing extension header                 */
 /* ------------------------------------------------------------------------ */
-static INLINE int frpr_routing6(fin)
-fr_info_t *fin;
+static INLINE int
+ipf_pr_routing6(fin)
+	fr_info_t *fin;
 {
 	struct ip6_routing *hdr;
 
-	hdr = (struct ip6_routing *)frpr_ipv6exthdr(fin, 0, IPPROTO_ROUTING);
+	hdr = (struct ip6_routing *)ipf_pr_ipv6exthdr(fin, 0, IPPROTO_ROUTING);
 	if (hdr == NULL)
 		return IPPROTO_NONE;
 
@@ -653,6 +684,7 @@ fr_info_t *fin;
 		if (((hdr->ip6r_len >> 1) < hdr->ip6r_segleft) ||
 		    (hdr->ip6r_segleft && (hdr->ip6r_len & 1))) {
 			fin->fin_flx |= FI_BAD;
+			ATOMIC_INCL(ipf_stats[fin->fin_out].fr_v6_rh_bad);
 			return IPPROTO_NONE;
 		}
 		break;
@@ -666,7 +698,7 @@ fr_info_t *fin;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    frpr_fragment6                                              */
+/* Function:    ipf_pr_fragment6                                            */
 /* Returns:     int    - value of the next header or IPPROTO_NONE if error  */
 /* Parameters:  fin(I) - pointer to packet information                      */
 /*                                                                          */
@@ -694,21 +726,27 @@ fr_info_t *fin;
 /* headers must always be in a packet that has the offset field set to 0    */
 /* and no packet is allowed to overlay that where offset = 0.               */
 /* ------------------------------------------------------------------------ */
-static INLINE int frpr_fragment6(fin)
-fr_info_t *fin;
+static INLINE int
+ipf_pr_fragment6(fin)
+	fr_info_t *fin;
 {
 	struct ip6_frag *frag;
 
 	fin->fin_flx |= FI_FRAG;
 
-	frag = (struct ip6_frag *)frpr_ipv6exthdr(fin, 0, IPPROTO_FRAGMENT);
-	if (frag == NULL)
+	frag = (struct ip6_frag *)ipf_pr_ipv6exthdr(fin, 0, IPPROTO_FRAGMENT);
+	if (frag == NULL) {
+		ATOMIC_INCL(ipf_stats[fin->fin_out].fr_v6_frag_bad);
 		return IPPROTO_NONE;
+	}
 
-	if (frpr_pullup(fin, sizeof(*frag)) == -1)
+	if (ipf_pr_pullup(fin, sizeof(*frag)) == -1) {
+		ATOMIC_INCL(ipf_stats[fin->fin_out].fr_v6_frag_pullup);
 		return IPPROTO_NONE;
+	}
 
 	if ((int)(fin->fin_dlen - sizeof(*frag)) < 0) {
+		ATOMIC_INCL(ipf_stats[fin->fin_out].fr_v6_frag_size);
 		fin->fin_flx |= FI_SHORT;
 		return IPPROTO_NONE;
 	}
@@ -740,27 +778,30 @@ fr_info_t *fin;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    frpr_dstopts6                                               */
+/* Function:    ipf_pr_dstopts6                                             */
 /* Returns:     int    - value of the next header or IPPROTO_NONE if error  */
 /* Parameters:  fin(I) - pointer to packet information                      */
 /*                                                                          */
 /* IPv6 Only                                                                */
 /* This is function checks pending destination options extension header     */
 /* ------------------------------------------------------------------------ */
-static INLINE int frpr_dstopts6(fin)
-fr_info_t *fin;
+static INLINE int
+ipf_pr_dstopts6(fin)
+	fr_info_t *fin;
 {
 	struct ip6_ext *hdr;
 
-	hdr = frpr_ipv6exthdr(fin, 0, IPPROTO_DSTOPTS);
-	if (hdr == NULL)
+	hdr = ipf_pr_ipv6exthdr(fin, 0, IPPROTO_DSTOPTS);
+	if (hdr == NULL) {
+		ATOMIC_INCL(ipf_stats[fin->fin_out].fr_v6_dst_bad);
 		return IPPROTO_NONE;
+	}
 	return hdr->ip6e_nxt;
 }
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    frpr_icmp6                                                  */
+/* Function:    ipf_pr_icmp6                                                */
 /* Returns:     void                                                        */
 /* Parameters:  fin(I) - pointer to packet information                      */
 /*                                                                          */
@@ -768,16 +809,21 @@ fr_info_t *fin;
 /* This routine is mainly concerned with determining the minimum valid size */
 /* for an ICMPv6 packet.                                                    */
 /* ------------------------------------------------------------------------ */
-static INLINE void frpr_icmp6(fin)
-fr_info_t *fin;
+static INLINE void
+ipf_pr_icmp6(fin)
+	fr_info_t *fin;
 {
 	int minicmpsz = sizeof(struct icmp6_hdr);
 	struct icmp6_hdr *icmp6;
 
-	if (frpr_pullup(fin, ICMP6ERR_MINPKTLEN - sizeof(ip6_t)) == -1)
+	if (ipf_pr_pullup(fin, ICMP6ERR_MINPKTLEN - sizeof(ip6_t)) == -1) {
+		ATOMIC_INCL(ipf_stats[fin->fin_out].fr_v6_icmp6_pullup);
 		return;
+	}
 
 	if (fin->fin_dlen > 1) {
+		ip6_t *ip6;
+
 		icmp6 = fin->fin_dp;
 
 		fin->fin_data[0] = *(u_short *)icmp6;
@@ -799,9 +845,24 @@ fr_info_t *fin;
 			fin->fin_flx |= FI_ICMPERR;
 			if ((fin->fin_m != NULL) &&
 			    (M_LEN(fin->fin_m) < fin->fin_plen)) {
-				if (fr_coalesce(fin) != 1)
+				if (ipf_coalesce(fin) != 1)
 					return;
 			}
+
+			if (ipf_pr_pullup(fin, ICMP6ERR_MINPKTLEN) == -1)
+				return;
+
+			/*
+			 * If the destination of this packet doesn't match the
+			 * source of the original packet then this packet is
+			 * not correct.
+			 */
+			icmp6 = fin->fin_dp;
+			ip6 = (ip6_t *)((char *)icmp6 + ICMPERR_ICMPHLEN);
+			if (IP6_NEQ(&fin->fin_fi.fi_dst,
+				    (i6addr_t *)&ip6->ip6_src))
+				fin->fin_flx |= FI_BAD;
+
 			minicmpsz = ICMP6ERR_IPICMPHLEN - sizeof(ip6_t);
 			break;
 		default :
@@ -809,12 +870,12 @@ fr_info_t *fin;
 		}
 	}
 
-	frpr_short6(fin, minicmpsz);
+	ipf_pr_short6(fin, minicmpsz);
 }
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    frpr_udp6                                                   */
+/* Function:    ipf_pr_udp6                                                 */
 /* Returns:     void                                                        */
 /* Parameters:  fin(I) - pointer to packet information                      */
 /*                                                                          */
@@ -822,17 +883,23 @@ fr_info_t *fin;
 /* Analyse the packet for IPv6/UDP properties.                              */
 /* Is not expected to be called for fragmented packets.                     */
 /* ------------------------------------------------------------------------ */
-static INLINE void frpr_udp6(fin)
-fr_info_t *fin;
+static INLINE void
+ipf_pr_udp6(fin)
+	fr_info_t *fin;
 {
 
-	if (frpr_udpcommon(fin) == 0)
-		fr_checkv6sum(fin);
+	if (ipf_pr_udpcommon(fin) == 0) {
+		u_char p = fin->fin_p;
+
+		fin->fin_p = IPPROTO_UDP;
+		ipf_checkv6sum(fin);
+		fin->fin_p = p;
+	}
 }
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    frpr_tcp6                                                   */
+/* Function:    ipf_pr_tcp6                                                 */
 /* Returns:     void                                                        */
 /* Parameters:  fin(I) - pointer to packet information                      */
 /*                                                                          */
@@ -840,17 +907,23 @@ fr_info_t *fin;
 /* Analyse the packet for IPv6/TCP properties.                              */
 /* Is not expected to be called for fragmented packets.                     */
 /* ------------------------------------------------------------------------ */
-static INLINE void frpr_tcp6(fin)
-fr_info_t *fin;
+static INLINE void
+ipf_pr_tcp6(fin)
+	fr_info_t *fin;
 {
 
-	if (frpr_tcpcommon(fin) == 0)
-		fr_checkv6sum(fin);
+	if (ipf_pr_tcpcommon(fin) == 0) {
+		u_char p = fin->fin_p;
+
+		fin->fin_p = IPPROTO_UDP;
+		ipf_checkv6sum(fin);
+		fin->fin_p = p;
+	}
 }
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    frpr_esp6                                                   */
+/* Function:    ipf_pr_esp6                                                 */
 /* Returns:     void                                                        */
 /* Parameters:  fin(I) - pointer to packet information                      */
 /*                                                                          */
@@ -861,16 +934,19 @@ fr_info_t *fin;
 /* is 32bits as well, it is not possible(?) to determine the version from a */
 /* simple packet header.                                                    */
 /* ------------------------------------------------------------------------ */
-static INLINE void frpr_esp6(fin)
-fr_info_t *fin;
+static INLINE void
+ipf_pr_esp6(fin)
+	fr_info_t *fin;
 {
-	if ((fin->fin_off == 0) && (frpr_pullup(fin, 8) == -1))
+	if ((fin->fin_off == 0) && (ipf_pr_pullup(fin, 8) == -1)) {
+		ATOMIC_INCL(ipf_stats[fin->fin_out].fr_v6_esp_pullup);
 		return;
+	}
 }
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    frpr_ah6                                                    */
+/* Function:    ipf_pr_ah6                                                  */
 /* Returns:     int    - value of the next header or IPPROTO_NONE if error  */
 /* Parameters:  fin(I) - pointer to packet information                      */
 /*                                                                          */
@@ -879,21 +955,24 @@ fr_info_t *fin;
 /* The minimum length is taken to be the combination of all fields in the   */
 /* header being present and no authentication data (null algorithm used.)   */
 /* ------------------------------------------------------------------------ */
-static INLINE int frpr_ah6(fin)
-fr_info_t *fin;
+static INLINE int
+ipf_pr_ah6(fin)
+	fr_info_t *fin;
 {
 	authhdr_t *ah;
 
 	fin->fin_flx |= FI_AH;
 
-	ah = (authhdr_t *)frpr_ipv6exthdr(fin, 0, IPPROTO_HOPOPTS);
-	if (ah == NULL)
+	ah = (authhdr_t *)ipf_pr_ipv6exthdr(fin, 0, IPPROTO_HOPOPTS);
+	if (ah == NULL) {
+		ATOMIC_INCL(ipf_stats[fin->fin_out].fr_v6_ah_bad);
 		return IPPROTO_NONE;
+	}
 
-	frpr_short6(fin, sizeof(*ah));
+	ipf_pr_short6(fin, sizeof(*ah));
 
 	/*
-	 * No need for another pullup, frpr_ipv6exthdr() will pullup
+	 * No need for another pullup, ipf_pr_ipv6exthdr() will pullup
 	 * enough data to satisfy ah_next (the very first one.)
 	 */
 	return ah->ah_next;
@@ -901,19 +980,22 @@ fr_info_t *fin;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    frpr_gre6                                                   */
+/* Function:    ipf_pr_gre6                                                 */
 /* Returns:     void                                                        */
 /* Parameters:  fin(I) - pointer to packet information                      */
 /*                                                                          */
 /* Analyse the packet for GRE properties.                                   */
 /* ------------------------------------------------------------------------ */
-static INLINE void frpr_gre6(fin)
-fr_info_t *fin;
+static INLINE void
+ipf_pr_gre6(fin)
+	fr_info_t *fin;
 {
 	grehdr_t *gre;
 
-	if (frpr_pullup(fin, sizeof(grehdr_t)) == -1)
+	if (ipf_pr_pullup(fin, sizeof(grehdr_t)) == -1) {
+		ATOMIC_INCL(ipf_stats[fin->fin_out].fr_v6_gre_pullup);
 		return;
+	}
 
 	gre = fin->fin_dp;
 	if (GRE_REV(gre->gr_flags) == 1)
@@ -923,18 +1005,19 @@ fr_info_t *fin;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    frpr_pullup                                                 */
+/* Function:    ipf_pr_pullup                                               */
 /* Returns:     int     - 0 == pullup succeeded, -1 == failure              */
 /* Parameters:  fin(I)  - pointer to packet information                     */
 /*              plen(I) - length (excluding L3 header) to pullup            */
 /*                                                                          */
 /* Short inline function to cut down on code duplication to perform a call  */
-/* to fr_pullup to ensure there is the required amount of data,             */
+/* to ipf_pullup to ensure there is the required amount of data,            */
 /* consecutively in the packet buffer.                                      */
 /* ------------------------------------------------------------------------ */
-static INLINE int frpr_pullup(fin, plen)
-fr_info_t *fin;
-int plen;
+int
+ipf_pr_pullup(fin, plen)
+	fr_info_t *fin;
+	int plen;
 {
 	if (fin->fin_m != NULL) {
 		if (fin->fin_dp != NULL)
@@ -943,11 +1026,11 @@ int plen;
 		plen += fin->fin_hlen;
 		if (M_LEN(fin->fin_m) < plen) {
 #if defined(_KERNEL)
-			if (fr_pullup(fin->fin_m, fin, plen) == NULL)
+			if (ipf_pullup(fin->fin_m, fin, plen) == NULL)
 				return -1;
 #else
 			/*
-			 * Fake fr_pullup failing
+			 * Fake ipf_pullup failing
 			 */
 			*fin->fin_mp = NULL;
 			fin->fin_m = NULL;
@@ -961,7 +1044,7 @@ int plen;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    frpr_short                                                  */
+/* Function:    ipf_pr_short                                                */
 /* Returns:     void                                                        */
 /* Parameters:  fin(I)  - pointer to packet information                     */
 /*              xmin(I) - minimum header size                               */
@@ -972,9 +1055,10 @@ int plen;
 /* start within the layer 4 header (hdrmin) or if it is at offset 0, the    */
 /* entire layer 4 header must be present (min).                             */
 /* ------------------------------------------------------------------------ */
-static INLINE void frpr_short(fin, xmin)
-fr_info_t *fin;
-int xmin;
+static INLINE void
+ipf_pr_short(fin, xmin)
+	fr_info_t *fin;
+	int xmin;
 {
 
 	if (fin->fin_off == 0) {
@@ -987,7 +1071,7 @@ int xmin;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    frpr_icmp                                                   */
+/* Function:    ipf_pr_icmp                                                 */
 /* Returns:     void                                                        */
 /* Parameters:  fin(I) - pointer to packet information                      */
 /*                                                                          */
@@ -999,25 +1083,33 @@ int xmin;
 /*                                                                          */
 /* XXX - other ICMP sanity checks?                                          */
 /* ------------------------------------------------------------------------ */
-static INLINE void frpr_icmp(fin)
-fr_info_t *fin;
+static INLINE void
+ipf_pr_icmp(fin)
+	fr_info_t *fin;
 {
 	int minicmpsz = sizeof(struct icmp);
 	icmphdr_t *icmp;
 	ip_t *oip;
 
-	frpr_short(fin, ICMPERR_ICMPHLEN);
+	ipf_pr_short(fin, ICMPERR_ICMPHLEN);
 
-	if (fin->fin_off != 0)
+	if (fin->fin_off != 0) {
+		ATOMIC_INCL(ipf_stats[fin->fin_out].fr_v4_icmp_frag);
 		return;
+	}
 
-	if (frpr_pullup(fin, ICMPERR_ICMPHLEN) == -1)
+	if (ipf_pr_pullup(fin, ICMPERR_ICMPHLEN) == -1) {
+		ATOMIC_INCL(ipf_stats[fin->fin_out].fr_v4_icmp_pullup);
 		return;
+	}
 
 	if (fin->fin_dlen > 1) {
 		icmp = fin->fin_dp;
 
 		fin->fin_data[0] = *(u_short *)icmp;
+
+		if (fin->fin_dlen >= 6)				/* ID field */
+			fin->fin_data[1] = icmp->icmp_id;
 
 		switch (icmp->icmp_type)
 		{
@@ -1053,7 +1145,7 @@ fr_info_t *fin;
 		case ICMP_UNREACH :
 #ifdef icmp_nextmtu
 			if (icmp->icmp_code == ICMP_UNREACH_NEEDFRAG) {
-				if (icmp->icmp_nextmtu < fr_icmpminfragmtu)
+				if (icmp->icmp_nextmtu < ipf_icmpminfragmtu)
 					fin->fin_flx |= FI_BAD;
 			}
 #endif
@@ -1062,8 +1154,12 @@ fr_info_t *fin;
 		case ICMP_TIMXCEED :
 		case ICMP_PARAMPROB :
 			fin->fin_flx |= FI_ICMPERR;
-			if (fr_coalesce(fin) != 1)
+			if (ipf_coalesce(fin) != 1) {
+				ATOMIC_INCL(ipf_stats[fin->fin_out].
+					    fr_icmp_coalesce);
 				return;
+			}
+
 			/*
 			 * ICMP error packets should not be generated for IP
 			 * packets that are a fragment that isn't the first
@@ -1072,23 +1168,28 @@ fr_info_t *fin;
 			oip = (ip_t *)((char *)fin->fin_dp + ICMPERR_ICMPHLEN);
 			if ((ntohs(oip->ip_off) & IP_OFFMASK) != 0)
 				fin->fin_flx |= FI_BAD;
+
+			/*
+			 * If the destination of this packet doesn't match the
+			 * source of the original packet then this packet is
+			 * not correct.
+			 */
+			if (oip->ip_src.s_addr != fin->fin_daddr)
+				fin->fin_flx |= FI_BAD;
 			break;
 		default :
 			break;
 		}
-
-		if (fin->fin_dlen >= 6)				/* ID field */
-			fin->fin_data[1] = icmp->icmp_id;
 	}
 
-	frpr_short(fin, minicmpsz);
+	ipf_pr_short(fin, minicmpsz);
 
-	fr_checkv4sum(fin);
+	ipf_checkv4sum(fin);
 }
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    frpr_tcpcommon                                              */
+/* Function:    ipf_pr_tcpcommon                                            */
 /* Returns:     int    - 0 = header ok, 1 = bad packet, -1 = buffer error   */
 /* Parameters:  fin(I) - pointer to packet information                      */
 /*                                                                          */
@@ -1097,18 +1198,23 @@ fr_info_t *fin;
 /* If compiled with IPFILTER_CKSUM, check to see if the TCP checksum is     */
 /* valid and mark the packet as bad if not.                                 */
 /* ------------------------------------------------------------------------ */
-static INLINE int frpr_tcpcommon(fin)
-fr_info_t *fin;
+static INLINE int
+ipf_pr_tcpcommon(fin)
+	fr_info_t *fin;
 {
 	int flags, tlen;
 	tcphdr_t *tcp;
 
 	fin->fin_flx |= FI_TCPUDP;
-	if (fin->fin_off != 0)
+	if (fin->fin_off != 0) {
+		ATOMIC_INCL(ipf_stats[fin->fin_out].fr_tcp_frag);
 		return 0;
+	}
 
-	if (frpr_pullup(fin, sizeof(*tcp)) == -1)
+	if (ipf_pr_pullup(fin, sizeof(*tcp)) == -1) {
+		ATOMIC_INCL(ipf_stats[fin->fin_out].fr_tcp_pullup);
 		return -1;
+	}
 	tcp = fin->fin_dp;
 
 	tcp = fin->fin_dp;
@@ -1117,8 +1223,10 @@ fr_info_t *fin;
 		fin->fin_dport = ntohs(tcp->th_dport);
 	}
 
-	if ((fin->fin_flx & FI_SHORT) != 0)
+	if ((fin->fin_flx & FI_SHORT) != 0) {
+		ATOMIC_INCL(ipf_stats[fin->fin_out].fr_tcp_short);
 		return 1;
+	}
 
 	/*
 	 * Use of the TCP data offset *must* result in a value that is at
@@ -1126,6 +1234,7 @@ fr_info_t *fin;
 	 */
 	tlen = TCP_OFF(tcp) << 2;
 	if (tlen < sizeof(tcphdr_t)) {
+		ATOMIC_INCL(ipf_stats[fin->fin_out].fr_tcp_small);
 		fin->fin_flx |= FI_BAD;
 		return 1;
 	}
@@ -1140,14 +1249,27 @@ fr_info_t *fin;
 	 */
 	if ((flags & TH_URG) != 0 && (tcp->th_urp == 0)) {
 		fin->fin_flx |= FI_BAD;
+#if 0
 	} else if ((flags & TH_URG) == 0 && (tcp->th_urp != 0)) {
-		/* Ignore this case, it shows up in "real" traffic with */
-		/* bogus values in the urgent pointer field. */
-		;
+		/*
+		 * Ignore this case (#if 0) as it shows up in "real"
+		 * traffic with bogus values in the urgent pointer field.
+		 */
+		fin->fin_flx |= FI_BAD;
+#endif
 	} else if (((flags & (TH_SYN|TH_FIN)) != 0) &&
 		   ((flags & (TH_RST|TH_ACK)) == TH_RST)) {
 		/* TH_FIN|TH_RST|TH_ACK seems to appear "naturally" */
 		fin->fin_flx |= FI_BAD;
+#if 1
+	} else if (((flags & TH_SYN) != 0) &&
+		   ((flags & (TH_URG|TH_PUSH)) != 0)) {
+		/*
+		 * SYN with URG and PUSH set is not for normal TCP but it is
+		 * possible(?) with T/TCP...but who uses T/TCP?
+		 */
+		fin->fin_flx |= FI_BAD;
+#endif
 	} else if (!(flags & TH_ACK)) {
 		/*
 		 * If the ack bit isn't set, then either the SYN or
@@ -1171,6 +1293,10 @@ fr_info_t *fin;
 			fin->fin_flx |= FI_BAD;
 		}
 	}
+	if (fin->fin_flx & FI_BAD) {
+		ATOMIC_INCL(ipf_stats[fin->fin_out].fr_tcp_bad_flags);
+		return 1;
+	}
 
 	/*
 	 * At this point, it's not exactly clear what is to be gained by
@@ -1180,13 +1306,17 @@ fr_info_t *fin;
 	 * Now if we were to analyse the header for passive fingerprinting,
 	 * then that might add some weight to adding this...
 	 */
-	if (tlen == sizeof(tcphdr_t))
+	if (tlen == sizeof(tcphdr_t)) {
 		return 0;
+	}
 
-	if (frpr_pullup(fin, tlen) == -1)
+	if (ipf_pr_pullup(fin, tlen) == -1) {
+		ATOMIC_INCL(ipf_stats[fin->fin_out].fr_tcp_pullup);
 		return -1;
+	}
 
 #if 0
+	tcp = fin->fin_dp;
 	ip = fin->fin_ip;
 	s = (u_char *)(tcp + 1);
 	off = IP_HL(ip) << 2;
@@ -1230,23 +1360,25 @@ fr_info_t *fin;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    frpr_udpcommon                                              */
+/* Function:    ipf_pr_udpcommon                                            */
 /* Returns:     int    - 0 = header ok, 1 = bad packet                      */
 /* Parameters:  fin(I) - pointer to packet information                      */
 /*                                                                          */
 /* Extract the UDP source and destination ports, if present.  If compiled   */
 /* with IPFILTER_CKSUM, check to see if the UDP checksum is valid.          */
 /* ------------------------------------------------------------------------ */
-static INLINE int frpr_udpcommon(fin)
-fr_info_t *fin;
+static INLINE int
+ipf_pr_udpcommon(fin)
+	fr_info_t *fin;
 {
 	udphdr_t *udp;
 
 	fin->fin_flx |= FI_TCPUDP;
 
 	if (!fin->fin_off && (fin->fin_dlen > 3)) {
-		if (frpr_pullup(fin, sizeof(*udp)) == -1) {
+		if (ipf_pr_pullup(fin, sizeof(*udp)) == -1) {
 			fin->fin_flx |= FI_SHORT;
+			ATOMIC_INCL(ipf_stats[fin->fin_out].fr_udp_pullup);
 			return 1;
 		}
 
@@ -1261,45 +1393,47 @@ fr_info_t *fin;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    frpr_tcp                                                    */
+/* Function:    ipf_pr_tcp                                                  */
 /* Returns:     void                                                        */
 /* Parameters:  fin(I) - pointer to packet information                      */
 /*                                                                          */
 /* IPv4 Only                                                                */
 /* Analyse the packet for IPv4/TCP properties.                              */
 /* ------------------------------------------------------------------------ */
-static INLINE void frpr_tcp(fin)
-fr_info_t *fin;
+static INLINE void
+ipf_pr_tcp(fin)
+	fr_info_t *fin;
 {
 
-	frpr_short(fin, sizeof(tcphdr_t));
+	ipf_pr_short(fin, sizeof(tcphdr_t));
 
-	if (frpr_tcpcommon(fin) == 0)
-		fr_checkv4sum(fin);
+	if (ipf_pr_tcpcommon(fin) == 0)
+		ipf_checkv4sum(fin);
 }
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    frpr_udp                                                    */
+/* Function:    ipf_pr_udp                                                  */
 /* Returns:     void                                                        */
 /* Parameters:  fin(I) - pointer to packet information                      */
 /*                                                                          */
 /* IPv4 Only                                                                */
 /* Analyse the packet for IPv4/UDP properties.                              */
 /* ------------------------------------------------------------------------ */
-static INLINE void frpr_udp(fin)
-fr_info_t *fin;
+static INLINE void
+ipf_pr_udp(fin)
+	fr_info_t *fin;
 {
 
-	frpr_short(fin, sizeof(udphdr_t));
+	ipf_pr_short(fin, sizeof(udphdr_t));
 
-	if (frpr_udpcommon(fin) == 0)
-		fr_checkv4sum(fin);
+	if (ipf_pr_udpcommon(fin) == 0)
+		ipf_checkv4sum(fin);
 }
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    frpr_esp                                                    */
+/* Function:    ipf_pr_esp                                                  */
 /* Returns:     void                                                        */
 /* Parameters:  fin(I) - pointer to packet information                      */
 /*                                                                          */
@@ -1309,19 +1443,21 @@ fr_info_t *fin;
 /* is 32bits as well, it is not possible(?) to determine the version from a */
 /* simple packet header.                                                    */
 /* ------------------------------------------------------------------------ */
-static INLINE void frpr_esp(fin)
-fr_info_t *fin;
+static INLINE void
+ipf_pr_esp(fin)
+	fr_info_t *fin;
 {
 
 	if (fin->fin_off == 0) {
-		frpr_short(fin, 8);
-		(void) frpr_pullup(fin, 8);
+		ipf_pr_short(fin, 8);
+		if (ipf_pr_pullup(fin, 8) == -1)
+			ATOMIC_INCL(ipf_stats[fin->fin_out].fr_v4_esp_pullup);
 	}
 }
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    frpr_ah                                                     */
+/* Function:    ipf_pr_ah                                                   */
 /* Returns:     int    - value of the next header or IPPROTO_NONE if error  */
 /* Parameters:  fin(I) - pointer to packet information                      */
 /*                                                                          */
@@ -1329,27 +1465,34 @@ fr_info_t *fin;
 /* The minimum length is taken to be the combination of all fields in the   */
 /* header being present and no authentication data (null algorithm used.)   */
 /* ------------------------------------------------------------------------ */
-static INLINE int frpr_ah(fin)
-fr_info_t *fin;
+static INLINE int
+ipf_pr_ah(fin)
+	fr_info_t *fin;
 {
 	authhdr_t *ah;
 	int len;
 
 	fin->fin_flx |= FI_AH;
-	frpr_short(fin, sizeof(*ah));
+	ipf_pr_short(fin, sizeof(*ah));
 
-	if (((fin->fin_flx & FI_SHORT) != 0) || (fin->fin_off != 0))
+	if (((fin->fin_flx & FI_SHORT) != 0) || (fin->fin_off != 0)) {
+		ATOMIC_INCL(ipf_stats[fin->fin_out].fr_v4_ah_bad);
 		return IPPROTO_NONE;
+	}
 
-	if (frpr_pullup(fin, sizeof(*ah)) == -1)
+	if (ipf_pr_pullup(fin, sizeof(*ah)) == -1) {
+		ATOMIC_INCL(ipf_stats[fin->fin_out].fr_v4_ah_pullup);
 		return IPPROTO_NONE;
+	}
 
 	ah = (authhdr_t *)fin->fin_dp;
 
 	len = (ah->ah_plen + 2) << 2;
-	frpr_short(fin, len);
-	if (frpr_pullup(fin, len) == -1)
+	ipf_pr_short(fin, len);
+	if (ipf_pr_pullup(fin, len) == -1) {
+		ATOMIC_INCL(ipf_stats[fin->fin_out].fr_v4_ah_pullup);
 		return IPPROTO_NONE;
+	}
 
 	/*
 	 * Adjust fin_dp and fin_dlen for skipping over the authentication
@@ -1362,24 +1505,29 @@ fr_info_t *fin;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    frpr_gre                                                    */
+/* Function:    ipf_pr_gre                                                  */
 /* Returns:     void                                                        */
 /* Parameters:  fin(I) - pointer to packet information                      */
 /*                                                                          */
 /* Analyse the packet for GRE properties.                                   */
 /* ------------------------------------------------------------------------ */
-static INLINE void frpr_gre(fin)
-fr_info_t *fin;
+static INLINE void
+ipf_pr_gre(fin)
+	fr_info_t *fin;
 {
 	grehdr_t *gre;
 
-	frpr_short(fin, sizeof(grehdr_t));
+	ipf_pr_short(fin, sizeof(grehdr_t));
 
-	if (fin->fin_off != 0)
+	if (fin->fin_off != 0) {
+		ATOMIC_INCL(ipf_stats[fin->fin_out].fr_v4_gre_frag);
 		return;
+	}
 
-	if (frpr_pullup(fin, sizeof(grehdr_t)) == -1)
+	if (ipf_pr_pullup(fin, sizeof(grehdr_t)) == -1) {
+		ATOMIC_INCL(ipf_stats[fin->fin_out].fr_v4_gre_pullup);
 		return;
+	}
 
 	gre = fin->fin_dp;
 	if (GRE_REV(gre->gr_flags) == 1)
@@ -1388,7 +1536,7 @@ fr_info_t *fin;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    frpr_ipv4hdr                                                */
+/* Function:    ipf_pr_ipv4hdr                                              */
 /* Returns:     void                                                        */
 /* Parameters:  fin(I) - pointer to packet information                      */
 /*                                                                          */
@@ -1396,8 +1544,9 @@ fr_info_t *fin;
 /* Analyze the IPv4 header and set fields in the fr_info_t structure.       */
 /* Check all options present and flag their presence if any exist.          */
 /* ------------------------------------------------------------------------ */
-static INLINE void frpr_ipv4hdr(fin)
-fr_info_t *fin;
+static INLINE void
+ipf_pr_ipv4hdr(fin)
+	fr_info_t *fin;
 {
 	u_short optmsk = 0, secmsk = 0, auth = 0;
 	int hlen, ol, mv, p, i;
@@ -1441,13 +1590,16 @@ fr_info_t *fin;
 	 */
 	off &= IP_MF|IP_OFFMASK;
 	if (off != 0) {
+		int morefrag = off & IP_MF;
+
 		fi->fi_flx |= FI_FRAG;
 		off &= IP_OFFMASK;
 		if (off != 0) {
 			fin->fin_flx |= FI_FRAGBODY;
 			off <<= 3;
 			if ((off + fin->fin_dlen > 65535) ||
-			    (fin->fin_dlen == 0) || (fin->fin_dlen & 7)) {
+			    (fin->fin_dlen == 0) ||
+			    ((morefrag != 0) && ((fin->fin_dlen & 7) != 0))) {
 				/*
 				 * The length of the packet, starting at its
 				 * offset cannot exceed 65535 (0xffff) as the
@@ -1471,25 +1623,25 @@ fr_info_t *fin;
 		 * Treat AH differently because we expect there to be another
 		 * layer 4 header after it.
 		 */
-		p = frpr_ah(fin);
+		p = ipf_pr_ah(fin);
 	}
 
 	switch (p)
 	{
 	case IPPROTO_UDP :
-		frpr_udp(fin);
+		ipf_pr_udp(fin);
 		break;
 	case IPPROTO_TCP :
-		frpr_tcp(fin);
+		ipf_pr_tcp(fin);
 		break;
 	case IPPROTO_ICMP :
-		frpr_icmp(fin);
+		ipf_pr_icmp(fin);
 		break;
 	case IPPROTO_ESP :
-		frpr_esp(fin);
+		ipf_pr_esp(fin);
 		break;
 	case IPPROTO_GRE :
-		frpr_gre(fin);
+		ipf_pr_gre(fin);
 		break;
 	}
 
@@ -1542,7 +1694,7 @@ fr_info_t *fin;
 					if (optmsk & op->ol_bit) {
 						fin->fin_flx |= FI_BAD;
 					} else {
-						doi = fr_checkripso(s);
+						doi = ipf_checkripso(s);
 						secmsk = doi >> 16;
 						auth = doi & 0xffff;
 					}
@@ -1553,7 +1705,8 @@ fr_info_t *fin;
 					if (optmsk & op->ol_bit) {
 						fin->fin_flx |= FI_BAD;
 					} else {
-						doi = fr_checkcipso(fin, s, ol);
+						doi = ipf_checkcipso(fin,
+								     s, ol);
 						secmsk = doi >> 16;
 						auth = doi & 0xffff;
 					}
@@ -1584,13 +1737,14 @@ fr_info_t *fin;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_checkripso                                               */
+/* Function:    ipf_checkripso                                              */
 /* Returns:     void                                                        */
 /* Parameters:  s(I)   - pointer to start of RIPSO option                   */
 /*                                                                          */
 /* ------------------------------------------------------------------------ */
-static u_32_t fr_checkripso(s)
-char *s;
+static u_32_t
+ipf_checkripso(s)
+	u_char *s;
 {
 	const struct optlist *sp;
 	u_short secmsk = 0, auth = 0;
@@ -1619,17 +1773,18 @@ char *s;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_checkcipso                                               */
+/* Function:    ipf_checkcipso                                              */
 /* Returns:     void                                                        */
 /* Parameters:  fin(IO) - pointer to packet information                     */
 /*              s(I)    - pointer to start of CIPSO option                  */
 /*              ol(I)   - length of CIPSO option field                      */
 /*                                                                          */
 /* ------------------------------------------------------------------------ */
-static u_32_t fr_checkcipso(fin, s, ol)
-fr_info_t *fin;
-char *s;
-int ol;
+static u_32_t
+ipf_checkcipso(fin, s, ol)
+	fr_info_t *fin;
+	u_char *s;
+	int ol;
 {
 	fr_ip_t *fi;
 	u_32_t doi;
@@ -1637,6 +1792,7 @@ int ol;
 	int len;
 
 	if (ol < 6 || ol > 40) {
+		ATOMIC_INCL(ipf_stats[fin->fin_out].fr_v4_cipso_bad);
 		fin->fin_flx |= FI_BAD;
 		return 0;
 	}
@@ -1653,6 +1809,7 @@ int ol;
 		tag = *t;
 		tlen = *(t + 1);
 		if (tlen > len || tlen < 4 || tlen > 34) {
+			ATOMIC_INCL(ipf_stats[fin->fin_out].fr_v4_cipso_tlen);
 			fin->fin_flx |= FI_BAD;
 			return 0;
 		}
@@ -1706,7 +1863,7 @@ int ol;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_makefrip                                                 */
+/* Function:    ipf_makefrip                                                */
 /* Returns:     void                                                        */
 /* Parameters:  hlen(I) - length of IP packet header                        */
 /*              ip(I)   - pointer to the IP header                          */
@@ -1717,10 +1874,11 @@ int ol;
 /* in the fr_info_t structure pointer to by fin.  At present, it is assumed */
 /* this function will be called with either an IPv4 or IPv6 packet.         */
 /* ------------------------------------------------------------------------ */
-int	fr_makefrip(hlen, ip, fin)
-int hlen;
-ip_t *ip;
-fr_info_t *fin;
+int
+ipf_makefrip(hlen, ip, fin)
+	int hlen;
+	ip_t *ip;
+	fr_info_t *fin;
 {
 	int v;
 
@@ -1732,41 +1890,50 @@ fr_info_t *fin;
 	fin->fin_rule = 0xffffffff;
 	fin->fin_group[0] = -1;
 	fin->fin_group[1] = '\0';
-	fin->fin_dlen = fin->fin_plen - hlen;
 	fin->fin_dp = (char *)ip + hlen;
 
 	v = fin->fin_v;
-	if (v == 4)
-		frpr_ipv4hdr(fin);
+	if (v == 4) {
+		fin->fin_plen = ntohs(ip->ip_len);
+		fin->fin_dlen = fin->fin_plen - hlen;
+		ipf_pr_ipv4hdr(fin);
 #ifdef	USE_INET6
-	else if (v == 6) {
-		if (frpr_ipv6hdr(fin) == -1)
+	} else if (v == 6) {
+		fin->fin_plen = ntohs(((ip6_t *)ip)->ip6_plen);
+		fin->fin_dlen = fin->fin_plen;
+		fin->fin_plen += hlen;
+
+		if (ipf_pr_ipv6hdr(fin) == -1) {
+			ATOMIC_INCL(ipf_stats[fin->fin_out].fr_v6_bad);
 			return -1;
-	}
+		}
 #endif
-	if (fin->fin_ip == NULL)
+	}
+	if (fin->fin_ip == NULL) {
+		ATOMIC_INCL(ipf_stats[fin->fin_out].fr_ip_freed);
 		return -1;
+	}
 	return 0;
 }
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_portcheck                                                */
+/* Function:    ipf_portcheck                                               */
 /* Returns:     int - 1 == port matched, 0 == port match failed             */
 /* Parameters:  frp(I) - pointer to port check `expression'                 */
-/*              pop(I) - pointer to port number to evaluate                 */
+/*              pop(I) - port number to evaluate                            */
 /*                                                                          */
 /* Perform a comparison of a port number against some other(s), using a     */
 /* structure with compare information stored in it.                         */
 /* ------------------------------------------------------------------------ */
-static INLINE int fr_portcheck(frp, pop)
-frpcmp_t *frp;
-u_short *pop;
+static INLINE int
+ipf_portcheck(frp, pop)
+	frpcmp_t *frp;
+	u_32_t pop;
 {
-	u_short tup, po;
 	int err = 1;
+	u_32_t po;
 
-	tup = *pop;
 	po = frp->frp_port;
 
 	/*
@@ -1775,39 +1942,39 @@ u_short *pop;
 	switch (frp->frp_cmp)
 	{
 	case FR_EQUAL :
-		if (tup != po) /* EQUAL */
+		if (pop != po) /* EQUAL */
 			err = 0;
 		break;
 	case FR_NEQUAL :
-		if (tup == po) /* NOTEQUAL */
+		if (pop == po) /* NOTEQUAL */
 			err = 0;
 		break;
 	case FR_LESST :
-		if (tup >= po) /* LESSTHAN */
+		if (pop >= po) /* LESSTHAN */
 			err = 0;
 		break;
 	case FR_GREATERT :
-		if (tup <= po) /* GREATERTHAN */
+		if (pop <= po) /* GREATERTHAN */
 			err = 0;
 		break;
 	case FR_LESSTE :
-		if (tup > po) /* LT or EQ */
+		if (pop > po) /* LT or EQ */
 			err = 0;
 		break;
 	case FR_GREATERTE :
-		if (tup < po) /* GT or EQ */
+		if (pop < po) /* GT or EQ */
 			err = 0;
 		break;
 	case FR_OUTRANGE :
-		if (tup >= po && tup <= frp->frp_top) /* Out of range */
+		if (pop >= po && pop <= frp->frp_top) /* Out of range */
 			err = 0;
 		break;
 	case FR_INRANGE :
-		if (tup <= po || tup >= frp->frp_top) /* In range */
+		if (pop <= po || pop >= frp->frp_top) /* In range */
 			err = 0;
 		break;
 	case FR_INCRANGE :
-		if (tup < po || tup > frp->frp_top) /* Inclusive range */
+		if (pop < po || pop > frp->frp_top) /* Inclusive range */
 			err = 0;
 		break;
 	default :
@@ -1818,17 +1985,18 @@ u_short *pop;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_tcpudpchk                                                */
+/* Function:    ipf_tcpudpchk                                               */
 /* Returns:     int - 1 == protocol matched, 0 == check failed              */
-/* Parameters:  fin(I) - pointer to packet information                      */
+/* Parameters:  fda(I) - pointer to packet information                      */
 /*              ft(I)  - pointer to structure with comparison data          */
 /*                                                                          */
 /* Compares the current pcket (assuming it is TCP/UDP) information with a   */
 /* structure containing information that we want to match against.          */
 /* ------------------------------------------------------------------------ */
-int fr_tcpudpchk(fin, ft)
-fr_info_t *fin;
-frtuc_t *ft;
+int
+ipf_tcpudpchk(fi, ft)
+	fr_ip_t *fi;
+	frtuc_t *ft;
 {
 	int err = 1;
 
@@ -1839,13 +2007,13 @@ frtuc_t *ft;
 	 * compare destination ports
 	 */
 	if (ft->ftu_dcmp)
-		err = fr_portcheck(&ft->ftu_dst, &fin->fin_dport);
+		err = ipf_portcheck(&ft->ftu_dst, fi->fi_ports[1]);
 
 	/*
 	 * compare source ports
 	 */
 	if (err && ft->ftu_scmp)
-		err = fr_portcheck(&ft->ftu_src, &fin->fin_sport);
+		err = ipf_portcheck(&ft->ftu_src, fi->fi_ports[0]);
 
 	/*
 	 * If we don't have all the TCP/UDP header, then how can we
@@ -1853,15 +2021,15 @@ frtuc_t *ft;
 	 * TCP flags, then NO match.  If not, then match (which should
 	 * satisfy the "short" class too).
 	 */
-	if (err && (fin->fin_p == IPPROTO_TCP)) {
-		if (fin->fin_flx & FI_SHORT)
+	if (err && (fi->fi_p == IPPROTO_TCP)) {
+		if (fi->fi_flx & FI_SHORT)
 			return !(ft->ftu_tcpf | ft->ftu_tcpfm);
 		/*
 		 * Match the flags ?  If not, abort this match.
 		 */
 		if (ft->ftu_tcpfm &&
-		    ft->ftu_tcpf != (fin->fin_tcpf & ft->ftu_tcpfm)) {
-			FR_DEBUG(("f. %#x & %#x != %#x\n", fin->fin_tcpf,
+		    ft->ftu_tcpf != (fi->fi_tcpf & ft->ftu_tcpfm)) {
+			FR_DEBUG(("f. %#x & %#x != %#x\n", fi->fi_tcpf,
 				 ft->ftu_tcpfm, ft->ftu_tcpf));
 			err = 0;
 		}
@@ -1871,8 +2039,8 @@ frtuc_t *ft;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_ipfcheck                                                 */
-/* Returns:     int - 0 == match, 1 == no match                             */
+/* Function:    ipf_check_ipf                                               */
+/* Returns:     int - 0 == match, else no match                             */
 /* Parameters:  fin(I)     - pointer to packet information                  */
 /*              fr(I)      - pointer to filter rule                         */
 /*              portcmp(I) - flag indicating whether to attempt matching on */
@@ -1882,10 +2050,11 @@ frtuc_t *ft;
 /* port numbers, etc, for "standard" IPFilter rules are all orchestrated in */
 /* this function.                                                           */
 /* ------------------------------------------------------------------------ */
-static INLINE int fr_ipfcheck(fin, fr, portcmp)
-fr_info_t *fin;
-frentry_t *fr;
-int portcmp;
+static INLINE int
+ipf_check_ipf(fin, fr, portcmp)
+	fr_info_t *fin;
+	frentry_t *fr;
+	int portcmp;
 {
 	u_32_t	*ld, *lm, *lip;
 	fripf_t *fri;
@@ -1913,10 +2082,10 @@ int portcmp;
 	 * are present (if any) in this packet.
 	 */
 	lip++, lm++, ld++;
-	i |= ((*lip & *lm) != *ld);
+	i = ((*lip & *lm) != *ld);
 	FR_DEBUG(("1. %#08x & %#08x != %#08x\n",
 		   ntohl(*lip), ntohl(*lm), ntohl(*ld)));
-	if (i)
+	if (i != 0)
 		return 1;
 
 	lip++, lm++, ld++;
@@ -1961,7 +2130,7 @@ int portcmp;
 	}
 #endif
 	i ^= (fr->fr_flags & FR_NOTSRCIP) >> 6;
-	if (i)
+	if (i != 0)
 		return 1;
 
 	/*
@@ -2003,24 +2172,22 @@ int portcmp;
 	}
 #endif
 	i ^= (fr->fr_flags & FR_NOTDSTIP) >> 7;
-	if (i)
+	if (i != 0)
 		return 1;
 	/*
 	 * IP addresses matched.  The next 32bits contains:
 	 * mast of old IP header security & authentication bits.
 	 */
 	lip++, lm++, ld++;
-	i |= ((*lip & *lm) != *ld);
-	FR_DEBUG(("4. %#08x & %#08x != %#08x\n",
-		   *lip, *lm, *ld));
+	i = (*ld - (*lip & *lm));
+	FR_DEBUG(("4. %#08x & %#08x != %#08x\n", *lip, *lm, *ld));
 
 	/*
 	 * Next we have 32 bits of packet flags.
 	 */
 	lip++, lm++, ld++;
-	i |= ((*lip & *lm) != *ld);
-	FR_DEBUG(("5. %#08x & %#08x != %#08x\n",
-		   *lip, *lm, *ld));
+	i |= (*ld - (*lip & *lm));
+	FR_DEBUG(("5. %#08x & %#08x != %#08x\n", *lip, *lm, *ld));
 
 	if (i == 0) {
 		/*
@@ -2028,7 +2195,7 @@ int portcmp;
 		 * looking for here...
 		 */
 		if (portcmp) {
-			if (!fr_tcpudpchk(fin, &fr->fr_tuc))
+			if (!ipf_tcpudpchk(&fin->fin_fi, &fr->fr_tuc))
 				i = 1;
 		} else {
 			if (fr->fr_dcmp || fr->fr_scmp ||
@@ -2054,7 +2221,7 @@ int portcmp;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_scanlist                                                 */
+/* Function:    ipf_scanlist                                                */
 /* Returns:     int - result flags of scanning filter list                  */
 /* Parameters:  fin(I) - pointer to packet information                      */
 /*              pass(I) - default result to return for filtering            */
@@ -2069,11 +2236,12 @@ int portcmp;
 /* Could be per interface, but this gets real nasty when you don't have,    */
 /* or can't easily change, the kernel source code to .                      */
 /* ------------------------------------------------------------------------ */
-int fr_scanlist(fin, pass)
-fr_info_t *fin;
-u_32_t pass;
+int
+ipf_scanlist(fin, pass)
+	fr_info_t *fin;
+	u_32_t pass;
 {
-	int rulen, portcmp, off, logged, skip;
+	int rulen, portcmp, off, skip;
 	struct frentry *fr, *fnext;
 	u_32_t passt, passo;
 
@@ -2092,7 +2260,6 @@ u_32_t pass;
 		return pass;
 
 	skip = 0;
-	logged = 0;
 	portcmp = 0;
 	fin->fin_depth++;
 	fin->fin_fr = NULL;
@@ -2104,7 +2271,7 @@ u_32_t pass;
 	for (rulen = 0; fr; fr = fnext, rulen++) {
 		fnext = fr->fr_next;
 		if (skip != 0) {
-			FR_VERBOSE(("%d (%#x)\n", skip, fr->fr_flags));
+			FR_VERBOSE(("SKIP %d (%#x)\n", skip, fr->fr_flags));
 			skip--;
 			continue;
 		}
@@ -2135,7 +2302,7 @@ u_32_t pass;
 		{
 		case FR_T_IPF :
 		case FR_T_IPF|FR_T_BUILTIN :
-			if (fr_ipfcheck(fin, fr, portcmp))
+			if (ipf_check_ipf(fin, fr, portcmp))
 				continue;
 			break;
 #if defined(IPFILTER_BPF)
@@ -2167,6 +2334,15 @@ u_32_t pass;
 				continue;
 			break;
 		    }
+
+		case FR_T_IPFEXPR :
+		case FR_T_IPFEXPR|FR_T_BUILTIN :
+			if (fin->fin_v != fr->fr_v)
+				continue;
+			if (ipf_fr_matcharray(fin, fr->fr_data) == 0)
+				continue;
+			break;
+
 		default :
 			break;
 		}
@@ -2174,21 +2350,12 @@ u_32_t pass;
 		if ((fin->fin_out == 0) && (fr->fr_nattag.ipt_num[0] != 0)) {
 			if (fin->fin_nattag == NULL)
 				continue;
-			if (fr_matchtag(&fr->fr_nattag, fin->fin_nattag) == 0)
+			if (ipf_matchtag(&fr->fr_nattag, fin->fin_nattag) == 0)
 				continue;
 		}
 		FR_VERBOSE(("=%s/%s.%d *", fr->fr_grhead,fr->fr_group, rulen));
 
 		passt = fr->fr_flags;
-
-		/*
-		 * Allowing a rule with the "keep state" flag set to match
-		 * packets that have been tagged "out of window" by the TCP
-		 * state tracking is foolish as the attempt to add a new
-		 * state entry to the table will fail.
-		 */
-		if ((passt & FR_KEEPSTATE) && (fin->fin_flx & FI_OOW))
-			continue;
 
 		/*
 		 * If the rule is a "call now" rule, then call the function
@@ -2220,40 +2387,49 @@ u_32_t pass;
 		 * Just log this packet...
 		 */
 		if ((passt & FR_LOGMASK) == FR_LOG) {
-			if (ipflog(fin, passt) == -1) {
+			if (ipf_log_pkt(fin, passt) == -1) {
 				if (passt & FR_LOGORBLOCK) {
 					passt &= ~FR_CMDMASK;
 					passt |= FR_BLOCK|FR_QUICK;
+					fin->fin_reason = 1;
 				}
-				ATOMIC_INCL(frstats[fin->fin_out].fr_skip);
+				ATOMIC_INCL(ipf_stats[fin->fin_out].fr_skip);
 			}
-			ATOMIC_INCL(frstats[fin->fin_out].fr_pkl);
-			logged = 1;
+			ATOMIC_INCL(ipf_stats[fin->fin_out].fr_pkl);
+			fin->fin_flx |= FI_DONTCACHE;
 		}
 #endif /* IPFILTER_LOG */
-		passo = pass;
-		if (FR_ISSKIP(passt))
-			skip = fr->fr_arg;
-		else if ((passt & FR_LOGMASK) != FR_LOG)
-			pass = passt;
-		if (passt & (FR_RETICMP|FR_FAKEICMP))
-			fin->fin_icode = fr->fr_icode;
-		FR_DEBUG(("pass %#x\n", pass));
+
 		MUTEX_ENTER(&fr->fr_lock);
 		fr->fr_bytes += (U_QUAD_T)fin->fin_plen;
 		fr->fr_hits++;
 		MUTEX_EXIT(&fr->fr_lock);
 		fin->fin_rule = rulen;
+
+		passo = pass;
+		if (FR_ISSKIP(passt)) {
+			skip = fr->fr_arg;
+			continue;
+		} else if ((passt & FR_LOGMASK) != FR_LOG) {
+			pass = passt;
+		}
+
+		if (passt & (FR_RETICMP|FR_FAKEICMP))
+			fin->fin_icode = fr->fr_icode;
+
 		(void) strncpy(fin->fin_group, fr->fr_group, FR_GROUPLEN);
+
+		FR_DEBUG(("pass %#x\n", pass));
+
 		if (fr->fr_grp != NULL) {
 
 			fin->fin_fr = *fr->fr_grp;
 			FR_VERBOSE(("group %s\n", fr->fr_grhead));
 
 			if (FR_ISDECAPS(pass))
-				passt = fr_decaps(fin, pass, fr->fr_icode);
+				passt = ipf_decaps(fin, pass, fr->fr_icode);
 			else
-				passt = fr_scanlist(fin, pass);
+				passt = ipf_scanlist(fin, pass);
 
 			if (fin->fin_fr == NULL) {
 				fin->fin_rule = rulen;
@@ -2262,12 +2438,10 @@ u_32_t pass;
 				fin->fin_fr = fr;
 				passt = pass;
 			}
-			if (fin->fin_flx & FI_DONTCACHE)
-				logged = 1;
 			pass = passt;
 		}
 
-		if (passt & FR_QUICK) {
+		if (pass & FR_QUICK) {
 			/*
 			 * Finally, if we've asked to track state for this
 			 * packet, set it up.  Add state for "quick" rules
@@ -2280,10 +2454,10 @@ u_32_t pass;
 				int out = fin->fin_out;
 
 				fin->fin_fr = fr;
-				if (fr_addstate(fin, NULL, 0) != NULL) {
-					ATOMIC_INCL(frstats[out].fr_ads);
+				if (ipf_state_add(fin, NULL, 0) != NULL) {
+					ATOMIC_INCL(ipf_stats[out].fr_ads);
 				} else {
-					ATOMIC_INCL(frstats[out].fr_bads);
+					ATOMIC_INCL(ipf_stats[out].fr_bads);
 					pass = passo;
 					continue;
 				}
@@ -2291,15 +2465,13 @@ u_32_t pass;
 			break;
 		}
 	}
-	if (logged)
-		fin->fin_flx |= FI_DONTCACHE;
 	fin->fin_depth--;
 	return pass;
 }
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_acctpkt                                                  */
+/* Function:    ipf_acctpkt                                                 */
 /* Returns:     frentry_t* - always returns NULL                            */
 /* Parameters:  fin(I) - pointer to packet information                      */
 /*              passp(IO) - pointer to current/new filter decision (unused) */
@@ -2310,25 +2482,26 @@ u_32_t pass;
 /* N.B.: this function returns NULL to match the prototype used by other    */
 /* functions called from the IPFilter "mainline" in fr_check().             */
 /* ------------------------------------------------------------------------ */
-frentry_t *fr_acctpkt(fin, passp)
-fr_info_t *fin;
-u_32_t *passp;
+frentry_t *
+ipf_acctpkt(fin, passp)
+	fr_info_t *fin;
+	u_32_t *passp;
 {
 	char group[FR_GROUPLEN];
 	frentry_t *fr, *frsave;
 	u_32_t pass, rulen;
 
 	passp = passp;
-	fr = ipacct[fin->fin_out][fr_active];
+	fr = ipf_acct[fin->fin_out][ipf_active];
 
 	if (fr != NULL) {
 		frsave = fin->fin_fr;
 		bcopy(fin->fin_group, group, FR_GROUPLEN);
 		rulen = fin->fin_rule;
 		fin->fin_fr = fr;
-		pass = fr_scanlist(fin, FR_NOMATCH);
+		pass = ipf_scanlist(fin, FR_NOMATCH);
 		if (FR_ISACCOUNT(pass)) {
-			ATOMIC_INCL(frstats[0].fr_acct);
+			ATOMIC_INCL(ipf_stats[0].fr_acct);
 		}
 		fin->fin_fr = frsave;
 		bcopy(group, fin->fin_group, FR_GROUPLEN);
@@ -2339,7 +2512,7 @@ u_32_t *passp;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_firewall                                                 */
+/* Function:    ipf_firewall                                                */
 /* Returns:     frentry_t* - returns pointer to matched rule, if no matches */
 /*                           were found, returns NULL.                      */
 /* Parameters:  fin(I) - pointer to packet information                      */
@@ -2351,9 +2524,10 @@ u_32_t *passp;
 /* matching rule is found, take any appropriate actions as defined by the   */
 /* rule - except logging.                                                   */
 /* ------------------------------------------------------------------------ */
-static frentry_t *fr_firewall(fin, passp)
-fr_info_t *fin;
-u_32_t *passp;
+static frentry_t *
+ipf_firewall(fin, passp)
+	fr_info_t *fin;
+	u_32_t *passp;
 {
 	frentry_t *fr;
 	fr_info_t *fc;
@@ -2364,11 +2538,10 @@ u_32_t *passp;
 	pass = *passp;
 
 	/*
-	 * If a packet is found in the auth table, then skip checking
-	 * the access lists for permission but we do need to consider
-	 * the result as if it were from the ACL's.
+	 * This rule cache will only affect packets that are not being
+	 * statefully filtered.
 	 */
-	fc = &frcache[out][CACHE_HASH(fin)];
+	fc = &ipf_cache[out][CACHE_HASH(fin)];
 	READ_ENTER(&ipf_frcache);
 	if (!bcmp((char *)fin, (char *)fc, FI_CSIZE)) {
 		/*
@@ -2376,7 +2549,7 @@ u_32_t *passp;
 		 */
 		bcopy((char *)fc, (char *)fin, FI_COPYSIZE);
 		RWLOCK_EXIT(&ipf_frcache);
-		ATOMIC_INCL(frstats[out].fr_chit);
+		ATOMIC_INCL(ipf_stats[out].fr_chit);
 
 		if ((fr = fin->fin_fr) != NULL) {
 			ATOMIC_INC64(fr->fr_hits);
@@ -2384,10 +2557,11 @@ u_32_t *passp;
 		}
 	} else {
 		RWLOCK_EXIT(&ipf_frcache);
+		ATOMIC_INCL(ipf_stats[out].fr_cmiss);
 
-		fin->fin_fr = ipfilter[out][fr_active];
+		fin->fin_fr = ipf_rules[out][ipf_active];
 		if (fin->fin_fr != NULL)
-			pass = fr_scanlist(fin, fr_pass);
+			pass = ipf_scanlist(fin, ipf_pass);
 
 		if (((pass & FR_KEEPSTATE) == 0) &&
 		    ((fin->fin_flx & FI_DONTCACHE) == 0)) {
@@ -2396,7 +2570,7 @@ u_32_t *passp;
 			RWLOCK_EXIT(&ipf_frcache);
 		}
 		if ((pass & FR_NOMATCH)) {
-			ATOMIC_INCL(frstats[out].fr_nom);
+			ATOMIC_INCL(ipf_stats[out].fr_nom);
 		}
 		fr = fin->fin_fr;
 	}
@@ -2408,7 +2582,8 @@ u_32_t *passp;
 	    !ppsratecheck(&fr->fr_lastpkt, &fr->fr_curpps, fr->fr_pps)) {
 		pass &= ~(FR_CMDMASK|FR_DUP|FR_RETICMP|FR_RETRST);
 		pass |= FR_BLOCK;
-		ATOMIC_INCL(frstats[out].fr_ppshit);
+		ATOMIC_INCL(ipf_stats[out].fr_ppshit);
+		fin->fin_reason = 2;
 	}
 
 	/*
@@ -2417,7 +2592,7 @@ u_32_t *passp;
 	 * we've dropped it already.
 	 */
 	if (FR_ISAUTH(pass)) {
-		if (fr_newauth(fin->fin_m, fin) != 0) {
+		if (ipf_auth_new(fin->fin_m, fin) != 0) {
 #ifdef	_KERNEL
 			if ((pass & FR_RETMASK) == 0)
 				fin->fin_m = *fin->fin_mp = NULL;
@@ -2425,8 +2600,10 @@ u_32_t *passp;
 			;
 #endif
 			fin->fin_error = 0;
-		} else
-			fin->fin_error = ENOSPC, ipf_interror = 1;
+		} else {
+			ipf_interror = 1;
+			fin->fin_error = ENOSPC;
+		}
 	}
 
 	if ((fr != NULL) && (fr->fr_func != NULL) &&
@@ -2440,8 +2617,8 @@ u_32_t *passp;
 	 * is treated as "not a pass", hence the packet is blocked.
 	 */
 	if (FR_ISPREAUTH(pass)) {
-		if ((fin->fin_fr = ipauth) != NULL)
-			pass = fr_scanlist(fin, fr_pass);
+		if ((fin->fin_fr = ipf_auth_ip) != NULL)
+			pass = ipf_scanlist(fin, ipf_pass);
 	}
 
 	/*
@@ -2450,13 +2627,13 @@ u_32_t *passp;
 	 */
 	if ((pass & (FR_KEEPFRAG|FR_KEEPSTATE)) == FR_KEEPFRAG) {
 		if (fin->fin_flx & FI_FRAG) {
-			if (fr_newfrag(fin, pass) == -1) {
-				ATOMIC_INCL(frstats[out].fr_bnfr);
+			if (ipf_frag_new(fin, pass) == -1) {
+				ATOMIC_INCL(ipf_stats[out].fr_bnfr);
 			} else {
-				ATOMIC_INCL(frstats[out].fr_nfr);
+				ATOMIC_INCL(ipf_stats[out].fr_nfr);
 			}
 		} else {
-			ATOMIC_INCL(frstats[out].fr_cfr);
+			ATOMIC_INCL(ipf_stats[out].fr_cfr);
 		}
 	}
 
@@ -2470,7 +2647,7 @@ u_32_t *passp;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_check                                                    */
+/* Function:    ipf_check                                                   */
 /* Returns:     int -  0 == packet allowed through,                         */
 /*              User space:                                                 */
 /*                    -1 == packet blocked                                  */
@@ -2488,7 +2665,7 @@ u_32_t *passp;
 /*             qpi(I)  - pointer to STREAMS queue information for this      */
 /*                       interface & direction.                             */
 /*                                                                          */
-/* fr_check() is the master function for all IPFilter packet processing.    */
+/* ipf_check() is the master function for all IPFilter packet processing.   */
 /* It orchestrates: Network Address Translation (NAT), checking for packet  */
 /* authorisation (or pre-authorisation), presence of related state info.,   */
 /* generating log entries, IP packet accounting, routing of packets as      */
@@ -2499,32 +2676,30 @@ u_32_t *passp;
 /* freed.  Packets passed may be returned with the pointer pointed to by    */
 /* by "mp" changed to a new buffer.                                         */
 /* ------------------------------------------------------------------------ */
-int fr_check(ip, hlen, ifp, out
+int
+ipf_check(ip, hlen, ifp, out
 #if defined(_KERNEL) && defined(MENTAT)
-, qif, mp)
-void *qif;
+	, qif, mp)
+	void *qif;
 #else
-, mp)
+	, mp)
 #endif
-mb_t **mp;
-ip_t *ip;
-int hlen;
-void *ifp;
-int out;
+	mb_t **mp;
+	ip_t *ip;
+	int hlen;
+	void *ifp;
+	int out;
 {
 	/*
 	 * The above really sucks, but short of writing a diff
 	 */
 	fr_info_t frinfo;
 	fr_info_t *fin = &frinfo;
-	u_32_t pass = fr_pass;
+	u_32_t pass = ipf_pass;
 	frentry_t *fr = NULL;
 	int v = IP_V(ip);
 	mb_t *mc = NULL;
 	mb_t *m;
-#ifdef USE_INET6
-	ip6_t *ip6;
-#endif
 	/*
 	 * The first part of fr_check() deals with making sure that what goes
 	 * into the filtering engine makes some sense.  Information about the
@@ -2544,7 +2719,7 @@ int out;
 
 	READ_ENTER(&ipf_global);
 
-	if (fr_running <= 0) {
+	if (ipf_running <= 0) {
 		RWLOCK_EXIT(&ipf_global);
 		return 0;
 	}
@@ -2604,7 +2779,7 @@ int out;
 	fin->fin_mp = mp;
 	fin->fin_out = out;
 	fin->fin_ifp = ifp;
-	fin->fin_error = ENETUNREACH, ipf_interror = 2;
+	fin->fin_error = ENETUNREACH;
 	fin->fin_hlen = (u_short)hlen;
 	fin->fin_dp = (char *)ip + hlen;
 
@@ -2614,27 +2789,23 @@ int out;
 
 #ifdef	USE_INET6
 	if (v == 6) {
-		ATOMIC_INCL(frstats[out].fr_ipv6);
+		ATOMIC_INCL(ipf_stats[out].fr_ipv6);
 		/*
 		 * Jumbo grams are quite likely too big for internal buffer
 		 * structures to handle comfortably, for now, so just drop
 		 * them.
 		 */
-		ip6 = (ip6_t *)ip;
-		fin->fin_plen = ntohs(ip6->ip6_plen);
-		if (fin->fin_plen == 0) {
+		if (((ip6_t *)ip)->ip6_plen == 0) {
 			pass = FR_BLOCK|FR_NOMATCH;
+			fin->fin_reason = 3;
 			goto finished;
 		}
-		fin->fin_plen += sizeof(ip6_t);
-	} else
-#endif
-	{
-		fin->fin_plen = ntohs(ip->ip_len);
 	}
+#endif
 
-	if (fr_makefrip(hlen, ip, fin) == -1) {
+	if (ipf_makefrip(hlen, ip, fin) == -1) {
 		pass = FR_BLOCK|FR_NOMATCH;
+		fin->fin_reason = 4;
 		goto finished;
 	}
 
@@ -2648,21 +2819,20 @@ int out;
 	if (!out) {
 		if (v == 4) {
 #ifdef _KERNEL
-			if (fr_chksrc && !fr_verifysrc(fin)) {
-				ATOMIC_INCL(frstats[0].fr_badsrc);
+			if (ipf_chksrc && !ipf_verifysrc(fin)) {
+				ATOMIC_INCL(ipf_stats[0].fr_badsrc);
 				fin->fin_flx |= FI_BADSRC;
 			}
 #endif
-			if (fin->fin_ip->ip_ttl < fr_minttl) {
-				ATOMIC_INCL(frstats[0].fr_badttl);
+			if (fin->fin_ip->ip_ttl < ipf_minttl) {
+				ATOMIC_INCL(ipf_stats[0].fr_badttl);
 				fin->fin_flx |= FI_LOWTTL;
 			}
 		}
 #ifdef USE_INET6
 		else  if (v == 6) {
-			ip6 = (ip6_t *)ip;
-			if (ip6->ip6_hlim < fr_minttl) {
-				ATOMIC_INCL(frstats[0].fr_badttl);
+			if (((ip6_t *)ip)->ip6_hlim < ipf_minttl) {
+				ATOMIC_INCL(ipf_stats[0].fr_badttl);
 				fin->fin_flx |= FI_LOWTTL;
 			}
 		}
@@ -2670,7 +2840,7 @@ int out;
 	}
 
 	if (fin->fin_flx & FI_SHORT) {
-		ATOMIC_INCL(frstats[out].fr_short);
+		ATOMIC_INCL(ipf_stats[out].fr_short);
 	}
 
 	READ_ENTER(&ipf_mutex);
@@ -2681,39 +2851,43 @@ int out;
 	 * otherwise occur when we reprocess it.  As it is, we only count it
 	 * after it has no auth. table matchup.  This also stops NAT from
 	 * occuring until after the packet has been auth'd.
+	 *
+	 * If a packet is found in the auth table, then skip checking
+	 * the access lists for permission but we do need to consider
+	 * the result as if it were from the ACL's.
 	 */
-	fr = fr_checkauth(fin, &pass);
-	if (!out && (fr_specfuncref[1][fr_active] == 0)) {
-		if (fr_checknatin(fin, &pass) == -1) {
-			RWLOCK_EXIT(&ipf_mutex);
-			goto finished;
+	fr = ipf_auth_check(fin, &pass);
+	if (!out && (ipf_specfuncref[1][ipf_active] == 0)) {
+		if (ipf_nat_checkin(fin, &pass) == -1) {
+			goto filterdone;
 		}
 	}
 	if (!out)
-		(void) fr_acctpkt(fin, NULL);
+		(void) ipf_acctpkt(fin, NULL);
 
 	if (fr == NULL)
 		if ((fin->fin_flx & (FI_FRAG|FI_BAD)) == FI_FRAG)
-			fr = fr_knownfrag(fin, &pass);
-	if ((fr == NULL) && (fr_specfuncref[0][fr_active] == 0))
-		fr = fr_checkstate(fin, &pass);
+			fr = ipf_frag_known(fin, &pass);
+	if ((fr == NULL) && (ipf_specfuncref[0][ipf_active] == 0))
+		fr = ipf_state_check(fin, &pass);
 
 	if ((pass & FR_NOMATCH) || (fr == NULL))
-		fr = fr_firewall(fin, &pass);
+		fr = ipf_firewall(fin, &pass);
 
 	/*
 	 * If we've asked to track state for this packet, set it up.
-	 * Here rather than fr_firewall because fr_checkauth may decide
+	 * Here rather than ipf_firewall because ipf_checkauth may decide
 	 * to return a packet for "keep state"
 	 */
 	if ((pass & FR_KEEPSTATE) && !(fin->fin_flx & FI_STATE)) {
-		if (fr_addstate(fin, NULL, 0) != NULL) {
-			ATOMIC_INCL(frstats[out].fr_ads);
+		if (ipf_state_add(fin, NULL, 0) != NULL) {
+			ATOMIC_INCL(ipf_stats[out].fr_ads);
 		} else {
-			ATOMIC_INCL(frstats[out].fr_bads);
+			ATOMIC_INCL(ipf_stats[out].fr_bads);
 			if (FR_ISPASS(pass)) {
 				pass &= ~FR_CMDMASK;
 				pass |= FR_BLOCK;
+				fin->fin_reason = 5;
 			}
 		}
 	}
@@ -2725,37 +2899,43 @@ int out;
 	 * interface.
 	 */
 	if (out && FR_ISPASS(pass)) {
-		(void) fr_acctpkt(fin, NULL);
+		(void) ipf_acctpkt(fin, NULL);
 
-		if ((fr_specfuncref[2][fr_active] == 0) &&
-		    (fr_checknatout(fin, &pass) == -1)) {
-			RWLOCK_EXIT(&ipf_mutex);
-			goto finished;
-		} else if ((fr_update_ipid != 0) && (v == 4)) {
-			if (fr_updateipid(fin) == -1) {
-				ATOMIC_INCL(frstats[1].fr_ipud);
+		if ((ipf_specfuncref[2][ipf_active] == 0) &&
+		    (ipf_nat_checkout(fin, &pass) == -1)) {
+			;
+		} else if ((ipf_update_ipid != 0) && (v == 4)) {
+			if (ipf_updateipid(fin) == -1) {
+				ATOMIC_INCL(ipf_stats[1].fr_ipud);
 				pass &= ~FR_CMDMASK;
 				pass |= FR_BLOCK;
+				fin->fin_reason = 6;
 			} else {
-				ATOMIC_INCL(frstats[0].fr_ipud);
+				ATOMIC_INCL(ipf_stats[0].fr_ipud);
 			}
 		}
 	}
 
+filterdone:
 #ifdef	IPFILTER_LOG
 	if ((ipf_flags & FF_LOGGING) || (pass & FR_LOGMASK)) {
-		(void) fr_dolog(fin, &pass);
+		(void) ipf_dolog(fin, &pass);
 	}
 #endif
 
+	/*
+	 * The FI_STATE flag is cleared here so that calling fr_checkstate
+	 * will work when called from inside of fr_fastroute.  Although
+	 * there is a similar flag, FI_NATED, for NAT, it does have the same
+	 * impact on code execution.
+	 */
 	if (fin->fin_state != NULL) {
-		fr_statederef(fin, (ipstate_t **)&fin->fin_state);
-		fin->fin_state = NULL;
+		ipf_state_deref((ipstate_t **)&fin->fin_state);
+		fin->fin_flx ^= FI_STATE;
 	}
 
 	if (fin->fin_nat != NULL) {
-		fr_natderef((nat_t **)&fin->fin_nat);
-		fin->fin_nat = NULL;
+		ipf_nat_deref((nat_t **)&fin->fin_nat);
 	}
 
 	/*
@@ -2790,13 +2970,14 @@ int out;
 					dst = 1;
 				else
 					dst = 0;
-				(void) fr_send_icmp_err(ICMP_UNREACH, fin, dst);
-				ATOMIC_INCL(frstats[0].fr_ret);
+				(void) ipf_send_icmp_err(ICMP_UNREACH, fin,
+							 dst);
+				ATOMIC_INCL(ipf_stats[0].fr_ret);
 			} else if (((pass & FR_RETMASK) == FR_RETRST) &&
 				   !(fin->fin_flx & FI_SHORT)) {
 				if (((fin->fin_flx & FI_OOW) != 0) ||
-				    (fr_send_reset(fin) == 0)) {
-					ATOMIC_INCL(frstats[1].fr_ret);
+				    (ipf_send_reset(fin) == 0)) {
+					ATOMIC_INCL(ipf_stats[1].fr_ret);
 				}
 			}
 
@@ -2808,8 +2989,9 @@ int out;
 				fin->fin_m = *fin->fin_mp = NULL;
 			}
 		} else {
-			if (pass & FR_RETRST)
-				fin->fin_error = ECONNRESET, ipf_interror = 3;
+			if (pass & FR_RETRST) {
+				fin->fin_error = ECONNRESET;
+			}
 		}
 	}
 
@@ -2827,15 +3009,15 @@ int out;
 
 		if (!out && (pass & FR_FASTROUTE)) {
 			/*
-			 * For fastroute rule, no destioation interface defined
+			 * For fastroute rule, no destination interface defined
 			 * so pass NULL as the frdest_t parameter
 			 */
-			(void) fr_fastroute(fin->fin_m, mp, fin, NULL);
+			(void) ipf_fastroute(fin->fin_m, mp, fin, NULL);
 			m = *mp = NULL;
 		} else if ((fdp->fd_ifp != NULL) &&
 			   (fdp->fd_ifp != (struct ifnet *)-1)) {
 			/* this is for to rules: */
-			(void) fr_fastroute(fin->fin_m, mp, fin, fdp);
+			(void) ipf_fastroute(fin->fin_m, mp, fin, fdp);
 			m = *mp = NULL;
 		}
 
@@ -2845,21 +3027,22 @@ int out;
 		if ((pass & FR_DUP) != 0) {
 			mc = M_DUPLICATE(fin->fin_m);
 			if (mc != NULL)
-				(void) fr_fastroute(mc, &mc, fin, &fr->fr_dif);
+				(void) ipf_fastroute(mc, &mc, fin,
+						     &fr->fr_dif);
 		}
 
-		(void) fr_derefrule(&fr);
+		(void) ipf_derefrule(&fr);
 	}
 
 finished:
 	if (!FR_ISPASS(pass)) {
-		ATOMIC_INCL(frstats[out].fr_block);
+		ATOMIC_INCL(ipf_stats[out].fr_block);
 		if (*mp != NULL) {
 			FREE_MB_T(*mp);
 			m = *mp = NULL;
 		}
 	} else {
-		ATOMIC_INCL(frstats[out].fr_pass);
+		ATOMIC_INCL(ipf_stats[out].fr_pass);
 #if defined(_KERNEL) && defined(__sgi)
 		if ((fin->fin_hbuf != NULL) &&
 		    (mtod(fin->fin_m, struct ip *) != fin->fin_ip)) {
@@ -2874,8 +3057,9 @@ finished:
 #ifdef _KERNEL
 	return (FR_ISPASS(pass)) ? 0 : fin->fin_error;
 #else /* _KERNEL */
+	blockreason = fin->fin_reason;
 	FR_VERBOSE(("fin_flx %#x pass %#x ", fin->fin_flx, pass));
-	if ((pass & FR_CMDMASK) == (fr_pass & FR_CMDMASK))
+	/*if ((pass & FR_CMDMASK) == (ipf_pass & FR_CMDMASK))*/
 		if ((pass & FR_NOMATCH) != 0)
 			return 1;
 
@@ -2910,7 +3094,7 @@ finished:
 
 #ifdef	IPFILTER_LOG
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_dolog                                                    */
+/* Function:    ipf_dolog                                                   */
 /* Returns:     frentry_t* - returns contents of fin_fr (no change made)    */
 /* Parameters:  fin(I) - pointer to packet information                      */
 /*              passp(IO) - pointer to current/new filter decision (unused) */
@@ -2918,9 +3102,10 @@ finished:
 /* Checks flags set to see how a packet should be logged, if it is to be    */
 /* logged.  Adjust statistics based on its success or not.                  */
 /* ------------------------------------------------------------------------ */
-frentry_t *fr_dolog(fin, passp)
-fr_info_t *fin;
-u_32_t *passp;
+frentry_t *
+ipf_dolog(fin, passp)
+	fr_info_t *fin;
+	u_32_t *passp;
 {
 	u_32_t pass;
 	int out;
@@ -2930,22 +3115,22 @@ u_32_t *passp;
 
 	if ((ipf_flags & FF_LOGNOMATCH) && (pass & FR_NOMATCH)) {
 		pass |= FF_LOGNOMATCH;
-		ATOMIC_INCL(frstats[out].fr_npkl);
+		ATOMIC_INCL(ipf_stats[out].fr_npkl);
 		goto logit;
 	} else if (((pass & FR_LOGMASK) == FR_LOGP) ||
 	    (FR_ISPASS(pass) && (ipf_flags & FF_LOGPASS))) {
 		if ((pass & FR_LOGMASK) != FR_LOGP)
 			pass |= FF_LOGPASS;
-		ATOMIC_INCL(frstats[out].fr_ppkl);
+		ATOMIC_INCL(ipf_stats[out].fr_ppkl);
 		goto logit;
 	} else if (((pass & FR_LOGMASK) == FR_LOGB) ||
 		   (FR_ISBLOCK(pass) && (ipf_flags & FF_LOGBLOCK))) {
 		if ((pass & FR_LOGMASK) != FR_LOGB)
 			pass |= FF_LOGBLOCK;
-		ATOMIC_INCL(frstats[out].fr_bpkl);
+		ATOMIC_INCL(ipf_stats[out].fr_bpkl);
 logit:
-		if (ipflog(fin, pass) == -1) {
-			ATOMIC_INCL(frstats[out].fr_skip);
+		if (ipf_log_pkt(fin, pass) == -1) {
+			ATOMIC_INCL(ipf_stats[out].fr_skip);
 
 			/*
 			 * If the "or-block" option has been used then
@@ -2955,6 +3140,7 @@ logit:
 			    FR_ISPASS(pass)) {
 				pass &= ~FR_CMDMASK;
 				pass |= FR_BLOCK;
+				fin->fin_reason = 7;
 			}
 		}
 		*passp = pass;
@@ -2975,9 +3161,10 @@ logit:
 /*                                                                          */
 /* N.B.: addr should be 16bit aligned.                                      */
 /* ------------------------------------------------------------------------ */
-u_short ipf_cksum(addr, len)
-u_short *addr;
-int len;
+u_short
+ipf_cksum(addr, len)
+	u_short *addr;
+	int len;
 {
 	u_32_t sum = 0;
 
@@ -3004,6 +3191,7 @@ int len;
 /*              ip(I)      - pointer to IP header                           */
 /*              l4proto(I) - protocol to caclulate checksum for             */
 /*              l4hdr(I)   - pointer to layer 4 header                      */
+/*              l3len(I)   - length of layer 4 data plus layer 3 header     */
 /*                                                                          */
 /* Calculates the TCP checksum for the packet held in "m", using the data   */
 /* in the IP header "ip" to seed it.                                        */
@@ -3012,13 +3200,16 @@ int len;
 /* and the TCP header.  We also assume that data blocks aren't allocated in */
 /* odd sizes.                                                               */
 /*                                                                          */
+/* For IPv6, l3len excludes extension header size.                          */
+/*                                                                          */
 /* Expects ip_len and ip_off to be in network byte order when called.       */
 /* ------------------------------------------------------------------------ */
-u_short fr_cksum(m, ip, l4proto, l4hdr, l3len)
-mb_t *m;
-ip_t *ip;
-int l4proto, l3len;
-void *l4hdr;
+u_short
+fr_cksum(m, ip, l4proto, l4hdr, l3len)
+	mb_t *m;
+	ip_t *ip;
+	int l4proto, l3len;
+	void *l4hdr;
 {
 	u_short *sp, slen, sumsave, l4hlen, *csump;
 	u_int sum, sum2;
@@ -3035,6 +3226,7 @@ void *l4hdr;
 	hlen = 0;
 	sum = 0;
 
+	sum = htons((u_short)l4proto);
 	/*
 	 * Add up IP Header portion
 	 */
@@ -3043,7 +3235,6 @@ void *l4hdr;
 #endif
 		hlen = IP_HL(ip) << 2;
 		slen = l3len - hlen;
-		sum = htons((u_short)l4proto);
 		sum += htons(slen);
 		sp = (u_short *)&ip->ip_src;
 		sum += *sp++;	/* ip_src */
@@ -3054,9 +3245,8 @@ void *l4hdr;
 	} else if (IP_V(ip) == 6) {
 		ip6 = (ip6_t *)ip;
 		hlen = sizeof(*ip6);
-		slen = htons(l3len);
-		sum = htons((u_short)l4proto);
-		sum += slen;
+		slen = l3len - hlen;
+		sum += htons(slen);
 		sp = (u_short *)&ip6->ip6_src;
 		sum += *sp++;	/* ip6_src */
 		sum += *sp++;
@@ -3186,11 +3376,11 @@ void *l4hdr;
 	 * In case we had to copy the IP & TCP header out of mbufs,
 	 * skip over the mbuf bits which are the header
 	 */
-	if ((caddr_t)ip != mtod(m, caddr_t)) {
-		hlen = (caddr_t)sp - (caddr_t)ip;
+	if ((char *)ip != mtod(m, char *)) {
+		hlen = (char *)sp - (char *)ip;
 		while (hlen) {
 			add = MIN(hlen, m->m_len);
-			sp = (u_short *)(mtod(m, caddr_t) + add);
+			sp = (u_short *)(mtod(m, char *) + add);
 			hlen -= add;
 			if (add == m->m_len) {
 				m = m->m_next;
@@ -3210,12 +3400,12 @@ void *l4hdr;
 		goto nodata;
 
 	while (len > 1) {
-		if (((caddr_t)sp - mtod(m, caddr_t)) >= m->m_len) {
+		if (((char *)sp - mtod(m, char *)) >= m->m_len) {
 			m = m->m_next;
 			PANIC((!m),("fr_cksum(2): not enough data"));
 			sp = mtod(m, u_short *);
 		}
-		if (((caddr_t)(sp + 1) - mtod(m, caddr_t)) > m->m_len) {
+		if (((char *)(sp + 1) - mtod(m, char *)) > m->m_len) {
 			bytes.c[0] = *(u_char *)sp;
 			m = m->m_next;
 			PANIC((!m),("fr_cksum(3): not enough data"));
@@ -3242,6 +3432,12 @@ nodata:
 #  endif /*  defined(BSD) || defined(sun) */
 # endif /* MENTAT */
 #else /* _KERNEL */
+	/*
+	 * Add up IP Header portion
+	 */
+	if (sp != (u_short *)l4hdr)
+		sp = (u_short *)l4hdr;
+
 	for (; slen > 1; slen -= 2)
 	        sum += *sp++;
 	if (slen)
@@ -3357,7 +3553,7 @@ m_copyback(m0, off, len, cp)
 	}
 	while (len > 0) {
 		mlen = min(m->m_len - off, len);
-		bcopy(cp, off + mtod(m, caddr_t), (unsigned)mlen);
+		bcopy(cp, off + mtod(m, char *), (unsigned)mlen);
 		cp += mlen;
 		len -= mlen;
 		mlen += off;
@@ -3385,7 +3581,7 @@ out:
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_findgroup                                                */
+/* Function:    ipf_findgroup                                               */
 /* Returns:     frgroup_t * - NULL = group not found, else pointer to group */
 /* Parameters:  group(I) - group name to search for                         */
 /*              unit(I)  - device to which this group belongs               */
@@ -3396,11 +3592,12 @@ out:
 /*                                                                          */
 /* Search amongst the defined groups for a particular group number.         */
 /* ------------------------------------------------------------------------ */
-frgroup_t *fr_findgroup(group, unit, set, fgpp)
-char *group;
-minor_t unit;
-int set;
-frgroup_t ***fgpp;
+frgroup_t *
+ipf_findgroup(group, unit, set, fgpp)
+	char *group;
+	minor_t unit;
+	int set;
+	frgroup_t ***fgpp;
 {
 	frgroup_t *fg, **fgp;
 
@@ -3408,7 +3605,7 @@ frgroup_t ***fgpp;
 	 * Which list of groups to search in is dependent on which list of
 	 * rules are being operated on.
 	 */
-	fgp = &ipfgroups[unit][set];
+	fgp = &ipf_groups[unit][set];
 
 	while ((fg = *fgp) != NULL) {
 		if (strncmp(group, fg->fg_name, FR_GROUPLEN) == 0)
@@ -3423,7 +3620,7 @@ frgroup_t ***fgpp;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_addgroup                                                 */
+/* Function:    ipf_group_add                                               */
 /* Returns:     frgroup_t * - NULL == did not create group,                 */
 /*                            != NULL == pointer to the group               */
 /* Parameters:  num(I)   - group number to add                              */
@@ -3436,12 +3633,13 @@ frgroup_t ***fgpp;
 /* Add a new group head, or if it already exists, increase the reference    */
 /* count to it.                                                             */
 /* ------------------------------------------------------------------------ */
-frgroup_t *fr_addgroup(group, head, flags, unit, set)
-char *group;
-void *head;
-u_32_t flags;
-minor_t unit;
-int set;
+frgroup_t *
+ipf_group_add(group, head, flags, unit, set)
+	char *group;
+	void *head;
+	u_32_t flags;
+	minor_t unit;
+	int set;
 {
 	frgroup_t *fg, **fgp;
 	u_32_t gflags;
@@ -3455,7 +3653,7 @@ int set;
 	fgp = NULL;
 	gflags = flags & FR_INOUT;
 
-	fg = fr_findgroup(group, unit, set, &fgp);
+	fg = ipf_findgroup(group, unit, set, &fgp);
 	if (fg != NULL) {
 		if (fg->fg_flags == 0)
 			fg->fg_flags = gflags;
@@ -3464,6 +3662,7 @@ int set;
 		fg->fg_ref++;
 		return fg;
 	}
+
 	KMALLOC(fg, frgroup_t *);
 	if (fg != NULL) {
 		fg->fg_head = head;
@@ -3479,7 +3678,7 @@ int set;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_delgroup                                                 */
+/* Function:    ipf_group_del                                               */
 /* Returns:     Nil                                                         */
 /* Parameters:  group(I) - group name to delete                             */
 /*              unit(I)  - device to which this group belongs               */
@@ -3489,14 +3688,15 @@ int set;
 /* Attempt to delete a group head.                                          */
 /* Only do this when its reference count reaches 0.                         */
 /* ------------------------------------------------------------------------ */
-void fr_delgroup(group, unit, set)
-char *group;
-minor_t unit;
-int set;
+void
+ipf_group_del(group, unit, set)
+	char *group;
+	minor_t unit;
+	int set;
 {
 	frgroup_t *fg, **fgp;
 
-	fg = fr_findgroup(group, unit, set, &fgp);
+	fg = ipf_findgroup(group, unit, set, &fgp);
 	if (fg == NULL)
 		return;
 
@@ -3509,7 +3709,7 @@ int set;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_getrulen                                                 */
+/* Function:    ipf_getrulen                                                */
 /* Returns:     frentry_t * - NULL == not found, else pointer to rule n     */
 /* Parameters:  unit(I)  - device for which to count the rule's number      */
 /*              flags(I) - which set of rules to find the rule in           */
@@ -3519,15 +3719,16 @@ int set;
 /* Find rule # n in group # g and return a pointer to it.  Return NULl if   */
 /* group # g doesn't exist or there are less than n rules in the group.     */
 /* ------------------------------------------------------------------------ */
-frentry_t *fr_getrulen(unit, group, n)
-int unit;
-char *group;
-u_32_t n;
+frentry_t *
+ipf_getrulen(unit, group, n)
+	int unit;
+	char *group;
+	u_32_t n;
 {
 	frentry_t *fr;
 	frgroup_t *fg;
 
-	fg = fr_findgroup(group, unit, fr_active, NULL);
+	fg = ipf_findgroup(group, unit, ipf_active, NULL);
 	if (fg == NULL)
 		return NULL;
 	for (fr = fg->fg_head; fr && n; fr = fr->fr_next, n--)
@@ -3539,16 +3740,17 @@ u_32_t n;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_rulen                                                    */
+/* Function:    ipf_rulen                                                   */
 /* Returns:     int - >= 0 - rule number, -1 == search failed               */
 /* Parameters:  unit(I) - device for which to count the rule's number       */
 /*              fr(I)   - pointer to rule to match                          */
 /*                                                                          */
 /* Return the number for a rule on a specific filtering device.             */
 /* ------------------------------------------------------------------------ */
-int fr_rulen(unit, fr)
-int unit;
-frentry_t *fr;
+int
+ipf_rulen(unit, fr)
+	int unit;
+	frentry_t *fr;
 {
 	frentry_t *fh;
 	frgroup_t *fg;
@@ -3556,7 +3758,7 @@ frentry_t *fr;
 
 	if (fr == NULL)
 		return -1;
-	fg = fr_findgroup(fr->fr_group, unit, fr_active, NULL);
+	fg = ipf_findgroup(fr->fr_group, unit, ipf_active, NULL);
 	if (fg == NULL)
 		return -1;
 	for (fh = fg->fg_head; fh; n++, fh = fh->fr_next)
@@ -3569,7 +3771,7 @@ frentry_t *fr;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    frflushlist                                                 */
+/* Function:    ipf_flushlist                                               */
 /* Returns:     int - >= 0 - number of flushed rules                        */
 /* Parameters:  set(I)   - which set of rules (inactive/inactive) this is   */
 /*              unit(I)  - device for which to flush rules                  */
@@ -3587,13 +3789,14 @@ frentry_t *fr;
 /*                                                                          */
 /* NOTE: Rules not loaded from user space cannot be flushed.                */
 /* ------------------------------------------------------------------------ */
-static int frflushlist(set, unit, nfreedp, listp)
-int set;
-minor_t unit;
-int *nfreedp;
-frentry_t **listp;
+static int
+ipf_flushlist(set, unit, nfreedp, listp)
+	int set;
+	minor_t unit;
+	int *nfreedp;
+	frentry_t **listp;
 {
-	int freed = 0, i;
+	int freed = 0;
 	frentry_t *fp;
 
 	while ((fp = *listp) != NULL) {
@@ -3604,18 +3807,22 @@ frentry_t **listp;
 		}
 		*listp = fp->fr_next;
 		if (fp->fr_grp != NULL) {
-			i = frflushlist(set, unit, nfreedp, fp->fr_grp);
-			fp->fr_ref -= i;
+			(void) ipf_flushlist(set, unit, nfreedp, fp->fr_grp);
 		}
 
 		if (fp->fr_grhead != NULL) {
-			fr_delgroup(fp->fr_grhead, unit, set);
+			ipf_group_del(fp->fr_grhead, unit, set);
 			*fp->fr_grhead = '\0';
+		}
+
+		if (fp->fr_icmphead != NULL) {
+			ipf_group_del(fp->fr_icmphead, unit, set);
+			*fp->fr_icmphead = '\0';
 		}
 
 		ASSERT(fp->fr_ref > 0);
 		fp->fr_next = NULL;
-		if (fr_derefrule(&fp) == 0)
+		if (ipf_derefrule(&fp) == 0)
 			freed++;
 	}
 	*nfreedp += freed;
@@ -3624,7 +3831,7 @@ frentry_t **listp;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    frflush                                                     */
+/* Function:    ipf_flush                                                   */
 /* Returns:     int - >= 0 - number of flushed rules                        */
 /* Parameters:  unit(I)  - device for which to flush rules                  */
 /*              flags(I) - which set of rules to flush                      */
@@ -3632,33 +3839,34 @@ frentry_t **listp;
 /* Calls flushlist() for all filter rules (accounting, firewall - both IPv4 */
 /* and IPv6) as defined by the value of flags.                              */
 /* ------------------------------------------------------------------------ */
-int frflush(unit, flags)
-minor_t unit;
-int flags;
+int
+ipf_flush(unit, flags)
+	minor_t unit;
+	int flags;
 {
 	int flushed = 0, set;
 
 	WRITE_ENTER(&ipf_mutex);
-	bzero((char *)frcache, sizeof(frcache));
+	bzero((char *)ipf_cache, sizeof(ipf_cache));
 
-	set = fr_active;
+	set = ipf_active;
 	if ((flags & FR_INACTIVE) == FR_INACTIVE)
 		set = 1 - set;
 
 	if (flags & FR_OUTQUE) {
-		(void) frflushlist(set, unit, &flushed, &ipfilter[1][set]);
-		(void) frflushlist(set, unit, &flushed, &ipacct[1][set]);
+		(void) ipf_flushlist(set, unit, &flushed, &ipf_rules[1][set]);
+		(void) ipf_flushlist(set, unit, &flushed, &ipf_acct[1][set]);
 	}
 	if (flags & FR_INQUE) {
-		(void) frflushlist(set, unit, &flushed, &ipfilter[0][set]);
-		(void) frflushlist(set, unit, &flushed, &ipacct[0][set]);
+		(void) ipf_flushlist(set, unit, &flushed, &ipf_rules[0][set]);
+		(void) ipf_flushlist(set, unit, &flushed, &ipf_acct[0][set]);
 	}
 	RWLOCK_EXIT(&ipf_mutex);
 
 	if (unit == IPL_LOGIPF) {
 		int tmp;
 
-		tmp = frflush(IPL_LOGCOUNT, flags);
+		tmp = ipf_flush(IPL_LOGCOUNT, flags);
 		if (tmp >= 0)
 			flushed += tmp;
 	}
@@ -3677,10 +3885,11 @@ int flags;
 /* Search dst for a sequence of bytes matching those at src and extend for  */
 /* slen bytes.                                                              */
 /* ------------------------------------------------------------------------ */
-char *memstr(src, dst, slen, dlen)
-const char *src;
-char *dst;
-size_t slen, dlen;
+char *
+memstr(src, dst, slen, dlen)
+	const char *src;
+	char *dst;
+	size_t slen, dlen;
 {
 	char *s = NULL;
 
@@ -3695,7 +3904,7 @@ size_t slen, dlen;
 	return s;
 }
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_fixskip                                                  */
+/* Function:    ipf_fixskip                                                 */
 /* Returns:     Nil                                                         */
 /* Parameters:  listp(IO)    - pointer to start of list with skip rule      */
 /*              rp(I)        - rule added/removed with skip in it.          */
@@ -3706,9 +3915,10 @@ size_t slen, dlen;
 /* Adjust all the rules in a list which would have skip'd past the position */
 /* where we are inserting to skip to the right place given the change.      */
 /* ------------------------------------------------------------------------ */
-void fr_fixskip(listp, rp, addremove)
-frentry_t **listp, *rp;
-int addremove;
+void
+ipf_fixskip(listp, rp, addremove)
+	frentry_t **listp, *rp;
+	int addremove;
 {
 	int rules, rn;
 	frentry_t *fp;
@@ -3737,8 +3947,9 @@ int addremove;
 /* consecutive 1's is different to that passed, return -1, else return #    */
 /* of bits.                                                                 */
 /* ------------------------------------------------------------------------ */
-int	count4bits(ip)
-u_32_t	ip;
+int
+count4bits(ip)
+	u_32_t	ip;
 {
 	u_32_t	ipn;
 	int	cnt = 0, i, j;
@@ -3770,8 +3981,9 @@ u_32_t	ip;
 /* count consecutive 1's in bit mask.                                       */
 /* ------------------------------------------------------------------------ */
 # ifdef USE_INET6
-int count6bits(msk)
-u_32_t *msk;
+int
+count6bits(msk)
+	u_32_t *msk;
 {
 	int i = 0, k;
 	u_32_t j;
@@ -3791,7 +4003,7 @@ u_32_t *msk;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    frsynclist                                                  */
+/* Function:    ipf_synclist                                                */
 /* Returns:     void                                                        */
 /* Parameters:  fr(I)  - start of filter list to sync interface names for   */
 /*              ifp(I) - interface pointer for limiting sync lookups        */
@@ -3802,9 +4014,10 @@ u_32_t *msk;
 /* used in the rule.  The interface pointer is used to limit the lookups to */
 /* a specific set of matching names if it is non-NULL.                      */
 /* ------------------------------------------------------------------------ */
-static void frsynclist(fr, ifp)
-frentry_t *fr;
-void *ifp;
+static void
+ipf_synclist(fr, ifp)
+	frentry_t *fr;
+	void *ifp;
 {
 	frdest_t *fdp;
 	int v, i;
@@ -3818,35 +4031,35 @@ void *ifp;
 		for (i = 0; i < 4; i++) {
 			if ((ifp != NULL) && (fr->fr_ifas[i] != ifp))
 				continue;
-			fr->fr_ifas[i] = fr_resolvenic(fr->fr_ifnames[i], v);
+			fr->fr_ifas[i] = ipf_resolvenic(fr->fr_ifnames[i], v);
 		}
 
 		if (fr->fr_type == FR_T_IPF) {
 			if (fr->fr_satype != FRI_NORMAL &&
 			    fr->fr_satype != FRI_LOOKUP) {
-				(void)fr_ifpaddr(v, fr->fr_satype,
-						 fr->fr_ifas[fr->fr_sifpidx],
-						 &fr->fr_src6, &fr->fr_smsk6);
+				ipf_ifpaddr(v, fr->fr_satype,
+					    fr->fr_ifas[fr->fr_sifpidx],
+					    &fr->fr_src6, &fr->fr_smsk6);
 			}
 			if (fr->fr_datype != FRI_NORMAL &&
 			    fr->fr_datype != FRI_LOOKUP) {
-				(void)fr_ifpaddr(v, fr->fr_datype,
-						 fr->fr_ifas[fr->fr_difpidx],
-						 &fr->fr_dst6, &fr->fr_dmsk6);
+				ipf_ifpaddr(v, fr->fr_datype,
+					    fr->fr_ifas[fr->fr_difpidx],
+					    &fr->fr_dst6, &fr->fr_dmsk6);
 			}
 		}
 
 		fdp = &fr->fr_tifs[0];
 		if ((ifp == NULL) || (fdp->fd_ifp == ifp))
-			fr_resolvedest(fdp, v);
+			ipf_resolvedest(fdp, v);
 
 		fdp = &fr->fr_tifs[1];
 		if ((ifp == NULL) || (fdp->fd_ifp == ifp))
-			fr_resolvedest(fdp, v);
+			ipf_resolvedest(fdp, v);
 
 		fdp = &fr->fr_dif;
 		if ((ifp == NULL) || (fdp->fd_ifp == ifp)) {
-			fr_resolvedest(fdp, v);
+			ipf_resolvedest(fdp, v);
 
 			fr->fr_flags &= ~FR_DUP;
 			if ((fdp->fd_ifp != (void *)-1) &&
@@ -3857,14 +4070,14 @@ void *ifp;
 #ifdef	IPFILTER_LOOKUP
 		if (fr->fr_type == FR_T_IPF && fr->fr_satype == FRI_LOOKUP &&
 		    fr->fr_srcptr == NULL) {
-			fr->fr_srcptr = fr_resolvelookup(IPL_LOGIPF,
+			fr->fr_srcptr = ipf_resolvelookup(IPL_LOGIPF,
 							 fr->fr_srctype,
 							 fr->fr_srcnum,
 							 &fr->fr_srcfunc);
 		}
 		if (fr->fr_type == FR_T_IPF && fr->fr_datype == FRI_LOOKUP &&
 		    fr->fr_dstptr == NULL) {
-			fr->fr_dstptr = fr_resolvelookup(IPL_LOGIPF,
+			fr->fr_dstptr = ipf_resolvelookup(IPL_LOGIPF,
 							 fr->fr_dsttype,
 							 fr->fr_dstnum,
 							 &fr->fr_dstfunc);
@@ -3885,31 +4098,34 @@ void *ifp;
 /* filter rules, NAT entries and the state table and check if anything      */
 /* needs to be changed/updated.                                             */
 /* ------------------------------------------------------------------------ */
-void frsync(ifp)
-void *ifp;
+int
+ipf_sync(ifp)
+	void *ifp;
 {
 	int i;
 
 # if !SOLARIS
-	fr_natsync(ifp);
-	fr_statesync(ifp);
+	ipf_nat_sync(ifp);
+	ipf_state_sync(ifp);
 # endif
 
 	WRITE_ENTER(&ipf_mutex);
-	frsynclist(ipacct[0][fr_active], ifp);
-	frsynclist(ipacct[1][fr_active], ifp);
-	frsynclist(ipfilter[0][fr_active], ifp);
-	frsynclist(ipfilter[1][fr_active], ifp);
+	ipf_synclist(ipf_acct[0][ipf_active], ifp);
+	ipf_synclist(ipf_acct[1][ipf_active], ifp);
+	ipf_synclist(ipf_rules[0][ipf_active], ifp);
+	ipf_synclist(ipf_rules[1][ipf_active], ifp);
 
 	for (i = 0; i < IPL_LOGSIZE; i++) {
 		frgroup_t *g;
 
-		for (g = ipfgroups[i][0]; g != NULL; g = g->fg_next)
-			frsynclist(g->fg_start, ifp);
-		for (g = ipfgroups[i][1]; g != NULL; g = g->fg_next)
-			frsynclist(g->fg_start, ifp);
+		for (g = ipf_groups[i][0]; g != NULL; g = g->fg_next)
+			ipf_synclist(g->fg_start, ifp);
+		for (g = ipf_groups[i][1]; g != NULL; g = g->fg_next)
+			ipf_synclist(g->fg_start, ifp);
 	}
 	RWLOCK_EXIT(&ipf_mutex);
+
+	return 0;
 }
 
 
@@ -3929,22 +4145,27 @@ void *ifp;
 /* to start copying from (src) and a pointer to where to store it (dst).    */
 /* NB: src - pointer to user space pointer, dst - kernel space pointer      */
 /* ------------------------------------------------------------------------ */
-int copyinptr(src, dst, size)
-void *src, *dst;
-size_t size;
+int
+copyinptr(src, dst, size)
+	void *src, *dst;
+	size_t size;
 {
 	caddr_t ca;
-	int err;
+	int error;
 
 # if SOLARIS
-	err = COPYIN(src, (caddr_t)&ca, sizeof(ca));
-	if (err != 0)
-		return err;
+	error = COPYIN(src, &ca, sizeof(ca));
+	if (error != 0)
+		return error;
 # else
 	bcopy(src, (caddr_t)&ca, sizeof(ca));
 # endif
-	err = COPYIN(ca, dst, size);
-	return err;
+	error = COPYIN(ca, dst, size);
+	if (error != 0) {
+		ipf_interror = 3;
+		error = EFAULT;
+	}
+	return error;
 }
 
 
@@ -3959,83 +4180,99 @@ size_t size;
 /* to start copying from (src) and a pointer to where to store it (dst).    */
 /* NB: src - kernel space pointer, dst - pointer to user space pointer.     */
 /* ------------------------------------------------------------------------ */
-int copyoutptr(src, dst, size)
-void *src, *dst;
-size_t size;
+int
+copyoutptr(src, dst, size)
+	void *src, *dst;
+	size_t size;
 {
 	caddr_t ca;
-	int err;
+	int error;
 
 	bcopy(dst, (caddr_t)&ca, sizeof(ca));
-	err = COPYOUT(src, ca, size);
-	return err;
+	error = COPYOUT(src, ca, size);
+	if (error != 0) {
+		ipf_interror = 4;
+		error = EFAULT;
+	}
+	return error;
 }
 #endif
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_lock                                                     */
-/* Returns:     (void)                                                      */
+/* Function:    ipf_lock                                                    */
+/* Returns:     int      - 0 = success, else error                          */
 /* Parameters:  data(I)  - pointer to lock value to set                     */
 /*              lockp(O) - pointer to location to store old lock value      */
 /*                                                                          */
 /* Get the new value for the lock integer, set it and return the old value  */
 /* in *lockp.                                                               */
 /* ------------------------------------------------------------------------ */
-void fr_lock(data, lockp)
-caddr_t data;
-int *lockp;
+int
+ipf_lock(data, lockp)
+	caddr_t data;
+	int *lockp;
 {
-	int arg;
+	int arg, err;
 
-	BCOPYIN(data, (caddr_t)&arg, sizeof(arg));
-	BCOPYOUT((caddr_t)lockp, data, sizeof(*lockp));
+	err = BCOPYIN(data, &arg, sizeof(arg));
+	if (err != 0)
+		return EFAULT;
+	err = BCOPYOUT(lockp, data, sizeof(*lockp));
+	if (err != 0)
+		return EFAULT;
 	*lockp = arg;
+	return 0;
 }
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_getstat                                                  */
+/* Function:    ipf_getstat                                                 */
 /* Returns:     Nil                                                         */
 /* Parameters:  fiop(I)  - pointer to ipfilter stats structure              */
 /*                                                                          */
 /* Stores a copy of current pointers, counters, etc, in the friostat        */
 /* structure.                                                               */
 /* ------------------------------------------------------------------------ */
-void fr_getstat(fiop)
-friostat_t *fiop;
+void
+ipf_getstat(fiop)
+	friostat_t *fiop;
 {
-	int i, j;
+	int i;
 
-	bcopy((char *)frstats, (char *)fiop->f_st, sizeof(filterstats_t) * 2);
-	fiop->f_locks[IPL_LOGSTATE] = fr_state_lock;
-	fiop->f_locks[IPL_LOGNAT] = fr_nat_lock;
-	fiop->f_locks[IPL_LOGIPF] = fr_frag_lock;
-	fiop->f_locks[IPL_LOGAUTH] = fr_auth_lock;
+	bcopy((char *)ipf_stats, (char *)fiop->f_st,
+	      sizeof(ipf_statistics_t) * 2);
+	fiop->f_locks[IPL_LOGSTATE] = ipf_state_lock;
+	fiop->f_locks[IPL_LOGNAT] = ipf_nat_lock;
+	fiop->f_locks[IPL_LOGIPF] = ipf_frag_lock;
+	fiop->f_locks[IPL_LOGAUTH] = ipf_auth_lock;
 
-	for (i = 0; i < 2; i++)
-		for (j = 0; j < 2; j++) {
-			fiop->f_ipf[i][j] = ipfilter[i][j];
-			fiop->f_acct[i][j] = ipacct[i][j];
-		}
+	fiop->f_ipf[0][0] = ipf_rules[0][0];
+	fiop->f_acct[0][0] = ipf_acct[0][0];
+	fiop->f_ipf[0][1] = ipf_rules[0][1];
+	fiop->f_acct[0][1] = ipf_acct[0][1];
+	fiop->f_ipf[1][0] = ipf_rules[1][0];
+	fiop->f_acct[1][0] = ipf_acct[1][0];
+	fiop->f_ipf[1][1] = ipf_rules[1][1];
+	fiop->f_acct[1][1] = ipf_acct[1][1];
 
-	fiop->f_ticks = fr_ticks;
-	fiop->f_active = fr_active;
-	fiop->f_froute[0] = fr_frouteok[0];
-	fiop->f_froute[1] = fr_frouteok[1];
+	fiop->f_ticks = ipf_ticks;
+	fiop->f_active = ipf_active;
+	fiop->f_froute[0] = ipf_frouteok[0];
+	fiop->f_froute[1] = ipf_frouteok[1];
 
-	fiop->f_running = fr_running;
+	fiop->f_running = ipf_running;
 	for (i = 0; i < IPL_LOGSIZE; i++) {
-		fiop->f_groups[i][0] = ipfgroups[i][0];
-		fiop->f_groups[i][1] = ipfgroups[i][1];
+		fiop->f_groups[i][0] = ipf_groups[i][0];
+		fiop->f_groups[i][1] = ipf_groups[i][1];
 	}
 #ifdef  IPFILTER_LOG
 	fiop->f_logging = 1;
 #else
 	fiop->f_logging = 0;
 #endif
-	fiop->f_defpass = fr_pass;
-	fiop->f_features = fr_features;
+	fiop->f_defpass = ipf_pass;
+	fiop->f_features = ipf_features;
 	(void) strncpy(fiop->f_version, ipfilter_version,
 		       sizeof(fiop->f_version));
 }
@@ -4088,7 +4325,7 @@ int	icmpreplytype4[ICMP_MAXTYPE + 1];
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_matchicmpqueryreply                                      */
+/* Function:    ipf_matchicmpqueryreply                                     */
 /* Returns:     int - 1 if "icmp" is a valid reply to "ic" else 0.          */
 /* Parameters:  v(I)    - IP protocol version (4 or 6)                      */
 /*              ic(I)   - ICMP information                                  */
@@ -4099,11 +4336,12 @@ int	icmpreplytype4[ICMP_MAXTYPE + 1];
 /* reply to one as described by what's in ic.  If it is a match, return 1,  */
 /* else return 0 for no match.                                              */
 /* ------------------------------------------------------------------------ */
-int fr_matchicmpqueryreply(v, ic, icmp, rev)
-int v;
-icmpinfo_t *ic;
-icmphdr_t *icmp;
-int rev;
+int
+ipf_matchicmpqueryreply(v, ic, icmp, rev)
+	int v;
+	icmpinfo_t *ic;
+	icmphdr_t *icmp;
+	int rev;
 {
 	int ictype;
 
@@ -4139,7 +4377,7 @@ int rev;
 
 #ifdef	IPFILTER_LOOKUP
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_resolvelookup                                            */
+/* Function:    ipf_resolvelookup                                           */
 /* Returns:     void * - NULL = failure, else success.                      */
 /* Parameters:  unit(I)     - device for which this is for                  */
 /*              type(I)     - type of lookup these parameters are for.      */
@@ -4152,10 +4390,11 @@ int rev;
 /* call to do the IP address search will be change, regardless of whether   */
 /* or not the "table" number exists.                                        */
 /* ------------------------------------------------------------------------ */
-void *fr_resolvelookup(unit, type, number, funcptr)
-int unit;
-u_int type, number;
-lookupfunc_t *funcptr;
+void *
+ipf_resolvelookup(unit, type, number, funcptr)
+	int unit;
+	u_int type, number;
+	lookupfunc_t *funcptr;
 {
 	char name[FR_GROUPLEN];
 	iphtable_t *iph;
@@ -4168,7 +4407,7 @@ lookupfunc_t *funcptr;
 	(void) sprintf(name, "%u", number);
 #endif
 
-	READ_ENTER(&ip_poolrw);
+	READ_ENTER(&ipf_poolrw);
 
 	switch (type)
 	{
@@ -4177,28 +4416,28 @@ lookupfunc_t *funcptr;
 		ptr = NULL;
 		*funcptr = NULL;
 # else
-		ipo = ip_pool_find(unit, name);
+		ipo = ipf_pool_find(unit, name);
 		ptr = ipo;
 		if (ipo != NULL) {
 			ATOMIC_INC32(ipo->ipo_ref);
 		}
-		*funcptr = ip_pool_search;
+		*funcptr = ipf_pool_search;
 # endif
 		break;
 	case IPLT_HASH :
-		iph = fr_findhtable(unit, name);
+		iph = ipf_htable_find(unit, name);
 		ptr = iph;
 		if (iph != NULL) {
 			ATOMIC_INC32(iph->iph_ref);
 		}
-		*funcptr = fr_iphmfindip;
+		*funcptr = ipf_iphmfindip;
 		break;
 	default:
 		ptr = NULL;
 		*funcptr = NULL;
 		break;
 	}
-	RWLOCK_EXIT(&ip_poolrw);
+	RWLOCK_EXIT(&ipf_poolrw);
 
 	return ptr;
 }
@@ -4222,11 +4461,12 @@ lookupfunc_t *funcptr;
 /* of the rule structure being loaded.  If a rule has user defined timeouts */
 /* then make sure they are created and initialised before exiting.          */
 /* ------------------------------------------------------------------------ */
-int frrequest(unit, req, data, set, makecopy)
-int unit;
-ioctlcmd_t req;
-int set, makecopy;
-caddr_t data;
+int
+frrequest(unit, req, data, set, makecopy)
+	int unit;
+	ioctlcmd_t req;
+	int set, makecopy;
+	caddr_t data;
 {
 	frentry_t frd, *fp, *f, **fprev, **ftail;
 	int error = 0, in, v, addrem;
@@ -4238,13 +4478,12 @@ caddr_t data;
 	fg = NULL;
 	fp = &frd;
 	if (makecopy != 0) {
-		error = fr_inobj(data, fp, IPFOBJ_FRENTRY);
+		error = ipf_inobj(data, fp, IPFOBJ_FRENTRY);
 		if (error) {
-			ipf_interror = 23;
-			return EFAULT;
+			return error;
 		}
 		if ((fp->fr_flags & FR_T_BUILTIN) != 0) {
-			ipf_interror = 24;
+			ipf_interror = 6;
 			return EINVAL;
 		}
 		fp->fr_ref = 0;
@@ -4252,7 +4491,7 @@ caddr_t data;
 	} else {
 		fp = (frentry_t *)data;
 		if ((fp->fr_type & FR_T_BUILTIN) == 0) {
-			ipf_interror = 25;
+			ipf_interror = 7;
 			return EINVAL;
 		}
 		fp->fr_flags &= ~FR_COPIED;
@@ -4260,7 +4499,7 @@ caddr_t data;
 
 	if (((fp->fr_dsize == 0) && (fp->fr_data != NULL)) ||
 	    ((fp->fr_dsize != 0) && (fp->fr_data == NULL))) {
-		ipf_interror = 26;
+		ipf_interror = 8;
 		return EINVAL;
 	}
 
@@ -4275,7 +4514,7 @@ caddr_t data;
 	else if (req == (ioctlcmd_t)SIOCZRLST)
 		addrem = 2;
 	else {
-		ipf_interror = 27;
+		ipf_interror = 9;
 		return EINVAL;
 	}
 
@@ -4289,7 +4528,7 @@ caddr_t data;
 		/*EMPTY*/;
 #endif
 	} else if (v != 0) {
-		ipf_interror = 28;
+		ipf_interror = 10;
 		return EINVAL;
 	}
 
@@ -4299,43 +4538,57 @@ caddr_t data;
 	 * rule.
 	 */
 	if ((makecopy == 1) && (fp->fr_func != NULL)) {
-		if (fr_findfunc(fp->fr_func) == NULL) {
-			ipf_interror = 29;
+		if (ipf_findfunc(fp->fr_func) == NULL) {
+			ipf_interror = 11;
 			return ESRCH;
 		}
-		error = fr_funcinit(fp);
+		error = ipf_funcinit(fp);
 		if (error != 0)
 			return error;
 	}
 
 	ptr = NULL;
-	/*
-	 * Check that the group number does exist and that its use (in/out)
-	 * matches what the rule is.
-	 */
-	if (!strncmp(fp->fr_grhead, "0", FR_GROUPLEN))
-		*fp->fr_grhead = '\0';
-	group = fp->fr_group;
-	if (!strncmp(group, "0", FR_GROUPLEN))
-		*group = '\0';
 
 	if (FR_ISACCOUNT(fp->fr_flags))
 		unit = IPL_LOGCOUNT;
 
+	/*
+	 * Check that the group number does exist and that its use (in/out)
+	 * matches what the rule is.
+	 */
+
+	if (!strncmp(fp->fr_icmphead, "0", FR_GROUPLEN))
+		*fp->fr_icmphead = '\0';
+
+	if (!strncmp(fp->fr_grhead, "0", FR_GROUPLEN))
+		*fp->fr_grhead = '\0';
+
+	group = fp->fr_group;
+
 	if ((req != (int)SIOCZRLST) && (*group != '\0')) {
-		fg = fr_findgroup(group, unit, set, NULL);
+		fg = ipf_findgroup(group, unit, set, NULL);
 		if (fg == NULL) {
-			ipf_interror = 30;
+			ipf_interror = 12;
 			return ESRCH;
 		}
 		if (fg->fg_flags == 0)
 			fg->fg_flags = fp->fr_flags & FR_INOUT;
 		else if (fg->fg_flags != (fp->fr_flags & FR_INOUT)) {
-			ipf_interror = 31;
+			ipf_interror = 13;
 			return ESRCH;
 		}
 	}
 
+	/*
+	 * If a rule is going to be part of a group then it does not matter
+	 * whether it is an in or out rule.
+	 */
+	if ((fp->fr_flags & (FR_INQUE|FR_OUTQUE)) == 0) {
+		if (*group == '\0') {
+			ipf_interror = 14;
+			return EINVAL;
+		}
+	}
 	in = (fp->fr_flags & FR_INQUE) ? 0 : 1;
 
 	/*
@@ -4344,35 +4597,20 @@ caddr_t data;
 	ftail = NULL;
 	fprev = NULL;
 	if (unit == IPL_LOGAUTH)
-		fprev = &ipauth;
+		fprev = &ipf_auth_ip;
 	else {
 		if (FR_ISACCOUNT(fp->fr_flags))
-			fprev = &ipacct[in][set];
+			fprev = &ipf_acct[in][set];
 		else if ((fp->fr_flags & (FR_OUTQUE|FR_INQUE)) != 0)
-			fprev = &ipfilter[in][set];
+			fprev = &ipf_rules[in][set];
 	}
 	if (fprev == NULL) {
-		ipf_interror = 32;
+		ipf_interror = 15;
 		return ESRCH;
 	}
 
-	if (*group != '\0') {
-		if (!fg && !(fg = fr_findgroup(group, unit, set, NULL))) {
-			ipf_interror = 33;
-			return ESRCH;
-		}
+	if (fg != NULL)
 		fprev = &fg->fg_start;
-	}
-
-	ftail = fprev;
-	for (f = *ftail; (f = *ftail) != NULL; ftail = &f->fr_next) {
-		if (fp->fr_collect <= f->fr_collect) {
-			ftail = fprev;
-			f = NULL;
-			break;
-		}
-		fprev = ftail;
-	}
 
 	/*
 	 * Copy in extra data for the rule.
@@ -4380,23 +4618,23 @@ caddr_t data;
 	if (fp->fr_dsize != 0) {
 		if (makecopy != 0) {
 			KMALLOCS(ptr, void *, fp->fr_dsize);
-			if (!ptr) {
-				ipf_interror = 34;
+			if (ptr == NULL) {
+				ipf_interror = 16;
 				return ENOMEM;
 			}
 			error = COPYIN(uptr, ptr, fp->fr_dsize);
+			if (error != 0) {
+				ipf_interror = 17;
+				KFREES(ptr, fp->fr_dsize);
+				return EFAULT;
+			}
 		} else {
 			ptr = uptr;
-			error = 0;
-		}
-		if (error != 0) {
-			KFREES(ptr, fp->fr_dsize);
-			ipf_interror = 35;
-			return ENOMEM;
 		}
 		fp->fr_data = ptr;
-	} else
+	} else {
 		fp->fr_data = NULL;
+	}
 
 	/*
 	 * Perform per-rule type sanity checks of their members.
@@ -4406,21 +4644,21 @@ caddr_t data;
 #if defined(IPFILTER_BPF)
 	case FR_T_BPFOPC :
 		if (fp->fr_dsize == 0) {
-			ipf_interror = 36;
+			ipf_interror = 19;
 			return EINVAL;
 		}
 		if (!bpf_validate(ptr, fp->fr_dsize/sizeof(struct bpf_insn))) {
 			if (makecopy && fp->fr_data != NULL) {
 				KFREES(fp->fr_data, fp->fr_dsize);
 			}
-			ipf_interror = 37;
+			ipf_interror = 20;
 			return EINVAL;
 		}
 		break;
 #endif
 	case FR_T_IPF :
 		if (fp->fr_dsize != sizeof(fripf_t)) {
-			ipf_interror = 38;
+			ipf_interror = 21;
 			return EINVAL;
 		}
 
@@ -4430,7 +4668,7 @@ caddr_t data;
 		 * fail with the out of window (oow) flag set.
 		 */
 		if ((fp->fr_flags & FR_KEEPSTATE) && (fp->fr_flx & FI_OOW)) {
-			ipf_interror = 39;
+			ipf_interror = 22;
 			return EINVAL;
 		}
 
@@ -4445,13 +4683,13 @@ caddr_t data;
 				if (makecopy && fp->fr_data != NULL) {
 					KFREES(fp->fr_data, fp->fr_dsize);
 				}
-				ipf_interror = 40;
+				ipf_interror = 23;
 				return EINVAL;
 			}
 			break;
 #ifdef	IPFILTER_LOOKUP
 		case FRI_LOOKUP :
-			fp->fr_srcptr = fr_resolvelookup(IPL_LOGIPF,
+			fp->fr_srcptr = ipf_resolvelookup(IPL_LOGIPF,
 							 fp->fr_srctype,
 							 fp->fr_srcnum,
 							 &fp->fr_srcfunc);
@@ -4472,13 +4710,13 @@ caddr_t data;
 				if (makecopy && fp->fr_data != NULL) {
 					KFREES(fp->fr_data, fp->fr_dsize);
 				}
-				ipf_interror = 41;
+				ipf_interror = 24;
 				return EINVAL;
 			}
 			break;
 #ifdef	IPFILTER_LOOKUP
 		case FRI_LOOKUP :
-			fp->fr_dstptr = fr_resolvelookup(IPL_LOGIPF,
+			fp->fr_dstptr = ipf_resolvelookup(IPL_LOGIPF,
 							 fp->fr_dsttype,
 							 fp->fr_dstnum,
 							 &fp->fr_dstfunc);
@@ -4488,24 +4726,38 @@ caddr_t data;
 			break;
 		}
 		break;
+
 	case FR_T_NONE :
 		break;
+
 	case FR_T_CALLFUNC :
 		break;
+
 	case FR_T_COMPIPF :
 		break;
+
+	case FR_T_IPFEXPR :
+		if (ipf_matcharray_verify(fp->fr_data, fp->fr_dsize) == -1) {
+			if (makecopy && fp->fr_data != NULL) {
+				KFREES(fp->fr_data, fp->fr_dsize);
+			}
+			ipf_interror = 25;
+			return EINVAL;
+		}
+		break;
+
 	default :
 		if (makecopy && fp->fr_data != NULL) {
 			KFREES(fp->fr_data, fp->fr_dsize);
 		}
-		ipf_interror = 42;
+		ipf_interror = 26;
 		return EINVAL;
 	}
 
 	/*
 	 * Lookup all the interface names that are part of the rule.
 	 */
-	frsynclist(fp, NULL);
+	ipf_synclist(fp, NULL);
 	fp->fr_statecnt = 0;
 
 	/*
@@ -4523,7 +4775,21 @@ caddr_t data;
 		fp->fr_cksum += *p;
 
 	WRITE_ENTER(&ipf_mutex);
-	bzero((char *)frcache, sizeof(frcache));
+
+	/*
+	 * Now that the filter rule lists are locked, we can walk the
+	 * chain of them without fear.
+	 */
+	ftail = fprev;
+	for (f = *ftail; (f = *ftail) != NULL; ftail = &f->fr_next) {
+		if (fp->fr_collect <= f->fr_collect) {
+			ftail = fprev;
+			f = NULL;
+			break;
+		}
+		fprev = ftail;
+	}
+	bzero((char *)ipf_cache, sizeof(ipf_cache));
 
 	for (; (f = *ftail) != NULL; ftail = &f->fr_next) {
 		if ((fp->fr_cksum != f->fr_cksum) ||
@@ -4541,9 +4807,10 @@ caddr_t data;
 	 * If zero'ing statistics, copy current to caller and zero.
 	 */
 	if (addrem == 2) {
-		if (f == NULL)
-			error = ESRCH, ipf_interror = 4;
-		else {
+		if (f == NULL) {
+			ipf_interror = 27;
+			error = ESRCH;
+		} else {
 			/*
 			 * Copy and reduce lock because of impending copyout.
 			 * Well we should, but if we do then the atomicity of
@@ -4560,12 +4827,16 @@ caddr_t data;
 			 * pointer to be what it was in user space.
 			 */
 			fp->fr_data = uptr;
-			error = fr_outobj(data, fp, IPFOBJ_FRENTRY);
+			error = ipf_outobj(data, fp, IPFOBJ_FRENTRY);
 
 			if (error == 0) {
 				if ((f->fr_dsize != 0) && (uptr != NULL))
 					error = COPYOUT(f->fr_data, uptr,
 							f->fr_dsize);
+					if (error != 0) {
+						ipf_interror = 28;
+						error = EFAULT;
+					}
 				if (error == 0) {
 					f->fr_hits = 0;
 					f->fr_bytes = 0;
@@ -4626,54 +4897,62 @@ caddr_t data;
 	 * Request to remove a rule.
 	 */
 	if (addrem == 1) {
-		if (!f)
-			error = ESRCH, ipf_interror = 5;
-		else {
+		if (!f) {
+			ipf_interror = 29;
+			error = ESRCH;
+		} else {
 			/*
 			 * Do not allow activity from user space to interfere
 			 * with rules not loaded that way.
 			 */
 			if ((makecopy == 1) && !(f->fr_flags & FR_COPIED)) {
-				error = EPERM, ipf_interror = 6;
+				ipf_interror = 30;
+				error = EPERM;
 				goto done;
 			}
 
 			/*
 			 * Return EBUSY if the rule is being reference by
-			 * something else (eg state information.
+			 * something else (eg state information.)
 			 */
 			if (f->fr_ref > 1) {
-				error = EBUSY, ipf_interror = 7;
+				ipf_interror = 31;
+				error = EBUSY;
 				goto done;
 			}
 #ifdef	IPFILTER_SCAN
 			if (f->fr_isctag[0] != '\0' &&
 			    (f->fr_isc != (struct ipscan *)-1))
-				ipsc_detachfr(f);
+				ipf_scan_detachfr(f);
 #endif
-			if ((fg != NULL) && (fg->fg_head != NULL))
-				fg->fg_head->fr_ref--;
+
 			if (unit == IPL_LOGAUTH) {
-				error = fr_preauthcmd(req, f, ftail);
+				error = ipf_auth_precmd(req, f, ftail);
 				goto done;
 			}
+
 			if (*f->fr_grhead != '\0')
-				fr_delgroup(f->fr_grhead, unit, set);
-			fr_fixskip(ftail, f, -1);
+				ipf_group_del(f->fr_grhead, unit, set);
+
+			if (*f->fr_icmphead != '\0')
+				ipf_group_del(f->fr_icmphead, unit, set);
+
+			ipf_fixskip(ftail, f, -1);
 			*ftail = f->fr_next;
 			f->fr_next = NULL;
-			fr_checkrulefunc(f->fr_func, addrem, set);
-			(void)fr_derefrule(&f);
+			ipf_checkrulefunc(f->fr_func, addrem, set);
+			(void) ipf_derefrule(&f);
 		}
 	} else {
 		/*
 		 * Not removing, so we must be adding/inserting a rule.
 		 */
-		if (f)
-			error = EEXIST, ipf_interror = 8;
-		else {
+		if (f != NULL) {
+			ipf_interror = 32;
+			error = EEXIST;
+		} else {
 			if (unit == IPL_LOGAUTH) {
-				error = fr_preauthcmd(req, fp, ftail);
+				error = ipf_auth_precmd(req, fp, ftail);
 				goto done;
 			}
 			if (makecopy) {
@@ -4681,8 +4960,6 @@ caddr_t data;
 			} else
 				f = fp;
 			if (f != NULL) {
-				if (fg != NULL && fg->fg_head != NULL)
-					fg->fg_head->fr_ref++;
 				if (fp != f)
 					bcopy((char *)fp, (char *)f,
 					      sizeof(*f));
@@ -4690,7 +4967,7 @@ caddr_t data;
 				MUTEX_INIT(&f->fr_lock, "filter rule lock");
 #ifdef	IPFILTER_SCAN
 				if (f->fr_isctag[0] != '\0' &&
-				    ipsc_attachfr(f))
+				    ipf_scan_attachfr(f))
 					f->fr_isc = (struct ipscan *)-1;
 #endif
 				f->fr_hits = 0;
@@ -4699,18 +4976,32 @@ caddr_t data;
 				f->fr_next = *ftail;
 				*ftail = f;
 				if (addrem == 0)
-					fr_fixskip(ftail, f, 1);
+					ipf_fixskip(ftail, f, 1);
+
+				f->fr_icmpgrp = NULL;
+				group = f->fr_icmphead;
+				if (*group != '\0') {
+					fg = ipf_group_add(group, f, 0,
+							 unit, set);
+					if (fg != NULL)
+						f->fr_icmpgrp = &fg->fg_start;
+				}
+
 				f->fr_grp = NULL;
 				group = f->fr_grhead;
 				if (*group != '\0') {
-					fg = fr_addgroup(group, f, f->fr_flags,
-							 unit, set);
+					fg = ipf_group_add(group, f,
+							   f->fr_flags, unit,
+							   set);
 					if (fg != NULL)
 						f->fr_grp = &fg->fg_start;
 				}
-				fr_checkrulefunc(f->fr_func, addrem, set);
-			} else
-				error = ENOMEM, ipf_interror = 9;
+
+				ipf_checkrulefunc(f->fr_func, addrem, set);
+			} else {
+				ipf_interror = 33;
+				error = ENOMEM;
+			}
 		}
 	}
 done:
@@ -4723,22 +5014,24 @@ done:
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_funcinit                                                 */
+/* Function:    ipf_funcinit                                                */
 /* Returns:     int - 0 == success, else ESRCH: cannot resolve rule details */
 /* Parameters:  fr(I) - pointer to filter rule                              */
 /*                                                                          */
 /* If a rule is a call rule, then check if the function it points to needs  */
 /* an init function to be called now the rule has been loaded.              */
 /* ------------------------------------------------------------------------ */
-static int fr_funcinit(fr)
-frentry_t *fr;
+static int
+ipf_funcinit(fr)
+	frentry_t *fr;
 {
 	ipfunc_resolve_t *ft;
 	int err;
 
-	err = ESRCH, ipf_interror = 10;
+	ipf_interror = 34;
+	err = ESRCH;
 
-	for (ft = fr_availfuncs; ft->ipfu_addr != NULL; ft++)
+	for (ft = ipf_availfuncs; ft->ipfu_addr != NULL; ft++)
 		if (ft->ipfu_addr == fr->fr_func) {
 			err = 0;
 			if (ft->ipfu_init != NULL)
@@ -4750,18 +5043,19 @@ frentry_t *fr;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_findfunc                                                 */
+/* Function:    ipf_findfunc                                                */
 /* Returns:     ipfunc_t - pointer to function if found, else NULL          */
 /* Parameters:  funcptr(I) - function pointer to lookup                     */
 /*                                                                          */
 /* Look for a function in the table of known functions.                     */
 /* ------------------------------------------------------------------------ */
-static ipfunc_t fr_findfunc(funcptr)
-ipfunc_t funcptr;
+static ipfunc_t
+ipf_findfunc(funcptr)
+	ipfunc_t funcptr;
 {
 	ipfunc_resolve_t *ft;
 
-	for (ft = fr_availfuncs; ft->ipfu_addr != NULL; ft++)
+	for (ft = ipf_availfuncs; ft->ipfu_addr != NULL; ft++)
 		if (ft->ipfu_addr == funcptr)
 			return funcptr;
 	return NULL;
@@ -4769,7 +5063,7 @@ ipfunc_t funcptr;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_resolvefunc                                              */
+/* Function:    ipf_resolvefunc                                             */
 /* Returns:     int - 0 == success, else error                              */
 /* Parameters:  data(IO) - ioctl data pointer to ipfunc_resolve_t struct    */
 /*                                                                          */
@@ -4778,46 +5072,52 @@ ipfunc_t funcptr;
 /* function pointer if the name is set.  When found, fill in the other one  */
 /* so that the entire, complete, structure can be copied back to user space.*/
 /* ------------------------------------------------------------------------ */
-int fr_resolvefunc(data)
-void *data;
+int
+ipf_resolvefunc(data)
+	void *data;
 {
 	ipfunc_resolve_t res, *ft;
+	int error;
 
-	BCOPYIN(data, &res, sizeof(res));
+	error = BCOPYIN(data, &res, sizeof(res));
+	if (error != 0) {
+		ipf_interror = 123;
+		return EFAULT;
+	}
 
 	if (res.ipfu_addr == NULL && res.ipfu_name[0] != '\0') {
-		for (ft = fr_availfuncs; ft->ipfu_addr != NULL; ft++)
+		for (ft = ipf_availfuncs; ft->ipfu_addr != NULL; ft++)
 			if (strncmp(res.ipfu_name, ft->ipfu_name,
 				    sizeof(res.ipfu_name)) == 0) {
 				res.ipfu_addr = ft->ipfu_addr;
 				res.ipfu_init = ft->ipfu_init;
 				if (COPYOUT(&res, data, sizeof(res)) != 0) {
-					ipf_interror = 43;
+					ipf_interror = 35;
 					return EFAULT;
 				}
 				return 0;
 			}
 	}
 	if (res.ipfu_addr != NULL && res.ipfu_name[0] == '\0') {
-		for (ft = fr_availfuncs; ft->ipfu_addr != NULL; ft++)
+		for (ft = ipf_availfuncs; ft->ipfu_addr != NULL; ft++)
 			if (ft->ipfu_addr == res.ipfu_addr) {
 				(void) strncpy(res.ipfu_name, ft->ipfu_name,
 					       sizeof(res.ipfu_name));
 				res.ipfu_init = ft->ipfu_init;
 				if (COPYOUT(&res, data, sizeof(res)) != 0) {
-					ipf_interror = 44;
+					ipf_interror = 36;
 					return EFAULT;
 				}
 				return 0;
 			}
 	}
-	ipf_interror = 45;
+	ipf_interror = 37;
 	return ESRCH;
 }
 
 
 #if !defined(_KERNEL) || (!defined(__NetBSD__) && !defined(__OpenBSD__) && !defined(__FreeBSD__)) || \
-    (defined(__FreeBSD__) && (__FreeBSD_version < 490000)) || \
+    (defined(__FreeBSD__) && (__FreeBSD_version < 501000)) || \
     (defined(__NetBSD__) && (__NetBSD_Version__ < 105000000)) || \
     (defined(__OpenBSD__) && (OpenBSD < 200006))
 /*
@@ -4869,19 +5169,21 @@ ppsratecheck(lasttime, curpps, maxpps)
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_derefrule                                                */
+/* Function:    ipf_derefrule                                               */
 /* Returns:     int   - 0 == rule freed up, else rule not freed             */
 /* Parameters:  fr(I) - pointer to filter rule                              */
 /*                                                                          */
 /* Decrement the reference counter to a rule by one.  If it reaches zero,   */
 /* free it and any associated storage space being used by it.               */
 /* ------------------------------------------------------------------------ */
-int fr_derefrule(frp)
-frentry_t **frp;
+int
+ipf_derefrule(frp)
+	frentry_t **frp;
 {
 	frentry_t *fr;
 
 	fr = *frp;
+	*frp = NULL;
 
 	MUTEX_ENTER(&fr->fr_lock);
 	fr->fr_ref--;
@@ -4891,9 +5193,9 @@ frentry_t **frp;
 
 #ifdef IPFILTER_LOOKUP
 		if (fr->fr_type == FR_T_IPF && fr->fr_satype == FRI_LOOKUP)
-			ip_lookup_deref(fr->fr_srctype, fr->fr_srcptr);
+			ipf_lookup_deref(fr->fr_srctype, fr->fr_srcptr);
 		if (fr->fr_type == FR_T_IPF && fr->fr_datype == FRI_LOOKUP)
-			ip_lookup_deref(fr->fr_dsttype, fr->fr_dstptr);
+			ipf_lookup_deref(fr->fr_dsttype, fr->fr_dstptr);
 #endif
 
 		if (fr->fr_dsize) {
@@ -4907,22 +5209,22 @@ frentry_t **frp;
 	} else {
 		MUTEX_EXIT(&fr->fr_lock);
 	}
-	*frp = NULL;
 	return -1;
 }
 
 
 #ifdef	IPFILTER_LOOKUP
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_grpmapinit                                               */
+/* Function:    ipf_grpmapinit                                              */
 /* Returns:     int - 0 == success, else ESRCH because table entry not found*/
 /* Parameters:  fr(I) - pointer to rule to find hash table for              */
 /*                                                                          */
 /* Looks for group hash table fr_arg and stores a pointer to it in fr_ptr.  */
-/* fr_ptr is later used by fr_srcgrpmap and fr_dstgrpmap.                   */
+/* fr_ptr is later used by ipf_srcgrpmap and ipf_dstgrpmap.                 */
 /* ------------------------------------------------------------------------ */
-static int fr_grpmapinit(fr)
-frentry_t *fr;
+static int
+ipf_grpmapinit(fr)
+	frentry_t *fr;
 {
 	char name[FR_GROUPLEN];
 	iphtable_t *iph;
@@ -4932,13 +5234,13 @@ frentry_t *fr;
 #else
 	(void) sprintf(name, "%d", fr->fr_arg);
 #endif
-	iph = fr_findhtable(IPL_LOGIPF, name);
+	iph = ipf_htable_find(IPL_LOGIPF, name);
 	if (iph == NULL) {
-		ipf_interror = 46;
+		ipf_interror = 38;
 		return ESRCH;
 	}
 	if ((iph->iph_flags & FR_INOUT) != (fr->fr_flags & FR_INOUT)) {
-		ipf_interror = 47;
+		ipf_interror = 39;
 		return ESRCH;
 	}
 	fr->fr_ptr = iph;
@@ -4947,7 +5249,7 @@ frentry_t *fr;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_srcgrpmap                                                */
+/* Function:    ipf_srcgrpmap                                               */
 /* Returns:     frentry_t * - pointer to "new last matching" rule or NULL   */
 /* Parameters:  fin(I)    - pointer to packet information                   */
 /*              passp(IO) - pointer to current/new filter decision (unused) */
@@ -4956,26 +5258,27 @@ frentry_t *fr;
 /* the key, and descend into that group and continue matching rules against */
 /* the packet.                                                              */
 /* ------------------------------------------------------------------------ */
-frentry_t *fr_srcgrpmap(fin, passp)
-fr_info_t *fin;
-u_32_t *passp;
+frentry_t *
+ipf_srcgrpmap(fin, passp)
+	fr_info_t *fin;
+	u_32_t *passp;
 {
 	frgroup_t *fg;
 	void *rval;
 
-	rval = fr_iphmfindgroup(fin->fin_fr->fr_ptr, &fin->fin_src);
+	rval = ipf_iphmfindgroup(fin->fin_fr->fr_ptr, &fin->fin_src);
 	if (rval == NULL)
 		return NULL;
 
 	fg = rval;
 	fin->fin_fr = fg->fg_start;
-	(void) fr_scanlist(fin, *passp);
+	(void) ipf_scanlist(fin, *passp);
 	return fin->fin_fr;
 }
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_dstgrpmap                                                */
+/* Function:    ipf_dstgrpmap                                               */
 /* Returns:     frentry_t * - pointer to "new last matching" rule or NULL   */
 /* Parameters:  fin(I)    - pointer to packet information                   */
 /*              passp(IO) - pointer to current/new filter decision (unused) */
@@ -4984,20 +5287,21 @@ u_32_t *passp;
 /* address as the key, and descend into that group and continue matching    */
 /* rules against  the packet.                                               */
 /* ------------------------------------------------------------------------ */
-frentry_t *fr_dstgrpmap(fin, passp)
-fr_info_t *fin;
-u_32_t *passp;
+frentry_t *
+ipf_dstgrpmap(fin, passp)
+	fr_info_t *fin;
+	u_32_t *passp;
 {
 	frgroup_t *fg;
 	void *rval;
 
-	rval = fr_iphmfindgroup(fin->fin_fr->fr_ptr, &fin->fin_dst);
+	rval = ipf_iphmfindgroup(fin->fin_fr->fr_ptr, &fin->fin_dst);
 	if (rval == NULL)
 		return NULL;
 
 	fg = rval;
 	fin->fin_fr = fg->fg_start;
-	(void) fr_scanlist(fin, *passp);
+	(void) ipf_scanlist(fin, *passp);
 	return fin->fin_fr;
 }
 #endif /* IPFILTER_LOOKUP */
@@ -5009,12 +5313,12 @@ u_32_t *passp;
  * a number of system defined queues as well as user defined timeouts.  It is
  * expected that a lock is held in the domain in which the queue belongs
  * (i.e. either state or NAT) when calling any of these functions that prevents
- * fr_freetimeoutqueue() from being called at the same time as any other.
+ * ipf_freetimeoutqueue() from being called at the same time as any other.
  */
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_addtimeoutqueue                                          */
+/* Function:    ipf_addtimeoutqueue                                         */
 /* Returns:     struct ifqtq * - NULL if malloc fails, else pointer to      */
 /*                               timeout queue with given interval.         */
 /* Parameters:  parent(I)  - pointer to pointer to parent node of this list */
@@ -5030,9 +5334,10 @@ u_32_t *passp;
 /* It is assumed that the caller of this function has an appropriate lock   */
 /* held (exclusively) in the domain that encompases 'parent'.               */
 /* ------------------------------------------------------------------------ */
-ipftq_t *fr_addtimeoutqueue(parent, seconds)
-ipftq_t **parent;
-u_int seconds;
+ipftq_t *
+ipf_addtimeoutqueue(parent, seconds)
+	ipftq_t **parent;
+	u_int seconds;
 {
 	ipftq_t *ifq;
 	u_int period;
@@ -5064,7 +5369,7 @@ u_int seconds;
 		ifq->ifq_pnext = parent;
 		ifq->ifq_flags = IFQF_USER;
 		*parent = ifq;
-		fr_userifqs++;
+		ipf_userifqs++;
 	}
 	MUTEX_EXIT(&ipf_timeoutlock);
 	return ifq;
@@ -5072,7 +5377,7 @@ u_int seconds;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_deletetimeoutqueue                                       */
+/* Function:    ipf_deletetimeoutqueue                                      */
 /* Returns:     int    - new reference count value of the timeout queue     */
 /* Parameters:  ifq(I) - timeout queue which is losing a reference.         */
 /* Locks:       ifq->ifq_lock                                               */
@@ -5086,8 +5391,9 @@ u_int seconds;
 /* way because the locking may not be sufficient to safely do a free when   */
 /* this function is called.                                                 */
 /* ------------------------------------------------------------------------ */
-int fr_deletetimeoutqueue(ifq)
-ipftq_t *ifq;
+int
+ipf_deletetimeoutqueue(ifq)
+	ipftq_t *ifq;
 {
 
 	ifq->ifq_ref--;
@@ -5100,7 +5406,7 @@ ipftq_t *ifq;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_freetimeoutqueue                                         */
+/* Function:    ipf_freetimeoutqueue                                        */
 /* Parameters:  ifq(I) - timeout queue which is losing a reference.         */
 /* Returns:     Nil                                                         */
 /*                                                                          */
@@ -5112,14 +5418,15 @@ ipftq_t *ifq;
 /* Remove a user definde timeout queue from the list of queues it is in and */
 /* tidy up after this is done.                                              */
 /* ------------------------------------------------------------------------ */
-void fr_freetimeoutqueue(ifq)
-ipftq_t *ifq;
+void
+ipf_freetimeoutqueue(ifq)
+	ipftq_t *ifq;
 {
 
 
 	if (((ifq->ifq_flags & IFQF_DELETE) == 0) || (ifq->ifq_ref != 0) ||
 	    ((ifq->ifq_flags & IFQF_USER) == 0)) {
-		printf("fr_freetimeoutqueue(%lx) flags 0x%x ttl %d ref %d\n",
+		printf("ipf_freetimeoutqueue(%lx) flags 0x%x ttl %d ref %d\n",
 		       (u_long)ifq, ifq->ifq_flags, ifq->ifq_ttl,
 		       ifq->ifq_ref);
 		return;
@@ -5133,24 +5440,25 @@ ipftq_t *ifq;
 		ifq->ifq_next->ifq_pnext = ifq->ifq_pnext;
 
 	MUTEX_DESTROY(&ifq->ifq_lock);
-	ATOMIC_DEC(fr_userifqs);
+	ATOMIC_DEC(ipf_userifqs);
 	KFREE(ifq);
 }
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_deletequeueentry                                         */
+/* Function:    ipf_deletequeueentry                                        */
 /* Returns:     Nil                                                         */
 /* Parameters:  tqe(I) - timeout queue entry to delete                      */
 /*              ifq(I) - timeout queue to remove entry from                 */
 /*                                                                          */
 /* Remove a tail queue entry from its queue and make it an orphan.          */
-/* fr_deletetimeoutqueue is called to make sure the reference count on the  */
-/* queue is correct.  We can't, however, call fr_freetimeoutqueue because   */
+/* ipf_deletetimeoutqueue is called to make sure the reference count on the */
+/* queue is correct.  We can't, however, call ipf_freetimeoutqueue because  */
 /* the correct lock(s) may not be held that would make it safe to do so.    */
 /* ------------------------------------------------------------------------ */
-void fr_deletequeueentry(tqe)
-ipftqent_t *tqe;
+void
+ipf_deletequeueentry(tqe)
+	ipftqent_t *tqe;
 {
 	ipftq_t *ifq;
 
@@ -5169,21 +5477,22 @@ ipftqent_t *tqe;
 		tqe->tqe_ifq = NULL;
 	}
 
-	(void) fr_deletetimeoutqueue(ifq);
+	(void) ipf_deletetimeoutqueue(ifq);
 
 	MUTEX_EXIT(&ifq->ifq_lock);
 }
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_queuefront                                               */
+/* Function:    ipf_queuefront                                              */
 /* Returns:     Nil                                                         */
 /* Parameters:  tqe(I) - pointer to timeout queue entry                     */
 /*                                                                          */
 /* Move a queue entry to the front of the queue, if it isn't already there. */
 /* ------------------------------------------------------------------------ */
-void fr_queuefront(tqe)
-ipftqent_t *tqe;
+void
+ipf_queuefront(tqe)
+	ipftqent_t *tqe;
 {
 	ipftq_t *ifq;
 
@@ -5209,21 +5518,22 @@ ipftqent_t *tqe;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_queueback                                                */
+/* Function:    ipf_queueback                                               */
 /* Returns:     Nil                                                         */
 /* Parameters:  tqe(I) - pointer to timeout queue entry                     */
 /*                                                                          */
 /* Move a queue entry to the back of the queue, if it isn't already there.  */
 /* ------------------------------------------------------------------------ */
-void fr_queueback(tqe)
-ipftqent_t *tqe;
+void
+ipf_queueback(tqe)
+	ipftqent_t *tqe;
 {
 	ipftq_t *ifq;
 
 	ifq = tqe->tqe_ifq;
 	if (ifq == NULL)
 		return;
-	tqe->tqe_die = fr_ticks + ifq->ifq_ttl;
+	tqe->tqe_die = ipf_ticks + ifq->ifq_ttl;
 
 	MUTEX_ENTER(&ifq->ifq_lock);
 	if (tqe->tqe_next != NULL) {		/* at the end already ? */
@@ -5246,7 +5556,7 @@ ipftqent_t *tqe;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_queueappend                                              */
+/* Function:    ipf_queueappend                                             */
 /* Returns:     Nil                                                         */
 /* Parameters:  tqe(I)    - pointer to timeout queue entry                  */
 /*              ifq(I)    - pointer to timeout queue                        */
@@ -5254,10 +5564,11 @@ ipftqent_t *tqe;
 /*                                                                          */
 /* Add a new item to this queue and put it on the very end.                 */
 /* ------------------------------------------------------------------------ */
-void fr_queueappend(tqe, ifq, parent)
-ipftqent_t *tqe;
-ipftq_t *ifq;
-void *parent;
+void
+ipf_queueappend(tqe, ifq, parent)
+	ipftqent_t *tqe;
+	ipftq_t *ifq;
+	void *parent;
 {
 
 	MUTEX_ENTER(&ifq->ifq_lock);
@@ -5267,14 +5578,14 @@ void *parent;
 	ifq->ifq_tail = &tqe->tqe_next;
 	tqe->tqe_next = NULL;
 	tqe->tqe_ifq = ifq;
-	tqe->tqe_die = fr_ticks + ifq->ifq_ttl;
+	tqe->tqe_die = ipf_ticks + ifq->ifq_ttl;
 	ifq->ifq_ref++;
 	MUTEX_EXIT(&ifq->ifq_lock);
 }
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_movequeue                                                */
+/* Function:    ipf_movequeue                                               */
 /* Returns:     Nil                                                         */
 /* Parameters:  tq(I)   - pointer to timeout queue information              */
 /*              oifp(I) - old timeout queue entry was on                    */
@@ -5284,9 +5595,10 @@ void *parent;
 /* If it notices that the current entry is already last and does not need   */
 /* to move queue, the return.                                               */
 /* ------------------------------------------------------------------------ */
-void fr_movequeue(tqe, oifq, nifq)
-ipftqent_t *tqe;
-ipftq_t *oifq, *nifq;
+void
+ipf_movequeue(tqe, oifq, nifq)
+	ipftqent_t *tqe;
+	ipftq_t *oifq, *nifq;
 {
 	/*
 	 * Is the operation here going to be a no-op ?
@@ -5312,7 +5624,7 @@ ipftq_t *oifq, *nifq;
 		if (oifq != nifq) {
 			tqe->tqe_ifq = NULL;
 
-			(void) fr_deletetimeoutqueue(oifq);
+			(void) ipf_deletetimeoutqueue(oifq);
 
 			MUTEX_EXIT(&oifq->ifq_lock);
 
@@ -5325,7 +5637,7 @@ ipftq_t *oifq, *nifq;
 		/*
 		 * Add to the bottom of the new queue
 		 */
-		tqe->tqe_die = fr_ticks + nifq->ifq_ttl;
+		tqe->tqe_die = ipf_ticks + nifq->ifq_ttl;
 		tqe->tqe_pnext = nifq->ifq_tail;
 		*nifq->ifq_tail = tqe;
 		nifq->ifq_tail = &tqe->tqe_next;
@@ -5335,7 +5647,7 @@ ipftq_t *oifq, *nifq;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_updateipid                                               */
+/* Function:    ipf_updateipid                                              */
 /* Returns:     int - 0 == success, -1 == error (packet should be droppped) */
 /* Parameters:  fin(I) - pointer to packet information                      */
 /*                                                                          */
@@ -5346,23 +5658,24 @@ ipftq_t *oifq, *nifq;
 /* the fragment cache for non-leading fragments.  If a non-leading fragment */
 /* has no match in the cache, return an error.                              */
 /* ------------------------------------------------------------------------ */
-static int fr_updateipid(fin)
-fr_info_t *fin;
+static int
+ipf_updateipid(fin)
+	fr_info_t *fin;
 {
 	u_short id, ido, sums;
 	u_32_t sumd, sum;
 	ip_t *ip;
 
 	if (fin->fin_off != 0) {
-		sum = fr_ipid_knownfrag(fin);
+		sum = ipf_frag_ipidknown(fin);
 		if (sum == 0xffffffff)
 			return -1;
 		sum &= 0xffff;
 		id = (u_short)sum;
 	} else {
-		id = fr_nextipid(fin);
+		id = ipf_nextipid(fin);
 		if (fin->fin_off == 0 && (fin->fin_flx & FI_FRAG) != 0)
-			(void) fr_ipid_newfrag(fin, (u_32_t)id);
+			(void) ipf_frag_ipidnew(fin, (u_32_t)id);
 	}
 
 	ip = fin->fin_ip;
@@ -5383,7 +5696,7 @@ fr_info_t *fin;
 
 #ifdef	NEED_FRGETIFNAME
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_getifname                                                */
+/* Function:    ipf_getifname                                               */
 /* Returns:     char *    - pointer to interface name                       */
 /* Parameters:  ifp(I)    - pointer to network interface                    */
 /*              buffer(O) - pointer to where to store interface name        */
@@ -5392,9 +5705,10 @@ fr_info_t *fin;
 /* expected to be at least LIFNAMSIZ in bytes big.  If buffer is passed in  */
 /* as a NULL pointer then return a pointer to a static array.               */
 /* ------------------------------------------------------------------------ */
-char *fr_getifname(ifp, buffer)
-struct ifnet *ifp;
-char *buffer;
+char *
+ipf_getifname(ifp, buffer)
+	struct ifnet *ifp;
+	char *buffer;
 {
 	static char namebuf[LIFNAMSIZ];
 # if defined(MENTAT) || defined(__FreeBSD__) || defined(__osf__) || \
@@ -5431,73 +5745,106 @@ char *buffer;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_ioctlswitch                                              */
+/* Function:    ipf_ioctlswitch                                             */
 /* Returns:     int     - -1 continue processing, else ioctl return value   */
 /* Parameters:  unit(I) - device unit opened                                */
 /*              data(I) - pointer to ioctl data                             */
 /*              cmd(I)  - ioctl command                                     */
 /*              mode(I) - mode value                                        */
+/*              uid(I)  - uid making the ioctl call                         */
+/*              ctx(I)  - pointer to context data                           */
 /*                                                                          */
 /* Based on the value of unit, call the appropriate ioctl handler or return */
 /* EIO if ipfilter is not running.   Also checks if write perms are req'd   */
-/* for the device in order to execute the ioctl.                            */
+/* for the device in order to execute the ioctl.  A special case is made    */
+/* SIOCIPFINTERROR so that the same code isn't required in every handler.   */
 /* ------------------------------------------------------------------------ */
-int fr_ioctlswitch(unit, data, cmd, mode)
-int unit, mode;
-ioctlcmd_t cmd;
-void *data;
+int
+ipf_ioctlswitch(unit, data, cmd, mode, uid, ctx)
+	int unit, mode, uid;
+	ioctlcmd_t cmd;
+	void *data, *ctx;
 {
 	int error = 0;
+
+	switch (cmd)
+	{
+	case SIOCIPFINTERROR :
+		error = BCOPYOUT(&ipf_interror, data, sizeof(ipf_flags));
+		if (error != 0) {
+			ipf_interror = 40;
+			error = EFAULT;
+		}
+		return error;
+	default :
+		break;
+	}
 
 	switch (unit)
 	{
 	case IPL_LOGIPF :
-		error = -1;
+		error = ipf_ipf_ioctl(data, cmd, mode, uid, ctx);
 		break;
 	case IPL_LOGNAT :
-		if (fr_running > 0)
-			error = fr_nat_ioctl(data, cmd, mode);
-		else
-			error = EIO, ipf_interror = 11;
+		if (ipf_running > 0)
+			error = ipf_nat_ioctl(data, cmd, mode, uid, ctx);
+		else {
+			ipf_interror = 42;
+			error = EIO;
+		}
 		break;
 	case IPL_LOGSTATE :
-		if (fr_running > 0)
-			error = fr_state_ioctl(data, cmd, mode);
-		else
-			error = EIO, ipf_interror = 12;
+		if (ipf_running > 0)
+			error = ipf_state_ioctl(data, cmd, mode, uid, ctx);
+		else {
+			ipf_interror = 43;
+			error = EIO;
+		}
 		break;
 	case IPL_LOGAUTH :
-		if (fr_running > 0)
-			error = fr_auth_ioctl(data, cmd, mode);
-		else
-			error = EIO, ipf_interror = 14;
+		if (ipf_running > 0)
+			error = ipf_auth_ioctl(data, cmd, mode, uid, ctx);
+		else {
+			ipf_interror = 44;
+			error = EIO;
+		}
 		break;
 	case IPL_LOGSYNC :
 #ifdef IPFILTER_SYNC
-		if (fr_running > 0)
-			error = fr_sync_ioctl(data, cmd, mode);
+		if (ipf_running > 0)
+			error = ipf_sync_ioctl(data, cmd, mode, uid, ctx);
 		else
 #endif
-			error = EIO, ipf_interror = 15;
+		{
+			error = EIO;
+			ipf_interror = 45;
+		}
 		break;
 	case IPL_LOGSCAN :
 #ifdef IPFILTER_SCAN
-		if (fr_running > 0)
-			error = fr_scan_ioctl(data, cmd, mode);
+		if (ipf_running > 0)
+			error = ipf_scan_ioctl(data, cmd, mode, uid, ctx);
 		else
 #endif
-			error = EIO, ipf_interror = 16;
+		{
+			error = EIO;
+			ipf_interror = 46;
+		}
 		break;
 	case IPL_LOGLOOKUP :
 #ifdef IPFILTER_LOOKUP
-		if (fr_running > 0)
-			error = ip_lookup_ioctl(data, cmd, mode);
+		if (ipf_running > 0)
+			error = ipf_lookup_ioctl(data, cmd, mode, uid, ctx);
 		else
 #endif
-			error = EIO, ipf_interror = 17;
+		{
+			error = EIO;
+			ipf_interror = 47;
+		}
 		break;
 	default :
-		error = EIO, ipf_interror = 18;
+		ipf_interror = 48;
+		error = EIO;
 		break;
 	}
 
@@ -5509,13 +5856,11 @@ void *data;
  * This array defines the expected size of objects coming into the kernel
  * for the various recognised object types.
  */
-#define	NUM_OBJ_TYPES	14
-
-static	int	fr_objbytes[NUM_OBJ_TYPES][2] = {
+static	int	ipf_objbytes[IPFOBJ_COUNT][2] = {
 	{ 1,	sizeof(struct frentry) },		/* frentry */
 	{ 0,	sizeof(struct friostat) },
 	{ 0,	sizeof(struct fr_info) },
-	{ 0,	sizeof(struct fr_authstat) },
+	{ 0,	sizeof(struct ipf_authstat) },
 	{ 0,	sizeof(struct ipfrstat) },
 	{ 0,	sizeof(struct ipnat) },
 	{ 0,	sizeof(struct natstat) },
@@ -5525,12 +5870,18 @@ static	int	fr_objbytes[NUM_OBJ_TYPES][2] = {
 	{ 1,	sizeof(struct ipstate) },		/* ipstate */
 	{ 0,	sizeof(struct ips_stat) },
 	{ 0,	sizeof(struct frauth) },
-	{ 0,	sizeof(struct ipftune) }
+	{ 0,	sizeof(struct ipftune) },
+	{ 0,	sizeof(struct nat) },			/* nat_t */
+	{ 0,	sizeof(struct ipfruleiter) },
+	{ 0,	sizeof(struct ipfgeniter) },
+	{ 0,	sizeof(struct ipftable) },
+	{ 0,	sizeof(struct ipflookupiter) },
+	{ 0,	sizeof(struct ipftq) * IPF_TCP_NSTATES },
 };
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_inobj                                                    */
+/* Function:    ipf_inobj                                                   */
 /* Returns:     int     - 0 = success, else failure                         */
 /* Parameters:  data(I) - pointer to ioctl data                             */
 /*              ptr(I)  - pointer to store real data in                     */
@@ -5540,106 +5891,119 @@ static	int	fr_objbytes[NUM_OBJ_TYPES][2] = {
 /* add things to check for version numbers, sizes, etc, to make it backward */
 /* compatible at the ABI for user land.                                     */
 /* ------------------------------------------------------------------------ */
-int fr_inobj(data, ptr, type)
-void *data;
-void *ptr;
-int type;
+int
+ipf_inobj(data, ptr, type)
+	void *data;
+	void *ptr;
+	int type;
 {
 	ipfobj_t obj;
 	int error = 0;
 
-	if ((type < 0) || (type > NUM_OBJ_TYPES-1)) {
-		ipf_interror = 48;
-		return EINVAL;
-	}
-
-	BCOPYIN((caddr_t)data, (caddr_t)&obj, sizeof(obj));
-
-	if (obj.ipfo_type != type) {
+	if ((type < 0) || (type >= IPFOBJ_COUNT)) {
 		ipf_interror = 49;
 		return EINVAL;
 	}
 
+	error = BCOPYIN(data, &obj, sizeof(obj));
+	if (error != 0) {
+		ipf_interror = 124;
+		return EFAULT;
+	}
+
+	if (obj.ipfo_type != type) {
+		ipf_interror = 50;
+		return EINVAL;
+	}
+
 #ifndef	IPFILTER_COMPAT
-	if ((fr_objbytes[type][0] & 1) != 0) {
-		if (obj.ipfo_size < fr_objbytes[type][1]) {
-			ipf_interror = 50;
+	if ((ipf_objbytes[type][0] & 1) != 0) {
+		if (obj.ipfo_size < ipf_objbytes[type][1]) {
+			ipf_interror = 51;
 			return EINVAL;
 		}
-	} else if (obj.ipfo_size != fr_objbytes[type][1]) {
-		ipf_interror = 51;
+	} else if (obj.ipfo_size != ipf_objbytes[type][1]) {
+		ipf_interror = 52;
 		return EINVAL;
 	}
 #else
 	if (obj.ipfo_rev != IPFILTER_VERSION)
 		/* XXX compatibility hook here */
 		;
-	if ((fr_objbytes[type][0] & 1) != 0) {
-		if (obj.ipfo_size < fr_objbytes[type][1]) {
+	if ((ipf_objbytes[type][0] & 1) != 0) {
+		if (obj.ipfo_size < ipf_objbytes[type][1]) {
 			/* XXX compatibility hook here */
-			ipf_interror = 52;
+			ipf_interror = 53;
 			return EINVAL;
 		}
-	} else if (obj.ipfo_size != fr_objbytes[type][1]) {
+	} else if (obj.ipfo_size != ipf_objbytes[type][1]) {
 		/* XXX compatibility hook here */
-		ipf_interror = 53;
+		ipf_interror = 54;
 		return EINVAL;
 	}
 #endif
 
-	if ((fr_objbytes[type][0] & 1) != 0) {
-		error = COPYIN((caddr_t)obj.ipfo_ptr, (caddr_t)ptr,
-				fr_objbytes[type][1]);
+	if ((ipf_objbytes[type][0] & 1) != 0) {
+		error = COPYIN(obj.ipfo_ptr, ptr, ipf_objbytes[type][1]);
 	} else {
-		error = COPYIN((caddr_t)obj.ipfo_ptr, (caddr_t)ptr,
-				obj.ipfo_size);
+		error = COPYIN(obj.ipfo_ptr, ptr, obj.ipfo_size);
+	}
+	if (error != 0) {
+		ipf_interror = 55;
+		error = EFAULT;
 	}
 	return error;
 }
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_inobjsz                                                  */
+/* Function:    ipf_inobjsz                                                 */
 /* Returns:     int     - 0 = success, else failure                         */
 /* Parameters:  data(I) - pointer to ioctl data                             */
 /*              ptr(I)  - pointer to store real data in                     */
 /*              type(I) - type of structure being moved                     */
 /*              sz(I)   - size of data to copy                              */
 /*                                                                          */
-/* As per fr_inobj, except the size of the object to copy in is passed in   */
+/* As per ipf_inobj, except the size of the object to copy in is passed in  */
 /* but it must not be smaller than the size defined for the type and the    */
 /* type must allow for varied sized objects.  The extra requirement here is */
 /* that sz must match the size of the object being passed in - this is not  */
-/* not possible nor required in fr_inobj().                                 */
+/* not possible nor required in ipf_inobj().                                */
 /* ------------------------------------------------------------------------ */
-int fr_inobjsz(data, ptr, type, sz)
-void *data;
-void *ptr;
-int type, sz;
+int
+ipf_inobjsz(data, ptr, type, sz)
+	void *data;
+	void *ptr;
+	int type, sz;
 {
 	ipfobj_t obj;
 	int error;
 
-	if ((type < 0) || (type > NUM_OBJ_TYPES-1)) {
-		ipf_interror = 54;
-		return EINVAL;
-	}
-
-	if (((fr_objbytes[type][0] & 1) == 0) || (sz < fr_objbytes[type][1])) {
-		ipf_interror = 55;
-		return EINVAL;
-	}
-
-	BCOPYIN((caddr_t)data, (caddr_t)&obj, sizeof(obj));
-
-	if (obj.ipfo_type != type) {
+	if ((type < 0) || (type >= IPFOBJ_COUNT)) {
 		ipf_interror = 56;
 		return EINVAL;
 	}
 
+	if (((ipf_objbytes[type][0] & 1) == 0) ||
+	    (sz < ipf_objbytes[type][1])) {
+		ipf_interror = 57;
+		return EINVAL;
+	}
+
+	error = BCOPYIN(data, &obj, sizeof(obj));
+	if (error != 0) {
+		ipf_interror = 125;
+		return EFAULT;
+	}
+
+	if (obj.ipfo_type != type) {
+		ipf_interror = 58;
+		return EINVAL;
+	}
+
 #ifndef	IPFILTER_COMPAT
 	if (obj.ipfo_size != sz) {
-		ipf_interror = 57;
+		ipf_interror = 59;
 		return EINVAL;
 	}
 #else
@@ -5648,55 +6012,64 @@ int type, sz;
 		;
 	if (obj.ipfo_size != sz) {
 		/* XXX compatibility hook here */
-		ipf_interror = 58;
+		ipf_interror = 60;
 		return EINVAL;
 	}
 #endif
 
-	error = COPYIN((caddr_t)obj.ipfo_ptr, (caddr_t)ptr, sz);
+	error = COPYIN(obj.ipfo_ptr, ptr, sz);
+	if (error != 0) {
+		ipf_interror = 61;
+		error = EFAULT;
+	}
 	return error;
 }
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_outobjsz                                                 */
+/* Function:    ipf_outobjsz                                                */
 /* Returns:     int     - 0 = success, else failure                         */
 /* Parameters:  data(I) - pointer to ioctl data                             */
 /*              ptr(I)  - pointer to store real data in                     */
 /*              type(I) - type of structure being moved                     */
 /*              sz(I)   - size of data to copy                              */
 /*                                                                          */
-/* As per fr_outobj, except the size of the object to copy out is passed in */
+/* As per ipf_outobj, except the size of the object to copy out is passed in*/
 /* but it must not be smaller than the size defined for the type and the    */
 /* type must allow for varied sized objects.  The extra requirement here is */
 /* that sz must match the size of the object being passed in - this is not  */
-/* not possible nor required in fr_outobj().                                */
+/* not possible nor required in ipf_outobj().                               */
 /* ------------------------------------------------------------------------ */
-int fr_outobjsz(data, ptr, type, sz)
-void *data;
-void *ptr;
-int type, sz;
+int
+ipf_outobjsz(data, ptr, type, sz)
+	void *data;
+	void *ptr;
+	int type, sz;
 {
 	ipfobj_t obj;
 	int error;
 
-	if ((type < 0) || (type > NUM_OBJ_TYPES-1) ||
-	    ((fr_objbytes[type][0] & 1) == 0) ||
-	    (sz < fr_objbytes[type][1])) {
-		ipf_interror = 59;
+	if ((type < 0) || (type >= IPFOBJ_COUNT) ||
+	    ((ipf_objbytes[type][0] & 1) == 0) ||
+	    (sz < ipf_objbytes[type][1])) {
+		ipf_interror = 62;
 		return EINVAL;
 	}
 
-	BCOPYIN((caddr_t)data, (caddr_t)&obj, sizeof(obj));
+	error = BCOPYIN(data, &obj, sizeof(obj));
+	if (error != 0) {
+		ipf_interror = 127;
+		return EFAULT;
+	}
 
 	if (obj.ipfo_type != type) {
-		ipf_interror = 60;
+		ipf_interror = 63;
 		return EINVAL;
 	}
 
 #ifndef	IPFILTER_COMPAT
 	if (obj.ipfo_size != sz) {
-		ipf_interror = 61;
+		ipf_interror = 64;
 		return EINVAL;
 	}
 #else
@@ -5705,18 +6078,22 @@ int type, sz;
 		;
 	if (obj.ipfo_size != sz) {
 		/* XXX compatibility hook here */
-		ipf_interror = 62;
+		ipf_interror = 65;
 		return EINVAL;
 	}
 #endif
 
-	error = COPYOUT((caddr_t)ptr, (caddr_t)obj.ipfo_ptr, sz);
+	error = COPYOUT(ptr, obj.ipfo_ptr, sz);
+	if (error != 0) {
+		ipf_interror = 66;
+		error = EFAULT;
+	}
 	return error;
 }
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_outobj                                                   */
+/* Function:    ipf_outobj                                                  */
 /* Returns:     int     - 0 = success, else failure                         */
 /* Parameters:  data(I) - pointer to ioctl data                             */
 /*              ptr(I)  - pointer to store real data in                     */
@@ -5726,60 +6103,69 @@ int type, sz;
 /* future, we add things to check for version numbers, sizes, etc, to make  */
 /* it backward  compatible at the ABI for user land.                        */
 /* ------------------------------------------------------------------------ */
-int fr_outobj(data, ptr, type)
-void *data;
-void *ptr;
-int type;
+int
+ipf_outobj(data, ptr, type)
+	void *data;
+	void *ptr;
+	int type;
 {
 	ipfobj_t obj;
 	int error;
 
-	if ((type < 0) || (type > NUM_OBJ_TYPES-1)) {
-		ipf_interror = 63;
+	if ((type < 0) || (type >= IPFOBJ_COUNT)) {
+		ipf_interror = 67;
 		return EINVAL;
 	}
 
-	BCOPYIN((caddr_t)data, (caddr_t)&obj, sizeof(obj));
+	error = BCOPYIN(data, &obj, sizeof(obj));
+	if (error != 0) {
+		ipf_interror = 126;
+		return EFAULT;
+	}
 
 	if (obj.ipfo_type != type) {
-		ipf_interror = 64;
+		ipf_interror = 68;
 		return EINVAL;
 	}
 
 #ifndef	IPFILTER_COMPAT
-	if ((fr_objbytes[type][0] & 1) != 0) {
-		if (obj.ipfo_size < fr_objbytes[type][1]) {
-			ipf_interror = 65;
+	if ((ipf_objbytes[type][0] & 1) != 0) {
+		if (obj.ipfo_size < ipf_objbytes[type][1]) {
+			ipf_interror = 69;
 			return EINVAL;
 		}
-	} else if (obj.ipfo_size != fr_objbytes[type][1]) {
-		ipf_interror = 66;
+	} else if (obj.ipfo_size != ipf_objbytes[type][1]) {
+		ipf_interror = 70;
 		return EINVAL;
 	}
 #else
 	if (obj.ipfo_rev != IPFILTER_VERSION)
 		/* XXX compatibility hook here */
 		;
-	if ((fr_objbytes[type][0] & 1) != 0) {
-		if (obj.ipfo_size < fr_objbytes[type][1]) {
+	if ((ipf_objbytes[type][0] & 1) != 0) {
+		if (obj.ipfo_size < ipf_objbytes[type][1]) {
 			/* XXX compatibility hook here */
-			ipf_interror = 67;
+			ipf_interror = 71;
 			return EINVAL;
 		}
-	} else if (obj.ipfo_size != fr_objbytes[type][1]) {
+	} else if (obj.ipfo_size != ipf_objbytes[type][1]) {
 		/* XXX compatibility hook here */
-		ipf_interror = 68;
+		ipf_interror = 72;
 		return EINVAL;
 	}
 #endif
 
-	error = COPYOUT((caddr_t)ptr, (caddr_t)obj.ipfo_ptr, obj.ipfo_size);
+	error = COPYOUT(ptr, obj.ipfo_ptr, obj.ipfo_size);
+	if (error != 0) {
+		ipf_interror = 73;
+		error = EFAULT;
+	}
 	return error;
 }
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_checkl4sum                                               */
+/* Function:    ipf_checkl4sum                                              */
 /* Returns:     int     - 0 = good, -1 = bad, 1 = cannot check              */
 /* Parameters:  fin(I) - pointer to packet information                      */
 /*                                                                          */
@@ -5787,14 +6173,21 @@ int type;
 /* not possible, return without indicating a failure or success but in a    */
 /* way that is ditinguishable.                                              */
 /* ------------------------------------------------------------------------ */
-int fr_checkl4sum(fin)
-fr_info_t *fin;
+int
+ipf_checkl4sum(fin)
+	fr_info_t *fin;
 {
 	u_short sum, hdrsum, *csump;
 	udphdr_t *udp;
 	int dosum;
 
 	if ((fin->fin_flx & FI_NOCKSUM) != 0)
+		return 0;
+
+	if (fin->fin_cksum == -1)
+		return -1;
+
+	if (fin->fin_cksum == 1)
 		return 0;
 
 	/*
@@ -5844,9 +6237,11 @@ fr_info_t *fin;
 		if (csump != NULL)
 			hdrsum = *csump;
 
-		if (dosum)
+		if (dosum) {
 			sum = fr_cksum(fin->fin_m, fin->fin_ip,
-				       fin->fin_p, fin->fin_dp, fin->fin_plen);
+				       fin->fin_p, fin->fin_dp,
+				       fin->fin_dlen + fin->fin_hlen);
+		}
 #if SOLARIS && defined(_KERNEL) && (SOLARIS2 >= 6) && defined(ICK_VALID)
 	}
 #endif
@@ -5857,14 +6252,17 @@ fr_info_t *fin;
 		FR_DEBUG(("checkl4sum: %hx != %hx\n", sum, hdrsum));
 	}
 #endif
-	if (hdrsum == sum)
+	if (hdrsum == sum) {
+		fin->fin_cksum = 1;
 		return 0;
+	}
+	fin->fin_cksum = -1;
 	return -1;
 }
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_ifpfillv4addr                                            */
+/* Function:    ipf_ifpfillv4addr                                           */
 /* Returns:     int     - 0 = address update, -1 = address not updated      */
 /* Parameters:  atype(I)   - type of network address update to perform      */
 /*              sin(I)     - pointer to source of address information       */
@@ -5879,10 +6277,11 @@ fr_info_t *fin;
 /* FRI_NETMASKED, if inpmask is non-NULL then the mask is set to an all 1s  */
 /* value.                                                                   */
 /* ------------------------------------------------------------------------ */
-int fr_ifpfillv4addr(atype, sin, mask, inp, inpmask)
-int atype;
-struct sockaddr_in *sin, *mask;
-struct in_addr *inp, *inpmask;
+int
+ipf_ifpfillv4addr(atype, sin, mask, inp, inpmask)
+	int atype;
+	struct sockaddr_in *sin, *mask;
+	struct in_addr *inp, *inpmask;
 {
 	if (inpmask != NULL && atype != FRI_NETMASKED)
 		inpmask->s_addr = 0xffffffff;
@@ -5903,7 +6302,7 @@ struct in_addr *inp, *inpmask;
 
 #ifdef	USE_INET6
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_ifpfillv6addr                                            */
+/* Function:    ipf_ifpfillv6addr                                           */
 /* Returns:     int     - 0 = address update, -1 = address not updated      */
 /* Parameters:  atype(I)   - type of network address update to perform      */
 /*              sin(I)     - pointer to source of address information       */
@@ -5918,10 +6317,11 @@ struct in_addr *inp, *inpmask;
 /* FRI_NETMASKED, if inpmask is non-NULL then the mask is set to an all 1s  */
 /* value.                                                                   */
 /* ------------------------------------------------------------------------ */
-int fr_ifpfillv6addr(atype, sin, mask, inp, inpmask)
-int atype;
-struct sockaddr_in6 *sin, *mask;
-i6addr_t *inp, *inpmask;
+int
+ipf_ifpfillv6addr(atype, sin, mask, inp, inpmask)
+	int atype;
+	struct sockaddr_in6 *sin, *mask;
+	i6addr_t *inp, *inpmask;
 {
 	i6addr_t *src, *and;
 
@@ -5961,7 +6361,7 @@ i6addr_t *inp, *inpmask;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_matchtag                                                 */
+/* Function:    ipf_matchtag                                                */
 /* Returns:     0 == mismatch, 1 == match.                                  */
 /* Parameters:  tag1(I) - pointer to first tag to compare                   */
 /*              tag2(I) - pointer to second tag to compare                  */
@@ -5973,8 +6373,9 @@ i6addr_t *inp, *inpmask;
 /* comparison.  This function should only be called with both tag1 and tag2 */
 /* as non-NULL pointers.                                                    */
 /* ------------------------------------------------------------------------ */
-int fr_matchtag(tag1, tag2)
-ipftag_t *tag1, *tag2;
+int
+ipf_matchtag(tag1, tag2)
+	ipftag_t *tag1, *tag2;
 {
 	if (tag1 == tag2)
 		return 1;
@@ -5992,15 +6393,16 @@ ipftag_t *tag1, *tag2;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_coalesce                                                 */
+/* Function:    ipf_coalesce                                                */
 /* Returns:     1 == success, -1 == failure, 0 == no change                 */
 /* Parameters:  fin(I) - pointer to packet information                      */
 /*                                                                          */
 /* Attempt to get all of the packet data into a single, contiguous buffer.  */
 /* If this call returns a failure then the buffers have also been freed.    */
 /* ------------------------------------------------------------------------ */
-int fr_coalesce(fin)
-fr_info_t *fin;
+int
+ipf_coalesce(fin)
+	fr_info_t *fin;
 {
 	if ((fin->fin_flx & FI_COALESCE) != 0)
 		return 1;
@@ -6013,8 +6415,8 @@ fr_info_t *fin;
 		return 0;
 
 #if defined(_KERNEL)
-	if (fr_pullup(fin->fin_m, fin, fin->fin_plen) == NULL) {
-		ATOMIC_INC(fr_badcoalesces[fin->fin_out]);
+	if (ipf_pullup(fin->fin_m, fin, fin->fin_plen) == NULL) {
+		ATOMIC_INC(ipf_badcoalesces[fin->fin_out]);
 # ifdef MENTAT
 		FREE_MB_T(*fin->fin_mp);
 # endif
@@ -6044,108 +6446,125 @@ fr_info_t *fin;
  */
 ipftuneable_t ipf_tuneables[] = {
 	/* filtering */
-	{ { &ipf_flags },	"fr_flags",		0,	0xffffffff,
-			sizeof(ipf_flags),		0 },
-	{ { &fr_active },	"fr_active",		0,	0,
-			sizeof(fr_active),		IPFT_RDONLY },
-	{ { &fr_control_forwarding },	"fr_control_forwarding",	0, 1,
-			sizeof(fr_control_forwarding),	0 },
-	{ { &fr_update_ipid },	"fr_update_ipid",	0,	1,
-			sizeof(fr_update_ipid),		0 },
-	{ { &fr_chksrc },	"fr_chksrc",		0,	1,
-			sizeof(fr_chksrc),		0 },
-	{ { &fr_minttl },	"fr_minttl",		0,	1,
-			sizeof(fr_minttl),		0 },
-	{ { &fr_icmpminfragmtu }, "fr_icmpminfragmtu",	0,	1,
-			sizeof(fr_icmpminfragmtu),	0 },
-	{ { &fr_pass },		"fr_pass",		0,	0xffffffff,
-			sizeof(fr_pass),		0 },
+	{ { &ipf_flags },	"ipf_flags",		0,	0xffffffff,
+		sizeof(ipf_flags),		0,			NULL },
+	{ { &ipf_active },	"active",		0,	0,
+		sizeof(ipf_active),		IPFT_RDONLY,		NULL },
+	{ { &ipf_control_forwarding },	"control_forwarding",	0, 1,
+		sizeof(ipf_control_forwarding),	0		,	NULL },
+	{ { &ipf_update_ipid },	"update_ipid",		0,	1,
+		sizeof(ipf_update_ipid),	0,			NULL },
+	{ { &ipf_chksrc },	"chksrc",		0,	1,
+		sizeof(ipf_chksrc),		0,			NULL },
+	{ { &ipf_minttl },	"min_ttl",		0,	1,
+		sizeof(ipf_minttl),		0,			NULL },
+	{ { &ipf_icmpminfragmtu }, "icmp_minfragmtu",	0,	1,
+		sizeof(ipf_icmpminfragmtu),	0,			NULL },
+	{ { &ipf_pass },	"default_pass",		0,	0xffffffff,
+		sizeof(ipf_pass),		0,			NULL },
 	/* state */
-	{ { &fr_tcpidletimeout }, "fr_tcpidletimeout",	1,	0x7fffffff,
-			sizeof(fr_tcpidletimeout),	IPFT_WRDISABLED },
-	{ { &fr_tcpclosewait },	"fr_tcpclosewait",	1,	0x7fffffff,
-			sizeof(fr_tcpclosewait),	IPFT_WRDISABLED },
-	{ { &fr_tcplastack },	"fr_tcplastack",	1,	0x7fffffff,
-			sizeof(fr_tcplastack),		IPFT_WRDISABLED },
-	{ { &fr_tcptimeout },	"fr_tcptimeout",	1,	0x7fffffff,
-			sizeof(fr_tcptimeout),		IPFT_WRDISABLED },
-	{ { &fr_tcpclosed },	"fr_tcpclosed",		1,	0x7fffffff,
-			sizeof(fr_tcpclosed),		IPFT_WRDISABLED },
-	{ { &fr_tcphalfclosed }, "fr_tcphalfclosed",	1,	0x7fffffff,
-			sizeof(fr_tcphalfclosed),	IPFT_WRDISABLED },
-	{ { &fr_udptimeout },	"fr_udptimeout",	1,	0x7fffffff,
-			sizeof(fr_udptimeout),		IPFT_WRDISABLED },
-	{ { &fr_udpacktimeout }, "fr_udpacktimeout",	1,	0x7fffffff,
-			sizeof(fr_udpacktimeout),	IPFT_WRDISABLED },
-	{ { &fr_icmptimeout },	"fr_icmptimeout",	1,	0x7fffffff,
-			sizeof(fr_icmptimeout),		IPFT_WRDISABLED },
-	{ { &fr_icmpacktimeout }, "fr_icmpacktimeout",	1,	0x7fffffff,
-			sizeof(fr_icmpacktimeout),	IPFT_WRDISABLED },
-	{ { &fr_iptimeout }, "fr_iptimeout",		1,	0x7fffffff,
-			sizeof(fr_iptimeout),		IPFT_WRDISABLED },
-	{ { &fr_statemax },	"fr_statemax",		1,	0x7fffffff,
-			sizeof(fr_statemax),		0 },
-	{ { &fr_statesize },	"fr_statesize",		1,	0x7fffffff,
-			sizeof(fr_statesize),		IPFT_WRDISABLED },
-	{ { &fr_state_lock },	"fr_state_lock",	0,	1,
-			sizeof(fr_state_lock),		IPFT_RDONLY },
-	{ { &fr_state_maxbucket }, "fr_state_maxbucket", 1,	0x7fffffff,
-			sizeof(fr_state_maxbucket),	IPFT_WRDISABLED },
-	{ { &fr_state_maxbucket_reset }, "fr_state_maxbucket_reset",	0, 1,
-			sizeof(fr_state_maxbucket_reset), IPFT_WRDISABLED },
-	{ { &ipstate_logging },	"ipstate_logging",	0,	1,
-			sizeof(ipstate_logging),	0 },
+	{ { &ipf_tcpidletimeout }, "tcp_idletimeout",	1,	0x7fffffff,
+		sizeof(ipf_tcpidletimeout),	IPFT_WRDISABLED,	NULL },
+	{ { &ipf_tcpclosewait },   "tcp_closewait",	1,	0x7fffffff,
+		sizeof(ipf_tcpclosewait),	IPFT_WRDISABLED,	NULL },
+	{ { &ipf_tcplastack },	"tcp_lastack",		1,	0x7fffffff,
+		sizeof(ipf_tcplastack),		IPFT_WRDISABLED,	NULL },
+	{ { &ipf_tcptimeout },	"tcp_timeout",		1,	0x7fffffff,
+		sizeof(ipf_tcptimeout),		IPFT_WRDISABLED,	NULL },
+	{ { &ipf_tcpclosed },	"tcp_closed",		1,	0x7fffffff,
+		sizeof(ipf_tcpclosed),		IPFT_WRDISABLED,	NULL },
+	{ { &ipf_tcphalfclosed }, "tcp_half_closed",	1,	0x7fffffff,
+		sizeof(ipf_tcphalfclosed),	IPFT_WRDISABLED,	NULL },
+	{ { &ipf_udptimeout },	"udp_timeout",		1,	0x7fffffff,
+		sizeof(ipf_udptimeout),		IPFT_WRDISABLED,	NULL },
+	{ { &ipf_udpacktimeout }, "udp_ack_timeout",	1,	0x7fffffff,
+		sizeof(ipf_udpacktimeout),	IPFT_WRDISABLED,	NULL },
+	{ { &ipf_icmptimeout },	"icmp_timeout",		1,	0x7fffffff,
+		sizeof(ipf_icmptimeout),	IPFT_WRDISABLED,	NULL },
+	{ { &ipf_icmpacktimeout }, "icmp_ack_timeout",	1,	0x7fffffff,
+		sizeof(ipf_icmpacktimeout),	IPFT_WRDISABLED,	NULL },
+	{ { &ipf_iptimeout },	"ip_timeout",		1,	0x7fffffff,
+		sizeof(ipf_iptimeout),		IPFT_WRDISABLED,	NULL },
+	{ { &ipf_state_max },	"state_max",		1,	0x7fffffff,
+		sizeof(ipf_state_max),		0,			NULL },
+	{ { &ipf_state_size },	"state_size",		1,	0x7fffffff,
+		sizeof(ipf_state_size),		IPFT_WRDISABLED,	NULL },
+	{ { &ipf_state_lock },	"state_lock",		0,	1,
+		sizeof(ipf_state_lock),		IPFT_RDONLY,		NULL },
+	{ { &ipf_state_maxbucket }, "state_maxbucket",	1,	0x7fffffff,
+		sizeof(ipf_state_maxbucket),	IPFT_WRDISABLED,	NULL },
+	{ { &ipf_state_maxbucket_reset }, "state_maxbucket_reset",	0, 1,
+		sizeof(ipf_state_maxbucket_reset), IPFT_WRDISABLED,	NULL },
+	{ { &ipf_state_logging },	"state_logging",0,	1,
+		sizeof(ipf_state_logging),	0,			NULL },
+	{ { &ipf_state_wm_high },	"state_wm_high",2,	100,
+		sizeof(ipf_state_wm_high),	0,			NULL },
+	{ { &ipf_state_wm_low },	"state_wm_low",	1,	99,
+		sizeof(ipf_state_wm_low),	0,			NULL },
+	{ { &ipf_state_wm_freq },	"state_wm_freq",2,	999999,
+		sizeof(ipf_state_wm_freq),	0,			NULL },
 	/* nat */
-	{ { &fr_nat_lock },		"fr_nat_lock",		0,	1,
-			sizeof(fr_nat_lock),		IPFT_RDONLY },
-	{ { &ipf_nattable_sz },	"ipf_nattable_sz",	1,	0x7fffffff,
-			sizeof(ipf_nattable_sz),	IPFT_WRDISABLED },
-	{ { &ipf_nattable_max }, "ipf_nattable_max",	1,	0x7fffffff,
-			sizeof(ipf_nattable_max),	0 },
-	{ { &ipf_natrules_sz },	"ipf_natrules_sz",	1,	0x7fffffff,
-			sizeof(ipf_natrules_sz),	IPFT_WRDISABLED },
-	{ { &ipf_rdrrules_sz },	"ipf_rdrrules_sz",	1,	0x7fffffff,
-			sizeof(ipf_rdrrules_sz),	IPFT_WRDISABLED },
-	{ { &ipf_hostmap_sz },	"ipf_hostmap_sz",	1,	0x7fffffff,
-			sizeof(ipf_hostmap_sz),		IPFT_WRDISABLED },
-	{ { &fr_nat_maxbucket }, "fr_nat_maxbucket",	1,	0x7fffffff,
-			sizeof(fr_nat_maxbucket),	IPFT_WRDISABLED },
-	{ { &fr_nat_maxbucket_reset },	"fr_nat_maxbucket_reset",	0, 1,
-			sizeof(fr_nat_maxbucket_reset),	IPFT_WRDISABLED },
-	{ { &nat_logging },		"nat_logging",		0,	1,
-			sizeof(nat_logging),		0 },
-	{ { &fr_defnatage },	"fr_defnatage",		1,	0x7fffffff,
-			sizeof(fr_defnatage),		IPFT_WRDISABLED },
-	{ { &fr_defnatipage },	"fr_defnatipage",	1,	0x7fffffff,
-			sizeof(fr_defnatipage),		IPFT_WRDISABLED },
-	{ { &fr_defnaticmpage }, "fr_defnaticmpage",	1,	0x7fffffff,
-			sizeof(fr_defnaticmpage),	IPFT_WRDISABLED },
+	{ { &ipf_nat_lock },		"nat_lock",	0,	1,
+		sizeof(ipf_nat_lock),		IPFT_RDONLY,		NULL },
+	{ { &ipf_nat_table_sz },	"nat_table_size", 1,	0x7fffffff,
+		sizeof(ipf_nat_table_sz),	IPFT_WRDISABLED,	NULL },
+	{ { &ipf_nat_table_max },	"nat_table_max", 1,	0x7fffffff,
+		sizeof(ipf_nat_table_max),	0,			NULL },
+	{ { &ipf_nat_maprules_sz },	"nat_rules_size", 1,	0x7fffffff,
+		sizeof(ipf_nat_maprules_sz),	IPFT_WRDISABLED,	NULL },
+	{ { &ipf_nat_rdrrules_sz },	"rdr_rules_size", 1,	0x7fffffff,
+		sizeof(ipf_nat_rdrrules_sz),	IPFT_WRDISABLED,	NULL },
+	{ { &ipf_nat_hostmap_sz },	"hostmap_size",	1,	0x7fffffff,
+		sizeof(ipf_nat_hostmap_sz),	IPFT_WRDISABLED,	NULL },
+	{ { &ipf_nat_maxbucket }, "nat_maxbucket",	1,	0x7fffffff,
+		sizeof(ipf_nat_maxbucket),	IPFT_WRDISABLED,	NULL },
+	{ { &ipf_nat_maxbucket_reset },	"nat_maxbucket_reset",	0, 1,
+		sizeof(ipf_nat_maxbucket_reset), IPFT_WRDISABLED,	NULL },
+	{ { &ipf_nat_logging },		"nat_logging",		0,	1,
+		sizeof(ipf_nat_logging),		0,		NULL },
+	{ { &ipf_nat_defage },	"nat_defage",		1,	0x7fffffff,
+		sizeof(ipf_nat_defage),		IPFT_WRDISABLED,	NULL },
+	{ { &ipf_nat_defipage },	"nat_defipage",	1,	0x7fffffff,
+		sizeof(ipf_nat_defipage),	IPFT_WRDISABLED,	NULL },
+	{ { &ipf_nat_deficmpage }, "nat_deficmpage",	1,	0x7fffffff,
+		sizeof(ipf_nat_deficmpage),	IPFT_WRDISABLED,	NULL },
+	{ { &ipf_nat_doflush }, "nat_doflush",		0,	1,
+		sizeof(ipf_nat_doflush),	0,			NULL },
+	{ { &ipf_nat_table_wm_low }, "nat_table_wm_low",	1,	99,
+		sizeof(ipf_nat_table_wm_low),	0,			NULL },
+	{ { &ipf_nat_table_wm_high }, "nat_table_wm_high",	2,	100,
+		sizeof(ipf_nat_table_wm_high),	0,			NULL },
+	/* proxy */
+	{ { &ipf_proxy_debug }, "ipf_proxy_debug",	0,	10,
+		sizeof(ipf_proxy_debug),	0,			NULL },
+  	/* frag */
+  	{ { &ipfr_size },	"ipfr_size",		1,	0x7fffffff,
+  		sizeof(ipfr_size),		IPFT_WRDISABLED,	NULL },
 	/* frag */
 	{ { &ipfr_size },	"ipfr_size",		1,	0x7fffffff,
-			sizeof(ipfr_size),		IPFT_WRDISABLED },
-	{ { &fr_ipfrttl },	"fr_ipfrttl",		1,	0x7fffffff,
-			sizeof(fr_ipfrttl),		IPFT_WRDISABLED },
+		sizeof(ipfr_size),		IPFT_WRDISABLED,	NULL },
+	{ { &ipf_ipfrttl },	"ipfrttl",		1,	0x7fffffff,
+		sizeof(ipf_ipfrttl),		IPFT_WRDISABLED,	NULL },
 #ifdef IPFILTER_LOG
 	/* log */
-	{ { &ipl_suppress },	"ipl_suppress",		0,	1,
-			sizeof(ipl_suppress),		0 },
-	{ { &ipl_buffer_sz },	"ipl_buffer_sz",	0,	0,
-			sizeof(ipl_buffer_sz),		IPFT_RDONLY },
-	{ { &ipl_logmax },	"ipl_logmax",		0,	0x7fffffff,
-			sizeof(ipl_logmax),		IPFT_WRDISABLED },
-	{ { &ipl_logall },	"ipl_logall",		0,	1,
-			sizeof(ipl_logall),		0 },
-	{ { &ipl_logsize },	"ipl_logsize",		0,	0x80000,
-			sizeof(ipl_logsize),		0 },
+	{ { &ipl_suppress },	"log_suppress",		0,	1,
+		sizeof(ipl_suppress),		0,			NULL },
+	{ { &ipl_logmax },	"log_max",		0,	0x7fffffff,
+		sizeof(ipl_logmax),		IPFT_WRDISABLED,	NULL },
+	{ { &ipl_logall },	"log_all",		0,	1,
+		sizeof(ipl_logall),		0,			NULL },
+	{ { &ipl_logsize },	"log_size",		0,	0x80000,
+		sizeof(ipl_logsize),		0,			NULL },
 #endif
-	{ { NULL },		NULL,			0,	0 }
+	{ { NULL },		NULL,			0,	0,
+		0,				0,	NULL }
 };
 
 static ipftuneable_t *ipf_tunelist = NULL;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_findtunebycookie                                         */
+/* Function:    ipf_tune_findbycookie                                       */
 /* Returns:     NULL = search failed, else pointer to tune struct           */
 /* Parameters:  cookie(I) - cookie value to search for amongst tuneables    */
 /*              next(O)   - pointer to place to store the cookie for the    */
@@ -6156,8 +6575,9 @@ static ipftuneable_t *ipf_tunelist = NULL;
 /* a matching value for "cookie" - ie its address.  When returning a match, */
 /* the next one to be found may be returned inside next.                    */
 /* ------------------------------------------------------------------------ */
-static ipftuneable_t *fr_findtunebycookie(cookie, next)
-void *cookie, **next;
+static ipftuneable_t *
+ipf_tune_findbycookie(cookie, next)
+	void *cookie, **next;
 {
 	ipftuneable_t *ta, **tap;
 
@@ -6194,7 +6614,7 @@ void *cookie, **next;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_findtunebyname                                           */
+/* Function:    ipf_tune_findbyname                                         */
 /* Returns:     NULL = search failed, else pointer to tune struct           */
 /* Parameters:  name(I) - name of the tuneable entry to find.               */
 /*                                                                          */
@@ -6202,8 +6622,9 @@ void *cookie, **next;
 /* for an entry with a matching name.  If we can find one, return a pointer */
 /* to the matching structure.                                               */
 /* ------------------------------------------------------------------------ */
-static ipftuneable_t *fr_findtunebyname(name)
-const char *name;
+static ipftuneable_t *
+ipf_tune_findbyname(name)
+	const char *name;
 {
 	ipftuneable_t *ta;
 
@@ -6222,22 +6643,55 @@ const char *name;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_addipftune                                               */
+/* Function:    ipf_tune_add_array                                          */
 /* Returns:     int - 0 == success, else failure                            */
-/* Parameters:  newtune - pointer to new tune struct to add to tuneables    */
+/* Parameters:  newtune - pointer to new tune array to add to tuneables     */
 /*                                                                          */
-/* Appends the tune structure pointer to by "newtune" to the end of the     */
-/* current list of "dynamic" tuneable parameters.  Once added, the owner    */
-/* of the object is not expected to ever change "ipft_next".                */
+/* Appends tune structures from the array passed in (newtune) to the end of */
+/* the current list of "dynamic" tuneable parameters.                       */
+/* If any entry to be added is already present (by name) then the operation */
+/* is aborted - entries that have been added are removed before returning.  */
+/* An entry with no name (NULL) is used as the indication that the end of   */
+/* the array has been reached.                                              */
 /* ------------------------------------------------------------------------ */
-int fr_addipftune(newtune)
-ipftuneable_t *newtune;
+int
+ipf_tune_add_array(newtune)
+	ipftuneable_t *newtune;
+{
+	ipftuneable_t *nt, *dt;
+	int error = 0;
+
+	for (nt = newtune; nt->ipft_name != NULL; nt++) {
+		error = ipf_tune_add(nt);
+		if (error != 0) {
+			for (dt = newtune; dt != nt; dt++) {
+				(void) ipf_tune_del(dt);
+			}
+		}
+	}
+
+	return error;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_tune_add                                                */
+/* Returns:     int - 0 == success, else failure                            */
+/* Parameters:  newtune - pointer to new tune entry to add to tuneables     */
+/*                                                                          */
+/* Appends tune structures from the array passed in (newtune) to the end of */
+/* the current list of "dynamic" tuneable parameters.  Once added, the      */
+/* owner of the object is not expected to ever change "ipft_next".          */
+/* ------------------------------------------------------------------------ */
+int
+ipf_tune_add(newtune)
+	ipftuneable_t *newtune;
 {
 	ipftuneable_t *ta, **tap;
 
-	ta = fr_findtunebyname(newtune->ipft_name);
+	ta = ipf_tune_findbyname(newtune->ipft_name);
 	if (ta != NULL) {
-		ipf_interror = 69;
+		ipf_interror = 74;
 		return EEXIST;
 	}
 
@@ -6251,34 +6705,69 @@ ipftuneable_t *newtune;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_delipftune                                               */
+/* Function:    ipf_tune_del                                                */
 /* Returns:     int - 0 == success, else failure                            */
-/* Parameters:  oldtune - pointer to tune struct to remove from the list of */
+/* Parameters:  oldtune - pointer to tune entry to remove from the list of  */
 /*                        current dynamic tuneables                         */
 /*                                                                          */
 /* Search for the tune structure, by pointer, in the list of those that are */
 /* dynamically added at run time.  If found, adjust the list so that this   */
 /* structure is no longer part of it.                                       */
 /* ------------------------------------------------------------------------ */
-int fr_delipftune(oldtune)
-ipftuneable_t *oldtune;
+int
+ipf_tune_del(oldtune)
+	ipftuneable_t *oldtune;
 {
 	ipftuneable_t *ta, **tap;
+	int error = 0;
 
-	for (tap = &ipf_tunelist; (ta = *tap) != NULL; tap = &ta->ipft_next)
+	for (tap = &ipf_tunelist; (ta = *tap) != NULL; tap = &ta->ipft_next) {
 		if (ta == oldtune) {
 			*tap = oldtune->ipft_next;
 			oldtune->ipft_next = NULL;
-			return 0;
+			break;
 		}
+	}
 
-	ipf_interror = 70;
-	return ESRCH;
+	if (ta == NULL) {
+		error = ESRCH;
+		ipf_interror = 75;
+	}
+	return error;
 }
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_ipftune                                                  */
+/* Function:    ipf_tune_del_array                                          */
+/* Returns:     int - 0 == success, else failure                            */
+/* Parameters:  oldtune - pointer to tuneables array                        */
+/*                                                                          */
+/* Remove each tuneable entry in the array from the list of "dynamic"       */
+/* tunables.  If one entry should fail to be found, an error will be        */
+/* returned and no further ones removed.                                    */
+/* An entry with a NULL name is used as the indicator of the last entry in  */
+/* the array.                                                               */
+/* ------------------------------------------------------------------------ */
+int
+ipf_tune_del_array(oldtune)
+	ipftuneable_t *oldtune;
+{
+	ipftuneable_t *ot;
+	int error = 0;
+
+	for (ot = oldtune; ot->ipft_name != NULL; ot++) {
+		error = ipf_tune_del(ot);
+		if (error != 0)
+			break;
+	}
+
+	return error;
+
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_tune                                                    */
 /* Returns:     int - 0 == success, else failure                            */
 /* Parameters:  cmd(I)  - ioctl command number                              */
 /*              data(I) - pointer to ioctl data structure                   */
@@ -6290,16 +6779,17 @@ ipftuneable_t *oldtune;
 /* and 'destruction' routines of the various components of ipfilter are all */
 /* each responsible for handling their own values being too big.            */
 /* ------------------------------------------------------------------------ */
-int fr_ipftune(cmd, data)
-ioctlcmd_t cmd;
-void *data;
+int
+ipf_ipftune(cmd, data)
+	ioctlcmd_t cmd;
+	void *data;
 {
 	ipftuneable_t *ta;
 	ipftune_t tu;
 	void *cookie;
 	int error;
 
-	error = fr_inobj(data, &tu, IPFOBJ_TUNEABLE);
+	error = ipf_inobj(data, &tu, IPFOBJ_TUNEABLE);
 	if (error != 0)
 		return error;
 
@@ -6320,7 +6810,7 @@ void *data;
 		 * at the front of the list.
 		 */
 		if (cookie != NULL) {
-			ta = fr_findtunebycookie(cookie, &tu.ipft_cookie);
+			ta = ipf_tune_findbycookie(cookie, &tu.ipft_cookie);
 		} else {
 			ta = ipf_tuneables;
 			tu.ipft_cookie = ta + 1;
@@ -6331,7 +6821,7 @@ void *data;
 			 * row fit in what we can return?
 			 */
 			if (ta->ipft_sz > sizeof(tu.ipft_un)) {
-				ipf_interror = 71;
+				ipf_interror = 76;
 				return EINVAL;
 			}
 
@@ -6353,7 +6843,7 @@ void *data;
 			      MIN(sizeof(tu.ipft_name),
 				  strlen(ta->ipft_name) + 1));
 		}
-		error = fr_outobj(data, &tu, IPFOBJ_TUNEABLE);
+		error = ipf_outobj(data, &tu, IPFOBJ_TUNEABLE);
 		break;
 
 	case SIOCIPFGET :
@@ -6362,13 +6852,14 @@ void *data;
 		 * Search by name or by cookie value for a particular entry
 		 * in the tuning paramter table.
 		 */
-		error = ESRCH, ipf_interror = 19;
+		ipf_interror = 77;
+		error = ESRCH;
 		if (cookie != NULL) {
-			ta = fr_findtunebycookie(cookie, NULL);
+			ta = ipf_tune_findbycookie(cookie, NULL);
 			if (ta != NULL)
 				error = 0;
 		} else if (tu.ipft_name[0] != '\0') {
-			ta = fr_findtunebyname(tu.ipft_name);
+			ta = ipf_tune_findbyname(tu.ipft_name);
 			if (ta != NULL)
 				error = 0;
 		}
@@ -6393,7 +6884,7 @@ void *data;
 			tu.ipft_min = ta->ipft_min;
 			tu.ipft_max = ta->ipft_max;
 			tu.ipft_flags = ta->ipft_flags;
-			error = fr_outobj(data, &tu, IPFOBJ_TUNEABLE);
+			error = ipf_outobj(data, &tu, IPFOBJ_TUNEABLE);
 
 		} else if (cmd == (ioctlcmd_t)SIOCIPFSET) {
 			/*
@@ -6404,14 +6895,16 @@ void *data;
 			u_long in;
 
 			if (((ta->ipft_flags & IPFT_WRDISABLED) != 0) &&
-			    (fr_running > 0)) {
-				error = EBUSY, ipf_interror = 20;
+			    (ipf_running > 0)) {
+				ipf_interror = 78;
+				error = EBUSY;
 				break;
 			}
 
 			in = tu.ipft_vlong;
 			if (in < ta->ipft_min || in > ta->ipft_max) {
-				error = EINVAL, ipf_interror = 21;
+				ipf_interror = 79;
+				error = EINVAL;
 				break;
 			}
 
@@ -6428,12 +6921,13 @@ void *data;
 				tu.ipft_vchar = *ta->ipft_pchar;
 				*ta->ipft_pchar = (u_char)(in & 0xff);
 			}
-			error = fr_outobj(data, &tu, IPFOBJ_TUNEABLE);
+			error = ipf_outobj(data, &tu, IPFOBJ_TUNEABLE);
 		}
 		break;
 
 	default :
-		error = EINVAL, ipf_interror = 22;
+		ipf_interror = 80;
+		error = EINVAL;
 		break;
 	}
 
@@ -6442,7 +6936,7 @@ void *data;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_initialise                                               */
+/* Function:    ipf_initialise                                              */
 /* Returns:     int - 0 == success,  < 0 == failure                         */
 /* Parameters:  None.                                                       */
 /*                                                                          */
@@ -6450,28 +6944,31 @@ void *data;
 /* of IPFilter.  If any of them should fail, return immeadiately a failure  */
 /* BUT do not try to recover from the error here.                           */
 /* ------------------------------------------------------------------------ */
-int fr_initialise()
+int
+ipf_initialise()
 {
 	int i;
 
+	bzero(&ipf_stats, sizeof(ipf_stats));
+
 #ifdef IPFILTER_LOG
-	i = fr_loginit();
+	i = ipf_log_init();
 	if (i < 0)
 		return -10 + i;
 #endif
-	i = fr_natinit();
+	i = ipf_nat_init();
 	if (i < 0)
 		return -20 + i;
 
-	i = fr_stateinit();
+	i = ipf_state_init();
 	if (i < 0)
 		return -30 + i;
 
-	i = fr_authinit();
+	i = ipf_auth_init();
 	if (i < 0)
 		return -40 + i;
 
-	i = fr_fraginit();
+	i = ipf_frag_init();
 	if (i < 0)
 		return -50 + i;
 
@@ -6480,17 +6977,17 @@ int fr_initialise()
 		return -60 + i;
 
 #ifdef IPFILTER_SYNC
-	i = ipfsync_init();
+	i = ipf_sync_init();
 	if (i < 0)
 		return -70 + i;
 #endif
 #ifdef IPFILTER_SCAN
-	i = ipsc_init();
+	i = ipf_scan_init();
 	if (i < 0)
 		return -80 + i;
 #endif
 #ifdef IPFILTER_LOOKUP
-	i = ip_lookup_init();
+	i = ipf_lookup_init();
 	if (i < 0)
 		return -90 + i;
 #endif
@@ -6502,7 +6999,7 @@ int fr_initialise()
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_deinitialise                                             */
+/* Function:    ipf_deinitialise                                            */
 /* Returns:     None.                                                       */
 /* Parameters:  None.                                                       */
 /*                                                                          */
@@ -6511,14 +7008,15 @@ int fr_initialise()
 /* The order here IS important as there are some cross references of        */
 /* internal data structures.                                                */
 /* ------------------------------------------------------------------------ */
-void fr_deinitialise()
+void
+ipf_deinitialise()
 {
-	fr_fragunload();
-	fr_authunload();
-	fr_natunload();
-	fr_stateunload();
+	ipf_frag_unload();
+	ipf_auth_unload();
+	ipf_nat_unload();
+	ipf_state_unload();
 #ifdef IPFILTER_SCAN
-	fr_scanunload();
+	ipf_scan_unload();
 #endif
 	appr_unload();
 
@@ -6526,23 +7024,23 @@ void fr_deinitialise()
 	ipfrule_remove();
 #endif
 
-	(void) frflush(IPL_LOGIPF, FR_INQUE|FR_OUTQUE|FR_INACTIVE);
-	(void) frflush(IPL_LOGIPF, FR_INQUE|FR_OUTQUE);
-	(void) frflush(IPL_LOGCOUNT, FR_INQUE|FR_OUTQUE|FR_INACTIVE);
-	(void) frflush(IPL_LOGCOUNT, FR_INQUE|FR_OUTQUE);
+	(void) ipf_flush(IPL_LOGIPF, FR_INQUE|FR_OUTQUE|FR_INACTIVE);
+	(void) ipf_flush(IPL_LOGIPF, FR_INQUE|FR_OUTQUE);
+	(void) ipf_flush(IPL_LOGCOUNT, FR_INQUE|FR_OUTQUE|FR_INACTIVE);
+	(void) ipf_flush(IPL_LOGCOUNT, FR_INQUE|FR_OUTQUE);
 
 #ifdef IPFILTER_LOOKUP
-	ip_lookup_unload();
+	ipf_lookup_unload();
 #endif
 
 #ifdef IPFILTER_LOG
-	fr_logunload();
+	ipf_log_unload();
 #endif
 }
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_zerostats                                                */
+/* Function:    ipf_zerostats                                               */
 /* Returns:     int - 0 = success, else failure                             */
 /* Parameters:  data(O) - pointer to pointer for copying data back to       */
 /*                                                                          */
@@ -6550,21 +7048,20 @@ void fr_deinitialise()
 /* current ones in the kernel. The lock is only held across the bzero() as  */
 /* the copyout may result in paging (ie network activity.)                  */
 /* ------------------------------------------------------------------------ */
-int	fr_zerostats(data)
-caddr_t	data;
+int
+ipf_zerostats(data)
+	caddr_t	data;
 {
 	friostat_t fio;
 	int error;
 
-	fr_getstat(&fio);
-	error = fr_outobj(data, &fio, IPFOBJ_IPFSTAT);
-	if (error) {
-		ipf_interror = 72;
-		return EFAULT;
-	}
+	ipf_getstat(&fio);
+	error = ipf_outobj(data, &fio, IPFOBJ_IPFSTAT);
+	if (error != 0)
+		return error;
 
 	WRITE_ENTER(&ipf_mutex);
-	bzero((char *)frstats, sizeof(*frstats) * 2);
+	bzero(&ipf_stats, sizeof(ipf_stats));
 	RWLOCK_EXIT(&ipf_mutex);
 
 	return 0;
@@ -6572,7 +7069,7 @@ caddr_t	data;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_resolvedest                                              */
+/* Function:    ipf_resolvedest                                             */
 /* Returns:     Nil                                                         */
 /* Parameters:  fdp(IO) - pointer to destination information to resolve     */
 /*              v(I)    - IP protocol version to match                      */
@@ -6583,14 +7080,14 @@ caddr_t	data;
 /* found, then set the interface pointer to be -1 as NULL is considered to  */
 /* indicate there is no information at all in the structure.                */
 /* ------------------------------------------------------------------------ */
-void fr_resolvedest(fdp, v)
-frdest_t *fdp;
-int v;
+void
+ipf_resolvedest(fdp, v)
+	frdest_t *fdp;
+	int v;
 {
 	void *ifp;
 
 	ifp = NULL;
-	v = v;		/* LINT */
 
 	if (*fdp->fd_ifname != '\0') {
 		ifp = GETIFP(fdp->fd_ifname, v);
@@ -6598,11 +7095,16 @@ int v;
 			ifp = (void *)-1;
 	}
 	fdp->fd_ifp = ifp;
+
+	if ((ifp != NULL) && (ifp != (void *)-1)) {
+		fdp->fd_local = ipf_deliverlocal(v, ifp, &fdp->fd_ip);
+	}
+
 }
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_resolvenic                                               */
+/* Function:    ipf_resolvenic                                              */
 /* Returns:     void* - NULL = wildcard name, -1 = failed to find NIC, else */
 /*                      pointer to interface structure for NIC              */
 /* Parameters:  name(I) - complete interface name                           */
@@ -6623,9 +7125,10 @@ int v;
 /* NOTE: This SHOULD ONLY be used with IPFilter structures that have an     */
 /*       array for the name that is LIFNAMSIZ bytes (at least) in length.   */
 /* ------------------------------------------------------------------------ */
-void *fr_resolvenic(name, v)
-char *name;
-int v;
+void *
+ipf_resolvenic(name, v)
+	char *name;
+	int v;
 {
 	void *nic;
 
@@ -6645,8 +7148,742 @@ int v;
 }
 
 
+ipftoken_t *ipftokenhead = NULL, **ipftokentail = &ipftokenhead;
+
+
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_decaps                                                   */
+/* Function:    ipf_expiretokens                                            */
+/* Returns:     None.                                                       */
+/* Parameters:  None.                                                       */
+/*                                                                          */
+/* This function is run every ipf tick to see if there are any tokens that  */
+/* have been held for too long and need to be freed up.                     */
+/* ------------------------------------------------------------------------ */
+void
+ipf_expiretokens()
+{
+	ipftoken_t *it;
+	void *data;
+
+	WRITE_ENTER(&ipf_tokens);
+	while ((it = ipftokenhead) != NULL) {
+		if (it->ipt_die > ipf_ticks)
+			break;
+
+		data = it->ipt_data;
+
+		ipf_freetoken(it);
+	}
+	RWLOCK_EXIT(&ipf_tokens);
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_deltoken                                                */
+/* Returns:     int     - 0 = success, else error                           */
+/* Parameters:  type(I) - the token type to match                           */
+/*              uid(I)  - uid owning the token                              */
+/*              ptr(I)  - context pointer for the token                     */
+/*                                                                          */
+/* This function looks for a a token in the current list that matches up    */
+/* the fields (type, uid, ptr).  If none is found, ESRCH is returned, else  */
+/* call ipf_freetoken() to remove it from the list.                         */
+/* ------------------------------------------------------------------------ */
+int
+ipf_deltoken(type, uid, ptr)
+	int type, uid;
+	void *ptr;
+{
+	ipftoken_t *it;
+	int error;
+
+	ipf_interror = 82;
+	error = ESRCH;
+
+	WRITE_ENTER(&ipf_tokens);
+	for (it = ipftokenhead; it != NULL; it = it->ipt_next)
+		if (ptr == it->ipt_ctx && type == it->ipt_type &&
+		    uid == it->ipt_uid) {
+			ipf_freetoken(it);
+			ipf_interror = 83;
+			error = 0;
+			break;
+	}
+	RWLOCK_EXIT(&ipf_tokens);
+
+	return error;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_findtoken                                               */
+/* Returns:     ipftoken_t * - NULL if no memory, else pointer to token     */
+/* Parameters:  type(I) - the token type to match                           */
+/*              uid(I)  - uid owning the token                              */
+/*              ptr(I)  - context pointer for the token                     */
+/*                                                                          */
+/* This function looks for a live token in the list of current tokens that  */
+/* matches the tuple (type, uid, ptr).  If one cannot be found then one is  */
+/* allocated.  If one is found then it is moved to the top of the list of   */
+/* currently active tokens.                                                 */
+/*                                                                          */
+/* NOTE: It is by design that this function returns holding a read lock on  */
+/*       ipf_tokens.  Callers must make sure they release it!               */
+/* ------------------------------------------------------------------------ */
+ipftoken_t *
+ipf_findtoken(type, uid, ptr)
+	int type, uid;
+	void *ptr;
+{
+	ipftoken_t *it, *new;
+
+	KMALLOC(new, ipftoken_t *);
+
+	WRITE_ENTER(&ipf_tokens);
+	for (it = ipftokenhead; it != NULL; it = it->ipt_next) {
+		if (it->ipt_alive == 0)
+			continue;
+		if (ptr == it->ipt_ctx && type == it->ipt_type &&
+		    uid == it->ipt_uid)
+			break;
+	}
+
+	if (it == NULL) {
+		it = new;
+		new = NULL;
+		if (it == NULL)
+			return NULL;
+		it->ipt_data = NULL;
+		it->ipt_ctx = ptr;
+		it->ipt_uid = uid;
+		it->ipt_type = type;
+		it->ipt_next = NULL;
+		it->ipt_alive = 1;
+	} else {
+		if (new != NULL) {
+			KFREE(new);
+			new = NULL;
+		}
+
+		ipf_unlinktoken(it);
+	}
+	it->ipt_pnext = ipftokentail;
+	*ipftokentail = it;
+	ipftokentail = &it->ipt_next;
+	it->ipt_next = NULL;
+
+	it->ipt_die = ipf_ticks + 2;
+
+	MUTEX_DOWNGRADE(&ipf_tokens);
+
+	return it;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_unlinktoken                                             */
+/* Returns:     None.                                                       */
+/* Parameters:  token(I) - pointer to token structure                       */
+/*                                                                          */
+/* This function unlinks a token structure from the linked list of tokens   */
+/* that "own" it.  The head pointer never needs to be explicitly adjusted   */
+/* but the tail does due to the linked list implementation.                 */
+/* ------------------------------------------------------------------------ */
+static void
+ipf_unlinktoken(token)
+	ipftoken_t *token;
+{
+
+	if (ipftokentail == &token->ipt_next)
+		ipftokentail = token->ipt_pnext;
+
+	*token->ipt_pnext = token->ipt_next;
+	if (token->ipt_next != NULL)
+		token->ipt_next->ipt_pnext = token->ipt_pnext;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_freetoken                                               */
+/* Returns:     None.                                                       */
+/* Parameters:  token(I) - pointer to token structure                       */
+/*                                                                          */
+/* This function unlinks a token from the linked list and on the path to    */
+/* free'ing the data, it calls the dereference function that is associated  */
+/* with the type of data pointed to by the token as it is considered to     */
+/* hold a reference to it.                                                  */
+/* ------------------------------------------------------------------------ */
+void
+ipf_freetoken(token)
+	ipftoken_t *token;
+{
+	void *data, **datap;
+
+	ipf_unlinktoken(token);
+
+	data = token->ipt_data;
+	datap = &data;
+
+	if ((data != NULL) && (data != (void *)-1)) {
+		switch (token->ipt_type)
+		{
+		case IPFGENITER_IPF :
+			(void) ipf_derefrule((frentry_t **)datap);
+			break;
+		case IPFGENITER_IPNAT :
+			WRITE_ENTER(&ipf_nat);
+			ipf_nat_rulederef((ipnat_t **)datap);
+			RWLOCK_EXIT(&ipf_nat);
+			break;
+		case IPFGENITER_NAT :
+			ipf_nat_deref((nat_t **)datap);
+			break;
+		case IPFGENITER_STATE :
+			ipf_state_deref((ipstate_t **)datap);
+			break;
+		case IPFGENITER_FRAG :
+#ifdef USE_MUTEXES
+			ipf_frag_deref((ipfr_t **)datap, &ipf_frag);
+#else
+			ipf_frag_deref((ipfr_t **)datap);
+#endif
+			break;
+		case IPFGENITER_NATFRAG :
+#ifdef USE_MUTEXES
+			ipf_frag_deref((ipfr_t **)datap, &ipf_natfrag);
+#else
+			ipf_frag_deref((ipfr_t **)datap);
+#endif
+			break;
+		case IPFGENITER_HOSTMAP :
+			ipf_nat_hostmapdel((hostmap_t **)datap);
+			break;
+		default :
+#ifdef IPFILTER_LOOKUP
+			ipf_lookup_iterderef(token->ipt_type, data);
+#endif
+			break;
+		}
+	}
+
+	KFREE(token);
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_getnextrule                                             */
+/* Returns:     int - 0 = success, else error                               */
+/* Parameters:  t(I)   - pointer to destination information to resolve      */
+/*              ptr(I) - pointer to ipfobj_t to copyin from user space      */
+/*                                                                          */
+/* This function's first job is to bring in the ipfruleiter_t structure via */
+/* the ipfobj_t structure to determine what should be the next rule to      */
+/* return. Once the ipfruleiter_t has been brought in, it then tries to     */
+/* find the 'next rule'.  This may include searching rule group lists or    */
+/* just be as simple as looking at the 'next' field in the rule structure.  */
+/* When we have found the rule to return, increase its reference count and  */
+/* if we used an existing rule to get here, decrease its reference count.   */
+/* ------------------------------------------------------------------------ */
+int
+ipf_getnextrule(ipftoken_t *t, void *ptr)
+{
+	frentry_t *fr, *next, zero;
+	int error, count, out;
+	ipfruleiter_t it;
+	frgroup_t *fg;
+	char *dst;
+
+	if (t == NULL || ptr == NULL) {
+		ipf_interror = 84;
+		return EFAULT;
+	}
+
+	error = ipf_inobj(ptr, &it, IPFOBJ_IPFITER);
+	if (error != 0)
+		return error;
+
+	if ((it.iri_inout < 0) || (it.iri_inout > 3)) {
+		ipf_interror = 85;
+		return EINVAL;
+	}
+	if ((it.iri_active != 0) && (it.iri_active != 1)) {
+		ipf_interror = 86;
+		return EINVAL;
+	}
+	if (it.iri_nrules == 0) {
+		ipf_interror = 87;
+		return ENOSPC;
+	}
+	if (it.iri_rule == NULL) {
+		ipf_interror = 88;
+		return EFAULT;
+	}
+
+	fg = NULL;
+	out = it.iri_inout & F_OUT;
+	fr = t->ipt_data;
+	READ_ENTER(&ipf_mutex);
+	if (fr == NULL) {
+		if (*it.iri_group == '\0') {
+			if ((it.iri_inout & F_ACIN) != 0)
+				next = ipf_acct[out][it.iri_active];
+			else
+				next = ipf_rules[out][it.iri_active];
+		} else {
+			fg = ipf_findgroup(it.iri_group, IPL_LOGIPF,
+					  it.iri_active, NULL);
+			if (fg != NULL)
+				next = fg->fg_start;
+			else
+				next = NULL;
+		}
+	} else {
+		next = fr->fr_next;
+	}
+
+	dst = (char *)it.iri_rule;
+	/*
+	 * The ipfruleiter may ask for more than 1 rule at a time to be
+	 * copied out, so long as that many exist in the list to start with!
+	 */
+	for (count = it.iri_nrules; count > 0; count--) {
+		if (next != NULL) {
+			MUTEX_ENTER(&next->fr_lock);
+			next->fr_ref++;
+			MUTEX_EXIT(&next->fr_lock);
+			t->ipt_data = next;
+		} else {
+			bzero(&zero, sizeof(zero));
+			next = &zero;
+			ipf_freetoken(t);
+			fr = NULL;
+			t = NULL;
+			count = 1;
+		}
+		RWLOCK_EXIT(&ipf_mutex);
+
+		if (fr != NULL) {
+			(void) ipf_derefrule(&fr);
+		}
+
+		error = COPYOUT(next, dst, sizeof(*next));
+		if (error != 0) {
+			ipf_interror = 89;
+			return EFAULT;
+		}
+
+		if (next->fr_data != NULL) {
+			dst += sizeof(*next);
+			error = COPYOUT(next->fr_data, dst, next->fr_dsize);
+			if (error != 0) {
+				ipf_interror = 90;
+				error = EFAULT;
+			} else {
+				dst += next->fr_dsize;
+			}
+		}
+
+		if ((count == 1) || (next->fr_next == NULL) || (error != 0))
+			break;
+
+		READ_ENTER(&ipf_mutex);
+		fr = next;
+		next = fr->fr_next;
+	}
+
+	return error;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_frruleiter                                              */
+/* Returns:     int - 0 = success, else error                               */
+/* Parameters:  data(I) - the token type to match                           */
+/*              uid(I)  - uid owning the token                              */
+/*              ptr(I)  - context pointer for the token                     */
+/*                                                                          */
+/* This function serves as a stepping stone between ipf_ipf_ioctl and       */
+/* ipf_getnextrule.  It's role is to find the right token in the kernel for */
+/* the process doing the ioctl and use that to ask for the next rule.       */
+/* ------------------------------------------------------------------------ */
+static int
+ipf_frruleiter(data, uid, ctx)
+	void *data, *ctx;
+	int uid;
+{
+	ipftoken_t *token;
+	int error;
+
+	token = ipf_findtoken(IPFGENITER_IPF, uid, ctx);
+	if (token != NULL) {
+		error = ipf_getnextrule(token, data);
+	} else {
+		ipf_interror = 91;
+		error = EFAULT;
+	}
+	RWLOCK_EXIT(&ipf_tokens);
+
+	return error;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_geniter                                                 */
+/* Returns:     int - 0 = success, else error                               */
+/* Parameters:  token(I) - pointer to ipftoken_t structure                  */
+/*              itp(I)   -                                                  */
+/*                                                                          */
+/* ------------------------------------------------------------------------ */
+static int
+ipf_geniter(token, itp)
+	ipftoken_t *token;
+	ipfgeniter_t *itp;
+{
+	int error;
+
+	switch (itp->igi_type)
+	{
+	case IPFGENITER_FRAG :
+#ifdef USE_MUTEXES
+		error = ipf_frag_next(token, itp,
+				    &ipfr_list, &ipfr_tail, &ipf_frag);
+#else
+		error = ipf_frag_next(token, itp, &ipfr_list, &ipfr_tail);
+#endif
+		break;
+	default :
+		ipf_interror = 92;
+		error = EINVAL;
+		break;
+	}
+
+	return error;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_genericiter                                             */
+/* Returns:     int - 0 = success, else error                               */
+/* Parameters:  data(I) - the token type to match                           */
+/*              uid(I)  - uid owning the token                              */
+/*              ptr(I)  - context pointer for the token                     */
+/*                                                                          */
+/* ------------------------------------------------------------------------ */
+int
+ipf_genericiter(data, uid, ctx)
+	void *data, *ctx;
+	int uid;
+{
+	ipftoken_t *token;
+	ipfgeniter_t iter;
+	int error;
+
+	error = ipf_inobj(data, &iter, IPFOBJ_GENITER);
+	if (error != 0)
+		return error;
+
+	token = ipf_findtoken(iter.igi_type, uid, ctx);
+	if (token != NULL) {
+		token->ipt_subtype = iter.igi_type;
+		error = ipf_geniter(token, &iter);
+	} else {
+		ipf_interror = 93;
+		error = EFAULT;
+	}
+	RWLOCK_EXIT(&ipf_tokens);
+
+	return error;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_ipf_ioctl                                               */
+/* Returns:     int - 0 = success, else error                               */
+/* Parameters:  data(I) - the token type to match                           */
+/*              cmd(I)  - the ioctl command number                          */
+/*              mode(I) - mode flags for the ioctl                          */
+/*              uid(I)  - uid owning the token                              */
+/*              ptr(I)  - context pointer for the token                     */
+/*                                                                          */
+/* This function handles all of the ioctl command that are actually isssued */
+/* to the /dev/ipl device.                                                  */
+/* ------------------------------------------------------------------------ */
+int
+ipf_ipf_ioctl(data, cmd, mode, uid, ctx)
+	caddr_t data;
+	ioctlcmd_t cmd;
+	int mode, uid;
+	void *ctx;
+{
+	friostat_t fio;
+	int error, tmp;
+	SPL_INT(s);
+
+	switch (cmd)
+	{
+	case SIOCFRENB :
+		if (!(mode & FWRITE)) {
+			ipf_interror = 94;
+			error = EPERM;
+		} else {
+			error = BCOPYIN(data, &tmp, sizeof(tmp));
+			if (error != 0) {
+				ipf_interror = 95;
+				error = EFAULT;
+				break;
+			}
+
+			RWLOCK_EXIT(&ipf_global);
+			WRITE_ENTER(&ipf_global);
+			if (tmp) {
+				if (ipf_running > 0)
+					error = 0;
+				else
+					error = ipfattach();
+				if (error == 0)
+					ipf_running = 1;
+				else
+					(void) ipfdetach();
+			} else {
+				error = ipfdetach();
+				if (error == 0)
+					ipf_running = -1;
+			}
+		}
+		break;
+
+	case SIOCIPFSET :
+		if (!(mode & FWRITE)) {
+			ipf_interror = 96;
+			error = EPERM;
+			break;
+		}
+		/* FALLTHRU */
+	case SIOCIPFGETNEXT :
+	case SIOCIPFGET :
+		error = ipf_ipftune(cmd, (void *)data);
+		break;
+
+	case SIOCSETFF :
+		if (!(mode & FWRITE)) {
+			ipf_interror = 97;
+			error = EPERM;
+		} else {
+			error = BCOPYIN(data, &ipf_flags, sizeof(ipf_flags));
+			if (error != 0) {
+				ipf_interror = 98;
+				error = EFAULT;
+			}
+		}
+		break;
+
+	case SIOCGETFF :
+		error = BCOPYOUT(&ipf_flags, data, sizeof(ipf_flags));
+		if (error != 0) {
+			ipf_interror = 99;
+			error = EFAULT;
+		}
+		break;
+
+	case SIOCFUNCL :
+		error = ipf_resolvefunc((void *)data);
+		break;
+
+	case SIOCINAFR :
+	case SIOCRMAFR :
+	case SIOCADAFR :
+	case SIOCZRLST :
+		if (!(mode & FWRITE)) {
+			ipf_interror = 100;
+			error = EPERM;
+		} else {
+			error = frrequest(IPL_LOGIPF, cmd, (caddr_t)data,
+					  ipf_active, 1);
+		}
+		break;
+
+	case SIOCINIFR :
+	case SIOCRMIFR :
+	case SIOCADIFR :
+		if (!(mode & FWRITE)) {
+			ipf_interror = 101;
+			error = EPERM;
+		} else {
+			error = frrequest(IPL_LOGIPF, cmd, (caddr_t)data,
+					  1 - ipf_active, 1);
+		}
+		break;
+
+	case SIOCSWAPA :
+		if (!(mode & FWRITE)) {
+			ipf_interror = 102;
+			error = EPERM;
+		} else {
+			WRITE_ENTER(&ipf_mutex);
+			bzero((char *)ipf_cache, sizeof(ipf_cache[0]) * 2);
+			error = BCOPYOUT(&ipf_active, data, sizeof(ipf_active));
+			if (error != 0) {
+				ipf_interror = 103;
+				error = EFAULT;
+			} else {
+				ipf_active = 1 - ipf_active;
+			}
+			RWLOCK_EXIT(&ipf_mutex);
+		}
+		break;
+
+	case SIOCGETFS :
+		ipf_getstat(&fio);
+		error = ipf_outobj((void *)data, &fio, IPFOBJ_IPFSTAT);
+		break;
+
+	case SIOCFRZST :
+		if (!(mode & FWRITE)) {
+			ipf_interror = 104;
+			error = EPERM;
+		} else
+			error = ipf_zerostats((caddr_t)data);
+		break;
+
+	case SIOCIPFFL :
+		if (!(mode & FWRITE)) {
+			ipf_interror = 105;
+			error = EPERM;
+		} else {
+			error = BCOPYIN(data, &tmp, sizeof(tmp));
+			if (!error) {
+				tmp = ipf_flush(IPL_LOGIPF, tmp);
+				error = BCOPYOUT(&tmp, data, sizeof(tmp));
+				if (error != 0) {
+					ipf_interror = 106;
+					error = EFAULT;
+				}
+			} else {
+				ipf_interror = 107;
+				error = EFAULT;
+			}
+		}
+		break;
+
+#ifdef USE_INET6
+	case SIOCIPFL6 :
+		if (!(mode & FWRITE)) {
+			ipf_interror = 108;
+			error = EPERM;
+		} else {
+			error = BCOPYIN(data, &tmp, sizeof(tmp));
+			if (!error) {
+				tmp = ipf_flush(IPL_LOGIPF, tmp);
+				error = BCOPYOUT(&tmp, data, sizeof(tmp));
+				if (error != 0) {
+					ipf_interror = 109;
+					error = EFAULT;
+				}
+			} else {
+				ipf_interror = 110;
+				error = EFAULT;
+			}
+		}
+		break;
+#endif
+
+	case SIOCSTLCK :
+		if (!(mode & FWRITE)) {
+			ipf_interror = 122;
+			error = EPERM;
+		} else {
+			error = BCOPYIN(data, &tmp, sizeof(tmp));
+			if (error == 0) {
+				ipf_state_lock = tmp;
+				ipf_nat_lock = tmp;
+				ipf_frag_lock = tmp;
+				ipf_auth_lock = tmp;
+			} else {
+				ipf_interror = 111;
+				error = EFAULT;
+			}
+		}
+		break;
+
+#ifdef	IPFILTER_LOG
+	case SIOCIPFFB :
+		if (!(mode & FWRITE)) {
+			ipf_interror = 112;
+			error = EPERM;
+		} else {
+			tmp = ipf_log_clear(IPL_LOGIPF);
+			error = BCOPYOUT(&tmp, data, sizeof(tmp));
+			if (error) {
+				ipf_interror = 113;
+				error = EFAULT;
+			}
+		}
+		break;
+#endif /* IPFILTER_LOG */
+
+	case SIOCFRSYN :
+		if (!(mode & FWRITE)) {
+			ipf_interror = 114;
+			error = EPERM;
+		} else {
+			RWLOCK_EXIT(&ipf_global);
+			WRITE_ENTER(&ipf_global);
+#if defined(MENTAT) && defined(_KERNEL)
+			error = ipfsync();
+#else
+			ipf_sync(NULL);
+			error = 0;
+#endif
+
+		}
+		break;
+
+	case SIOCGFRST :
+		error = ipf_outobj((void *)data, ipf_frag_stats(),
+				  IPFOBJ_FRAGSTAT);
+		break;
+
+#ifdef	IPFILTER_LOG
+	case FIONREAD :
+		tmp = (int)iplused[IPL_LOGIPF];
+
+		error = BCOPYOUT(&tmp, data, sizeof(tmp));
+		break;
+#endif
+
+	case SIOCIPFITER :
+		SPL_SCHED(s);
+		error = ipf_frruleiter(data, uid, ctx);
+		SPL_X(s);
+		break;
+
+	case SIOCGENITER :
+		SPL_SCHED(s);
+		error = ipf_genericiter(data, uid, ctx);
+		SPL_X(s);
+		break;
+
+	case SIOCIPFDELTOK :
+		error = BCOPYIN(data, &tmp, sizeof(tmp));
+		if (error == 0) {
+			SPL_SCHED(s);
+			error = ipf_deltoken(tmp, uid, ctx);
+			SPL_X(s);
+		}
+		break;
+
+	default :
+		ipf_interror = 115;
+		error = EINVAL;
+		break;
+	}
+
+	return error;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_decaps                                                  */
 /* Returns:     int        - -1 == decapsulation failed, else bit mask of   */
 /*                           flags indicating packet filtering decision.    */
 /* Parameters:  fin(I)     - pointer to packet information                  */
@@ -6659,10 +7896,11 @@ int v;
 /* buffer to point to the start of the inner packet and start processing    */
 /* rules belonging to the head group this rule specifies.                   */
 /* ------------------------------------------------------------------------ */
-u_32_t fr_decaps(fin, pass, l5proto)
-fr_info_t *fin;
-u_32_t pass;
-int l5proto;
+u_32_t
+ipf_decaps(fin, pass, l5proto)
+	fr_info_t *fin;
+	u_32_t pass;
+	int l5proto;
 {
 	fr_info_t fin2, *fino = NULL;
 	int elen, hlen, nh;
@@ -6671,7 +7909,7 @@ int l5proto;
 	mb_t *m;
 
 	if ((fin->fin_flx & FI_COALESCE) == 0)
-		if (fr_coalesce(fin) == -1)
+		if (ipf_coalesce(fin) == -1)
 			goto cantdecaps;
 
 	m = fin->fin_m;
@@ -6802,15 +8040,16 @@ int l5proto;
 			goto cantdecaps;
 	}
 
-	if (fr_makefrip(hlen, ip, fin) == -1) {
+	if (ipf_makefrip(hlen, ip, fin) == -1) {
 cantdecaps:
 		pass &= ~FR_CMDMASK;
 		pass |= FR_BLOCK|FR_QUICK;
+		fin->fin_reason = 8;
 		return -1;
 	}
 
 	/*fin->fin_fr = *fr->fr_grp;*/
-	pass = fr_scanlist(fin, pass);
+	pass = ipf_scanlist(fin, pass);
 
 	/*
 	 * Copy the packet filter "result" fields out of the fr_info_t struct
@@ -6842,7 +8081,7 @@ cantdecaps:
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_checkrulefunc                                            */
+/* Function:    ipf_checkrulefunc                                           */
 /* Returns:     Nil                                                         */
 /* Parameters:  funcptr(I) - function pointer                               */
 /*              addrem(I)  - 0 == add, 1 == remove                          */
@@ -6851,13 +8090,14 @@ cantdecaps:
 /* Lookup a function pointer in the table of available functions and modify */
 /* its use counter if found, according to the value of addrem.              */
 /* ------------------------------------------------------------------------ */
-static void fr_checkrulefunc(funcptr, addrem, set)
-void *funcptr;
-int addrem, set;
+static void
+ipf_checkrulefunc(funcptr, addrem, set)
+	void *funcptr;
+	int addrem, set;
 {
 	ipfunc_resolve_t *ft;
 
-	for (ft = fr_availfuncs; ft->ipfu_addr != NULL; ft++)
+	for (ft = ipf_availfuncs; ft->ipfu_addr != NULL; ft++)
 		if (ft->ipfu_addr == funcptr)
 			break;
 
@@ -6869,4 +8109,428 @@ int addrem, set;
 	} else if (addrem == 1) {
 		ATOMIC_DEC(ft->ipfu_ref[set]);
 	}
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_matcharray_load                                         */
+/* Returns:     int         - 0 = success, else error                       */
+/* Parameters:  data(I)     - pointer to ioctl data                         */
+/*              objp(I)     - ipfobj_t structure to load data into          */
+/*              arrayptr(I) - pointer to location to store array pointer    */
+/*                                                                          */
+/* This function loads in a mathing array through the ipfobj_t struct that  */
+/* describes it.  Sanity checking and array size limitations are enforced   */
+/* in this function to prevent userspace from trying to load in something   */
+/* that is insanely big.  Once the size of the array is known, the memory   */
+/* required is malloc'd and returned through changing *arrayptr.  The       */
+/* contents of the array are verified before returning.  Only in the event  */
+/* of a successful call is the caller required to free up the malloc area.  */
+/* ------------------------------------------------------------------------ */
+int
+ipf_matcharray_load(data, objp, arrayptr)
+	caddr_t data;
+	ipfobj_t *objp;
+	int **arrayptr;
+{
+	int arraysize, *array, error;
+
+	*arrayptr = NULL;
+
+	error = BCOPYIN(data, objp, sizeof(*objp));
+	if (error != 0) {
+		ipf_interror = 116;
+		return EFAULT;
+	}
+
+	if (objp->ipfo_type != IPFOBJ_IPFEXPR) {
+		ipf_interror = 117;
+		return EINVAL;
+	}
+
+	if (((objp->ipfo_size & 3) != 0) || (objp->ipfo_size == 0) ||
+	    (objp->ipfo_size > 1024)) {
+		ipf_interror = 118;
+		return EINVAL;
+	}
+
+	arraysize = objp->ipfo_size * sizeof(*array);
+	KMALLOCS(array, int *, arraysize);
+	if (array == NULL) {
+		ipf_interror = 119;
+		return ENOMEM;
+	}
+
+	error = COPYIN(objp->ipfo_ptr, array, arraysize);
+	if (error != 0) {
+		KFREES(array, arraysize);
+		ipf_interror = 120;
+		return EFAULT;
+	}
+
+	if (ipf_matcharray_verify(array, arraysize) != 0) {
+		KFREES(array, arraysize);
+		ipf_interror = 121;
+		return EINVAL;
+	}
+
+	*arrayptr = array;
+	return 0;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_matcharray_verify                                       */
+/* Returns:     Nil                                                         */
+/* Parameters:  array(I)     - pointer to matching array                    */
+/*              arraysize(I) - number of elements in the array              */
+/*                                                                          */
+/* Verify the contents of a matching array by stepping through each element */
+/* in it.  The actual commands in the array are not verified for            */
+/* correctness, only that all of the sizes are correctly within limits.     */
+/* ------------------------------------------------------------------------ */
+int
+ipf_matcharray_verify(array, arraysize)
+	int *array, arraysize;
+{
+	int i, nelem, maxidx, len;
+
+	nelem = arraysize / sizeof(*array);
+
+	/*
+	 * Currently, it makes no sense to have an array less than 6
+	 * elements long - the initial size at the from, a single operation
+	 * (minimum 4 in length) and a trailer, for a total of 6.
+	 */
+	if ((array[0] < 6) || (arraysize < 24) || (arraysize > 4096)) {
+		return -1;
+	}
+
+	/*
+	 * Verify the size of data pointed to by array with how long
+	 * the array claims to be itself.
+	 */
+	if (array[0] * sizeof(*array) != arraysize) {
+		return -1;
+	}
+
+	maxidx = nelem - 1;
+	/*
+	 * The last opcode in this array should be an IPF_EXP_END.
+	 */
+	if (array[maxidx] != IPF_EXP_END) {
+		return -1;
+	}
+
+	for (i = 1; i < maxidx; ) {
+		len = array[i + 2];
+
+		/*
+		 * The length of the bits to check must be at least 1
+		 * (or else there is nothing to comapre with!) and it
+		 * cannot exceed the length of the data present.
+		 */
+		if ((len < 1) || (i + 3 + len > maxidx)) {
+			return -1;
+		}
+		i += 3 + len;
+	}
+	return 0;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_fr_matcharray                                           */
+/* Returns:     int      - 0 = match failed, else positive match            */
+/* Parameters:  fin(I)   - pointer to packet information                    */
+/*              array(I) - pointer to matching array                        */
+/*                                                                          */
+/* This function is used to apply a matching array against a packet and     */
+/* return an indication of whether or not the packet successfully matches   */
+/* all of the commands in it.                                               */
+/* ------------------------------------------------------------------------ */
+static int
+ipf_fr_matcharray(fin, array)
+	fr_info_t *fin;
+	int *array;
+{
+	int i, n, *x, e, p;
+
+	e = 0;
+	n = array[0];
+	x = array + 1;
+
+	for (; n > 0; x += 3 + x[3], e = 0) {
+		n -= x[3] + 3;
+
+		/*
+		 * The upper 16 bits currently store the protocol value.
+		 * This is currently used with TCP and UDP port compares and
+		 * allows "tcp.port = 80" without requiring an explicit
+		 " "ip.pr = tcp" first.
+		 */
+		p = x[0] >> 16;
+		if ((p != 0) && (p != fin->fin_p))
+			break;
+
+		switch (x[0])
+		{
+		case IPF_EXP_IP_PR :
+			for (i = 0; !e && i < x[3]; i++) {
+				e |= (fin->fin_p == x[i + 3]);
+			}
+			break;
+
+		case IPF_EXP_IP_SRCADDR :
+			for (i = 0; !e && i < x[3]; i++) {
+				e |= ((fin->fin_saddr & x[i + 4]) ==
+				      x[i + 3]);
+			}
+			break;
+
+		case IPF_EXP_IP_DSTADDR :
+			for (i = 0; !e && i < x[3]; i++) {
+				e |= ((fin->fin_daddr & x[i + 4]) ==
+				      x[i + 3]);
+			}
+			break;
+
+		case IPF_EXP_IP_ADDR :
+			for (i = 0; !e && i < x[3]; i++) {
+				e |= ((fin->fin_saddr & x[i + 4]) ==
+				      x[i + 3]) ||
+				     ((fin->fin_daddr & x[i + 4]) ==
+				      x[i + 3]);
+			}
+			break;
+
+		case IPF_EXP_UDP_PORT :
+		case IPF_EXP_TCP_PORT :
+			for (i = 0; !e && i < x[3]; i++) {
+				e |= (fin->fin_sport == x[i + 3]) ||
+				     (fin->fin_dport == x[i + 3]);
+			}
+			break;
+
+		case IPF_EXP_UDP_SPORT :
+		case IPF_EXP_TCP_SPORT :
+			for (i = 0; !e && i < x[3]; i++) {
+				e |= (fin->fin_sport == x[i + 3]);
+			}
+			break;
+
+		case IPF_EXP_UDP_DPORT :
+		case IPF_EXP_TCP_DPORT :
+			for (i = 0; !e && i < x[3]; i++) {
+				e |= (fin->fin_dport == x[i + 3]);
+			}
+			break;
+
+		case IPF_EXP_TCP_FLAGS :
+			for (i = 0; !e && i < x[3]; i++) {
+				e |= ((fin->fin_tcpf & x[i + 4]) == x[i + 3]);
+			}
+			break;
+		}
+		e ^= x[1];
+
+		if (!e)
+			break;
+	}
+
+	return e;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_queueflush                                              */
+/* Returns:     int - number of entries flushed (0 = none)                  */
+/* Parameters:  deletefn(I) - function to call to delete entry              */
+/*              ipfqs(I)    - top of the list of ipf internal queues        */
+/*              userqs(I)   - top of the list of user defined timeouts      */
+/*                                                                          */
+/* This fucntion gets called when the state/NAT hash tables fill up and we  */
+/* need to try a bit harder to free up some space.  The algorithm used here */
+/* split into two parts but both halves have the same goal: to reduce the   */
+/* number of connections considered to be "active" to the low watermark.    */
+/* There are two steps in doing this:                                       */
+/* 1) Remove any TCP connections that are already considered to be "closed" */
+/*    but have not yet been removed from the state table.  The two states   */
+/*    TCPS_TIME_WAIT and TCPS_CLOSED are considered to be the perfect       */
+/*    candidates for this style of removal.  If freeing up entries in       */
+/*    CLOSED or both CLOSED and TIME_WAIT brings us to the low watermark,   */
+/*    we do not go on to step 2.                                            */
+/*                                                                          */
+/* 2) Look for the oldest entries on each timeout queue and free them if    */
+/*    they are within the given window we are considering.  Where the       */
+/*    window starts and the steps taken to increase its size depend upon    */
+/*    how long ipf has been running (fr_ticks.)  Anything modified in the   */
+/*    last 30 seconds is not touched.                                       */
+/*                                              touched                     */
+/*         die     fr_ticks   30*1.5    1800*1.5   |  43200*1.5             */
+/*           |          |        |           |     |     |                  */
+/* future <--+----------+--------+-----------+-----+-----+-----------> past */
+/*                     now        \_int=30s_/ \_int=1hr_/ \_int=12hr        */
+/*                                                                          */
+/* Points to note:                                                          */
+/* - tqe_die is the time, in the future, when entries die.                  */
+/* - tqe_die - fr_ticks is how long left the connection has to live in ipf  */
+/*   ticks.                                                                 */
+/* - tqe_touched is when the entry was last used by NAT/state               */
+/* - the closer tqe_touched is to fr_ticks, the further tqe_die will be for */
+/*   any given timeout queue and vice versa.                                */
+/* - both tqe_die and tqe_touched increase over time                        */
+/* - timeout queues are sorted with the highest value of tqe_die at the     */
+/*   bottom and therefore the smallest values of each are at the top        */
+/* - the pointer passed in as ipfqs should point to an array of timeout     */
+/*   queues representing each of the TCP states                             */
+/*                                                                          */
+/* We start by setting up a maximum range to scan for things to move of     */
+/* iend (newest) to istart (oldest) in chunks of "interval".  If nothing is */
+/* found in that range, "interval" is adjusted (so long as it isn't 30) and */
+/* we start again with a new value for "iend" and "istart".  This is        */
+/* continued until we either finish the scan of 30 second intervals or the  */
+/* low water mark is reached.                                               */
+/* ------------------------------------------------------------------------ */
+int
+ipf_queueflush(deletefn, ipfqs, userqs, activep, size, low)
+	ipftq_delete_fn_t deletefn;
+	ipftq_t *ipfqs, *userqs;
+	u_int *activep;
+	int size, low;
+{
+	u_long interval, istart, iend;
+	ipftq_t *ifq, *ifqnext;
+	ipftqent_t *tqe, *tqn;
+	int removed = 0;
+
+	for (tqn = ipfqs[IPF_TCPS_CLOSED].ifq_head; ((tqe = tqn) != NULL); ) {
+		tqn = tqe->tqe_next;
+		if ((*deletefn)(tqe->tqe_parent) == 0)
+			removed++;
+	}
+	if ((*activep * 100 / size) > low) {
+		for (tqn = ipfqs[IPF_TCPS_TIME_WAIT].ifq_head;
+		     ((tqe = tqn) != NULL); ) {
+			tqn = tqe->tqe_next;
+			if ((*deletefn)(tqe->tqe_parent) == 0)
+				removed++;
+		}
+	}
+
+	if ((*activep * 100 / size) <= low) {
+		return removed;
+	}
+
+	/*
+	 * NOTE: Use of "* 15 / 10" is required here because if "* 1.5" is    
+	 *       used then the operations are upgraded to floating point      
+	 *       and kernels don't like floating point...
+	 */
+	if (ipf_ticks > IPF_TTLVAL(43200 * 15 / 10)) {
+		istart = IPF_TTLVAL(86400 * 4);
+		interval = IPF_TTLVAL(43200);
+	} else if (ipf_ticks > IPF_TTLVAL(1800 * 15 / 10)) {
+		istart = IPF_TTLVAL(43200);
+		interval = IPF_TTLVAL(1800);
+	} else if (ipf_ticks > IPF_TTLVAL(30 * 15 / 10)) {
+		istart = IPF_TTLVAL(1800);
+		interval = IPF_TTLVAL(30);
+	} else {
+		return 0;
+	}
+	if (istart > ipf_ticks) {
+		if (ipf_ticks - interval < interval)
+			istart = interval;
+		else
+			istart = (ipf_ticks / interval) * interval;
+	}
+
+	iend = ipf_ticks - interval;
+
+	while ((*activep * 100 / size) > low) {
+		u_long try;
+
+		try = ipf_ticks - istart; 
+
+		for (ifq = ipfqs; ifq != NULL; ifq = ifq->ifq_next) {
+			for (tqn = ifq->ifq_head; ((tqe = tqn) != NULL); ) {
+				if (try < tqe->tqe_touched)
+					break;
+				tqn = tqe->tqe_next;
+				if ((*deletefn)(tqe->tqe_parent) == 0)
+					removed++;
+			}
+		}
+
+		for (ifq = userqs; ifq != NULL; ifq = ifqnext) {
+			ifqnext = ifq->ifq_next;
+
+			for (tqn = ifq->ifq_head; ((tqe = tqn) != NULL); ) {
+				if (try < tqe->tqe_touched)
+					break;
+				tqn = tqe->tqe_next;
+				if ((*deletefn)(tqe->tqe_parent) == 0)
+					removed++;
+			}
+		}
+
+		if (try >= iend) {
+			if (interval == IPF_TTLVAL(43200)) {
+				interval = IPF_TTLVAL(1800);
+			} else if (interval == IPF_TTLVAL(1800)) {
+				interval = IPF_TTLVAL(30);
+			} else {
+				break;
+			}
+			if (interval >= ipf_ticks)
+				break;
+
+			iend = ipf_ticks - interval;
+		}
+		istart -= interval;
+	}
+
+	return removed;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_deliverlocal                                            */
+/* Returns:     int - 1 = local address, 0 = non-local address              */
+/* Parameters:  ipversion(I) - IP protocol version (4 or 6)                 */
+/*              ifp(I)       - network interface pointer                    */
+/*              sinaddr(I)   - sockaddr structure with original address     */
+/*                                                                          */
+/* This fucntion is used to determine in the address "sinaddr" belongs to   */
+/* the network interface represented by ifp.                                */
+/* ------------------------------------------------------------------------ */
+static int ipf_deliverlocal(ipversion, ifp, sinaddr)
+int ipversion;
+void *ifp;
+void *sinaddr;
+{
+	i6addr_t addr;
+	int islocal = 0;
+
+	if (ipversion == 4) {
+		struct sockaddr_in *sin = sinaddr;
+
+		if (ipf_ifpaddr(4, FRI_NORMAL, ifp, &addr, NULL) == 0) {
+			if (addr.in4.s_addr == sin->sin_addr.s_addr)
+				islocal = 1;
+		}
+
+#ifdef USE_INET6
+	} else if (ipversion == 6) {
+		struct sockaddr_in6 *sin = sinaddr;
+
+		if (ipf_ifpaddr(6, FRI_NORMAL, ifp, &addr, NULL) == 0) {
+			if (IP6_EQ(&addr, &sin->sin6_addr))
+				islocal = 1;
+		}
+#endif
+	}
+
+	return islocal;
 }

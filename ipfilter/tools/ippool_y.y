@@ -1,3 +1,8 @@
+/*
+ * Copyright (C) 2001-2006 by Darren Reed.
+ *
+ * See the IPFILTER.LICENCE file for details on licencing.
+ */
 %{
 #include <sys/types.h>
 #include <sys/time.h>
@@ -32,6 +37,7 @@
 #include "kmem.h"
 
 #define	YYDEBUG	1
+#define	YYSTACKSIZE	0x00ffffff
 
 extern	int	yyparse __P((void));
 extern	int	yydebug;
@@ -44,6 +50,8 @@ static	ioctlfunc_t	poolioctl = NULL;
 static	char		poolname[FR_GROUPLEN];
 
 static void ippool_setnodesize __P((ip_pool_node_t *));
+static iphtent_t *add_htablehosts __P((char *));
+static ip_pool_node_t *add_poolhosts __P((char *));
 
 %}
 
@@ -116,6 +124,7 @@ assign:	YY_STR assigning YY_STR ';'	{ set_variable($1, $3);
 					  resetlexer();
 					  free($1);
 					  free($3);
+					  yyvarnext = 0;
 					}
 	;
 
@@ -244,6 +253,7 @@ grouplist:
 #endif
 						$$->ipe_family = AF_INET;
 					}
+	| YY_STR			{ $$ = add_htablehosts($1); }
 	;
 
 setgrouplist:
@@ -288,6 +298,8 @@ range:	addrmask	{ $$ = calloc(1, sizeof(*$$));
 			  bcopy(&($2[1]), &($$->ipn_mask.adf_addr),
 				sizeof($$->ipn_mask.adf_addr));
 			}
+	| YY_STR			{ $$ = add_poolhosts($1); }
+	;
 
 hashlist:
 	';'				{ $$ = NULL; }
@@ -310,6 +322,7 @@ hashentry:
 #endif
 					$$->ipe_family = AF_INET;
 				}
+	| YY_STR		{ $$ = add_htablehosts($1); }
 	;
 
 addrmask:
@@ -325,22 +338,18 @@ addrmask:
 ipaddr:	ipv4			{ use_inet6 = 0; $$.in4 = $1; }
 	| YY_NUMBER		{ use_inet6 = 0; $$.in4.s_addr = htonl($1); }
 	| YY_IPV6		{ use_inet6 = 1; $$ = $1; }
-	| YY_STR		{ use_inet6 = 0;
-				  if (gethost($1, &($$.in4.s_addr)) == -1)
-					yyerror("Unknown hostname");
-				}
 	;
 
-mask:	YY_NUMBER		{ if (use_inet6) {
-					if (ntomask(6, $1, (u_32_t *)&$$) == -1)
-						yyerror("bad bitmask");
-				  } else {
-					if (ntomask(4, $1, (u_32_t *)&$$.in4) == -1)
-						yyerror("bad bitmask");
-				  }
-				}
-	| ipv4			{ $$.in4 = $1; }
-	| YY_IPV6		{ $$ = $1; }
+mask:	YY_NUMBER	{ if (use_inet6) {
+				if (ntomask(6, $1, (u_32_t *)&$$) == -1)
+					yyerror("bad bitmask");
+			  } else {
+				if (ntomask(4, $1, (u_32_t *)&$$.in4) == -1)
+					yyerror("bad bitmask");
+			  }
+			}
+	| ipv4		{ $$.in4 = $1; }
+	| YY_IPV6	{ $$ = $1; }
 	;
 
 size:	IPT_SIZE '=' YY_NUMBER	{ ipht.iph_size = $3; }
@@ -473,4 +482,118 @@ ip_pool_node_t *node;
 		  node->ipn_mask.adf_len = 8;
 		  node->ipn_mask.adf_family = AF_INET;
 	  }
+}
+
+
+static iphtent_t *
+add_htablehosts(url)
+char *url;
+{
+	iphtent_t *htop, *hbot, *h;
+	alist_t *a, *hlist;
+
+	if (!strncmp(url, "file://", 7) || !strncmp(url, "http://", 7)) {
+		hlist = load_url(url);
+	} else {
+		use_inet6 = 0;
+
+		hlist = calloc(1, sizeof(*hlist));
+		if (hlist == NULL)
+			return NULL;
+
+		if (gethost(url, &hlist->al_addr) == -1)
+			yyerror("Unknown hostname");
+	}
+
+	hbot = NULL;
+	htop = NULL;
+
+	for (a = hlist; a != NULL; a = a->al_next) {
+		h = calloc(1, sizeof(*h));
+		if (h == NULL)
+			break;
+
+		if (a->al_v == 4)
+			h->ipe_family = AF_INET;
+#ifdef USE_INET6
+		else if (a->al_v == 6)
+			h->ipe_family = AF_INET6;
+#endif
+		bcopy((char *)&a->al_addr, (char *)&h->ipe_addr,
+		      sizeof(h->ipe_addr));
+		bcopy((char *)&a->al_mask, (char *)&h->ipe_mask,
+		      sizeof(h->ipe_mask));
+
+		if (hbot != NULL)
+			hbot->ipe_next = h;
+		else
+			htop = h;
+		hbot = h;
+	}
+
+	alist_free(hlist);
+
+	return htop;
+}
+
+
+static ip_pool_node_t *
+add_poolhosts(url)
+char *url;
+{
+	ip_pool_node_t *ptop, *pbot, *p;
+	alist_t *a, *hlist;
+
+	if (!strncmp(url, "file://", 7) || !strncmp(url, "http://", 7)) {
+		hlist = load_url(url);
+	} else {
+		use_inet6 = 0;
+
+		hlist = calloc(1, sizeof(*hlist));
+		if (hlist == NULL)
+			return NULL;
+
+		if (gethost(url, &hlist->al_addr) == -1)
+			yyerror("Unknown hostname");
+	}
+
+	pbot = NULL;
+	ptop = NULL;
+
+	for (a = hlist; a != NULL; a = a->al_next) {
+		p = calloc(1, sizeof(*p));
+		if (p == NULL)
+			break;
+
+		if (a->al_v == 4) {
+			p->ipn_addr.adf_family = AF_INET;
+			p->ipn_addr.adf_len = 8;
+			p->ipn_mask.adf_family = AF_INET;
+			p->ipn_mask.adf_len = 8;
+#ifdef USE_INET6
+		} else if (a->al_v == 6) {
+			p->ipn_addr.adf_family = AF_INET6;
+			p->ipn_addr.adf_len = 20;
+			p->ipn_mask.adf_family = AF_INET6;
+			p->ipn_mask.adf_len = 20;
+#endif
+		}
+
+		p->ipn_info = a->al_not;
+
+		bcopy((char *)&a->al_addr, (char *)&p->ipn_addr.adf_addr,
+		      sizeof(p->ipn_addr.adf_addr));
+		bcopy((char *)&a->al_mask, (char *)&p->ipn_mask.adf_addr,
+		      sizeof(p->ipn_mask.adf_addr));
+
+		if (pbot != NULL)
+			pbot->ipn_next = p;
+		else
+			ptop = p;
+		pbot = p;
+	}
+
+	alist_free(hlist);
+
+	return ptop;
 }

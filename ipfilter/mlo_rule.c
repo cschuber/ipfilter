@@ -60,12 +60,12 @@ int cmd;
 
 		err = ipfrule_add();
 		if (!err)
-			fr_refcnt++;
+			ipf_refcnt++;
 		break;
 	case LKM_E_UNLOAD :
 		err = ipfrule_remove();
 		if (!err)
-			fr_refcnt--;
+			ipf_refcnt--;
 		break;
 	case LKM_E_STAT :
 		break;

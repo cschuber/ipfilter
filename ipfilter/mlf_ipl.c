@@ -94,42 +94,42 @@ int sysctl_ipf_int SYSCTL_HANDLER_ARGS;
 # define	CTLFLAG_RWO	(CTLFLAG_RW|CTLFLAG_OFF)
 SYSCTL_NODE(_net_inet, OID_AUTO, ipf, CTLFLAG_RW, 0, "IPF");
 SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_flags, CTLFLAG_RW, &ipf_flags, 0, "");
-SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_pass, CTLFLAG_RW, &fr_pass, 0, "");
-SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_active, CTLFLAG_RD, &fr_active, 0, "");
-SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_chksrc, CTLFLAG_RW, &fr_chksrc, 0, "");
-SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_minttl, CTLFLAG_RW, &fr_minttl, 0, "");
+SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_pass, CTLFLAG_RW, &ipf_pass, 0, "");
+SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_active, CTLFLAG_RD, &ipf_active, 0, "");
+SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_chksrc, CTLFLAG_RW, &ipf_chksrc, 0, "");
+SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_minttl, CTLFLAG_RW, &ipf_minttl, 0, "");
 SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_tcpidletimeout, CTLFLAG_RWO,
-	   &fr_tcpidletimeout, 0, "");
+	   &ipf_tcpidletimeout, 0, "");
 SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_tcphalfclosed, CTLFLAG_RWO,
-	   &fr_tcphalfclosed, 0, "");
+	   &ipf_tcphalfclosed, 0, "");
 SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_tcpclosewait, CTLFLAG_RWO,
-	   &fr_tcpclosewait, 0, "");
+	   &ipf_tcpclosewait, 0, "");
 SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_tcplastack, CTLFLAG_RWO,
-	   &fr_tcplastack, 0, "");
+	   &ipf_tcplastack, 0, "");
 SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_tcptimeout, CTLFLAG_RWO,
-	   &fr_tcptimeout, 0, "");
+	   &ipf_tcptimeout, 0, "");
 SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_tcpclosed, CTLFLAG_RWO,
-	   &fr_tcpclosed, 0, "");
+	   &ipf_tcpclosed, 0, "");
 SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_udptimeout, CTLFLAG_RWO,
-	   &fr_udptimeout, 0, "");
+	   &ipf_udptimeout, 0, "");
 SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_icmptimeout, CTLFLAG_RWO,
-	   &fr_icmptimeout, 0, "");
+	   &ipf_icmptimeout, 0, "");
 SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_defnatage, CTLFLAG_RWO,
-	   &fr_defnatage, 0, "");
+	   &ipf_defnatage, 0, "");
 SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_ipfrttl, CTLFLAG_RW,
-	   &fr_ipfrttl, 0, "");
+	   &ipf_ipfrttl, 0, "");
 SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_running, CTLFLAG_RD,
-	   &fr_running, 0, "");
+	   &ipf_running, 0, "");
 SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_statesize, CTLFLAG_RWO,
-	   &fr_statesize, 0, "");
+	   &ipf_statesize, 0, "");
 SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_statemax, CTLFLAG_RWO,
-	   &fr_statemax, 0, "");
+	   &ipf_statemax, 0, "");
 SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_authsize, CTLFLAG_RWO,
-	   &fr_authsize, 0, "");
+	   &ipf_authsize, 0, "");
 SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_authused, CTLFLAG_RD,
-	   &fr_authused, 0, "");
+	   &ipf_authused, 0, "");
 SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_defaultauthage, CTLFLAG_RW,
-	   &fr_defaultauthage, 0, "");
+	   &ipf_defaultauthage, 0, "");
 SYSCTL_IPF(_net_inet_ipf, OID_AUTO, ippr_ftp_pasvonly, CTLFLAG_RW,
 	   &ippr_ftp_pasvonly, 0, "");
 #endif
@@ -296,7 +296,7 @@ int cmd;
 {
 	int error = 0;
 
-	error = ipldetach();
+	error = ipfdetach();
 	if (!error)
 		error = if_ipl_remove();
 	return error;
@@ -312,7 +312,7 @@ int cmd;
 	int error = 0, fmode = S_IFCHR|0600, i;
 	char *name;
 
-	error = iplattach();
+	error = ipfattach();
 	if (error)
 		return error;
 	(void) if_ipl_remove();
@@ -551,6 +551,9 @@ register struct uio *uio;
 	if (xmin < 0)
 		return ENXIO;
 
+	if (fr_running < 1)
+		return EIO;
+
 # ifdef	IPFILTER_SYNC
 	if (xmin == IPL_LOGSYNC)
 		return ipfsync_read(uio);
@@ -583,6 +586,9 @@ dev_t dev;
 #endif
 register struct uio *uio;
 {
+
+	if (fr_running < 1)
+		return EIO;
 
 #ifdef	IPFILTER_SYNC
 	if (GET_MINOR(dev) == IPL_LOGSYNC)

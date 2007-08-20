@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 1993-2001, 2003 by Darren Reed.
+ * Copyright (C) 2001-2006 by Darren Reed.
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  */
@@ -531,9 +531,9 @@ char *buf;
 }
 
 
-char	*hostname(res, v, ip)
-int	res, v;
-u_32_t	*ip;
+char *hostname(res, v, ip)
+int res, v;
+u_32_t *ip;
 {
 # define MAX_INETA	16
 	static char hname[MAXHOSTNAMELEN + MAX_INETA + 3];
@@ -564,13 +564,13 @@ u_32_t	*ip;
 }
 
 
-char	*portname(res, proto, port)
-int	res;
-char	*proto;
-u_int	port;
+char *portname(res, proto, port)
+int res;
+char *proto;
+u_int port;
 {
-	static	char	pname[8];
-	char	*s;
+	static char pname[8];
+	char *s;
 
 	port = ntohs(port);
 	port &= 0xffff;
@@ -588,9 +588,9 @@ u_int	port;
 }
 
 
-static	char	*icmpname(type, code)
-u_int	type;
-u_int	code;
+static char *icmpname(type, code)
+u_int type;
+u_int code;
 {
 	static char name[80];
 	icmp_subtype_t *ist;
@@ -619,9 +619,9 @@ u_int	code;
 	return name;
 }
 
-static	char	*icmpname6(type, code)
-u_int	type;
-u_int	code;
+static char *icmpname6(type, code)
+u_int type;
+u_int code;
 {
 	static char name[80];
 	icmp_subtype_t *ist;
@@ -651,11 +651,11 @@ u_int	code;
 }
 
 
-void	dumphex(log, dopts, buf, len)
-FILE	*log;
-int	dopts;
-char	*buf;
-int	len;
+void dumphex(log, dopts, buf, len)
+FILE *log;
+int dopts;
+char *buf;
+int len;
 {
 	char	hline[80];
 	int	i, j, k;
@@ -715,11 +715,11 @@ int	len;
 }
 
 
-static	struct	tm	*get_tm(sec)
+static struct tm *get_tm(sec)
 #ifdef __hpux
-u_32_t	sec;
+u_32_t sec;
 #else
-time_t	sec;
+time_t sec;
 #endif
 {
 	struct tm *tm;
@@ -730,22 +730,27 @@ time_t	sec;
 	return tm;
 }
 
-static	void	print_natlog(conf, buf, blen)
+static void print_natlog(conf, buf, blen)
 config_t *conf;
-char	*buf;
-int	blen;
+char *buf;
+int blen;
 {
-	struct	natlog	*nl;
-	iplog_t	*ipl = (iplog_t *)buf;
-	char	*t = line;
-	struct	tm	*tm;
-	int	res, i, len;
-	char	*proto;
+	struct natlog *nl;
+	int res, i, len;
+	struct tm *tm;
+	iplog_t	*ipl;
+	char *proto;
+	int simple;
+	char *t;
 
+	t = line;
+	simple = 0;
+	ipl = (iplog_t *)buf;
 	nl = (struct natlog *)((char *)ipl + sizeof(*ipl));
 	res = (opts & OPT_RESOLVE) ? 1 : 0;
 	tm = get_tm(ipl->ipl_sec);
 	len = sizeof(line);
+
 	if (!(opts & OPT_SYSLOG)) {
 		(void) strftime(t, len, "%d/%m/%Y ", tm);
 		i = strlen(t);
@@ -757,36 +762,110 @@ int	blen;
 	sprintf(t, ".%-.6ld @%hd ", ipl->ipl_usec, nl->nl_rule + 1);
 	t += strlen(t);
 
-	if (nl->nl_type == NL_NEWMAP)
-		strcpy(t, "NAT:MAP ");
-	else if (nl->nl_type == NL_NEWRDR)
-		strcpy(t, "NAT:RDR ");
-	else if (nl->nl_type == NL_FLUSH)
-		strcpy(t, "NAT:FLUSH ");
-	else if (nl->nl_type == NL_EXPIRE)
-		strcpy(t, "NAT:EXPIRE ");
-	else if (nl->nl_type == NL_NEWBIMAP)
-		strcpy(t, "NAT:BIMAP ");
-	else if (nl->nl_type == NL_NEWBLOCK)
-		strcpy(t, "NAT:MAPBLOCK ");
-	else if (nl->nl_type == NL_CLONE)
-		strcpy(t, "NAT:CLONE ");
-	else
-		sprintf(t, "Type: %d ", nl->nl_type);
+	switch (nl->nl_action)
+	{
+	case NL_NEW :
+		strcpy(t, "NAT:NEW");
+		break;
+
+	case NL_FLUSH :
+		strcpy(t, "NAT:FLUSH");
+		break;
+
+	case NL_CLONE :
+		strcpy(t, "NAT:CLONE");
+		break;
+
+	case NL_EXPIRE :
+		strcpy(t, "NAT:EXPIRE");
+		break;
+
+	default :
+		sprintf(t, "NAT:Action(%d)", nl->nl_action);
+		break;
+	}
+	t += strlen(t);
+
+
+	switch (nl->nl_type)
+	{
+	case NAT_MAP :
+		strcpy(t, "-NAT ");
+		simple = 1;
+		break;
+
+	case NAT_REDIRECT :
+		strcpy(t, "-RDR ");
+		simple = 1;
+		break;
+
+	case NAT_BIMAP :
+		strcpy(t, "-BIMAP ");
+		simple = 1;
+		break;
+
+	case NAT_MAPBLK :
+		strcpy(t, "-MAPBLOCK ");
+		simple = 1;
+		break;
+
+	case NAT_REWRITE|NAT_MAP :
+		strcpy(t, "-RWR_MAP ");
+		break;
+
+	case NAT_REWRITE|NAT_REDIRECT :
+		strcpy(t, "-RWR_RDR ");
+		break;
+
+	case NAT_ENCAP|NAT_MAP :
+		strcpy(t, "-ENC_MAP ");
+		break;
+
+	case NAT_ENCAP|NAT_REDIRECT :
+		strcpy(t, "-ENC_RDR ");
+		break;
+
+	case NAT_DIVERTUDP|NAT_MAP :
+		strcpy(t, "-DIV_MAP ");
+		break;
+
+	case NAT_DIVERTUDP|NAT_REDIRECT :
+		strcpy(t, "-DIV_RDR ");
+		break;
+
+	default :
+		sprintf(t, "-Type(%d) ", nl->nl_type);
+		break;
+	}
 	t += strlen(t);
 
 	proto = getproto(nl->nl_p);
 
-	sprintf(t, "%s,%s <- -> ", HOSTNAME_V4(res, nl->nl_inip),
-		portname(res, proto, (u_int)nl->nl_inport));
+	if (simple == 1) {
+		sprintf(t, "%s,%s <- -> ", HOSTNAME_V4(res, nl->nl_osrcip),
+			portname(res, proto, (u_int)nl->nl_osrcport));
+		t += strlen(t);
+		sprintf(t, "%s,%s ", HOSTNAME_V4(res, nl->nl_nsrcip),
+			portname(res, proto, (u_int)nl->nl_nsrcport));
+		t += strlen(t);
+		sprintf(t, "[%s,%s]", HOSTNAME_V4(res, nl->nl_odstip),
+			portname(res, proto, (u_int)nl->nl_odstport));
+	} else {
+		sprintf(t, "%s,%s ", HOSTNAME_V4(res, nl->nl_osrcip),
+			portname(res, proto, (u_int)nl->nl_osrcport));
+		t += strlen(t);
+		sprintf(t, "%s,%s <- -> ", HOSTNAME_V4(res, nl->nl_odstip),
+			portname(res, proto, (u_int)nl->nl_odstport));
+		t += strlen(t);
+		sprintf(t, "%s,%s ", HOSTNAME_V4(res, nl->nl_nsrcip),
+			portname(res, proto, (u_int)nl->nl_nsrcport));
+		t += strlen(t);
+		sprintf(t, "%s,%s", HOSTNAME_V4(res, nl->nl_ndstip),
+			portname(res, proto, (u_int)nl->nl_ndstport));
+	}
 	t += strlen(t);
-	sprintf(t, "%s,%s ", HOSTNAME_V4(res, nl->nl_outip),
-		portname(res, proto, (u_int)nl->nl_outport));
-	t += strlen(t);
-	sprintf(t, "[%s,%s]", HOSTNAME_V4(res, nl->nl_origip),
-		portname(res, proto, (u_int)nl->nl_origport));
-	t += strlen(t);
-	if (nl->nl_type == NL_EXPIRE) {
+
+	if (nl->nl_action == NL_EXPIRE || nl->nl_action == NL_FLUSH) {
 #ifdef	USE_QUAD_T
 		sprintf(t, " Pkts %qd/%qd Bytes %qd/%qd",
 				(long long)nl->nl_pkts[0],
@@ -810,17 +889,19 @@ int	blen;
 }
 
 
-static	void	print_statelog(conf, buf, blen)
+static void print_statelog(conf, buf, blen)
 config_t *conf;
-char	*buf;
-int	blen;
+char *buf;
+int blen;
 {
-	struct	ipslog *sl;
-	iplog_t	*ipl = (iplog_t *)buf;
-	char	*t = line, *proto;
-	struct	tm	*tm;
-	int	res, i, len;
+	struct ipslog *sl;
+	char *t, *proto;
+	int res, i, len;
+	struct tm *tm;
+	iplog_t *ipl;
 
+	t = line;
+	ipl = (iplog_t *)buf;
 	sl = (struct ipslog *)((char *)ipl + sizeof(*ipl));
 	res = (opts & OPT_RESOLVE) ? 1 : 0;
 	tm = get_tm(ipl->ipl_sec);
@@ -836,27 +917,49 @@ int	blen;
 	sprintf(t, ".%-.6ld ", ipl->ipl_usec);
 	t += strlen(t);
 
-	if (sl->isl_type == ISL_NEW)
+	switch (sl->isl_type)
+	{
+	case ISL_NEW :
 		strcpy(t, "STATE:NEW ");
-	else if (sl->isl_type == ISL_CLONE)
+		break;
+
+	case ISL_CLONE :
 		strcpy(t, "STATE:CLONED ");
-	else if (sl->isl_type == ISL_EXPIRE) {
+		break;
+
+	case ISL_EXPIRE :
 		if ((sl->isl_p == IPPROTO_TCP) &&
 		    (sl->isl_state[0] > IPF_TCPS_ESTABLISHED ||
 		     sl->isl_state[1] > IPF_TCPS_ESTABLISHED))
 			strcpy(t, "STATE:CLOSE ");
 		else
 			strcpy(t, "STATE:EXPIRE ");
-	} else if (sl->isl_type == ISL_FLUSH)
+		break;
+
+	case ISL_FLUSH :
 		strcpy(t, "STATE:FLUSH ");
-	else if (sl->isl_type == ISL_INTERMEDIATE)
+		break;
+
+	case ISL_INTERMEDIATE :
 		strcpy(t, "STATE:INTERMEDIATE ");
-	else if (sl->isl_type == ISL_REMOVE)
+		break;
+
+	case ISL_REMOVE :
 		strcpy(t, "STATE:REMOVE ");
-	else if (sl->isl_type == ISL_KILLED)
+		break;
+
+	case ISL_KILLED :
 		strcpy(t, "STATE:KILLED ");
-	else
+		break;
+
+	case ISL_UNLOAD :
+		strcpy(t, "STATE:UNLOAD ");
+		break;
+
+	default :
 		sprintf(t, "Type: %d ", sl->isl_type);
+		break;
+	}
 	t += strlen(t);
 
 	proto = getproto(sl->isl_p);
@@ -927,11 +1030,11 @@ int	blen;
 }
 
 
-static	void	print_log(conf, log, buf, blen)
+static void print_log(conf, log, buf, blen)
 config_t *conf;
 logsource_t *log;
-char	*buf;
-int	blen;
+char *buf;
+int blen;
 {
 	char *bp, *bpo;
 	iplog_t	*ipl;
@@ -986,22 +1089,22 @@ int	blen;
 }
 
 
-static	void	print_ipflog(conf, buf, blen)
+static void print_ipflog(conf, buf, blen)
 config_t *conf;
-char	*buf;
-int	blen;
+char *buf;
+int blen;
 {
-	tcphdr_t	*tp;
-	struct	icmp	*ic;
-	struct	icmp	*icmp;
-	struct	tm	*tm;
-	char	*t, *proto;
-	int	i, v, lvl, res, len, off, plen, ipoff, defaction;
-	ip_t	*ipc, *ip;
-	u_32_t	*s, *d;
-	u_short	hl, p;
+	int i, v, lvl, res, len, off, plen, ipoff, defaction;
+	struct icmp *icmp;
+	struct icmp *ic;
+	char *t, *proto;
+	ip_t *ipc, *ip;
+	struct tm *tm;
+	u_32_t *s, *d;
+	u_short hl, p;
 	ipflog_t *ipf;
-	iplog_t	*ipl;
+	iplog_t *ipl;
+	tcphdr_t *tp;
 #ifdef	USE_INET6
 	ip6_t *ip6;
 #endif
@@ -1705,6 +1808,7 @@ static int read_loginfo(config_t *conf)
 				return 0;
 		}
 
+		n = 0;
 		tr = read_log(l->fd, &n, buf, sizeof(buf));
 		if (donehup) {
 			if (conf->file != NULL) {

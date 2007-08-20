@@ -10,15 +10,18 @@ static const char rcsid[] = "@(#)$Id$";
 #include <sys/types.h>
 #include <sys/socket.h>
 #if !defined(ultrix) && !defined(hpux) && !defined(__hpux) && !defined(__osf__) && !defined(_AIX51)
-#include <sys/sockio.h>
+# include <sys/sockio.h>
 #endif
 #include <sys/ioctl.h>
 #include <netinet/in_systm.h>
 #include <netinet/in.h>
+#ifdef __osf__
+# include "radix_ipf_local.h"
+#endif
 #include <net/if.h>
 #include <netinet/if_ether.h>
 #ifndef	ultrix
-#include <net/if_arp.h>
+# include <net/if_arp.h>
 #endif
 #include <netinet/in.h>
 #include <netinet/ip.h>

@@ -52,39 +52,35 @@ typedef struct ipparam_s {
 extern	ipparam_t	*ip_param_arr;
 
 #undef	IPFDEBUG
-extern	ipf_flags, fr_active;
-extern	struct	callout	*fr_timer_id;
+extern	int	ipf_flags, ipf_active;
+extern	struct	callout	*ipf_timer_id;
 
-static	int	fr_send_ip(fr_info_t *, mblk_t *);
-ipfmutex_t	ipl_mutex, ipf_authmx, ipf_rw, ipf_stinsert;
+static	int	ipf_send_ip(fr_info_t *, mblk_t *);
+ipfmutex_t	ipl_mutex, ipf_auth_mx, ipf_rw, ipf_stinsert;
 ipfmutex_t	ipf_nat_new, ipf_natio, ipf_timeoutlock;
-ipfrwlock_t	ipf_mutex, ipf_global, ipf_ipidfrag, ipf_frcache;
-ipfrwlock_t	ipf_frag, ipf_state, ipf_nat, ipf_natfrag, ipf_auth;
+ipfrwlock_t	ipf_mutex, ipf_global, ipf_ipidfrag, ipf_frcache, ipf_tokens;
+ipfrwlock_t	ipf_frag, ipf_state, ipf_nat, ipf_natfrag, ipf_authlk;
 int		*ip_ttl_ptr;
 int		*ip_mtudisc;
 int		*ip_forwarding;
 
 
-int ipldetach()
+int
+ipfdetach()
 {
 
-	if (fr_control_forwarding & 2)
+	if (ipf_control_forwarding & 2)
 		ip_forwarding = 0;
 #ifdef	IPFDEBUG
-	cmn_err(CE_CONT, "ipldetach()\n");
+	cmn_err(CE_CONT, "ipfdetach()\n");
 #endif
-	fr_deinitialise();
+	ipf_deinitialise();
 
 	(void) frflush(IPL_LOGIPF, FR_INQUE|FR_OUTQUE|FR_INACTIVE);
 	(void) frflush(IPL_LOGIPF, FR_INQUE|FR_OUTQUE);
 
+	RW_DESTROY(&ipf_tokens);
 	RW_DESTROY(&ipf_ipidfrag);
-	RW_DESTROY(&ipf_mutex);
-	RW_DESTROY(&ipf_frcache);
-	/* NOTE: This lock is acquired in ipf_detach */
-	RWLOCK_EXIT(&ipf_global);
-	RW_DESTROY(&ipf_global);
-
 	MUTEX_DESTROY(&ipf_timeoutlock);
 	MUTEX_DESTROY(&ipf_rw);
 
@@ -92,22 +88,21 @@ int ipldetach()
 }
 
 
-int iplattach __P((void))
+int
+ipfattach __P((void))
 {
 	int i;
 
 #ifdef	IPFDEBUG
-	cmn_err(CE_CONT, "iplattach()\n");
+	cmn_err(CE_CONT, "ipfattach()\n");
 #endif
-	bzero((char *)frcache, sizeof(frcache));
+	bzero((char *)ipf_cache, sizeof(ipf_cache));
 	MUTEX_INIT(&ipf_rw, "ipf_rw");
 	MUTEX_INIT(&ipf_timeoutlock, "ipf_timeoutlock");
-	RWLOCK_INIT(&ipf_global, "ipf filter load/unload mutex");
-	RWLOCK_INIT(&ipf_mutex, "ipf filter rwlock");
-	RWLOCK_INIT(&ipf_frcache, "ipf cache rwlock");
 	RWLOCK_INIT(&ipf_ipidfrag, "ipf IP NAT-Frag rwlock");
+	RWLOCK_INIT(&ipf_tokens, "ipf token rwlock");
 
-	if (fr_initialise() < 0)
+	if (ipf_initialise() < 0)
 		return -1;
 
 	/*
@@ -132,9 +127,9 @@ int iplattach __P((void))
 	}
 
 #ifdef	IPFDEBUG
-	cmn_err(CE_CONT, "iplattach() - success!\n");
+	cmn_err(CE_CONT, "ipfattach() - success!\n");
 #endif
-	if (fr_control_forwarding & 1)
+	if (ipf_control_forwarding & 1)
 		*ip_forwarding = 1;
 	return 0;
 }
@@ -143,15 +138,14 @@ int iplattach __P((void))
 /*
  * Filter ioctl interface.
  */
-int iplioctl(dev, cmd, data, flags)
-dev_t dev;
-int cmd;
-caddr_t data;
-int flags;
+int
+iplioctl(dev, cmd, data, flags)
+	dev_t dev;
+	int cmd;
+	caddr_t data;
+	int flags;
 {
-	int error = 0, tmp;
-	friostat_t fio;
-	u_int enable;
+	int error = 0;
 	minor_t unit;
 
 #ifdef	IPFDEBUG
@@ -163,7 +157,7 @@ int flags;
 	if (IPL_LOGMAX < unit)
 		return ENXIO;
 
-	if (fr_running <= 0) {
+	if (ipf_running <= 0) {
 		if (unit != IPL_LOGIPF)
 			return EIO;
 		if (cmd != SIOCIPFGETNEXT && cmd != SIOCIPFGET &&
@@ -174,164 +168,22 @@ int flags;
 
 	READ_ENTER(&ipf_global);
 
-	error = fr_ioctlswitch(unit, data, cmd, flags);
+	error = ipf_ioctlswitch(unit, data, cmd, flags, curproc->p_uid,
+				curproc);
 	if (error != -1) {
 		RWLOCK_EXIT(&ipf_global);
 		return error;
 	}
-	error = 0;
 
-	switch (cmd)
-	{
-	case SIOCFRENB :
-		if (!(flags & FWRITE))
-			error = EPERM;
-		else {
-			error = BCOPYIN(data, &enable, sizeof(enable));
-			if (enable) {
-				if (fr_running > 0)
-					error = 0;
-				else
-					error = iplattach();
-				if (error == 0)
-					fr_running = 1;
-				else
-					(void) ipldetach();
-			} else {
-				error = ipldetach();
-				if (error == 0)
-					fr_running = -1;
-			}
-		}
-		break;
-	case SIOCIPFSET :
-		if (!(flags & FWRITE)) {
-			error = EPERM;
-			break;
-		}
-	case SIOCIPFGETNEXT :
-	case SIOCIPFGET :
-		error = fr_ipftune(cmd, data);
-		break;
-	case SIOCSETFF :
-		if (!(flags & FWRITE))
-			error = EPERM;
-		else {
-			WRITE_ENTER(&ipf_mutex);
-			error = BCOPYIN(data, &ipf_flags, sizeof(ipf_flags));
-			RWLOCK_EXIT(&ipf_mutex);
-		}
-		break;
-	case SIOCGETFF :
-		error = BCOPYOUT(&ipf_flags, data, sizeof(ipf_flags));
-		break;
-	case SIOCFUNCL :
-		error = fr_resolvefunc(data);
-		break;
-	case SIOCINAFR :
-	case SIOCRMAFR :
-	case SIOCADAFR :
-	case SIOCZRLST :
-		if (!(flags & FWRITE))
-			error = EPERM;
-		else
-			error = frrequest(unit, cmd, (caddr_t)data,
-					  fr_active, 1);
-		break;
-	case SIOCINIFR :
-	case SIOCRMIFR :
-	case SIOCADIFR :
-		if (!(flags & FWRITE))
-			error = EPERM;
-		else
-			error = frrequest(unit, cmd, (caddr_t)data,
-					  1 - fr_active, 1);
-		break;
-	case SIOCSWAPA :
-		if (!(flags & FWRITE))
-			error = EPERM;
-		else {
-			WRITE_ENTER(&ipf_mutex);
-			bzero((char *)frcache, sizeof(frcache[0]) * 2);
-			error = BCOPYOUT(&fr_active, data, sizeof(fr_active));
-			if (error != 0)
-				error = EFAULT;
-			else
-				fr_active = 1 - fr_active;
-			RWLOCK_EXIT(&ipf_mutex);
-		}
-		break;
-	case SIOCGETFS :
-		READ_ENTER(&ipf_mutex);
-		fr_getstat(&fio);
-		RWLOCK_EXIT(&ipf_mutex);
-		error = fr_outobj(data, &fio, IPFOBJ_IPFSTAT);
-		break;
-	case SIOCFRZST :
-		if (!(flags & FWRITE))
-			error = EPERM;
-		else
-			error = fr_zerostats((caddr_t)data);
-		break;
-	case	SIOCIPFFL :
-		if (!(flags & FWRITE))
-			error = EPERM;
-		else {
-			error = BCOPYIN(data, &tmp, sizeof(tmp));
-			if (!error) {
-				tmp = frflush(unit, tmp);
-				error = BCOPYOUT(&tmp, data, sizeof(tmp));
-			}
-		}
-		break;
-	case SIOCSTLCK :
-		error = BCOPYIN(data, &tmp, sizeof(tmp));
-		if (error == 0) {
-			fr_state_lock = tmp;
-			fr_nat_lock = tmp;
-			fr_frag_lock = tmp;
-			fr_auth_lock = tmp;
-		} else
-			error = EFAULT;
-	break;
-#ifdef	IPFILTER_LOG
-	case	SIOCIPFFB :
-		if (!(flags & FWRITE))
-			error = EPERM;
-		else {
-			tmp = ipflog_clear(unit);
-			error = BCOPYOUT(&tmp, data, sizeof(tmp));
-		}
-		break;
-#endif /* IPFILTER_LOG */
-	case SIOCFRSYN :
-		if (!(flags & FWRITE))
-			error = EPERM;
-		else
-			error = ipfsync();
-		break;
-	case SIOCGFRST :
-		error = fr_outobj(data, fr_fragstats(), IPFOBJ_FRAGSTAT);
-		break;
-	case FIONREAD :
-#ifdef	IPFILTER_LOG
-		tmp = (int)iplused[IPL_LOGIPF];
-
-		error = BCOPYOUT(&tmp, data, sizeof(tmp));
-#endif
-		break;
-	default :
-		error = EINVAL;
-		break;
-	}
 	RWLOCK_EXIT(&ipf_global);
 	return error;
 }
 
 
-void *get_unit(name, v)
-char	*name;
-int	v;
+void *
+get_unit(name, v)
+	char *name;
+	int v;
 {
 	size_t len = strlen(name) + 1;	/* includes \0 */
 	qif_t *qf;
@@ -349,11 +201,12 @@ int	v;
 
 
 /*
- * fr_send_reset - this could conceivably be a call to tcp_respond(), but that
+ * ipf_send_reset - this could conceivably be a call to tcp_respond(), but that
  * requires a large amount of setting up and isn't any more efficient.
  */
-int fr_send_reset(fin)
-fr_info_t *fin;
+int
+ipf_send_reset(fin)
+	fr_info_t *fin;
 {
 	tcphdr_t *tcp, *tcp2;
 	int tlen, hlen;
@@ -367,10 +220,8 @@ fr_info_t *fin;
 	if (tcp->th_flags & TH_RST)
 		return -1;
 
-#ifndef	IPFILTER_CKSUM
-	if (fr_checkl4sum(fin) == -1)
+	if (ipf_checkl4sum(fin) == -1)
 		return -1;
-#endif
 
 	tlen = (tcp->th_flags & (TH_SYN|TH_FIN)) ? 1 : 0;
 #ifdef	USE_INET6
@@ -421,22 +272,23 @@ fr_info_t *fin;
 	{
 		ip->ip_src.s_addr = fin->fin_daddr;
 		ip->ip_dst.s_addr = fin->fin_saddr;
-		ip->ip_id = fr_nextipid(fin);
+		ip->ip_id = ipf_nextipid(fin);
 		ip->ip_hl = sizeof(*ip) >> 2;
 		ip->ip_p = IPPROTO_TCP;
 		ip->ip_len = htons(sizeof(*ip) + sizeof(*tcp));
 		ip->ip_tos = fin->fin_ip->ip_tos;
-		tcp2->th_sum = fr_cksum(m, ip, IPPROTO_TCP, tcp2,
-					ntohs(ip->ip_len));
+		tcp2->th_sum = ipf_cksum(m, ip, IPPROTO_TCP, tcp2,
+					 ntohs(ip->ip_len));
 	}
-	return fr_send_ip(fin, m);
+	return ipf_send_ip(fin, m);
 }
 
 
 /*
  * On input, ip_len is in network byte order.
  */
-static int fr_send_ip(fr_info_t *fin, mblk_t *m)
+static int
+ipf_send_ip(fr_info_t *fin, mblk_t *m)
 {
 	int i;
 
@@ -465,10 +317,11 @@ static int fr_send_ip(fr_info_t *fin, mblk_t *m)
 }
 
 
-int fr_send_icmp_err(type, fin, dst)
-int type;
-fr_info_t *fin;
-int dst;
+int
+ipf_send_icmp_err(type, fin, dst)
+	int type;
+	fr_info_t *fin;
+	int dst;
 {
 	struct in_addr dst4;
 	struct icmp *icmp;
@@ -491,10 +344,8 @@ int dst;
 		return -1;
 #endif
 
-#ifndef	IPFILTER_CKSUM
-	if (fr_checkl4sum(fin) == -1)
+	if (ipf_checkl4sum(fin) == -1)
 		return -1;
-#endif
 
 	qpi = fin->fin_qpi;
 	mb = fin->fin_qfm;
@@ -546,8 +397,8 @@ int dst;
 		int csz;
 
 		if (dst == 0) {
-			if (fr_ifpaddr(6, FRI_NORMAL, qpi->qpi_real,
-				       &dst6, NULL) == -1) {
+			if (ipf_ifpaddr(6, FRI_NORMAL, qpi->qpi_real,
+					&dst6, NULL) == -1) {
 				FREE_MB_T(m);
 				return -1;
 			}
@@ -574,8 +425,8 @@ int dst;
 		ip->ip_tos = fin->fin_ip->ip_tos;
 		ip->ip_len = (u_short)sz;
 		if (dst == 0) {
-			if (fr_ifpaddr(4, FRI_NORMAL, qpi->qpi_real,
-				       &dst6, NULL) == -1) {
+			if (ipf_ifpaddr(4, FRI_NORMAL, qpi->qpi_real,
+					&dst6, NULL) == -1) {
 				FREE_MB_T(m);
 				return -1;
 			}
@@ -596,17 +447,18 @@ int dst;
 	 * Need to exit out of these so we don't recursively call rw_enter
 	 * from fr_qout.
 	 */
-	return fr_send_ip(fin, m);
+	return ipf_send_ip(fin, m);
 }
 
 
 /*
  * return the first IP Address associated with an interface
  */
-int fr_ifpaddr(v, atype, qifptr, inp, inpmask)
-int v, atype;
-void *qifptr;
-i6addr_t *inp, *inpmask;
+int
+ipf_ifpaddr(v, atype, qifptr, inp, inpmask)
+	int v, atype;
+	void *qifptr;
+	i6addr_t *inp, *inpmask;
 {
 #ifdef	USE_INET6
 	struct sockaddr_in6 sin6, mask6;
@@ -637,7 +489,7 @@ i6addr_t *inp, *inpmask;
 	}
 	mask.sin_addr.s_addr = QF_V4_NETMASK(qif);
 
-	return fr_ifpfillv4addr(atype, &sin, &mask, &inp->in4, &inpmask->in4);
+	return ipf_ifpfillv4addr(atype, &sin, &mask, &inp->in4, &inpmask->in4);
 }
 
 
@@ -648,8 +500,9 @@ extern	int		selwait;
 /*
  * iplog_input_ready and ipflog_select are both submissions from HP.
  */
-void iplog_input_ready(unit)
-minor_t unit;
+void
+iplog_input_ready(unit)
+	minor_t unit;
 {
 	if (iplog_ss[unit].read_waiter) {
 		selwakeup(iplog_ss[unit].read_waiter,
@@ -660,9 +513,10 @@ minor_t unit;
 }
 
 
-int iplselect(unit, flag)
-minor_t unit;
-int flag;
+int
+iplselect(unit, flag)
+	minor_t unit;
+	int flag;
 {
 	kthread_t * t;
 
@@ -693,8 +547,9 @@ int flag;
 #endif
 
 
-u_32_t fr_newisn(fin)
-fr_info_t *fin;
+u_32_t
+ipf_newisn(fin)
+	fr_info_t *fin;
 {
 	static iss_seq_off = 0;
 	u_char hash[16];
@@ -733,14 +588,15 @@ fr_info_t *fin;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_nextipid                                                 */
+/* Function:    ipf_nextipid                                                */
 /* Returns:     int - 0 == success, -1 == error (packet should be droppped) */
 /* Parameters:  fin(I) - pointer to packet information                      */
 /*                                                                          */
 /* Returns the next IPv4 ID to use for this packet.                         */
 /* ------------------------------------------------------------------------ */
-INLINE u_short fr_nextipid(fin)
-fr_info_t *fin;
+INLINE u_short
+ipf_nextipid(fin)
+	fr_info_t *fin;
 {
 	static u_short ipid = 0;
 	u_short id;
@@ -753,22 +609,24 @@ fr_info_t *fin;
 }
 
 
-INLINE void fr_checkv4sum(fin)
-fr_info_t *fin;
+INLINE void
+ipf_checkv4sum(fin)
+	fr_info_t *fin;
 {
 #ifdef IPFILTER_CKSUM
-	if (fr_checkl4sum(fin) == -1)
+	if (ipf_checkl4sum(fin) == -1)
 		fin->fin_flx |= FI_BAD;
 #endif
 }
 
 
 #ifdef USE_INET6
-INLINE void fr_checkv6sum(fin)
-fr_info_t *fin;
+INLINE void
+ipf_checkv6sum(fin)
+	fr_info_t *fin;
 {
 # ifdef IPFILTER_CKSUM
-	if (fr_checkl4sum(fin) == -1)
+	if (ipf_checkl4sum(fin) == -1)
 		fin->fin_flx |= FI_BAD;
 # endif
 }
@@ -776,7 +634,7 @@ fr_info_t *fin;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_pullup                                                   */
+/* Function:    ipf_pullup                                                  */
 /* Returns:     NULL == pullup failed, else pointer to protocol header      */
 /* Parameters:  m(I)   - pointer to buffer where data packet starts         */
 /*              fin(I) - pointer to packet information                      */
@@ -785,17 +643,18 @@ fr_info_t *fin;
 /* Attempt to move at least len bytes (from the start of the buffer) into a */
 /* single buffer for ease of access.  Operating system native functions are */
 /* used to manage buffers - if necessary.  If the entire packet ends up in  */
-/* a single buffer, set the FI_COALESCE flag even though fr_coalesce() has  */
+/* a single buffer, set the FI_COALESCE flag even though ipf_coalesce() has */
 /* not been called.  Both fin_ip and fin_dp are updated before exiting _IF_ */
 /* and ONLY if the pullup succeeds.                                         */
 /*                                                                          */
 /* We assume that 'min' is a pointer to a buffer that is part of the chain  */
 /* of buffers that starts at *fin->fin_mp.                                  */
 /* ------------------------------------------------------------------------ */
-void *fr_pullup(min, fin, len)
-mb_t *min;
-fr_info_t *fin;
-int len;
+void *
+ipf_pullup(min, fin, len)
+	mb_t *min;
+	fr_info_t *fin;
+	int len;
 {
 	qpktinfo_t *qpi = fin->fin_qpi;
 	int out = fin->fin_out, dpoff, ipoff;
@@ -873,4 +732,162 @@ int len;
 	if (len == fin->fin_plen)
 		fin->fin_flx |= FI_COALESCE;
 	return ip;
+}
+
+
+int
+ipf_fastroute(mb, mpp, fin, fdp)
+	mblk_t *mb, **mpp;
+	fr_info_t *fin;
+	frdest_t *fdp;
+{
+#ifdef	USE_INET6
+	ip6_t *ip6 = (ip6_t *)fin->fin_ip;
+#endif
+	struct in_addr dst, src;
+	ifinfo_t *ifp, *sifp;
+	mblk_t *mp, **mps;
+	size_t hlen = 0;
+	qpktinfo_t *qpi;
+	frentry_t *fr;
+	irinfo_t ir;
+	queue_t *q;
+	u_char *s;
+	ip_t *ip;
+	int p, i;
+
+	ip = fin->fin_ip;
+	qpi = fin->fin_qpi;
+	/*
+	 * If this is a duplicate mblk then we want ip to point at that
+	 * data, not the original, if and only if it is already pointing at
+	 * the current mblk data.
+	 */
+	if (ip == (ip_t *)qpi->qpi_m->b_rptr && qpi->qpi_m != mb)
+		ip = (ip_t *)mb->b_rptr;
+
+	/*
+	 * If there is another M_PROTO, we don't want it
+	 */
+	if (*mpp != mb) {
+		mp = *mpp;
+		(void) unlinkb(mp);
+		mp = (*mpp)->b_cont;
+		(*mpp)->b_cont = NULL;
+		(*mpp)->b_prev = NULL;
+		freemsg(*mpp);
+		*mpp = mp;
+	}
+
+	ifp = (ifinfo_t *)fdp->fd_ifp;
+	if (fdp && fdp->fd_ip.s_addr)
+		dst = fdp->fd_ip;
+	else
+		dst.s_addr = fin->fin_fi.fi_daddr;
+
+	src.s_addr = 0;
+	bzero((char *)&ir, sizeof(ir));
+	i = ir_lookup(&ir, &dst.s_addr, &src.s_addr,
+		      ~(IR_ROUTE|IR_ROUTE_ASSOC|IR_ROUTE_REDIRECT), 4);
+	mp = ir.ir_ll_hdr_mp;
+	hlen = ir.ir_ll_hdr_length;
+	if (!mp || !hlen || (i == 0))
+		goto bad_fastroute;
+
+	fr = fin->fin_fr;
+	if ((ifp || (fr && (fr->fr_flags & FR_FASTROUTE)))) {
+		if (ifp && (ir_to_ill(&ir) != ifp))
+			goto bad_fastroute;
+
+		if (fin->fin_out == 0) {
+			sifp = fin->fin_ifp;
+			fin->fin_ifp = ir_to_ill(&ir);
+			fin->fin_out = 1;
+			(void) ipf_acctpkt(fin, NULL);
+			fin->fin_fr = NULL;
+			if (!fr || !(fr->fr_flags & FR_RETMASK)) {
+				u_32_t pass;
+
+				fin->fin_flx &= ~FI_STATE;
+				if (ipf_state_check(fin, &pass) != NULL)
+					ipf_state_deref((ipstate_t **)&fin->fin_state);
+			}
+			
+			switch (ipf_nat_checkout(fin, NULL))
+			{
+			case 0 :
+				break;
+			case 1 :
+				ipf_nat_deref((nat_t **)&fin->fin_nat);
+				break;
+			case -1 :
+				goto bad_fastroute;
+				break;
+			}
+
+			fin->fin_out = 0;
+			fin->fin_ifp = sifp;
+		}
+
+		s = mb->b_rptr;
+		if ((hlen && (s - mb->b_datap->db_base) >= hlen)) {
+			s -= hlen;
+			mb->b_rptr = (u_char *)s;
+			bcopy((char *)mp->b_rptr, (char *)s, hlen);
+			freeb(mp);
+			mp = NULL;
+		} else {
+			mblk_t	*mp2;
+
+			linkb(mp, *mpp);
+			*mpp = mp;
+			mb = mp;
+			mp = NULL;
+		}
+
+		q = NULL;
+		if (ir.ir_stq)
+			q = ir.ir_stq;
+		else if (ir.ir_rfq)
+			q = WR(ir.ir_rfq);
+		if (q)
+			q = q->q_next;
+		if (q) {
+			mb->b_prev = NULL;
+			RWLOCK_EXIT(&ipf_global);
+			putnext(q, mb);
+			READ_ENTER(&ipf_global);
+			ipf_frouteok[0]++;
+			return 0;
+		}
+	}
+bad_fastroute:
+	if (mp)
+		freeb(mp);
+	mb->b_prev = NULL;
+	freemsg(*mpp);
+	*mpp = NULL;
+	ipf_frouteok[1]++;
+	return -1;
+}
+
+
+int
+ipf_verifysrc(fin)
+	fr_info_t *fin;
+{
+	struct in_addr ips, ipa;
+	irinfo_t ir, *dir, *gw;
+	qif_t *qif;
+	int i;
+
+	ips.s_addr = 0;
+	ipa = fin->fin_src;
+
+	if (ir_lookup(&ir, (uint32_t *)&ipa, (uint32_t *)&ips, 0, 4) == 0)
+		return 1;
+	i = (ir_to_ill(&ir) == fin->fin_ifp);
+	if (ir.ir_ll_hdr_mp)
+		freeb(ir.ir_ll_hdr_mp);
+	return i;
 }

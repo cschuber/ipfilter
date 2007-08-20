@@ -27,10 +27,12 @@ typedef struct  frauth {
 typedef	struct	frauthent  {
 	struct	frentry	fae_fr;
 	struct	frauthent	*fae_next;
+	struct	frauthent	**fae_pnext;
 	u_long	fae_age;
+	int	fae_ref;
 } frauthent_t;
 
-typedef struct  fr_authstat {
+typedef struct  ipf_authstat {
 	U_QUAD_T	fas_hits;
 	U_QUAD_T	fas_miss;
 	u_long		fas_nospace;
@@ -41,26 +43,27 @@ typedef struct  fr_authstat {
 	u_long		fas_quefail;
 	u_long		fas_expire;
 	frauthent_t	*fas_faelist;
-} fr_authstat_t;
+} ipf_authstat_t;
 
 
-extern	frentry_t	*ipauth;
-extern	struct fr_authstat	fr_authstats;
-extern	int	fr_defaultauthage;
-extern	int	fr_authstart;
-extern	int	fr_authend;
-extern	int	fr_authsize;
-extern	int	fr_authused;
-extern	int	fr_auth_lock;
-extern	frentry_t *fr_checkauth __P((fr_info_t *, u_32_t *));
-extern	void	fr_authexpire __P((void));
-extern	int	fr_authinit __P((void));
-extern	void	fr_authunload __P((void));
-extern	int	fr_authflush __P((void));
-extern	mb_t	**fr_authpkts;
-extern	int	fr_newauth __P((mb_t *, fr_info_t *));
-extern	int	fr_preauthcmd __P((ioctlcmd_t, frentry_t *, frentry_t **));
-extern	int	fr_auth_ioctl __P((caddr_t, ioctlcmd_t, int));
-extern	int	fr_auth_waiting __P((void));
+extern	frentry_t	*ipf_auth_ip;
+extern	ipf_authstat_t	ipf_auth_stats;
+extern	int	ipf_auth_defaultage;
+extern	int	ipf_auth_start;
+extern	int	ipf_auth_end;
+extern	int	ipf_auth_size;
+extern	int	ipf_auth_used;
+extern	int	ipf_auth_lock;
+extern	mb_t	**ipf_auth_pkts;
+
+extern	frentry_t *ipf_auth_check __P((fr_info_t *, u_32_t *));
+extern	void	ipf_auth_expire __P((void));
+extern	int	ipf_auth_flush __P((void));
+extern	int	ipf_auth_ioctl __P((caddr_t, ioctlcmd_t, int, int, void *));
+extern	int	ipf_auth_init __P((void));
+extern	int	ipf_auth_new __P((mb_t *, fr_info_t *));
+extern	int	ipf_auth_precmd __P((ioctlcmd_t, frentry_t *, frentry_t **));
+extern	void	ipf_auth_unload __P((void));
+extern	int	ipf_auth_waiting __P((void));
 
 #endif	/* __IP_AUTH_H__ */

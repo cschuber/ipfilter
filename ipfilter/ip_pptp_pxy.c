@@ -53,7 +53,8 @@ int	ippr_pptp_gretimeout = IPF_TTLVAL(120);	/* 2 minutes */
 /*
  * PPTP application proxy initialization.
  */
-int ippr_pptp_init()
+int
+ippr_pptp_init()
 {
 	bzero((char *)&pptpfr, sizeof(pptpfr));
 	pptpfr.fr_ref = 1;
@@ -67,7 +68,8 @@ int ippr_pptp_init()
 }
 
 
-void ippr_pptp_fini()
+void
+ippr_pptp_fini()
 {
 	if (pptp_proxy_init == 1) {
 		MUTEX_DESTROY(&pptpfr.fr_lock);
@@ -78,19 +80,23 @@ void ippr_pptp_fini()
 
 /*
  * Setup for a new PPTP proxy.
+ *
+ * NOTE: The printf's are broken up with %s in them to prevent them being
+ * optimised into puts statements on FreeBSD (this doesn't exist in the kernel)
  */
-int ippr_pptp_new(fin, aps, nat)
-fr_info_t *fin;
-ap_session_t *aps;
-nat_t *nat;
+int
+ippr_pptp_new(fin, aps, nat)
+	fr_info_t *fin;
+	ap_session_t *aps;
+	nat_t *nat;
 {
 	pptp_pxy_t *pptp;
-	ipnat_t *ipn;
+	ipnat_t *ipn, *np;
 	ip_t *ip;
 
 	ip = fin->fin_ip;
 
-	if (nat_outlookup(fin, 0, IPPROTO_GRE, nat->nat_inip,
+	if (ipf_nat_outlookup(fin, 0, IPPROTO_GRE, nat->nat_osrcip,
 			  ip->ip_dst) != NULL) {
 		if (ippr_pptp_debug > 0)
 			printf("ippr_pptp_new: GRE session already exists\n");
@@ -110,6 +116,7 @@ nat_t *nat;
 	 * created.  This is required because the current NAT rule does not
 	 * describe GRE but TCP instead.
 	 */
+	np = nat->nat_ptr;
 	pptp = aps->aps_data;
 	bzero((char *)pptp, sizeof(*pptp));
 	ipn = &pptp->pptp_rule;
@@ -118,23 +125,25 @@ nat_t *nat;
 	ipn->in_use = 1;
 	ipn->in_hits = 1;
 	ipn->in_ippip = 1;
-	if (nat->nat_dir == NAT_OUTBOUND) {
-		ipn->in_nip = ntohl(nat->nat_outip.s_addr);
-		ipn->in_outip = fin->fin_saddr;
-		ipn->in_redir = NAT_MAP;
-	} else if (nat->nat_dir == NAT_INBOUND) {
-		ipn->in_nip = 0;
-		ipn->in_outip = nat->nat_outip.s_addr;
-		ipn->in_redir = NAT_REDIRECT;
-	}
-	ipn->in_inip = nat->nat_inip.s_addr;
-	ipn->in_inmsk = 0xffffffff;
-	ipn->in_outmsk = 0xffffffff;
-	ipn->in_srcip = fin->fin_saddr;
-	ipn->in_srcmsk = 0xffffffff;
-	bcopy(nat->nat_ptr->in_ifnames[0], ipn->in_ifnames[0],
+	ipn->in_snip = ntohl(nat->nat_nsrcaddr);
+	ipn->in_nsrcaddr = fin->fin_saddr;
+	ipn->in_dnip = ntohl(nat->nat_ndstaddr);
+	ipn->in_ndstaddr = nat->nat_ndstaddr;
+	ipn->in_redir = np->in_redir;
+	ipn->in_osrcaddr = nat->nat_osrcaddr;
+	ipn->in_odstaddr = nat->nat_odstaddr;
+	ipn->in_osrcmsk = 0xffffffff;
+	ipn->in_nsrcmsk = 0xffffffff;
+	ipn->in_odstmsk = 0xffffffff;
+	ipn->in_ndstmsk = 0xffffffff;
+
+	bcopy(np->in_ifnames[0], ipn->in_ifnames[0],
 	      sizeof(ipn->in_ifnames[0]));
-	ipn->in_p = IPPROTO_GRE;
+	bcopy(np->in_ifnames[1], ipn->in_ifnames[1],
+	      sizeof(ipn->in_ifnames[1]));
+
+	ipn->in_pr[0] = IPPROTO_GRE;
+	ipn->in_pr[1] = IPPROTO_GRE;
 
 	pptp->pptp_side[0].pptps_wptr = pptp->pptp_side[0].pptps_buffer;
 	pptp->pptp_side[1].pptps_wptr = pptp->pptp_side[1].pptps_buffer;
@@ -142,10 +151,11 @@ nat_t *nat;
 }
 
 
-void ippr_pptp_donatstate(fin, nat, pptp)
-fr_info_t *fin;
-nat_t *nat;
-pptp_pxy_t *pptp;
+void
+ippr_pptp_donatstate(fin, nat, pptp)
+	fr_info_t *fin;
+	nat_t *nat;
+	pptp_pxy_t *pptp;
 {
 	fr_info_t fi;
 	grehdr_t gre;
@@ -178,47 +188,42 @@ pptp_pxy_t *pptp;
 		fi.fin_flx |= FI_IGNORE;
 		fi.fin_dp = &gre;
 		gre.gr_flags = htons(1 << 13);
-		if (fin->fin_out && nat->nat_dir == NAT_INBOUND) {
-			fi.fin_fi.fi_saddr = fin->fin_fi.fi_daddr;
-			fi.fin_fi.fi_daddr = nat->nat_outip.s_addr;
-		} else if (!fin->fin_out && nat->nat_dir == NAT_OUTBOUND) {
-			fi.fin_fi.fi_saddr = nat->nat_inip.s_addr;
-			fi.fin_fi.fi_daddr = fin->fin_fi.fi_saddr;
-		}
+
+		fi.fin_fi.fi_saddr = nat->nat_osrcaddr;
+		fi.fin_fi.fi_daddr = nat->nat_odstaddr;
 	}
 
 	/*
 	 * Update NAT timeout/create NAT if missing.
 	 */
 	if (nat2 != NULL)
-		fr_queueback(&nat2->nat_tqe);
+		ipf_queueback(&nat2->nat_tqe);
 	else {
-		nat2 = nat_new(&fi, &pptp->pptp_rule, &pptp->pptp_nat,
+		nat2 = ipf_nat_add(&fi, &pptp->pptp_rule, &pptp->pptp_nat,
 			       NAT_SLAVE, nat->nat_dir);
 		pptp->pptp_nat = nat2;
 		if (nat2 != NULL) {
-			(void) nat_proto(&fi, nat2, 0);
-			nat_update(&fi, nat2, nat2->nat_ptr);
+			(void) ipf_nat_proto(&fi, nat2, 0);
+			ipf_nat_update(&fi, nat2, nat2->nat_ptr);
 		}
 	}
 
 	READ_ENTER(&ipf_state);
 	if (pptp->pptp_state != NULL) {
-		fr_queueback(&pptp->pptp_state->is_sti);
+		ipf_queueback(&pptp->pptp_state->is_sti);
 		RWLOCK_EXIT(&ipf_state);
 	} else {
 		RWLOCK_EXIT(&ipf_state);
 		if (nat2 != NULL) {
 			if (nat->nat_dir == NAT_INBOUND)
-				fi.fin_fi.fi_daddr = nat2->nat_inip.s_addr;
+				fi.fin_fi.fi_daddr = nat2->nat_ndstaddr;
 			else
-				fi.fin_fi.fi_saddr = nat2->nat_inip.s_addr;
+				fi.fin_fi.fi_saddr = nat2->nat_osrcaddr;
 		}
 		fi.fin_ifp = NULL;
-		pptp->pptp_state = fr_addstate(&fi, &pptp->pptp_state,
-					       0);
+		pptp->pptp_state = ipf_state_add(&fi, &pptp->pptp_state, 0);
 		if (fi.fin_state != NULL)
-			fr_statederef(&fi, (ipstate_t **)&fi.fin_state);
+			ipf_state_deref((ipstate_t **)&fi.fin_state);
 	}
 	ip->ip_p = p;
 	return;
@@ -230,11 +235,12 @@ pptp_pxy_t *pptp;
  * build it up completely (fits in our buffer) then pass it off to the message
  * parsing function.
  */
-int ippr_pptp_nextmessage(fin, nat, pptp, rev)
-fr_info_t *fin;
-nat_t *nat;
-pptp_pxy_t *pptp;
-int rev;
+int
+ippr_pptp_nextmessage(fin, nat, pptp, rev)
+	fr_info_t *fin;
+	nat_t *nat;
+	pptp_pxy_t *pptp;
+	int rev;
 {
 	static const char *funcname = "ippr_pptp_nextmessage";
 	pptp_side_t *pptps;
@@ -354,11 +360,12 @@ int rev;
 /*
  * handle a complete PPTP message
  */
-int ippr_pptp_message(fin, nat, pptp, pptps)
-fr_info_t *fin;
-nat_t *nat;
-pptp_pxy_t *pptp;
-pptp_side_t *pptps;
+int
+ippr_pptp_message(fin, nat, pptp, pptps)
+	fr_info_t *fin;
+	nat_t *nat;
+	pptp_pxy_t *pptp;
+	pptp_side_t *pptps;
 {
 	pptp_hdr_t *hdr = (pptp_hdr_t *)pptps->pptps_buffer;
 
@@ -378,11 +385,12 @@ pptp_side_t *pptps;
 /*
  * handle a complete PPTP control message
  */
-int ippr_pptp_mctl(fin, nat, pptp, pptps)
-fr_info_t *fin;
-nat_t *nat;
-pptp_pxy_t *pptp;
-pptp_side_t *pptps;
+int
+ippr_pptp_mctl(fin, nat, pptp, pptps)
+	fr_info_t *fin;
+	nat_t *nat;
+	pptp_pxy_t *pptp;
+	pptp_side_t *pptps;
 {
 	u_short *buffer = (u_short *)(pptps->pptps_buffer);
 	pptp_side_t *pptpo;
@@ -466,10 +474,11 @@ pptp_side_t *pptps;
  * For outgoing PPTP packets.  refresh timeouts for NAT & state entries, if
  * we can.  If they have disappeared, recreate them.
  */
-int ippr_pptp_inout(fin, aps, nat)
-fr_info_t *fin;
-ap_session_t *aps;
-nat_t *nat;
+int
+ippr_pptp_inout(fin, aps, nat)
+	fr_info_t *fin;
+	ap_session_t *aps;
+	nat_t *nat;
 {
 	pptp_pxy_t *pptp;
 	tcphdr_t *tcp;
@@ -498,8 +507,9 @@ nat_t *nat;
 /*
  * clean up after ourselves.
  */
-void ippr_pptp_del(aps)
-ap_session_t *aps;
+void
+ippr_pptp_del(aps)
+	ap_session_t *aps;
 {
 	pptp_pxy_t *pptp;
 
@@ -513,9 +523,9 @@ ap_session_t *aps;
 
 		READ_ENTER(&ipf_state);
 		if (pptp->pptp_state != NULL) {
-			pptp->pptp_state->is_die = fr_ticks + 1;
+			pptp->pptp_state->is_die = ipf_ticks + 1;
 			pptp->pptp_state->is_me = NULL;
-			fr_queuefront(&pptp->pptp_state->is_sti);
+			ipf_queuefront(&pptp->pptp_state->is_sti);
 		}
 		RWLOCK_EXIT(&ipf_state);
 

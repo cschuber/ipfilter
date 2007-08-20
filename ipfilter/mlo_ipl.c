@@ -173,10 +173,10 @@ static int ipl_unload()
 	 * Unloading - remove the filter rule check from the IP
 	 * input/output stream.
 	 */
-        if (fr_refcnt)
+        if (ipf_refcnt)
                 error = EBUSY;
 	else if (fr_running >= 0)
-		error = ipldetach();
+		error = ipfdetach();
 
 	if (error == 0) {
 		fr_running = -2;
@@ -201,7 +201,7 @@ static int ipl_load()
 	 */
 	(void)ipl_remove();
 
-	error = iplattach();
+	error = ipfattach();
 
 	for (i = 0; (error == 0) && (name = ipf_devfiles[i]); i++) {
 		NDINIT(&nd, CREATE, LOCKPARENT, UIO_SYSSPACE, name, curproc);

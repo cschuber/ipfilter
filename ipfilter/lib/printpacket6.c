@@ -1,24 +1,38 @@
+/*
+ * Copyright (C) 2002 by Darren Reed.
+ * 
+ * See the IPFILTER.LICENCE file for details on licencing.  
+ *   
+ * $Id$ 
+ */     
+
 #include "ipf.h"
 
 /*
  * This is meant to work without the IPv6 header files being present or
  * the inet_ntop() library.
  */
-void printpacket6(ip)
-struct ip *ip;
+void printpacket6(dir, m)
+int dir;
+mb_t *m;
 {
 	u_char *buf, p;
 	u_short plen, *addrs;
 	tcphdr_t *tcp;
 	u_32_t flow;
 
-	buf = (u_char *)ip;
+	buf = (u_char *)m->mb_data;
 	tcp = (tcphdr_t *)(buf + 40);
 	p = buf[6];
 	flow = ntohl(*(u_32_t *)buf);
 	flow &= 0xfffff;
 	plen = ntohs(*((u_short *)buf +2));
 	addrs = (u_short *)buf + 4;
+
+	if (dir)
+		printf("> ");
+	else
+		printf("< ");
 
 	printf("ip6/%d %d %#x %d", buf[0] & 0xf, plen, flow, p);
 	printf(" %02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x",

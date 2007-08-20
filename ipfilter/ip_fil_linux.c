@@ -17,12 +17,12 @@
 extern int sysctl_ip_default_ttl;
 
 static	int	frzerostats __P((caddr_t));
-static	int	fr_send_ip __P((fr_info_t *, struct sk_buff *, struct sk_buff **));
+static	int	ipf_send_ip __P((fr_info_t *, struct sk_buff *, struct sk_buff **));
 
-ipfmutex_t	ipl_mutex, ipf_authmx, ipf_rw, ipf_stinsert;
+ipfmutex_t	ipl_mutex, ipf_auth_mx, ipf_rw, ipf_stinsert;
 ipfmutex_t	ipf_nat_new, ipf_natio, ipf_timeoutlock;
 ipfrwlock_t	ipf_mutex, ipf_global, ipf_ipidfrag, ipf_frcache;
-ipfrwlock_t	ipf_frag, ipf_state, ipf_nat, ipf_natfrag, ipf_auth;
+ipfrwlock_t	ipf_frag, ipf_state, ipf_nat, ipf_natfrag, ipf_authlk;
 
 static u_int ipf_linux_inout __P((u_int, struct sk_buff **, const struct net_device *, const struct net_device *, int (*okfn)(struct sk_buff *)));
 
@@ -98,10 +98,10 @@ static struct	nf_hook_ops	ipf_hooks[] = {
 /*
  * Filter ioctl interface.
  */
-int ipf_ioctl(struct inode *in, struct file *fp, u_int cmd, u_long arg)
+int
+ipf_ioctl(struct inode *in, struct file *fp, u_int cmd, u_long arg)
 {
-	int error = 0, unit = 0, tmp;
-	friostat_t fio;
+	int error = 0, unit = 0;
 	caddr_t data;
 	mode_t mode;
 
@@ -109,7 +109,7 @@ int ipf_ioctl(struct inode *in, struct file *fp, u_int cmd, u_long arg)
 	if (unit < 0 || unit > IPL_LOGMAX)
 		return -ENXIO;
 
-	if (fr_running <= 0) {
+	if (ipf_running <= 0) {
 		if (unit != IPL_LOGIPF)
 			return -EIO;
 		if (cmd != SIOCIPFGETNEXT && cmd != SIOCIPFGET &&
@@ -121,152 +121,23 @@ int ipf_ioctl(struct inode *in, struct file *fp, u_int cmd, u_long arg)
 	mode = fp->f_mode;
 	data = (caddr_t)arg;
 
-	error = fr_ioctlswitch(unit, data, cmd, mode);
+	error = ipf_ioctlswitch(unit, data, cmd, mode, fp->f_uid, fp);
 	if (error != -1) {
 		SPL_X(s);
 		if (error > 0)
 			error = -error;
 		return error;
 	}
-
-	error = 0;
-
-	switch (cmd)
-	{
-	case FIONREAD :
-#ifdef IPFILTER_LOG
-		bcopy(&iplused[IPL_LOGIPF], (caddr_t)data,
-		         sizeof(iplused[IPL_LOGIPF]));
-#endif
-		break;
-	case SIOCFRENB :
-		if (!(mode & FWRITE))
-			error = EPERM;
-		else {
-			bcopy(data, &tmp, sizeof(tmp));
-			if (tmp) {
-				if (fr_running > 0)
-					error = 0;
-				else
-					error = iplattach();
-				if (error == 0)
-					fr_running = 1;
-				else
-					(void) ipldetach();
-			} else {
-				error = ipldetach();
-				if (error == 0)
-					fr_running = -1;
-			}
-		}
-		break;
-	case SIOCIPFSET :
-		if (!(mode & FWRITE)) {
-			error = EPERM;
-			break;
-		}
-	case SIOCIPFGETNEXT :
-	case SIOCIPFGET :
-		error = fr_ipftune(cmd, data);
-		break;
-	case SIOCSETFF :
-		if (!(mode & FWRITE))
-			error = EPERM;
-		else
-			bcopy(data, &ipf_flags, sizeof(ipf_flags));
-		break;
-	case SIOCGETFF :
-		bcopy(&ipf_flags, data, sizeof(ipf_flags));
-		break;
-	case SIOCFUNCL :
-		error = fr_resolvefunc(data);
-		break;
-	case SIOCINAFR :
-	case SIOCRMAFR :
-	case SIOCADAFR :
-	case SIOCZRLST :
-		if (!(mode & FWRITE))
-			error = EPERM;
-		else
-			error = frrequest(unit, cmd, data, fr_active, 1);
-		break;
-	case SIOCINIFR :
-	case SIOCRMIFR :
-	case SIOCADIFR :
-		if (!(mode & FWRITE))
-			error = EPERM;
-		else
-			error = frrequest(unit, cmd, data, 1 - fr_active, 1);
-		break;
-	case SIOCSWAPA :
-		if (!(mode & FWRITE))
-			error = EPERM;
-		else {
-			bzero((char *)frcache, sizeof(frcache[0]) * 2);
-			*(u_int *)data = fr_active;
-			fr_active = 1 - fr_active;
-		}
-		break;
-	case SIOCGETFS :
-		fr_getstat(&fio);
-		error = fr_outobj(data, &fio, IPFOBJ_IPFSTAT);
-		break;
-	case	SIOCFRZST :
-		if (!(mode & FWRITE))
-			error = EPERM;
-		else
-			error = frzerostats(data);
-		break;
-	case	SIOCIPFFL :
-		if (!(mode & FWRITE))
-			error = EPERM;
-		else {
-			bcopy(data, &tmp, sizeof(tmp));
-			tmp = frflush(unit, tmp);
-			bcopy(&tmp, data, sizeof(tmp));
-		}
-		break;
-	case SIOCSTLCK :
-		error = COPYIN(data, &tmp, sizeof(tmp));
-		if (error == 0) {
-			fr_state_lock = tmp;
-			fr_nat_lock = tmp;
-			fr_frag_lock = tmp;
-			fr_auth_lock = tmp;
-		} else
-			error = EFAULT;
-		break;
-#ifdef	IPFILTER_LOG
-	case	SIOCIPFFB :
-		if (!(mode & FWRITE))
-			error = EPERM;
-		else
-			*(int *)data = ipflog_clear(unit);
-		break;
-#endif /* IPFILTER_LOG */
-	case SIOCGFRST :
-		error = fr_outobj(data, fr_fragstats(), IPFOBJ_FRAGSTAT);
-		break;
-	case SIOCFRSYN :
-		if (!(mode & FWRITE))
-			error = EPERM;
-		else {
-			frsync(NULL);
-		}
-		break;
-	default :
-		error = EINVAL;
-		break;
-	}
 	SPL_X(s);
+
 	if (error > 0)
 		error = -error;
 	return error;
 }
 
 
-u_32_t fr_newisn(fin)
-fr_info_t *fin;
+u_32_t
+ipf_newisn(fr_info_t *fin)
 {
 	u_32_t isn;
 
@@ -276,8 +147,8 @@ fr_info_t *fin;
 }
 
 
-int fr_send_reset(fin)
-fr_info_t *fin;
+int
+ipf_send_reset(fr_info_t *fin)
 {
 	tcphdr_t *tcp, *tcp2;
 	int tlen, hlen;
@@ -291,10 +162,9 @@ fr_info_t *fin;
 	if (tcp->th_flags & TH_RST)
 		return -1;
 
-#ifndef	IPFILTER_CKSUM
-	if (fr_checkl4sum(fin) == -1)
+	if (ipf_checkl4sum(fin) == -1)
 		return -1;
-#endif
+
 	m = skb_copy(fin->fin_m, GFP_ATOMIC);
 	if (m == NULL)
 		return -1;
@@ -342,19 +212,18 @@ fr_info_t *fin;
 		ip->ip_dst.s_addr = fin->fin_saddr;
 		ip->ip_p = IPPROTO_TCP;
 		ip->ip_len = htons(sizeof(*ip) + sizeof(*tcp));
-		tcp2->th_sum = fr_cksum(m, ip, IPPROTO_TCP, tcp2,
-					ntohs(ip->ip_len));
+		tcp2->th_sum = ipf_cksum(m, ip, IPPROTO_TCP, tcp2,
+					 ntohs(ip->ip_len));
 	}
-	return fr_send_ip(fin, m, &m);
+	return ipf_send_ip(fin, m, &m);
 }
 
 
 /*
  * On input, ip_len is in network byte order
  */
-static int fr_send_ip(fin, sk, skp)
-fr_info_t *fin;
-struct sk_buff *sk, **skp;
+static int
+ipf_send_ip(fr_info_t *fin, struct sk_buff *sk, struct sk_buff **skp)
 {
 	fr_info_t fnew;
 	ip_t *ip, *oip;
@@ -387,16 +256,14 @@ struct sk_buff *sk, **skp;
 	fnew.fin_mp = skp;
 	fnew.fin_hlen = hlen;
 	fnew.fin_dp = (char *)ip + hlen;
-	(void) fr_makefrip(hlen, ip, &fnew);
+	(void) ipf_makefrip(hlen, ip, &fnew);
 
-	return fr_fastroute(sk, skp, &fnew, NULL);
+	return ipf_fastroute(sk, skp, &fnew, NULL);
 }
 
 
-int fr_send_icmp_err(type, fin, isdst)
-int type;
-fr_info_t *fin;
-int isdst;
+int
+ipf_send_icmp_err(int type, fr_info_t *fin, int isdst)
 {
 	int hlen, code, leader, dlen;
 	struct net_device *ifp;
@@ -421,10 +288,8 @@ int isdst;
 		return -1;
 #endif
 
-#ifndef	IPFILTER_CKSUM
-	if (fr_checkl4sum(fin) == -1)
+	if (ipf_checkl4sum(fin) == -1)
 		return -1;
-#endif
 
 	m0 = fin->fin_m;
 #ifdef USE_INET6
@@ -479,9 +344,17 @@ int isdst;
 	icmp->icmp_code = code & 0xff;
 #ifdef	icmp_nextmtu
 	ifp = fin->fin_ifp;
-	if (type == ICMP_UNREACH && (ifp->mtu != 0) &&
-	    fin->fin_icode == ICMP_UNREACH_NEEDFRAG)
-		icmp->icmp_nextmtu = htons(ifp->mtu);
+	if (type == ICMP_UNREACH && fin->fin_icode == ICMP_UNREACH_NEEDFRAG) {
+		if (fin->fin_mtu != 0) {
+			icmp->icmp_nextmtu = htons(fin->fin_mtu);
+
+		} else if (ifp->mtu != 0) {
+			icmp->icmp_nextmtu = htons(ifp->mtu);
+
+		} else {
+			icmp->icmp_nextmtu = htons(fin->fin_plen - 20);
+		}
+	}
 #endif
 
 #ifdef	USE_INET6
@@ -489,8 +362,8 @@ int isdst;
 		int csz;
 
 		if (isdst == 0) {
-			if (fr_ifpaddr(6, FRI_NORMAL, qif->qf_ill,
-				       &dst6, NULL) == -1) {
+			if (ipf_ifpaddr(6, FRI_NORMAL, qif->qf_ill,
+					&dst6, NULL) == -1) {
 				FREE_MB_T(m);
 				return -1;
 			}
@@ -515,8 +388,8 @@ int isdst;
 		ip->ip_p = IPPROTO_ICMP;
 		ip->ip_len = (u_short)sz;
 		if (isdst == 0) {
-			if (fr_ifpaddr(4, FRI_NORMAL, fin->fin_ifp,
-				       &dst6, NULL) == -1) {
+			if (ipf_ifpaddr(4, FRI_NORMAL, fin->fin_ifp,
+					&dst6, NULL) == -1) {
 				FREE_MB_T(m);
 				return -1;
 			}
@@ -538,19 +411,19 @@ int isdst;
 	 * Need to exit out of these so we don't recursively call rw_enter
 	 * from fr_qout.
 	 */
-	return fr_send_ip(fin, m, &m);
+	return ipf_send_ip(fin, m, &m);
 }
 
 
-int fr_verifysrc(fin)
-fr_info_t *fin;
+int
+ipf_verifysrc(fr_info_t *fin)
 {
 	return 0;
 }
 
 
-void fr_checkv4sum(fin)
-fr_info_t *fin;
+void
+ipf_checkv4sum(fr_info_t *fin)
 {
 	/*
 	 * Linux 2.4.20-8smp (RedHat 9)
@@ -559,14 +432,14 @@ fr_info_t *fin;
 	 * advantage of the work already done by the hardware.
 	 */
 #ifdef IPFILTER_CKSUM
-	if (fr_checkl4sum(fin) == -1)
+	if (ipf_checkl4sum(fin) == -1)
 		fin->fin_flx |= FI_BAD;
 #endif
 }
 
 
-u_short fr_nextipid(fin)
-fr_info_t *fin;
+u_short
+ipf_nextipid(fr_info_t *fin)
 {
 #if 1
 	static u_short ipid = 0;
@@ -582,10 +455,8 @@ fr_info_t *fin;
 
 
 /*ARGSUSED*/
-int fr_fastroute(min, mp, fin, fdp)
-mb_t *min, **mp;
-fr_info_t *fin;
-frdest_t *fdp;
+int
+ipf_fastroute(mb_t *min, mb_t **mp, fr_info_t *fin, frdest_t *fdp)
 {
 	struct net_device *ifp, *sifp;
 	struct in_addr dip;
@@ -639,19 +510,21 @@ frdest_t *fdp;
 		sout = fin->fin_out;
 		fin->fin_ifp = ifp;
 		fin->fin_out = 1;
-		(void) fr_acctpkt(fin, NULL);
+		(void) ipf_acctpkt(fin, NULL);
 		fin->fin_fr = NULL;
 		if (!fr || !(fr->fr_flags & FR_RETMASK)) {
 			u_32_t pass;
 
-			(void) fr_checkstate(fin, &pass);
+			if (ipf_state_check(fin, &pass) != NULL)
+				ipf_state_deref((ipstate_t **)&fin->fin_state);
 		}
 
-		switch (fr_checknatout(fin, NULL))
+		switch (ipf_nat_checkout(fin, NULL))
 		{
 		case 0 :
 			break;
 		case 1 :
+			ipf_nat_deref((nat_t **)&fin->fin_nat);
 			ip->ip_sum = 0;
 			break;
 		case -1 :
@@ -704,10 +577,8 @@ bad:
 }
 
 
-int fr_ifpaddr(v, atype, ifptr, inp, inpmask)
-int v, atype;
-void *ifptr;
-i6addr_t *inp, *inpmask;
+int
+ipf_ifpaddr(int v, int atype, void *ifptr, i6addr_t *inp, i6addr_t *inpmask)
 {
 	struct sockaddr_in sin, sinmask;
 	struct net_device *dev;
@@ -746,28 +617,26 @@ i6addr_t *inp, *inpmask;
 	else
 		sin.sin_addr.s_addr = ifa->ifa_local;
 
-	return fr_ifpfillv4addr(atype, (struct sockaddr_in *)&sin,
-				(struct sockaddr_in *)&sinmask,
-				&inp->in4, &inpmask->in4);
+	return ipf_ifpfillv4addr(atype, (struct sockaddr_in *)&sin,
+				 (struct sockaddr_in *)&sinmask,
+				 &inp->in4, &inpmask->in4);
 }
 
 
-void m_copydata(m, off, len, cp)
-mb_t *m;
-int off, len;
-caddr_t cp;
+void
+m_copydata(mb_t *m, int off, int len, caddr_t cp)
 {
 	bcopy(MTOD(m, char *) + off, cp, len);
 }
 
 
-static	int	frzerostats(data)
-caddr_t	data;
+static int
+ipf_zerostats(caddr_t data)
 {
 	friostat_t fio;
 	int error;
 
-	fr_getstat(&fio);
+	ipf_getstat(&fio);
 	error = copyoutptr(&fio, data, sizeof(fio));
 	if (error)
 		return EFAULT;
@@ -778,23 +647,21 @@ caddr_t	data;
 }
 
 
-int iplattach()
+int
+iplattach()
 {
 	int err, i;
 
 	SPL_NET(s);
-	if (fr_running > 0) {
+	if (ipf_running > 0) {
 		SPL_X(s);
 		return -EBUSY;
 	}
 
-	bzero((char *)frcache, sizeof(frcache));
+	bzero((char *)ipf_cache, sizeof(ipf_cache));
 	MUTEX_INIT(&ipf_rw, "ipf rw mutex");
 	MUTEX_INIT(&ipl_mutex, "ipf log mutex");
 	MUTEX_INIT(&ipf_timeoutlock, "ipf timeout lock mutex");
-	RWLOCK_INIT(&ipf_global, "ipf global rwlock");
-	RWLOCK_INIT(&ipf_mutex, "ipf global mutex rwlock");
-	RWLOCK_INIT(&ipf_frcache, "ipf cache mutex rwlock");
 	RWLOCK_INIT(&ipf_ipidfrag, "ipf IP NAT-Frag rwlock");
 
 	for (i = 0; i < sizeof(ipf_hooks)/sizeof(ipf_hooks[0]); i++) {
@@ -803,26 +670,26 @@ int iplattach()
 			return err;
 	}
 
-	if (fr_initialise() < 0) {
+	if (ipf_initialise() < 0) {
 		for (i = 0; i < sizeof(ipf_hooks)/sizeof(ipf_hooks[0]); i++)
 			nf_unregister_hook(&ipf_hooks[i]);
 		SPL_X(s);
 		return EIO;
 	}
 
-	bzero((char *)frcache, sizeof(frcache));
 #ifdef notyet
-	if (fr_control_forwarding & 1)
+	if (ipf_control_forwarding & 1)
 		ipv4_devconf.forwarding = 1;
 #endif
 
 	SPL_X(s);
-	/* timeout(fr_slowtimer, NULL, (hz / IPF_HZ_DIVIDE) * IPF_HZ_MULT); */
+	/* timeout(ipf_slowtimer, NULL, (hz / IPF_HZ_DIVIDE) * IPF_HZ_MULT); */
 	return 0;
 }
 
 
-int ipldetach()
+int
+ipldetach()
 {
 	int i;
 
@@ -830,14 +697,14 @@ int ipldetach()
 
 	for (i = 0; i < sizeof(ipf_hooks)/sizeof(ipf_hooks[0]); i++)
 		nf_unregister_hook(&ipf_hooks[i]);
-	/* untimeout(fr_slowtimer, NULL); */
+	/* untimeout(ipf_slowtimer, NULL); */
 
 #ifdef notyet
-	if (fr_control_forwarding & 2)
+	if (ipf_control_forwarding & 2)
 		ipv4_devconf.forwarding = 0;
 #endif
 
-	fr_deinitialise();
+	ipf_deinitialise();
 
 	(void) frflush(IPL_LOGIPF, FR_INQUE|FR_OUTQUE|FR_INACTIVE);
 	(void) frflush(IPL_LOGIPF, FR_INQUE|FR_OUTQUE);
@@ -845,9 +712,6 @@ int ipldetach()
 	MUTEX_DESTROY(&ipf_timeoutlock);
 	MUTEX_DESTROY(&ipl_mutex);
 	MUTEX_DESTROY(&ipf_rw);
-	RW_DESTROY(&ipf_mutex);
-	RW_DESTROY(&ipf_frcache);
-	RW_DESTROY(&ipf_global);
 	RW_DESTROY(&ipf_ipidfrag);
 
 	SPL_X(s);
@@ -856,11 +720,12 @@ int ipldetach()
 }
 
 
-static u_int ipf_linux_inout(hooknum, skbp, inifp, outifp, okfn)
-u_int hooknum;
-struct sk_buff **skbp;
-const struct net_device *inifp, *outifp;
-int (*okfn)(struct sk_buff *);
+static u_int
+ipf_linux_inout(hooknum, skbp, inifp, outifp, okfn)
+	u_int hooknum;
+	struct sk_buff **skbp;
+	const struct net_device *inifp, *outifp;
+	int (*okfn)(struct sk_buff *);
 {
 	int result, hlen, dir;
 	void *ifp;
@@ -886,7 +751,7 @@ int (*okfn)(struct sk_buff *);
 #endif
 	} else
 		return NF_DROP;
-	result = fr_check(ip, hlen, (struct net_device *)ifp, dir, skbp);
+	result = ipf_check(ip, hlen, (struct net_device *)ifp, dir, skbp);
 
 	/*
 	 * This is kind of not always right...*skbp == NULL might really be
@@ -902,8 +767,8 @@ int (*okfn)(struct sk_buff *);
 }
 
 
-INLINE void ipf_read_enter(rwlk)
-ipfrwlock_t *rwlk;
+INLINE void
+ipf_read_enter(ipfrwlock_t *rwlk)
 {
 #if defined(IPFDEBUG) && !defined(_KERNEL)
 	if (rwlk->ipf_magic != 0x97dd8b3a) {
@@ -918,8 +783,8 @@ ipfrwlock_t *rwlk;
 }
 
 
-INLINE void ipf_write_enter(rwlk)
-ipfrwlock_t *rwlk;
+INLINE void
+ipf_write_enter(ipfrwlock_t *rwlk)
 {
 #if defined(IPFDEBUG) && !defined(_KERNEL)
 	if (rwlk->ipf_magic != 0x97dd8b3a) {
@@ -934,8 +799,8 @@ ipfrwlock_t *rwlk;
 }
 
 
-INLINE void ipf_rw_exit(rwlk)
-ipfrwlock_t *rwlk;
+INLINE void
+ipf_rw_exit(ipfrwlock_t *rwlk)
 {
 #if defined(IPFDEBUG) && !defined(_KERNEL)
 	if (rwlk->ipf_magic != 0x97dd8b3a) {
@@ -962,8 +827,8 @@ ipfrwlock_t *rwlk;
  * This is not a perfect solution for a downgrade because we can lose the lock
  * on the object of desire.
  */
-INLINE void ipf_rw_downgrade(rwlk)
-ipfrwlock_t *rwlk;
+INLINE void
+ipf_rw_downgrade(ipfrwlock_t *rwlk)
 {
 	ipf_rw_exit(rwlk);
 	ipf_read_enter(rwlk);
@@ -1012,9 +877,8 @@ struct sk_buff *sk;
 #endif
 
 
-mb_t *m_pullup(m, len)
-mb_t *m;
-int len;
+mb_t *
+m_pullup(mb_t *m, int len)
 {
 	if (len <= M_LEN(m))
 		return m;
@@ -1024,7 +888,7 @@ int len;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_pullup                                                   */
+/* Function:    ipf_pullup                                                  */
 /* Returns:     NULL == pullup failed, else pointer to protocol header      */
 /* Parameters:  m(I)   - pointer to buffer where data packet starts         */
 /*              fin(I) - pointer to packet information                      */
@@ -1033,17 +897,15 @@ int len;
 /* Attempt to move at least len bytes (from the start of the buffer) into a */
 /* single buffer for ease of access.  Operating system native functions are */
 /* used to manage buffers - if necessary.  If the entire packet ends up in  */
-/* a single buffer, set the FI_COALESCE flag even though fr_coalesce() has  */
+/* a single buffer, set the FI_COALESCE flag even though ipf_coalesce() has */
 /* not been called.  Both fin_ip and fin_dp are updated before exiting _IF_ */
 /* and ONLY if the pullup succeeds.                                         */
 /*                                                                          */
 /* We assume that 'min' is a pointer to a buffer that is part of the chain  */
 /* of buffers that starts at *fin->fin_mp.                                  */
 /* ------------------------------------------------------------------------ */
-void *fr_pullup(min, fin, len)
-mb_t *min;
-fr_info_t *fin;
-int len;
+void *
+ipf_pullup(mb_t *min, fr_info_t *fin, int len)
 {
 	int out = fin->fin_out, dpoff, ipoff;
 	mb_t *m = min;
@@ -1081,4 +943,25 @@ int len;
 	if (len == fin->fin_plen)
 		fin->fin_flx |= FI_COALESCE;
 	return ip;
+}
+
+
+/*
+ * In the face of no kernel random function, this is implemented...it is
+ * not meant to be random, just a fill in.
+ */
+int
+ipf_random(int range)
+{
+	static int last = 0;
+	static int calls = 0;
+	struct timeval tv;
+	int number;
+
+	GETKTIME(&tv);
+	last *= tv.tv_usec + calls++;
+	last += (int)&range * ipf_ticks;
+	number = last + tv.tv_sec;
+	number %= range;
+	return number;
 }

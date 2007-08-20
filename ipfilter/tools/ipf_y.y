@@ -1,3 +1,8 @@
+/*
+ * Copyright (C) 2001-2006 by Darren Reed.
+ *
+ * See the IPFILTER.LICENCE file for details on licencing.
+ */
 %{
 #include "ipf.h"
 #include <sys/ioctl.h>
@@ -23,6 +28,7 @@ extern	int	yydebug;
 extern	FILE	*yyin;
 extern	int	yylineNum;
 
+static	void	doipfexpr __P((char *));
 static	void	newrule __P((void));
 static	void	setipftype __P((void));
 static	u_32_t	lookuphost __P((char *));
@@ -48,9 +54,9 @@ static	int		newlist = 0;
 static	int		added = 0;
 static	int		ipffd = -1;
 static	int		*yycont = NULL;
-static	ioctlfunc_t	ipfioctl[IPL_LOGSIZE];
+static	ioctlfunc_t	ipfioctls[IPL_LOGSIZE];
 static	addfunc_t	ipfaddfunc = NULL;
-static	struct	wordtab ipfwords[96];
+static	struct	wordtab ipfwords[99];
 static	struct	wordtab	addrwords[4];
 static	struct	wordtab	maskwords[5];
 static	struct	wordtab icmpcodewords[17];
@@ -83,6 +89,7 @@ static	struct	wordtab logwords[33];
 		char	*if1;
 		char	*if2;
 	} ifs;
+	char	gname[FR_GROUPLEN];
 };
 
 %type	<port>	portnum
@@ -92,7 +99,7 @@ static	struct	wordtab logwords[33];
 %type	<ipa>	hostname ipv4 ipv4mask ipv4_16 ipv4_24
 %type	<ip6>	ipv6mask
 %type	<ipp>	addr ipaddr
-%type	<str>	servicename name interfacename
+%type	<str>	servicename name interfacename groupname
 %type	<pc>	portrange portcomp
 %type	<alist>	addrlist poollist
 %type	<ifs>	onname
@@ -104,6 +111,7 @@ static	struct	wordtab logwords[33];
 %token		YY_RANGE_OUT YY_RANGE_IN
 %token	<ip6>	YY_IPV6
 
+%token	IPFY_SET
 %token	IPFY_PASS IPFY_BLOCK IPFY_COUNT IPFY_CALL IPFY_NOMATCH
 %token	IPFY_RETICMP IPFY_RETRST IPFY_RETICMPASDST
 %token	IPFY_IN IPFY_OUT
@@ -115,7 +123,7 @@ static	struct	wordtab logwords[33];
 %token	IPFY_LOG IPFY_BODY IPFY_FIRST IPFY_LEVEL IPFY_ORBLOCK IPFY_L5AS
 %token	IPFY_LOGTAG IPFY_MATCHTAG IPFY_SETTAG IPFY_SKIP IPFY_DECAPS
 %token	IPFY_FROM IPFY_ALL IPFY_ANY IPFY_BPFV4 IPFY_BPFV6 IPFY_POOL IPFY_HASH
-%token	IPFY_PPS
+%token	IPFY_IPFEXPR IPFY_PPS
 %token	IPFY_ESP IPFY_AH
 %token	IPFY_WITH IPFY_AND IPFY_NOT IPFY_NO IPFY_OPT
 %token	IPFY_TCPUDP IPFY_TCP IPFY_UDP
@@ -127,7 +135,7 @@ static	struct	wordtab logwords[33];
 %token	IPFY_IPOPTS IPFY_SHORT IPFY_NAT IPFY_BADSRC IPFY_LOWTTL IPFY_FRAG
 %token	IPFY_MBCAST IPFY_BAD IPFY_BADNAT IPFY_OOW IPFY_NEWISN IPFY_NOICMPERR
 %token	IPFY_KEEP IPFY_STATE IPFY_FRAGS IPFY_LIMIT IPFY_STRICT IPFY_AGE
-%token	IPFY_SYNC IPFY_FRAGBODY
+%token	IPFY_SYNC IPFY_FRAGBODY IPFY_ICMPHEAD IPFY_NOLOG
 %token	IPFY_IPOPT_NOP IPFY_IPOPT_RR IPFY_IPOPT_ZSU IPFY_IPOPT_MTUP
 %token	IPFY_IPOPT_MTUR IPFY_IPOPT_ENCODE IPFY_IPOPT_TS IPFY_IPOPT_TR
 %token	IPFY_IPOPT_SEC IPFY_IPOPT_LSRR IPFY_IPOPT_ESEC IPFY_IPOPT_CIPSO
@@ -163,20 +171,35 @@ static	struct	wordtab logwords[33];
 %token	IPFY_PRI_EMERG IPFY_PRI_ALERT IPFY_PRI_CRIT IPFY_PRI_ERR IPFY_PRI_WARN
 %token	IPFY_PRI_NOTICE IPFY_PRI_INFO IPFY_PRI_DEBUG
 %%
-file:	line
-	| assign
-	| file line
-	| file assign
+file:	settings rules
+	| rules
 	;
 
-line:	xx rule		{ while ((fr = frtop) != NULL) {
+settings:
+	YY_COMMENT
+	| setting
+	| settings setting
+	;
+
+rules:	line
+	| assign
+	| rules line
+	| rules assign
+	;
+
+setting:
+	IPFY_SET YY_STR YY_STR ';'
+	| IPFY_SET YY_STR YY_NUMBER ';'
+	;
+
+line:	rule		{ while ((fr = frtop) != NULL) {
 				frtop = fr->fr_next;
 				fr->fr_next = NULL;
 				if ((fr->fr_type == FR_T_IPF) &&
 				    (fr->fr_ip.fi_v == 0))
 					fr->fr_mip.fi_v = 0;
 				/* XXX validate ? */
-				(*ipfaddfunc)(ipffd, ipfioctl[IPL_LOGIPF], fr);
+				(*ipfaddfunc)(ipffd, ipfioctls[IPL_LOGIPF], fr);
 				fr->fr_next = frold;
 				frold = fr;
 			  }
@@ -192,6 +215,7 @@ assign:	YY_STR assigning YY_STR ';'	{ set_variable($1, $3);
 					  resetlexer();
 					  free($1);
 					  free($3);
+					  yyvarnext = 0;
 					}
 	;
 
@@ -215,8 +239,8 @@ outrule:
 	;
 
 rulehead:
-	collection action
-	| insert collection action
+	xx collection action
+	| xx insert collection action
 	;
 
 markin:	IPFY_IN				{ fr->fr_flags |= FR_INQUE; }
@@ -229,6 +253,7 @@ markout:
 rulemain:
 	ipfrule
 	| bpfrule
+	| exprrule
 	;
 
 ipfrule:
@@ -254,6 +279,10 @@ family:	| IPFY_INET			{ if (use_inet6 == 1) {
 bpfrule:
 	IPFY_BPFV4 '{' YY_STR '}' 	{ dobpf(4, $3); free($3); }
 	| IPFY_BPFV6 '{' YY_STR '}' 	{ dobpf(6, $3); free($3); }
+	;
+
+exprrule:
+	IPFY_IPFEXPR '{' YY_STR '}'	{ doipfexpr($3); }
 	;
 
 ruletail:
@@ -320,10 +349,11 @@ auth:	IPFY_AUTH			{ fr->fr_flags |= FR_AUTH; }
 	| IPFY_PREAUTH			{ fr->fr_flags |= FR_PREAUTH; }
 	;
 
-func:	YY_STR '/' YY_NUMBER	{ fr->fr_func = nametokva($1,
-							  ipfioctl[IPL_LOGIPF]);
-				  fr->fr_arg = $3;
-				  free($1); }
+func:	YY_STR '/' YY_NUMBER
+			{ fr->fr_func = nametokva($1, ipfioctls[IPL_LOGIPF]);
+			  fr->fr_arg = $3;
+			  free($1);
+			}
 	;
 
 inopts:
@@ -350,6 +380,7 @@ outopt:
 	| on
 	| dup
 	| proute
+	| froute
 	| replyto
 	;
 
@@ -414,20 +445,24 @@ protox:	IPFY_PROTO			{ setipftype();
 ip:	srcdst flags icmp
 	;
 
-group:	| IPFY_GROUP YY_STR		{ DOALL(strncpy(fr->fr_group, $2, \
+group:	| IPFY_GROUP groupname		{ DOALL(strncpy(fr->fr_group, $2, \
 							FR_GROUPLEN); \
 							fillgroup(fr););
-					  free($2); }
-	| IPFY_GROUP YY_NUMBER		{ DOALL(sprintf(fr->fr_group, "%d", \
-							$2); \
-							fillgroup(fr);) }
+					}
 	;
 
-head:	| IPFY_HEAD YY_STR		{ DOALL(strncpy(fr->fr_grhead, $2, \
+head:	| IPFY_HEAD groupname		{ DOALL(strncpy(fr->fr_grhead, $2, \
 							FR_GROUPLEN););
 					  free($2); }
-	| IPFY_HEAD YY_NUMBER		{ DOALL(sprintf(fr->fr_grhead, "%d", \
-							$2);) }
+	;
+
+groupname:
+	YY_STR				{ $1[FR_GROUPLEN - 1] = '\0';
+					  $$ = $1;
+					}
+	| YY_NUMBER			{ $$ = malloc(16);
+					  sprintf($$, "%d", $1);
+					}
 	;
 
 settagin:
@@ -772,7 +807,7 @@ srcaddr:
 			if ($1.v != 0) { \
 				fr->fr_v = $1.v; \
 				fr->fr_ip.fi_v = $1.v; \
-				fr->fr_mip.fi_v = 0xff; \
+				fr->fr_mip.fi_v = 0xf; \
 			} \
 			if (dynamic != -1) { \
 				fr->fr_satype = ifpflag; \
@@ -789,7 +824,7 @@ srcaddrlist:
 			if ($1.v != 0) { \
 				fr->fr_v = $1.v; \
 				fr->fr_ip.fi_v = $1.v; \
-				fr->fr_mip.fi_v = 0xff; \
+				fr->fr_mip.fi_v = 0xf; \
 			} \
 			if (dynamic != -1) { \
 				fr->fr_satype = ifpflag; \
@@ -803,7 +838,7 @@ srcaddrlist:
 			if ($3.v != 0) { \
 				fr->fr_v = $3.v; \
 				fr->fr_ip.fi_v = $3.v; \
-				fr->fr_mip.fi_v = 0xff; \
+				fr->fr_mip.fi_v = 0xf; \
 			} \
 			if (dynamic != -1) { \
 				fr->fr_satype = ifpflag; \
@@ -852,7 +887,7 @@ dstaddr:
 			if ($1.v != 0) { \
 				fr->fr_v = $1.v; \
 				fr->fr_ip.fi_v = $1.v; \
-				fr->fr_mip.fi_v = 0xff; \
+				fr->fr_mip.fi_v = 0xf; \
 			} \
 			if (dynamic != -1) { \
 				fr->fr_datype = ifpflag; \
@@ -869,7 +904,7 @@ dstaddrlist:
 			if ($1.v != 0) { \
 				fr->fr_v = $1.v; \
 				fr->fr_ip.fi_v = $1.v; \
-				fr->fr_mip.fi_v = 0xff; \
+				fr->fr_mip.fi_v = 0xf; \
 			} \
 			if (dynamic != -1) { \
 				fr->fr_datype = ifpflag; \
@@ -883,7 +918,7 @@ dstaddrlist:
 			if ($3.v != 0) { \
 				fr->fr_v = $3.v; \
 				fr->fr_ip.fi_v = $3.v; \
-				fr->fr_mip.fi_v = 0xff; \
+				fr->fr_mip.fi_v = 0xf; \
 			} \
 			if (dynamic != -1) { \
 				fr->fr_datype = ifpflag; \
@@ -924,22 +959,39 @@ addr:	pool '/' YY_NUMBER		{ pooled = 1;
 					  yyexpectaddr = 0;
 					  $$.v = 0;
 					  $$.a.iplookuptype = IPLT_POOL;
+					  $$.a.iplookupsubtype = 0;
 					  $$.a.iplookupnum = $3; }
-	| pool '=' '(' poollist ')'	{ pooled = 1;
+	| pool '/' YY_STR		{ pooled = 1;
+					  $$.a.iplookuptype = IPLT_POOL;
+					  $$.a.iplookupsubtype = 1;
+					  strncpy($$.a.iplookupname, $3,
+						  sizeof($$.a.iplookupname));
+					}
+	| pool '=' '('			{ yyexpectaddr = 1; }
+			poollist ')'	{ pooled = 1;
 					  yyexpectaddr = 0;
 					  $$.v = 0;
 					  $$.a.iplookuptype = IPLT_POOL;
-					  $$.a.iplookupnum = makepool($4); }
+					  $$.a.iplookupsubtype = 0;
+					  $$.a.iplookupnum = makepool($5); }
 	| hash '/' YY_NUMBER		{ hashed = 1;
 					  yyexpectaddr = 0;
 					  $$.v = 0;
 					  $$.a.iplookuptype = IPLT_HASH;
+					  $$.a.iplookupsubtype = 0;
 					  $$.a.iplookupnum = $3; }
+	| hash '/' YY_STR		{ pooled = 1;
+					  $$.a.iplookuptype = IPLT_HASH;
+					  $$.a.iplookupsubtype = 1;
+					  strncpy($$.a.iplookupname, $3,
+						  sizeof($$.a.iplookupname));
+					}
 	| hash '=' '(' 			{ yyexpectaddr = 1; }
 			addrlist ')'	{ hashed = 1;
 					  yyexpectaddr = 0;
 					  $$.v = 0;
 					  $$.a.iplookuptype = IPLT_HASH;
+					  $$.a.iplookupsubtype = 0;
 					  $$.a.iplookupnum = makehash($5); }
 	| ipaddr			{ bcopy(&$1, &$$, sizeof($$));
 					  yyexpectaddr = 0; }
@@ -1225,10 +1277,19 @@ stateopt:
 	| IPFY_AGE YY_NUMBER '/' YY_NUMBER
 					{ DOALL(fr->fr_age[0] = $2; \
 						fr->fr_age[1] = $4;) }
+	| IPFY_ICMPHEAD groupname
+				{ DOALL(strncpy(fr->fr_icmphead, $2, \
+						FR_GROUPLEN); \
+					fr->fr_icmphead[FR_GROUPLEN-1] = '\0';\
+					)
+				}
+	| IPFY_NOLOG
+				{ DOALL(fr->fr_nostatelog = 1;) }
 	;
 
 portnum:
-	servicename			{ if (getport(frc, $1, &($$)) == -1)
+	servicename			{ if (getport(frc, $1,
+						      &($$), NULL) == -1)
 						yyerror("service unknown");
 					  $$ = ntohs($$);
 					  free($1);
@@ -1478,8 +1539,8 @@ servicename:
 	YY_STR				{ $$ = $1; }
 	;
 
-interfacename:	YY_STR				{ $$ = $1; }
-	| YY_STR ':' YY_NUMBER
+interfacename:	name				{ $$ = $1; }
+	| name ':' YY_NUMBER
 		{ $$ = $1;
 		  fprintf(stderr, "%d: Logical interface %s:%d unsupported, "
 			  "use the physical interface %s instead.\n",
@@ -1488,6 +1549,7 @@ interfacename:	YY_STR				{ $$ = $1; }
 	;
 
 name:	YY_STR				{ $$ = $1; }
+	| '-'				{ $$ = strdup("-"); }
 	;
 
 ipv4_16:
@@ -1525,7 +1587,7 @@ ipv4:	ipv4_24 '.' YY_NUMBER
 %%
 
 
-static	struct	wordtab ipfwords[96] = {
+static	struct	wordtab ipfwords[99] = {
 	{ "age",			IPFY_AGE },
 	{ "ah",				IPFY_AH },
 	{ "all",			IPFY_ALL },
@@ -1549,6 +1611,7 @@ static	struct	wordtab ipfwords[96] = {
 	{ "dup-to",			IPFY_DUPTO },
 	{ "eq",				YY_CMP_EQ },
 	{ "esp",			IPFY_ESP },
+	{ "exp",			IPFY_IPFEXPR },
 	{ "fastroute",			IPFY_FROUTE },
 	{ "first",			IPFY_FIRST },
 	{ "flags",			IPFY_FLAGS },
@@ -1561,6 +1624,7 @@ static	struct	wordtab ipfwords[96] = {
 	{ "gt",				YY_CMP_GT },
 	{ "head",			IPFY_HEAD },
 	{ "icmp",			IPFY_ICMP },
+	{ "icmp-head",			IPFY_ICMPHEAD },
 	{ "icmp-type",			IPFY_ICMPTYPE },
 	{ "in",				IPFY_IN },
 	{ "in-via",			IPFY_INVIA },
@@ -1587,6 +1651,7 @@ static	struct	wordtab ipfwords[96] = {
 	{ "newisn",			IPFY_NEWISN },
 	{ "no",				IPFY_NO },
 	{ "no-icmp-err",		IPFY_NOICMPERR },
+	{ "nolog",			IPFY_NOLOG },
 	{ "nomatch",			IPFY_NOMATCH },
 	{ "now",			IPFY_NOW },
 	{ "not",			IPFY_NOT },
@@ -1799,7 +1864,7 @@ FILE *fp;
 
 	ipffd = fd;
 	for (i = 0; i <= IPL_LOGMAX; i++)
-		ipfioctl[i] = iocfuncs[i];
+		ipfioctls[i] = iocfuncs[i];
 	ipfaddfunc = addfunc;
 
 	if (feof(fp))
@@ -2073,7 +2138,7 @@ alist_t *list;
 	bzero((char *)&pool, sizeof(pool));
 	pool.ipo_unit = IPL_LOGIPF;
 	pool.ipo_list = top;
-	num = load_pool(&pool, ipfioctl[IPL_LOGLOOKUP]);
+	num = load_pool(&pool, ipfioctls[IPL_LOGLOOKUP]);
 
 	while ((n = top) != NULL) {
 		top = n->ipn_next;
@@ -2119,7 +2184,7 @@ alist_t *list;
 	iph.iph_type = IPHASH_LOOKUP;
 	*iph.iph_name = '\0';
 
-	if (load_hash(&iph, top, ipfioctl[IPL_LOGLOOKUP]) == 0)
+	if (load_hash(&iph, top, ipfioctls[IPL_LOGLOOKUP]) == 0)
 		sscanf(iph.iph_name, "%u", &num);
 	else
 		num = 0;
@@ -2140,6 +2205,9 @@ void *ptr;
 	ioctlcmd_t add, del;
 	frentry_t *fr;
 	ipfobj_t obj;
+
+	if (ptr == NULL)
+		return;
 
 	fr = ptr;
 	add = 0;
@@ -2170,10 +2238,10 @@ void *ptr;
 		fr->fr_flags |= FR_OUTQUE;
 	if (fr->fr_hits)
 		fr->fr_hits--;
-	if (fr && (opts & OPT_VERBOSE))
+	if ((opts & OPT_VERBOSE) != 0)
 		printfr(fr, ioctlfunc);
 
-	if (opts & OPT_DEBUG) {
+	if ((opts & OPT_DEBUG) != 0) {
 		binprint(fr, sizeof(*fr));
 		if (fr->fr_data != NULL)
 			binprint(fr->fr_data, fr->fr_dsize);
@@ -2205,8 +2273,14 @@ void *ptr;
 		}
 	} else {
 		if ((*ioctlfunc)(fd, add, (void *)&obj) == -1) {
+			int save = errno, realerr;
+
+			if ((*ioctlfunc)(fd, SIOCIPFINTERROR, &realerr) == -1)
+				realerr = 0;
+
 			if ((opts & OPT_DONOTHING) == 0) {
-				fprintf(stderr, "%d:", yylineNum);
+				errno = save;
+				fprintf(stderr, "%d:%d:", yylineNum, realerr);
 				perror("ioctl(add/insert rule)");
 			}
 		}
@@ -2258,4 +2332,23 @@ frentry_t *fr;
 	if ((fr->fr_mproto == 0) && ((fr->fr_flx & FI_TCPUDP) == 0) &&
 	    ((f->fr_flx & FI_TCPUDP) != 0))
 		fr->fr_flx |= FI_TCPUDP;
+}
+
+
+static void doipfexpr(line)
+char *line;
+{
+	int *array;
+	char *error;
+
+	array = parseipfexpr(line, &error);
+	if (array == NULL) {
+		fprintf(stderr, "%s:", error);
+		yyerror("error parsing ipf matching expression");
+		return;
+	}
+
+	fr->fr_type = FR_T_IPFEXPR;
+	fr->fr_data = array;
+	fr->fr_dsize = array[0] * sizeof(*array);
 }

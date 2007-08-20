@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 1993-2001 by Darren Reed.
+ * Copyright (C) 2002-2004 by Darren Reed.
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
@@ -16,19 +16,27 @@ static const char rcsid[] = "@(#)$Id$";
 /*
  * Get a nat filter type given its kernel address.
  */
-char *getnattype(ipnat)
-ipnat_t *ipnat;
+char *getnattype(nat, alive)
+nat_t *nat;
+int alive;
 {
 	static char unknownbuf[20];
-	ipnat_t ipnatbuff;
+	ipnat_t *ipn, ipnat;
 	char *which;
+	int type;
 
-	if (!ipnat)
+	if (!nat)
 		return "???";
-	if (kmemcpy((char *)&ipnatbuff, (long)ipnat, sizeof(ipnatbuff)))
-		return "!!!";
+	if (alive) {
+		type = nat->nat_redir;
+	} else {
+		ipn = nat->nat_ptr;
+		if (kmemcpy((char *)&ipnat, (long)ipn, sizeof(ipnat)))
+			return "!!!";
+		type = ipnat.in_redir;
+	}
 
-	switch (ipnatbuff.in_redir)
+	switch (type)
 	{
 	case NAT_MAP :
 		which = "MAP";
@@ -39,12 +47,29 @@ ipnat_t *ipnat;
 	case NAT_REDIRECT :
 		which = "RDR";
 		break;
+	case NAT_MAP|NAT_REWRITE :
+		which = "RWR-MAP";
+		break;
+	case NAT_REDIRECT|NAT_REWRITE :
+		which = "RWR-RDR";
+		break;
 	case NAT_BIMAP :
 		which = "BIMAP";
 		break;
+	case NAT_REDIRECT|NAT_DIVERTUDP :
+		which = "DIV-RDR";
+		break;
+	case NAT_MAP|NAT_DIVERTUDP :
+		which = "DIV-MAP";
+		break;
+	case NAT_REDIRECT|NAT_ENCAP :
+		which = "ENC-RDR";
+		break;
+	case NAT_MAP|NAT_ENCAP :
+		which = "ENC-MAP";
+		break;
 	default :
-		sprintf(unknownbuf, "unknown(%04x)",
-			ipnatbuff.in_redir & 0xffffffff);
+		sprintf(unknownbuf, "unknown(%04x)", type & 0xffffffff);
 		which = unknownbuf;
 		break;
 	}

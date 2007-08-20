@@ -102,16 +102,16 @@ typedef	struct	syncupdent	{		/* 28 or 32 bytes */
 extern	synclogent_t	synclog[SYNCLOG_SZ];
 
 
-extern	int		fr_sync_ioctl __P((caddr_t, ioctlcmd_t, int));
-extern	synclist_t	*ipfsync_new __P((int, fr_info_t *, void *));
-extern	void		ipfsync_del __P((synclist_t *));
-extern	void		ipfsync_update __P((int, fr_info_t *, synclist_t *));
-extern	int		ipfsync_init __P((void));
-extern	int		ipfsync_nat __P((synchdr_t *sp, void *data));
-extern	int		ipfsync_state __P((synchdr_t *sp, void *data));
-extern	int		ipfsync_read __P((struct uio *uio));
-extern	int		ipfsync_write __P((struct uio *uio));
-extern	int		ipfsync_canread __P((void));
-extern	int		ipfsync_canwrite __P((void));
+extern	int ipf_sync_canread __P((void));
+extern	int ipf_sync_canwrite __P((void));
+extern	void ipf_sync_del __P((synclist_t *));
+extern	int ipf_sync_init __P((void));
+extern	int ipf_sync_ioctl __P((caddr_t, ioctlcmd_t, int, int, void *));
+extern	int ipf_sync_nat __P((synchdr_t *sp, void *data));
+extern	synclist_t *ipf_sync_new __P((int, fr_info_t *, void *));
+extern	int ipf_sync_read __P((struct uio *uio));
+extern	int ipf_sync_state __P((synchdr_t *sp, void *data));
+extern	int ipf_sync_write __P((struct uio *uio));
+extern	void ipf_sync_update __P((int, fr_info_t *, synclist_t *));
 
 #endif /* IP_SYNC */

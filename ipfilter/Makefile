@@ -132,7 +132,7 @@ all:
 	@echo "freebsd22	- compile for FreeBSD-2.2 or greater"
 	@echo "freebsd3	- compile for FreeBSD-3.x"
 	@echo "freebsd4	- compile for FreeBSD-4.x"
-	@echo "freebsd5 - compile for FreeBSD-5.x"
+	@echo "freebsd5 - compile for FreeBSD-5.x, 6.x, 7.x"
 	@echo "bsd	- compile for generic 4.4BSD systems"
 	@echo "bsdi	- compile for BSD/OS"
 	@echo "irix	- compile for SGI IRIX"
@@ -149,6 +149,8 @@ retest:
 	else echo test directory not present, sorry; fi
 
 include:
+	mkdir -p net
+	mkdir -p netinet
 	if [ ! -f netinet/done ] ; then \
 		(cd netinet; ln -s ../*.h .; ln -s ../ip_*_pxy.c .;); \
 		(cd netinet; ln -s ../ipsend/tcpip.h tcpip.h); \
@@ -163,6 +165,9 @@ include:
 sunos solaris: include
 	MAKE="$(MAKE)" MAKEFLAGS="$(MAKEFLAGS)" BPFILTER=$(BPFILTER) \
 		CC="$(CC)" DEBUG="$(DEBUG)" ./buildsunos
+
+freebsd:
+	make freebsd`uname -r|cut -c1`
 
 freebsd22: include
 	make setup "TARGOS=BSD" "CPUDIR=$(CPUDIR)"
@@ -185,7 +190,7 @@ freebsd22: include
 	fi
 	make freebsd20
 
-freebsd5: include
+freebsd5 freebsd6 freebsd7: include
 	if [ x$(INET6) = x ] ; then \
 		echo "#undef INET6" > opt_inet6.h; \
 	else \
@@ -227,6 +232,15 @@ freebsd3 freebsd30: include
 
 netbsd: include
 	make setup "TARGOS=BSD" "CPUDIR=$(CPUDIR)"
+	@if [ ! -d /sys -o ! -d /sys/arch ] ; then \
+		echo "*****************************************************"; \
+		echo "*                                                   *"; \
+		echo "* Please extract source code to create /sys and     *";\
+		echo "* /sys/arch and run 'config GENERIC'                *"; \
+		echo "*                                                   *"; \
+		echo "*****************************************************"; \
+		exit 1; \
+	fi
 	(cd BSD/$(CPUDIR); make build TOP=../.. $(MFLAGS) 'DLKM=-D_LKM' "ML=mln_ipl.c" LKMR= "MLR=mln_rule.o"; cd ..)
 	(cd BSD/$(CPUDIR); make -f Makefile.ipsend build TOP=../.. $(MFLAGS); cd ..)
 
@@ -281,7 +295,7 @@ setup:
 
 clean: clean-include
 	/bin/rm -rf h y.output
-	${RM} -f core *.o ipt fils ipf ipfstat ipftest ipmon if_ipl \
+	${RM} -f core *.o ipt fils ipf ipfstat ipftest ipmon if_ipl ipflkm \
 	vnode_if.h $(LKM) *~
 	/bin/rm -rf sparcv7 sparcv9 mdbgen_build
 	(cd SunOS4; $(MAKE) TOP=.. clean)

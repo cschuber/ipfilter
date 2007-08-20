@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 1993-2001 by Darren Reed.
+ * Copyright (C) 2000-2005 by Darren Reed.
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
@@ -13,38 +13,52 @@
 #endif
 
 
-void printpacket(ip)
-struct ip *ip;
+void printpacket(dir, m)
+int dir;
+mb_t *m;
 {
-	struct	tcphdr	*tcp;
 	u_short len, off;
+	tcphdr_t *tcp;
+	ip_t *ip;
+
+	ip = MTOD(m, ip_t *);
 
 	if (IP_V(ip) == 6) {
 		len = ntohs(((u_short *)ip)[2]) + 40;
 	} else {
 		len = ntohs(ip->ip_len);
 	}
+	ASSERT(len == msgdsize(m));
 
 	if ((opts & OPT_HEX) == OPT_HEX) {
 		u_char *s;
 		int i;
 
-		for (s = (u_char *)ip, i = 0; i < len; i++) {
-			printf("%02x", *s++ & 0xff);
-			if (len - i > 1) {
-				i++;
+		for (; m != NULL; m = m->mb_next) {
+			len = m->mb_len;
+			for (s = (u_char *)m->mb_data, i = 0; i < len; i++) {
 				printf("%02x", *s++ & 0xff);
+				if (len - i > 1) {
+					i++;
+					printf("%02x", *s++ & 0xff);
+				}
+				putchar(' ');
 			}
-			putchar(' ');
 		}
+		putchar('\n');
 		putchar('\n');
 		return;
 	}
 
 	if (IP_V(ip) == 6) {
-		printpacket6(ip);
+		printpacket6(dir, m);
 		return;
 	}
+
+	if (dir)
+		printf("> ");
+	else
+		printf("< ");
 
 	off = ntohs(ip->ip_off);
 	tcp = (struct tcphdr *)((char *)ip + (IP_HL(ip) << 2));

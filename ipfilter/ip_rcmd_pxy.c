@@ -28,7 +28,8 @@ int	rcmd_proxy_init = 0;
 /*
  * RCMD application proxy initialization.
  */
-int ippr_rcmd_init()
+int
+ippr_rcmd_init()
 {
 	bzero((char *)&rcmdfr, sizeof(rcmdfr));
 	rcmdfr.fr_ref = 1;
@@ -40,7 +41,8 @@ int ippr_rcmd_init()
 }
 
 
-void ippr_rcmd_fini()
+void
+ippr_rcmd_fini()
 {
 	if (rcmd_proxy_init == 1) {
 		MUTEX_DESTROY(&rcmdfr.fr_lock);
@@ -52,27 +54,71 @@ void ippr_rcmd_fini()
 /*
  * Setup for a new RCMD proxy.
  */
-int ippr_rcmd_new(fin, aps, nat)
-fr_info_t *fin;
-ap_session_t *aps;
-nat_t *nat;
+int
+ippr_rcmd_new(fin, aps, nat)
+	fr_info_t *fin;
+	ap_session_t *aps;
+	nat_t *nat;
 {
 	tcphdr_t *tcp = (tcphdr_t *)fin->fin_dp;
+	rcmdinfo_t *rc;
+	ipnat_t *ipn;
 
 	fin = fin;	/* LINT */
 	nat = nat;	/* LINT */
 
-	aps->aps_psiz = sizeof(u_32_t);
-	KMALLOCS(aps->aps_data, u_32_t *, sizeof(u_32_t));
-	if (aps->aps_data == NULL) {
+	aps->aps_psiz = sizeof(rcmdinfo_t);
+	KMALLOCS(rc, rcmdinfo_t *, sizeof(rcmdinfo_t));
+	if (rc == NULL) {
 #ifdef IP_RCMD_PROXY_DEBUG
-		printf("ippr_rcmd_new:KMALLOCS(%d) failed\n", sizeof(u_32_t));
+		printf("ippr_rcmd_new:KMALLOCS(%d) failed\n", sizeof(*rc));
 #endif
 		return -1;
 	}
-	*(u_32_t *)aps->aps_data = 0;
+
+	aps->aps_data = rc;
+	bzero((char *)rc, sizeof(*rc));
 	aps->aps_sport = tcp->th_sport;
 	aps->aps_dport = tcp->th_dport;
+
+	ipn = &rc->rcmd_rule;
+	ipn->in_ifps[0] = nat->nat_ifps[0];
+	ipn->in_ifps[1] = nat->nat_ifps[1];
+	ipn->in_apr = NULL;
+	ipn->in_use = 1;
+	ipn->in_hits = 1;
+	ipn->in_ippip = 1;
+
+	if ((nat->nat_ptr->in_redir & NAT_REDIRECT) != 0) {
+		ipn->in_redir = NAT_MAP;
+		ipn->in_snip = ntohl(nat->nat_odstaddr);
+		ipn->in_nsrcaddr = nat->nat_odstaddr;
+		ipn->in_dnip = ntohl(nat->nat_nsrcaddr);
+		ipn->in_ndstaddr = nat->nat_nsrcaddr;
+		ipn->in_osrcaddr = nat->nat_ndstaddr;
+		ipn->in_odstaddr = nat->nat_osrcaddr;
+	} else {
+		ipn->in_redir = NAT_REDIRECT;
+		ipn->in_snip = ntohl(nat->nat_odstaddr);
+		ipn->in_nsrcaddr = nat->nat_odstaddr;
+		ipn->in_dnip = ntohl(nat->nat_osrcaddr);
+		ipn->in_ndstaddr = nat->nat_osrcaddr;
+		ipn->in_osrcaddr = nat->nat_ndstaddr;
+		ipn->in_odstaddr = nat->nat_nsrcaddr;
+	}
+
+	ipn->in_osrcmsk = 0xffffffff;
+	ipn->in_nsrcmsk = 0xffffffff;
+	ipn->in_odstmsk = 0xffffffff;
+	ipn->in_ndstmsk = 0xffffffff;
+	ipn->in_pr[0] = IPPROTO_TCP;
+	ipn->in_pr[1] = IPPROTO_TCP;
+
+	bcopy(nat->nat_ptr->in_ifnames[0], ipn->in_ifnames[0],
+	      sizeof(ipn->in_ifnames[0]));
+	bcopy(nat->nat_ptr->in_ifnames[1], ipn->in_ifnames[1],
+	      sizeof(ipn->in_ifnames[1]));
+
 	return 0;
 }
 
@@ -80,8 +126,9 @@ nat_t *nat;
 /*
  * ipf_rcmd_atoi - implement a simple version of atoi
  */
-u_short ipf_rcmd_atoi(ptr)
-char *ptr;
+u_short
+ipf_rcmd_atoi(ptr)
+	char *ptr;
 {
 	register char *s = ptr, c;
 	register u_short i = 0;
@@ -94,15 +141,16 @@ char *ptr;
 }
 
 
-int ippr_rcmd_portmsg(fin, aps, nat)
-fr_info_t *fin;
-ap_session_t *aps;
-nat_t *nat;
+int
+ippr_rcmd_portmsg(fin, aps, nat)
+	fr_info_t *fin;
+	ap_session_t *aps;
+	nat_t *nat;
 {
 	tcphdr_t *tcp, tcph, *tcp2 = &tcph;
-	struct in_addr swip, swip2;
-	int off, dlen, nflags;
+	int off, dlen, nflags, direction;
 	char portbuf[8], *s;
+	rcmdinfo_t *rc;
 	fr_info_t fi;
 	u_short sp;
 	nat_t *nat2;
@@ -116,8 +164,9 @@ nat_t *nat;
 		return 0;
 	}
 
-	if ((*(u_32_t *)aps->aps_data != 0) &&
-	    (tcp->th_seq != *(u_32_t *)aps->aps_data))
+	rc = (rcmdinfo_t *)aps->aps_data;
+	if ((rc->rcmd_portseq != 0) &&
+	    (tcp->th_seq != rc->rcmd_portseq))
 		return 0;
 
 	m = fin->fin_m;
@@ -146,78 +195,98 @@ nat_t *nat;
 		return 0;
 	}
 
+	if (rc->rcmd_port != 0 && sp != rc->rcmd_port) {
+#ifdef IP_RCMD_PROXY_DEBUG
+		printf("ippr_rcmd_portmsg:sp(%d) != rcmd_port(%d)\n",
+		       sp, rc->rcmd_port);
+#endif
+		return 0;
+	}
+
+	rc->rcmd_port = sp;
+	rc->rcmd_portseq = tcp->th_seq;
+
 	/*
-	 * Add skeleton NAT entry for connection which will come back the
-	 * other way.
+	 * Initialise the packet info structure so we can search the NAT
+	 * table to see if there already is soemthing present that matches
+	 * up with what we want to add.
 	 */
 	bcopy((char *)fin, (char *)&fi, sizeof(fi));
 	fi.fin_state = NULL;
 	fi.fin_nat = NULL;
 	fi.fin_flx |= FI_IGNORE;
-	fi.fin_data[0] = sp;
-	fi.fin_data[1] = 0;
-	if (nat->nat_dir == NAT_OUTBOUND)
-		nat2 = nat_outlookup(&fi, NAT_SEARCH|IPN_TCP, nat->nat_p,
-				     nat->nat_inip, nat->nat_oip);
-	else
-		nat2 = nat_inlookup(&fi, NAT_SEARCH|IPN_TCP, nat->nat_p,
-				    nat->nat_inip, nat->nat_oip);
+	fi.fin_data[0] = 0;
+	fi.fin_data[1] = sp;
+	fi.fin_fi.fi_saddr = nat->nat_ndstaddr;
+	fi.fin_fi.fi_daddr = nat->nat_nsrcaddr;
+
+	if (nat->nat_dir == NAT_OUTBOUND) {
+		nat2 = ipf_nat_outlookup(&fi, NAT_SEARCH|IPN_TCP, nat->nat_pr[1],
+				     nat->nat_osrcip, nat->nat_odstip);
+	} else {
+		nat2 = ipf_nat_inlookup(&fi, NAT_SEARCH|IPN_TCP, nat->nat_pr[0],
+				    nat->nat_osrcip, nat->nat_odstip);
+	}
+
 	if (nat2 == NULL) {
+		/*
+		 * Add skeleton NAT entry for connection which will come
+		 * back the other way.
+		 */
 		int slen;
 
 		slen = ip->ip_len;
 		ip->ip_len = htons(fin->fin_hlen + sizeof(*tcp));
+
+		/*
+		 * Fill out the fake TCP header with a few fields that ipfilter
+		 * considers to be important.
+		 */
 		bzero((char *)tcp2, sizeof(*tcp2));
 		tcp2->th_win = htons(8192);
-		tcp2->th_sport = htons(sp);
-		tcp2->th_dport = 0; /* XXX - don't specify remote port */
 		TCP_OFF_A(tcp2, 5);
 		tcp2->th_flags = TH_SYN;
+
 		fi.fin_dp = (char *)tcp2;
 		fi.fin_fr = &rcmdfr;
 		fi.fin_dlen = sizeof(*tcp2);
 		fi.fin_plen = fi.fin_hlen + sizeof(*tcp2);
-		fi.fin_flx &= FI_LOWTTL|FI_FRAG|FI_TCPUDP|FI_OPTIONS|FI_IGNORE;
-		nflags = NAT_SLAVE|IPN_TCP|SI_W_DPORT;
-
-		swip = ip->ip_src;
-		swip2 = ip->ip_dst;
 
 		if (nat->nat_dir == NAT_OUTBOUND) {
-			fi.fin_fi.fi_saddr = nat->nat_inip.s_addr;
-			ip->ip_src = nat->nat_inip;
+			fi.fin_out = 0;
+			direction = NAT_INBOUND;
 		} else {
-			fi.fin_fi.fi_saddr = nat->nat_oip.s_addr;
-			ip->ip_src = nat->nat_oip;
-			nflags |= NAT_NOTRULEPORT;
+			fi.fin_out = 1;
+			direction = NAT_OUTBOUND;
 		}
+		nflags = SI_W_SPORT;
 
-		nat2 = nat_new(&fi, nat->nat_ptr, NULL, nflags, nat->nat_dir);
+		fi.fin_flx &= FI_LOWTTL|FI_FRAG|FI_TCPUDP|FI_OPTIONS|FI_IGNORE;
+
+		nflags |= NAT_SLAVE|IPN_TCP;
+		nat2 = ipf_nat_add(&fi, &rc->rcmd_rule, NULL, nflags, direction);
 
 		if (nat2 != NULL) {
-			(void) nat_proto(&fi, nat2, IPN_TCP);
-			nat_update(&fi, nat2, nat2->nat_ptr);
+			(void) ipf_nat_proto(&fi, nat2, IPN_TCP);
+			ipf_nat_update(&fi, nat2, nat2->nat_ptr);
 			fi.fin_ifp = NULL;
-			if (nat->nat_dir == NAT_INBOUND) {
-				fi.fin_fi.fi_daddr = nat->nat_inip.s_addr;
-				ip->ip_dst = nat->nat_inip;
-			}
-			(void) fr_addstate(&fi, NULL, SI_W_DPORT);
+			if (nat2->nat_dir == NAT_INBOUND)
+				fi.fin_fi.fi_daddr = nat->nat_osrcaddr;
+			(void) ipf_state_add(&fi, NULL, SI_W_SPORT);
 			if (fi.fin_state != NULL)
-				fr_statederef(&fi, (ipstate_t **)&fi.fin_state);
+				ipf_state_deref((ipstate_t **)&fi.fin_state);
 		}
 		ip->ip_len = slen;
-		ip->ip_src = swip;
-		ip->ip_dst = swip2;
 	}
 	return 0;
 }
 
 
-int ippr_rcmd_out(fin, aps, nat)
-fr_info_t *fin;
-ap_session_t *aps;
-nat_t *nat;
+int
+ippr_rcmd_out(fin, aps, nat)
+	fr_info_t *fin;
+	ap_session_t *aps;
+	nat_t *nat;
 {
 	if (nat->nat_dir == NAT_OUTBOUND)
 		return ippr_rcmd_portmsg(fin, aps, nat);
@@ -225,10 +294,11 @@ nat_t *nat;
 }
 
 
-int ippr_rcmd_in(fin, aps, nat)
-fr_info_t *fin;
-ap_session_t *aps;
-nat_t *nat;
+int
+ippr_rcmd_in(fin, aps, nat)
+	fr_info_t *fin;
+	ap_session_t *aps;
+	nat_t *nat;
 {
 	if (nat->nat_dir == NAT_INBOUND)
 		return ippr_rcmd_portmsg(fin, aps, nat);

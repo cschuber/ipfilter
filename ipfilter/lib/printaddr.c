@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 1993-2001 by Darren Reed.
+ * Copyright (C) 2005 by Darren Reed.
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
@@ -44,6 +44,7 @@ u_32_t *addr, *mask;
 		printlookup((i6addr_t *)addr, (i6addr_t *)mask);
 		break;
 
+	case FRI_NONE :
 	case FRI_NORMAL :
 		printhostmask(family, addr, mask);
 		suffix = NULL;

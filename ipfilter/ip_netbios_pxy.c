@@ -45,7 +45,8 @@ int	netbios_proxy_init = 0;
 /*
  * Initialize local structures.
  */
-int ippr_netbios_init()
+int
+ippr_netbios_init()
 {
 	bzero((char *)&netbiosfr, sizeof(netbiosfr));
 	netbiosfr.fr_ref = 1;
@@ -57,7 +58,8 @@ int ippr_netbios_init()
 }
 
 
-void ippr_netbios_fini()
+void
+ippr_netbios_fini()
 {
 	if (netbios_proxy_init == 1) {
 		MUTEX_DESTROY(&netbiosfr.fr_lock);
@@ -66,10 +68,11 @@ void ippr_netbios_fini()
 }
 
 
-int ippr_netbios_out(fin, aps, nat)
-fr_info_t *fin;
-ap_session_t *aps;
-nat_t *nat;
+int
+ippr_netbios_out(fin, aps, nat)
+	fr_info_t *fin;
+	ap_session_t *aps;
+	nat_t *nat;
 {
 	char dgmbuf[6];
 	int off, dlen;

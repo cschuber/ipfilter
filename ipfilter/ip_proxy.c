@@ -121,63 +121,80 @@ aproxy_t	*ap_proxylist = NULL;
 aproxy_t	ap_proxies[] = {
 #ifdef	IPF_FTP_PROXY
 	{ NULL, "ftp", (char)IPPROTO_TCP, 0, 0, ippr_ftp_init, ippr_ftp_fini,
-	  ippr_ftp_new, ippr_ftp_del, ippr_ftp_in, ippr_ftp_out, NULL },
+	  ippr_ftp_new, ippr_ftp_del, ippr_ftp_in, ippr_ftp_out, NULL,
+	  NULL, NULL },
 #endif
 #ifdef	IPF_IRC_PROXY
 	{ NULL, "irc", (char)IPPROTO_TCP, 0, 0, ippr_irc_init, ippr_irc_fini,
-	  ippr_irc_new, NULL, NULL, ippr_irc_out, NULL, NULL },
+	  ippr_irc_new, NULL, NULL, ippr_irc_out, NULL, NULL, NULL, NULL },
 #endif
 #ifdef	IPF_RCMD_PROXY
 	{ NULL, "rcmd", (char)IPPROTO_TCP, 0, 0, ippr_rcmd_init, ippr_rcmd_fini,
-	  ippr_rcmd_new, NULL, ippr_rcmd_in, ippr_rcmd_out, NULL, NULL },
+	  ippr_rcmd_new, NULL, ippr_rcmd_in, ippr_rcmd_out, NULL, NULL,
+	  NULL, NULL },
 #endif
 #ifdef	IPF_RAUDIO_PROXY
 	{ NULL, "raudio", (char)IPPROTO_TCP, 0, 0, ippr_raudio_init, ippr_raudio_fini,
-	  ippr_raudio_new, NULL, ippr_raudio_in, ippr_raudio_out, NULL, NULL },
+	  ippr_raudio_new, NULL, ippr_raudio_in, ippr_raudio_out, NULL, NULL,
+	  NULL, NULL },
 #endif
 #ifdef	IPF_MSNRPC_PROXY
 	{ NULL, "msnrpc", (char)IPPROTO_TCP, 0, 0, ippr_msnrpc_init, ippr_msnrpc_fini,
-	  ippr_msnrpc_new, NULL, ippr_msnrpc_in, ippr_msnrpc_out, NULL, NULL },
+	  ippr_msnrpc_new, NULL, ippr_msnrpc_in, ippr_msnrpc_out, NULL, NULL,
+	  NULL, NULL },
 #endif
 #ifdef	IPF_NETBIOS_PROXY
 	{ NULL, "netbios", (char)IPPROTO_UDP, 0, 0, ippr_netbios_init, ippr_netbios_fini,
-	  NULL, NULL, NULL, ippr_netbios_out, NULL, NULL },
+	  NULL, NULL, NULL, ippr_netbios_out, NULL, NULL, NULL, NULL },
 #endif
 #ifdef	IPF_IPSEC_PROXY
 	{ NULL, "ipsec", (char)IPPROTO_UDP, 0, 0,
 	  ippr_ipsec_init, ippr_ipsec_fini, ippr_ipsec_new, ippr_ipsec_del,
-	  ippr_ipsec_inout, ippr_ipsec_inout, ippr_ipsec_match, NULL },
+	  ippr_ipsec_inout, ippr_ipsec_inout, ippr_ipsec_match, NULL,
+	  NULL, NULL },
+#endif
+#ifdef	IPF_DNS_PROXY
+	{ NULL, "dns", (char)IPPROTO_UDP, 0, 0,
+	  ippr_dns_init, ippr_dns_fini, ippr_dns_new, ippr_ipsec_del,
+	  ippr_dns_inout, ippr_dns_inout, ippr_dns_match, NULL,
+	  NULL, NULL },
 #endif
 #ifdef	IPF_PPTP_PROXY
 	{ NULL, "pptp", (char)IPPROTO_TCP, 0, 0,
 	  ippr_pptp_init, ippr_pptp_fini, ippr_pptp_new, ippr_pptp_del,
-	  ippr_pptp_inout, ippr_pptp_inout, NULL, NULL },
+	  ippr_pptp_inout, ippr_pptp_inout, NULL, NULL, NULL, NULL },
 #endif
 #ifdef  IPF_H323_PROXY
 	{ NULL, "h323", (char)IPPROTO_TCP, 0, 0, ippr_h323_init, ippr_h323_fini,
-	  ippr_h323_new, ippr_h323_del, ippr_h323_in, NULL, NULL },
+	  ippr_h323_new, ippr_h323_del, ippr_h323_in, NULL, NULL, NULL, NULL },
 	{ NULL, "h245", (char)IPPROTO_TCP, 0, 0, NULL, NULL,
-	  ippr_h245_new, NULL, NULL, ippr_h245_out, NULL },
+	  ippr_h245_new, NULL, NULL, ippr_h245_out, NULL, NULL, NULL },
 #endif
 #ifdef	IPF_RPCB_PROXY
-# if 0
+# ifndef _KERNEL
 	{ NULL, "rpcbt", (char)IPPROTO_TCP, 0, 0,
 	  ippr_rpcb_init, ippr_rpcb_fini, ippr_rpcb_new, ippr_rpcb_del,
-	  ippr_rpcb_in, ippr_rpcb_out, NULL, NULL },
+	  ippr_rpcb_in, ippr_rpcb_out, NULL, NULL, NULL, NULL },
 # endif
 	{ NULL, "rpcbu", (char)IPPROTO_UDP, 0, 0,
 	  ippr_rpcb_init, ippr_rpcb_fini, ippr_rpcb_new, ippr_rpcb_del,
-	  ippr_rpcb_in, ippr_rpcb_out, NULL, NULL },
+	  ippr_rpcb_in, ippr_rpcb_out, NULL, NULL, NULL, NULL },
 #endif
-	{ NULL, "", '\0', 0, 0, NULL, NULL, NULL, NULL }
+	{ NULL, "", '\0', 0, 0, NULL, NULL, NULL, NULL, NULL, NULL }
 };
 
-/*
- * Dynamically add a new kernel proxy.  Ensure that it is unique in the
- * collection compiled in and dynamically added.
- */
-int appr_add(ap)
-aproxy_t *ap;
+
+/* ------------------------------------------------------------------------ */
+/* Function:    appr_add                                                    */
+/* Returns:     int - -1 == error, 0 == success                             */
+/* Parameters:  ap(I) - pointer to proxy structure                          */
+/*                                                                          */
+/* Dynamically add a new kernel proxy.  Ensure that it is unique in the     */
+/* collection compiled in and dynamically added.                            */
+/* ------------------------------------------------------------------------ */
+int
+appr_add(ap)
+	aproxy_t *ap;
 {
 	aproxy_t *a;
 
@@ -208,13 +225,18 @@ aproxy_t *ap;
 }
 
 
-/*
- * Check to see if the proxy this control request has come through for
- * exists, and if it does and it has a control function then invoke that
- * control function.
- */
-int appr_ctl(ctl)
-ap_ctl_t *ctl;
+/* ------------------------------------------------------------------------ */
+/* Function:    appr_ctl                                                    */
+/* Returns:     int - 0 == success, else error                              */
+/* Parameters:  ctl(I) - pointer to proxy control structure                 */
+/*                                                                          */
+/* Check to see if the proxy this control request has come through for      */
+/* exists, and if it does and it has a control function then invoke that    */
+/* control function.                                                        */
+/* ------------------------------------------------------------------------ */
+int
+appr_ctl(ctl)
+	ap_ctl_t *ctl;
 {
 	aproxy_t *a;
 	int error;
@@ -224,11 +246,13 @@ ap_ctl_t *ctl;
 		if (ipf_proxy_debug > 1)
 			printf("appr_ctl: can't find %s/%d\n",
 				ctl->apc_label, ctl->apc_p);
+		ipf_interror = 80001;
 		error = ESRCH;
 	} else if (a->apr_ctl == NULL) {
 		if (ipf_proxy_debug > 1)
 			printf("appr_ctl: no ctl function for %s/%d\n",
 				ctl->apc_label, ctl->apc_p);
+		ipf_interror = 80002;
 		error = ENXIO;
 	} else {
 		error = (*a->apr_ctl)(a, ctl);
@@ -240,13 +264,18 @@ ap_ctl_t *ctl;
 }
 
 
-/*
- * Delete a proxy that has been added dynamically from those available.
- * If it is in use, return 1 (do not destroy NOW), not in use 0 or -1
- * if it cannot be matched.
- */
-int appr_del(ap)
-aproxy_t *ap;
+/* ------------------------------------------------------------------------ */
+/* Function:    appr_del                                                    */
+/* Returns:     int - -1 == error, 0 == success                             */
+/* Parameters:  ap(I) - pointer to proxy structure                          */
+/*                                                                          */
+/* Delete a proxy that has been added dynamically from those available.     */
+/* If it is in use, return 1 (do not destroy NOW), not in use 0 or -1       */
+/* if it cannot be matched.                                                 */
+/* ------------------------------------------------------------------------ */
+int
+appr_del(ap)
+	aproxy_t *ap;
 {
 	aproxy_t *a, **app;
 
@@ -268,16 +297,21 @@ aproxy_t *ap;
 }
 
 
-/*
- * Return 1 if the packet is a good match against a proxy, else 0.
- */
-int appr_ok(fin, tcp, nat)
-fr_info_t *fin;
-tcphdr_t *tcp;
-ipnat_t *nat;
+/* ------------------------------------------------------------------------ */
+/* Function:    appr_ok                                                     */
+/* Returns:     int - 1 == good match else not.                             */
+/* Parameters:  fin(I) - pointer to packet information                      */
+/*              nat(I) - pointer to current NAT session                     */
+/*                                                                          */
+/* ------------------------------------------------------------------------ */
+int
+appr_ok(fin, tcp, nat)
+	fr_info_t *fin;
+	tcphdr_t *tcp;
+	ipnat_t *nat;
 {
 	aproxy_t *apr = nat->in_apr;
-	u_short dport = nat->in_dport;
+	u_short dport = nat->in_odport;
 
 	if ((apr == NULL) || (apr->apr_flags & APR_DELETE) ||
 	    (fin->fin_p != apr->apr_p))
@@ -288,10 +322,19 @@ ipnat_t *nat;
 }
 
 
-int appr_ioctl(data, cmd, mode)
-caddr_t data;
-ioctlcmd_t cmd;
-int mode;
+/* ------------------------------------------------------------------------ */
+/* Function:    appr_ioctl                                                  */
+/* Returns:     int - 0 == success, else error                              */
+/* Parameters:  fin(I) - pointer to packet information                      */
+/*              nat(I) - pointer to current NAT session                     */
+/*                                                                          */
+/* ------------------------------------------------------------------------ */
+int
+appr_ioctl(data, cmd, mode, ctx)
+	caddr_t data;
+	ioctlcmd_t cmd;
+	int mode;
+	void *ctx;
 {
 	ap_ctl_t ctl;
 	caddr_t ptr;
@@ -302,14 +345,18 @@ int mode;
 	switch (cmd)
 	{
 	case SIOCPROXY :
-		BCOPYIN(data, &ctl, sizeof(ctl));
+		error = ipf_inobj(data, &ctl, IPFOBJ_PROXYCTL);
+		if (error != 0) {
+			return error;
+		}
 		ptr = NULL;
 
 		if (ctl.apc_dsize > 0) {
 			KMALLOCS(ptr, caddr_t, ctl.apc_dsize);
-			if (ptr == NULL)
+			if (ptr == NULL) {
+				ipf_interror = 80003;
 				error = ENOMEM;
-			else {
+			} else {
 				error = copyinptr(ctl.apc_data, ptr,
 						  ctl.apc_dsize);
 				if (error == 0)
@@ -323,25 +370,32 @@ int mode;
 		if (error == 0)
 			error = appr_ctl(&ctl);
 
-		if (ptr != NULL) {
+		if ((error != 0) && (ptr != NULL)) {
 			KFREES(ptr, ctl.apc_dsize);
 		}
 		break;
 
 	default :
+		ipf_interror = 80004;
 		error = EINVAL;
 	}
 	return error;
 }
 
 
-/*
- * If a proxy has a match function, call that to do extended packet
- * matching.
- */
-int appr_match(fin, nat)
-fr_info_t *fin;
-nat_t *nat;
+/* ------------------------------------------------------------------------ */
+/* Function:    appr_match                                                  */
+/* Returns:     int - -1 == error, 0 == success                             */
+/* Parameters:  fin(I) - pointer to packet information                      */
+/*              nat(I) - pointer to current NAT session                     */
+/*                                                                          */
+/* If a proxy has a match function, call that to do extended packet         */
+/* matching.                                                                */
+/* ------------------------------------------------------------------------ */
+int
+appr_match(fin, nat)
+	fr_info_t *fin;
+	nat_t *nat;
 {
 	aproxy_t *apr;
 	ipnat_t *ipn;
@@ -380,14 +434,20 @@ nat_t *nat;
 }
 
 
-/*
- * Allocate a new application proxy structure and fill it in with the
- * relevant details.  call the init function once complete, prior to
- * returning.
- */
-int appr_new(fin, nat)
-fr_info_t *fin;
-nat_t *nat;
+/* ------------------------------------------------------------------------ */
+/* Function:    appr_new                                                    */
+/* Returns:     int - -1 == error, 0 == success                             */
+/* Parameters:  fin(I) - pointer to packet information                      */
+/*              nat(I) - pointer to current NAT session                     */
+/*                                                                          */
+/* Allocate a new application proxy structure and fill it in with the       */
+/* relevant details.  call the init function once complete, prior to        */
+/* returning.                                                               */
+/* ------------------------------------------------------------------------ */
+int
+appr_new(fin, nat)
+	fr_info_t *fin;
+	nat_t *nat;
 {
 	register ap_session_t *aps;
 	aproxy_t *apr;
@@ -445,15 +505,21 @@ nat_t *nat;
 }
 
 
-/*
- * Check to see if a packet should be passed through an active proxy routine
- * if one has been setup for it.  We don't need to check the checksum here if
- * IPFILTER_CKSUM is defined because if it is, a failed check causes FI_BAD
- * to be set.
- */
-int appr_check(fin, nat)
-fr_info_t *fin;
-nat_t *nat;
+/* ------------------------------------------------------------------------ */
+/* Function:    appr_check                                                  */
+/* Returns:     int - -1 == error, 0 == success                             */
+/* Parameters:  fin(I) - pointer to packet information                      */
+/*              nat(I) - pointer to current NAT session                     */
+/*                                                                          */
+/* Check to see if a packet should be passed through an active proxy        */
+/* routine if one has been setup for it.  We don't need to check the        */
+/* checksum here if IPFILTER_CKSUM is defined because if it is, a failed    */
+/* check causes FI_BAD to be set.                                           */
+/* ------------------------------------------------------------------------ */
+int
+appr_check(fin, nat)
+	fr_info_t *fin;
+	nat_t *nat;
 {
 #if SOLARIS && defined(_KERNEL) && (SOLARIS2 >= 6)
 # if defined(ICK_VALID)
@@ -479,12 +545,12 @@ nat_t *nat;
 	}
 
 #ifndef IPFILTER_CKSUM
-	if ((fin->fin_out == 0) && (fr_checkl4sum(fin) == -1)) {
+	if ((fin->fin_out == 0) && (ipf_checkl4sum(fin) == -1)) {
 		if (ipf_proxy_debug > 0)
 			printf("appr_check: l4 checksum failure %d\n",
 				fin->fin_p);
 		if (fin->fin_p == IPPROTO_TCP)
-			frstats[fin->fin_out].fr_tcpbad++;
+			ipf_stats[fin->fin_out].fr_tcpbad++;
 		return -1;
 	}
 #endif
@@ -497,9 +563,9 @@ nat_t *nat;
 		 */
 #if defined(MENTAT) || defined(HAVE_M_PULLDOWN)
 		if ((fin->fin_dlen > 0) && !(fin->fin_flx & FI_COALESCE))
-			if (fr_coalesce(fin) == -1) {
+			if (ipf_coalesce(fin) == -1) {
 				if (ipf_proxy_debug > 0)
-					printf("appr_check: fr_coalesce failed %x\n", fin->fin_flx);
+					printf("appr_check: coalesce failed %x\n", fin->fin_flx);
 				return -1;
 			}
 #endif
@@ -565,7 +631,7 @@ nat_t *nat;
 			s1 = LONG_SUM(fin->fin_plen - adjlen);
 			s2 = LONG_SUM(fin->fin_plen);
 			CALC_SUMD(s1, s2, sd);
-			fix_outcksum(fin, &ip->ip_sum, sd);
+			ipf_fix_outcksum(fin, &ip->ip_sum, sd);
 		}
 #endif
 
@@ -610,12 +676,18 @@ nat_t *nat;
 }
 
 
-/*
- * Search for an proxy by the protocol it is being used with and its name.
- */
-aproxy_t *appr_lookup(pr, name)
-u_int pr;
-char *name;
+/* ------------------------------------------------------------------------ */
+/* Function:    appr_lookup                                                 */
+/* Returns:     int - -1 == error, 0 == success                             */
+/* Parameters:  fin(I) - pointer to packet information                      */
+/*              nat(I) - pointer to current NAT session                     */
+/*                                                                          */
+/* Search for an proxy by the protocol it is being used with and its name.  */
+/* ------------------------------------------------------------------------ */
+aproxy_t *
+appr_lookup(pr, name)
+	u_int pr;
+	char *name;
 {
 	aproxy_t *ap;
 
@@ -641,16 +713,31 @@ char *name;
 }
 
 
-void appr_free(ap)
-aproxy_t *ap;
+/* ------------------------------------------------------------------------ */
+/* Function:    appr_free                                                   */
+/* Returns:     Nil                                                         */
+/* Parameters:  ap(I) - pointer to proxy structure                          */
+/*                                                                          */
+/* ------------------------------------------------------------------------ */
+void
+appr_free(ap)
+	aproxy_t *ap;
 {
 	ap->apr_ref--;
 }
 
 
-/* Locks Held: ipf_nat_new, ipf_nat(W) */
-void aps_free(aps)
-ap_session_t *aps;
+/* ------------------------------------------------------------------------ */
+/* Function:    aps_free                                                    */
+/* Returns:     Nil                                                         */
+/* Parameters:  fin(I) - pointer to packet information                      */
+/*              nat(I) - pointer to current NAT session                     */
+/*                                                                          */
+/* Locks Held:  ipf_nat_new, ipf_nat(W)                                     */
+/* ------------------------------------------------------------------------ */
+void
+aps_free(aps)
+	ap_session_t *aps;
 {
 	ap_session_t *a, **ap;
 	aproxy_t *apr;
@@ -674,14 +761,19 @@ ap_session_t *aps;
 }
 
 
-/*
- * returns 2 if ack or seq number in TCP header is changed, returns 0 otherwise
- */
-static int appr_fixseqack(fin, ip, aps, inc)
-fr_info_t *fin;
-ip_t *ip;
-ap_session_t *aps;
-int inc;
+/* ------------------------------------------------------------------------ */
+/* Function:    appr_fixseqack                                              */
+/* Returns:     int -  2 if TCP ack/seq is changed, else 0                  */ 
+/* Parameters:  fin(I) - pointer to packet information                      */
+/*              nat(I) - pointer to current NAT session                     */
+/*                                                                          */
+/* ------------------------------------------------------------------------ */
+static int
+appr_fixseqack(fin, ip, aps, inc)
+	fr_info_t *fin;
+	ip_t *ip;
+	ap_session_t *aps;
+	int inc;
 {
 	int sel, ch = 0, out, nlen;
 	u_32_t seq1, seq2;
@@ -814,16 +906,24 @@ int inc;
 
 	if (ipf_proxy_debug > 8)
 		printf("appr_fixseqack: seq %x ack %x\n",
-			ntohl(tcp->th_seq), ntohl(tcp->th_ack));
+			(u_32_t)ntohl(tcp->th_seq), (u_32_t)ntohl(tcp->th_ack));
 	return ch ? 2 : 0;
 }
 
 
+/* ------------------------------------------------------------------------ */
+/* Function:    appr_init                                                   */
+/* Returns:     int - -1 == error, 0 == success                             */
+/* Parameters:  fin(I) - pointer to packet information                      */
+/*              nat(I) - pointer to current NAT session                     */
+/*                                                                          */
+/* ------------------------------------------------------------------------ */
 /*
  * Initialise hook for kernel application proxies.
  * Call the initialise routine for all the compiled in kernel proxies.
  */
-int appr_init()
+int
+appr_init()
 {
 	aproxy_t *ap;
 	int err = 0;
@@ -839,11 +939,16 @@ int appr_init()
 }
 
 
-/*
- * Unload hook for kernel application proxies.
- * Call the finialise routine for all the compiled in kernel proxies.
- */
-void appr_unload()
+/* ------------------------------------------------------------------------ */
+/* Function:    appr_unload                                                 */
+/* Returns:     Nil                                                         */
+/* Parameters:  Nil                                                         */
+/*                                                                          */
+/* Unload hook for kernel application proxies.                              */
+/* Call the finialise routine for all the compiled in kernel proxies.       */
+/* ------------------------------------------------------------------------ */
+void
+appr_unload()
 {
 	aproxy_t *ap;
 
@@ -853,4 +958,41 @@ void appr_unload()
 	for (ap = ap_proxylist; ap; ap = ap->apr_next)
 		if (ap->apr_fini != NULL)
 			(*ap->apr_fini)();
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    appr_flush                                                  */
+/* Returns:     Nil                                                         */
+/* Parameters:  fin(I) - pointer to packet information                      */
+/*              nat(I) - pointer to current NAT session                     */
+/*                                                                          */
+/* ------------------------------------------------------------------------ */
+void
+appr_flush(how)
+	int how;
+{
+	aproxy_t *ap;
+
+	switch (how)
+	{
+	case 0 :
+		for (ap = ap_proxies; ap->apr_p; ap++)
+			if (ap->apr_flush != NULL)
+				(*ap->apr_flush)(ap, how);
+		for (ap = ap_proxylist; ap; ap = ap->apr_next)
+			if (ap->apr_flush != NULL)
+				(*ap->apr_flush)(ap, how);
+		break;
+	case 1 :
+		for (ap = ap_proxies; ap->apr_p; ap++)
+			if (ap->apr_clear != NULL)
+				(*ap->apr_clear)(ap);
+		for (ap = ap_proxylist; ap; ap = ap->apr_next)
+			if (ap->apr_clear != NULL)
+				(*ap->apr_clear)(ap);
+		break;
+	default :
+		break;
+	}
 }

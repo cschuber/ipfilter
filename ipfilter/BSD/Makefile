@@ -8,7 +8,7 @@ SBINDEST=/sbin
 MANDIR=/usr/share/man
 SEARCHDIRS!=echo $(BINDEST) $(SBINDEST) /bin /usr/bin /sbin /usr/sbin /usr/local/bin /usr/local/sbin | awk '{for(i=1;i<NF;i++){print $$i;}}' - | sort -u
 
-CC=gcc -Wall -Wuninitialized -Wstrict-prototypes -O
+CC=gcc -Wall -Wuninitialized -Wstrict-prototypes -O -Wmissing-prototypes -Wpointer-arith -Wno-sign-compare -Wno-traditional -Werror
 #UFLAGS=-fprofile-arcs -ftest-coverage
 CFLAGS=-g -I$(TOP)
 #
@@ -17,12 +17,12 @@ CFLAGS=-g -I$(TOP)
 DEVFS!=/usr/bin/lsvfs 2>&1 | sed -n 's/.*devfs.*/-DDEVFS/p'
 CPU!=uname -m
 INC=-I/usr/include -I/sys -I/sys/sys -I/sys/arch
-DEF=-D$(CPU) -D__$(CPU)__ -DINET -DKERNEL -D_KERNEL $(INC) $(DEVFS)
+DEF=-D$(CPU) -D__$(CPU)__ -DINET -DKERNEL -D_KERNEL $(INC) $(DEVFS) -fno-builtin
 IPDEF=$(DEF) -DGATEWAY -DDIRECTED_BROADCAST
 VNODESHDIR=/sys/kern
 MLD=$(ML)
 ML=mln_ipl.c
-LKM=if_ipl.o
+LKM=ipflkm.o
 LKMR=ipfrule.o
 DLKM=
 OBJ=.
@@ -83,6 +83,11 @@ build all: machine $(OBJ)/libipf.a ipf ipfs ipfstat ipftest ipmon ipnat \
 	-ln -s ../tools .
 	-ln -s ../tools ..
 
+bpf.h:
+	echo '#define DEV_BPF 1' > bpf.h
+
+$(TOP)/ip_compat.h: bpf.h
+
 machine: Makefile.kmod
 	if [ -f Makefile.kmod ] ; then \
 		make -f Makefile.kmod depend MKUPDATE=no; \
@@ -136,7 +141,7 @@ ipfs.o: $(TOOL)/ipfs.c $(TOP)/ip_fil.h $(TOP)/ipf.h $(TOP)/ip_state.h \
 
 fil_u.o: $(TOP)/fil.c $(TOP)/ip_fil.h $(TOP)/ipf.h $(TOP)/ip_compat.h \
 	    $(TOP)/opts.h $(TOP)/ip_rules.h
-	$(CC) $(CCARGS) $(EXTRA) $(IPFBPF) -D_RADIX_H_ -c $(TOP)/fil.c -o $@
+	$(CC) $(CCARGS) $(EXTRA) $(IPFBPF) -c $(TOP)/fil.c -o $@
 
 fil.o: $(TOP)/fil.c $(TOP)/ip_fil.h $(TOP)/ip_compat.h $(TOP)/ipl.h \
 	    $(TOP)/ip_rules.h
@@ -157,7 +162,7 @@ ipnat.o: $(TOOL)/ipnat.c $(TOP)/ip_fil.h $(TOP)/ipf.h $(TOP)/ip_nat.h \
 	    $(TOP)/opts.h
 	$(CC) $(CCARGS) -c $(TOOL)/ipnat.c -o $@
 
-ipnat_y.o: ipnat_y.c ipnat_y.h ipnat_l.h
+ipnat_y.o: ipnat_y.c ipnat_y.h ipnat_l.h $(TOP)/ip_fil.h $(TOP)/ip_nat.h
 	$(CC) $(CCARGS) -c ipnat_y.c -o $@
 
 ipnat_l.o: ipnat_l.c ipnat_y.h
@@ -236,9 +241,9 @@ radix_u.o: $(TOP)/md5.c $(TOP)/radix_ipf.h
 bpf_filter_u.o: $(TOP)/bpf_filter.c $(TOP)/pcap-ipf.h
 	$(CC) $(CCARGS) $(EXTRA) -c $(TOP)/bpf_filter.c -o $@
 
-if_ipl.o: $(MODOBJS) 
+ipflkm.o: $(MODOBJS) 
 	ld -r $(MODOBJS) -o $(LKM)
-	${RM} -f if_ipl
+	${RM} -f ipflkm
 
 ipfrule.ko.5: ip_rulesx.o $(MLR)
 	ld -warn-common -r -d -o $(.TARGET:S/.ko/.kld/) ip_rulesx.o $(MLR)
@@ -446,14 +451,14 @@ clean:
 	${RM} -f ../ipf ../ipnat ../ipmon ../ippool ../ipftest 
 	${RM} -f ../ipscan ../ipsyncm ../ipsyncs
 	${RM} -f *.core *.o *.a ipt ipfstat ipf ipfstat ipftest ipmon
-	${RM} -f if_ipl ipnat ipfrule.ko* ipf.kld*
+	${RM} -f ipflkm ipnat ipfrule.ko* ipf.kld* ipfrule.kld*
 	${RM} -f vnode_if.h $(LKM) ioconf.h *.ko setdef1.c setdef0.c setdefs.h
 	${RM} -f ip_fil.c ipf_l.c ipf_y.c ipf_y.h ipf_l.h
 	${RM} -f ipscan ipscan_y.c ipscan_y.h ipscan_l.c ipscan_l.h
 	${RM} -f ippool ippool_y.c ippool_y.h ippool_l.c ippool_l.h
 	${RM} -f ipnat_y.c ipnat_y.h ipnat_l.c ipnat_l.h
 	${RM} -f ipmon_y.c ipmon_y.h ipmon_l.c ipmon_l.h
-	${RM} -f ipsyncm ipsyncs ipfs ip_rules.c ip_rules.h
+	${RM} -f ipsyncm ipsyncs ipfs ip_rules.c ip_rules.h bpf.h
 	${RM} -f *.da *.gcov *.bb *.bbg tools
 
 	${MAKE} -f Makefile.ipsend ${MFLAGS} clean
@@ -475,8 +480,8 @@ install:
 		/bin/cp $(TOP)/$$i /usr/include/netinet/; \
 		$(CHMOD) 444 /usr/include/netinet/$$i; \
 	done
-	-if [ -d /lkm -a -f if_ipl.o ] ; then \
-		cp if_ipl.o /lkm; \
+	-if [ -d /lkm -a -f ipflkm.o ] ; then \
+		cp ipflkm.o /lkm; \
 	fi
 	-if [ -d /modules -a -f ipf.ko ] ; then \
 		cp ipf.ko /modules; \
@@ -490,8 +495,8 @@ install:
 	-if [ -d /boot/kernel -a -f ipfrule.ko ] ; then \
 		cp ipfrule.ko /boot/kernel; \
 	fi
-	-if [ -d /usr/lkm -a -f if_ipl.o ] ; then \
-		cp if_ipl.o /usr/lkm; \
+	-if [ -d /usr/lkm -a -f ipflkm.o ] ; then \
+		cp ipflkm.o /usr/lkm; \
 	fi
 	-$(INSTALL) -cs -g wheel -m 755 -o root ipscan $(SBINDEST)
 	(cd $(TOP)/man; make INSTALL=$(INSTALL) MANDIR=$(MANDIR) install; cd $(TOP))
@@ -513,6 +518,9 @@ install:
 			$(INSTALL) -cs -g wheel -m 755 -o root $$p $$def; \
 		fi \
 	done
+	if [ -d /etc/rc.d ] ; then \
+		$(INSTALL) -c -g wheel -m 755 -o root ../ipfadm-rcd $(SBINDEST)/ipfadm; \
+	fi
 	(cd $(TOP)/man; make INSTALL=$(INSTALL) MANDIR=$(MANDIR) install; cd $(TOP))
 
 coverage:

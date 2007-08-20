@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 1993-2001 by Darren Reed.
+ * Copyright (C) 2000-2006 by Darren Reed.
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
@@ -114,6 +114,22 @@ table_t	pris[] = {
 	{ "info", LOG_INFO },		{ "debug", LOG_DEBUG  },
 	{ NULL, 0 }
 };
+
+
+/*
+ * map a facility name to its number
+ */
+int     
+pri_findname(name)
+	char *name;
+{
+	int     i;
+
+	for (i = 0; pris[i].name; i++)
+		if (!strcmp(pris[i].name, name))
+			return pris[i].value;
+	return -1;
+}
 
 
 /*

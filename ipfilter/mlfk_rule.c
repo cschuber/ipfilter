@@ -39,12 +39,12 @@ ipfrule_modevent(module_t mod, int type, void *unused)
 	case MOD_LOAD :
 		error = ipfrule_add();
 		if (!error)
-			fr_refcnt++;
+			ipf_refcnt++;
 		break;
 	case MOD_UNLOAD :
 		error = ipfrule_remove();
 		if (!error)
-			fr_refcnt--;
+			ipf_refcnt--;
 		break;
 	default:
 		error = EINVAL;

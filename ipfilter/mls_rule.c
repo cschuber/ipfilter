@@ -97,12 +97,12 @@ struct	vdstat	*vds;
 	case VDLOAD:
 		err = ipfrule_add();
 		if (!err)
-			fr_refcnt++;
+			ipf_refcnt++;
 		break;
 	case VDUNLOAD:
 		err = ipfrule_remove();
 		if (!err)
-			fr_refcnt--;
+			ipf_refcnt--;
 		break;
 	case VDSTAT:
 		err = 0;

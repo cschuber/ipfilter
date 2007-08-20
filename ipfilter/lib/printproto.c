@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 1993-2005 by Darren Reed.
+ * Copyright (C) 2005 by Darren Reed.
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  */
@@ -30,13 +30,13 @@ ipnat_t *np;
 		/*
 		 * To make up for "ip = 252" and "hopopt = 0" in /etc/protocols
 		 */
-		else if (np->in_p == 0)
+		else if (np->in_pr[0] == 0)
 			printf("ip");
 #endif
 		else if (pr != NULL)
 			printf("%s", pr->p_name);
 		else
-			printf("%d", np->in_p);
+			printf("%d", np->in_pr[0]);
 	} else {
 #ifdef _AIX51
 		if (p == 0)

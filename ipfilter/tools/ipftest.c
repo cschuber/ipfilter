@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 1993-2001 by Darren Reed.
+ * Copyright (C) 2002-2006 by Darren Reed.
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  */
@@ -14,18 +14,18 @@ static const char rcsid[] = "@(#)$Id$";
 #endif
 
 extern	char	*optarg;
-extern	struct frentry	*ipfilter[2][2];
 extern	struct ipread	snoop, etherf, tcpd, pcap, iptext, iphex;
 extern	struct ifnet	*get_unit __P((char *, int));
 extern	void	init_ifp __P((void));
 extern	ipnat_t	*natparse __P((char *, int));
-extern	int	fr_running;
-extern	hostmap_t **maptable;
+extern	hostmap_t **ipf_hm_maptable;
+extern	hostmap_t *ipf_hm_maplist;
 
-ipfmutex_t	ipl_mutex, ipf_authmx, ipf_rw, ipf_stinsert;
+ipfmutex_t	ipl_mutex, ipf_auth_mx, ipf_rw, ipf_stinsert;
 ipfmutex_t	ipf_nat_new, ipf_natio, ipf_timeoutlock;
 ipfrwlock_t	ipf_mutex, ipf_global, ipf_ipidfrag, ip_poolrw, ipf_frcache;
-ipfrwlock_t	ipf_frag, ipf_state, ipf_nat, ipf_natfrag, ipf_auth;
+ipfrwlock_t	ipf_frag, ipf_state, ipf_nat, ipf_natfrag, ipf_authlk;
+ipfrwlock_t	ipf_tokens;
 int	opts = OPT_DONOTHING;
 int	use_inet6 = 0;
 int	docksum = 0;
@@ -34,6 +34,7 @@ int	main __P((int, char *[]));
 int	loadrules __P((char *, int));
 int	kmemcpy __P((char *, long, int));
 int     kstrncpy __P((char *, long, int n));
+int	blockreason;
 void	dumpnat __P((void));
 void	dumpstate __P((void));
 void	dumplookups __P((void));
@@ -81,7 +82,7 @@ char *argv[];
 	struct	in_addr	sip;
 	struct	ifnet	*ifp;
 	struct	ipread	*r;
-	mb_t	mb, *m;
+	mb_t	mb, *m, *n;
 	ip_t	*ip;
 
 	m = &mb;
@@ -102,11 +103,12 @@ char *argv[];
 	RWLOCK_INIT(&ipf_mutex, "ipf filter rwlock");
 	RWLOCK_INIT(&ipf_ipidfrag, "ipf IP NAT-Frag rwlock");
 	RWLOCK_INIT(&ipf_frcache, "ipf filter cache");
+	RWLOCK_INIT(&ipf_tokens, "ipf token rwlock");
 
 	initparse();
-	if (fr_initialise() == -1)
+	if (ipf_initialise() == -1)
 		abort();
-	fr_running = 1;
+	ipf_running = 1;
 
 	while ((c = getopt(argc, argv, "6bCdDF:i:I:l:N:P:or:RS:T:vxX")) != -1)
 		switch (c)
@@ -209,12 +211,15 @@ char *argv[];
 		exit(-1);
 
 	m->m_data = (char *)m->mb_buf;
-	ip = MTOD(m, ip_t *);
 	while ((i = (*r->r_readip)(MTOD(m, char *), sizeof(m->mb_buf),
 				    &iface, &dir)) > 0) {
+
 		if ((iface == NULL) || (*iface == '\0'))
 			iface = ifname;
+
+		ip = MTOD(m, ip_t *);
 		ifp = get_unit(iface, IP_V(ip));
+
 		if (!use_inet6) {
 			if ((r->r_flags & R_DO_CKSUM) || docksum)
 				fixv4sums(m, ip);
@@ -227,9 +232,10 @@ char *argv[];
 			hlen = sizeof(ip6_t);
 #endif
 		/* ipfr_slowtimer(); */
+		blockreason = 0;
 		m = &mb;
 		m->mb_len = i;
-		i = fr_check(ip, hlen, ifp, dir, &m);
+		i = ipf_check(ip, hlen, ifp, dir, &m);
 		if ((opts & OPT_NAT) == 0)
 			switch (i)
 			{
@@ -270,10 +276,19 @@ char *argv[];
 
 		if (!(opts & OPT_BRIEF)) {
 			putchar(' ');
-			printpacket(ip);
+			if (m != NULL)
+				printpacket(dir, m);
+			else
+				printpacket(dir, &mb);
 			printf("--------------");
-		} else if ((opts & (OPT_BRIEF|OPT_NAT)) == (OPT_NAT|OPT_BRIEF))
-			printpacket(ip);
+		} else if ((opts & (OPT_BRIEF|OPT_NAT)) ==
+			   (OPT_NAT|OPT_BRIEF)) {
+			if (m != NULL)
+				printpacket(dir, m);
+			else
+				printpacket(dir, &mb);
+		}
+
 		if (dir && (ifp != NULL) && IP_V(ip) && (m != NULL))
 #if  defined(__sgi) && (IRIX < 60500)
 			(*ifp->if_output)(ifp, (void *)m, NULL);
@@ -284,6 +299,13 @@ char *argv[];
 			(*ifp->if_output)(ifp, (void *)m, NULL, 0);
 # endif
 #endif
+
+		while ((m != NULL) && (m != &mb)) {
+			n = m->mb_next;
+			freembt(m);
+			m = n;
+		}
+
 		if ((opts & (OPT_BRIEF|OPT_NAT)) != (OPT_NAT|OPT_BRIEF))
 			putchar('\n');
 		dir = 0;
@@ -292,6 +314,7 @@ char *argv[];
 			iface = ifname;
 		}
 		m = &mb;
+		m->mb_data = (char *)m->mb_buf;
 	}
 
 	if (i != 0)
@@ -309,7 +332,7 @@ char *argv[];
 		dumpgroups();
 	}
 
-	fr_deinitialise();
+	ipf_deinitialise();
 
 	return 0;
 }
@@ -329,9 +352,9 @@ int ipftestioctl(int dev, ioctlcmd_t cmd, ...)
 	data = va_arg(ap, caddr_t);
 	va_end(ap);
 
-	i = iplioctl(IPL_LOGIPF, cmd, data, FWRITE|FREAD);
+	i = ipfioctl(IPL_LOGIPF, cmd, data, FWRITE|FREAD);
 	if (opts & OPT_DEBUG)
-		fprintf(stderr, "iplioctl(IPF,%#x,%p) = %d (%d)\n",
+		fprintf(stderr, "ipfioctl(IPF,%#x,%p) = %d (%d)\n",
 			(u_int)cmd, data, i, ipf_interror);
 	if (i != 0) {
 		errno = i;
@@ -351,9 +374,9 @@ int ipnattestioctl(int dev, ioctlcmd_t cmd, ...)
 	data = va_arg(ap, caddr_t);
 	va_end(ap);
 
-	i = iplioctl(IPL_LOGNAT, cmd, data, FWRITE|FREAD);
+	i = ipfioctl(IPL_LOGNAT, cmd, data, FWRITE|FREAD);
 	if (opts & OPT_DEBUG)
-		fprintf(stderr, "iplioctl(NAT,%#x,%p) = %d\n",
+		fprintf(stderr, "ipfioctl(NAT,%#x,%p) = %d\n",
 			(u_int)cmd, data, i);
 	if (i != 0) {
 		errno = i;
@@ -373,9 +396,9 @@ int ipstatetestioctl(int dev, ioctlcmd_t cmd, ...)
 	data = va_arg(ap, caddr_t);
 	va_end(ap);
 
-	i = iplioctl(IPL_LOGSTATE, cmd, data, FWRITE|FREAD);
+	i = ipfioctl(IPL_LOGSTATE, cmd, data, FWRITE|FREAD);
 	if ((opts & OPT_DEBUG) || (i != 0))
-		fprintf(stderr, "iplioctl(STATE,%#x,%p) = %d\n",
+		fprintf(stderr, "ipfioctl(STATE,%#x,%p) = %d\n",
 			(u_int)cmd, data, i);
 	if (i != 0) {
 		errno = i;
@@ -395,9 +418,9 @@ int ipauthtestioctl(int dev, ioctlcmd_t cmd, ...)
 	data = va_arg(ap, caddr_t);
 	va_end(ap);
 
-	i = iplioctl(IPL_LOGAUTH, cmd, data, FWRITE|FREAD);
+	i = ipfioctl(IPL_LOGAUTH, cmd, data, FWRITE|FREAD);
 	if ((opts & OPT_DEBUG) || (i != 0))
-		fprintf(stderr, "iplioctl(AUTH,%#x,%p) = %d\n",
+		fprintf(stderr, "ipfioctl(AUTH,%#x,%p) = %d\n",
 			(u_int)cmd, data, i);
 	if (i != 0) {
 		errno = i;
@@ -417,9 +440,9 @@ int ipscantestioctl(int dev, ioctlcmd_t cmd, ...)
 	data = va_arg(ap, caddr_t);
 	va_end(ap);
 
-	i = iplioctl(IPL_LOGSCAN, cmd, data, FWRITE|FREAD);
+	i = ipfioctl(IPL_LOGSCAN, cmd, data, FWRITE|FREAD);
 	if ((opts & OPT_DEBUG) || (i != 0))
-		fprintf(stderr, "iplioctl(SCAN,%#x,%p) = %d\n",
+		fprintf(stderr, "ipfioctl(SCAN,%#x,%p) = %d\n",
 			(u_int)cmd, data, i);
 	if (i != 0) {
 		errno = i;
@@ -439,9 +462,9 @@ int ipsynctestioctl(int dev, ioctlcmd_t cmd, ...)
 	data = va_arg(ap, caddr_t);
 	va_end(ap);
 
-	i = iplioctl(IPL_LOGSYNC, cmd, data, FWRITE|FREAD);
+	i = ipfioctl(IPL_LOGSYNC, cmd, data, FWRITE|FREAD);
 	if ((opts & OPT_DEBUG) || (i != 0))
-		fprintf(stderr, "iplioctl(SYNC,%#x,%p) = %d\n",
+		fprintf(stderr, "ipfioctl(SYNC,%#x,%p) = %d\n",
 			(u_int)cmd, data, i);
 	if (i != 0) {
 		errno = i;
@@ -461,9 +484,9 @@ int ipooltestioctl(int dev, ioctlcmd_t cmd, ...)
 	data = va_arg(ap, caddr_t);
 	va_end(ap);
 
-	i = iplioctl(IPL_LOGLOOKUP, cmd, data, FWRITE|FREAD);
+	i = ipfioctl(IPL_LOGLOOKUP, cmd, data, FWRITE|FREAD);
 	if ((opts & OPT_DEBUG) || (i != 0))
-		fprintf(stderr, "iplioctl(POOL,%#x,%p) = %d\n",
+		fprintf(stderr, "ipfioctl(POOL,%#x,%p) = %d\n",
 			(u_int)cmd, data, i);
 	if (i != 0) {
 		errno = i;
@@ -480,9 +503,9 @@ void *data;
 	extern	int	ipf_interror;
 	int i;
 
-	i = iplioctl(IPL_LOGIPF, cmd, data, FWRITE|FREAD);
+	i = ipfioctl(IPL_LOGIPF, cmd, data, FWRITE|FREAD);
 	if ((opts & OPT_DEBUG) || (i != 0))
-		fprintf(stderr, "iplioctl(IPF,%#x,%p) = %d (%d)\n", cmd, data, i, ipf_interror);
+		fprintf(stderr, "ipfioctl(IPF,%#x,%p) = %d (%d)\n", cmd, data, i, ipf_interror);
 	if (i != 0) {
 		errno = i;
 		return -1;
@@ -498,9 +521,9 @@ void *data;
 {
 	int i;
 
-	i = iplioctl(IPL_LOGNAT, cmd, data, FWRITE|FREAD);
+	i = ipfioctl(IPL_LOGNAT, cmd, data, FWRITE|FREAD);
 	if ((opts & OPT_DEBUG) || (i != 0))
-		fprintf(stderr, "iplioctl(NAT,%#x,%p) = %d\n", cmd, data, i);
+		fprintf(stderr, "ipfioctl(NAT,%#x,%p) = %d\n", cmd, data, i);
 	if (i != 0) {
 		errno = i;
 		return -1;
@@ -516,9 +539,9 @@ void *data;
 {
 	int i;
 
-	i = iplioctl(IPL_LOGSTATE, cmd, data, FWRITE|FREAD);
+	i = ipfioctl(IPL_LOGSTATE, cmd, data, FWRITE|FREAD);
 	if ((opts & OPT_DEBUG) || (i != 0))
-		fprintf(stderr, "iplioctl(STATE,%#x,%p) = %d\n", cmd, data, i);
+		fprintf(stderr, "ipfioctl(STATE,%#x,%p) = %d\n", cmd, data, i);
 	if (i != 0) {
 		errno = i;
 		return -1;
@@ -534,9 +557,9 @@ void *data;
 {
 	int i;
 
-	i = iplioctl(IPL_LOGAUTH, cmd, data, FWRITE|FREAD);
+	i = ipfioctl(IPL_LOGAUTH, cmd, data, FWRITE|FREAD);
 	if ((opts & OPT_DEBUG) || (i != 0))
-		fprintf(stderr, "iplioctl(AUTH,%#x,%p) = %d\n", cmd, data, i);
+		fprintf(stderr, "ipfioctl(AUTH,%#x,%p) = %d\n", cmd, data, i);
 	if (i != 0) {
 		errno = i;
 		return -1;
@@ -552,9 +575,9 @@ void *data;
 {
 	int i;
 
-	i = iplioctl(IPL_LOGSYNC, cmd, data, FWRITE|FREAD);
+	i = ipfioctl(IPL_LOGSYNC, cmd, data, FWRITE|FREAD);
 	if ((opts & OPT_DEBUG) || (i != 0))
-		fprintf(stderr, "iplioctl(SYNC,%#x,%p) = %d\n", cmd, data, i);
+		fprintf(stderr, "ipfioctl(SYNC,%#x,%p) = %d\n", cmd, data, i);
 	if (i != 0) {
 		errno = i;
 		return -1;
@@ -570,9 +593,9 @@ void *data;
 {
 	int i;
 
-	i = iplioctl(IPL_LOGSCAN, cmd, data, FWRITE|FREAD);
+	i = ipfioctl(IPL_LOGSCAN, cmd, data, FWRITE|FREAD);
 	if ((opts & OPT_DEBUG) || (i != 0))
-		fprintf(stderr, "iplioctl(SCAN,%#x,%p) = %d\n", cmd, data, i);
+		fprintf(stderr, "ipfioctl(SCAN,%#x,%p) = %d\n", cmd, data, i);
 	if (i != 0) {
 		errno = i;
 		return -1;
@@ -588,9 +611,9 @@ void *data;
 {
 	int i;
 
-	i = iplioctl(IPL_LOGLOOKUP, cmd, data, FWRITE|FREAD);
+	i = ipfioctl(IPL_LOGLOOKUP, cmd, data, FWRITE|FREAD);
 	if (opts & OPT_DEBUG)
-		fprintf(stderr, "iplioctl(POOL,%#x,%p) = %d\n", cmd, data, i);
+		fprintf(stderr, "ipfioctl(POOL,%#x,%p) = %d\n", cmd, data, i);
 	if (i != 0) {
 		errno = i;
 		return -1;
@@ -630,26 +653,23 @@ int n;
  */
 void dumpnat()
 {
-	ipnat_t	*ipn;
-	nat_t	*nat;
 	hostmap_t *hm;
-	int	i;
+	ipnat_t	*ipn;
+	nat_t *nat;
 
 	printf("List of active MAP/Redirect filters:\n");
-	for (ipn = nat_list; ipn != NULL; ipn = ipn->in_next)
+	for (ipn = ipf_nat_list; ipn != NULL; ipn = ipn->in_next)
 		printnat(ipn, opts & (OPT_DEBUG|OPT_VERBOSE));
 	printf("\nList of active sessions:\n");
-	for (nat = nat_instances; nat; nat = nat->nat_next) {
-		printactivenat(nat, opts);
+	for (nat = ipf_nat_instances; nat; nat = nat->nat_next) {
+		printactivenat(nat, opts, 0, 0);
 		if (nat->nat_aps)
 			printaps(nat->nat_aps, opts);
 	}
 
 	printf("\nHostmap table:\n");
-	for (i = 0; i < ipf_hostmap_sz; i++) {
-		for (hm = maptable[i]; hm != NULL; hm = hm->hm_next)
-			printhostmap(hm, i);
-	}
+	for (hm = ipf_hm_maplist; hm != NULL; hm = hm->hm_next)
+		printhostmap(hm, hm->hm_hv);
 }
 
 
@@ -661,9 +681,9 @@ void dumpstate()
 	ipstate_t *ips;
 
 	printf("List of active state sessions:\n");
-	for (ips = ips_list; ips != NULL; )
+	for (ips = ipf_state_list; ips != NULL; )
 		ips = printstate(ips, opts & (OPT_DEBUG|OPT_VERBOSE),
-				 fr_ticks);
+				 ipf_ticks);
 }
 
 
@@ -675,7 +695,7 @@ void dumplookups()
 
 	printf("List of configured pools\n");
 	for (i = 0; i < IPL_LOGSIZE; i++)
-		for (ipl = ip_pool_list[i]; ipl != NULL; ipl = ipl->ipo_next)
+		for (ipl = ipf_pool_list[i]; ipl != NULL; ipl = ipl->ipo_next)
 			printpool(ipl, bcopywrap, NULL, opts);
 
 	printf("List of configured hash tables\n");
@@ -692,7 +712,7 @@ void dumpgroups()
 
 	printf("List of groups configured (set 0)\n");
 	for (i = 0; i < IPL_LOGSIZE; i++)
-		for (fg =  ipfgroups[i][0]; fg != NULL; fg = fg->fg_next) {
+		for (fg =  ipf_groups[i][0]; fg != NULL; fg = fg->fg_next) {
 			printf("Dev.%d. Group %s Ref %d Flags %#x\n",
 				i, fg->fg_name, fg->fg_ref, fg->fg_flags);
 			dumprules(fg->fg_start);
@@ -700,29 +720,29 @@ void dumpgroups()
 
 	printf("List of groups configured (set 1)\n");
 	for (i = 0; i < IPL_LOGSIZE; i++)
-		for (fg =  ipfgroups[i][1]; fg != NULL; fg = fg->fg_next) {
+		for (fg =  ipf_groups[i][1]; fg != NULL; fg = fg->fg_next) {
 			printf("Dev.%d. Group %s Ref %d Flags %#x\n",
 				i, fg->fg_name, fg->fg_ref, fg->fg_flags);
 			dumprules(fg->fg_start);
 		}
 
 	printf("Rules configured (set 0, in)\n");
-	dumprules(ipfilter[0][0]);
+	dumprules(ipf_rules[0][0]);
 	printf("Rules configured (set 0, out)\n");
-	dumprules(ipfilter[1][0]);
+	dumprules(ipf_rules[1][0]);
 	printf("Rules configured (set 1, in)\n");
-	dumprules(ipfilter[0][1]);
+	dumprules(ipf_rules[0][1]);
 	printf("Rules configured (set 1, out)\n");
-	dumprules(ipfilter[1][1]);
+	dumprules(ipf_rules[1][1]);
 
 	printf("Accounting rules configured (set 0, in)\n");
-	dumprules(ipacct[0][0]);
+	dumprules(ipf_acct[0][0]);
 	printf("Accounting rules configured (set 0, out)\n");
-	dumprules(ipacct[0][1]);
+	dumprules(ipf_acct[0][1]);
 	printf("Accounting rules configured (set 1, in)\n");
-	dumprules(ipacct[1][0]);
+	dumprules(ipf_acct[1][0]);
 	printf("Accounting rules configured (set 1, out)\n");
-	dumprules(ipacct[1][1]);
+	dumprules(ipf_acct[1][1]);
 }
 
 void dumprules(rulehead)
@@ -768,7 +788,7 @@ char *filename;
 			uio.uio_resid = iov.iov_len;
 			resid = uio.uio_resid;
 
-			if (ipflog_read(i, &uio) == 0) {
+			if (ipf_log_read(i, &uio) == 0) {
 				/*
 				 * If nothing was read then break out.
 				 */

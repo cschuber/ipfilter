@@ -193,7 +193,8 @@ bpf_filter(pc, p, wirelen, buflen)
 	register int k;
 	int32 mem[BPF_MEMWORDS];
 	mb_t *m, *n;
-	int merr, len;
+	int merr = 0;	/* XXX: GCC */
+	int len;
 
 	if (buflen == 0) {
 		m = (mb_t *)p;
