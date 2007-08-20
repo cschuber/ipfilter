@@ -1,0 +1,57 @@
+#!/usr/bin/sh
+########
+#  Product: IP Fitler
+#  Fileset: IPF-ALL
+#  postinstall
+########
+#
+# (c) Copyright Darren Reed 2000
+#
+########
+PATH=/usr/bin:/usr/sbin:/bin:/sbin
+export PATH
+########
+# Source control script environment
+########
+ETCDIR=/etc/opt/ipf
+
+UTILS="/usr/lbin/sw/control_utils"
+if [[ ! -f $UTILS ]] ; then
+    echo "ERROR: Cannot find $UTILS"
+    exit 1
+fi
+. $UTILS
+exitval=$SUCCESS
+
+########
+# Restore original header files
+# The script checkremove has verified that it exists.
+########
+
+#    exit $GLOBAL_ERROR
+
+for i in ipf.conf ipnat.conf; do
+	/bin/touch ${ETCDIR}/$i
+	/bin/chmod 444 ${ETCDIR}/$i
+done
+(kmadmin -U pfil)
+(kminstall -d pfil)
+
+cd ${SW_ROOT_DIRECTORY}stand/pfil
+
+kminstall -u pfil
+if [[ $? -ne 0 ]] ; then
+	exit 1
+fi
+config -M pfil -u
+if [[ $? -ne 0 ]] ; then
+	exit 1
+fi
+kmadmin -L pfil
+kmadmin -Q pfil
+if [[ $? -ne 0 ]] ; then
+	exit 1
+fi
+ln -s /sbin/init.d/pfilboot /sbin/rc2.d/S010pfilboot
+
+exit $exitval

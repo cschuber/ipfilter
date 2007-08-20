@@ -1,0 +1,29 @@
+#!/sbin/sh
+#
+PATH=/sbin:/usr/bin:/usr/sbin:/opt/ipf/bin
+#
+. /etc/rc.config
+
+case "$1" in
+	start_msg)
+		echo "Configuring PFIL"
+		;;
+
+	stop_msg)
+		;;
+
+	start)
+		kmadmin -L pfil
+		autopush -f /etc/opt/pfil/iu.ap
+		;;
+
+	stop)
+		;;
+
+	*)
+		echo "Usage: $0 start" >&2
+		exit 1
+		;;
+
+esac
+exit 0

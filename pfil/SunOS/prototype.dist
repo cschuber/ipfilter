@@ -1,0 +1,26 @@
+i pkginfo
+i copyright
+i preinstall
+i postinstall
+i postremove
+d none etc
+d none etc/init.d
+f none etc/init.d/pfil=S10pfil 0755 root root
+d none etc/rcS.d
+l none etc/rcS.d/S10pfil=/etc/init.d/pfil 0755 root root
+d none etc/rc2.d
+l none etc/rc2.d/S10pfil=/etc/init.d/pfil 0755 root root
+d none etc/opt
+d none etc/opt/pfil 0755 root root
+v preserve etc/opt/pfil/iu.ap=iu.ap 0644 root root
+d none kernel
+d none kernel/drv
+f none kernel/drv/pfil=pfil32 0755 root root
+d none kernel/strmod
+l none kernel/strmod/pfil=../drv/pfil
+f none kernel/drv/pfil.conf=pfil.conf 0755 root root
+d none usr
+d none usr/include
+d none usr/include/net
+f none usr/include/net/pfil.h=../pfil.h 0644 root bin
+f none usr/include/net/qif.h=../qif.h 0644 root bin

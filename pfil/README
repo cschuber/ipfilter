@@ -1,0 +1,64 @@
+Installation.
+-------------
+
+1. Build package
+----------------
+At a shell prompt, do:
+
+make package
+
+This will compile and create pfil.pkg.  Copy this to the destination
+machine, where you will install the package.
+
+To build with gcc:
+make -f Makefile.gcc package
+
+2. Install package
+------------------
+Run the following command from a shell prompt:
+
+pkgadd -d /tmp/pfil.pkg
+
+Check the file /etc/opt/pfil/iu.ap.  It should contain one line for
+each network interface type, excluding the loopback (lo).  You must now
+reboot the system.
+
+3. Check configuration
+----------------------
+
+As root, run this command:
+
+strconf < /dev/hme
+
+(assuming there is a hme network interface configured).  This should
+produce two lines of output, one with 'pfil' (1st) and one with 'hme'
+(2nd).
+
+
+4. Use on Solaris8 and later with ifconfig.
+-------------------------------------------
+If you do "ifconfig <if> modlist", you will see a list of STREAMS modules
+pushed onto the interface like this (for hme0):
+0 arp
+1 ip
+2 hme
+You need to insert pfil between ip and hme.  To do this, you do the
+following:
+ifconfig hme0 modinsert pfil@2
+checking the list, you should see:
+0 arp
+1 ip
+2 pfil
+3 hme
+
+5. Confirming Interfaces Attached.
+----------------------------------
+pfil supports the ndd interface and the list of active interfaces can be
+queried as follows:
+
+# ndd /dev/pfil qif_status
+ifname ill q OTHERQ num sap hl len nr nw bad copy drop notip nodata notdata
+hme0     f665d174 f6424df0 f6424e6c 0 800 14 0 2 1 0 0 0 1 0 2
+
+The list of commands pfil supports via ndd is determined with:
+# ndd /dev/pfil \?

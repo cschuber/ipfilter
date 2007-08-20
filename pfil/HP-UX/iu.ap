@@ -1,0 +1,7 @@
+dlpi -1 0 pfil
+cip -1 0 pfil
+el -1 0 pfil
+tun -1 0 pfil
+ixe -1 0 ip2ixe pfil
+mfe -1 0 ip2mfe pfil
+clic -1 0 pfil

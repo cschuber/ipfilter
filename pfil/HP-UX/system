@@ -1,0 +1,8 @@
+*
+* system file for "pfil" module
+*
+$VERSION	1
+$CONFIGURE	Y
+$LOADABLE	Y
+$TUNABLE
+$$$

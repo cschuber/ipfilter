@@ -1,0 +1,41 @@
+*** S25fw1boot.orig	Mon Jun 12 23:36:02 2000
+--- S25fw1boot	Mon Jun 12 23:36:05 2000
+***************
+*** 98,104 ****
+--- 98,133 ----
+  	else
+  		if $ap_cmd -g $ifdev 0 >/dev/null 2>&1 ; then
+  			ap_if_save=`$ap_cmd -g $ifdev 0`
++ 			set -- $ap_if_save
++ 			apifs="$1 $2"
++ 			shift
++ 			shift
++ 			if [ $1 = pfil ] ; then
++ 				pfil=pfil
++ 				shift
++ 			else
++ 				pfil=
++ 			fi
++ 			ap_if_save="$apifs $*"
+  			ap_if_fw=`$ap_cmd -g $ifdev 0 0 $pfil fw`
++ 			set -- $ap_if_fw
++ 			apifws="$1 $2"
++ 			shift
++ 			shift
++ 			if [ x$pfil = x ] ; then
++ 				apifws="$apifws $*"
++ 			else
++ 				apifws="$apifws pfil fw"
++ 				shift
++ 				shift
++ 				while [ $# -gt 0 ] ; do
++ 					if [ $1 != pfil ] ; then
++ 						apifws="$apifws $1"
++ 					fi
++ 					shift
++ 				done
++ 			fi
++ 			ap_if_fw=$apifws
+  			apverify $ifdev $ap_if_save
+    			dbg echo $ap_cmd -r $ifdev 0
+   			$ap_cmd -r $ifdev 0
