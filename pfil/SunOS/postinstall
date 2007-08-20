@@ -1,0 +1,28 @@
+#!/bin/sh
+#
+CONFDIR=${BASEDIR}/etc/opt/pfil
+AUTOPUSH=${CONFDIR}/iu.ap
+
+if [ x${BASEDIR} = x -o x${BASEDIR} = x/ ] ; then
+	add_drv -m '* 0600 root root' pfil
+else
+	add_drv -m '* 0600 root root' -b ${BASEDIR:-/} pfil
+fi
+
+if [ x"`grep name=pfil ${BASEDIR}/etc/devlink.tab`" = x ] ; then
+	echo "type=ddi_pseudo;name=pfil	\M0" >>${BASEDIR}/etc/devlink.tab
+fi
+
+ifaces=`ifconfig -a|sed -ne 's/\([a-z0-9]*\)[0-9]\{1,\}[:0-9]*: .*/\1/p'|grep -v lo|sort -u`
+for i in $ifaces; do
+	/usr/xpg4/bin/grep -q "	$i	" ${AUTOPUSH}
+	if [ $? -ne 0 ] ; then
+		echo "	$i	-1	0	pfil" >> ${AUTOPUSH}
+	fi
+done
+
+/usr/sbin/devlinks
+if [ -d /usr/ucb -a -f /usr/ucb/ucblinks ] ; then
+	/usr/ucb/ucblinks
+fi
+exit 0

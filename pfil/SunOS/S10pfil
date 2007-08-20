@@ -1,0 +1,89 @@
+#!/bin/sh
+PFILAP=/etc/opt/pfil/iu.ap
+
+fixif()
+{
+	ifconfig $1 2>/dev/null 1>&2
+	if [ $? -ne 0 ] ; then
+		ifconfig $1 plumb
+		ifconfig $1 unplumb
+	fi
+}
+
+fixtun()
+{
+	# Unfortunately tunnels are implemented using
+	# a streams modules, not a device driver so
+	# autopush isn't of much help.  The current
+	# approach is to see if /usr/bin exists in
+	# which case it's late enough in the game
+	# to plumb the tunnel and modinsert pfil.
+
+	ifname="$1"
+
+	if [ -d /usr/bin ] ; then
+		ifconfig $ifname plumb
+		set -- `ifconfig $ifname modlist`
+		pos=""
+		while [ $# -ge 2 -a -z "$pos" ]
+			do
+				case "$2" in
+					tun) pos="$1"
+						;;
+					pfil) return
+						;;
+					*)
+						;;
+				esac
+				shift 2
+			done
+		if [ -n "$pos" ] ; then
+			ifconfig $ifname modinsert pfil@$pos
+		fi
+	fi
+}
+
+
+case "$1" in
+	start)
+		if [ ! -f /etc/ipf.conf -a ! -f /etc/opt/ipf/ipf.conf ] ; then
+			exit 0;
+		fi
+		iflist="`echo /etc/hostname.*[0-9] 2>/dev/null`"
+		if [ "$iflist" != '/etc/hostname.*[0-9]' ] ; then
+			(
+				y=xxx
+				x=$IFS
+				for i in /etc/hostname.*[0-9]; do
+					ORIGIFS="$IFS"
+					IFS="$IFS.:"
+					set -- $i
+					IFS="$ORIGIFS"
+					case "$2" in
+						# Handle tunnels
+						ip|ip6) ifname="$2.$3"
+							fixtun $ifname
+							continue
+							;;
+						# Normal interfaces
+						*) ifname="$2"
+							;;
+					esac
+					if [ $ifname != $y ] ; then
+						y=$ifname
+						fixif $ifname
+					fi
+				done
+			)
+		fi
+		echo > /dev/pfil
+		autopush -f ${PFILAP} 2>/dev/null 1>&2
+		;;
+
+	*)
+		echo "Usage: $0 start" >&2
+		exit 1
+		;;
+
+esac
+exit 0

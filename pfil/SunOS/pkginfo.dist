@@ -1,0 +1,18 @@
+CLASSES=none save restore
+BASEDIR=/
+TZ=EST
+PATH=/sbin:/usr/sbin:/usr/bin:/usr/sadm/install/bin
+PKG=pfil
+NAME=Packet Filtering Interface
+ARCH=ARCH_updated_by_sed_when_package_is_built
+VERSION=2.1.13,REV=RELEASE_DATE
+CATEGORY=system
+DESC=Packet Filter Control Driver
+VENDOR=Darren Reed
+HOTLINE=
+EMAIL=
+VSTOCK=
+PSTAMP=
+PKGINST=pfil
+PKGSAV=/var/sadm/pkg/pfil/save
+INSTDATE=
