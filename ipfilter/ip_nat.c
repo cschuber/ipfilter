@@ -16,7 +16,11 @@
 #include <sys/file.h>
 #if defined(__NetBSD__) && (NetBSD >= 199905) && !defined(IPFILTER_LKM) && \
     defined(_KERNEL)
-# include "opt_ipfilter_log.h"
+# if (__NetBSD_Version__ < 399001400)
+#  include "opt_ipfilter_log.h"
+# else
+#  include "opt_ipfilter.h"
+# endif
 #endif
 #if !defined(_KERNEL)
 # include <stdio.h>
@@ -145,6 +149,7 @@ u_int	fr_nat_maxbucket = 0,
 	fr_nat_maxbucket_reset = 1;
 u_32_t	nat_masks = 0;
 u_32_t	rdr_masks = 0;
+u_long	nat_last_force_flush = 0;
 ipnat_t	**nat_rules = NULL;
 ipnat_t	**rdr_rules = NULL;
 hostmap_t	**ipf_hm_maptable  = NULL;
@@ -154,6 +159,7 @@ ipftq_t	nat_udptq;
 ipftq_t	nat_icmptq;
 ipftq_t	nat_iptq;
 ipftq_t	*nat_utqe = NULL;
+int	fr_nat_doflush = 0;
 #ifdef  IPFILTER_LOG
 int	nat_logging = 1;
 #else
@@ -180,6 +186,7 @@ static	void	nat_delnat __P((struct ipnat *));
 static	int	fr_natgetent __P((caddr_t));
 static	int	fr_natgetsz __P((caddr_t));
 static	int	fr_natputent __P((caddr_t, int));
+static	int	nat_extraflush __P((int));
 static	void	nat_tabmove __P((nat_t *));
 static	int	nat_match __P((fr_info_t *, ipnat_t *));
 static	INLINE	int nat_newmap __P((fr_info_t *, nat_t *, natinfo_t *));
@@ -838,6 +845,8 @@ void *ctx;
 				ret = nat_flushtable();
 			else if (arg == 1)
 				ret = nat_clearlist();
+			else if (arg >=2 && arg <= 4)
+				ret = nat_extraflush(arg - 2);
 			else
 				error = EINVAL;
 		}
@@ -2257,6 +2266,7 @@ int direction;
 
 	if (nat_stats.ns_inuse >= ipf_nattable_max) {
 		nat_stats.ns_memfail++;
+		fr_nat_doflush = 1;
 		return NULL;
 	}
 
@@ -2803,14 +2813,17 @@ int dir;
 	/*
 	 * Step 1
 	 * Fix the IP addresses in the offending IP packet. You also need
-	 * to adjust the IP header checksum of that offending IP packet
-	 * and the ICMP checksum of the ICMP error message itself.
+	 * to adjust the IP header checksum of that offending IP packet.
 	 *
-	 * Unfortunately, for UDP and TCP, the IP addresses are also contained
-	 * in the pseudo header that is used to compute the UDP resp. TCP
-	 * checksum. So, we must compensate that as well. Even worse, the
-	 * change in the UDP and TCP checksums require yet another
-	 * adjustment of the ICMP checksum of the ICMP error message.
+	 * Normally, you would expect that the ICMP checksum of the
+	 * ICMP error message needs to be adjusted as well for the
+	 * IP address change in oip.
+	 * However, this is a NOP, because the ICMP checksum is
+	 * calculated over the complete ICMP packet, which includes the
+	 * changed oip IP addresses and oip->ip_sum. However, these
+	 * two changes cancel each other out (if the delta for
+	 * the IP address is x, then the delta for ip_sum is minus x),
+	 * so no change in the icmp_cksum is necessary.
 	 */
 
 	if (nat->nat_dir == NAT_OUTBOUND) {
@@ -2829,23 +2842,6 @@ int dir;
 			sumd--;
 		sumd = ~sumd;
 
-		/*
-		 * Fix IP checksum of the offending IP packet to adjust for
-		 * the change in the IP address.
-		 *
-		 * Normally, you would expect that the ICMP checksum of the
-		 * ICMP error message needs to be adjusted as well for the
-		 * IP address change in oip.
-		 * However, this is a NOP, because the ICMP checksum is
-		 * calculated over the complete ICMP packet, which includes the
-		 * changed oip IP addresses and oip->ip_sum. However, these
-		 * two changes cancel each other out (if the delta for
-		 * the IP address is x, then the delta for ip_sum is minus x),
-		 * so no change in the icmp_cksum is necessary.
-		 *
-		 * Be careful that nat_dir refers to the direction of the
-		 * offending IP packet (oip), not to its ICMP response (icmp)
-		 */
 		fix_datacksum(&oip->ip_sum, sumd);
 	}
 
@@ -2862,21 +2858,14 @@ int dir;
 		 * Step 2 :
 		 * For offending TCP/UDP IP packets, translate the ports as
 		 * well, based on the NAT specification. Of course such
-		 * a change must be reflected in the ICMP checksum as well.
-		 *
-		 * Advance notice : Now it becomes complicated :-)
+		 * a change may be reflected in the ICMP checksum as well.
 		 *
 		 * Since the port fields are part of the TCP/UDP checksum
 		 * of the offending IP packet, you need to adjust that checksum
 		 * as well... except that the change in the port numbers should 
-		 * be offset by the checksum change, so we only need to change  
-		 * the ICMP checksum if we only change the ports.
-		 *
-		 * To further complicate: the TCP checksum is not in the first
-		 * 8 bytes of the offending ip packet, so it most likely is not
-		 * available. Some OSses like Solaris return enough bytes to
-		 * include the TCP checksum. So we have to check if the
-		 * ip->ip_len actually holds the TCP checksum of the oip!
+		 * be offset by the checksum change.  However, the TCP/UDP
+		 * checksum will also need to change if there has been an
+		 * IP address change.
 		 */
 		if (nat->nat_dir == NAT_OUTBOUND) {
 			sum1 = ntohs(nat->nat_inport);
@@ -2891,14 +2880,20 @@ int dir;
 		}
 
 		sumd += sum1 - sum2;
-		if (sumd != 0) {
+		if (sumd != 0 || sumd2 != 0) {
 			/*
-			 * Fix udp checksum to compensate port adjustment.
-			 * NOTE : the offending IP packet flows the other
-			 * direction compared to the ICMP message.
+			 * At this point, sumd is the delta to apply to the
+			 * TCP/UDP header, given the changes in both the IP
+			 * address and the ports and sumd2 is the delta to
+			 * apply to the ICMP header, given the IP address
+			 * change delta that may need to be applied to the
+			 * TCP/UDP checksum instead.
 			 *
-			 * The UDP checksum is optional, only adjust it if
-			 * it has been set.
+			 * If we will both the IP and TCP/UDP checksums
+			 * then the ICMP checksum changes by the address
+			 * delta applied to the TCP/UDP checksum.  If we
+			 * do not change the TCP/UDP checksum them we
+			 * apply the delta in ports to the ICMP checksum.
 			 */
 			if (oip->ip_p == IPPROTO_UDP) {
 				if ((dlen >= 8) && (*csump != 0)) {
@@ -2908,14 +2903,7 @@ int dir;
 					if (sum2 > sum1)
 						sumd2--;
 				}
-			}
-
-			/*
-			 * Fix TCP checksum (if present) to compensate port
-			 * adjustment. NOTE : the offending IP packet flows
-			 * the other direction compared to the ICMP message.
-			 */
-			else if (oip->ip_p == IPPROTO_TCP) {
+			} else if (oip->ip_p == IPPROTO_TCP) {
 				if (dlen >= 18) {
 					fix_datacksum(csump, sumd);
 				} else {
@@ -4342,6 +4330,11 @@ void fr_natexpire()
 		}
 	}
 
+	if (fr_nat_doflush != 0) {
+		nat_extraflush(2);
+		fr_nat_doflush = 0;
+	}
+
 	RWLOCK_EXIT(&ipf_nat);
 	SPL_X(s);
 }
@@ -5088,4 +5081,143 @@ ipfgeniter_t *itp;
 	}
 
 	return error;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    nat_extraflush                                              */
+/* Returns:     int - 0 == success, -1 == failure                           */
+/* Parameters:  which(I) - how to flush the active NAT table                */
+/* Write Locks: ipf_nat                                                     */
+/*                                                                          */
+/* Flush nat tables.  Three actions currently defined:                      */
+/* which == 0 : flush all nat table entries                                 */
+/* which == 1 : flush TCP connections which have started to close but are   */
+/*	      stuck for some reason.                                        */
+/* which == 2 : flush TCP connections which have been idle for a long time, */
+/*	      starting at > 4 days idle and working back in successive half-*/
+/*	      days to at most 12 hours old.  If this fails to free enough   */
+/*            slots then work backwards in half hour slots to 30 minutes.   */
+/*            If that too fails, then work backwards in 30 second intervals */
+/*            for the last 30 minutes to at worst 30 seconds idle.          */
+/* ------------------------------------------------------------------------ */
+static int nat_extraflush(which)
+int which;
+{
+	ipftq_t *ifq, *ifqnext;
+	ipftqent_t *tqe, *tqn;
+	int delete, removed;
+	nat_t *nat, **natp;
+	long try, maxtick;
+	u_long interval;
+	SPL_INT(s);
+
+	removed = 0;
+
+	SPL_NET(s);
+	for (natp = &nat_instances; ((nat = *natp) != NULL); ) {
+		delete = 0;
+
+		switch (which)
+		{
+		case 0 :
+			delete = 1;
+			break;
+		case 1 :
+		case 2 :
+			if (nat->nat_p != IPPROTO_TCP)
+				break;
+			if ((nat->nat_tcpstate[0] != IPF_TCPS_ESTABLISHED) ||
+			    (nat->nat_tcpstate[1] != IPF_TCPS_ESTABLISHED))
+				delete = 1;
+			break;
+		}
+
+		if (delete) {
+			nat_delete(nat, ISL_FLUSH);
+			removed++;
+		} else
+			natp = &nat->nat_next;
+	}
+
+	if (which != 2) {
+		SPL_X(s);
+		return removed;
+	}
+
+	/*
+	 * Asked to remove inactive entries because the table is full, try
+	 * again, 3 times, if first attempt failed with a different criteria
+	 * each time.  The order tried in must be in decreasing age.
+	 * Another alternative is to implement random drop and drop N entries
+	 * at random until N have been freed up.
+	 */
+	if (fr_ticks - nat_last_force_flush < IPF_TTLVAL(5))
+		goto force_flush_skipped;
+	nat_last_force_flush = fr_ticks;
+
+	if (fr_ticks > IPF_TTLVAL(43200))
+		interval = IPF_TTLVAL(43200);
+	else if (fr_ticks > IPF_TTLVAL(1800))
+		interval = IPF_TTLVAL(1800);
+	else if (fr_ticks > IPF_TTLVAL(30))
+		interval = IPF_TTLVAL(30);
+	else
+		interval = IPF_TTLVAL(10);
+	try = fr_ticks - (fr_ticks - interval);
+	if (try < 0)
+		goto force_flush_skipped;
+
+	while (removed == 0) {
+		maxtick = fr_ticks - interval;
+		if (maxtick < 0)
+			break;
+
+		while (try < maxtick) {
+			for (ifq = ips_tqtqb; ifq != NULL;
+			     ifq = ifq->ifq_next) {
+				for (tqn = ifq->ifq_head;
+				     ((tqe = tqn) != NULL); ) {
+					if (tqe->tqe_die > try)
+						break;
+					tqn = tqe->tqe_next;
+					nat = tqe->tqe_parent;
+					nat_delete(nat, ISL_EXPIRE);
+					removed++;
+				}
+			}
+
+			for (ifq = ips_utqe; ifq != NULL; ifq = ifqnext) {
+				ifqnext = ifq->ifq_next;
+
+				for (tqn = ifq->ifq_head;
+				     ((tqe = tqn) != NULL); ) {
+					if (tqe->tqe_die > try)
+						break;
+					tqn = tqe->tqe_next;
+					nat = tqe->tqe_parent;
+					nat_delete(nat, ISL_EXPIRE);
+					removed++;
+				}
+			}
+			if (try + interval > maxtick)
+				break;
+			try += interval;
+		}
+
+		if (removed == 0) {
+			if (interval == IPF_TTLVAL(43200)) {
+				interval = IPF_TTLVAL(1800);
+			} else if (interval == IPF_TTLVAL(1800)) {
+				interval = IPF_TTLVAL(30);
+			} else if (interval == IPF_TTLVAL(30)) {
+				interval = IPF_TTLVAL(10);
+			} else {
+				break;
+			}
+		}
+	}
+force_flush_skipped:
+	SPL_X(s);
+	return removed;
 }

@@ -409,6 +409,7 @@ extern	u_int	ipf_hostmap_sz;
 extern	u_int	fr_nat_maxbucket;
 extern	u_int	fr_nat_maxbucket_reset;
 extern	int	fr_nat_lock;
+extern	int	fr_nat_doflush;
 extern	void	fr_natsync __P((void *));
 extern	u_long	fr_defnatage;
 extern	u_long	fr_defnaticmpage;

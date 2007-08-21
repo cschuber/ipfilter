@@ -16,7 +16,11 @@ static const char rcsid[] = "@(#)$Id$";
 #endif
 #include <sys/param.h>
 #if (NetBSD >= 199905) && !defined(IPFILTER_LKM) && defined(_KERNEL)
-# include "opt_ipfilter_log.h"
+# if (__NetBSD_Version__ < 399001400)
+#  include "opt_ipfilter_log.h"
+# else
+#  include "opt_ipfilter.h"
+# endif
 # include "opt_pfil_hooks.h"
 # include "opt_ipsec.h"
 #endif
@@ -650,6 +654,9 @@ dev_t dev;
 register struct uio *uio;
 {
 
+	if (fr_running < 1)
+		return EIO;
+
 # ifdef	IPFILTER_SYNC
 	if (GET_MINOR(dev) == IPL_LOGSYNC)
 		return ipfsync_read(uio);
@@ -678,6 +685,9 @@ int iplwrite(dev, uio)
 dev_t dev;
 register struct uio *uio;
 {
+
+	if (fr_running < 1)
+		return EIO;
 
 #ifdef	IPFILTER_SYNC
 	if (GET_MINOR(dev) == IPL_LOGSYNC)
@@ -1361,18 +1371,27 @@ frdest_t *fdp;
 
 	{
 #if (__NetBSD_Version__ >= 106010000)
+# if (__NetBSD_Version__ >= 399001400)
+		struct in6_ifextra *ife;
+# else
 		struct in6_addr finaldst = fin->fin_dst6;
 		int frag;
+# endif
 #endif
 		if (ro->ro_rt->rt_flags & RTF_GATEWAY)
 			dst6 = (struct sockaddr_in6 *)ro->ro_rt->rt_gateway;
 		ro->ro_rt->rt_use++;
 
+		/* Determine path MTU. */
 #if (__NetBSD_Version__ <= 106009999)
 		mtu = nd_ifinfo[ifp->if_index].linkmtu;
 #else
-		/* Determine path MTU. */
+# if (__NetBSD_Version__ >= 399001400)
+		ife = (struct in6_ifextra *)(ifp)->if_afdata[AF_INET6];
+		mtu = ife->nd_ifinfo[ifp->if_index].linkmtu;
+# else
 		error = ip6_getpmtu(ro, ro, ifp, &finaldst, &mtu, &frag);
+# endif
 #endif
 		if ((error == 0) && (m0->m_pkthdr.len <= mtu)) {
 			*mpp = NULL;

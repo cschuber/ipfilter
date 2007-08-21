@@ -1109,7 +1109,7 @@ typedef	union	ipftunevalptr	{
 
 typedef	struct	ipftuneable	{
 	ipftunevalptr_t	ipft_una;
-	char		*ipft_name;
+	const char	*ipft_name;
 	u_long		ipft_min;
 	u_long		ipft_max;
 	int		ipft_sz;
@@ -1258,6 +1258,7 @@ extern	void	m_freem __P((mb_t *));
 extern	int	bcopywrap __P((void *, void *, size_t));
 #else /* #ifndef _KERNEL */
 # ifdef BSD
+#  include <sys/selinfo.h>
 extern struct selinfo ipfselwait[IPL_LOGSIZE];
 # endif
 # if defined(__NetBSD__) && defined(PFIL_HOOKS)
@@ -1318,7 +1319,11 @@ extern	int	iplioctl __P((struct cdev*, u_long, caddr_t, int, struct thread *));
 extern	int	iplioctl __P((dev_t, u_long, caddr_t, int, struct thread *));
 #      endif /* __FreeBSD_version >= 502116 */
 #     else
+#      if  (__NetBSD_Version__ >= 399001400)
+extern	int	iplioctl __P((dev_t, u_long, caddr_t, int, struct lwp *));
+#      else
 extern	int	iplioctl __P((dev_t, u_long, caddr_t, int, struct proc *));
+#      endif
 #     endif /* __FreeBSD_version >= 500024 */
 #    else
 extern	int	iplioctl __P((dev_t, int, caddr_t, int, struct proc *));
@@ -1332,8 +1337,13 @@ extern	int	iplopen __P((dev_t, int, int, struct thread *));
 extern	int	iplclose __P((dev_t, int, int, struct thread *));
 #      endif /* __FreeBSD_version >= 502116 */
 #    else
+#     if  (__NetBSD_Version__ >= 399001400)
+extern	int	iplopen __P((dev_t, int, int, struct lwp *));
+extern	int	iplclose __P((dev_t, int, int, struct lwp *));
+#     else
 extern	int	iplopen __P((dev_t, int, int, struct proc *));
 extern	int	iplclose __P((dev_t, int, int, struct proc *));
+#     endif /* __NetBSD_Version__ >= 399001400 */
 #    endif /* __FreeBSD_version >= 500024 */
 #   else
 #    ifdef linux

@@ -327,6 +327,9 @@ register struct uio *uio;
 int ioflag;
 {
 
+	if (fr_running < 1)
+		return EIO;
+
 # ifdef	IPFILTER_SYNC
 	if (GET_MINOR(dev) == IPL_LOGSYNC)
 		return ipfsync_read(uio);
@@ -355,6 +358,9 @@ int iplwrite(dev, uio)
 dev_t dev;
 register struct uio *uio;
 {
+
+	if (fr_running < 1)
+		return EIO;
 
 #ifdef	IPFILTER_SYNC
 	if (GET_MINOR(dev) == IPL_LOGSYNC)

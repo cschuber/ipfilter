@@ -60,6 +60,9 @@ static const char rcsid[] = "@(#)$Id$";
 #include <net/if.h>
 #if __FreeBSD_version >= 300000
 # include <net/if_var.h>
+# if __FreeBSD_version >= 504000
+#  include <net/netisr.h>
+# endif
 # if !defined(IPFILTER_LKM)
 #  include "opt_ipfilter.h"
 # endif
@@ -441,7 +444,11 @@ int iplioctl(dev, cmd, data, mode
 , p)
 #  if (__FreeBSD_version >= 500024)
 struct thread *p;
-#   define	p_uid	t_proc->p_cred->p_ruid
+#   if (__FreeBSD_version >= 504000)
+#    define	p_uid	td_ucred->cr_ruid
+#   else
+#    define	p_uid	t_proc->p_cred->p_ruid
+#   endif
 #  else
 struct proc *p;
 #   define	p_uid	p_cred->p_ruid
@@ -616,6 +623,9 @@ register struct uio *uio;
 {
 	u_int	xmin = GET_MINOR(dev);
 
+	if (fr_running < 1)
+		return EIO;
+
 	if (xmin < 0)
 		return ENXIO;
 
@@ -651,6 +661,9 @@ dev_t dev;
 #endif
 register struct uio *uio;
 {
+
+	if (fr_running < 1)
+		return EIO;
 
 #ifdef	IPFILTER_SYNC
 	if (GET_MINOR(dev) == IPL_LOGSYNC)
@@ -1605,17 +1618,15 @@ int ipf_inject(fin, m)
 fr_info_t *fin;
 mb_t *m;
 {
-	int error;
-	mb_t *m;
+	int error = 0;
 
 	if (fin->fin_out == 0) {
-		struct ifqueue *ifq;
-
-		ifq = &ipintrq;
-
 #if (__FreeBSD_version >= 501000)
 		netisr_dispatch(NETISR_IP, m);
 #else
+		struct ifqueue *ifq;
+
+		ifq = &ipintrq;
 
 		if (IF_QFULL(ifq)) {
 			IF_DROP(ifq);
@@ -1623,7 +1634,6 @@ mb_t *m;
 			error = ENOBUFS;
 		} else {
 			IF_ENQUEUE(ifq, m);
-			error = 0;
 		}
 #endif
 	} else {

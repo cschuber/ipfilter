@@ -78,6 +78,9 @@ void ippr_pptp_fini()
 
 /*
  * Setup for a new PPTP proxy.
+ *
+ * NOTE: The printf's are broken up with %s in them to prevent them being
+ * optimised into puts statements on FreeBSD (this doesn't exist in the kernel)
  */
 int ippr_pptp_new(fin, aps, nat)
 fr_info_t *fin;

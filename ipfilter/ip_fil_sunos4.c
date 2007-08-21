@@ -236,6 +236,9 @@ int iplread(dev, uio)
 dev_t dev;
 register struct uio *uio;
 {
+	if (fr_running < 1)
+		return EIO;
+
 #ifdef IPFILTER_LOG
 	return ipflog_read(GET_MINOR(dev), uio);
 #else
@@ -251,6 +254,9 @@ int iplwrite(dev, uio)
 dev_t dev;
 register struct uio *uio;
 {
+	if (fr_running < 1)
+		return EIO;
+
 #ifdef IPFILTER_SYNC
 	if (getminor(dev) == IPL_LOGSYNC)
 		return ipfsync_write(uio);

@@ -16,7 +16,11 @@ static const char rcsid[] = "@(#)$Id$";
 #include <sys/ioctl.h>
 #include <sys/filio.h>
 #include <sys/systm.h>
-#include <sys/cred.h>
+#if SOLARIS2 >= 10
+# include <sys/cred_impl.h>
+#else
+# include <sys/cred.h>
+#endif
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <sys/ksynch.h>
@@ -58,6 +62,7 @@ extern	int	fr_flags, fr_active;
 
 
 static	int	fr_send_ip __P((fr_info_t *fin, mblk_t *m, mblk_t **mp));
+static	void	ipf_fixl4sum __P((fr_info_t *));
 
 ipfmutex_t	ipl_mutex, ipf_authmx, ipf_rw, ipf_stinsert;
 ipfmutex_t	ipf_nat_new, ipf_natio, ipf_timeoutlock;
@@ -324,6 +329,10 @@ cred_t *cp;
 # ifdef	IPFDEBUG
 	cmn_err(CE_CONT, "iplread(%x,%x,%x)\n", dev, uio, cp);
 # endif
+
+	if (fr_running < 1)
+		return EIO;
+
 # ifdef	IPFILTER_SYNC
 	if (getminor(dev) == IPL_LOGSYNC)
 		return ipfsync_read(uio);
@@ -348,6 +357,10 @@ cred_t *cp;
 #ifdef	IPFDEBUG
 	cmn_err(CE_CONT, "iplwrite(%x,%x,%x)\n", dev, uio, cp);
 #endif
+
+	if (fr_running < 1)
+		return EIO;
+
 #ifdef	IPFILTER_SYNC
 	if (getminor(dev) == IPL_LOGSYNC)
 		return ipfsync_write(uio);
@@ -627,7 +640,7 @@ int dst;
 		ip->ip_p = IPPROTO_ICMP;
 		ip->ip_id = fin->fin_ip->ip_id;
 		ip->ip_tos = fin->fin_ip->ip_tos;
-		ip->ip_len = htons((u_short)sz);
+		ip->ip_len = (u_short)sz;
 		if (dst == 0) {
 			if (fr_ifpaddr(4, FRI_NORMAL, qpi->qpi_real,
 				       &dst4, NULL) == -1) {
@@ -1013,7 +1026,28 @@ frdest_t *fdp;
 
 		fin->fin_out = 0;
 		fin->fin_ifp = saveqif;
+	} else if (fin->fin_out == 1) {
+#if SOLARIS2 >= 6
+		/*
+		 * We're taking a packet from an interface and putting it on
+		 * another interface.  There's no guarantee that the other
+		 * interface will have the same capabilities, so disable
+		 * any flags that are set and do things manually for both
+		 * IP and TCP/UDP
+		 */
+		if (mb->b_datap->db_struioflag) {
+			mb->b_datap->db_struioflag = 0;
+
+			if (fin->fin_v == 4) {
+				ip->ip_sum = 0;
+				ip->ip_sum = ipf_cksum((u_short *)ip,
+						       sizeof(*ip));
+			}
+			ipf_fixl4sum(fin);
+		}
+#endif
 	}
+
 #ifndef sparc
 	if (fin->fin_v == 4) {
 		__iplen = (u_short)ip->ip_len,
@@ -1129,4 +1163,36 @@ int ipf_inject(fr_info_t *fin, mb_t *m)
 	strncpy(qp->qp_ifname, fin->fin_ifname, LIFNAMSIZ);
 	qif_addinject(qp);
 	return 0;
+}
+
+
+static void ipf_fixl4sum(fin)
+fr_info_t *fin;
+{
+	u_short *csump;
+	udphdr_t *udp;
+
+	csump = NULL;
+
+	switch (fin->fin_p)
+	{
+	case IPPROTO_TCP :
+		csump = &((tcphdr_t *)fin->fin_dp)->th_sum;
+		break;
+
+	case IPPROTO_UDP :
+		udp = fin->fin_dp;
+		if (udp->uh_sum != 0)
+			csump = &udp->uh_sum;
+		break;
+
+	default :
+		break;
+	}
+
+	if (csump != NULL) {
+		*csump = 0;
+		*csump = fr_cksum(fin->fin_m, fin->fin_ip, fin->fin_p,
+				  fin->fin_dp, fin->fin_plen);
+	}
 }

@@ -252,6 +252,9 @@ register struct uio *uio;
 #ifdef	IPFDEBUG
 	cmn_err(CE_CONT, "iplread(%x,%x)\n", dev, uio);
 #endif
+	if (fr_running < 1)
+		return EIO;
+
 	return ipflog_read(getminor(dev), uio);
 }
 #endif /* IPFILTER_LOG */
@@ -272,6 +275,9 @@ cred_t *cp;
 #ifdef	IPFDEBUG
 	cmn_err(CE_CONT, "iplwrite(%x,%x,%x)\n", dev, uio, cp);
 #endif
+	if (fr_running < 1)
+		return EIO;
+
 	if (getminor(dev) != IPL_LOGSYNC)
 		return ENXIO;
 	return ipfsync_write(uio);

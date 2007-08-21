@@ -365,7 +365,7 @@ ddi_detach_cmd_t cmd;
 		 * this lock others should just fall out of the loop.
 		 */
 		WRITE_ENTER(&ipf_global);
-		if (fr_running <= 0) {
+		if (fr_running == -2) {
 			RWLOCK_EXIT(&ipf_global);
 			return DDI_FAILURE;
 		}

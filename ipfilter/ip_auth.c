@@ -950,8 +950,8 @@ char *data;
 {
 	frauth_t auth, *au = &auth, *fra;
 	int error, i;
-	SPL_INT(s);
 	mb_t *m;
+	SPL_INT(s);
 
 	error = fr_inobj(data, &auth, IPFOBJ_FRAUTH);
 	if (error != 0)

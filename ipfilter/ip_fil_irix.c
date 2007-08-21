@@ -277,6 +277,9 @@ dev_t dev;
 register struct uio *uio;
 cred_t *crp;
 {
+	if (fr_running < 1)
+		return EIO;
+
 #ifdef IPFILTER_LOG
 	return ipflog_read(GET_MINOR(dev), uio);
 #else

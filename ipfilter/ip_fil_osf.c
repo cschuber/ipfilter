@@ -290,6 +290,9 @@ int iplread(dev, uio)
 dev_t dev;
 register struct uio *uio;
 {
+	if (fr_running < 1)
+		return EIO;
+
 #ifdef IPFILTER_LOG
 	return ipflog_read(minor(dev), uio);
 #else
