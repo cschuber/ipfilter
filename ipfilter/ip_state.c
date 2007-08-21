@@ -133,6 +133,8 @@ static ipstate_t *fr_stclone __P((fr_info_t *, tcphdr_t *, ipstate_t *));
 static void fr_fixinisn __P((fr_info_t *, ipstate_t *));
 static void fr_fixoutisn __P((fr_info_t *, ipstate_t *));
 static void fr_checknewisn __P((fr_info_t *, ipstate_t *));
+static int fr_stateiter __P((ipftoken_t *, ipfgeniter_t *));
+static int fr_stgettable __P((char *));
 
 int fr_stputent __P((caddr_t));
 int fr_stgetent __P((caddr_t));
@@ -414,10 +416,11 @@ caddr_t data;
 /*                                                                          */
 /* Processes an ioctl call made to operate on the IP Filter state device.   */
 /* ------------------------------------------------------------------------ */
-int fr_state_ioctl(data, cmd, mode)
+int fr_state_ioctl(data, cmd, mode, uid, ctx)
 caddr_t data;
 ioctlcmd_t cmd;
-int mode;
+int mode, uid;
+void *ctx;
 {
 	int arg, ret, error = 0;
 
@@ -429,29 +432,41 @@ int mode;
 	case SIOCDELST :
 		error = fr_state_remove(data);
 		break;
+
 	/*
 	 * Flush the state table
 	 */
 	case SIOCIPFFL :
-		BCOPYIN(data, (char *)&arg, sizeof(arg));
-		if (arg == 0 || arg == 1) {
+		error = BCOPYIN(data, (char *)&arg, sizeof(arg));
+		if (error != 0) {
+			error = EFAULT;
+		} else if (arg == 0 || arg == 1) {
 			WRITE_ENTER(&ipf_state);
 			ret = fr_state_flush(arg, 4);
 			RWLOCK_EXIT(&ipf_state);
-			BCOPYOUT((char *)&ret, data, sizeof(ret));
-		} else
+			error = BCOPYOUT((char *)&ret, data, sizeof(ret));
+			if (error != 0)
+				error = EFAULT;
+		} else {
 			error = EINVAL;
+		}
 		break;
+
 #ifdef	USE_INET6
 	case SIOCIPFL6 :
-		BCOPYIN(data, (char *)&arg, sizeof(arg));
-		if (arg == 0 || arg == 1) {
+		error = BCOPYIN(data, (char *)&arg, sizeof(arg));
+		if (error != 0) {
+			error = EFAULT;
+		} else if (arg == 0 || arg == 1) {
 			WRITE_ENTER(&ipf_state);
 			ret = fr_state_flush(arg, 6);
 			RWLOCK_EXIT(&ipf_state);
-			BCOPYOUT((char *)&ret, data, sizeof(ret));
-		} else
+			error = BCOPYOUT((char *)&ret, data, sizeof(ret));
+			if (error != 0)
+				error = EFAULT;
+		} else {
 			error = EINVAL;
+		}
 		break;
 #endif
 #ifdef	IPFILTER_LOG
@@ -465,9 +480,12 @@ int mode;
 			int tmp;
 
 			tmp = ipflog_clear(IPL_LOGSTATE);
-			BCOPYOUT((char *)&tmp, data, sizeof(tmp));
+			error = BCOPYOUT((char *)&tmp, data, sizeof(tmp));
+			if (error != 0)
+				error = EFAULT;
 		}
 		break;
+
 	/*
 	 * Turn logging of state information on/off.
 	 */
@@ -475,31 +493,41 @@ int mode;
 		if (!(mode & FWRITE))
 			error = EPERM;
 		else {
-			BCOPYIN((char *)data, (char *)&ipstate_logging,
-				sizeof(ipstate_logging));
+			error = BCOPYIN((char *)data, (char *)&ipstate_logging,
+					sizeof(ipstate_logging));
+			if (error != 0)
+				error = EFAULT;
 		}
 		break;
+
 	/*
 	 * Return the current state of logging.
 	 */
 	case SIOCGETLG :
-		BCOPYOUT((char *)&ipstate_logging, (char *)data,
-			 sizeof(ipstate_logging));
+		error = BCOPYOUT((char *)&ipstate_logging, (char *)data,
+				 sizeof(ipstate_logging));
+		if (error != 0)
+			error = EFAULT;
 		break;
+
 	/*
 	 * Return the number of bytes currently waiting to be read.
 	 */
 	case FIONREAD :
 		arg = iplused[IPL_LOGSTATE];	/* returned in an int */
-		BCOPYOUT((char *)&arg, data, sizeof(arg));
+		error = BCOPYOUT((char *)&arg, data, sizeof(arg));
+		if (error != 0)
+			error = EFAULT;
 		break;
 #endif
+
 	/*
 	 * Get the current state statistics.
 	 */
 	case SIOCGETFS :
 		error = fr_outobj(data, fr_statetstats(), IPFOBJ_STATESTAT);
 		break;
+
 	/*
 	 * Lock/Unlock the state table.  (Locking prevents any changes, which
 	 * means no packets match).
@@ -511,6 +539,7 @@ int mode;
 			fr_lock(data, &fr_state_lock);
 		}
 		break;
+
 	/*
 	 * Add an entry to the current state table.
 	 */
@@ -521,6 +550,7 @@ int mode;
 		}
 		error = fr_stputent(data);
 		break;
+
 	/*
 	 * Get a state table entry.
 	 */
@@ -531,6 +561,47 @@ int mode;
 		}
 		error = fr_stgetent(data);
 		break;
+
+	/*
+	 * Return a copy of the hash table bucket lengths
+	 */
+	case SIOCSTAT1 :
+		error = BCOPYOUT(ips_stats.iss_bucketlen, data,
+				 fr_statesize * sizeof(u_long));
+		if (error != 0)
+			error = EFAULT;
+		break;
+
+	case SIOCGENITER :
+	    {
+		ipftoken_t *token;
+		ipfgeniter_t iter;
+
+		error = fr_inobj(data, &iter, IPFOBJ_GENITER);
+		if (error != 0)
+			break;
+
+		token = ipf_findtoken(IPFGENITER_STATE, uid, ctx);
+		if (token != NULL)
+			error = fr_stateiter(token, &iter);
+		else
+			error = ESRCH;
+		RWLOCK_EXIT(&ipf_tokens);
+		break;
+	    }
+
+	case SIOCGTABL :
+		error = fr_stgettable(data);
+		break;
+
+	case SIOCIPFDELTOK :
+		error = BCOPYIN(data, (char *)&arg, sizeof(arg));
+		if (error != 0)
+			error = EFAULT;
+		else
+			error = ipf_deltoken(arg, uid, ctx);
+		break;
+
 	default :
 		error = EINVAL;
 		break;
@@ -819,7 +890,6 @@ u_int flags;
 	frentry_t *fr;
 	tcphdr_t *tcp;
 	grehdr_t *gre;
-	void *ifp;
 	int out;
 
 	if (fr_state_lock ||
@@ -1085,21 +1155,16 @@ u_int flags;
 		is->is_tag = fr->fr_logtag;
 
 		is->is_ifp[(out << 1) + 1] = fr->fr_ifas[1];
-		is->is_ifp[(1 - out) << 1] = fr->fr_ifas[2];
-		is->is_ifp[((1 - out) << 1) + 1] = fr->fr_ifas[3];
+		strncpy(is->is_ifname[(out << 1) + 1], fr->fr_ifnames[1],
+			sizeof(fr->fr_ifnames[1]));
 
-		if (((ifp = fr->fr_ifas[1]) != NULL) &&
-		    (ifp != (void *)-1)) {
-			COPYIFNAME(ifp, is->is_ifname[(out << 1) + 1]);
-		}
-		if (((ifp = fr->fr_ifas[2]) != NULL) &&
-		    (ifp != (void *)-1)) {
-			COPYIFNAME(ifp, is->is_ifname[(1 - out) << 1]);
-		}
-		if (((ifp = fr->fr_ifas[3]) != NULL) &&
-		    (ifp != (void *)-1)) {
-			COPYIFNAME(ifp, is->is_ifname[((1 - out) << 1) + 1]);
-		}
+		is->is_ifp[(1 - out) << 1] = fr->fr_ifas[2];
+		strncpy(is->is_ifname[((1 - out) << 1)], fr->fr_ifnames[2],
+			sizeof(fr->fr_ifnames[2]));
+
+		is->is_ifp[((1 - out) << 1) + 1] = fr->fr_ifas[3];
+		strncpy(is->is_ifname[((1 - out) << 1) + 1], fr->fr_ifnames[3],
+			sizeof(fr->fr_ifnames[3]));
 	} else {
 		pass = fr_flags;
 		is->is_tag = FR_NOLOGTAG;
@@ -1733,9 +1798,9 @@ u_32_t cmask;
 	 * If the interface for this 'direction' is set, make sure it matches.
 	 * An interface name that is not set matches any, as does a name of *.
 	 */
-	if ((is->is_ifp[idx] == NULL &&
-	    (*is->is_ifname[idx] == '\0' || *is->is_ifname[idx] == '*')) ||
-	    is->is_ifp[idx] == ifp)
+	if ((is->is_ifp[idx] == ifp) || (is->is_ifp[idx] == NULL &&
+	    (*is->is_ifname[idx] == '\0' || *is->is_ifname[idx] == '-' ||
+	     *is->is_ifname[idx] == '*')))
 		ret = 1;
 
 	if (ret == 0)
@@ -2035,7 +2100,6 @@ fr_info_t *fin;
 	ofin.fin_ip = oip;
 	ofin.fin_m = NULL;	/* if dereferenced, panic XXX */
 	ofin.fin_mp = NULL;	/* if dereferenced, panic XXX */
-	ofin.fin_plen = fin->fin_dlen - ICMPERR_ICMPHLEN;
 	(void) fr_makefrip(IP_HL(oip) << 2, oip, &ofin);
 	ofin.fin_ifp = fin->fin_ifp;
 	ofin.fin_out = !fin->fin_out;
@@ -2818,7 +2882,8 @@ int why;
 	/*
 	 * Next, remove it from the timeout queue it is in.
 	 */
-	fr_deletequeueentry(&is->is_sti);
+	if (is->is_sti.tqe_ifq != NULL)
+		fr_deletequeueentry(&is->is_sti);
 
 	if (is->is_me != NULL) {
 		*is->is_me = NULL;
@@ -2827,7 +2892,11 @@ int why;
 
 	/*
 	 * If it is still in use by something else, do not go any further,
-	 * but note that at this point it is now an orphan.
+	 * but note that at this point it is now an orphan.  How can this
+	 * be?  fr_state_flush() calls fr_delete() directly because it wants
+	 * to empty the table out and if something has a hold on a state
+	 * entry (such as ipfstat), it'll do the deref path that'll bring
+	 * us back here to do the real delete & free.
 	 */
 	is->is_ref--;
 	if (is->is_ref > 0)
@@ -2860,7 +2929,7 @@ int why;
 
 	if (is->is_rule != NULL) {
 		is->is_rule->fr_statecnt--;
-		(void)fr_derefrule(&is->is_rule);
+		(void) fr_derefrule(&is->is_rule);
 	}
 
 	MUTEX_DESTROY(&is->is_lock);
@@ -3572,7 +3641,6 @@ fr_info_t *fin;
 	oip6->ip6_plen = fin->fin_dlen - ICMPERR_ICMPHLEN;
 	ofin.fin_flx = FI_NOCKSUM;
 	ofin.fin_ip = (ip_t *)oip6;
-	ofin.fin_plen = oip6->ip6_plen;
 	(void) fr_makefrip(sizeof(*oip6), (ip_t *)oip6, &ofin);
 	ofin.fin_flx &= ~(FI_BAD|FI_SHORT);
 	oip6->ip6_plen = savelen;
@@ -3765,40 +3833,11 @@ ipftq_t *tqp;
 /*    dir == 0 : a packet from source to dest                               */
 /*    dir == 1 : a packet from dest to source                               */
 /* ------------------------------------------------------------------------ */
-void fr_statederef(fin, isp)
-fr_info_t *fin;
+void fr_statederef(isp)
 ipstate_t **isp;
 {
 	ipstate_t *is = *isp;
-#if 0
-	int nstate, ostate, dir, eol;
 
-	eol = 0; /* End-of-the-line flag. */
-	dir = fin->fin_rev;
-	ostate = is->is_state[1 - dir];
-	nstate = is->is_state[dir];
-	/*
-	 * Determine whether this packet is local or routed.  State entries
-	 * with us as the destination will have an interface list of
-	 * int1,-,-,int1.  Entries with us as the origin run as -,int1,int1,-.
-	 */
-	if ((fin->fin_p == IPPROTO_TCP) && (fin->fin_out == 0)) {
-		if ((strcmp(is->is_ifname[0], is->is_ifname[3]) == 0) &&
-		    (strcmp(is->is_ifname[1], is->is_ifname[2]) == 0)) {
-			if ((dir == 0) &&
-			    (strcmp(is->is_ifname[1], "-") == 0) &&
-			    (strcmp(is->is_ifname[0], "-") != 0)) {
-				eol = 1;
-			} else if ((dir == 1) &&
-				   (strcmp(is->is_ifname[0], "-") == 0) &&
-				   (strcmp(is->is_ifname[1], "-") != 0)) {
-				eol = 1;
-			}
-		}
-	}
-#endif
-
-	fin = fin;	/* LINT */
 	is = *isp;
 	*isp = NULL;
 	WRITE_ENTER(&ipf_state);
@@ -3807,15 +3846,8 @@ ipstate_t **isp;
 		is->is_ref++;		/* To counter ref-- in fr_delstate() */
 		fr_delstate(is, ISL_EXPIRE);
 #ifndef	_KERNEL
-#if 0
-	} else if (((fin->fin_out == 1) || (eol == 1)) &&
-		   ((ostate == IPF_TCPS_LAST_ACK) &&
-		   (nstate == IPF_TCPS_TIME_WAIT))) {
-		;
-#else
 	} else if ((is->is_sti.tqe_state[0] > IPF_TCPS_ESTABLISHED) ||
 		   (is->is_sti.tqe_state[1] > IPF_TCPS_ESTABLISHED)) {
-#endif
 		fr_delstate(is, ISL_ORPHAN);
 #endif
 	}
@@ -3889,4 +3921,121 @@ int rev;
 	else
 		fr_queueappend(&is->is_sti, nifq, is);
 	return;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    fr_stateiter                                                */
+/* Returns:     int - 0 == success, else error                              */
+/* Parameters:  token(I) - pointer to ipftoken structure                    */
+/*              itp(I)   - pointer to ipfgeniter structure                  */
+/*                                                                          */
+/* This function handles the SIOCGENITER ioctl for the state tables and     */
+/* walks through the list of entries in the state table list (ips_list.)    */
+/* ------------------------------------------------------------------------ */
+static int fr_stateiter(token, itp)
+ipftoken_t *token;
+ipfgeniter_t *itp;
+{
+	ipstate_t *is, *next, zero;
+	int error, count;
+	char *dst;
+
+	if (itp->igi_data == NULL)
+		return EFAULT;
+
+	if (itp->igi_nitems == 0)
+		return ENOSPC;
+
+	if (itp->igi_type != IPFGENITER_STATE)
+		return EINVAL;
+
+	is = token->ipt_data;
+	if (is == (void *)-1) {
+		ipf_freetoken(token);
+		return ESRCH;
+	}
+
+	error = 0;
+	dst = itp->igi_data;
+
+	READ_ENTER(&ipf_state);
+	if (is == NULL) {
+		next = ips_list;
+	} else {
+		next = is->is_next;
+	}
+
+	for (count = itp->igi_nitems; count > 0; count--) {
+		if (next != NULL) {
+			/*
+			 * If we find a state entry to use, bump its
+			 * reference count so that it can be used for
+			 * is_next when we come back.
+			 */
+			MUTEX_ENTER(&next->is_lock);
+			next->is_ref++;
+			MUTEX_EXIT(&next->is_lock);
+			token->ipt_data = next;
+		} else {
+			bzero(&zero, sizeof(zero));
+			next = &zero;
+			token->ipt_data = (void *)-1;
+			count = 1;
+		}
+		RWLOCK_EXIT(&ipf_state);
+
+		/*
+		 * If we had a prior pointer to a state entry, release it.
+		 */
+		if (is != NULL) {
+			fr_statederef(&is);
+		}
+
+		/*
+		 * This should arguably be via fr_outobj() so that the state
+		 * structure can (if required) be massaged going out.
+		 */
+		error = COPYOUT(next, dst, sizeof(*next));
+		if (error != 0)
+			error = EFAULT;
+		if ((count == 1) || (error != 0))
+			break;
+
+		dst += sizeof(*next);
+		READ_ENTER(&ipf_state);
+		is = next;
+		next = is->is_next;
+	}
+
+	return error;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    fr_stgettable                                               */
+/* Returns:     int     - 0 = success, else error                           */
+/* Parameters:  data(I) - pointer to ioctl data                             */
+/*                                                                          */
+/* This function handles ioctl requests for tables of state information.    */
+/* At present the only table it deals with is the hash bucket statistics.   */
+/* ------------------------------------------------------------------------ */
+static int fr_stgettable(data)
+char *data;
+{
+	ipftable_t table;
+	int error;
+
+	error = fr_inobj(data, &table, IPFOBJ_GTABLE);
+	if (error != 0)
+		return error;
+
+	if (table.ita_type != IPFTABLE_BUCKETS)
+		return EINVAL;
+
+	error = COPYOUT(ips_stats.iss_bucketlen, table.ita_table, 
+			fr_statesize * sizeof(u_long));
+	if (error != 0)
+		error = EFAULT;
+	return error;
 }

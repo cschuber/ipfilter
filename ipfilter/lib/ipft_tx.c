@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 1995-2001 by Darren Reed.
+ * Copyright (C) 2000-2006 by Darren Reed.
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
@@ -127,6 +127,7 @@ int	cnt, *dir;
 {
 	register char *s;
 	char	line[513];
+	ip_t	*ip;
 
 	*ifn = NULL;
 	while (fgets(line, sizeof(line)-1, tfp)) {
@@ -142,12 +143,10 @@ int	cnt, *dir;
 			printf("input: %s\n", line);
 		*ifn = NULL;
 		*dir = 0;
-		if (!parseline(line, (ip_t *)buf, ifn, dir))
-#if 0
-			return sizeof(ip_t) + sizeof(tcphdr_t);
-#else
-			return sizeof(ip_t);
-#endif
+		if (!parseline(line, (ip_t *)buf, ifn, dir)) {
+			ip = (ip_t *)buf;
+			return ntohs(ip->ip_len);
+		}
 	}
 	if (feof(tfp))
 		return 0;

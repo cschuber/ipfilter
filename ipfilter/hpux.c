@@ -291,7 +291,7 @@ static int ipf_attach()
 	/*
 	 * Initialize mutex's
 	 */
-	if (iplattach() == -1)
+	if (ipfattach() == -1)
 		return -1;
 	/*
 	 * Lock people out while we set things up.
@@ -374,9 +374,9 @@ static int ipf_detach()
 			"IP Filter: pfil_remove_hook(pfh_sync) failed");
 	while (fr_timer_id != NULL)
 		sched_yield();
-	i = ipldetach();
+	i = ipfdetach();
 #ifdef	IPFDEBUG
-	printf("IP Filter: ipldetach() = %d\n", i);
+	printf("IP Filter: ipfdetach() = %d\n", i);
 #endif
 	return i;
 }

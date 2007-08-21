@@ -30,6 +30,7 @@ typedef	struct	ipfr	{
 	u_char	ipfr_ttl;
 	u_char	ipfr_seen0;
 	frentry_t *ipfr_rule;
+	int	ipfr_ref;
 } ipfr_t;
 
 
@@ -49,6 +50,8 @@ typedef	struct	ipfrstat {
 #define	IPFR_CMPSZ	(offsetof(ipfr_t, ipfr_pass) - \
 			 offsetof(ipfr_t, ipfr_ifp))
 
+extern	ipfr_t	*ipfr_list, **ipfr_tail;
+extern	ipfr_t	*ipfr_natlist, **ipfr_nattail;
 extern	int	ipfr_size;
 extern	int	fr_ipfrttl;
 extern	int	fr_frag_lock;
@@ -64,6 +67,15 @@ extern	nat_t	*fr_nat_knownfrag __P((fr_info_t *));
 
 extern	int	fr_ipid_newfrag __P((fr_info_t *, u_32_t));
 extern	u_32_t	fr_ipid_knownfrag __P((fr_info_t *));
+#ifdef USE_MUTEXES
+extern	void	fr_fragderef __P((ipfr_t **, ipfrwlock_t *));
+extern	int	fr_nextfrag __P((ipftoken_t *, ipfgeniter_t *, ipfr_t **, \
+				 ipfr_t ***, ipfrwlock_t *));
+#else
+extern	void	fr_fragderef __P((ipfr_t **));
+extern	int	fr_nextfrag __P((ipftoken_t *, ipfgeniter_t *, ipfr_t **, \
+				 ipfr_t ***));
+#endif
 
 extern	void	fr_forget __P((void *));
 extern	void	fr_forgetnat __P((void *));

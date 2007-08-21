@@ -568,10 +568,11 @@ ipstate_t *is;
 }
 
 
-int fr_scan_ioctl(data, cmd, mode)
+int fr_scan_ioctl(data, cmd, mode, uid, ctx)
 caddr_t data;
 ioctlcmd_t cmd;
-int mode;
+int mode, uid;
+void *ctx;
 {
 	ipscanstat_t ipscs;
 	int err = 0;

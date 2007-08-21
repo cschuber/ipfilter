@@ -248,12 +248,12 @@ extern	int	fr_tcpinwindow __P((struct fr_info *, struct tcpdata *,
 				    struct tcpdata *, tcphdr_t *, int));
 extern	void	fr_stateunload __P((void));
 extern	void	ipstate_log __P((struct ipstate *, u_int));
-extern	int	fr_state_ioctl __P((caddr_t, ioctlcmd_t, int));
+extern	int	fr_state_ioctl __P((caddr_t, ioctlcmd_t, int, int, void *));
 extern	void	fr_stinsert __P((struct ipstate *, int));
 extern	void	fr_sttab_init __P((struct ipftq *));
 extern	void	fr_sttab_destroy __P((struct ipftq *));
 extern	void	fr_updatestate __P((fr_info_t *, ipstate_t *, ipftq_t *));
-extern	void	fr_statederef __P((fr_info_t *, ipstate_t **));
+extern	void	fr_statederef __P((ipstate_t **));
 extern	void	fr_setstatequeue __P((ipstate_t *, int));
 
 #endif /* __IP_STATE_H__ */

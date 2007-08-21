@@ -17,12 +17,11 @@
 
 extern int sysctl_ip_default_ttl;
 
-static	int	frzerostats __P((caddr_t));
 static	int	fr_send_ip __P((fr_info_t *, struct sk_buff *, struct sk_buff **));
 
 ipfmutex_t	ipl_mutex, ipf_authmx, ipf_rw, ipf_stinsert;
 ipfmutex_t	ipf_nat_new, ipf_natio, ipf_timeoutlock;
-ipfrwlock_t	ipf_mutex, ipf_global, ipf_ipidfrag, ipf_frcache;
+ipfrwlock_t	ipf_mutex, ipf_global, ipf_ipidfrag, ipf_frcache, ipf_tokens;
 ipfrwlock_t	ipf_frag, ipf_state, ipf_nat, ipf_natfrag, ipf_auth;
 struct timer_list	ipf_timer;
 
@@ -97,7 +96,7 @@ static struct	nf_hook_ops	ipf_hooks[] = {
 #endif
 
 
-int iplattach()
+int ipfattach()
 {
 	int err, i;
 
@@ -115,6 +114,7 @@ int iplattach()
 	RWLOCK_INIT(&ipf_mutex, "ipf global mutex rwlock");
 	RWLOCK_INIT(&ipf_frcache, "ipf cache mutex rwlock");
 	RWLOCK_INIT(&ipf_ipidfrag, "ipf IP NAT-Frag rwlock");
+	RWLOCK_INIT(&ipf_tokens, "ipf token rwlock");
 
 	for (i = 0; i < sizeof(ipf_hooks)/sizeof(ipf_hooks[0]); i++) {
 		err = nf_register_hook(&ipf_hooks[i]);
@@ -147,7 +147,7 @@ int iplattach()
 }
 
 
-int ipldetach()
+int ipfdetach()
 {
 	int i;
 
@@ -175,6 +175,7 @@ int ipldetach()
 	RW_DESTROY(&ipf_mutex);
 	RW_DESTROY(&ipf_frcache);
 	RW_DESTROY(&ipf_global);
+	RW_DESTROY(&ipf_tokens);
 	RW_DESTROY(&ipf_ipidfrag);
 
 	SPL_X(s);
@@ -183,14 +184,12 @@ int ipldetach()
 }
 
 
-
 /*
  * Filter ioctl interface.
  */
 int ipf_ioctl(struct inode *in, struct file *fp, u_int cmd, u_long arg)
 {
-	int error = 0, unit = 0, tmp;
-	friostat_t fio;
+	int error = 0, unit = 0;
 	caddr_t data;
 	mode_t mode;
 
@@ -210,155 +209,15 @@ int ipf_ioctl(struct inode *in, struct file *fp, u_int cmd, u_long arg)
 	mode = fp->f_mode;
 	data = (caddr_t)arg;
 
-	error = fr_ioctlswitch(unit, data, cmd, mode);
+	error = fr_ioctlswitch(unit, data, cmd, mode, fp->f_uid, fp);
 	if (error != -1) {
 		SPL_X(s);
 		if (error > 0)
 			error = -error;
 		return error;
 	}
-
-	error = 0;
-
-	switch (cmd)
-	{
-	case FIONREAD :
-#ifdef IPFILTER_LOG
-		bcopy(&iplused[IPL_LOGIPF], (caddr_t)data,
-		         sizeof(iplused[IPL_LOGIPF]));
-#endif
-		break;
-	case SIOCFRENB :
-		if (!(mode & FWRITE))
-			error = EPERM;
-		else {
-			bcopy(data, &tmp, sizeof(tmp));
-			if (tmp) {
-				if (fr_running > 0)
-					error = 0;
-				else
-					error = iplattach();
-				if (error == 0)
-					fr_running = 1;
-				else
-					(void) ipldetach();
-			} else {
-				error = ipldetach();
-				if (error == 0)
-					fr_running = -1;
-			}
-		}
-		break;
-	case SIOCIPFSET :
-		if (!(mode & FWRITE)) {
-			error = EPERM;
-			break;
-		}
-	case SIOCIPFGETNEXT :
-	case SIOCIPFGET :
-		error = fr_ipftune(cmd, data);
-		break;
-	case SIOCSETFF :
-		if (!(mode & FWRITE))
-			error = EPERM;
-		else
-			bcopy(data, &fr_flags, sizeof(fr_flags));
-		break;
-	case SIOCGETFF :
-		bcopy(&fr_flags, data, sizeof(fr_flags));
-		break;
-	case SIOCFUNCL :
-		error = fr_resolvefunc(data);
-		break;
-	case SIOCINAFR :
-	case SIOCRMAFR :
-	case SIOCADAFR :
-	case SIOCZRLST :
-		if (!(mode & FWRITE))
-			error = EPERM;
-		else
-			error = frrequest(unit, cmd, data, fr_active, 1);
-		break;
-	case SIOCINIFR :
-	case SIOCRMIFR :
-	case SIOCADIFR :
-		if (!(mode & FWRITE))
-			error = EPERM;
-		else
-			error = frrequest(unit, cmd, data, 1 - fr_active, 1);
-		break;
-	case SIOCSWAPA :
-		if (!(mode & FWRITE))
-			error = EPERM;
-		else {
-			bzero((char *)frcache, sizeof(frcache[0]) * 2);
-			*(u_int *)data = fr_active;
-			fr_active = 1 - fr_active;
-		}
-		break;
-	case SIOCGETFS :
-		fr_getstat(&fio);
-		error = fr_outobj(data, &fio, IPFOBJ_IPFSTAT);
-		break;
-	case	SIOCFRZST :
-		if (!(mode & FWRITE))
-			error = EPERM;
-		else
-			error = frzerostats(data);
-		break;
-	case	SIOCIPFFL :
-		if (!(mode & FWRITE))
-			error = EPERM;
-		else {
-			bcopy(data, &tmp, sizeof(tmp));
-			tmp = frflush(unit, 4, tmp);
-			bcopy(&tmp, data, sizeof(tmp));
-		}
-		break;
-#ifdef USE_INET6
-	case	SIOCIPFL6 :
-		if (!(mode & FWRITE))
-			error = EPERM;
-		else {
-			bcopy(data, &tmp, sizeof(tmp));
-			tmp = frflush(unit, 6, tmp);
-			bcopy(&tmp, data, sizeof(tmp));
-		}
-		break;
-#endif
-	case SIOCSTLCK :
-		error = COPYIN(data, &tmp, sizeof(tmp));
-		if (error == 0) {
-			fr_state_lock = tmp;
-			fr_nat_lock = tmp;
-			fr_frag_lock = tmp;
-			fr_auth_lock = tmp;
-		} else
-			error = EFAULT;
-		break;
-#ifdef	IPFILTER_LOG
-	case	SIOCIPFFB :
-		if (!(mode & FWRITE))
-			error = EPERM;
-		else
-			*(int *)data = ipflog_clear(unit);
-		break;
-#endif /* IPFILTER_LOG */
-	case SIOCGFRST :
-		error = fr_outobj(data, fr_fragstats(), IPFOBJ_FRAGSTAT);
-		break;
-	case SIOCFRSYN :
-		if (!(mode & FWRITE))
-			error = EPERM;
-		else {
-			frsync(NULL);
-		}
-		break;
-	default :
-		error = EINVAL;
-		break;
-	}
 	SPL_X(s);
+
 	if (error > 0)
 		error = -error;
 	return error;
@@ -748,6 +607,7 @@ frdest_t *fdp;
 		case 0 :
 			break;
 		case 1 :
+			fr_natderef((nat_t **)&fin->fin_nat);
 			ip->ip_sum = 0;
 			break;
 		case -1 :
@@ -858,23 +718,6 @@ caddr_t cp;
 }
 
 
-static	int	frzerostats(data)
-caddr_t	data;
-{
-	friostat_t fio;
-	int error;
-
-	fr_getstat(&fio);
-	error = copyoutptr(&fio, data, sizeof(fio));
-	if (error)
-		return EFAULT;
-
-	bzero((char *)frstats, sizeof(*frstats) * 2);
-
-	return 0;
-}
-
-
 static u_int ipf_linux_inout(hooknum, skbp, inifp, outifp, okfn)
 u_int hooknum;
 struct sk_buff **skbp;
@@ -934,6 +777,9 @@ ipfrwlock_t *rwlk;
 	if (rwlk->ipf_magic != 0x97dd8b3a) {
 		printk("ipf_read_enter:rwlk %p ipf_magic 0x%x\n",
 			rwlk, rwlk->ipf_magic);
+		/*
+		 * Force a panic.
+		 */
 		rwlk->ipf_magic = 0;
 		*((int *)rwlk->ipf_magic) = 1;
 	}
@@ -966,6 +812,9 @@ ipfrwlock_t *rwlk;
 	if (rwlk->ipf_magic != 0x97dd8b3a) {
 		printk("ipf_rw_exit:rwlk %p ipf_magic 0x%x\n",
 			rwlk, rwlk->ipf_magic);
+		/*
+		 * Force a panic.
+		 */
 		rwlk->ipf_magic = 0;
 		*((int *)rwlk->ipf_magic) = 1;
 	}
@@ -992,6 +841,16 @@ ipfrwlock_t *rwlk;
 {
 	ipf_rw_exit(rwlk);
 	ipf_read_enter(rwlk);
+}
+
+
+void ipf_rw_init(rwlck, name)
+ipfrwlock_t *rwlck;
+char *name;
+{
+	memset(rwlck, 0, sizeof(*rwlck));
+	rwlck->ipf_lname = name;
+	rwlock_init(&rwlck->ipf_lk);
 }
 
 
@@ -1121,6 +980,7 @@ void fr_slowtimer(long value)
 {
 	READ_ENTER(&ipf_global);
 
+	ipf_expiretokens();
 	fr_fragexpire();
 	fr_timeoutstate();
 	fr_natexpire();
@@ -1132,4 +992,17 @@ void fr_slowtimer(long value)
 
 done:
 	RWLOCK_EXIT(&ipf_global);
+}
+
+
+int ipf_inject(fin, m)
+fr_info_t *fin;
+mb_t *m;
+{
+	FREE_MB_T(m);
+
+	fin->fin_m = NULL;
+	fin->fin_ip = NULL;
+
+	return EINVAL;
 }

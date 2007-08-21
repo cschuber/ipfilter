@@ -251,7 +251,7 @@ static int ipfilter_init(void)
 	}
 #endif
 
-	i = iplattach();
+	i = ipfattach();
 
 #ifdef	CONFIG_PROC_FS
 	if (i == 0) {
@@ -307,7 +307,7 @@ static int ipfilter_fini(void)
 		return EBUSY;
 
 	if (fr_running >= 0) {
-		result = ipldetach();
+		result = ipfdetach();
 		if (result != 0) {
 			if (result > 0)
 				result = -result;

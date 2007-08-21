@@ -475,6 +475,7 @@ int info;
 		return ENOMEM;
 	}
 
+	x->ipn_ref = 1;
 	x->ipn_next = ipo->ipo_list;
 	x->ipn_pnext = &ipo->ipo_list;
 	if (ipo->ipo_list != NULL)
@@ -574,36 +575,26 @@ iplookupop_t *op;
 /*              ipe(I) - address being deleted as a node                    */
 /* Locks:       WRITE(ip_poolrw)                                            */
 /*                                                                          */
-/* Add another node to the pool given by ipo.  The three parameters passed  */
-/* in (addr, mask, info) shold all be stored in the node.                   */
+/* Remove a node from the pool given by ipo.                                */
 /* ------------------------------------------------------------------------ */
 int ip_pool_remove(ipo, ipe)
 ip_pool_t *ipo;
 ip_pool_node_t *ipe;
 {
-	ip_pool_node_t **ipp, *n;
 
 	ASSERT(rw_read_locked(&ip_poolrw.ipf_lk) == 0);
 
-	for (ipp = &ipo->ipo_list; (n = *ipp) != NULL; ipp = &n->ipn_next) {
-		if (ipe == n) {
-			*n->ipn_pnext = n->ipn_next;
-			if (n->ipn_next)
-				n->ipn_next->ipn_pnext = n->ipn_pnext;
-			break;
-		}
-	}
-
-	if (n == NULL)
-		return ENOENT;
+	if (ipe->ipn_pnext != NULL)
+		*ipe->ipn_pnext = ipe->ipn_next;
+	if (ipe->ipn_next != NULL)
+		ipe->ipn_next->ipn_pnext = ipe->ipn_pnext;
 
 	RADIX_NODE_HEAD_LOCK(ipo->ipo_head);
-	ipo->ipo_head->rnh_deladdr(&n->ipn_addr, &n->ipn_mask,
+	ipo->ipo_head->rnh_deladdr(&ipe->ipn_addr, &ipe->ipn_mask,
 				   ipo->ipo_head);
 	RADIX_NODE_HEAD_UNLOCK(ipo->ipo_head);
-	KFREE(n);
 
-	ipoolstat.ipls_nodes--;
+	ip_pool_node_deref(ipe);
 
 	return 0;
 }
@@ -618,7 +609,7 @@ ip_pool_node_t *ipe;
 /* Search for a pool using paramters passed in and if it's not otherwise    */
 /* busy, free it.                                                           */
 /*                                                                          */
-/* NOTE: Because this function is called out of ipldetach() where ip_poolrw */
+/* NOTE: Because this function is called out of ipfdetach() where ip_poolrw */
 /* may not be initialised, we can't use an ASSERT to enforce the locking    */
 /* assertion that one of the two (ip_poolrw,ipf_global) is held.            */
 /* ------------------------------------------------------------------------ */
@@ -648,7 +639,7 @@ iplookupop_t *op;
 /* Free all pools associated with the device that matches the unit number   */
 /* passed in with operation.                                                */
 /*                                                                          */
-/* NOTE: Because this function is called out of ipldetach() where ip_poolrw */
+/* NOTE: Because this function is called out of ipfdetach() where ip_poolrw */
 /* may not be initialised, we can't use an ASSERT to enforce the locking    */
 /* assertion that one of the two (ip_poolrw,ipf_global) is held.            */
 /* ------------------------------------------------------------------------ */
@@ -690,7 +681,7 @@ iplookupflush_t *fp;
 /* all of the address information stored in it, including any tree data     */
 /* structures also allocated.                                               */
 /*                                                                          */
-/* NOTE: Because this function is called out of ipldetach() where ip_poolrw */
+/* NOTE: Because this function is called out of ipfdetach() where ip_poolrw */
 /* may not be initialised, we can't use an ASSERT to enforce the locking    */
 /* assertion that one of the two (ip_poolrw,ipf_global) is held.            */
 /* ------------------------------------------------------------------------ */
@@ -746,6 +737,173 @@ ip_pool_t *ipo;
 }
 
 
+/* ------------------------------------------------------------------------ */
+/* Function:    ip_pool_node_deref                                          */
+/* Returns:     void                                                        */
+/* Parameters:  ipn(I) - pointer to pool structure                          */
+/* Locks:       WRITE(ip_poolrw)                                            */
+/*                                                                          */
+/* Drop a reference to the pool node passed in and if we're the last, free  */
+/* it all up and adjust the stats accordingly.                              */
+/* ------------------------------------------------------------------------ */
+void ip_pool_node_deref(ipn)
+ip_pool_node_t *ipn;
+{
+
+	ipn->ipn_ref--;
+
+	if (ipn->ipn_ref == 0) {
+		KFREE(ipn);
+		ipoolstat.ipls_nodes--;
+	}
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ip_pool_getnext                                             */
+/* Returns:     void                                                        */
+/* Parameters:  token(I) - pointer to pool structure                        */
+/* Parameters:  ilp(IO)   - pointer to pool iterating structure             */
+/*                                                                          */
+/* ------------------------------------------------------------------------ */
+int ip_pool_getnext(token, ilp)
+ipftoken_t *token;
+ipflookupiter_t *ilp;
+{
+	ip_pool_node_t *node, zn, *nextnode;
+	ip_pool_t *ipo, zp, *nextipo;
+	int err;
+
+	err = 0;
+	node = NULL;
+	nextnode = NULL;
+	ipo = NULL;
+	nextipo = NULL;
+
+	READ_ENTER(&ip_poolrw);
+
+	switch (ilp->ili_otype)
+	{
+	case IPFLOOKUPITER_LIST :
+		ipo = token->ipt_data;
+		if (ipo == NULL) {
+			nextipo = ip_pool_list[(int)ilp->ili_unit];
+		} else {
+			nextipo = ipo->ipo_next;
+		}
+
+		if (nextipo != NULL) {
+			ATOMIC_INC(nextipo->ipo_ref);
+			if (nextipo->ipo_next == NULL)
+				token->ipt_alive = 0;
+		} else {
+			bzero((char *)&zp, sizeof(zp));
+			nextipo = &zp;
+		}
+		break;
+
+	case IPFLOOKUPITER_NODE :
+		node = token->ipt_data;
+		if (node == NULL) {
+			ipo = ip_pool_find(ilp->ili_unit, ilp->ili_name);
+			if (ipo == NULL)
+				err = ESRCH;
+			else {
+				nextnode = ipo->ipo_list;
+				ipo = NULL;
+			}
+		} else {
+			nextnode = node->ipn_next;
+		}
+
+		if (nextnode != NULL) {
+			ATOMIC_INC(nextnode->ipn_ref);
+			if (nextnode->ipn_next == NULL)
+				token->ipt_alive = 0;
+		} else {
+			bzero((char *)&zn, sizeof(zn));
+			nextnode = &zn;
+		}
+		break;
+	default :
+		err = EINVAL;
+		break;
+	}
+
+	RWLOCK_EXIT(&ip_poolrw);
+
+	if (err != 0)
+		return err;
+
+	switch (ilp->ili_otype)
+	{
+	case IPFLOOKUPITER_LIST :
+		if (ipo != NULL) {
+			WRITE_ENTER(&ip_poolrw);
+			ip_pool_deref(ipo);
+			RWLOCK_EXIT(&ip_poolrw);
+		}
+		token->ipt_data = nextipo;
+		err = COPYOUT(nextipo, ilp->ili_data, sizeof(*nextipo));
+		if (err != 0)
+			err = EFAULT;
+		break;
+
+	case IPFLOOKUPITER_NODE :
+		if (node != NULL) {
+			WRITE_ENTER(&ip_poolrw);
+			ip_pool_node_deref(node);
+			RWLOCK_EXIT(&ip_poolrw);
+		}
+		token->ipt_data = nextnode;
+		err = COPYOUT(nextnode, ilp->ili_data, sizeof(*nextnode));
+		if (err != 0)
+			err = EFAULT;
+		break;
+	}
+
+	return err;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ip_pool_iterderef                                           */
+/* Returns:     void                                                        */
+/* Parameters:  ipn(I) - pointer to pool structure                          */
+/* Locks:       WRITE(ip_poolrw)                                            */
+/*                                                                          */
+/* ------------------------------------------------------------------------ */
+void ip_pool_iterderef(otype, unit, data)
+u_int otype;
+int unit;
+void *data;
+{
+
+	if (data == NULL)
+		return;
+
+	if (unit < 0 || unit > IPL_LOGMAX)
+		return;
+
+	switch (otype)
+	{
+	case IPFLOOKUPITER_LIST :
+		WRITE_ENTER(&ip_poolrw);
+		ip_pool_deref((ip_pool_t *)data);
+		RWLOCK_EXIT(&ip_poolrw);
+		break;
+
+	case IPFLOOKUPITER_NODE :
+		WRITE_ENTER(&ip_poolrw);
+		ip_pool_node_deref((ip_pool_node_t *)data);
+		RWLOCK_EXIT(&ip_poolrw);
+		break;
+	default :
+		break;
+	}
+}
+
+
 # if defined(_KERNEL) && ((BSD >= 198911) && !defined(__osf__) && \
       !defined(__hpux) && !defined(__sgi))
 static int
@@ -780,5 +938,4 @@ rn_freehead(rnh)
 	Free(rnh);
 }
 # endif
-
 #endif /* IPFILTER_LOOKUP */

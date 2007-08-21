@@ -1,3 +1,8 @@
+/*
+ * Copyright (C) 2001-2004 by Darren Reed.
+ *
+ * See the IPFILTER.LICENCE file for details on licencing.
+ */
 %{
 #include <sys/types.h>
 #include <sys/ioctl.h>

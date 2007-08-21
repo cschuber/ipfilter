@@ -299,7 +299,7 @@ ddi_attach_cmd_t cmd;
 		 * Lock people out while we set things up.
 		 */
 		WRITE_ENTER(&ipf_global);
-		if ((fr_running != 0) || (iplattach() == -1)) {
+		if ((fr_running != 0) || (ipfattach() == -1)) {
 			RWLOCK_EXIT(&ipf_global);
 			goto attach_failed;
 		}
@@ -405,7 +405,7 @@ ddi_detach_cmd_t cmd;
 		}
 
 		WRITE_ENTER(&ipf_global);
-		if (!ipldetach()) {
+		if (!ipfdetach()) {
 			RWLOCK_EXIT(&ipf_global);
 			RW_DESTROY(&ipf_mutex);
 			RW_DESTROY(&ipf_frcache);

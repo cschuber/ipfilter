@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2002 by Darren Reed.
+ * Copyright (C) 2003-2004 by Darren Reed.
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
@@ -52,7 +52,7 @@ ioctlfunc_t iocfunc;
 
 	if (err != 0) {
 		if ((opts & OPT_DONOTHING) == 0) {
-			perror("load_pool:SIOCLOOKUP*NODE");
+			perror("load_poolnode:SIOCLOOKUP*NODE");
 			return -1;
 		}
 	}

@@ -120,7 +120,7 @@ iplookupop_t *op;
 	}
 
 	if ((op->iplo_arg & IPHASH_ANON) == 0) {
-		if (fr_findhtable(op->iplo_unit, op->iplo_name) != NULL) {
+		if (fr_findhtable(unit, op->iplo_name) != NULL) {
 			KFREE(iph);
 			return EEXIST;
 		}
@@ -155,7 +155,9 @@ iplookupop_t *op;
 
 	bzero((char *)iph->iph_table, iph->iph_size * sizeof(*iph->iph_table));
 	iph->iph_masks = 0;
+	iph->iph_list = NULL;
 
+	iph->iph_ref = 1;
 	iph->iph_next = ipf_htables[unit];
 	iph->iph_pnext = &ipf_htables[unit];
 	if (ipf_htables[unit] != NULL)
@@ -174,7 +176,6 @@ int fr_removehtable(op)
 iplookupop_t *op;
 {
 	iphtable_t *iph;
-
 
 	iph = fr_findhtable(op->iplo_unit, op->iplo_name);
 	if (iph == NULL)
@@ -198,23 +199,56 @@ void fr_delhtable(iph)
 iphtable_t *iph;
 {
 	iphtent_t *ipe;
-	int i;
 
-	for (i = 0; i < iph->iph_size; i++)
-		while ((ipe = iph->iph_table[i]) != NULL)
-			if (fr_delhtent(iph, ipe) != 0)
-				return;
+	while ((ipe = iph->iph_list) != NULL)
+		if (fr_delhtent(iph, ipe) != 0)
+			return;
 
-	*iph->iph_pnext = iph->iph_next;
+	if (iph->iph_pnext != NULL)
+		*iph->iph_pnext = iph->iph_next;
 	if (iph->iph_next != NULL)
 		iph->iph_next->iph_pnext = iph->iph_pnext;
 
 	ipf_nhtables[iph->iph_unit]--;
 
-	if (iph->iph_ref == 0) {
-		KFREES(iph->iph_table, iph->iph_size * sizeof(*iph->iph_table));
-		KFREE(iph);
+	fr_derefhtable(iph);
+}
+
+
+/*
+ * Delete an entry from a hash table.
+ */
+int fr_delhtent(iph, ipe)
+iphtable_t *iph;
+iphtent_t *ipe;
+{
+
+	if (ipe->ipe_phnext != NULL)
+		*ipe->ipe_phnext = ipe->ipe_hnext;
+	if (ipe->ipe_hnext != NULL)
+		ipe->ipe_hnext->ipe_phnext = ipe->ipe_phnext;
+
+	if (ipe->ipe_pnext != NULL)
+		*ipe->ipe_pnext = ipe->ipe_next;
+	if (ipe->ipe_next != NULL)
+		ipe->ipe_next->ipe_pnext = ipe->ipe_pnext;
+
+	switch (iph->iph_type & ~IPHASH_ANON)
+	{
+	case IPHASH_GROUPMAP :
+		if (ipe->ipe_group != NULL)
+			fr_delgroup(ipe->ipe_group, IPL_LOGIPF, fr_active);
+		break;
+
+	default :
+		ipe->ipe_ptr = NULL;
+		ipe->ipe_value = 0;
+		break;
 	}
+
+	fr_derefhtent(ipe);
+
+	return 0;
 }
 
 
@@ -222,8 +256,22 @@ void fr_derefhtable(iph)
 iphtable_t *iph;
 {
 	iph->iph_ref--;
-	if (iph->iph_ref == 0)
-		fr_delhtable(iph);
+	if (iph->iph_ref == 0) {
+		KFREES(iph->iph_table, iph->iph_size * sizeof(*iph->iph_table));
+		KFREE(iph);
+	}
+}
+
+
+void fr_derefhtent(ipe)
+iphtent_t *ipe;
+{
+	ipe->ipe_ref--;
+	if (ipe->ipe_ref == 0) {
+		ipf_nhtnodes[ipe->ipe_unit]--;
+
+		KFREE(ipe);
+	}
 }
 
 
@@ -285,13 +333,20 @@ iphtent_t *ipeo;
 
 	hv = IPE_HASH_FN(ipe->ipe_addr.in4_addr, ipe->ipe_mask.in4_addr,
 			 iph->iph_size);
-	ipe->ipe_ref = 0;
-	ipe->ipe_next = iph->iph_table[hv];
-	ipe->ipe_pnext = iph->iph_table + hv;
+	ipe->ipe_ref = 1;
+	ipe->ipe_hnext = iph->iph_table[hv];
+	ipe->ipe_phnext = iph->iph_table + hv;
 
 	if (iph->iph_table[hv] != NULL)
-		iph->iph_table[hv]->ipe_pnext = &ipe->ipe_next;
+		iph->iph_table[hv]->ipe_phnext = &ipe->ipe_hnext;
 	iph->iph_table[hv] = ipe;
+
+	ipe->ipe_next = iph->iph_list;
+	ipe->ipe_pnext = &iph->iph_list;
+	if (ipe->ipe_next != NULL)
+		ipe->ipe_next->ipe_pnext = &ipe->ipe_next;
+	iph->iph_list = ipe;
+
 	if ((bits >= 0) && (bits != 32))
 		iph->iph_masks |= 1 << bits;
 
@@ -309,44 +364,8 @@ iphtent_t *ipeo;
 		break;
 	}
 
-	ipf_nhtnodes[iph->iph_unit]++;
-
-	return 0;
-}
-
-
-/*
- * Delete an entry from a hash table.
- */
-int fr_delhtent(iph, ipe)
-iphtable_t *iph;
-iphtent_t *ipe;
-{
-
-	if (ipe->ipe_ref != 0)
-		return EBUSY;
-
-
-	*ipe->ipe_pnext = ipe->ipe_next;
-	if (ipe->ipe_next != NULL)
-		ipe->ipe_next->ipe_pnext = ipe->ipe_pnext;
-
-	switch (iph->iph_type & ~IPHASH_ANON)
-	{
-	case IPHASH_GROUPMAP :
-		if (ipe->ipe_group != NULL)
-			fr_delgroup(ipe->ipe_group, IPL_LOGIPF, fr_active);
-		break;
-
-	default :
-		ipe->ipe_ptr = NULL;
-		ipe->ipe_value = 0;
-		break;
-	}
-
-	KFREE(ipe);
-
-	ipf_nhtnodes[iph->iph_unit]--;
+	ipe->ipe_unit = iph->iph_unit;
+	ipf_nhtnodes[ipe->ipe_unit]++;
 
 	return 0;
 }
@@ -377,22 +396,22 @@ void *tptr, *aptr;
 /* ------------------------------------------------------------------------ */
 /* Function:    fr_iphmfindip                                               */
 /* Returns:     int     - 0 == +ve match, -1 == error, 1 == -ve/no match    */
-/* Parameters:  tptr(I)    - pointer to the pool to search                  */
-/*              version(I) - IP protocol version (4 or 6)                   */
-/*              aptr(I)    - pointer to address information                 */
+/* Parameters:  tptr(I)      - pointer to the pool to search                */
+/*              ipversion(I) - IP protocol version (4 or 6)                 */
+/*              aptr(I)      - pointer to address information               */
 /*                                                                          */
 /* Search the hash table for a given address and return a search result.    */
 /* ------------------------------------------------------------------------ */
-int fr_iphmfindip(tptr, version, aptr)
+int fr_iphmfindip(tptr, ipversion, aptr)
 void *tptr, *aptr;
-int version;
+int ipversion;
 {
 	struct in_addr *addr;
 	iphtable_t *iph;
 	iphtent_t *ipe;
 	int rval;
 
-	if (version != 4)
+	if (ipversion != 4)
 		return -1;
 
 	if (tptr == NULL || aptr == NULL)
@@ -426,7 +445,7 @@ struct in_addr *addr;
 maskloop:
 	ips = ntohl(addr->s_addr) & msk;
 	hv = IPE_HASH_FN(ips, msk, iph->iph_size);
-	for (ipe = iph->iph_table[hv]; (ipe != NULL); ipe = ipe->ipe_next) {
+	for (ipe = iph->iph_table[hv]; (ipe != NULL); ipe = ipe->ipe_hnext) {
 		if (ipe->ipe_mask.in4_addr != msk ||
 		    ipe->ipe_addr.in4_addr != ips) {
 			continue;
@@ -447,6 +466,135 @@ maskloop:
 		}
 	}
 	return ipe;
+}
+
+
+int fr_htable_getnext(token, ilp)
+ipftoken_t *token;
+ipflookupiter_t *ilp;
+{
+	iphtent_t *node, zn, *nextnode;
+	iphtable_t *iph, zp, *nextiph;
+	int err;
+
+	err = 0;
+	iph = NULL;
+	node = NULL;
+	nextiph = NULL;
+	nextnode = NULL;
+
+	READ_ENTER(&ip_poolrw);
+
+	switch (ilp->ili_otype)
+	{
+	case IPFLOOKUPITER_LIST :
+		iph = token->ipt_data;
+		if (iph == NULL) {
+			nextiph = ipf_htables[(int)ilp->ili_unit];
+		} else {
+			nextiph = iph->iph_next;
+		}
+
+		if (nextiph != NULL) {
+			ATOMIC_INC(nextiph->iph_ref);
+			if (nextiph->iph_next == NULL)
+				token->ipt_alive = 0;
+		} else {
+			bzero((char *)&zp, sizeof(zp));
+			nextiph = &zp;
+		}
+		break;
+
+	case IPFLOOKUPITER_NODE :
+		node = token->ipt_data;
+		if (node == NULL) {
+			iph = fr_findhtable(ilp->ili_unit, ilp->ili_name);
+			if (iph == NULL)
+				err = ESRCH;
+			else {
+				nextnode = iph->iph_list;
+			}
+		} else {
+			nextnode = node->ipe_next;
+		}
+
+		if (nextnode != NULL) {
+			ATOMIC_INC(nextnode->ipe_ref);
+			if (nextnode->ipe_next == NULL)
+				token->ipt_alive = 0;
+		} else {
+			bzero((char *)&zn, sizeof(zn));
+			nextnode = &zn;
+		}
+		break;
+	default :
+		err = EINVAL;
+		break;
+	}
+
+	RWLOCK_EXIT(&ip_poolrw);
+	if (err != 0)
+		return err;
+
+	switch (ilp->ili_otype)
+	{
+	case IPFLOOKUPITER_LIST :
+		if (iph != NULL) {
+			WRITE_ENTER(&ip_poolrw);
+			fr_derefhtable(iph);
+			RWLOCK_EXIT(&ip_poolrw);
+		}
+		token->ipt_data = nextiph;
+		err = COPYOUT(nextiph, ilp->ili_data, sizeof(*nextiph));
+		if (err != 0)
+			err = EFAULT;
+		break;
+
+	case IPFLOOKUPITER_NODE :
+		if (node != NULL) {
+			WRITE_ENTER(&ip_poolrw);
+			fr_derefhtent(node);
+			RWLOCK_EXIT(&ip_poolrw);
+		}
+		token->ipt_data = nextnode;
+		err = COPYOUT(nextnode, ilp->ili_data, sizeof(*nextnode));
+		if (err != 0)
+			err = EFAULT;
+		break;
+	}
+
+	return err;
+}
+
+
+void fr_htable_iterderef(otype, unit, data)
+u_int otype;
+int unit;
+void *data;
+{
+
+	if (data == NULL)
+		return;
+
+	if (unit < 0 || unit > IPL_LOGMAX)
+		return;
+
+	switch (otype)
+	{
+	case IPFLOOKUPITER_LIST :
+		WRITE_ENTER(&ip_poolrw);
+		fr_derefhtable((iphtable_t *)data);
+		RWLOCK_EXIT(&ip_poolrw);
+		break;
+
+	case IPFLOOKUPITER_NODE :
+		WRITE_ENTER(&ip_poolrw);
+		fr_derefhtent((iphtent_t *)data);
+		RWLOCK_EXIT(&ip_poolrw);
+		break;
+	default :
+		break;
+	}
 }
 
 #endif /* IPFILTER_LOOKUP */

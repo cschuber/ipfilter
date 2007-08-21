@@ -191,7 +191,7 @@ aproxy_t *ap;
 			return -1;
 		}
 
-	for (a = ap_proxylist; a->apr_p; a = a->apr_next)
+	for (a = ap_proxylist; (a != NULL); a = a->apr_next)
 		if ((a->apr_p == ap->apr_p) &&
 		    !strncmp(a->apr_label, ap->apr_label,
 			     sizeof(ap->apr_label))) {
@@ -288,10 +288,11 @@ ipnat_t *nat;
 }
 
 
-int appr_ioctl(data, cmd, mode)
+int appr_ioctl(data, cmd, mode, ctx)
 caddr_t data;
 ioctlcmd_t cmd;
 int mode;
+void *ctx;
 {
 	ap_ctl_t ctl;
 	caddr_t ptr;

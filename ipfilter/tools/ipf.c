@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 1993-2001 by Darren Reed.
+ * Copyright (C) 2001-2006 by Darren Reed.
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  */
@@ -451,15 +451,21 @@ void ipf_frsync()
 
 void zerostats()
 {
+	ipfobj_t	obj;
 	friostat_t	fio;
-	friostat_t	*fiop = &fio;
+
+	obj.ipfo_rev = IPFILTER_VERSION;
+	obj.ipfo_type = IPFOBJ_IPFSTAT;
+	obj.ipfo_size = sizeof(fio);
+	obj.ipfo_ptr = &fio;
+	obj.ipfo_offset = 0;
 
 	if (opendevice(ipfname, 1) != -2) {
-		if (ioctl(fd, SIOCFRZST, &fiop) == -1) {
+		if (ioctl(fd, SIOCFRZST, &obj) == -1) {
 			perror("ioctl(SIOCFRZST)");
 			exit(-1);
 		}
-		showstats(fiop);
+		showstats(&fio);
 	}
 
 }

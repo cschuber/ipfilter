@@ -58,26 +58,27 @@ extern	struct	callout	*fr_timer_id;
 static	int	fr_send_ip(fr_info_t *, mblk_t *);
 ipfmutex_t	ipl_mutex, ipf_authmx, ipf_rw, ipf_stinsert;
 ipfmutex_t	ipf_nat_new, ipf_natio, ipf_timeoutlock;
-ipfrwlock_t	ipf_mutex, ipf_global, ipf_ipidfrag, ipf_frcache;
+ipfrwlock_t	ipf_mutex, ipf_global, ipf_ipidfrag, ipf_frcache, ipf_tokens;
 ipfrwlock_t	ipf_frag, ipf_state, ipf_nat, ipf_natfrag, ipf_auth;
 int		*ip_ttl_ptr;
 int		*ip_mtudisc;
 int		*ip_forwarding;
 
 
-int ipldetach()
+int ipfdetach()
 {
 
 	if (fr_control_forwarding & 2)
 		ip_forwarding = 0;
 #ifdef	IPFDEBUG
-	cmn_err(CE_CONT, "ipldetach()\n");
+	cmn_err(CE_CONT, "ipfdetach()\n");
 #endif
 	fr_deinitialise();
 
 	(void) frflush(IPL_LOGIPF, 0, FR_INQUE|FR_OUTQUE|FR_INACTIVE);
 	(void) frflush(IPL_LOGIPF, 0, FR_INQUE|FR_OUTQUE);
 
+	RW_DESTROY(&ipf_tokens);
 	RW_DESTROY(&ipf_ipidfrag);
 	RW_DESTROY(&ipf_mutex);
 	RW_DESTROY(&ipf_frcache);
@@ -92,12 +93,12 @@ int ipldetach()
 }
 
 
-int iplattach __P((void))
+int ipfattach __P((void))
 {
 	int i;
 
 #ifdef	IPFDEBUG
-	cmn_err(CE_CONT, "iplattach()\n");
+	cmn_err(CE_CONT, "ipfattach()\n");
 #endif
 	bzero((char *)frcache, sizeof(frcache));
 	MUTEX_INIT(&ipf_rw, "ipf_rw");
@@ -106,6 +107,7 @@ int iplattach __P((void))
 	RWLOCK_INIT(&ipf_mutex, "ipf filter rwlock");
 	RWLOCK_INIT(&ipf_frcache, "ipf cache rwlock");
 	RWLOCK_INIT(&ipf_ipidfrag, "ipf IP NAT-Frag rwlock");
+	RWLOCK_INIT(&ipf_tokens, "ipf token rwlock");
 
 	if (fr_initialise() < 0)
 		return -1;
@@ -132,7 +134,7 @@ int iplattach __P((void))
 	}
 
 #ifdef	IPFDEBUG
-	cmn_err(CE_CONT, "iplattach() - success!\n");
+	cmn_err(CE_CONT, "ipfattach() - success!\n");
 #endif
 	if (fr_control_forwarding & 1)
 		*ip_forwarding = 1;
@@ -149,9 +151,7 @@ int cmd;
 caddr_t data;
 int flags;
 {
-	int error = 0, tmp;
-	friostat_t fio;
-	u_int enable;
+	int error = 0;
 	minor_t unit;
 
 #ifdef	IPFDEBUG
@@ -174,169 +174,12 @@ int flags;
 
 	READ_ENTER(&ipf_global);
 
-	error = fr_ioctlswitch(unit, data, cmd, flags);
+	error = fr_ioctlswitch(unit, data, cmd, flags, curproc->p_uid, curproc);
 	if (error != -1) {
 		RWLOCK_EXIT(&ipf_global);
 		return error;
 	}
-	error = 0;
 
-	switch (cmd)
-	{
-	case SIOCFRENB :
-		if (!(flags & FWRITE))
-			error = EPERM;
-		else {
-			error = BCOPYIN(data, &enable, sizeof(enable));
-			if (enable) {
-				if (fr_running > 0)
-					error = 0;
-				else
-					error = iplattach();
-				if (error == 0)
-					fr_running = 1;
-				else
-					(void) ipldetach();
-			} else {
-				error = ipldetach();
-				if (error == 0)
-					fr_running = -1;
-			}
-		}
-		break;
-	case SIOCIPFSET :
-		if (!(flags & FWRITE)) {
-			error = EPERM;
-			break;
-		}
-	case SIOCIPFGETNEXT :
-	case SIOCIPFGET :
-		error = fr_ipftune(cmd, data);
-		break;
-	case SIOCSETFF :
-		if (!(flags & FWRITE))
-			error = EPERM;
-		else {
-			WRITE_ENTER(&ipf_mutex);
-			error = BCOPYIN(data, &fr_flags, sizeof(fr_flags));
-			RWLOCK_EXIT(&ipf_mutex);
-		}
-		break;
-	case SIOCGETFF :
-		error = BCOPYOUT(&fr_flags, data, sizeof(fr_flags));
-		break;
-	case SIOCFUNCL :
-		error = fr_resolvefunc(data);
-		break;
-	case SIOCINAFR :
-	case SIOCRMAFR :
-	case SIOCADAFR :
-	case SIOCZRLST :
-		if (!(flags & FWRITE))
-			error = EPERM;
-		else
-			error = frrequest(unit, cmd, (caddr_t)data,
-					  fr_active, 1);
-		break;
-	case SIOCINIFR :
-	case SIOCRMIFR :
-	case SIOCADIFR :
-		if (!(flags & FWRITE))
-			error = EPERM;
-		else
-			error = frrequest(unit, cmd, (caddr_t)data,
-					  1 - fr_active, 1);
-		break;
-	case SIOCSWAPA :
-		if (!(flags & FWRITE))
-			error = EPERM;
-		else {
-			WRITE_ENTER(&ipf_mutex);
-			bzero((char *)frcache, sizeof(frcache[0]) * 2);
-			error = BCOPYOUT(&fr_active, data, sizeof(fr_active));
-			if (error != 0)
-				error = EFAULT;
-			else
-				fr_active = 1 - fr_active;
-			RWLOCK_EXIT(&ipf_mutex);
-		}
-		break;
-	case SIOCGETFS :
-		READ_ENTER(&ipf_mutex);
-		fr_getstat(&fio);
-		RWLOCK_EXIT(&ipf_mutex);
-		error = fr_outobj(data, &fio, IPFOBJ_IPFSTAT);
-		break;
-	case SIOCFRZST :
-		if (!(flags & FWRITE))
-			error = EPERM;
-		else
-			error = fr_zerostats((caddr_t)data);
-		break;
-	case	SIOCIPFFL :
-		if (!(flags & FWRITE))
-			error = EPERM;
-		else {
-			error = BCOPYIN(data, &tmp, sizeof(tmp));
-			if (!error) {
-				tmp = frflush(unit, 4, tmp);
-				error = BCOPYOUT(&tmp, data, sizeof(tmp));
-			}
-		}
-		break;
-#ifdef USE_INET6
-	case	SIOCIPFL6 :
-		if (!(flags & FWRITE))
-			error = EPERM;
-		else {
-			error = COPYIN(data, &tmp, sizeof(tmp));
-			if (!error) {
-				tmp = frflush(unit, 6, tmp);
-				error = COPYOUT(&tmp, data, sizeof(tmp));
-			}
-		}
-		break;
-#endif
-	case SIOCSTLCK :
-		error = BCOPYIN(data, &tmp, sizeof(tmp));
-		if (error == 0) {
-			fr_state_lock = tmp;
-			fr_nat_lock = tmp;
-			fr_frag_lock = tmp;
-			fr_auth_lock = tmp;
-		} else
-			error = EFAULT;
-	break;
-#ifdef	IPFILTER_LOG
-	case	SIOCIPFFB :
-		if (!(flags & FWRITE))
-			error = EPERM;
-		else {
-			tmp = ipflog_clear(unit);
-			error = BCOPYOUT(&tmp, data, sizeof(tmp));
-		}
-		break;
-#endif /* IPFILTER_LOG */
-	case SIOCFRSYN :
-		if (!(flags & FWRITE))
-			error = EPERM;
-		else
-			error = ipfsync();
-		break;
-	case SIOCGFRST :
-		error = fr_outobj(data, fr_fragstats(), IPFOBJ_FRAGSTAT);
-		break;
-	case FIONREAD :
-#ifdef	IPFILTER_LOG
-		tmp = (int)iplused[IPL_LOGIPF];
-
-		error = BCOPYOUT(&tmp, data, sizeof(tmp));
-#endif
-		break;
-	default :
-		error = EINVAL;
-		break;
-	}
 	RWLOCK_EXIT(&ipf_global);
 	return error;
 }

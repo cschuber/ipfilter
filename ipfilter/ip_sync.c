@@ -995,10 +995,11 @@ synclist_t *sl;
 /* This function currently does not handle any ioctls and so just returns   */
 /* EINVAL on all occasions.                                                 */
 /* ------------------------------------------------------------------------ */
-int fr_sync_ioctl(data, cmd, mode)
+int fr_sync_ioctl(data, cmd, mode, uid, ctx)
 caddr_t data;
 ioctlcmd_t cmd;
-int mode;
+int mode, uid;
+void *ctx;
 {
 	return EINVAL;
 }

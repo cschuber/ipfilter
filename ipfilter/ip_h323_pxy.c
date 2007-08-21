@@ -135,7 +135,7 @@ ap_session_t *aps;
 			 * called with ipf_nat locked.
 			 */
 			if (fr_nat_ioctl((caddr_t)ipn, SIOCRMNAT, NAT_SYSSPACE|
-				         NAT_LOCKHELD|FWRITE) == -1) {
+				         NAT_LOCKHELD|FWRITE, 0, NULL) == -1) {
 				/*EMPTY*/;
 				/* log the error */
 			}
@@ -199,7 +199,7 @@ nat_t *nat;
 		 */
 		RWLOCK_EXIT(&ipf_nat);
 		if (fr_nat_ioctl((caddr_t)ipn, SIOCADNAT,
-				 NAT_SYSSPACE|FWRITE) == -1) {
+				 NAT_SYSSPACE|FWRITE, 0, NULL) == -1) {
 			READ_ENTER(&ipf_nat);
 			return -1;
 		}

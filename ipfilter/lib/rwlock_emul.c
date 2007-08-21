@@ -1,3 +1,11 @@
+/*
+ * Copyright (C) 2003 by Darren Reed.
+ * 
+ * See the IPFILTER.LICENCE file for details on licencing.  
+ *   
+ * $Id$ 
+ */     
+
 #include "ipf.h"
 
 #define	EMM_MAGIC	0x97dd8b3a

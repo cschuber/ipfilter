@@ -43,12 +43,12 @@
 # define	SIOCZRLST	_IOWR('r', 75, struct ipfobj)
 # define	SIOCAUTHW	_IOWR('r', 76, struct ipfobj)
 # define	SIOCAUTHR	_IOWR('r', 77, struct ipfobj)
-# define	SIOCATHST	_IOWR('r', 78, struct ipfobj)
+# define	SIOCSTAT1	_IOWR('r', 78, struct ipfobj)
 # define	SIOCSTLCK	_IOWR('r', 79, u_int)
 # define	SIOCSTPUT	_IOWR('r', 80, struct ipfobj)
 # define	SIOCSTGET	_IOWR('r', 81, struct ipfobj)
 # define	SIOCSTGSZ	_IOWR('r', 82, struct ipfobj)
-# define	SIOCGFRST	_IOWR('r', 83, struct ipfobj)
+# define	SIOCSTAT2	_IOWR('r', 83, struct ipfobj)
 # define	SIOCSETLG	_IOWR('r', 84, int)
 # define	SIOCGETLG	_IOWR('r', 85, int)
 # define	SIOCFUNCL	_IOWR('r', 86, struct ipfunc_resolve)
@@ -56,6 +56,11 @@
 # define	SIOCIPFGET	_IOWR('r', 88, struct ipfobj)
 # define	SIOCIPFSET	_IOWR('r', 89, struct ipfobj)
 # define	SIOCIPFL6	_IOWR('r', 90, int)
+# define	SIOCIPFITER	_IOWR('r', 91, struct ipfobj)
+# define	SIOCGENITER	_IOWR('r', 92, struct ipfobj)
+# define	SIOCGTABL	_IOWR('r', 93, struct ipfobj)
+# define	SIOCIPFDELTOK	_IOWR('r', 94, int)
+# define	SIOCLOOKUPITER	_IOWR('r', 95, struct ipfobj)
 #else
 # define	SIOCADAFR	_IOW(r, 60, struct ipfobj)
 # define	SIOCRMAFR	_IOW(r, 61, struct ipfobj)
@@ -75,12 +80,12 @@
 # define	SIOCZRLST	_IOWR(r, 75, struct ipfobj)
 # define	SIOCAUTHW	_IOWR(r, 76, struct ipfobj)
 # define	SIOCAUTHR	_IOWR(r, 77, struct ipfobj)
-# define	SIOCATHST	_IOWR(r, 78, struct ipfobj)
+# define	SIOCSTAT1	_IOWR(r, 78, struct ipfobj)
 # define	SIOCSTLCK	_IOWR(r, 79, u_int)
 # define	SIOCSTPUT	_IOWR(r, 80, struct ipfobj)
 # define	SIOCSTGET	_IOWR(r, 81, struct ipfobj)
 # define	SIOCSTGSZ	_IOWR(r, 82, struct ipfobj)
-# define	SIOCGFRST	_IOWR(r, 83, struct ipfobj)
+# define	SIOCSTAT2	_IOWR(r, 83, struct ipfobj)
 # define	SIOCSETLG	_IOWR(r, 84, int)
 # define	SIOCGETLG	_IOWR(r, 85, int)
 # define	SIOCFUNCL	_IOWR(r, 86, struct ipfunc_resolve)
@@ -88,10 +93,17 @@
 # define	SIOCIPFGET	_IOWR(r, 88, struct ipfobj)
 # define	SIOCIPFSET	_IOWR(r, 89, struct ipfobj)
 # define	SIOCIPFL6	_IOWR(r, 90, int)
+# define	SIOCIPFITER	_IOWR(r, 91, struct ipfobj)
+# define	SIOCGENITER	_IOWR(r, 92, struct ipfobj)
+# define	SIOCGTABL	_IOWR(r, 93, struct ipfobj)
+# define	SIOCIPFDELTOK	_IOWR(r, 94, int)
+# define	SIOCLOOKUPITER	_IOWR(r, 95, struct ipfobj)
 #endif
 #define	SIOCADDFR	SIOCADAFR
 #define	SIOCDELFR	SIOCRMAFR
 #define	SIOCINSFR	SIOCINAFR
+#define	SIOCATHST	SIOCSTAT1
+#define	SIOCGFRST	SIOCSTAT2
 
 
 struct ipscan;
@@ -111,6 +123,11 @@ typedef	union	i6addr	{
 	struct	in6_addr in6;
 	void	*vptr[2];
 	lookupfunc_t	lptr[2];
+	struct {
+		u_short	type;
+		u_short	subtype;
+		char	label[12];
+	} i6un;
 } i6addr_t;
 #else
 typedef	union	i6addr	{
@@ -118,12 +135,19 @@ typedef	union	i6addr	{
 	struct	in_addr	in4;
 	void	*vptr[2];
 	lookupfunc_t	lptr[2];
+	struct {
+		u_short	type;
+		u_short	subtype;
+		char	label[12];
+	} i6un;
 } i6addr_t;
 #endif
 
 #define in4_addr	in4.s_addr
-#define	iplookupnum	i6[0]
-#define	iplookuptype	i6[1]
+#define	iplookupnum	i6[1]
+#define	iplookupname	i6un.label
+#define	iplookuptype	i6un.type
+#define	iplookupsubtype	i6un.subtype
 /*
  * NOTE: These DO overlap the above on 64bit systems and this IS recognised.
  */
@@ -249,8 +273,12 @@ typedef	struct	fr_ip	{
 #define	fi_daddr	fi_dst.in4.s_addr
 #define	fi_srcnum	fi_src.iplookupnum
 #define	fi_dstnum	fi_dst.iplookupnum
+#define	fi_srcname	fi_src.iplookupname
+#define	fi_dstname	fi_dst.iplookupname
 #define	fi_srctype	fi_src.iplookuptype
 #define	fi_dsttype	fi_dst.iplookuptype
+#define	fi_srcsubtype	fi_src.iplookupsubtype
+#define	fi_dstsubtype	fi_dst.iplookupsubtype
 #define	fi_srcptr	fi_src.iplookupptr
 #define	fi_dstptr	fi_dst.iplookupptr
 #define	fi_srcfunc	fi_src.iplookupfunc
@@ -440,9 +468,13 @@ typedef	struct	fripf	{
 	int	fri_difpidx;		/* index into fr_ifps[] to use when */
 } fripf_t;
 
-#define	fri_dstnum	fri_ip.fi_dstnum
+#define	fri_dlookup	fri_mip.fi_dst
+#define	fri_slookup	fri_mip.fi_src
+#define	fri_dstnum	fri_mip.fi_dstnum
 #define	fri_srcnum	fri_mip.fi_srcnum
-#define	fri_dstptr	fri_ip.fi_dstptr
+#define	fri_dstname	fri_mip.fi_dstname
+#define	fri_srcname	fri_mip.fi_srcname
+#define	fri_dstptr	fri_mip.fi_dstptr
 #define	fri_srcptr	fri_mip.fi_srcptr
 
 #define	FRI_NORMAL	0	/* Normal address */
@@ -554,8 +586,14 @@ typedef	struct	frentry {
 #define	fr_smask	fr_mip.fi_src.in4.s_addr
 #define	fr_dstnum	fr_ip.fi_dstnum
 #define	fr_srcnum	fr_ip.fi_srcnum
+#define	fr_dlookup	fr_ip.fi_dst
+#define	fr_slookup	fr_ip.fi_src
+#define	fr_dstname	fr_ip.fi_dstname
+#define	fr_srcname	fr_ip.fi_srcname
 #define	fr_dsttype	fr_ip.fi_dsttype
 #define	fr_srctype	fr_ip.fi_srctype
+#define	fr_dstsubtype	fr_ip.fi_dstsubtype
+#define	fr_srcsubtype	fr_ip.fi_srcsubtype
 #define	fr_dstptr	fr_mip.fi_dstptr
 #define	fr_srcptr	fr_mip.fi_srcptr
 #define	fr_dstfunc	fr_mip.fi_dstfunc
@@ -1053,6 +1091,12 @@ typedef	struct	ipfobj	{
 #define	IPFOBJ_STATESTAT	11	/* struct ips_stat */
 #define	IPFOBJ_FRAUTH		12	/* struct frauth */
 #define	IPFOBJ_TUNEABLE		13	/* struct ipftune */
+#define	IPFOBJ_NAT		14	/* struct nat */
+#define	IPFOBJ_IPFITER		15	/* struct ipfruleiter */
+#define	IPFOBJ_GENITER		16	/* struct ipfgeniter */
+#define	IPFOBJ_GTABLE		17	/* struct ipftable */
+#define	IPFOBJ_LOOKUPITER	18	/* struct ipflookupiter */
+#define	IPFOBJ_COUNT		19	/* How many #defines are above this? */
 
 
 typedef	union	ipftunevalptr	{
@@ -1103,6 +1147,57 @@ typedef	struct	ipftune	{
 #define	ipft_vint	ipft_un.ipftu_int
 #define	ipft_vshort	ipft_un.ipftu_short
 #define	ipft_vchar	ipft_un.ipftu_char
+
+/*
+ *
+ */
+typedef	struct	ipfruleiter {
+	int		iri_inout;
+	char		iri_group[FR_GROUPLEN];
+	int		iri_active;
+	int		iri_nrules;
+	int		iri_v;
+	frentry_t	*iri_rule;
+} ipfruleiter_t;
+
+typedef	struct	ipfgeniter {
+	int	igi_type;
+	int	igi_nitems;
+	void	*igi_data;
+} ipfgeniter_t;
+
+#define	IPFGENITER_IPF		0
+#define	IPFGENITER_NAT		1
+#define	IPFGENITER_IPNAT	2
+#define	IPFGENITER_FRAG		3
+#define	IPFGENITER_AUTH		4
+#define	IPFGENITER_STATE	5
+#define	IPFGENITER_NATFRAG	6
+#define	IPFGENITER_HOSTMAP	7
+#define	IPFGENITER_LOOKUP	8
+
+typedef	struct	ipftable {
+	int	ita_type;
+	void	*ita_table;
+} ipftable_t;
+
+#define	IPFTABLE_BUCKETS	1
+
+
+/*
+ *
+ */
+typedef struct ipftoken {
+	struct ipftoken	*ipt_next;
+	struct ipftoken	**ipt_pnext;
+	void		*ipt_ctx;
+	void		*ipt_data;
+	u_long		ipt_die;
+	int		ipt_type;
+	int		ipt_uid;
+	int		ipt_subtype;
+	int		ipt_alive;
+} ipftoken_t;
 
 
 /*
@@ -1162,11 +1257,15 @@ extern	int	iplclose __P((dev_t, int));
 extern	void	m_freem __P((mb_t *));
 extern	int	bcopywrap __P((void *, void *, size_t));
 #else /* #ifndef _KERNEL */
+# ifdef BSD
+extern struct selinfo ipfselwait[IPL_LOGSIZE];
+# endif
 # if defined(__NetBSD__) && defined(PFIL_HOOKS)
 extern	void	ipfilterattach __P((int));
 # endif
 extern	int	ipl_enable __P((void));
 extern	int	ipl_disable __P((void));
+extern	int	ipf_inject __P((fr_info_t *, mb_t *));
 # ifdef MENTAT
 extern	int	fr_check __P((struct ip *, int, void *, int, void *,
 			      mblk_t **));
@@ -1189,7 +1288,6 @@ extern	int	iplread __P((dev_t, uio_t *));
 extern	int	iplwrite __P((dev_t, uio_t *));
 extern	int	iplselect __P((dev_t, int));
 #  endif
-extern	int	ipfsync __P((void));
 extern	int	fr_qout __P((queue_t *, mblk_t *));
 # else /* MENTAT */
 extern	int	fr_check __P((struct ip *, int, void *, int, mb_t **));
@@ -1202,7 +1300,6 @@ extern	int	iplopen __P((dev_t *, int, int, cred_t *));
 extern	int	iplclose __P((dev_t, int, int, cred_t *));
 extern	int	iplread __P((dev_t, uio_t *, cred_t *));
 extern	int	iplwrite __P((dev_t, uio_t *, cred_t *));
-extern	int	ipfsync __P((void));
 extern	int	ipfilter_sgi_attach __P((void));
 extern	void	ipfilter_sgi_detach __P((void));
 extern	void	ipfilter_sgi_intfsync __P((void));
@@ -1270,21 +1367,22 @@ extern	ipfmutex_t	ipl_mutex, ipf_authmx, ipf_rw, ipf_hostmap;
 extern	ipfmutex_t	ipf_timeoutlock, ipf_stinsert, ipf_natio, ipf_nat_new;
 extern	ipfrwlock_t	ipf_mutex, ipf_global, ip_poolrw, ipf_ipidfrag;
 extern	ipfrwlock_t	ipf_frag, ipf_state, ipf_nat, ipf_natfrag, ipf_auth;
-extern	ipfrwlock_t	ipf_frcache;
+extern	ipfrwlock_t	ipf_frcache, ipf_tokens;
 
 extern	char	*memstr __P((const char *, char *, size_t, size_t));
 extern	int	count4bits __P((u_32_t));
 extern	int	frrequest __P((int, ioctlcmd_t, caddr_t, int, int));
 extern	char	*getifname __P((struct ifnet *));
-extern	int	iplattach __P((void));
-extern	int	ipldetach __P((void));
+extern	int	ipfattach __P((void));
+extern	int	ipfdetach __P((void));
 extern	u_short	ipf_cksum __P((u_short *, int));
 extern	int	copyinptr __P((void *, void *, size_t));
 extern	int	copyoutptr __P((void *, void *, size_t));
 extern	int	fr_fastroute __P((mb_t *, mb_t **, fr_info_t *, frdest_t *));
 extern	int	fr_inobj __P((void *, void *, int));
 extern	int	fr_inobjsz __P((void *, void *, int, int));
-extern	int	fr_ioctlswitch __P((int, void *, ioctlcmd_t, int));
+extern	int	fr_ioctlswitch __P((int, void *, ioctlcmd_t, int, int, void *));
+extern	int	fr_ipf_ioctl __P((caddr_t, ioctlcmd_t, int, int, void *));
 extern	int	fr_ipftune __P((ioctlcmd_t, void *));
 extern	int	fr_outobj __P((void *, void *, int));
 extern	int	fr_outobjsz __P((void *, void *, int, int));
@@ -1362,6 +1460,13 @@ extern	frentry_t 	*fr_srcgrpmap __P((fr_info_t *, u_32_t *));
 extern	int		fr_tcpudpchk __P((fr_info_t *, frtuc_t *));
 extern	int		fr_verifysrc __P((fr_info_t *fin));
 extern	int		fr_zerostats __P((char *));
+extern	ipftoken_t	*ipf_findtoken __P((int, int, void *));
+extern	int		ipf_getnextrule __P((ipftoken_t *, void *));
+extern	void		ipf_expiretokens __P((void));
+extern	void		ipf_freetoken __P((ipftoken_t *));
+extern	int		ipf_deltoken __P((int,int, void *));
+extern	int		ipfsync __P((void));
+extern	int		ipf_genericiter __P((void *, int, void *));
 
 extern	int	fr_running;
 extern	u_long	fr_frouteok[2];

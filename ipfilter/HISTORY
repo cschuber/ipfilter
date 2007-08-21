@@ -10,6 +10,25 @@
 # and especially those who have found the time to port IP Filter to new
 # platforms.
 #
+4.1.14 - Released 04 October 2006
+
+rewrite checksum alteration for ICMP packets being NAT'd to use a sane
+algorithm that can be understood...now it needs better comments
+
+fix 1 byte error in checksum validation perl script
+
+remove unused files in lib directory
+
+ipftest will say "bad-packet" if it has been freed rather than just "blocked"
+
+make it possible to load IP address pools from external files in ippool.conf
+
+update copyright messages in tools directory
+
+consolidate ioctl hanlding source code into fil.c
+
+make ipfstat, ippool, ipnat retrieve information via ioctls rather than /dev/kmem
+
 4.1.13 - Released 4 April 2006
 
 fix bug where null pointers introduced by proxies could cause a crash
@@ -39,6 +58,7 @@ add missing ipfsync_canread() and ipfsync_canwrite()
 behaviour of \ on the end of a line in ipf.conf does not match older behaviour
 
 remove duplicate statistics line output with "ipfstat -s"
+
 4.1.11 - Released 19 March 2006
 
 Patch for NAT with ipfsync from N. Ersen (SESCI) - www.enderunix.org

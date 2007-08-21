@@ -166,10 +166,8 @@ int mode;
 cred_t *cp;
 int *rp;
 {
-	int error = 0, unit = 0, tmp;
-	friostat_t fio;
-	u_int enable;
-	int s;
+	int error = 0, unit = 0;
+	SPL_INT(s);
 
 	unit = GET_MINOR(dev);
 	if ((IPL_LOGMAX < unit) || (unit < 0))
@@ -186,158 +184,12 @@ int *rp;
 
 	SPL_NET(s);
 
-	error = fr_ioctlswitch(unit, data, cmd, mode);
+	error = fr_ioctlswitch(unit, data, cmd, mode, cp->cr_uid, curproc);
 	if (error != -1) {
 		SPL_X(s);
 		return error;
 	}
-	error = 0;
 
-
-	switch (cmd)
-	{
-	case FIONREAD :
-#ifdef IPFILTER_LOG
-		error = COPYOUT(&iplused[IPL_LOGIPF], (caddr_t)data,
-			       sizeof(iplused[IPL_LOGIPF]));
-#endif
-		break;
-	case SIOCFRENB :
-		if (!(mode & FWRITE))
-			error = EPERM;
-		else {
-			error = COPYIN(data, &enable, sizeof(enable));
-			if (error)
-				break;
-			if (enable) {
-				if (fr_running > 0)
-					error = 0;
-				else
-					error = ipl_attach();
-				if (error == 0)
-					fr_running = 1;
-				else
-					(void) ipl_detach();
-			} else {
-				error = ipl_detach();
-				if (error == 0)
-					fr_running = -1;
-			}
-		}
-		break;
-	case SIOCIPFSET :
-		if (!(mode & FWRITE)) {
-			error = EPERM;
-			break;
-		}
-	case SIOCIPFGETNEXT :
-	case SIOCIPFGET :
-		error = fr_ipftune(cmd, data);
-		break;
-	case SIOCSETFF :
-		if (!(mode & FWRITE))
-			error = EPERM;
-		else
-			error = COPYIN(data, &fr_flags, sizeof(fr_flags));
-		break;
-	case SIOCGETFF :
-		error = COPYOUT(&fr_flags, data, sizeof(fr_flags));
-		break;
-	case SIOCFUNCL :
-		error = fr_resolvefunc(data);
-		break;
-	case SIOCINAFR :
-	case SIOCRMAFR :
-	case SIOCADAFR :
-	case SIOCZRLST :
-		if (!(mode & FWRITE))
-			error = EPERM;
-		else
-			error = frrequest(unit, cmd, data, fr_active, 1);
-		break;
-	case SIOCINIFR :
-	case SIOCRMIFR :
-	case SIOCADIFR :
-		if (!(mode & FWRITE))
-			error = EPERM;
-		else
-			error = frrequest(unit, cmd, data, 1 - fr_active, 1);
-		break;
-	case SIOCSWAPA :
-		if (!(mode & FWRITE))
-			error = EPERM;
-		else {
-			bzero((char *)frcache, sizeof(frcache[0]) * 2);
-			*(u_int *)data = fr_active;
-			fr_active = 1 - fr_active;
-		}
-		break;
-	case SIOCGETFS :
-		fr_getstat(&fio);
-		error = fr_outobj(data, &fio, IPFOBJ_IPFSTAT);
-		break;
-	case	SIOCFRZST :
-		if (!(mode & FWRITE))
-			error = EPERM;
-		else
-			error = fr_zerostats(data);
-		break;
-	case	SIOCIPFFL :
-		if (!(mode & FWRITE))
-			error = EPERM;
-		else {
-			error = COPYIN(data, &tmp, sizeof(tmp));
-			if (!error) {
-				tmp = frflush(unit, 4, tmp);
-				error = COPYOUT(&tmp, data, sizeof(tmp));
-			}
-		}
-		break;
-#ifdef USE_INET6
-	case	SIOCIPFL6 :
-		if (!(mode & FWRITE))
-			error = EPERM;
-		else {
-			error = COPYIN(data, &tmp, sizeof(tmp));
-			if (!error) {
-				tmp = frflush(unit, 6, tmp);
-				error = COPYOUT(&tmp, data, sizeof(tmp));
-			}
-		}
-		break;
-#endif
-	case SIOCSTLCK :
-		error = COPYIN(data, &tmp, sizeof(tmp));
-		if (error == 0) {
-			fr_state_lock = tmp;
-			fr_nat_lock = tmp;
-			fr_frag_lock = tmp;
-			fr_auth_lock = tmp;
-		} else
-			error = EFAULT;
-		break;
-#ifdef	IPFILTER_LOG
-	case	SIOCIPFFB :
-		if (!(mode & FWRITE))
-			error = EPERM;
-		else
-			*(int *)data = ipflog_clear(unit);
-		break;
-#endif /* IPFILTER_LOG */
-	case SIOCGFRST :
-		error = fr_outobj(data, fr_fragstats(), IPFOBJ_FRAGSTAT);
-		break;
-	case SIOCFRSYN :
-		if (!(mode & FWRITE))
-			error = EPERM;
-		else {
-			frsync(NULL);
-		}
-		break;
-	default :
-		error = EINVAL;
-		break;
-	}
 	SPL_X(s);
 	return error;
 }
@@ -767,13 +619,13 @@ if (i==256)printf("iplinit:ipfilter not found\n");
 	else
 		ip_init();
 }
-int iplattach(void)
+int ipfattach(void)
 {
 int i;
 
 for (i = 0; i < 256; i++)
-if (cdevsw[i].d_open == iplopen){printf("iplattach:ipfilter @%d\n", i); break;}
-if (i==256)printf("iplattach:ipfilter not found\n");
+if (cdevsw[i].d_open == iplopen){printf("ipfattach:ipfilter @%d\n", i); break;}
+if (i==256)printf("ipfattach:ipfilter not found\n");
 return 0;
 }
 
@@ -889,6 +741,7 @@ frdest_t *fdp;
 		case 0 :
 			break;
 		case 1 :
+			fr_natderef((nat_t **)&fin->fin_nat);
 			ip->ip_sum = 0;
 			break;
 		case -1 :
@@ -1301,4 +1154,42 @@ int len;
 		fin->fin_dp = (char *)fin->fin_ip + dpoff;
 
 	return ip;
+}
+
+
+int ipf_inject(fin, m)
+fr_info_t *fin;
+mb_t *m;
+{
+	int error;
+
+	if (fin->fin_out == 0) {
+		struct ifqueue *ifq;
+
+#if (IRIX >= 60516)
+		ifq = &((struct ifnet *)fin->fin_ifp)->if_snd;
+#else
+		ifq = &ipintrq;
+#endif
+
+		if (IF_QFULL(ifq)) {
+			IF_DROP(ifq);
+			FREE_MB_T(m);
+			error = ENOBUFS;
+		} else {
+			IF_ENQUEUE(ifq, m);
+#if IRIX < 60500
+			schednetisr(NETISR_IP);
+#endif
+			error = 0;
+		}
+	} else {
+#if IRIX >= 60500
+		error = ip_output(m, NULL, NULL, IP_FORWARDING, NULL, NULL);
+#else
+		error = ip_output(m, NULL, NULL, IP_FORWARDING, NULL);
+#endif
+	}
+
+	return error;
 }

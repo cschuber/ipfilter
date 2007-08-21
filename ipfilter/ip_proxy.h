@@ -453,6 +453,6 @@ extern	void	aps_free __P((ap_session_t *));
 extern	int	appr_check __P((fr_info_t *, struct nat *));
 extern	aproxy_t	*appr_lookup __P((u_int, char *));
 extern	int	appr_new __P((fr_info_t *, struct nat *));
-extern	int	appr_ioctl __P((caddr_t, ioctlcmd_t, int));
+extern	int	appr_ioctl __P((caddr_t, ioctlcmd_t, int, void *));
 
 #endif /* __IP_PROXY_H__ */

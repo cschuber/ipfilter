@@ -29,7 +29,7 @@
 #define	IPL_NAME	"/dev/ipl"
 #endif
 
-extern	int	iplattach(), iplopen(), iplclose(), iplioctl(), iplread();
+extern	int	ipfattach(), iplopen(), iplclose(), iplioctl(), iplread();
 extern	int	nulldev(), iplidentify(), errno;
 
 struct	cdevsw	ipldevsw =
@@ -44,7 +44,7 @@ struct	dev_ops	ipl_ops =
 {
 	1,
 	iplidentify,
-	iplattach,
+	ipfattach,
 	iplopen,
 	iplclose,
 	iplread,
@@ -138,7 +138,7 @@ static unload(vdp, vdi)
 	int	i;
 
 	(void) vn_remove(IPL_NAME, UIO_SYSSPACE, FILE);
-	return ipldetach();
+	return ipfdetach();
 }
 
 
@@ -158,5 +158,5 @@ struct	vdioctl_load	*vdi;
 	error = vn_create(IPL_NAME, UIO_SYSSPACE, &vattr, EXCL, 0, &vp);
 	if (error == 0)
 		VN_RELE(vp);
-	return iplattach(0);
+	return ipfattach(0);
 }

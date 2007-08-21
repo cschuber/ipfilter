@@ -296,7 +296,7 @@ int cmd;
 {
 	int error = 0;
 
-	error = ipldetach();
+	error = ipfdetach();
 	if (!error)
 		error = if_ipl_remove();
 	return error;
@@ -312,7 +312,7 @@ int cmd;
 	int error = 0, fmode = S_IFCHR|0600, i;
 	char *name;
 
-	error = iplattach();
+	error = ipfattach();
 	if (error)
 		return error;
 	(void) if_ipl_remove();

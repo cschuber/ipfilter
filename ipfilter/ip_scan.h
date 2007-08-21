@@ -94,7 +94,7 @@ typedef	struct	ipscanstat	{
 } ipscanstat_t;
 
 
-extern	int fr_scan_ioctl __P((caddr_t, ioctlcmd_t, int));
+extern	int fr_scan_ioctl __P((caddr_t, ioctlcmd_t, int, int, void *));
 extern	int ipsc_init __P((void));
 extern	int ipsc_attachis __P((struct ipstate *));
 extern	int ipsc_attachfr __P((struct frentry *));

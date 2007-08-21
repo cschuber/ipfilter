@@ -177,7 +177,7 @@ nat_t *nat;
 		ipsec->ipsc_state = fr_addstate(&fi, &ipsec->ipsc_state,
 						SI_WILDP);
 		if (fi.fin_state != NULL)
-			fr_statederef(&fi, (ipstate_t **)&fi.fin_state);
+			fr_statederef((ipstate_t **)&fi.fin_state);
 	}
 	ip->ip_p = p & 0xff;
 	return 0;
@@ -256,7 +256,7 @@ nat_t *nat;
 							&ipsec->ipsc_state,
 							SI_WILDP);
 			if (fi.fin_state != NULL)
-				fr_statederef(&fi, (ipstate_t **)&fi.fin_state);
+				fr_statederef((ipstate_t **)&fi.fin_state);
 		}
 		ip->ip_p = p;
 	}

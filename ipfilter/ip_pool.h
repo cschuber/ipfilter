@@ -35,8 +35,9 @@ typedef	struct ip_pool_node {
 	addrfamily_t		ipn_addr;
 	addrfamily_t		ipn_mask;
 	int			ipn_info;
-	char			ipn_name[FR_GROUPLEN];
-	u_long			ipn_hits;
+	int			ipn_ref;
+char			ipn_name[FR_GROUPLEN];
+u_long			ipn_hits;
 	struct ip_pool_node	*ipn_next, **ipn_pnext;
 } ip_pool_node_t;
 
@@ -76,10 +77,13 @@ extern	int	ip_pool_remove __P((ip_pool_t *, ip_pool_node_t *));
 extern	int	ip_pool_destroy __P((iplookupop_t *));
 extern	void	ip_pool_free __P((ip_pool_t *));
 extern	void	ip_pool_deref __P((ip_pool_t *));
+extern	void	ip_pool_node_deref __P((ip_pool_node_t *));
 extern	void	*ip_pool_find __P((int, char *));
 extern	ip_pool_node_t *ip_pool_findeq __P((ip_pool_t *,
 					  addrfamily_t *, addrfamily_t *));
 extern	int	ip_pool_flush __P((iplookupflush_t *));
 extern	int	ip_pool_statistics __P((iplookupop_t *));
+extern	int	ip_pool_getnext __P((ipftoken_t *, ipflookupiter_t *));
+extern	void	ip_pool_iterderef __P((u_int, int, void *));
 
 #endif /* __IP_POOL_H__ */

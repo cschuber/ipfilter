@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 1993-2001 by Darren Reed.
+ * Copyright (C) 2002-2004 by Darren Reed.
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
@@ -14,12 +14,12 @@ static const char rcsid[] = "@(#)$Id$";
 #endif
 
 
-void printactivenat(nat, opts)
+void printactivenat(nat, opts, alive)
 nat_t *nat;
-int opts;
+int opts, alive;
 {
 
-	printf("%s", getnattype(nat->nat_ptr));
+	printf("%s", getnattype(nat, alive));
 
 	if (nat->nat_flags & SI_CLONE)
 		printf(" CLONE");

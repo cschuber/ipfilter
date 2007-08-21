@@ -5,10 +5,12 @@
 
 typedef	struct	iphtent_s	{
 	struct	iphtent_s	*ipe_next, **ipe_pnext;
+	struct	iphtent_s	*ipe_hnext, **ipe_phnext;
 	void		*ipe_ptr;
 	i6addr_t	ipe_addr;
 	i6addr_t	ipe_mask;
 	int		ipe_ref;
+	int		ipe_unit;
 	union	{
 		char	ipeu_char[16];
 		u_long	ipeu_long;
@@ -26,6 +28,7 @@ typedef	struct	iphtable_s	{
 	ipfrwlock_t	iph_rwlock;
 	struct	iphtable_s	*iph_next, **iph_pnext;
 	struct	iphtent_s	**iph_table;
+	struct	iphtent_s	*iph_list;
 	size_t	iph_size;		/* size of hash table */
 	u_long	iph_seed;		/* hashing seed */
 	u_32_t	iph_flags;
@@ -61,9 +64,12 @@ extern size_t fr_flushhtable __P((iplookupflush_t *));
 extern int fr_addhtent __P((iphtable_t *, iphtent_t *));
 extern int fr_delhtent __P((iphtable_t *, iphtent_t *));
 extern void fr_derefhtable __P((iphtable_t *));
+extern void fr_derefhtent __P((iphtent_t *));
 extern void fr_delhtable __P((iphtable_t *));
 extern void *fr_iphmfindgroup __P((void *, void *));
 extern int fr_iphmfindip __P((void *, int, void *));
 extern int fr_gethtablestat __P((iplookupop_t *));
+extern int fr_htable_getnext __P((ipftoken_t *, ipflookupiter_t *));
+extern void fr_htable_iterderef __P((u_int, int, void *));
 
 #endif /* __IP_HTABLE_H__ */

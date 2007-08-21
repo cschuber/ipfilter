@@ -49,6 +49,7 @@ in4 text text
 in5 text text
 in6 text text
 ip1 text text
+ip2 text text
 ipv6.1 hex hex
 ipv6.2 hex hex
 ipv6.3 hex hex
@@ -89,3 +90,5 @@ ni21 text text
 p1 text text
 p2 text text
 p3 text text
+p4 text text
+p5 text text

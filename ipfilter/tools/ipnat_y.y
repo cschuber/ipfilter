@@ -1,3 +1,8 @@
+/*
+ * Copyright (C) 2001-2006 by Darren Reed.
+ *
+ * See the IPFILTER.LICENCE file for details on licencing.
+ */
 %{
 #ifdef  __FreeBSD__
 # ifndef __FreeBSD_cc_version

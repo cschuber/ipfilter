@@ -43,7 +43,7 @@ static const char sccsid[] = "@(#)mls_ipl.c	2.6 10/15/95 (C) 1993-2000 Darren Re
 static const char rcsid[] = "@(#)$Id$";
 #endif
 
-extern	int	ipldetach __P((void));
+extern	int	ipfdetach __P((void));
 #ifndef	IPFILTER_LOG
 #define	iplread	nulldev
 #endif
@@ -72,7 +72,7 @@ struct	dev_ops	ipl_ops =
 {
 	1,
 	iplidentify,
-	iplattach,
+	ipfattach,
 	iplopen,
 	iplclose,
 	iplread,
@@ -177,7 +177,7 @@ static	int	unload()
 	if (fr_refcnt != 0)
 		err = EBUSY;
 	else if (fr_running >= 0)
-		err = ipldetach();
+		err = ipfdetach();
 	if (err)
 		return err;
 
@@ -196,7 +196,7 @@ static	int	ipl_attach()
 	int error = 0, fmode = S_IFCHR|0600, i;
 	char *name;
 
-	error = iplattach();
+	error = ipfattach();
 	if (error)
 		return error;
 

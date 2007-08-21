@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 1993-2001 by Darren Reed.
+ * Copyright (C) 2000-2006 by Darren Reed.
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
@@ -96,13 +96,18 @@ int	cnt, *dir;
 
 	switch (ip->ip_p) {
 	case IPPROTO_TCP :
+		if (isdigit(*sprt))
+			pkt.ti_sport = htons(atoi(sprt) & 65535);
+		if (isdigit(*dprt))
+			pkt.ti_dport = htons(atoi(dprt) & 65535);
+		extra = sizeof(struct tcphdr);
+		break;
 	case IPPROTO_UDP :
-		s = strtok(NULL, " :");
-		ip->ip_len += atoi(s);
-		if (ip->ip_p == IPPROTO_TCP)
-			extra = sizeof(struct tcphdr);
-		else if (ip->ip_p == IPPROTO_UDP)
-			extra = sizeof(struct udphdr);
+		if (isdigit(*sprt))
+			pkt.ti_sport = htons(atoi(sprt) & 65535);
+		if (isdigit(*dprt))
+			pkt.ti_dport = htons(atoi(dprt) & 65535);
+		extra = sizeof(struct udphdr);
 		break;
 #ifdef	IGMP
 	case IPPROTO_IGMP :

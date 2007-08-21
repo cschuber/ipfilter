@@ -220,7 +220,7 @@ pptp_pxy_t *pptp;
 		pptp->pptp_state = fr_addstate(&fi, &pptp->pptp_state,
 					       0);
 		if (fi.fin_state != NULL)
-			fr_statederef(&fi, (ipstate_t **)&fi.fin_state);
+			fr_statederef((ipstate_t **)&fi.fin_state);
 	}
 	ip->ip_p = p;
 	return;
