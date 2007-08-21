@@ -201,18 +201,31 @@ static int ipl_remove()
 
         for (i = 0; (name = ipf_devfiles[i]); i++) {
 #if (__NetBSD_Version__ > 106009999)
+# if (__NetBSD_Version__ > 399000000)
+		NDINIT(&nd, DELETE, LOCKPARENT|LOCKLEAF, UIO_SYSSPACE,
+		       name, curlwp);
+# else
 		NDINIT(&nd, DELETE, LOCKPARENT|LOCKLEAF, UIO_SYSSPACE,
 		       name, curproc);
+# endif
 #else
 		NDINIT(&nd, DELETE, LOCKPARENT, UIO_SYSSPACE, name, curproc);
 #endif
 		if ((error = namei(&nd)))
 			return (error);
+#if (__NetBSD_Version__ > 399000000)
+		VOP_LEASE(nd.ni_dvp, curlwp, curlwp->l_proc->p_ucred, LEASE_WRITE);
+#else
 		VOP_LEASE(nd.ni_dvp, curproc, curproc->p_ucred, LEASE_WRITE);
+#endif
 #if !defined(__NetBSD_Version__) || (__NetBSD_Version__ < 106000000)
 		vn_lock(nd.ni_vp, LK_EXCLUSIVE | LK_RETRY);
 #endif
+#if (__NetBSD_Version__ > 399000000)
+		VOP_LEASE(nd.ni_vp, curlwp, curlwp->l_proc->p_ucred, LEASE_WRITE);
+#else
 		VOP_LEASE(nd.ni_vp, curproc, curproc->p_ucred, LEASE_WRITE);
+#endif
 		(void) VOP_REMOVE(nd.ni_dvp, nd.ni_vp, &nd.ni_cnd);
 	}
 	return 0;
@@ -258,7 +271,11 @@ static int ipl_load()
 	error = ipfattach();
 
 	for (i = 0; (error == 0) && (name = ipf_devfiles[i]); i++) {
+#if (__NetBSD_Version__ > 399000000)
+		NDINIT(&nd, CREATE, LOCKPARENT, UIO_SYSSPACE, name, curlwp);
+#else
 		NDINIT(&nd, CREATE, LOCKPARENT, UIO_SYSSPACE, name, curproc);
+#endif
 		if ((error = namei(&nd)))
 			break;
 		if (nd.ni_vp != NULL) {
@@ -275,7 +292,11 @@ static int ipl_load()
 		vattr.va_type = VCHR;
 		vattr.va_mode = (fmode & 07777);
 		vattr.va_rdev = (ipl_major << 8) | i;
+#if (__NetBSD_Version__ > 399000000)
+		VOP_LEASE(nd.ni_dvp, curlwp, curlwp->l_proc->p_ucred, LEASE_WRITE);
+#else
 		VOP_LEASE(nd.ni_dvp, curproc, curproc->p_ucred, LEASE_WRITE);
+#endif
 		error = VOP_MKNOD(nd.ni_dvp, &nd.ni_vp, &nd.ni_cnd, &vattr);
 		if (error == 0)
 			vput(nd.ni_vp);

@@ -92,11 +92,15 @@ frentry_t *fr;
  		fprintf(fp, "* to the original author and the contributors.\n");
  		fprintf(fp, "*/\n\n");
 
+		fprintf(fp, "#include <sys/param.h>\n");
 		fprintf(fp, "#include <sys/types.h>\n");
 		fprintf(fp, "#include <sys/time.h>\n");
 		fprintf(fp, "#include <sys/socket.h>\n");
-		fprintf(fp, "#if !defined(__FreeBSD__) && !defined(__OpenBSD__) && !defined(__sgi)\n");
-		fprintf(fp, "# include <sys/systm.h>\n");
+		fprintf(fp, "#if (__NetBSD_Version__ >= 399000000)\n");
+		fprintf(fp, "#else\n");
+		fprintf(fp, "# if !defined(__FreeBSD__) && !defined(__OpenBSD__) && !defined(__sgi)\n");
+		fprintf(fp, "#  include <sys/systm.h>\n");
+		fprintf(fp, "# endif\n");
 		fprintf(fp, "#endif\n");
 		fprintf(fp, "#include <sys/errno.h>\n");
 		fprintf(fp, "#include <sys/param.h>\n");

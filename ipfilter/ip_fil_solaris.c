@@ -935,7 +935,7 @@ frdest_t *fdp;
 	qpktinfo_t *qpi;
 	frentry_t *fr;
 	frdest_t fd;
-	qif_t *qif;
+	qif_t *ifp;
 	void *dstp;
 	void *sifp;
 	ip_t *ip;
@@ -993,11 +993,11 @@ frdest_t *fdp;
 		dstp = &dst6;
 	}
 #endif
-	qif = fdp->fd_ifp;
-	if (qif == NULL)
-		qif = qif_illrouteto(fin->fin_v, dstp);
+	ifp = fdp->fd_ifp;
+	if (ifp == NULL)
+		ifp = qif_illrouteto(fin->fin_v, dstp);
 
-	if (qif == NULL || qif == (void *)-1)
+	if (ifp == NULL || ifp == (void *)-1)
 		goto bad_fastroute;
 
 	/*
@@ -1065,7 +1065,7 @@ frdest_t *fdp;
 		ip->ip_off = htons(__ipoff);
 	}
 #endif
-	if (pfil_sendbuf(qif, mb, ip, dstp) == 0) {
+	if (pfil_sendbuf(ifp, mb, ip, dstp) == 0) {
 		ATOMIC_INCL(fr_frouteok[0]);
 	} else {
 		ATOMIC_INCL(fr_frouteok[1]);
