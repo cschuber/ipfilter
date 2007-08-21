@@ -5251,7 +5251,8 @@ int which;
 			if (fr_ticks - nat->nat_touched > which) {
 				nat_delete(nat, NL_FLUSH);
 				removed++;
-			}
+			} else
+				natp = &nat->nat_next;
 		}
 		break;
 	}

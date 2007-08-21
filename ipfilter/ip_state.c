@@ -3164,16 +3164,15 @@ int which, proto;
 		 */
 		which = IPF_TTLVAL(which);
 		for (isp = &ips_list; ((is = *isp) != NULL); ) {
-			if ((proto != 0) && (is->is_v != proto)) {
-				isp = &is->is_next;
-				continue;
+			if ((proto == 0) || (is->is_v == proto)) {
+				if (fr_ticks - is->is_touched > which) {
+					if (fr_delstate(is, ISL_FLUSH) == 0) {
+						removed++;
+						continue;
+					}
+				}
 			}
-			if (fr_ticks - is->is_touched > which) {
-				if (fr_delstate(is, ISL_FLUSH) == 0)
-					removed++;
-				else
-					isp = &is->is_next;
-			}
+			isp = &is->is_next;
 		}
 		break;
 	}
