@@ -332,7 +332,7 @@ int opts;
 	for (np = nsp->ns_instances; np; np = nat.nat_next) {
 		if (kmemcpy((char *)&nat, (long)np, sizeof(nat)))
 			break;
-		printactivenat(&nat, opts, 0);
+		printactivenat(&nat, opts, 0, nsp->ns_ticks);
 		if (nat.nat_aps)
 			printaps(nat.nat_aps, opts);
 	}
@@ -417,7 +417,7 @@ int fd, opts;
 	while (nsp->ns_instances != NULL) {
 		if (ioctl(fd, SIOCGENITER, &obj) == -1)
 			break;
-		printactivenat(&nat, opts, 1);
+		printactivenat(&nat, opts, 1, nsp->ns_ticks);
 		if (nat.nat_aps)
 			printaps(nat.nat_aps, opts);
 		nsp->ns_instances = nat.nat_next;

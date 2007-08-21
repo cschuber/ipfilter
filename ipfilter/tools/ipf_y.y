@@ -174,7 +174,7 @@ file:	line
 	| file assign
 	;
 
-line:	xx rule		{ while ((fr = frtop) != NULL) {
+line:	rule		{ while ((fr = frtop) != NULL) {
 				frtop = fr->fr_next;
 				fr->fr_next = NULL;
 				(*ipfaddfunc)(ipffd, ipfioctl[IPL_LOGIPF], fr);
@@ -193,6 +193,7 @@ assign:	YY_STR assigning YY_STR ';'	{ set_variable($1, $3);
 					  resetlexer();
 					  free($1);
 					  free($3);
+					  yyvarnext = 0;
 					}
 	;
 
@@ -216,8 +217,8 @@ outrule:
 	;
 
 rulehead:
-	collection action
-	| insert collection action
+	xx collection action
+	| xx insert collection action
 	;
 
 markin:	IPFY_IN				{ fr->fr_flags |= FR_INQUE; }

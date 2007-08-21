@@ -712,6 +712,7 @@ fr_info_t *fin;
 
 	if (fin->fin_dlen > 1) {
 		icmp6 = fin->fin_dp;
+		ip6_t *ip6;
 
 		fin->fin_data[0] = *(u_short *)icmp6;
 
@@ -725,12 +726,26 @@ fr_info_t *fin;
 		case ICMP6_PACKET_TOO_BIG :
 		case ICMP6_TIME_EXCEEDED :
 		case ICMP6_PARAM_PROB :
+			fin->fin_flx |= FI_ICMPERR;
 			if ((fin->fin_m != NULL) &&
 			    (M_LEN(fin->fin_m) < fin->fin_plen)) {
 				if (fr_coalesce(fin) != 1)
 					return;
 			}
-			fin->fin_flx |= FI_ICMPERR;
+
+			if (frpr_pullup(fin, ICMP6ERR_MINPKTLEN) == -1)
+				return;
+
+			/*
+			 * If the destination of this packet doesn't match the
+			 * source of the original packet then this packet is
+			 * not correct.
+			 */
+			ip6 = (ip6_t *)((char *)icmp6 + ICMPERR_ICMPHLEN);
+			if (IP6_NEQ(&fin->fin_fi.fi_dst,
+				    (i6addr_t *)&ip6->ip6_src))
+				fin->fin_flx |= FI_BAD;
+
 			minicmpsz = ICMP6ERR_IPICMPHLEN - sizeof(ip6_t);
 			break;
 		default :
@@ -999,6 +1014,22 @@ fr_info_t *fin;
 			 */
 			oip = (ip_t *)((char *)fin->fin_dp + ICMPERR_ICMPHLEN);
 			if ((ntohs(oip->ip_off) & IP_OFFMASK) != 0)
+				fin->fin_flx |= FI_BAD;
+
+			/*
+			 * If the destination of this packet doesn't match the
+			 * source of the original packet then this packet is
+			 * not correct.
+			 */
+			if (oip->ip_src.s_addr != fin->fin_daddr)
+				fin->fin_flx |= FI_BAD;
+
+			/*
+			 * If the destination of this packet doesn't match the
+			 * source of the original packet then this packet is
+			 * not correct.
+			 */
+			if (oip->ip_src.s_addr != fin->fin_daddr)
 				fin->fin_flx |= FI_BAD;
 			break;
 		default :
@@ -2475,8 +2506,7 @@ int out;
 	fr = fr_checkauth(fin, &pass);
 	if (!out) {
 		if (fr_checknatin(fin, &pass) == -1) {
-			RWLOCK_EXIT(&ipf_mutex);
-			goto finished;
+			goto filterdone;
 		}
 	}
 	if (!out)
@@ -2518,8 +2548,7 @@ int out;
 		(void) fr_acctpkt(fin, NULL);
 
 		if (fr_checknatout(fin, &pass) == -1) {
-			RWLOCK_EXIT(&ipf_mutex);
-			goto finished;
+			;
 		} else if ((fr_update_ipid != 0) && (v == 4)) {
 			if (fr_updateipid(fin) == -1) {
 				ATOMIC_INCL(frstats[1].fr_ipud);
@@ -2531,6 +2560,7 @@ int out;
 		}
 	}
 
+filterdone:
 #ifdef	IPFILTER_LOG
 	if ((fr_flags & FF_LOGGING) || (pass & FR_LOGMASK)) {
 		(void) fr_dolog(fin, &pass);
@@ -2539,12 +2569,10 @@ int out;
 
 	if (fin->fin_state != NULL) {
 		fr_statederef((ipstate_t **)&fin->fin_state);
-		fin->fin_state = NULL;
 	}
 
 	if (fin->fin_nat != NULL) {
 		fr_natderef((nat_t **)&fin->fin_nat);
-		fin->fin_nat = NULL;
 	}
 
 	/*
@@ -6642,8 +6670,8 @@ ipftoken_t *token;
 int ipf_getnextrule(ipftoken_t *t, void *ptr)
 {
 	frentry_t *fr, *next, zero;
+	int error, count, out;
 	ipfruleiter_t it;
-	int error, count;
 	frgroup_t *fg;
 	char *dst;
 
@@ -6652,7 +6680,7 @@ int ipf_getnextrule(ipftoken_t *t, void *ptr)
 	error = fr_inobj(ptr, &it, IPFOBJ_IPFITER);
 	if (error != 0)
 		return error;
-	if ((it.iri_inout != 0) && (it.iri_inout != 1))
+	if ((it.iri_inout < 0) || (it.iri_inout > 3))
 		return EINVAL;
 	if ((it.iri_active != 0) && (it.iri_active != 1))
 		return EINVAL;
@@ -6661,14 +6689,22 @@ int ipf_getnextrule(ipftoken_t *t, void *ptr)
 	if (it.iri_rule == NULL)
 		return EFAULT;
 
+	out = it.iri_inout & F_OUT;
 	fr = t->ipt_data;
 	READ_ENTER(&ipf_mutex);
 	if (fr == NULL) {
 		if (*it.iri_group == '\0') {
-			if (it.iri_v == 4)
-				next = ipfilter[it.iri_inout][it.iri_active];
-			else
-				next = ipfilter6[it.iri_inout][it.iri_active];
+			if ((it.iri_inout & F_ACIN) != 0) {
+				if (it.iri_v == 4)
+					next = ipacct[out][it.iri_active];
+				else
+					next = ipacct6[out][it.iri_active];
+			} else {
+				if (it.iri_v == 4)
+					next = ipfilter[out][it.iri_active];
+				else
+					next = ipfilter6[out][it.iri_active];
+			}
 		} else {
 			fg = fr_findgroup(it.iri_group, IPL_LOGIPF,
 					  it.iri_active, NULL);
@@ -6805,6 +6841,7 @@ ipfgeniter_t *itp;
 /* ------------------------------------------------------------------------ */
 int ipf_genericiter(data, uid, ctx)
 void *data, *ctx;
+int uid;
 {
 	ipftoken_t *token;
 	ipfgeniter_t iter;
@@ -6939,8 +6976,8 @@ void *ctx;
 		else {
 			WRITE_ENTER(&ipf_mutex);
 			bzero((char *)frcache, sizeof(frcache[0]) * 2);
-			error = COPYOUT((caddr_t)&fr_active, (caddr_t)data,
-					sizeof(fr_active));
+			error = BCOPYOUT((caddr_t)&fr_active, (caddr_t)data,
+					 sizeof(fr_active));
 			if (error != 0)
 				error = EFAULT;
 			else

@@ -357,8 +357,8 @@ typedef	struct	fr_info	{
 #define	fin_dport	fin_dat.fid_16[1]
 #define	fin_ports	fin_dat.fid_32
 
-#define	IPF_IN	0
-#define	IPF_OUT	1
+#define	IPF_IN		0
+#define	IPF_OUT		1
 
 typedef	struct frentry	*(*ipfunc_t) __P((fr_info_t *, u_32_t *));
 typedef	int		(*ipfuncinit_t) __P((struct frentry *));
@@ -500,6 +500,13 @@ typedef	struct	frentry {
 	int	fr_ref;		/* reference count - for grouping */
 	int	fr_statecnt;	/* state count - for limit rules */
 	/*
+	 * The line number from a file is here because we need to be able to
+	 * match the rule generated with ``grep rule ipf.conf | ipf -rf -''
+	 * with the rule loaded using ``ipf -f ipf.conf'' - thus it can't be
+	 * on the other side of fr_func.
+	 */
+	int	fr_flineno;	/* line number from conf file */
+	/*
 	 * These are only incremented when a packet  matches this rule and
 	 * it is the last match
 	 */
@@ -526,7 +533,6 @@ typedef	struct	frentry {
 	int	fr_dsize;
 	int	fr_pps;
 	int	fr_statemax;	/* max reference count */
-	int	fr_flineno;	/* line number from conf file */
 	u_32_t	fr_type;
 	u_32_t	fr_flags;	/* per-rule flags && options (see below) */
 	u_32_t	fr_logtag;	/* user defined log tag # */
@@ -1160,6 +1166,15 @@ typedef	struct	ipfruleiter {
 	frentry_t	*iri_rule;
 } ipfruleiter_t;
 
+/*
+ * Values for iri_inout
+ */
+#define	F_IN	0
+#define	F_OUT	1
+#define	F_ACIN	2
+#define	F_ACOUT	3
+
+
 typedef	struct	ipfgeniter {
 	int	igi_type;
 	int	igi_nitems;
@@ -1258,7 +1273,11 @@ extern	void	m_freem __P((mb_t *));
 extern	int	bcopywrap __P((void *, void *, size_t));
 #else /* #ifndef _KERNEL */
 # ifdef BSD
-#  include <sys/selinfo.h>
+#  if defined(__NetBSD__) && (__NetBSD_Version__ < 399000000)
+#   include <sys/select.h>
+#  else
+#   include <sys/selinfo.h>
+#  endif
 extern struct selinfo ipfselwait[IPL_LOGSIZE];
 # endif
 # if defined(__NetBSD__) && defined(PFIL_HOOKS)

@@ -456,7 +456,9 @@ void *ctx;
 		i = fr_authflush();
 		RWLOCK_EXIT(&ipf_auth);
 		SPL_X(s);
-		error = copyoutptr((char *)&i, data, sizeof(i));
+		error = BCOPYOUT((char *)&i, data, sizeof(i));
+		if (error != 0)
+			error = EFAULT;
 		break;
 
 	case SIOCAUTHW:
@@ -931,7 +933,7 @@ fr_authioctlloop:
 	READ_ENTER(&ipf_global);
 	if (error == 0)
 		goto fr_authioctlloop;
-	return 0;
+	return error;
 }
 
 

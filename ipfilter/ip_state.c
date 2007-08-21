@@ -128,7 +128,7 @@ static ipstate_t *fr_matchsrcdst __P((fr_info_t *, ipstate_t *, i6addr_t *,
 static ipstate_t *fr_checkicmpmatchingstate __P((fr_info_t *));
 static int fr_state_flush __P((int, int));
 static ips_stat_t *fr_statetstats __P((void));
-static void fr_delstate __P((ipstate_t *, int));
+static int fr_delstate __P((ipstate_t *, int));
 static int fr_state_remove __P((caddr_t));
 static void fr_ipsmove __P((ipstate_t *, u_int));
 static int fr_tcpstate __P((fr_info_t *, tcphdr_t *, ipstate_t *));
@@ -301,7 +301,7 @@ void fr_stateunload()
 	ipstate_t *is;
 
 	while ((is = ips_list) != NULL)
-		fr_delstate(is, 0);
+		fr_delstate(is, ISL_UNLOAD);
 
 	/*
 	 * Proxy timeout queues are not cleaned here because although they
@@ -2692,8 +2692,6 @@ matched:
 	fin->fin_rule = is->is_rulen;
 	pass = is->is_pass;
 	fr_updatestate(fin, is, ifq);
-	if (fin->fin_out == 1)
-		fin->fin_nat = is->is_nat[fin->fin_rev];
 
 	fin->fin_state = is;
 	is->is_touched = fr_ticks;
@@ -2838,7 +2836,7 @@ void *ifp;
 /* and timeout queue lists.  Make adjustments to hash table statistics and  */
 /* global counters as required.                                             */
 /* ------------------------------------------------------------------------ */
-static void fr_delstate(is, why)
+static int fr_delstate(is, why)
 ipstate_t *is;
 int why;
 {
@@ -2849,16 +2847,6 @@ int why;
 	 * Since we want to delete this, remove it from the state table,
 	 * where it can be found & used, first.
 	 */
-	if (is->is_pnext != NULL) {
-		*is->is_pnext = is->is_next;
-
-		if (is->is_next != NULL)
-			is->is_next->is_pnext = is->is_pnext;
-
-		is->is_pnext = NULL;
-		is->is_next = NULL;
-	}
-
 	if (is->is_phnext != NULL) {
 		*is->is_phnext = is->is_hnext;
 		if (is->is_hnext != NULL)
@@ -2904,7 +2892,7 @@ int why;
 	 */
 	is->is_ref--;
 	if (is->is_ref > 0)
-		return;
+		return is->is_ref;
 
 	if (is->is_tqehead[0] != NULL) {
 		if (fr_deletetimeoutqueue(is->is_tqehead[0]) == 0)
@@ -2923,6 +2911,19 @@ int why;
 	(void) ipsc_detachis(is);
 #endif
 
+	/*
+	 * Now remove it from the linked list of known states
+	 */
+	if (is->is_pnext != NULL) {
+		*is->is_pnext = is->is_next;
+
+		if (is->is_next != NULL)
+			is->is_next->is_pnext = is->is_pnext;
+
+		is->is_pnext = NULL;
+		is->is_next = NULL;
+	}
+
 	if (ipstate_logging != 0 && why != 0)
 		ipstate_log(is, why);
 
@@ -2939,6 +2940,8 @@ int why;
 	MUTEX_DESTROY(&is->is_lock);
 	KFREE(is);
 	ips_num--;
+
+	return 0;
 }
 
 
@@ -3056,8 +3059,10 @@ int which, proto;
 		}
 
 		if (delete) {
-			fr_delstate(is, ISL_FLUSH);
-			removed++;
+			if (fr_delstate(is, ISL_FLUSH) == 0)
+				removed++;
+			else
+				isp = &is->is_next;
 		} else
 			isp = &is->is_next;
 	}
@@ -3104,8 +3109,8 @@ int which, proto;
 						break;
 					tqn = tqe->tqe_next;
 					is = tqe->tqe_parent;
-					fr_delstate(is, ISL_EXPIRE);
-					removed++;
+					if (fr_delstate(is, ISL_EXPIRE) == 0)
+						removed++;
 				}
 			}
 
@@ -3118,8 +3123,8 @@ int which, proto;
 						break;
 					tqn = tqe->tqe_next;
 					is = tqe->tqe_parent;
-					fr_delstate(is, ISL_EXPIRE);
-					removed++;
+					if (fr_delstate(is, ISL_EXPIRE) == 0)
+						removed++;
 				}
 			}
 			if (try + interval > maxtick)
@@ -3840,7 +3845,7 @@ ipftq_t *tqp;
 void fr_statederef(isp)
 ipstate_t **isp;
 {
-	ipstate_t *is = *isp;
+	ipstate_t *is;
 
 	is = *isp;
 	*isp = NULL;

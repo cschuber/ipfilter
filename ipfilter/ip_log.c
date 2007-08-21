@@ -263,8 +263,11 @@ u_int flags;
 	struct ifnet *ifp;
 # endif /* SOLARIS || __hpux */
 
-	ipfl.fl_nattag.ipt_num[0] = 0;
 	m = fin->fin_m;
+	if (m == NULL)
+		return -1;
+
+	ipfl.fl_nattag.ipt_num[0] = 0;
 	ifp = fin->fin_ifp;
 	hlen = fin->fin_hlen;
 	/*

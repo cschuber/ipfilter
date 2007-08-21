@@ -14,9 +14,10 @@ static const char rcsid[] = "@(#)$Id$";
 #endif
 
 
-void printactivenat(nat, opts, alive)
+void printactivenat(nat, opts, alive, now)
 nat_t *nat;
 int opts, alive;
+u_long now;
 {
 
 	printf("%s", getnattype(nat, alive));
@@ -40,8 +41,9 @@ int opts, alive;
 	printf("]");
 
 	if (opts & OPT_VERBOSE) {
-		printf("\n\tage %lu use %hu sumd %s/",
-			nat->nat_age, nat->nat_use, getsumd(nat->nat_sumd[0]));
+		printf("\n\tttl %lu use %hu sumd %s/",
+			nat->nat_age - now, nat->nat_use,
+			getsumd(nat->nat_sumd[0]));
 		printf("%s pr %u bkt %d/%d flags %x\n",
 			getsumd(nat->nat_sumd[1]), nat->nat_p,
 			nat->nat_hv[0], nat->nat_hv[1], nat->nat_flags);

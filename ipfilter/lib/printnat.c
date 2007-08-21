@@ -46,10 +46,16 @@ int opts;
 		break;
 	}
 
-	printf(" %s", np->in_ifnames[0]);
+	if (!strcmp(np->in_ifnames[0], "-"))
+		printf(" \"%s\"", np->in_ifnames[0]);
+	else
+		printf(" %s", np->in_ifnames[0]);
 	if ((np->in_ifnames[1][0] != '\0') &&
 	    (strncmp(np->in_ifnames[0], np->in_ifnames[1], LIFNAMSIZ) != 0)) {
-		printf(",%s", np->in_ifnames[1]);
+		if (!strcmp(np->in_ifnames[1], "-"))
+			printf(",\"%s\"", np->in_ifnames[1]);
+		else
+			printf(",%s", np->in_ifnames[1]);
 	}
 	putchar(' ');
 

@@ -82,10 +82,6 @@ extern	int	opterr;
 
 #define	PRINTF	(void)printf
 #define	FPRINTF	(void)fprintf
-#define	F_IN	0
-#define	F_OUT	1
-#define	F_ACIN	2
-#define	F_ACOUT	3
 static	char	*filters[4] = { "ipfilter(in)", "ipfilter(out)",
 				"ipacct(in)", "ipacct(out)" };
 static	int	state_logging = -1;

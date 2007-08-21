@@ -815,27 +815,49 @@ int	blen;
 	(void) sprintf(t, ".%-.6ld ", ipl->ipl_usec);
 	t += strlen(t);
 
-	if (sl->isl_type == ISL_NEW)
+	switch (sl->isl_type)
+	{
+	case ISL_NEW :
 		strcpy(t, "STATE:NEW ");
-	else if (sl->isl_type == ISL_CLONE)
+		break;
+
+	case ISL_CLONE :
 		strcpy(t, "STATE:CLONED ");
-	else if (sl->isl_type == ISL_EXPIRE) {
+		break;
+
+	case ISL_EXPIRE :
 		if ((sl->isl_p == IPPROTO_TCP) &&
 		    (sl->isl_state[0] > IPF_TCPS_ESTABLISHED ||
 		     sl->isl_state[1] > IPF_TCPS_ESTABLISHED))
 			strcpy(t, "STATE:CLOSE ");
 		else
 			strcpy(t, "STATE:EXPIRE ");
-	} else if (sl->isl_type == ISL_FLUSH)
+		break;
+
+	case ISL_FLUSH :
 		strcpy(t, "STATE:FLUSH ");
-	else if (sl->isl_type == ISL_INTERMEDIATE)
+		break;
+
+	case ISL_INTERMEDIATE :
 		strcpy(t, "STATE:INTERMEDIATE ");
-	else if (sl->isl_type == ISL_REMOVE)
+		break;
+
+	case ISL_REMOVE :
 		strcpy(t, "STATE:REMOVE ");
-	else if (sl->isl_type == ISL_KILLED)
+		break;
+
+	case ISL_KILLED :
 		strcpy(t, "STATE:KILLED ");
-	else
+		break;
+
+	case ISL_UNLOAD :
+		strcpy(t, "STATE:UNLOAD ");
+		break;
+
+	default :
 		sprintf(t, "Type: %d ", sl->isl_type);
+		break;
+	}
 	t += strlen(t);
 
 	proto = getproto(sl->isl_p);

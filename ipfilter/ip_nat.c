@@ -690,9 +690,13 @@ void *ctx;
 		}
 		MUTEX_ENTER(&ipf_natio);
 		for (np = &nat_list; ((n = *np) != NULL); np = &n->in_next)
-			if (!bcmp((char *)&nat->in_flags, (char *)&n->in_flags,
-					IPN_CMPSIZ))
+			if (bcmp((char *)&nat->in_flags, (char *)&n->in_flags,
+					IPN_CMPSIZ) == 0) {
+				if (nat->in_redir == NAT_REDIRECT &&
+				    nat->in_pnext != n->in_pnext)
+					continue;
 				break;
+			}
 	}
 
 	switch (cmd)
@@ -804,6 +808,7 @@ void *ctx;
 		nat_stats.ns_hostmap_sz = ipf_hostmap_sz;
 		nat_stats.ns_instances = nat_instances;
 		nat_stats.ns_apslist = ap_sess_list;
+		nat_stats.ns_ticks = fr_ticks;
 		error = fr_outobj(data, &nat_stats, IPFOBJ_NATSTAT);
 		break;
 
@@ -2070,10 +2075,12 @@ nat_t *nat;
 natinfo_t *ni;
 {
 	u_short nport, dport, sport;
-	struct in_addr in;
+	struct in_addr in, inb;
+	u_short sp, dp;
 	hostmap_t *hm;
 	u_32_t flags;
 	ipnat_t *np;
+	nat_t *natl;
 	int move;
 
 	move = 1;
@@ -2182,6 +2189,23 @@ natinfo_t *ni;
 			return -1;
 		in.s_addr = ntohl(fin->fin_daddr);
 	}
+
+	/*
+	 * Check to see if this redirect mapping already exists and if
+	 * it does, return "failure" (allowing it to be created will just
+	 * cause one or both of these "connections" to stop working.)
+	 */
+	inb.s_addr = htonl(in.s_addr);
+	sp = fin->fin_data[0];
+	dp = fin->fin_data[1];
+	fin->fin_data[1] = fin->fin_data[0];
+	fin->fin_data[0] = ntohs(nport);
+	natl = nat_outlookup(fin, flags & ~(SI_WILDP|NAT_SEARCH),
+			     (u_int)fin->fin_p, inb, fin->fin_src);
+	fin->fin_data[0] = sp;
+	fin->fin_data[1] = dp;
+	if (natl != NULL)
+		return -1;
 
 	nat->nat_inip.s_addr = htonl(in.s_addr);
 	nat->nat_outip = fin->fin_dst;

@@ -357,6 +357,7 @@ typedef	struct	natstat	{
 	nat_t	*ns_instances;
 	hostmap_t *ns_maplist;
 	u_long	*ns_bucketlen[2];
+	u_long	ns_ticks;
 } natstat_t;
 
 typedef	struct	natlog {

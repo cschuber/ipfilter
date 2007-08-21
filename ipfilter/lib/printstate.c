@@ -17,6 +17,8 @@ u_long now;
 {
 	synclist_t ipsync;
 
+	if (sp->is_phnext == NULL)
+		PRINTF("ORPHAN ");
 	PRINTF("%s -> ", hostname(sp->is_v, &sp->is_src.in4));
 	PRINTF("%s pass %#x pr %d state %d/%d bkt %d\n",
 		hostname(sp->is_v, &sp->is_dst.in4), sp->is_pass, sp->is_p,

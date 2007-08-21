@@ -97,6 +97,7 @@ assign:	YY_STR assigning YY_STR
 						  resetlexer();
 						  free($1);
 						  free($3);
+						  yyvarnext = 0;
 						}
 	;
 

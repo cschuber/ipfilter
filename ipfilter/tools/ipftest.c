@@ -643,7 +643,7 @@ void dumpnat()
 		printnat(ipn, opts & (OPT_DEBUG|OPT_VERBOSE));
 	printf("\nList of active sessions:\n");
 	for (nat = nat_instances; nat; nat = nat->nat_next) {
-		printactivenat(nat, opts, 0);
+		printactivenat(nat, opts, 0, 0);
 		if (nat->nat_aps)
 			printaps(nat->nat_aps, opts);
 	}

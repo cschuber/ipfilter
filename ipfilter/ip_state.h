@@ -39,7 +39,6 @@ typedef struct ipstate {
 	struct	ipstate	**is_me;
 	void		*is_ifp[4];
 	void		*is_sync;
-	struct nat	*is_nat[2];
 	frentry_t	*is_rule;
 	struct	ipftq	*is_tqehead[2];
 	struct	ipscan	*is_isc;
@@ -187,6 +186,7 @@ typedef	struct	ipslog	{
 #define	ISL_INTERMEDIATE	0xfffc
 #define	ISL_KILLED		0xfffb
 #define	ISL_ORPHAN		0xfffa
+#define	ISL_UNLOAD		0xfff9
 
 
 typedef	struct	ips_stat {

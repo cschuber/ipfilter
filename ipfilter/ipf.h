@@ -281,7 +281,7 @@ extern char *hostname __P((int, void *));
 extern struct ipstate *printstate __P((struct ipstate *, int, u_long));
 extern void printsbuf __P((char *));
 extern void printnat __P((struct ipnat *, int));
-extern void printactivenat __P((struct nat *, int, int));
+extern void printactivenat __P((struct nat *, int, int, u_long));
 extern void printhostmap __P((struct hostmap *, u_int));
 extern void printpacket __P((struct ip *));
 
