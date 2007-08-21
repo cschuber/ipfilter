@@ -252,7 +252,7 @@ nat_t *nat;
 		nat_t     *nat2;
 
 /*		port = htons(port); */
-		nat2 = nat_outlookup(fin->fin_ifp, IPN_UDP, IPPROTO_UDP,
+		nat2 = nat_outlookup(fin, IPN_UDP, IPPROTO_UDP,
 				    ip->ip_src, ip->ip_dst);
 		if (nat2 == NULL) {
 			struct ip newip;

@@ -223,7 +223,9 @@ int dir;
 	 */
 	if (dir == PFIL_OUT) {
 		if ((*mp)->m_pkthdr.csum_flags & (M_CSUM_TCPv6|M_CSUM_UDPv6)) {
+#   if (__NetBSD_Version__ > 399000600)
 			in6_delayed_cksum(*mp);
+#   endif
 			(*mp)->m_pkthdr.csum_flags &= ~(M_CSUM_TCPv6|
 							M_CSUM_UDPv6);
 		}

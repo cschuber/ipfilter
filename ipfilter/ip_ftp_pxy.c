@@ -1141,8 +1141,8 @@ int rv;
 				f->ftps_seq[1] = thseq + 1 - seqoff;
 			} else {
 				if (ippr_ftp_debug > 1) {
-					printf("FIN: thseq %x seqoff %d ftps_seq %x\n",
-					       thseq, seqoff, f->ftps_seq[0]);
+					printf("FIN: thseq %x seqoff %d ftps_seq %x %x\n",
+					       thseq, seqoff, f->ftps_seq[0], f->ftps_seq[1]);
 				}
 				return APR_ERR(1);
 			}

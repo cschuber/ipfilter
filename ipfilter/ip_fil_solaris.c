@@ -688,6 +688,8 @@ struct in_addr *inp, *inpmask;
 		return -1;
 
 	qif = qifptr;
+	if (qif->qf_ill == NULL)
+		return -1;
 
 #ifdef	USE_INET6
 	if (v == 6) {
@@ -855,7 +857,11 @@ fr_info_t *fin;
 
 #if SOLARIS2 >= 6
 	dir = ire_route_lookup(fin->fin_saddr, 0xffffffff, 0, 0, NULL,
-			       NULL, NULL, MATCH_IRE_DSTONLY|MATCH_IRE_DEFAULT|
+			       NULL, NULL,
+# ifdef IP_ULP_OUT_LABELED
+			       NULL,
+# endif
+			       MATCH_IRE_DSTONLY|MATCH_IRE_DEFAULT|
 			       MATCH_IRE_RECURSIVE);
 #else
 	dir = ire_lookup(fin->fin_saddr);
@@ -881,25 +887,24 @@ void fr_slowtimer __P((void *ptr))
 
 	WRITE_ENTER(&ipf_global);
 	if (fr_running <= 0) {
-		if (fr_running == -1)
+		if (fr_running >= -1) {
 			fr_timer_id = timeout(fr_slowtimer, NULL,
 					      drv_usectohz(500000));
-		else
+		} else {
 			fr_timer_id = NULL;
+		}
 		RWLOCK_EXIT(&ipf_global);
 		return;
 	}
 	MUTEX_DOWNGRADE(&ipf_global);
 
+	ipf_expiretokens();
 	fr_fragexpire();
 	fr_timeoutstate();
 	fr_natexpire();
 	fr_authexpire();
 	fr_ticks++;
-	if (fr_running == -1 || fr_running == 1)
-		fr_timer_id = timeout(fr_slowtimer, NULL, drv_usectohz(500000));
-	else
-		fr_timer_id = NULL;
+	fr_timer_id = timeout(fr_slowtimer, NULL, drv_usectohz(500000));
 	RWLOCK_EXIT(&ipf_global);
 }
 

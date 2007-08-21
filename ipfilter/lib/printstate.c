@@ -20,10 +20,12 @@ u_long now;
 	if (sp->is_phnext == NULL)
 		PRINTF("ORPHAN ");
 	PRINTF("%s -> ", hostname(sp->is_v, &sp->is_src.in4));
-	PRINTF("%s pass %#x pr %d state %d/%d bkt %d\n",
+	PRINTF("%s pass %#x pr %d state %d/%d",
 		hostname(sp->is_v, &sp->is_dst.in4), sp->is_pass, sp->is_p,
-		sp->is_state[0], sp->is_state[1], sp->is_hv);
-	PRINTF("\ttag %u ttl %lu", sp->is_tag, sp->is_die - now);
+		sp->is_state[0], sp->is_state[1]);
+	if (opts & OPT_DEBUG)
+		PRINTF(" bkt %d", sp->is_hv);
+	PRINTF("\n\ttag %u ttl %lu", sp->is_tag, sp->is_die - now);
 
 	if (sp->is_p == IPPROTO_TCP) {
 		PRINTF("\n\t%hu -> %hu %x:%x %hu<<%d:%hu<<%d\n",

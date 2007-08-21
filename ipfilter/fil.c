@@ -1106,14 +1106,27 @@ fr_info_t *fin;
 	 */
 	if ((flags & TH_URG) != 0 && (tcp->th_urp == 0)) {
 		fin->fin_flx |= FI_BAD;
+#if 0
 	} else if ((flags & TH_URG) == 0 && (tcp->th_urp != 0)) {
-		/* Ignore this case, it shows up in "real" traffic with */
-		/* bogus values in the urgent pointer field. */
-		;
+		/*
+		 * Ignore this case (#if 0) as it shows up in "real"
+		 * traffic with bogus values in the urgent pointer field.
+		 */
+		fin->fin_flx |= FI_BAD;
+#endif
 	} else if (((flags & (TH_SYN|TH_FIN)) != 0) &&
 		   ((flags & (TH_RST|TH_ACK)) == TH_RST)) {
 		/* TH_FIN|TH_RST|TH_ACK seems to appear "naturally" */
 		fin->fin_flx |= FI_BAD;
+#if 1
+	} else if (((flags & TH_SYN) != 0) &&
+		   ((flags & (TH_URG|TH_PUSH)) != 0)) {
+		/*
+		 * SYN with URG and PUSH set is not for normal TCP but it is
+		 * possible(?) with T/TCP...but who uses T/TCP?
+		 */
+		fin->fin_flx |= FI_BAD;
+#endif
 	} else if (!(flags & TH_ACK)) {
 		/*
 		 * If the ack bit isn't set, then either the SYN or
@@ -1399,13 +1412,16 @@ fr_info_t *fin;
 	 */
 	off &= IP_MF|IP_OFFMASK;
 	if (off != 0) {
+		int morefrag = off & IP_MF;
+
 		fi->fi_flx |= FI_FRAG;
 		off &= IP_OFFMASK;
 		if (off != 0) {
 			fin->fin_flx |= FI_FRAGBODY;
 			off <<= 3;
 			if ((off + fin->fin_dlen > 65535) || 
-			    (fin->fin_dlen == 0) || (fin->fin_dlen & 7)) {
+			    (fin->fin_dlen == 0) ||
+			    ((morefrag != 0) && ((fin->fin_dlen & 7) != 0))) {
 				/* 
 				 * The length of the packet, starting at its
 				 * offset cannot exceed 65535 (0xffff) as the 
@@ -5944,6 +5960,9 @@ ipftuneable_t ipf_tuneables[] = {
 		sizeof(fr_defnaticmpage),	IPFT_WRDISABLED,	NULL },
 	{ { &fr_nat_doflush }, "fr_nat_doflush",	0,	1,
 		sizeof(fr_nat_doflush),		0,	NULL },
+	/* proxy */
+	{ { &ipf_proxy_debug }, "ipf_proxy_debug",	0,	10,
+		sizeof(ipf_proxy_debug),	0,	0 },
 	/* frag */
 	{ { &ipfr_size },	"ipfr_size",		1,	0x7fffffff,
 		sizeof(ipfr_size),		IPFT_WRDISABLED,	NULL },

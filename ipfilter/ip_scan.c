@@ -232,20 +232,17 @@ struct ipstate *is;
 	fr = is->is_rule;
 	if (fr) {
 		i = fr->fr_isc;
-		if (!i || (i != (ipscan_t *)-1)) {
+		if ((i != NULL) && (i != (ipscan_t *)-1)) {
 			is->is_isc = i;
-			if (i) {
-				ATOMIC_INC32(i->ipsc_sref);
-				if (i->ipsc_clen)
-					is->is_flags |= IS_SC_CLIENT;
-				else
-					is->is_flags |= IS_SC_MATCHC;
-				if (i->ipsc_slen)
-					is->is_flags |= IS_SC_SERVER;
-				else
-					is->is_flags |= IS_SC_MATCHS;
-			} else
-				is->is_flags |= (IS_SC_CLIENT|IS_SC_SERVER);
+			ATOMIC_INC32(i->ipsc_sref);
+			if (i->ipsc_clen)
+				is->is_flags |= IS_SC_CLIENT;
+			else
+				is->is_flags |= IS_SC_MATCHC;
+			if (i->ipsc_slen)
+				is->is_flags |= IS_SC_SERVER;
+			else
+				is->is_flags |= IS_SC_MATCHS;
 		}
 	}
 	RWLOCK_EXIT(&ipsc_rwlock);
