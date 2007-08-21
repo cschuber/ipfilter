@@ -388,7 +388,7 @@ caddr_t data;
 	 * For anonymous pools, copy back the operation struct because in the
 	 * case of success it will contain the new table's name.
 	 */
-	if ((err == 0) && ((op.iplo_arg & IPOOL_ANON) != 0)) {
+	if ((err == 0) && ((op.iplo_arg & LOOKUP_ANON) != 0)) {
 		err = BCOPYOUT(&op, data, sizeof(op));
 		if (err != 0)
 			err = EFAULT;
@@ -421,9 +421,6 @@ caddr_t data;
 
 	op.iplo_name[sizeof(op.iplo_name) - 1] = '\0';
 
-	if (op.iplo_arg & IPLT_ANON)
-		op.iplo_arg &= IPLT_ANON;
-
 	/*
 	 * create a new pool - fail if one already exists with
 	 * the same #
@@ -431,11 +428,11 @@ caddr_t data;
 	switch (op.iplo_type)
 	{
 	case IPLT_POOL :
-		err = ip_pool_destroy(&op);
+		err = ip_pool_destroy(op.iplo_unit, op.iplo_name);
 		break;
 
 	case IPLT_HASH :
-		err = fr_removehtable(&op);
+		err = fr_removehtable(op.iplo_unit, op.iplo_name);
 		break;
 
 	default :

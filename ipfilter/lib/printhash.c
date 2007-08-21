@@ -29,6 +29,9 @@ int opts;
 
 	printhashdata(hp, opts);
 
+	if ((hp->iph_flags & IPHASH_DELETE) != 0)
+		PRINTF("# ");
+
 	if ((opts & OPT_DEBUG) == 0)
 		PRINTF("\t{");
 

@@ -28,6 +28,8 @@ int opts;
 
 	printpooldata(pool, opts);
 
+	if ((pool->ipo_flags & IPOOL_DELETE) != 0)
+		PRINTF("# ");
 	if ((opts & OPT_DEBUG) == 0)
 		PRINTF("\t{");
 
@@ -60,6 +62,8 @@ int opts;
 	while (top != NULL) {
 		node = top;
 		(void) printpoolnode(node, opts);
+		if ((opts & OPT_DEBUG) == 0)
+			putchar(';');
 		top = node->ipn_next;
 		free(node);
 		printed++;

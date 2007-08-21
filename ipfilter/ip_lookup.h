@@ -33,6 +33,9 @@ typedef	struct	iplookupop	{
 	void	*iplo_struct;
 } iplookupop_t;
 
+#define	LOOKUP_ANON	0x80000000
+
+
 typedef	struct	iplookupflush	{
 	int	iplf_type;	/* IPLT_* */
 	int	iplf_unit;	/* IPL_LOG* */

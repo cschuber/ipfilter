@@ -26,6 +26,8 @@ int opts;
 
 	printpooldata(&ipp, opts);
 
+	if ((ipp.ipo_flags & IPOOL_DELETE) != 0)
+		PRINTF("# ");
 	if ((opts & OPT_DEBUG) == 0)
 		PRINTF("\t{");
 

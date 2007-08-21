@@ -90,6 +90,9 @@ static const char rcsid[] = "@(#)$Id$";
 #  define RADIX_NODE_HEAD_UNLOCK(x)	;
 # endif
 
+static void ip_pool_clearnodes __P((ip_pool_t *));
+static void *ip_pool_exists __P((int, char *));
+
 ip_pool_stat_t ipoolstat;
 ipfrwlock_t ip_poolrw;
 
@@ -137,7 +140,7 @@ main(argc, argv)
 	strcpy(op.iplo_name, "0");
 
 	if (ip_pool_create(&op) == 0)
-		ipo = ip_pool_find(0, "0");
+		ipo = ip_pool_exists(0, "0");
 
 	a.adf_addr.in4.s_addr = 0x0a010203;
 	b.adf_addr.in4.s_addr = 0xffffffff;
@@ -262,18 +265,14 @@ int ip_pool_init()
 void ip_pool_fini()
 {
 	ip_pool_t *p, *q;
-	iplookupop_t op;
 	int i;
 
 	ASSERT(rw_read_locked(&ipf_global.ipf_lk) == 0);
 
 	for (i = 0; i <= IPL_LOGMAX; i++) {
 		for (q = ip_pool_list[i]; (p = q) != NULL; ) {
-			op.iplo_unit = i;
-			(void)strncpy(op.iplo_name, p->ipo_name,
-				sizeof(op.iplo_name));
 			q = p->ipo_next;
-			(void) ip_pool_destroy(&op);
+			(void) ip_pool_destroy(i, p->ipo_name);
 		}
 	}
 
@@ -307,8 +306,8 @@ iplookupop_t *op;
 			stats.ipls_list[i] = ip_pool_list[i];
 	} else if (unit >= 0 && unit < IPL_LOGSIZE) {
 		if (op->iplo_name[0] != '\0')
-			stats.ipls_list[unit] = ip_pool_find(unit,
-							     op->iplo_name);
+			stats.ipls_list[unit] = ip_pool_exists(unit,
+							       op->iplo_name);
 		else
 			stats.ipls_list[unit] = ip_pool_list[unit];
 	} else
@@ -319,16 +318,15 @@ iplookupop_t *op;
 }
 
 
-
 /* ------------------------------------------------------------------------ */
-/* Function:    ip_pool_find                                                */
+/* Function:    ip_pool_exists                                              */
 /* Returns:     int     - 0 = success, else error                           */
 /* Parameters:  ipo(I)  - pointer to the pool getting the new node.         */
 /*                                                                          */
 /* Find a matching pool inside the collection of pools for a particular     */
 /* device, indicated by the unit number.                                    */
 /* ------------------------------------------------------------------------ */
-void *ip_pool_find(unit, name)
+static void *ip_pool_exists(unit, name)
 int unit;
 char *name;
 {
@@ -337,6 +335,29 @@ char *name;
 	for (p = ip_pool_list[unit]; p != NULL; p = p->ipo_next)
 		if (strncmp(p->ipo_name, name, sizeof(p->ipo_name)) == 0)
 			break;
+	return p;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ip_pool_find                                                */
+/* Returns:     int     - 0 = success, else error                           */
+/* Parameters:  ipo(I)  - pointer to the pool getting the new node.         */
+/*                                                                          */
+/* Find a matching pool inside the collection of pools for a particular     */
+/* device, indicated by the unit number.  If it is marked for deletion then */
+/* pretend it does not exist.                                               */
+/* ------------------------------------------------------------------------ */
+void *ip_pool_find(unit, name)
+int unit;
+char *name;
+{
+	ip_pool_t *p;
+
+	p = ip_pool_exists(unit, name);
+	if ((p != NULL) && (p->ipo_flags & IPOOL_DELETE))
+		return NULL;
+
 	return p;
 }
 
@@ -499,6 +520,10 @@ int info;
 /* when being inserted - assume this has already been done.  If the pool is */
 /* marked as being anonymous, give it a new, unique, identifier.  Call any  */
 /* other functions required to initialise the structure.                    */
+/*                                                                          */
+/* If the structure is flagged for deletion then reset the flag and return, */
+/* as this likely means we've tried to free a pool that is in use (flush)   */
+/* and now want to repopulate it with "new" data.                           */
 /* ------------------------------------------------------------------------ */
 int ip_pool_create(op)
 iplookupop_t *op;
@@ -509,23 +534,37 @@ iplookupop_t *op;
 
 	ASSERT(rw_read_locked(&ip_poolrw.ipf_lk) == 0);
 
-	KMALLOC(h, ip_pool_t *);
-	if (h == NULL)
-		return ENOMEM;
-	bzero(h, sizeof(*h));
-
-	if (rn_inithead((void **)&h->ipo_head,
-			offsetof(addrfamily_t, adf_addr) << 3) == 0) {
-		KFREE(h);
-		return ENOMEM;
-	}
-
 	unit = op->iplo_unit;
 
-	if ((op->iplo_arg & IPOOL_ANON) != 0) {
+	if ((op->iplo_arg & LOOKUP_ANON) == 0)
+		h = ip_pool_exists(unit, op->iplo_name);
+	else
+		h = NULL;
+
+	if (h != NULL) {
+		if ((h->ipo_flags & IPOOL_DELETE) != 0) {
+			h->ipo_flags &= ~IPOOL_DELETE;
+			return 0;
+		}
+		return EEXIST;
+	} else {
+		KMALLOC(h, ip_pool_t *);
+		if (h == NULL)
+			return ENOMEM;
+		bzero(h, sizeof(*h));
+
+		if (rn_inithead((void **)&h->ipo_head,
+				offsetof(addrfamily_t, adf_addr) << 3) == 0) {
+			KFREE(h);
+			return ENOMEM;
+		}
+	}
+
+	if ((op->iplo_arg & LOOKUP_ANON) != 0) {
 		ip_pool_t *p;
 
-		poolnum = IPOOL_ANON;
+		h->ipo_flags |= IPOOL_ANON;
+		poolnum = LOOKUP_ANON;
 
 #if defined(SNPRINTF) && defined(_KERNEL)
 		SNPRINTF(name, sizeof(name), "%x", poolnum);
@@ -550,19 +589,21 @@ iplookupop_t *op;
 		(void)strncpy(h->ipo_name, name, sizeof(h->ipo_name));
 		(void)strncpy(op->iplo_name, name, sizeof(op->iplo_name));
 	} else {
-		(void) strncpy(h->ipo_name, op->iplo_name, sizeof(h->ipo_name));
+		(void)strncpy(h->ipo_name, op->iplo_name, sizeof(h->ipo_name));
 	}
 
-	h->ipo_ref = 1;
-	h->ipo_list = NULL;
-	h->ipo_unit = unit;
-	h->ipo_next = ip_pool_list[unit];
-	if (ip_pool_list[unit] != NULL)
-		ip_pool_list[unit]->ipo_pnext = &h->ipo_next;
-	h->ipo_pnext = &ip_pool_list[unit];
-	ip_pool_list[unit] = h;
+	if ((h->ipo_flags & IPOOL_DELETE) == 0) {
+		h->ipo_ref = 1;
+		h->ipo_list = NULL;
+		h->ipo_unit = unit;
+		h->ipo_next = ip_pool_list[unit];
+		if (ip_pool_list[unit] != NULL)
+			ip_pool_list[unit]->ipo_pnext = &h->ipo_next;
+		h->ipo_pnext = &ip_pool_list[unit];
+		ip_pool_list[unit] = h;
 
-	ipoolstat.ipls_pools++;
+		ipoolstat.ipls_pools++;
+	}
 
 	return 0;
 }
@@ -607,23 +648,28 @@ ip_pool_node_t *ipe;
 /* Locks:       WRITE(ip_poolrw) or WRITE(ipf_global)                       */
 /*                                                                          */
 /* Search for a pool using paramters passed in and if it's not otherwise    */
-/* busy, free it.                                                           */
+/* busy, free it.  If it is busy, clear all of its nodes, mark it for being */
+/* deleted and return an error saying it is busy.                           */
 /*                                                                          */
 /* NOTE: Because this function is called out of ipfdetach() where ip_poolrw */
 /* may not be initialised, we can't use an ASSERT to enforce the locking    */
 /* assertion that one of the two (ip_poolrw,ipf_global) is held.            */
 /* ------------------------------------------------------------------------ */
-int ip_pool_destroy(op)
-iplookupop_t *op;
+int ip_pool_destroy(unit, name)
+int unit;
+char *name;
 {
 	ip_pool_t *ipo;
 
-	ipo = ip_pool_find(op->iplo_unit, op->iplo_name);
+	ipo = ip_pool_exists(unit, name);
 	if (ipo == NULL)
 		return ESRCH;
 
-	if (ipo->ipo_ref != 1)
-		return EBUSY;
+	if (ipo->ipo_ref != 1) {
+		ip_pool_clearnodes(ipo);
+		ipo->ipo_flags |= IPOOL_DELETE;
+		return 0;
+	}
 
 	ip_pool_free(ipo);
 	return 0;
@@ -660,7 +706,7 @@ iplookupflush_t *fp;
 			(void)strncpy(op.iplo_name, p->ipo_name,
 				sizeof(op.iplo_name));
 			q = p->ipo_next;
-			err = ip_pool_destroy(&op);
+			err = ip_pool_destroy(op.iplo_unit, op.iplo_name);
 			if (err == 0)
 				num++;
 			else
@@ -688,6 +734,30 @@ iplookupflush_t *fp;
 void ip_pool_free(ipo)
 ip_pool_t *ipo;
 {
+
+	ip_pool_clearnodes(ipo);
+
+	if (ipo->ipo_next != NULL)
+		ipo->ipo_next->ipo_pnext = ipo->ipo_pnext;
+	*ipo->ipo_pnext = ipo->ipo_next;
+	rn_freehead(ipo->ipo_head);
+	KFREE(ipo);
+
+	ipoolstat.ipls_pools--;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ip_pool_clearnodes                                          */
+/* Returns:     void                                                        */
+/* Parameters:  ipo(I) -  pointer to pool structure                         */
+/* Locks:       WRITE(ip_poolrw) or WRITE(ipf_global)                       */
+/*                                                                          */
+/* Deletes all nodes stored in a pool structure.                            */
+/* ------------------------------------------------------------------------ */
+static void ip_pool_clearnodes(ipo)
+ip_pool_t *ipo;
+{
 	ip_pool_node_t *n;
 
 	RADIX_NODE_HEAD_LOCK(ipo->ipo_head);
@@ -706,13 +776,6 @@ ip_pool_t *ipo;
 	RADIX_NODE_HEAD_UNLOCK(ipo->ipo_head);
 
 	ipo->ipo_list = NULL;
-	if (ipo->ipo_next != NULL)
-		ipo->ipo_next->ipo_pnext = ipo->ipo_pnext;
-	*ipo->ipo_pnext = ipo->ipo_next;
-	rn_freehead(ipo->ipo_head);
-	KFREE(ipo);
-
-	ipoolstat.ipls_pools--;
 }
 
 
@@ -732,8 +795,12 @@ ip_pool_t *ipo;
 	ASSERT(rw_read_locked(&ip_poolrw.ipf_lk) == 0);
 
 	ipo->ipo_ref--;
+
 	if (ipo->ipo_ref == 0)
 		ip_pool_free(ipo);
+
+	else if ((ipo->ipo_ref == 1) && (ipo->ipo_flags & IPOOL_DELETE))
+		ip_pool_destroy(ipo->ipo_unit, ipo->ipo_name);
 }
 
 
@@ -805,7 +872,7 @@ ipflookupiter_t *ilp;
 	case IPFLOOKUPITER_NODE :
 		node = token->ipt_data;
 		if (node == NULL) {
-			ipo = ip_pool_find(ilp->ili_unit, ilp->ili_name);
+			ipo = ip_pool_exists(ilp->ili_unit, ilp->ili_name);
 			if (ipo == NULL)
 				err = ESRCH;
 			else {

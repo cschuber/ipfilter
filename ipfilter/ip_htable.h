@@ -42,6 +42,7 @@ typedef	struct	iphtable_s	{
 /* iph_type */
 #define	IPHASH_LOOKUP	0
 #define	IPHASH_GROUPMAP	1
+#define	IPHASH_DELETE	2
 #define	IPHASH_ANON	0x80000000
 
 
@@ -56,16 +57,18 @@ typedef	struct	iphtstat_s	{
 
 extern iphtable_t *ipf_htables[IPL_LOGSIZE];
 
+extern iphtable_t *fr_existshtable __P((int, char *));
+extern int fr_clearhtable __P((iphtable_t *));
 extern void fr_htable_unload __P((void));
 extern int fr_newhtable __P((iplookupop_t *));
 extern iphtable_t *fr_findhtable __P((int, char *));
-extern int fr_removehtable __P((iplookupop_t *));
+extern int fr_removehtable __P((int, char *));
 extern size_t fr_flushhtable __P((iplookupflush_t *));
 extern int fr_addhtent __P((iphtable_t *, iphtent_t *));
 extern int fr_delhtent __P((iphtable_t *, iphtent_t *));
-extern void fr_derefhtable __P((iphtable_t *));
-extern void fr_derefhtent __P((iphtent_t *));
-extern void fr_delhtable __P((iphtable_t *));
+extern int fr_derefhtable __P((iphtable_t *));
+extern int fr_derefhtent __P((iphtent_t *));
+extern int fr_delhtable __P((iphtable_t *));
 extern void *fr_iphmfindgroup __P((void *, void *));
 extern int fr_iphmfindip __P((void *, int, void *));
 extern int fr_gethtablestat __P((iplookupop_t *));

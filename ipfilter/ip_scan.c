@@ -115,8 +115,10 @@ caddr_t data;
 		return ENOMEM;
 
 	err = copyinptr(data, isc, sizeof(*isc));
-	if (err)
+	if (err) {
+		KFREE(isc);
 		return err;
+	}
 
 	WRITE_ENTER(&ipsc_rwlock);
 

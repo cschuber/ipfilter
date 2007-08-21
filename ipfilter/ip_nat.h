@@ -150,7 +150,7 @@ typedef	struct	nat	{
 #define	NAT_ICMPQUERY	0x0008	/* IPN_ICMPQUERY */
 #define	NAT_SEARCH	0x0010
 #define	NAT_SLAVE	0x0020	/* Slave connection for a proxy */
-#define	NAT_NOTRULEPORT	0x0040
+#define	NAT_NOTRULEPORT	0x0040	/* Don't use the port # in the NAT rule */
 
 #define	NAT_TCPUDP	(NAT_TCP|NAT_UDP)
 #define	NAT_TCPUDPICMP	(NAT_TCP|NAT_UDP|NAT_ICMPERR)

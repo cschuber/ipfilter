@@ -307,6 +307,8 @@ ippr_rpcb_out(fin, aps, nat)
 	COPYDATA(m, off, dlen, (caddr_t)&rm->rm_msgbuf);
 	rm->rm_buflen = dlen;
 
+	rx = NULL;		/* XXX gcc */
+
 	/* Send off to decode reply. */
 	rv = ippr_rpcb_decoderep(fin, nat, rs, rm, &rx);
 
@@ -1193,8 +1195,9 @@ ippr_rpcb_getnat(fin, nat, proto, port)
 	 * no use for this lock, so simply unlock it if necessary.
 	 */
 	is = fr_stlookup(&fi, &tcp, NULL);
-	if (is != NULL)
+	if (is != NULL) {
 		RWLOCK_EXIT(&ipf_state);
+	}
 
 	RWLOCK_EXIT(&ipf_nat);
 

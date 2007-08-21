@@ -324,7 +324,7 @@ static ipfunc_resolve_t fr_availfuncs[] = {
 	{ "fr_srcgrpmap", fr_srcgrpmap, fr_grpmapinit },
 	{ "fr_dstgrpmap", fr_dstgrpmap, fr_grpmapinit },
 #endif
-	{ "", NULL }
+	{ "", NULL, NULL }
 };
 
 
@@ -4205,16 +4205,6 @@ caddr_t data;
 		fprev = &fg->fg_start;
 	}
 
-	ftail = fprev;
-	for (f = *ftail; (f = *ftail) != NULL; ftail = &f->fr_next) {
-		if (fp->fr_collect <= f->fr_collect) {
-			ftail = fprev;
-			f = NULL;
-			break;
-		}
-		fprev = ftail;
-	}
-
 	/*
 	 * Copy in extra data for the rule.
 	 */
@@ -4357,6 +4347,20 @@ caddr_t data;
 		fp->fr_cksum += *p;
 
 	WRITE_ENTER(&ipf_mutex);
+
+	/*
+	 * Now that the filter rule lists are locked, we can walk the
+	 * chain of them without fear.
+	 */
+	ftail = fprev;
+	for (f = *ftail; (f = *ftail) != NULL; ftail = &f->fr_next) {
+		if (fp->fr_collect <= f->fr_collect) {
+			ftail = fprev;
+			f = NULL;
+			break;
+		}
+		fprev = ftail;
+	}
 	bzero((char *)frcache, sizeof(frcache));
 
 	for (; (f = *ftail) != NULL; ftail = &f->fr_next) {
@@ -6728,6 +6732,7 @@ int ipf_getnextrule(ipftoken_t *t, void *ptr)
 			next->fr_ref++;
 			MUTEX_EXIT(&next->fr_lock);
 			if (next->fr_next == NULL) {
+				t->ipt_data = next;
 				ipf_freetoken(t);
 				fr = NULL;
 			}
@@ -6737,6 +6742,7 @@ int ipf_getnextrule(ipftoken_t *t, void *ptr)
 			ipf_freetoken(t);
 			fr = NULL;
 			count = 1;
+			t->ipt_data = next;
 		}
 		RWLOCK_EXIT(&ipf_mutex);
 
@@ -6744,7 +6750,6 @@ int ipf_getnextrule(ipftoken_t *t, void *ptr)
 			(void) fr_derefrule(&fr);
 		}
 
-		t->ipt_data = next;
 		error = COPYOUT(next, dst, sizeof(*next));
 		if (error != 0)
 			return EFAULT;

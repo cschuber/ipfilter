@@ -1367,12 +1367,12 @@ int getlock;
 	aps = NULL;
 	nat = NULL;
 	ipnn = NULL;
+	fr = NULL;
 
 	/*
 	 * New entry, copy in the rest of the NAT entry if it's size is more
 	 * than just the nat_t structure.
 	 */
-	fr = NULL;
 	if (ipn.ipn_dsize > sizeof(ipn)) {
 		if (ipn.ipn_dsize > 81920) {
 			error = ENOMEM;
@@ -4900,7 +4900,10 @@ ipfgeniter_t *itp;
 	ipnat_t *ipn, *nextipnat = NULL, zeroipn;
 	nat_t *nat, *nextnat = NULL, zeronat;
 	int error = 0, count;
+	ipftoken_t *freet;
 	char *dst;
+
+	freet = NULL;
 
 	READ_ENTER(&ipf_nat);
 
@@ -4933,6 +4936,7 @@ ipfgeniter_t *itp;
 		}
 		break;
 	default :
+		RWLOCK_EXIT(&ipf_nat);
 		return EINVAL;
 	}
 
@@ -4942,12 +4946,15 @@ ipfgeniter_t *itp;
 		{
 		case IPFGENITER_HOSTMAP :
 			if (nexthm != NULL) {
-				/*MUTEX_ENTER(&nexthm->hm_lock);*/
-				nexthm->hm_ref++;
-				/*MUTEX_EXIT(&nextipnat->hm_lock);*/
 				if (nexthm->hm_next == NULL) {
-					ipf_freetoken(t);
+					freet = t;
+					count = 1;
 					hm = NULL;
+				}
+				if (count == 1) {
+					/*MUTEX_ENTER(&nexthm->hm_lock);*/
+					nexthm->hm_ref++;
+					/*MUTEX_EXIT(&nextipnat->hm_lock);*/
 				}
 			} else {
 				bzero(&zerohm, sizeof(zerohm));
@@ -4958,13 +4965,15 @@ ipfgeniter_t *itp;
 
 		case IPFGENITER_IPNAT :
 			if (nextipnat != NULL) {
-				MUTEX_ENTER(&nextipnat->in_lock);
-				nextipnat->in_use++;
-				MUTEX_EXIT(&nextipnat->in_lock);
 				if (nextipnat->in_next == NULL) {
-					ipf_freetoken(t);
+					freet = t;
+					count = 1;
 					ipn = NULL;
-
+				}
+				if (count == 1) {
+					MUTEX_ENTER(&nextipnat->in_lock);
+					nextipnat->in_use++;
+					MUTEX_EXIT(&nextipnat->in_lock);
 				}
 			} else {
 				bzero(&zeroipn, sizeof(zeroipn));
@@ -4975,12 +4984,15 @@ ipfgeniter_t *itp;
 
 		case IPFGENITER_NAT :
 			if (nextnat != NULL) {
-				MUTEX_ENTER(&nextnat->nat_lock);
-				nextnat->nat_ref++;
-				MUTEX_EXIT(&nextnat->nat_lock);
 				if (nextnat->nat_next == NULL) {
-					ipf_freetoken(t);
+					count = 1;
+					freet = t;
 					nat = NULL;
+				}
+				if (count == 1) {
+					MUTEX_ENTER(&nextnat->nat_lock);
+					nextnat->nat_ref++;
+					MUTEX_EXIT(&nextnat->nat_lock);
 				}
 			} else {
 				bzero(&zeronat, sizeof(zeronat));
@@ -4992,6 +5004,11 @@ ipfgeniter_t *itp;
 			break;
 		}
 		RWLOCK_EXIT(&ipf_nat);
+
+		if (freet != NULL) {
+			ipf_freetoken(freet);
+			freet = NULL;
+		}
 
 		switch (itp->igi_type)
 		{

@@ -151,7 +151,7 @@ extern int selwait;
 # if defined(linux) && defined(_KERNEL)
 wait_queue_head_t	iplh_linux[IPL_LOGSIZE];
 # endif
-# if SOLARIS
+# if SOLARIS && defined(_KERNEL)
 extern	kcondvar_t	iplwait;
 extern	struct pollhead	iplpollhead[IPL_LOGSIZE];
 # endif

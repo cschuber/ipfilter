@@ -17,8 +17,12 @@ int opts;
 	if ((opts & OPT_DEBUG) == 0) {
 		if ((pool->ipo_flags & IPOOL_ANON) != 0)
 			PRINTF("# 'anonymous' tree %s\n", pool->ipo_name);
+		if ((pool->ipo_flags & IPOOL_DELETE) != 0)
+			PRINTF("# ");
 		PRINTF("table role = ");
 	} else {
+		if ((pool->ipo_flags & IPOOL_DELETE) != 0)
+			PRINTF("# ");
 		PRINTF("%s: %s",
 			isdigit(*pool->ipo_name) ? "Number" : "Name",
 			pool->ipo_name);
@@ -67,6 +71,8 @@ int opts;
 
 		PRINTF("\tReferences: %d\tHits: %lu\n", pool->ipo_ref,
 			pool->ipo_hits);
+		if ((pool->ipo_flags & IPOOL_DELETE) != 0)
+			PRINTF("# ");
 		PRINTF("\tNodes Starting at %p\n", pool->ipo_list);
 	}
 }

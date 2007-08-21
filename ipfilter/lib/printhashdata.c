@@ -18,6 +18,8 @@ int opts;
 	if ((opts & OPT_DEBUG) == 0) {
 		if ((hp->iph_type & IPHASH_ANON) == IPHASH_ANON)
 			PRINTF("# 'anonymous' table\n");
+		if ((hp->iph_flags & IPHASH_DELETE) == IPHASH_DELETE)
+			PRINTF("# ");
 		switch (hp->iph_type & ~IPHASH_ANON)
 		{
 		case IPHASH_LOOKUP :

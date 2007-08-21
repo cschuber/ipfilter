@@ -17,6 +17,8 @@ void *ip;
 	struct in_addr ipa;
 	struct netent *np;
 
+	memset(&ipa, 0, sizeof(ipa));	/* XXX gcc */
+
 	if (v == 4) {
 		ipa.s_addr = *(u_32_t *)ip;
 		if (ipa.s_addr == htonl(0xfedcba98))

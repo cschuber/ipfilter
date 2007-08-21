@@ -54,7 +54,8 @@ typedef	struct ip_pool_s {
 	char		ipo_name[FR_GROUPLEN];
 } ip_pool_t;
 
-#define	IPOOL_ANON	0x80000000
+#define	IPOOL_DELETE	0x01
+#define	IPOOL_ANON	0x02
 
 
 typedef	struct	ip_pool_stat	{
@@ -74,7 +75,7 @@ extern	void	ip_pool_fini __P((void));
 extern	int	ip_pool_create __P((iplookupop_t *));
 extern	int	ip_pool_insert __P((ip_pool_t *, i6addr_t *, i6addr_t *, int));
 extern	int	ip_pool_remove __P((ip_pool_t *, ip_pool_node_t *));
-extern	int	ip_pool_destroy __P((iplookupop_t *));
+extern	int	ip_pool_destroy __P((int, char *));
 extern	void	ip_pool_free __P((ip_pool_t *));
 extern	void	ip_pool_deref __P((ip_pool_t *));
 extern	void	ip_pool_node_deref __P((ip_pool_node_t *));
