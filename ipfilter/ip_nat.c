@@ -643,6 +643,9 @@ int mode;
 		} else {
 			error = fr_inobj(data, &natd, IPFOBJ_IPNAT);
 		}
+
+	} else if (cmd == (ioctlcmd_t)SIOCIPFFL) { /* SIOCFLNAT & SIOCCNATL */
+		BCOPYIN(data, &arg, sizeof(arg));
 	}
 
 	if (error != 0)
@@ -779,8 +782,6 @@ int mode;
 			WRITE_ENTER(&ipf_nat);
 		}
 		error = 0;
-		BCOPYIN(data, &arg, sizeof(arg));
-
 		if (arg == 0)
 			ret = nat_flushtable();
 		else if (arg == 1)
@@ -1353,8 +1354,8 @@ int getlock;
 	 */
 	bzero((char *)&fin, sizeof(fin));
 	fin.fin_p = nat->nat_p;
+	fin.fin_ifp = nat->nat_ifps[0];
 	if (nat->nat_dir == NAT_OUTBOUND) {
-		fin.fin_ifp = nat->nat_ifps[0];
 		fin.fin_data[0] = ntohs(nat->nat_oport);
 		fin.fin_data[1] = ntohs(nat->nat_outport);
 		if (getlock) {
@@ -1370,7 +1371,6 @@ int getlock;
 			goto junkput;
 		}
 	} else if (nat->nat_dir == NAT_INBOUND) {
-		fin.fin_ifp = nat->nat_ifps[0];
 		fin.fin_data[0] = ntohs(nat->nat_outport);
 		fin.fin_data[1] = ntohs(nat->nat_oport);
 		if (getlock) {
@@ -1580,8 +1580,7 @@ int logtype;
 		nat->nat_me = NULL;
 	}
 
-	if (nat->nat_tqe.tqe_ifq != NULL)
-		fr_deletequeueentry(&nat->nat_tqe);
+	fr_deletequeueentry(&nat->nat_tqe);
 
 	nat->nat_ref--;
 	if (nat->nat_ref > 0) {
@@ -2889,10 +2888,6 @@ int dir;
 				if ((dlen >= 8) && (*csump != 0)) {
 					fix_datacksum(csump, sumd);
 				} else {
-					if (sum2 > sum1)
-						sumd = sum2 - sum1 + 1;
-					else
-						sumd = sum2 - sum1;
 					sumd2 += sumd;
 				}
 			}
@@ -2908,10 +2903,7 @@ int dir;
 				if (dlen >= 18) {
 					fix_datacksum(csump, sumd);
 				} else {
-					if (sum2 > sum1)
-						sumd = sum2 - sum1 + 1;
-					else
-						sumd = sum2 - sum1;
+					sumd = sum2 - sum1 + 1;
 					sumd2 += sumd;
 				}
 			}

@@ -230,7 +230,7 @@ static	INLINE int	frpr_udpcommon __P((fr_info_t *));
 static	int		fr_updateipid __P((fr_info_t *));
 #ifdef	IPFILTER_LOOKUP
 static	int		fr_grpmapinit __P((frentry_t *fr));
-static	INLINE void	*fr_resolvelookup __P((u_int, u_int, i6addr_t *, lookupfunc_t *));
+static	INLINE void	*fr_resolvelookup __P((u_int, u_int, lookupfunc_t *));
 #endif
 static	void		frsynclist __P((frentry_t *, void *));
 static	ipftuneable_t	*fr_findtunebyname __P((const char *));
@@ -697,7 +697,7 @@ fr_info_t *fin;
 	int minicmpsz = sizeof(struct icmp6_hdr);
 	struct icmp6_hdr *icmp6;
 
-	if (frpr_pullup(fin, ICMP6ERR_MINPKTLEN - sizeof(ip6_t)) == -1)
+	if (frpr_pullup(fin, ICMP6ERR_MINPKTLEN + 8 - sizeof(ip6_t)) == -1)
 		return;
 
 	if (fin->fin_dlen > 1) {
@@ -857,26 +857,18 @@ static INLINE int frpr_pullup(fin, plen)
 fr_info_t *fin;
 int plen;
 {
+#if defined(_KERNEL)
 	if (fin->fin_m != NULL) {
 		if (fin->fin_dp != NULL)
 			plen += (char *)fin->fin_dp -
 				((char *)fin->fin_ip + fin->fin_hlen);
 		plen += fin->fin_hlen;
 		if (M_LEN(fin->fin_m) < plen) {
-#if defined(_KERNEL)
 			if (fr_pullup(fin->fin_m, fin, plen) == NULL)
 				return -1;
-#else
-			/*
-			 * Fake fr_pullup failing
-			 */
-			*fin->fin_mp = NULL;
-			fin->fin_m = NULL;
-			fin->fin_ip = NULL;
-			return -1;
-#endif
 		}
 	}
+#endif
 	return 0;
 }
 
@@ -1683,7 +1675,7 @@ int portcmp;
 	 */
 	i = ((*lip & *lm) != *ld);
 	FR_DEBUG(("0. %#08x & %#08x != %#08x\n",
-		   ntohl(*lip), ntohl(*lm), ntohl(*ld)));
+		   *lip, *lm, *ld));
 	if (i)
 		return 1;
 
@@ -1694,7 +1686,7 @@ int portcmp;
 	lip++, lm++, ld++;
 	i |= ((*lip & *lm) != *ld);
 	FR_DEBUG(("1. %#08x & %#08x != %#08x\n",
-		   ntohl(*lip), ntohl(*lm), ntohl(*ld)));
+		   *lip, *lm, *ld));
 	if (i)
 		return 1;
 
@@ -1717,20 +1709,20 @@ int portcmp;
 #endif
 		i = ((*lip & *lm) != *ld);
 		FR_DEBUG(("2a. %#08x & %#08x != %#08x\n",
-			   ntohl(*lip), ntohl(*lm), ntohl(*ld)));
+			   *lip, *lm, *ld));
 		if (fi->fi_v == 6) {
 			lip++, lm++, ld++;
 			i |= ((*lip & *lm) != *ld);
 			FR_DEBUG(("2b. %#08x & %#08x != %#08x\n",
-				   ntohl(*lip), ntohl(*lm), ntohl(*ld)));
+				   *lip, *lm, *ld));
 			lip++, lm++, ld++;
 			i |= ((*lip & *lm) != *ld);
 			FR_DEBUG(("2c. %#08x & %#08x != %#08x\n",
-				   ntohl(*lip), ntohl(*lm), ntohl(*ld)));
+				   *lip, *lm, *ld));
 			lip++, lm++, ld++;
 			i |= ((*lip & *lm) != *ld);
 			FR_DEBUG(("2d. %#08x & %#08x != %#08x\n",
-				   ntohl(*lip), ntohl(*lm), ntohl(*ld)));
+				   *lip, *lm, *ld));
 		} else {
 			lip += 3;
 			lm += 3;
@@ -1759,20 +1751,20 @@ int portcmp;
 #endif
 		i = ((*lip & *lm) != *ld);
 		FR_DEBUG(("3a. %#08x & %#08x != %#08x\n",
-			   ntohl(*lip), ntohl(*lm), ntohl(*ld)));
+			   *lip, *lm, *ld));
 		if (fi->fi_v == 6) {
 			lip++, lm++, ld++;
 			i |= ((*lip & *lm) != *ld);
 			FR_DEBUG(("3b. %#08x & %#08x != %#08x\n",
-				   ntohl(*lip), ntohl(*lm), ntohl(*ld)));
+				   *lip, *lm, *ld));
 			lip++, lm++, ld++;
 			i |= ((*lip & *lm) != *ld);
 			FR_DEBUG(("3c. %#08x & %#08x != %#08x\n",
-				   ntohl(*lip), ntohl(*lm), ntohl(*ld)));
+				   *lip, *lm, *ld));
 			lip++, lm++, ld++;
 			i |= ((*lip & *lm) != *ld);
 			FR_DEBUG(("3d. %#08x & %#08x != %#08x\n",
-				   ntohl(*lip), ntohl(*lm), ntohl(*ld)));
+				   *lip, *lm, *ld));
 		} else {
 			lip += 3;
 			lm += 3;
@@ -3665,15 +3657,13 @@ void *ifp;
 		if (fr->fr_type == FR_T_IPF && fr->fr_satype == FRI_LOOKUP &&
 		    fr->fr_srcptr == NULL) {
 			fr->fr_srcptr = fr_resolvelookup(fr->fr_srctype,
-							 fr->fr_srcsubtype,
-							 &fr->fr_slookup,
+							 fr->fr_srcnum,
 							 &fr->fr_srcfunc);
 		}
 		if (fr->fr_type == FR_T_IPF && fr->fr_datype == FRI_LOOKUP &&
 		    fr->fr_dstptr == NULL) {
 			fr->fr_dstptr = fr_resolvelookup(fr->fr_dsttype,
-							 fr->fr_dstsubtype,
-							 &fr->fr_dlookup,
+							 fr->fr_dstnum,
 							 &fr->fr_dstfunc);
 		}
 #endif
@@ -3955,8 +3945,7 @@ int rev;
 /* Function:    fr_resolvelookup                                            */
 /* Returns:     void * - NULL = failure, else success.                      */
 /* Parameters:  type(I)     - type of lookup these parameters are for.      */
-/*              subtype(I)  - whether the info below contains number/name   */
-/*              info(I)     - pointer to name/number of the lookup data     */
+/*              number(I)   - table number to use when searching            */
 /*              funcptr(IO) - pointer to pointer for storing IP address     */
 /*                           searching function.                            */
 /*                                                                          */
@@ -3965,35 +3954,20 @@ int rev;
 /* call to do the IP address search will be change, regardless of whether   */
 /* or not the "table" number exists.                                        */
 /* ------------------------------------------------------------------------ */
-static void *fr_resolvelookup(type, subtype, info, funcptr)
-u_int type, subtype;
-i6addr_t *info;
+static void *fr_resolvelookup(type, number, funcptr)
+u_int type, number;
 lookupfunc_t *funcptr;
 {
-	char label[FR_GROUPLEN], *name;
+	char name[FR_GROUPLEN];
 	iphtable_t *iph;
 	ip_pool_t *ipo;
 	void *ptr;
 
-	if (subtype == 0) {
 #if defined(SNPRINTF) && defined(_KERNEL)
-		SNPRINTF(label, sizeof(label), "%u", info->iplookupnum);
+	SNPRINTF(name, sizeof(name), "%u", number);
 #else
-		(void) sprintf(label, "%u", info->iplookupnum);
+	(void) sprintf(name, "%u", number);
 #endif
-		name = label;
-	} else if (subtype == 1) {
-		/*
-		 * Because iplookupname is currently only a 12 character
-		 * string and FR_GROUPLEN is 16, copy all of it into the
-		 * label buffer and add on a NULL at the end.
-		 */
-		strncpy(label, info->iplookupname, sizeof(info->iplookupname));
-		label[sizeof(info->iplookupname)] = '\0';
-		name = label;
-	} else {
-		return NULL;
-	}
 
 	READ_ENTER(&ip_poolrw);
 
@@ -4242,11 +4216,8 @@ caddr_t data;
 #ifdef	IPFILTER_LOOKUP
 		case FRI_LOOKUP :
 			fp->fr_srcptr = fr_resolvelookup(fp->fr_srctype,
-							 fp->fr_srcsubtype,
-							 &fp->fr_slookup,
+							 fp->fr_srcnum,
 							 &fp->fr_srcfunc);
-			if (fp->fr_srcptr == NULL)
-				return ESRCH;
 			break;
 #endif
 		default :
@@ -4270,11 +4241,8 @@ caddr_t data;
 #ifdef	IPFILTER_LOOKUP
 		case FRI_LOOKUP :
 			fp->fr_dstptr = fr_resolvelookup(fp->fr_dsttype,
-							 fp->fr_dstsubtype,
-							 &fp->fr_dlookup,
+							 fp->fr_dstnum,
 							 &fp->fr_dstfunc);
-			if (fp->fr_dstptr == NULL)
-				return ESRCH;
 			break;
 #endif
 		default :
@@ -5253,9 +5221,19 @@ void *data;
 			error = EIO;
 		break;
 	case IPL_LOGAUTH :
-		if (fr_running > 0)
-			error = fr_auth_ioctl(data, cmd, mode);
-		else
+		if (fr_running > 0) {
+			if ((cmd == (ioctlcmd_t)SIOCADAFR) ||
+			    (cmd == (ioctlcmd_t)SIOCRMAFR)) {
+				if (!(mode & FWRITE)) {
+					error = EPERM;
+				} else {
+					error = frrequest(unit, cmd, data,
+							  fr_active, 1);
+				}
+			} else {
+				error = fr_auth_ioctl(data, cmd, mode);
+			}
+		} else
 			error = EIO;
 		break;
 	case IPL_LOGSYNC :
@@ -6297,7 +6275,7 @@ caddr_t	data;
 	int error;
 
 	fr_getstat(&fio);
-	error = fr_outobj(data, &fio, IPFOBJ_IPFSTAT);
+	error = copyoutptr(&fio, data, sizeof(fio));
 	if (error)
 		return EFAULT;
 

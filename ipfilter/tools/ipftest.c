@@ -249,10 +249,7 @@ char *argv[];
 				(void)printf("pass");
 				break;
 			case 1 :
-				if (m == NULL)
-					(void)printf("bad-packet");
-				else
-					(void)printf("nomatch");
+				(void)printf("nomatch");
 				break;
 			case 3 :
 				(void)printf("block return-rst");

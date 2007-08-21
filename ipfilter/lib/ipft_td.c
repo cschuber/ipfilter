@@ -142,8 +142,6 @@ int	cnt, *dir;
 	IP_HL_A(ip, sizeof(ip_t));
 
 	s = strtok(misc, " :");
-	if (s == NULL)
-		return 0;
 	ip->ip_p = getproto(s);
 
 	switch (ip->ip_p)
@@ -151,8 +149,6 @@ int	cnt, *dir;
 	case IPPROTO_TCP :
 	case IPPROTO_UDP :
 		s = strtok(NULL, " :");
-		if (s == NULL)
-			return 0;
 		ip->ip_len += atoi(s);
 		if (ip->ip_p == IPPROTO_TCP)
 			extra = sizeof(struct tcphdr);

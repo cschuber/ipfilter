@@ -318,10 +318,7 @@ fr_info_t *fin;
 
 	fra = fr_auth + i;
 	fra->fra_index = i;
-	if (fin->fin_fr != NULL)
-		fra->fra_pass = fin->fin_fr->fr_flags;
-	else
-		fra->fra_pass = 0;
+	fra->fra_pass = fin->fin_fr->fr_flags;
 	fra->fra_age = fr_defaultauthage;
 	bcopy((char *)fin, (char *)&fra->fra_info, sizeof(*fin));
 #if !defined(sparc) && !defined(m68k)
@@ -376,15 +373,6 @@ int mode;
 
 	switch (cmd)
 	{
-	case SIOCADAFR :
-	case SIOCRMAFR :
-		if (!(mode & FWRITE))
-			error = EPERM;
-		else
-			error = frrequest(IPL_LOGAUTH, cmd, data,
-					  fr_active, 1);
-		break;
-
 	case SIOCSTLCK :
 		if (!(mode & FWRITE)) {
 			error = EPERM;
@@ -695,9 +683,6 @@ void fr_authexpire()
 		}
 	}
 
-	/*
-	 * Expire pre-auth rules
-	 */
 	for (faep = &fae_list; ((fae = *faep) != NULL); ) {
 		fae->fae_age--;
 		if (fae->fae_age == 0) {
@@ -733,7 +718,7 @@ frentry_t *fr, **frptr;
 
 	if ((cmd != SIOCADAFR) && (cmd != SIOCRMAFR))
 		return EIO;
-
+	
 	for (faep = &fae_list; ((fae = *faep) != NULL); ) {
 		if (&fae->fae_fr == fr)
 			break;

@@ -191,7 +191,7 @@ aproxy_t *ap;
 			return -1;
 		}
 
-	for (a = ap_proxylist; (a != NULL); a = a->apr_next)
+	for (a = ap_proxylist; a->apr_p; a = a->apr_next)
 		if ((a->apr_p == ap->apr_p) &&
 		    !strncmp(a->apr_label, ap->apr_label,
 			     sizeof(ap->apr_label))) {

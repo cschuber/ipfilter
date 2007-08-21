@@ -79,8 +79,7 @@ int opts;
 	if ((opts & OPT_DEBUG) == 0) {
 		if ((iph.iph_type & ~IPHASH_ANON) == IPHASH_LOOKUP)
 			PRINTF(" type = hash");
-		PRINTF(" %s = %s size = %lu",
-			isdigit(*iph.iph_name) ? "number" : "name",
+		PRINTF(" number = %s size = %lu",
 			iph.iph_name, (u_long)iph.iph_size);
 		if (iph.iph_seed != 0)
 			PRINTF(" seed = %lu", iph.iph_seed);

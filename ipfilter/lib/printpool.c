@@ -67,9 +67,7 @@ int opts;
 	}
 
 	if ((opts & OPT_DEBUG) == 0) {
-		PRINTF(" type = tree %s = %s\n",
-			isdigit(*ipp.ipo_name) ? "number" : "name",
-			ipp.ipo_name);
+		PRINTF(" type = tree number = %s\n", ipp.ipo_name);
 		PRINTF("\t{");
 	} else {
 		putchar(' ');

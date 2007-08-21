@@ -835,32 +835,20 @@ dstportlist:
 	;
 
 addr:	pool '/' YY_NUMBER		{ pooled = 1;
+					  yyexpectaddr = 0;
 					  $$.a.iplookuptype = IPLT_POOL;
-					  $$.a.iplookupsubtype = 0;
 					  $$.a.iplookupnum = $3; }
-	| pool '/' YY_STR		{ pooled = 1;
-					  $$.a.iplookuptype = IPLT_POOL;
-					  $$.a.iplookupsubtype = 1;
-					  strncpy($$.a.iplookupname, $3,
-						  sizeof($$.a.iplookupname));
-					}
 	| pool '=' '(' poollist ')'	{ pooled = 1;
+					  yyexpectaddr = 0;
 					  $$.a.iplookuptype = IPLT_POOL;
-					  $$.a.iplookupsubtype = 0;
 					  $$.a.iplookupnum = makepool($4); }
 	| hash '/' YY_NUMBER		{ hashed = 1;
+					  yyexpectaddr = 0;
 					  $$.a.iplookuptype = IPLT_HASH;
-					  $$.a.iplookupsubtype = 0;
 					  $$.a.iplookupnum = $3; }
-	| hash '/' YY_STR		{ pooled = 1;
-					  $$.a.iplookuptype = IPLT_HASH;
-					  $$.a.iplookupsubtype = 1;
-					  strncpy($$.a.iplookupname, $3,
-						  sizeof($$.a.iplookupname));
-					}
 	| hash '=' '(' addrlist ')'	{ hashed = 1;
+					  yyexpectaddr = 0;
 					  $$.a.iplookuptype = IPLT_HASH;
-					  $$.a.iplookupsubtype = 0;
 					  $$.a.iplookupnum = makehash($4); }
 	| ipaddr			{ bcopy(&$1, &$$, sizeof($$));
 					  yyexpectaddr = 0; }

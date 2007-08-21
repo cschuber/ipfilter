@@ -111,11 +111,6 @@ typedef	union	i6addr	{
 	struct	in6_addr in6;
 	void	*vptr[2];
 	lookupfunc_t	lptr[2];
-	struct {
-		u_short	type;
-		u_short	subtype;
-		char	label[12];
-	} i6un;
 } i6addr_t;
 #else
 typedef	union	i6addr	{
@@ -123,19 +118,12 @@ typedef	union	i6addr	{
 	struct	in_addr	in4;
 	void	*vptr[2];
 	lookupfunc_t	lptr[2];
-	struct {
-		u_short	type;
-		u_short	subtype;
-		char	label[12];
-	} i6un;
 } i6addr_t;
 #endif
 
 #define in4_addr	in4.s_addr
-#define	iplookupnum	i6[1]
-#define	iplookupname	i6un.label
-#define	iplookuptype	i6un.type
-#define	iplookupsubtype	i6un.subtype
+#define	iplookupnum	i6[0]
+#define	iplookuptype	i6[1]
 /*
  * NOTE: These DO overlap the above on 64bit systems and this IS recognised.
  */
@@ -261,12 +249,8 @@ typedef	struct	fr_ip	{
 #define	fi_daddr	fi_dst.in4.s_addr
 #define	fi_srcnum	fi_src.iplookupnum
 #define	fi_dstnum	fi_dst.iplookupnum
-#define	fi_srcname	fi_src.iplookupname
-#define	fi_dstname	fi_dst.iplookupname
 #define	fi_srctype	fi_src.iplookuptype
 #define	fi_dsttype	fi_dst.iplookuptype
-#define	fi_srcsubtype	fi_src.iplookupsubtype
-#define	fi_dstsubtype	fi_dst.iplookupsubtype
 #define	fi_srcptr	fi_src.iplookupptr
 #define	fi_dstptr	fi_dst.iplookupptr
 #define	fi_srcfunc	fi_src.iplookupfunc
@@ -456,13 +440,9 @@ typedef	struct	fripf	{
 	int	fri_difpidx;		/* index into fr_ifps[] to use when */
 } fripf_t;
 
-#define	fri_dlookup	fri_mip.fi_dst
-#define	fri_slookup	fri_mip.fi_src
-#define	fri_dstnum	fri_mip.fi_dstnum
+#define	fri_dstnum	fri_ip.fi_dstnum
 #define	fri_srcnum	fri_mip.fi_srcnum
-#define	fri_dstname	fri_mip.fi_dstname
-#define	fri_srcname	fri_mip.fi_srcname
-#define	fri_dstptr	fri_mip.fi_dstptr
+#define	fri_dstptr	fri_ip.fi_dstptr
 #define	fri_srcptr	fri_mip.fi_srcptr
 
 #define	FRI_NORMAL	0	/* Normal address */
@@ -574,14 +554,8 @@ typedef	struct	frentry {
 #define	fr_smask	fr_mip.fi_src.in4.s_addr
 #define	fr_dstnum	fr_ip.fi_dstnum
 #define	fr_srcnum	fr_ip.fi_srcnum
-#define	fr_dlookup	fr_ip.fi_dst
-#define	fr_slookup	fr_ip.fi_src
-#define	fr_dstname	fr_ip.fi_dstname
-#define	fr_srcname	fr_ip.fi_srcname
 #define	fr_dsttype	fr_ip.fi_dsttype
 #define	fr_srctype	fr_ip.fi_srctype
-#define	fr_dstsubtype	fr_ip.fi_dstsubtype
-#define	fr_srcsubtype	fr_ip.fi_srcsubtype
 #define	fr_dstptr	fr_mip.fi_dstptr
 #define	fr_srcptr	fr_mip.fi_srcptr
 #define	fr_dstfunc	fr_mip.fi_dstfunc
