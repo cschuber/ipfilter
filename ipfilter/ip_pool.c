@@ -55,9 +55,6 @@ struct file;
 
 #if defined(_KERNEL) && (defined(__osf__) || defined(AIX) || \
      defined(__hpux) || defined(__sgi))
-# ifdef __osf__
-#  include <net/radix.h>
-# endif
 # include "radix_ipf_local.h"
 # define _RADIX_H_
 #endif

@@ -778,9 +778,10 @@ char *group, *comment;
 {
 	frgroup_t *grtop, *grtail, *g;
 	struct	frentry	fb;
-	int	n;
 	ipfruleiter_t rule;
+	frentry_t zero;
 	ipfobj_t obj;
+	int n;
 
 	if (use_inet6 == 1)
 		fb.fr_v = 6;
@@ -801,6 +802,8 @@ char *group, *comment;
 	else
 		rule.iri_group[0] = '\0';
 
+	bzero((char *)&zero, sizeof(zero));
+
 	bzero((char *)&obj, sizeof(obj));
 	obj.ipfo_rev = IPFILTER_VERSION;
 	obj.ipfo_type = IPFOBJ_IPFITER;
@@ -815,8 +818,12 @@ char *group, *comment;
 		rule.iri_rule = fp;
 		if (ioctl(ipf_fd, SIOCIPFITER, &obj) == -1) {
 			perror("ioctl(SIOCIPFITER)");
+			n = IPFGENITER_IPF;
+			ioctl(ipf_fd, SIOCIPFDELTOK, &n);
 			return;
 		}
+		if (bcmp(fp, &zero, sizeof(zero)) == 0)
+			break;
 		if (fp->fr_data != NULL)
 			fp->fr_data = (char *)fp + sizeof(*fp);
 
@@ -864,7 +871,11 @@ char *group, *comment;
 		}
 	} while (fp->fr_next != NULL);
 
+	n = IPFGENITER_IPF;
+	ioctl(ipf_fd, SIOCIPFDELTOK, &n);
+
 	while ((g = grtop) != NULL) {
+		printf("# Group %s\n", g->fg_name);
 		printlivelist(out, set, NULL, g->fg_name, comment);
 		grtop = g->fg_next;
 		free(g);

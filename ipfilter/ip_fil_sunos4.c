@@ -559,19 +559,21 @@ frdest_t *fdp;
 	/*
 	 * For input packets which are being "fastrouted", they won't
 	 * go back through output filtering and miss their chance to get
-	 * NAT'd and counted.
+	 * NAT'd and counted.  Duplicated packets aren't considered to be
+	 * part of the normal packet stream, so do not NAT them or pass
+	 * them through stateful checking, etc.
 	 */
-	if (fin->fin_out == 0) {
-		u_32_t pass;
-
+	if ((fdp != &fr->fr_dif) && (fin->fin_out == 0)) {
 		sifp = fin->fin_ifp;
 		fin->fin_ifp = ifp;
 		fin->fin_out = 1;
-		fr_acctpkt(fin, &pass);
-
+		(void) fr_acctpkt(fin, NULL);
 		fin->fin_fr = NULL;
-		if (!fr || !(fr->fr_flags & FR_RETMASK))
+		if (!fr || !(fr->fr_flags & FR_RETMASK)) {
+			u_32_t pass;
+
 			(void) fr_checkstate(fin, &pass);
+		}
 
 		switch (fr_checknatout(fin, NULL))
 		{

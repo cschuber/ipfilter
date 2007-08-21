@@ -804,16 +804,15 @@ frdest_t *fdp;
 	/*
 	 * For input packets which are being "fastrouted", they won't
 	 * go back through output filtering and miss their chance to get
-	 * NAT'd and counted.
+	 * NAT'd and counted.  Duplicated packets aren't considered to be
+	 * part of the normal packet stream, so do not NAT them or pass
+	 * them through stateful checking, etc.
 	 */
-	if (fin->fin_out == 0) {
-		fin->fin_out = 1;
+	if ((fdp != &fr->fr_dif) && (fin->fin_out == 0)) {
 		sifp = fin->fin_ifp;
 		fin->fin_ifp = ifp;
-		if ((fin->fin_fr = ipacct[1][fr_active]) &&
-		    (fr_scanlist(fin, FR_NOMATCH) & FR_ACCOUNT)) {
-			ATOMIC_INCL(frstats[1].fr_acct);
-		}
+		fin->fin_out = 1;
+		(void) fr_acctpkt(fin, NULL);
 		fin->fin_fr = NULL;
 		if (!fr || !(fr->fr_flags & FR_RETMASK)) {
 			u_32_t pass;
@@ -821,7 +820,7 @@ frdest_t *fdp;
 			(void) fr_checkstate(fin, &pass);
 		}
 
-		switch (fr_checknatout(fin, &pass))
+		switch (fr_checknatout(fin, NULL))
 		{
 		case 0 :
 			break;

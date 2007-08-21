@@ -87,6 +87,7 @@ ni16 hex hex fr_update_ipid=1
 ni19 hex hex fr_update_ipid=0
 ni20 hex hex fr_update_ipid=0
 ni21 text text
+ni23 text text -D
 p1 text text
 p2 text text
 p3 text text

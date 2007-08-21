@@ -1273,7 +1273,8 @@ extern	void	m_freem __P((mb_t *));
 extern	int	bcopywrap __P((void *, void *, size_t));
 #else /* #ifndef _KERNEL */
 # ifdef BSD
-#  if defined(__NetBSD__) && (__NetBSD_Version__ < 399000000)
+#  if (defined(__NetBSD__) && (__NetBSD_Version__ < 399000000)) || \
+      defined(__osf__)
 #   include <sys/select.h>
 #  else
 #   include <sys/selinfo.h>
@@ -1510,7 +1511,6 @@ extern	int	fr_update_ipid;
 extern	int	nat_logging;
 extern	int	ipstate_logging;
 extern	int	ipl_suppress;
-extern	int	ipl_buffer_sz;
 extern	int	ipl_logmax;
 extern	int	ipl_logall;
 extern	int	ipl_logsize;

@@ -3621,9 +3621,11 @@ u_32_t *passp;
 	natfailed = 0;
 	fr = fin->fin_fr;
 	sifp = fin->fin_ifp;
-	if ((fr != NULL) && !(fr->fr_flags & FR_DUP) &&
-	    fr->fr_tif.fd_ifp && fr->fr_tif.fd_ifp != (void *)-1)
-		fin->fin_ifp = fr->fr_tif.fd_ifp;
+	if (fr != NULL) {
+		ifp = fr->fr_tifs[fin->fin_rev].fd_ifp;
+		if ((ifp != NULL) && (ifp != (void *)-1))
+			fin->fin_ifp = ifp;
+	}
 	ifp = fin->fin_ifp;
 
 	if (!(fin->fin_flx & FI_SHORT) && (fin->fin_off == 0)) {
@@ -5215,7 +5217,7 @@ int which;
 			break;
 
 		while (try < maxtick) {
-			for (ifq = ips_tqtqb; ifq != NULL;
+			for (ifq = nat_tqb; ifq != NULL;
 			     ifq = ifq->ifq_next) {
 				for (tqn = ifq->ifq_head;
 				     ((tqe = tqn) != NULL); ) {
@@ -5228,7 +5230,7 @@ int which;
 				}
 			}
 
-			for (ifq = ips_utqe; ifq != NULL; ifq = ifqnext) {
+			for (ifq = nat_utqe; ifq != NULL; ifq = ifqnext) {
 				ifqnext = ifq->ifq_next;
 
 				for (tqn = ifq->ifq_head;

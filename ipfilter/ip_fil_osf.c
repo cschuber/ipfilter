@@ -26,8 +26,8 @@ static const char rcsid[] = "@(#)$Id$";
 #include <sys/protosw.h>
 #include <sys/socket.h>
 
+#include "radix_ipf_local.h"
 #include <net/if.h>
-#include <net/route.h>
 #include <netinet/in.h>
 #include <netinet/in_var.h>
 #include <netinet/in_systm.h>
@@ -180,6 +180,7 @@ caddr_t data;
 int mode;
 {
 	int error = 0, unit = 0;
+	struct proc *p;
 	SPL_INT(s);
 
 	unit = minor(dev);
@@ -200,7 +201,8 @@ int mode;
 
 	SPL_NET(s);
 
-	error = fr_ioctlswitch(unit, data, cmd, mode, curproc->p_uid, curproc);
+	p = task_to_proc(current_task());
+	error = fr_ioctlswitch(unit, data, cmd, mode, p->p_ruid, p);
 	if (error != -1) {
 		SPL_X(s);
 		return error;
@@ -781,22 +783,23 @@ frdest_t *fdp;
 	/*
 	 * For input packets which are being "fastrouted", they won't
 	 * go back through output filtering and miss their chance to get
-	 * NAT'd and counted.
+	 * NAT'd and counted.  Duplicated packets aren't considered to be
+	 * part of the normal packet stream, so do not NAT them or pass
+	 * them through stateful checking, etc.
 	 */
-	if (fin->fin_out == 0) {
-		u_32_t pass;
-
+	if ((fdp != &fr->fr_dif) && (fin->fin_out == 0)) {
 		sifp = fin->fin_ifp;
 		fin->fin_ifp = ifp;
 		fin->fin_out = 1;
-		(void) fr_acctpkt(fin, &pass);
+		(void) fr_acctpkt(fin, NULL);
 		fin->fin_fr = NULL;
 		if (!fr || !(fr->fr_flags & FR_RETMASK)) {
+			u_32_t pass;
 
 			(void) fr_checkstate(fin, &pass);
 		}
 
-		switch (fr_checknatout(fin, &pass))
+		switch (fr_checknatout(fin, NULL))
 		{
 		case 0 :
 			break;

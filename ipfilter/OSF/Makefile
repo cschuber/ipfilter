@@ -339,8 +339,8 @@ ippool_l.c ippool_l.h: $(TOOL)/lexer.c $(TOP)/ip_pool.h
 	(cd $(TOOL); make "DEST=../$(HERE)" ../$(HERE)/$@)
 
 radix_ipf_local.h: $(TOP)/radix_ipf.h Makefile
-	sed -e 's/radix_node/ipf_radix_node/g' \
-	    -e 's/radix_mask/ipf_radix_mask/g' \
+	sed -e 's/^\([^#].*\)\([ 	]\)radix_node/\1\2ipf_radix_node/g' \
+	    -e 's/^\([^#].*\)\([ 	]\)radix_mask/\1\2ipf_radix_mask/g' \
 	    $(TOP)/radix_ipf.h > $@
 
 .y.c:
@@ -394,4 +394,5 @@ install:
 	done
 	(cd $(TOP)/man; make INSTALL=../bsdinstall MANDIR=$(MANDIR) install; cd $(TOP))
 	sync
+	-sysconfigdb -d ipfilter
 	sysconfigdb -f /usr/sys/io/ipfilter/sysconfigtab -a ipfilter

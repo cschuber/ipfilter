@@ -745,7 +745,8 @@ caddr_t data;
 		fr->fr_data = NULL;
 		fr->fr_type = FR_T_NONE;
 
-		fr_resolvedest(&fr->fr_tif, fr->fr_v);
+		fr_resolvedest(&fr->fr_tifs[0], fr->fr_v);
+		fr_resolvedest(&fr->fr_tifs[1], fr->fr_v);
 		fr_resolvedest(&fr->fr_dif, fr->fr_v);
 
 		/*
@@ -2062,7 +2063,7 @@ fr_info_t *fin;
 # endif
 	}
 #endif
-	bcopy((char *)fin, (char *)&ofin, sizeof(fin));
+	bcopy((char *)fin, (char *)&ofin, sizeof(*fin));
 
 	/*
 	 * in the IPv4 case we must zero the i6addr union otherwise
@@ -3617,7 +3618,7 @@ fr_info_t *fin;
 	if (fin->fin_plen < sizeof(*oip6))
 		return NULL;
 
-	bcopy((char *)fin, (char *)&ofin, sizeof(fin));
+	bcopy((char *)fin, (char *)&ofin, sizeof(*fin));
 	ofin.fin_v = 6;
 	ofin.fin_ifp = fin->fin_ifp;
 	ofin.fin_out = !fin->fin_out;

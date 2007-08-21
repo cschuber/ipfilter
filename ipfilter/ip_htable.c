@@ -330,7 +330,7 @@ char *name;
 	iphtable_t *iph;
 
 	iph = fr_existshtable(unit, name);
-	if ((iph->iph_flags & IPHASH_DELETE) == 0)
+	if ((iph != NULL) && (iph->iph_flags & IPHASH_DELETE) == 0)
 		return iph;
 
 	return NULL;

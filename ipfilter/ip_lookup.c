@@ -34,9 +34,6 @@ struct file;
 #endif
 #include <sys/socket.h>
 #if (defined(__osf__) || defined(AIX) || defined(__hpux) || defined(__sgi)) && defined(_KERNEL)
-# ifdef __osf__
-#  include <net/radix.h>
-# endif
 # include "radix_ipf_local.h"
 # define _RADIX_H_
 #endif

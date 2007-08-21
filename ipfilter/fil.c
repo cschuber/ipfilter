@@ -86,7 +86,11 @@ struct file;
 # endif
 # include "radix_ipf.h"
 #endif
-#include <net/route.h>
+#ifdef __osf__
+# include "radix_ipf.h"
+#else
+# include <net/route.h>
+#endif
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
@@ -104,6 +108,9 @@ struct file;
 #endif
 #ifdef __hpux
 # undef _NET_ROUTE_INCLUDED
+#endif
+#ifdef __osf__
+# undef _RADIX_H_
 #endif
 #include "netinet/ip_compat.h"
 #ifdef	USE_INET6
@@ -711,8 +718,9 @@ fr_info_t *fin;
 		return;
 
 	if (fin->fin_dlen > 1) {
-		icmp6 = fin->fin_dp;
 		ip6_t *ip6;
+
+		icmp6 = fin->fin_dp;
 
 		fin->fin_data[0] = *(u_short *)icmp6;
 
@@ -2567,8 +2575,15 @@ filterdone:
 	}
 #endif
 
+	/*
+	 * The FI_STATE flag is cleared here so that calling fr_checkstate
+	 * will work when called from inside of fr_fastroute.  Although
+	 * there is a similar flag, FI_NATED, for NAT, it does have the same
+	 * impact on code execution.
+	 */
 	if (fin->fin_state != NULL) {
 		fr_statederef((ipstate_t **)&fin->fin_state);
+		fin->fin_flx ^= FI_STATE;
 	}
 
 	if (fin->fin_nat != NULL) {
@@ -5938,8 +5953,6 @@ ipftuneable_t ipf_tuneables[] = {
 	/* log */
 	{ { &ipl_suppress },	"ipl_suppress",		0,	1,
 		sizeof(ipl_suppress),		0,	NULL },
-	{ { &ipl_buffer_sz },	"ipl_buffer_sz",	0,	0,
-		sizeof(ipl_buffer_sz),		IPFT_RDONLY,	NULL },
 	{ { &ipl_logmax },	"ipl_logmax",		0,	0x7fffffff,
 		sizeof(ipl_logmax),		IPFT_WRDISABLED,	NULL },
 	{ { &ipl_logall },	"ipl_logall",		0,	1,
@@ -6731,11 +6744,7 @@ int ipf_getnextrule(ipftoken_t *t, void *ptr)
 			MUTEX_ENTER(&next->fr_lock);
 			next->fr_ref++;
 			MUTEX_EXIT(&next->fr_lock);
-			if (next->fr_next == NULL) {
-				t->ipt_data = next;
-				ipf_freetoken(t);
-				fr = NULL;
-			}
+			t->ipt_data = next;
 		} else {
 			bzero(&zero, sizeof(zero));
 			next = &zero;
