@@ -329,6 +329,7 @@ typedef	struct	fr_info	{
 	void	*fin_nat;
 	void	*fin_state;
 	void	*fin_nattag;
+	void	*fin_exthdr;
 	ip_t	*fin_ip;
 	mb_t	**fin_mp;		/* pointer to pointer to mbuf */
 	mb_t	*fin_m;			/* pointer to mbuf */
@@ -1345,10 +1346,14 @@ extern	int	iplioctl __P((struct cdev*, u_long, caddr_t, int, struct thread *));
 extern	int	iplioctl __P((dev_t, u_long, caddr_t, int, struct thread *));
 #      endif /* __FreeBSD_version >= 502116 */
 #     else
-#      if  (__NetBSD_Version__ >= 399001400)
+#      if  (__NetBSD_Version__ >= 499001000)
+extern	int	iplioctl __P((dev_t, u_long, void *, int, struct lwp *));
+#       else
+#       if  (__NetBSD_Version__ >= 399001400)
 extern	int	iplioctl __P((dev_t, u_long, caddr_t, int, struct lwp *));
-#      else
+#       else
 extern	int	iplioctl __P((dev_t, u_long, caddr_t, int, struct proc *));
+#       endif
 #      endif
 #     endif /* __FreeBSD_version >= 500024 */
 #    else

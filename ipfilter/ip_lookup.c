@@ -572,6 +572,7 @@ void *ctx;
 	ipflookupiter_t iter;
 	ipftoken_t *token;
 	int err;
+	SPL_INT(s);
 
 	err = fr_inobj(data, &iter, IPFOBJ_LOOKUPITER);
 	if (err != 0)
@@ -583,9 +584,11 @@ void *ctx;
 	if (iter.ili_ival != IPFGENITER_LOOKUP)
 		return EINVAL;
 
+	SPL_SCHED(s);
 	token = ipf_findtoken(iter.ili_key, uid, ctx);
 	if (token == NULL) {
 		RWLOCK_EXIT(&ipf_tokens);
+		SPL_X(s);
 		return ESRCH;
 	}
 
@@ -602,6 +605,7 @@ void *ctx;
 		break;
 	}
 	RWLOCK_EXIT(&ipf_tokens);
+	SPL_X(s);
 
 	return err;
 }

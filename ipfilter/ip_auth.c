@@ -418,12 +418,14 @@ void *ctx;
 		if (error != 0)
 			break;
 
+		SPL_SCHED(s);
 		token = ipf_findtoken(IPFGENITER_AUTH, uid, ctx);
 		if (token != NULL)
 			error = fr_authgeniter(token, &iter);
 		else
 			error = ESRCH;
 		RWLOCK_EXIT(&ipf_tokens);
+		SPL_X(s);
 
 		break;
 	    }
@@ -756,8 +758,12 @@ ipfgeniter_t *itp;
 		 * so that it can be used for is_next when we come back.
 		 */
 		ATOMIC_INC(next->fae_ref);
-		if (next->fae_next == NULL)
+		if (next->fae_next == NULL) {
 			ipf_freetoken(token);
+			token = NULL;
+		} else {
+			token->ipt_data = next;
+		}
 	} else {
 		bzero(&zero, sizeof(zero));
 		next = &zero;
@@ -772,7 +778,6 @@ ipfgeniter_t *itp;
 		fr_authderef(&fae);
 		RWLOCK_EXIT(&ipf_auth);
 	}
-	token->ipt_data = next;
 
 	/*
 	 * This should arguably be via fr_outobj() so that the auth

@@ -163,7 +163,7 @@ extern	int	opts;
 
 
 fr_info_t	frcache[2][8];
-struct	filterstats frstats[2] = { { 0, 0, 0, 0, 0 }, { 0, 0, 0, 0, 0 } };
+struct	filterstats frstats[2];
 struct	frentry	*ipfilter[2][2] = { { NULL, NULL }, { NULL, NULL } },
 		*ipfilter6[2][2] = { { NULL, NULL }, { NULL, NULL } },
 		*ipacct6[2][2] = { { NULL, NULL }, { NULL, NULL } },
@@ -544,7 +544,16 @@ int multiple, proto;
 		return IPPROTO_NONE;
 
 	hdr = fin->fin_dp;
-	shift = 8 + (hdr->ip6e_len << 3);
+	switch (proto)
+	{
+	case IPPROTO_FRAGMENT :
+		shift = 8;
+		break;
+	default :
+		shift = 8 + (hdr->ip6e_len << 3);
+		break;
+	}
+
 	if (shift > fin->fin_dlen) {	/* Nasty extension header length? */
 		fin->fin_flx |= FI_BAD;
 		return IPPROTO_NONE;
@@ -563,6 +572,7 @@ int multiple, proto;
 			break;
 		}
 
+	fin->fin_exthdr = fin->fin_dp;
 	fin->fin_dp = (char *)fin->fin_dp + shift;
 	fin->fin_dlen -= shift;
 
@@ -612,24 +622,22 @@ static INLINE int frpr_routing6(fin)
 fr_info_t *fin;
 {
 	struct ip6_ext *hdr;
-	int shift;
 
 	if (frpr_ipv6exthdr(fin, 0, IPPROTO_ROUTING) == IPPROTO_NONE)
 		return IPPROTO_NONE;
+	hdr = fin->fin_exthdr;
 
-	hdr = fin->fin_dp;
-	shift = 8 + (hdr->ip6e_len << 3);
-	/*
-	 * Nasty extension header length?
-	 */
-	if ((shift < sizeof(struct ip6_hdr)) ||
-	    ((shift - sizeof(struct ip6_hdr)) & 15)) {
+	if ((hdr->ip6e_len & 1) != 0) {
+		/*
+		 * The routing header data is made up of 128 bit IPv6 addresses
+		 * which means it must be a multiple of 2 lots of 8 in length.
+		 */
 		fin->fin_flx |= FI_BAD;
 		/*
 		 * Compensate for the changes made in frpr_ipv6exthdr()
 		 */
-		fin->fin_dlen += shift;
-		fin->fin_dp = (char *)fin->fin_dp - shift;
+		fin->fin_dlen += 8 + (hdr->ip6e_len << 3);
+		fin->fin_dp = hdr;
 		return IPPROTO_NONE;
 	}
 
@@ -655,16 +663,20 @@ static INLINE void frpr_fragment6(fin)
 fr_info_t *fin;
 {
 	struct ip6_frag *frag;
+	int extoff;
 
 	fin->fin_flx |= FI_FRAG;
 
 	if (frpr_ipv6exthdr(fin, 0, IPPROTO_FRAGMENT) == IPPROTO_NONE)
 		return;
 
+	extoff = (char *)fin->fin_exthdr - (char *)fin->fin_dp;
+
 	if (frpr_pullup(fin, sizeof(*frag)) == -1)
 		return;
 
-	frag = fin->fin_dp;
+	fin->fin_exthdr = (char *)fin->fin_dp + extoff;
+	frag = fin->fin_exthdr;
 	/*
 	 * Fragment but no fragmentation info set?  Bad packet...
 	 */
@@ -780,8 +792,13 @@ fr_info_t *fin;
 
 	frpr_short6(fin, sizeof(struct udphdr));
 
-	if (frpr_udpcommon(fin) == 0)
+	if (frpr_udpcommon(fin) == 0) {
+		u_char p = fin->fin_p;
+
+		fin->fin_p = IPPROTO_UDP;
 		fr_checkv6sum(fin);
+		fin->fin_p = p;
+	}
 }
 
 
@@ -800,8 +817,13 @@ fr_info_t *fin;
 
 	frpr_short6(fin, sizeof(struct tcphdr));
 
-	if (frpr_tcpcommon(fin) == 0)
+	if (frpr_tcpcommon(fin) == 0) {
+		u_char p = fin->fin_p;
+
+		fin->fin_p = IPPROTO_TCP;
 		fr_checkv6sum(fin);
+		fin->fin_p = p;
+	}
 }
 
 
@@ -2858,6 +2880,7 @@ int len;
 /*              ip(I)      - pointer to IP header                           */
 /*              l4proto(I) - protocol to caclulate checksum for             */
 /*              l4hdr(I)   - pointer to layer 4 header                      */
+/*              l3len(I)   - length of layer 4 data plus layer 3 header     */
 /*                                                                          */
 /* Calculates the TCP checksum for the packet held in "m", using the data   */
 /* in the IP header "ip" to seed it.                                        */
@@ -2865,6 +2888,8 @@ int len;
 /* NB: This function assumes we've pullup'd enough for all of the IP header */
 /* and the TCP header.  We also assume that data blocks aren't allocated in */
 /* odd sizes.                                                               */
+/*                                                                          */
+/* For IPv6, l3len excludes extension header size.                          */
 /*                                                                          */
 /* Expects ip_len to be in host byte order when called.                     */
 /* ------------------------------------------------------------------------ */
@@ -2908,9 +2933,9 @@ void *l4hdr;
 	} else if (IP_V(ip) == 6) {
 		ip6 = (ip6_t *)ip;
 		hlen = sizeof(*ip6);
-		slen = ntohs(l3len);
+		slen = l3len - hlen;
 		sum = htons((u_short)l4proto);
-		sum += slen;
+		sum += htons(slen);
 		sp = (u_short *)&ip6->ip6_src;
 		sum += *sp++;	/* ip6_src */
 		sum += *sp++;
@@ -3096,6 +3121,12 @@ nodata:
 #  endif /*  defined(BSD) || defined(sun) */
 # endif /* MENTAT */
 #else /* _KERNEL */
+	/*
+	 * Add up IP Header portion
+	 */
+	if (sp != (u_short *)l4hdr)
+		sp = (u_short *)l4hdr;
+
 	for (; slen > 1; slen -= 2)
 	        sum += *sp++;
 	if (slen)
@@ -5681,9 +5712,11 @@ fr_info_t *fin;
 		if (csump != NULL)
 			hdrsum = *csump;
 
-		if (dosum)
+		if (dosum) {
 			sum = fr_cksum(fin->fin_m, fin->fin_ip,
-				       fin->fin_p, fin->fin_dp, fin->fin_plen);
+				       fin->fin_p, fin->fin_dp,
+				       fin->fin_dlen + fin->fin_hlen);
+		}
 #if SOLARIS && defined(_KERNEL) && (SOLARIS2 >= 6) && defined(ICK_VALID)
 	}
 #endif
@@ -5980,7 +6013,8 @@ ipftuneable_t ipf_tuneables[] = {
 	{ { &ipl_logsize },	"ipl_logsize",		0,	0x80000,
 		sizeof(ipl_logsize),		0,	NULL },
 #endif
-	{ { NULL },		NULL,			0,	0 }
+	{ { NULL },		NULL,			0,	0,
+		0,				0,	NULL }
 };
 
 static ipftuneable_t *ipf_tunelist = NULL;
@@ -6291,6 +6325,8 @@ int fr_initialise()
 {
 	int i;
 
+	bzero(&frstats, sizeof(frstats));
+
 #ifdef IPFILTER_LOG
 	i = fr_loginit();
 	if (i < 0)
@@ -6399,7 +6435,7 @@ caddr_t	data;
 		return EFAULT;
 
 	WRITE_ENTER(&ipf_mutex);
-	bzero((char *)frstats, sizeof(*frstats) * 2);
+	bzero(&frstats, sizeof(frstats));
 	RWLOCK_EXIT(&ipf_mutex);
 
 	return 0;
@@ -6552,6 +6588,9 @@ void *ptr;
 /* matches the tuple (type, uid, ptr).  If one cannot be found then one is  */
 /* allocated.  If one is found then it is moved to the top of the list of   */
 /* currently active tokens.                                                 */
+/*                                                                          */
+/* NOTE: It is by design that this function returns holding a read lock on  */
+/*       ipf_tokens.  Callers must make sure they release it!               */
 /* ------------------------------------------------------------------------ */
 ipftoken_t *ipf_findtoken(type, uid, ptr)
 int type, uid;
@@ -6770,8 +6809,8 @@ int ipf_getnextrule(ipftoken_t *t, void *ptr)
 			next = &zero;
 			ipf_freetoken(t);
 			fr = NULL;
+			t = NULL;
 			count = 1;
-			t->ipt_data = next;
 		}
 		RWLOCK_EXIT(&ipf_mutex);
 
@@ -6917,6 +6956,7 @@ void *ctx;
 {
 	friostat_t fio;
 	int error, tmp;
+	SPL_INT(s);
 
 	switch (cmd)
 	{
@@ -7123,17 +7163,25 @@ void *ctx;
 #endif
 
 	case SIOCIPFITER :
+		SPL_SCHED(s);
 		error = ipf_frruleiter(data, uid, ctx);
+		SPL_X(s);
 		break;
 
 	case SIOCGENITER :
+		SPL_SCHED(s);
 		error = ipf_genericiter(data, uid, ctx);
+		SPL_X(s);
+		break;
 		break;
 
 	case SIOCIPFDELTOK :
+		SPL_SCHED(s);
 		error = BCOPYIN((caddr_t)data, (caddr_t)&tmp, sizeof(tmp));
 		if (error == 0)
 			error = ipf_deltoken(tmp, uid, ctx);
+		SPL_X(s);
+		break;
 		break;
 
 	default :

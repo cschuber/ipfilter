@@ -393,9 +393,9 @@ addrfamily_t *addr, *mask;
 /*                                                                          */
 /* Search the pool for a given address and return a search result.          */
 /* ------------------------------------------------------------------------ */
-int ip_pool_search(tptr, version, dptr)
+int ip_pool_search(tptr, ipversion, dptr)
 void *tptr;
-int version;
+int ipversion;
 void *dptr;
 {
 	struct radix_node *rn;
@@ -415,11 +415,11 @@ void *dptr;
 	bzero(&v, sizeof(v));
 	v.adf_len = offsetof(addrfamily_t, adf_addr);
 
-	if (version == 4) {
+	if (ipversion == 4) {
 		v.adf_len += sizeof(addr->in4);
 		v.adf_addr.in4 = addr->in4;
 #ifdef USE_INET6
-	} else if (version == 6) {
+	} else if (ipversion == 6) {
 		v.adf_len += sizeof(addr->in6);
 		v.adf_addr.in6 = addr->in6;
 #endif

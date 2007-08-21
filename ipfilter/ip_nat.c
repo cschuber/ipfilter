@@ -14,6 +14,9 @@
 #include <sys/param.h>
 #include <sys/time.h>
 #include <sys/file.h>
+#if (__NetBSD_Version__ >= 399002000) && defined(_KERNEL)
+# include <sys/kauth.h>
+#endif
 #if defined(__NetBSD__) && (NetBSD >= 199905) && !defined(IPFILTER_LKM) && \
     defined(_KERNEL)
 # if (__NetBSD_Version__ < 399001400)
@@ -644,10 +647,21 @@ void *ctx;
 	ipnat_t *nat, *nt, *n = NULL, **np = NULL;
 	int error = 0, ret, arg, getlock;
 	ipnat_t natd;
+	SPL_INT(s);
 
 #if (BSD >= 199306) && defined(_KERNEL)
-	if ((securelevel >= 2) && (mode & FWRITE))
+# if (__NetBSD_Version__ >= 399002000)
+	if ((mode & FWRITE) &&
+	     kauth_authorize_network(curlwp->l_cred, KAUTH_NETWORK_FIREWALL,
+				     KAUTH_REQ_NETWORK_FIREWALL_FW,
+				     NULL, NULL, NULL)) {
 		return EPERM;
+	}
+# else
+	if ((securelevel >= 2) && (mode & FWRITE)) {
+		return EPERM;
+	}
+# endif
 #endif
 
 #if defined(__osf__) && defined(_KERNEL)
@@ -702,22 +716,6 @@ void *ctx;
 
 	switch (cmd)
 	{
-	case SIOCGENITER :
-	    {
-		ipfgeniter_t iter;
-		ipftoken_t *token;
-
-		error = fr_inobj(data, &iter, IPFOBJ_GENITER);
-		if (error != 0)
-			break;
-
-		token = ipf_findtoken(iter.igi_type, uid, ctx);
-		if (token != NULL) {
-			error  = nat_iterator(token, &iter);
-		}
-		RWLOCK_EXIT(&ipf_tokens);
-		break;
-	    }
 #ifdef  IPFILTER_LOG
 	case SIOCIPFFB :
 	{
@@ -910,12 +908,33 @@ void *ctx;
 			error = EACCES;
 		break;
 
+	case SIOCGENITER :
+	    {
+		ipfgeniter_t iter;
+		ipftoken_t *token;
+
+		SPL_SCHED(s);
+		error = fr_inobj(data, &iter, IPFOBJ_GENITER);
+		if (error == 0) {
+			token = ipf_findtoken(iter.igi_type, uid, ctx);
+			if (token != NULL) {
+				error  = nat_iterator(token, &iter);
+			}
+			RWLOCK_EXIT(&ipf_tokens);
+		}
+		SPL_X(s);
+		break;
+	    }
+
 	case SIOCIPFDELTOK :
 		error = BCOPYIN((caddr_t)data, (caddr_t)&arg, sizeof(arg));
-		if (error == 0)
+		if (error == 0) {
+			SPL_SCHED(s);
 			error = ipf_deltoken(arg, uid, ctx);
-		else
+			SPL_X(s);
+		} else {
 			error = EFAULT;
+		}
 		break;
 
 	case SIOCGTQTAB :
@@ -2309,6 +2328,8 @@ int direction;
 	ni.nai_np = np;
 	ni.nai_nflags = nflags;
 	ni.nai_flags = flags;
+	ni.nai_dport = 0;
+	ni.nai_sport = 0;
 
 	/* Give me a new nat */
 	KMALLOC(nat, nat_t *);
@@ -2793,8 +2814,8 @@ int dir;
 {
 	u_32_t sum1, sum2, sumd, sumd2;
 	struct in_addr a1, a2;
+	int flags, dlen, odst;
 	icmphdr_t *icmp;
-	int flags, dlen;
 	u_short *csump;
 	tcphdr_t *tcp;
 	nat_t *nat;
@@ -2856,9 +2877,30 @@ int dir;
 	 * two changes cancel each other out (if the delta for
 	 * the IP address is x, then the delta for ip_sum is minus x),
 	 * so no change in the icmp_cksum is necessary.
+	 *
+	 * Inbound ICMP
+	 * ------------
+	 * MAP rule, SRC=a,DST=b -> SRC=c,DST=b
+	 * - response to outgoing packet (a,b)=>(c,b) (OIP_SRC=c,OIP_DST=b)
+	 * - OIP_SRC(c)=nat_outip, OIP_DST(b)=nat_oip
+	 *
+	 * RDR rule, SRC=a,DST=b -> SRC=a,DST=c
+	 * - response to outgoing packet (c,a)=>(b,a) (OIP_SRC=b,OIP_DST=a)
+	 * - OIP_SRC(b)=nat_outip, OIP_DST(a)=nat_oip
+	 *
+	 * Outbound ICMP
+	 * -------------
+	 * MAP rule, SRC=a,DST=b -> SRC=c,DST=b
+	 * - response to incoming packet (b,c)=>(b,a) (OIP_SRC=b,OIP_DST=a)
+	 * - OIP_SRC(a)=nat_oip, OIP_DST(c)=nat_inip
+	 *
+	 * RDR rule, SRC=a,DST=b -> SRC=a,DST=c
+	 * - response to incoming packet (a,b)=>(a,c) (OIP_SRC=a,OIP_DST=c)
+	 * - OIP_SRC(a)=nat_oip, OIP_DST(c)=nat_inip
+	 *
 	 */
-
-	if (nat->nat_dir == NAT_OUTBOUND) {
+	odst = (oip->ip_dst.s_addr == nat->nat_oip.s_addr) ? 1 : 0;
+	if (odst == 1) {
 		a1.s_addr = ntohl(nat->nat_inip.s_addr);
 		a2.s_addr = ntohl(oip->ip_src.s_addr);
 		oip->ip_src.s_addr = htonl(a1.s_addr);
@@ -2899,7 +2941,7 @@ int dir;
 		 * checksum will also need to change if there has been an
 		 * IP address change.
 		 */
-		if (nat->nat_dir == NAT_OUTBOUND) {
+		if (odst == 1) {
 			sum1 = ntohs(nat->nat_inport);
 			sum2 = ntohs(tcp->th_sport);
 
@@ -2961,7 +3003,7 @@ int dir;
 		 */
 		orgicmp = (icmphdr_t *)dp;
 
-		if (nat->nat_dir == NAT_OUTBOUND) {
+		if (odst == 1) {
 			if (orgicmp->icmp_id != nat->nat_inport) {
 
 				/*
@@ -5277,7 +5319,7 @@ int which;
 
 /* ------------------------------------------------------------------------ */
 /* Function:    nat_flush_entry                                             */
-/* Returns:     1 - always succeeds                                         */
+/* Returns:     0 - always succeeds                                         */
 /* Parameters:  entry(I) - pointer to NAT entry                             */
 /* Write Locks: ipf_nat                                                     */
 /*                                                                          */
@@ -5290,5 +5332,5 @@ static int nat_flush_entry(entry)
 void *entry;
 {
 	nat_delete(entry, NL_FLUSH);
-	return 1;
+	return 0;
 }

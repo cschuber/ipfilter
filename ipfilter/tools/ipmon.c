@@ -1649,6 +1649,7 @@ char *argv[];
 			if (!tr)
 				continue;
 			nr += tr;
+			n = 0;
 
 			tr = read_log(fd[i], &n, buf, sizeof(buf));
 			if (donehup) {

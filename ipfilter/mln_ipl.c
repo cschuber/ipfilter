@@ -214,17 +214,25 @@ static int ipl_remove()
 		if ((error = namei(&nd)))
 			return (error);
 #if (__NetBSD_Version__ > 399001400)
+# if (__NetBSD_Version__ > 399002000)
+		VOP_LEASE(nd.ni_dvp, curlwp, curlwp->l_cred, LEASE_WRITE);
+# else
 		VOP_LEASE(nd.ni_dvp, curlwp, curlwp->l_proc->p_ucred, LEASE_WRITE);
+# endif
 #else
 		VOP_LEASE(nd.ni_dvp, curproc, curproc->p_ucred, LEASE_WRITE);
 #endif
 #if !defined(__NetBSD_Version__) || (__NetBSD_Version__ < 106000000)
 		vn_lock(nd.ni_vp, LK_EXCLUSIVE | LK_RETRY);
 #endif
-#if (__NetBSD_Version__ > 399001400)
+#if (__NetBSD_Version__ >= 399002000)
+		VOP_LEASE(nd.ni_vp, curlwp, curlwp->l_cred, LEASE_WRITE);
+# else
+# if (__NetBSD_Version__ > 399001400)
 		VOP_LEASE(nd.ni_vp, curlwp, curlwp->l_proc->p_ucred, LEASE_WRITE);
-#else
+# else
 		VOP_LEASE(nd.ni_vp, curproc, curproc->p_ucred, LEASE_WRITE);
+# endif
 #endif
 		(void) VOP_REMOVE(nd.ni_dvp, nd.ni_vp, &nd.ni_cnd);
 	}
@@ -293,7 +301,11 @@ static int ipl_load()
 		vattr.va_mode = (fmode & 07777);
 		vattr.va_rdev = (ipl_major << 8) | i;
 #if (__NetBSD_Version__ > 399001400)
+# if (__NetBSD_Version__ >= 399002000)
+		VOP_LEASE(nd.ni_dvp, curlwp, curlwp->l_cred, LEASE_WRITE);
+# else
 		VOP_LEASE(nd.ni_dvp, curlwp, curlwp->l_proc->p_ucred, LEASE_WRITE);
+# endif
 #else
 		VOP_LEASE(nd.ni_dvp, curproc, curproc->p_ucred, LEASE_WRITE);
 #endif

@@ -444,7 +444,7 @@ int v;
 		ifp->if_unit = -1;
 	}
 #endif
-	ifp->if_output = no_output;
+	ifp->if_output = (void *)no_output;
 
 	if (addr != NULL) {
 		fr_setifpaddr(ifp, addr);
@@ -480,7 +480,7 @@ void init_ifp()
     (defined(OpenBSD) && (OpenBSD >= 199603)) || defined(linux) || \
     (defined(__FreeBSD__) && (__FreeBSD_version >= 501113))
 	for (ifpp = ifneta; ifpp && (ifp = *ifpp); ifpp++) {
-		ifp->if_output = write_output;
+		ifp->if_output = (void *)write_output;
 		sprintf(fname, "/tmp/%s", ifp->if_xname);
 		fd = open(fname, O_WRONLY|O_CREAT|O_EXCL|O_TRUNC, 0600);
 		if (fd == -1)

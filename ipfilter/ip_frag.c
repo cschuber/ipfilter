@@ -708,6 +708,14 @@ ipfr_t *fra, ***tail;
 }
 
 
+/* ------------------------------------------------------------------------ */
+/* Function:    fr_fragfree                                                 */
+/* Returns:     Nil                                                         */
+/* Parameters:  fra - pointer to frag structure to free                     */
+/*                                                                          */
+/* Take care of the details associated with deleting an entry from the frag */
+/* cache.  Currently this just means bumping stats correctly after freeing  */
+/* ------------------------------------------------------------------------ */
 static void fr_fragfree(fra)
 ipfr_t *fra;
 {
