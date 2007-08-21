@@ -884,7 +884,8 @@ frdest_t *fdp;
 				u_32_t pass;
 
 				fin->fin_flx &= ~FI_STATE;
-				(void) fr_checkstate(fin, &pass);
+				if (fr_checkstate(fin, &pass) != NULL)
+					fr_statederef((ipstate_t **)&fin->fin_state);
 			}
 			
 			switch (fr_checknatout(fin, NULL))

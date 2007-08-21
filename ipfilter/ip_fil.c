@@ -62,7 +62,6 @@ struct file;
 #include <stdlib.h>
 #include <ctype.h>
 #include <fcntl.h>
-#include <arpa/inet.h>
 
 #ifdef __hpux
 # define _NET_ROUTE_INCLUDED
@@ -109,6 +108,7 @@ struct file;
 #include <netinet/ip_icmp.h>
 #include <unistd.h>
 #include <syslog.h>
+#include <arpa/inet.h>
 #ifdef __hpux
 # undef _NET_ROUTE_INCLUDED
 #endif

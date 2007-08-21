@@ -814,7 +814,7 @@ int inc;
 
 	if (ipf_proxy_debug > 8)
 		printf("appr_fixseqack: seq %x ack %x\n",
-			ntohl(tcp->th_seq), ntohl(tcp->th_ack));
+			(u_32_t)ntohl(tcp->th_seq), (u_32_t)ntohl(tcp->th_ack));
 	return ch ? 2 : 0;
 }
 

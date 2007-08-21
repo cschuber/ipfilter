@@ -283,6 +283,7 @@ extern void printsbuf __P((char *));
 extern void printnat __P((struct ipnat *, int));
 extern void printactivenat __P((struct nat *, int, int, u_long));
 extern void printhostmap __P((struct hostmap *, u_int));
+extern void printtqtable __P((ipftq_t *));
 
 extern void set_variable __P((char *, char *));
 extern char *get_variable __P((char *, char **, int));

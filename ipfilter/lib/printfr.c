@@ -468,7 +468,12 @@ ioctlfunc_t	iocfunc;
 		}
 		printf(")");
 	}
+
 	if (fp->fr_pps)
 		printf(" pps %d", fp->fr_pps);
+
+	if ((fp->fr_flags & FR_KEEPSTATE) && (opts & OPT_VERBOSE)) {
+		printf(" # count %d", fp->fr_statecnt);
+	}
 	(void)putchar('\n');
 }

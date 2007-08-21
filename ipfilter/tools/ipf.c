@@ -342,11 +342,13 @@ char	*arg;
 
 	if (!arg || !*arg)
 		return;
-	if (!strcmp(arg, "s") || !strcmp(arg, "S")) {
+	if (!strcmp(arg, "s") || !strcmp(arg, "S") || ISDIGIT(*arg)) {
 		if (*arg == 'S')
 			fl = 0;
-		else
+		else if (*arg == 's')
 			fl = 1;
+		else
+			fl = atoi(arg);
 		rem = fl;
 
 		closedevice();
@@ -368,7 +370,7 @@ char	*arg;
 		}
 		if ((opts & (OPT_DONOTHING|OPT_VERBOSE)) == OPT_VERBOSE) {
 			printf("remove flags %s (%d)\n", arg, rem);
-			printf("removed %d filter rules\n", fl);
+			printf("removed %d entries\n", fl);
 		}
 		closedevice();
 		return;

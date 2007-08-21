@@ -87,6 +87,7 @@ LIBOBJS=$(DEST)/addicmp.o \
      $(DEST)/printpacket6.o \
      $(DEST)/printsbuf.o \
      $(DEST)/printstate.o \
+     $(DEST)/printtqtable.o \
      $(DEST)/printtunable.o \
      $(DEST)/remove_hash.o \
      $(DEST)/remove_hashnode.o \
@@ -278,6 +279,8 @@ $(DEST)/printsbuf.o: $(LIBSRC)/printsbuf.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/printsbuf.c -o $@
 $(DEST)/printstate.o: $(LIBSRC)/printstate.c $(INCDEP) $(TOP)/ip_state.h
 	$(CC) $(CCARGS) -c $(LIBSRC)/printstate.c -o $@
+$(DEST)/printtqtable.o: $(LIBSRC)/printtqtable.c $(INCDEP)
+	$(CC) $(CCARGS) -c $(LIBSRC)/printtqtable.c -o $@
 $(DEST)/printtunable.o: $(LIBSRC)/printtunable.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/printtunable.c -o $@
 $(DEST)/remove_hash.o: $(LIBSRC)/remove_hash.c $(INCDEP) \

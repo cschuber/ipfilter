@@ -55,12 +55,16 @@ static const char rcsid[] = "@(#)$Id$";
 #endif
 #include <sys/protosw.h>
 #include <sys/socket.h>
-#include <sys/selinfo.h>
+#if __FreeBSD_version >= 500043
+# include <sys/selinfo.h>
+#else
+# include <sys/select.h>
+#endif
 
 #include <net/if.h>
 #if __FreeBSD_version >= 300000
 # include <net/if_var.h>
-# if __FreeBSD_version >= 504000
+# if __FreeBSD_version >= 500043
 #  include <net/netisr.h>
 # endif
 # if !defined(IPFILTER_LKM)
@@ -444,7 +448,7 @@ int iplioctl(dev, cmd, data, mode
 , p)
 #  if (__FreeBSD_version >= 500024)
 struct thread *p;
-#   if (__FreeBSD_version >= 504000)
+#   if (__FreeBSD_version >= 500043)
 #    define	p_uid	td_ucred->cr_ruid
 #   else
 #    define	p_uid	t_proc->p_cred->p_ruid
@@ -1146,7 +1150,8 @@ frdest_t *fdp;
 		if (!fr || !(fr->fr_flags & FR_RETMASK)) {
 			u_32_t pass;
 
-			(void) fr_checkstate(fin, &pass);
+			if (fr_checkstate(fin, &pass) != NULL)
+				fr_statederef((ipstate_t **)&fin->fin_state);
 		}
 
 		switch (fr_checknatout(fin, NULL))
@@ -1630,8 +1635,17 @@ mb_t *m;
 
 		ifq = &ipintrq;
 
-		if (IF_QFULL(ifq)) {
+# ifdef _IF_QFULL
+		if (_IF_QFULL(ifq))
+# else
+		if (IF_QFULL(ifq))
+# endif
+		{
+# ifdef _IF_DROP
+			_IF_DROP(ifq);
+# else
 			IF_DROP(ifq);
+# endif
 			FREE_MB_T(m);
 			error = ENOBUFS;
 		} else {

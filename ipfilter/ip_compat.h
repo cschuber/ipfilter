@@ -707,6 +707,11 @@ typedef unsigned int    u_32_t;
 /*                                  N E T B S D                            */
 /* ----------------------------------------------------------------------- */
 #ifdef __NetBSD__
+# if defined(_KERNEL)
+#  include <sys/systm.h>
+# else
+#  include <stddef.h>
+# endif
 # if defined(_KERNEL) && !defined(IPFILTER_LKM)
 #  include "bpfilter.h"
 #  if defined(__NetBSD_Version__) && (__NetBSD_Version__ >= 104110000)
@@ -800,7 +805,7 @@ typedef	u_int32_t	u_32_t;
  * with a WITNESS kernel, it generates LOR messages.
  */
 #  define	KMUTEX_T		struct mtx
-#  if 1
+#  if (__FreeBSD_version < 700000)
 #   define	KRWLOCK_T		struct mtx
 #  else
 #   define	KRWLOCK_T		struct sx
@@ -844,7 +849,7 @@ typedef	u_int32_t	u_32_t;
  * for what we want to use them for, despite testing showing they work -
  * with a WITNESS kernel, it generates LOR messages.
  */
-#   if 1
+#   if (__FreeBSD_version < 700000)
 #    define	READ_ENTER(x)		mtx_lock(&(x)->ipf_lk)
 #    define	WRITE_ENTER(x)		mtx_lock(&(x)->ipf_lk)
 #    define	RWLOCK_EXIT(x)		mtx_unlock(&(x)->ipf_lk)
@@ -859,7 +864,7 @@ typedef	u_int32_t	u_32_t;
 #    define	RWLOCK_INIT(x, y)	sx_init(&(x)->ipf_lk, (y))
 #    define	RW_DESTROY(x)		sx_destroy(&(x)->ipf_lk)
 #    ifdef sx_unlock
-#     define	RWLOCK_EXIT(x)		sx_unlock(x)
+#     define	RWLOCK_EXIT(x)		sx_unlock(&(x)->ipf_lk)
 #    else
 #     define	RWLOCK_EXIT(x)		do { \
 					    if ((x)->ipf_lk.sx_cnt < 0) \
@@ -1707,9 +1712,6 @@ typedef	struct	tcpiphdr	tcpiphdr_t;
 # define	FR_GROUPLEN	16
 #endif
 
-#ifdef offsetof
-# undef	offsetof
-#endif
 #ifndef offsetof
 # define offsetof(t,m) (int)((&((t *)0L)->m))
 #endif

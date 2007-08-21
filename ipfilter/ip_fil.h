@@ -61,6 +61,7 @@
 # define	SIOCGTABL	_IOWR('r', 93, struct ipfobj)
 # define	SIOCIPFDELTOK	_IOWR('r', 94, int)
 # define	SIOCLOOKUPITER	_IOWR('r', 95, struct ipfobj)
+# define	SIOCGTQTAB	_IOWR('r', 96, struct ipfobj)
 #else
 # define	SIOCADAFR	_IOW(r, 60, struct ipfobj)
 # define	SIOCRMAFR	_IOW(r, 61, struct ipfobj)
@@ -98,6 +99,7 @@
 # define	SIOCGTABL	_IOWR(r, 93, struct ipfobj)
 # define	SIOCIPFDELTOK	_IOWR(r, 94, int)
 # define	SIOCLOOKUPITER	_IOWR(r, 95, struct ipfobj)
+# define	SIOCGTQTAB	_IOWR(r, 96, struct ipfobj)
 #endif
 #define	SIOCADDFR	SIOCADAFR
 #define	SIOCDELFR	SIOCRMAFR
@@ -1062,6 +1064,8 @@ typedef struct  ipftq   {
 					/* checks its timeout queues.       */
 #define	IPF_TTLVAL(x)	(((x) / IPF_HZ_MULT) * IPF_HZ_DIVIDE)
 
+typedef	int	(*ipftq_delete_fn_t)(void *);       
+
 /*
  * Structure to define address for pool lookups.
  */
@@ -1102,7 +1106,8 @@ typedef	struct	ipfobj	{
 #define	IPFOBJ_GENITER		16	/* struct ipfgeniter */
 #define	IPFOBJ_GTABLE		17	/* struct ipftable */
 #define	IPFOBJ_LOOKUPITER	18	/* struct ipflookupiter */
-#define	IPFOBJ_COUNT		19	/* How many #defines are above this? */
+#define	IPFOBJ_STATETQTAB	19	/* struct ipftq [NSTATES] */
+#define	IPFOBJ_COUNT		20	/* How many #defines are above this? */
 
 
 typedef	union	ipftunevalptr	{
@@ -1274,7 +1279,8 @@ extern	int	bcopywrap __P((void *, void *, size_t));
 #else /* #ifndef _KERNEL */
 # ifdef BSD
 #  if (defined(__NetBSD__) && (__NetBSD_Version__ < 399000000)) || \
-      defined(__osf__)
+      defined(__osf__) || \
+      (defined(__FreeBSD_version) && (__FreeBSD_version < 500043))
 #   include <sys/select.h>
 #  else
 #   include <sys/selinfo.h>
@@ -1422,7 +1428,7 @@ extern	int	fr_resolvefunc __P((void *));
 extern	void	*fr_resolvenic __P((char *, int));
 extern	int	fr_send_icmp_err __P((int, fr_info_t *, int));
 extern	int	fr_send_reset __P((fr_info_t *));
-#if  (__FreeBSD_version < 490000) || !defined(_KERNEL)
+#if  (__FreeBSD_version < 501000) || !defined(_KERNEL)
 extern	int	ppsratecheck __P((struct timeval *, int *, int));
 #endif
 extern	ipftq_t	*fr_addtimeoutqueue __P((ipftq_t **, u_int));
@@ -1484,6 +1490,7 @@ extern	int		fr_matchicmpqueryreply __P((int, icmpinfo_t *,
 					    struct icmp *, int));
 extern	u_32_t		fr_newisn __P((fr_info_t *));
 extern	u_short		fr_nextipid __P((fr_info_t *));
+extern	int	ipf_queueflush __P((ipftq_delete_fn_t, ipftq_t *, ipftq_t *));
 extern	int		fr_rulen __P((int, frentry_t *));
 extern	int		fr_scanlist __P((fr_info_t *, u_32_t));
 extern	frentry_t 	*fr_srcgrpmap __P((fr_info_t *, u_32_t *));

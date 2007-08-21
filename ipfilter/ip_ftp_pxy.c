@@ -373,19 +373,6 @@ int dlen;
 		ip->ip_len = slen;
 		ip->ip_src = swip;
 		ip->ip_dst = swip2;
-	} else {
-		ipstate_t *is;
-
-		nat_update(&fi, nat2, nat->nat_ptr);
-		READ_ENTER(&ipf_state);
-		is = nat2->nat_state;
-		if (is != NULL) {
-			MUTEX_ENTER(&is->is_lock);
-			(void)fr_tcp_age(&is->is_sti, &fi, ips_tqtqb,
-					 is->is_flags);
-			MUTEX_EXIT(&is->is_lock);
-		}
-		RWLOCK_EXIT(&ipf_state);
 	}
 	return APR_INC(inc);
 }
@@ -736,19 +723,6 @@ u_int data_ip;
 		ip->ip_len = slen;
 		ip->ip_src = swip;
 		ip->ip_dst = swip2;
-	} else {
-		ipstate_t *is;
-
-		nat_update(&fi, nat2, nat->nat_ptr);
-		READ_ENTER(&ipf_state);
-		is = nat2->nat_state;
-		if (is != NULL) {
-			MUTEX_ENTER(&is->is_lock);
-			(void)fr_tcp_age(&is->is_sti, &fi, ips_tqtqb,
-					 is->is_flags);
-			MUTEX_EXIT(&is->is_lock);
-		}
-		RWLOCK_EXIT(&ipf_state);
 	}
 	return inc;
 }

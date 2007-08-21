@@ -213,6 +213,7 @@ typedef	struct	ips_stat {
 	ipstate_t **iss_table;
 	ipstate_t *iss_list;
 	u_long	*iss_bucketlen;
+	ipftq_t	*iss_tcptab;
 } ips_stat_t;
 
 
