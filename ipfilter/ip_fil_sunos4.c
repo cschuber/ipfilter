@@ -281,10 +281,8 @@ fr_info_t *fin;
 	if (tcp->th_flags & TH_RST)
 		return -1;		/* feedback loop */
 
-#ifndef	IPFILTER_CKSUM
 	if (fr_checkl4sum(fin) == -1)
 		return -1;
-#endif
 
 	tlen = fin->fin_dlen - (TCP_OFF(tcp) << 2) +
 		((tcp->th_flags & TH_SYN) ? 1 : 0) +
@@ -387,10 +385,9 @@ int dst;
 	if ((type < 0) || (type > ICMP_MAXTYPE))
 		return -1;
 
-#ifndef	IPFILTER_CKSUM
 	if (fr_checkl4sum(fin) == -1)
 		return -1;
-#endif
+
 	MGET(m, M_DONTWAIT, MT_HEADER);
 	if (m == NULL)
 		return -1;

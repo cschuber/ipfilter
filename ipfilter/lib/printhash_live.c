@@ -6,7 +6,7 @@
 
 #include <sys/ioctl.h>
 #include "ipf.h"
-#include "ipl.h"
+#include "netinet/ipl.h"
 
 #define	PRINTF	(void)printf
 #define	FPRINTF	(void)fprintf

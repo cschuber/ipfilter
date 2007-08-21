@@ -548,7 +548,7 @@ void *ctx;
 		if (!(mode & FWRITE)) {
 			error = EPERM;
 		} else {
-			fr_lock(data, &fr_state_lock);
+			error = fr_lock(data, &fr_state_lock);
 		}
 		break;
 
@@ -650,8 +650,8 @@ caddr_t data;
 	int error;
 
 	error = fr_inobj(data, &ips, IPFOBJ_STATESAVE);
-	if (error)
-		return EFAULT;
+	if (error != 0)
+		return error;
 
 	isn = ips.ips_next;
 	if (isn == NULL) {
@@ -680,9 +680,7 @@ caddr_t data;
 		bcopy((char *)isn->is_rule, (char *)&ips.ips_fr,
 		      sizeof(ips.ips_fr));
 	error = fr_outobj(data, &ips, IPFOBJ_STATESAVE);
-	if (error)
-		return EFAULT;
-	return 0;
+	return error;
 }
 
 
@@ -1437,7 +1435,7 @@ ipstate_t *is;
 			is->is_state[!source] = IPF_TCPS_CLOSED;
 			fr_movequeue(&is->is_sti, is->is_sti.tqe_ifq,
 				     &ips_deletetq);
-			MUTEX_ENTER(&is->is_lock);
+			MUTEX_EXIT(&is->is_lock);
 			return 0;
 		}
 	}
@@ -2297,8 +2295,6 @@ u_int hv;
 	ipstate_t **isp;
 	u_int hvm;
 
-	ASSERT(rw_read_locked(&ipf_state.ipf_lk) == 0);
-
 	hvm = is->is_hv;
 	/*
 	 * Remove the hash from the old location...
@@ -2885,8 +2881,6 @@ static int fr_delstate(is, why)
 ipstate_t *is;
 int why;
 {
-
-	ASSERT(rw_read_locked(&ipf_state.ipf_lk) == 0);
 
 	/*
 	 * Since we want to delete this, remove it from the state table,

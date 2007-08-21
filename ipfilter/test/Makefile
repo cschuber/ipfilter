@@ -6,7 +6,10 @@
 BINDEST=/usr/local/bin
 SBINDEST=/sbin
 MANDIR=/usr/share/man
-all: results tests
+all: expected.d results tests
+
+expected.d:
+	(cd expected; make)
 
 results:
 	mkdir -p results
@@ -90,6 +93,7 @@ clean:
 	/bin/rm -f ipv6.1 ipv6.2 ipv6.3 ipv6.5
 	/bin/rm -f bpf1 bpf-f1
 	/bin/rm -f results/* logout
+	(cd expected; make clean)
 
 diffs:
 	-cd expected; for i in *; do if [ -f $$i -a ! -f ../$$i -a -f ../results/$$i ] ; then  diff -c $$i ../results/$$i >> ../diff.out; fi done

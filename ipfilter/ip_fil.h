@@ -326,6 +326,7 @@ typedef	struct	fr_info	{
 	u_short	fin_off;
 	int	fin_depth;		/* Group nesting depth */
 	int	fin_error;		/* Error code to return */
+	int	fin_cksum;		/* -1 bad, 1 good, 0 not done */
 	void	*fin_nat;
 	void	*fin_state;
 	void	*fin_nattag;
@@ -1203,6 +1204,8 @@ typedef	struct	ipftable {
 } ipftable_t;
 
 #define	IPFTABLE_BUCKETS	1
+#define	IPFTABLE_BUCKETS_NATIN	2
+#define	IPFTABLE_BUCKETS_NATOUT	3
 
 
 /*
@@ -1488,7 +1491,7 @@ extern	void		fr_getstat __P((struct friostat *));
 extern	int		fr_ifpaddr __P((int, int, void *,
 				struct in_addr *, struct in_addr *));
 extern	int		fr_initialise __P((void));
-extern	void		fr_lock __P((caddr_t, int *));
+extern	int		fr_lock __P((caddr_t, int *));
 extern  int		fr_makefrip __P((int, ip_t *, fr_info_t *));
 extern	int		fr_matchtag __P((ipftag_t *, ipftag_t *));
 extern	int		fr_matchicmpqueryreply __P((int, icmpinfo_t *,
@@ -1501,7 +1504,7 @@ extern	int		fr_scanlist __P((fr_info_t *, u_32_t));
 extern	frentry_t 	*fr_srcgrpmap __P((fr_info_t *, u_32_t *));
 extern	int		fr_tcpudpchk __P((fr_info_t *, frtuc_t *));
 extern	int		fr_verifysrc __P((fr_info_t *fin));
-extern	int		fr_zerostats __P((char *));
+extern	int		fr_zerostats __P((void *));
 extern	ipftoken_t	*ipf_findtoken __P((int, int, void *));
 extern	int		ipf_getnextrule __P((ipftoken_t *, void *));
 extern	void		ipf_expiretokens __P((void));

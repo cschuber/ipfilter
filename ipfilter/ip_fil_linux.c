@@ -110,9 +110,6 @@ int ipfattach()
 	MUTEX_INIT(&ipf_rw, "ipf rw mutex");
 	MUTEX_INIT(&ipl_mutex, "ipf log mutex");
 	MUTEX_INIT(&ipf_timeoutlock, "ipf timeout lock mutex");
-	RWLOCK_INIT(&ipf_global, "ipf global rwlock");
-	RWLOCK_INIT(&ipf_mutex, "ipf global mutex rwlock");
-	RWLOCK_INIT(&ipf_frcache, "ipf cache mutex rwlock");
 	RWLOCK_INIT(&ipf_ipidfrag, "ipf IP NAT-Frag rwlock");
 	RWLOCK_INIT(&ipf_tokens, "ipf token rwlock");
 
@@ -172,9 +169,6 @@ int ipfdetach()
 	MUTEX_DESTROY(&ipf_timeoutlock);
 	MUTEX_DESTROY(&ipl_mutex);
 	MUTEX_DESTROY(&ipf_rw);
-	RW_DESTROY(&ipf_mutex);
-	RW_DESTROY(&ipf_frcache);
-	RW_DESTROY(&ipf_global);
 	RW_DESTROY(&ipf_tokens);
 	RW_DESTROY(&ipf_ipidfrag);
 
@@ -250,10 +244,9 @@ fr_info_t *fin;
 	if (tcp->th_flags & TH_RST)
 		return -1;
 
-#ifndef	IPFILTER_CKSUM
 	if (fr_checkl4sum(fin) == -1)
 		return -1;
-#endif
+
 	m = skb_copy(fin->fin_m, GFP_ATOMIC);
 	if (m == NULL)
 		return -1;
@@ -375,10 +368,8 @@ int isdst;
 		return -1;
 #endif
 
-#ifndef	IPFILTER_CKSUM
 	if (fr_checkl4sum(fin) == -1)
 		return -1;
-#endif
 
 	m0 = fin->fin_m;
 #ifdef USE_INET6

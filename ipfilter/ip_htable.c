@@ -102,31 +102,29 @@ iplookupop_t *op;
 	int err, i, unit;
 
 	unit = op->iplo_unit;
-	if ((op->iplo_arg & IPHASH_ANON) == 0)
+	if ((op->iplo_arg & IPHASH_ANON) == 0) {
 		iph = fr_existshtable(unit, op->iplo_name);
-	else
-		iph = NULL;
+		if (iph != NULL) {
+			if ((iph->iph_flags & IPHASH_DELETE) == 0)
+				return EEXIST;
+			iph->iph_flags &= ~IPHASH_DELETE;
+			return 0;
+		}
+	}
 
+	KMALLOC(iph, iphtable_t *);
 	if (iph == NULL) {
-		KMALLOC(iph, iphtable_t *);
-		if (iph == NULL) {
-			ipht_nomem[op->iplo_unit]++;
-			return ENOMEM;
-		}
-		err = COPYIN(op->iplo_struct, iph, sizeof(*iph));
-		if (err != 0) {
-			KFREE(iph);
-			return EFAULT;
-		}
-	} else {
-		if ((iph->iph_flags & IPHASH_DELETE) == 0)
-			return EEXIST;
+		ipht_nomem[op->iplo_unit]++;
+		return ENOMEM;
+	}
+	err = COPYIN(op->iplo_struct, iph, sizeof(*iph));
+	if (err != 0) {
+		KFREE(iph);
+		return EFAULT;
 	}
 
 	if (iph->iph_unit != unit) {
-		if ((iph->iph_flags & IPHASH_DELETE) == 0) {
-			KFREE(iph);
-		}
+		KFREE(iph);
 		return EINVAL;
 	}
 
@@ -151,33 +149,25 @@ iplookupop_t *op;
 		iph->iph_type |= IPHASH_ANON;
 	}
 
-	if ((iph->iph_flags & IPHASH_DELETE) == 0) {
-		KMALLOCS(iph->iph_table, iphtent_t **,
-			 iph->iph_size * sizeof(*iph->iph_table));
-		if (iph->iph_table == NULL) {
-			if ((iph->iph_flags & IPHASH_DELETE) == 0) {
-				KFREE(iph);
-			}
-			ipht_nomem[unit]++;
-			return ENOMEM;
-		}
-
-		bzero((char *)iph->iph_table,
-		      iph->iph_size * sizeof(*iph->iph_table));
-		iph->iph_masks = 0;
-		iph->iph_list = NULL;
-
-		iph->iph_ref = 1;
-		iph->iph_next = ipf_htables[unit];
-		iph->iph_pnext = &ipf_htables[unit];
-		if (ipf_htables[unit] != NULL)
-			ipf_htables[unit]->iph_pnext = &iph->iph_next;
-		ipf_htables[unit] = iph;
-
-		ipf_nhtables[unit]++;
+	KMALLOCS(iph->iph_table, iphtent_t **,
+		 iph->iph_size * sizeof(*iph->iph_table));
+	if (iph->iph_table == NULL) {
+		KFREE(iph);
+		ipht_nomem[unit]++;
+		return ENOMEM;
 	}
 
-	iph->iph_flags &= ~IPHASH_DELETE;
+	bzero((char *)iph->iph_table, iph->iph_size * sizeof(*iph->iph_table));
+	iph->iph_masks = 0;
+	iph->iph_list = NULL;
+
+	iph->iph_ref = 1;
+	iph->iph_next = ipf_htables[unit];
+	iph->iph_pnext = &ipf_htables[unit];
+	if (ipf_htables[unit] != NULL)
+		ipf_htables[unit]->iph_pnext = &iph->iph_next;
+	ipf_htables[unit] = iph;
+	ipf_nhtables[unit]++;
 
 	return 0;
 }

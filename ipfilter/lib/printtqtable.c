@@ -7,7 +7,6 @@
 #include <fcntl.h>
 #include <sys/ioctl.h>
 #include "ipf.h"
-#include "ipl.h"
 
 
 void printtqtable(table)

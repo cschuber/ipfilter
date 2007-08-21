@@ -290,6 +290,7 @@ ippr_rpcb_out(fin, aps, nat)
 
 	/* Perform basic variable initialization. */
 	rs = (rpcb_session_t *)aps->aps_data;
+	rx = NULL;
 
 	m = fin->fin_m;
 	off = (char *)fin->fin_dp - (char *)fin->fin_ip;

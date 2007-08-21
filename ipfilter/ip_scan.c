@@ -587,7 +587,9 @@ void *ctx;
 	case SIOCGSCST :
 		bcopy((char *)&ipsc_stat, (char *)&ipscs, sizeof(ipscs));
 		ipscs.iscs_list = ipsc_list;
-		BCOPYOUT(&ipscs, data, sizeof(ipscs));
+		err = BCOPYOUT(&ipscs, data, sizeof(ipscs));
+		if (err != 0)
+			err = EFAULT;
 		break;
 	default :
 		err = EINVAL;

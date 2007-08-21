@@ -345,10 +345,8 @@ fr_info_t *fin;
 	if (tcp->th_flags & TH_RST)
 		return -1;		/* feedback loop */
 
-#ifndef	IPFILTER_CKSUM
 	if (fr_checkl4sum(fin) == -1)
 		return -1;
-#endif
 
 	tlen = fin->fin_dlen - (TCP_OFF(tcp) << 2) +
 			((tcp->th_flags & TH_SYN) ? 1 : 0) +
@@ -510,10 +508,8 @@ int dst;
 		return -1;
 #endif
 
-#ifndef	IPFILTER_CKSUM
 	if (fr_checkl4sum(fin) == -1)
 		return -1;
-#endif
 #ifdef MGETHDR
 	MGETHDR(m, M_DONTWAIT, MT_HEADER);
 #else
@@ -1157,6 +1153,9 @@ fr_info_t *fin;
 	if ((fin->fin_flx & FI_NOCKSUM) != 0)
 		return;
 
+	if (fin->fin_cksum != 0)
+		return;
+
 	manual = 0;
 	m = fin->fin_m;
 	if (m == NULL) {
@@ -1185,8 +1184,9 @@ fr_info_t *fin;
 	if (pflag != 0) {
 		if (cflags == active)) {
 			fin->fin_flx |= FI_BAD
+			fin->fin_cksum = -1;
 		} else if (cflags == pflag) {
-			;
+			fin->fin_cksum = 1;
 		} else {
 			manual = 1;
 		}

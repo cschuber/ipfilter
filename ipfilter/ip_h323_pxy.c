@@ -45,12 +45,12 @@ static	frentry_t	h323_fr;
 
 int	h323_proxy_init = 0;
 
-static int find_port __P((int, caddr_t, int datlen, int *, u_short *));
+static int find_port __P((int, void *, int datlen, int *, u_short *));
 
 
 static int find_port(ipaddr, data, datlen, off, port)
 int ipaddr;
-caddr_t data;
+void * data;
 int datlen, *off;
 unsigned short *port;
 {
@@ -156,15 +156,15 @@ nat_t *nat;
 {
 	int ipaddr, off, datlen;
 	unsigned short port;
-	caddr_t data;
 	tcphdr_t *tcp;
+	void * data;
 	ip_t *ip;
 
 	ip = fin->fin_ip;
 	tcp = (tcphdr_t *)fin->fin_dp;
 	ipaddr = ip->ip_src.s_addr;
 	
-	data = (caddr_t)tcp + (TCP_OFF(tcp) << 2);
+	data = (char *)tcp + (TCP_OFF(tcp) << 2);
 	datlen = fin->fin_dlen - (TCP_OFF(tcp) << 2);
 	if (find_port(ipaddr, data, datlen, &off, &port) == 0) {
 		ipnat_t *ipn;
@@ -236,8 +236,8 @@ nat_t *nat;
 {
 	int ipaddr, off, datlen;
 	tcphdr_t *tcp;
-	caddr_t data;
 	u_short port;
+	char *data;
 	ip_t *ip;
 
 	aps = aps;	/* LINT */
@@ -245,7 +245,7 @@ nat_t *nat;
 	ip = fin->fin_ip;
 	tcp = (tcphdr_t *)fin->fin_dp;
 	ipaddr = nat->nat_inip.s_addr;
-	data = (caddr_t)tcp + (TCP_OFF(tcp) << 2);
+	data = (char *)tcp + (TCP_OFF(tcp) << 2);
 	datlen = fin->fin_dlen - (TCP_OFF(tcp) << 2);
 	if (find_port(ipaddr, data, datlen, &off, &port) == 0) {
 		fr_info_t fi;

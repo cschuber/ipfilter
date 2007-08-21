@@ -264,8 +264,6 @@ void ip_pool_fini()
 	ip_pool_t *p, *q;
 	int i;
 
-	ASSERT(rw_read_locked(&ipf_global.ipf_lk) == 0);
-
 	for (i = 0; i <= IPL_LOGMAX; i++) {
 		for (q = ip_pool_list[i]; (p = q) != NULL; ) {
 			q = p->ipo_next;
@@ -463,8 +461,6 @@ int info;
 	struct radix_node *rn;
 	ip_pool_node_t *x;
 
-	ASSERT(rw_read_locked(&ip_poolrw.ipf_lk) == 0);
-
 	KMALLOC(x, ip_pool_node_t *);
 	if (x == NULL) {
 		return ENOMEM;
@@ -529,32 +525,27 @@ iplookupop_t *op;
 	int poolnum, unit;
 	ip_pool_t *h;
 
-	ASSERT(rw_read_locked(&ip_poolrw.ipf_lk) == 0);
-
 	unit = op->iplo_unit;
 
-	if ((op->iplo_arg & LOOKUP_ANON) == 0)
+	if ((op->iplo_arg & LOOKUP_ANON) == 0) {
 		h = ip_pool_exists(unit, op->iplo_name);
-	else
-		h = NULL;
-
-	if (h != NULL) {
-		if ((h->ipo_flags & IPOOL_DELETE) != 0) {
+		if (h != NULL) {
+			if ((h->ipo_flags & IPOOL_DELETE) == 0)
+				return EEXIST;
 			h->ipo_flags &= ~IPOOL_DELETE;
 			return 0;
 		}
-		return EEXIST;
-	} else {
-		KMALLOC(h, ip_pool_t *);
-		if (h == NULL)
-			return ENOMEM;
-		bzero(h, sizeof(*h));
+	}
 
-		if (rn_inithead((void **)&h->ipo_head,
-				offsetof(addrfamily_t, adf_addr) << 3) == 0) {
-			KFREE(h);
-			return ENOMEM;
-		}
+	KMALLOC(h, ip_pool_t *);
+	if (h == NULL)
+		return ENOMEM;
+	bzero(h, sizeof(*h));
+
+	if (rn_inithead((void **)&h->ipo_head,
+			offsetof(addrfamily_t, adf_addr) << 3) == 0) {
+		KFREE(h);
+		return ENOMEM;
 	}
 
 	if ((op->iplo_arg & LOOKUP_ANON) != 0) {
@@ -589,18 +580,16 @@ iplookupop_t *op;
 		(void)strncpy(h->ipo_name, op->iplo_name, sizeof(h->ipo_name));
 	}
 
-	if ((h->ipo_flags & IPOOL_DELETE) == 0) {
-		h->ipo_ref = 1;
-		h->ipo_list = NULL;
-		h->ipo_unit = unit;
-		h->ipo_next = ip_pool_list[unit];
-		if (ip_pool_list[unit] != NULL)
-			ip_pool_list[unit]->ipo_pnext = &h->ipo_next;
-		h->ipo_pnext = &ip_pool_list[unit];
-		ip_pool_list[unit] = h;
+	h->ipo_ref = 1;
+	h->ipo_list = NULL;
+	h->ipo_unit = unit;
+	h->ipo_next = ip_pool_list[unit];
+	if (ip_pool_list[unit] != NULL)
+		ip_pool_list[unit]->ipo_pnext = &h->ipo_next;
+	h->ipo_pnext = &ip_pool_list[unit];
+	ip_pool_list[unit] = h;
 
-		ipoolstat.ipls_pools++;
-	}
+	ipoolstat.ipls_pools++;
 
 	return 0;
 }
@@ -619,8 +608,6 @@ int ip_pool_remove(ipo, ipe)
 ip_pool_t *ipo;
 ip_pool_node_t *ipe;
 {
-
-	ASSERT(rw_read_locked(&ip_poolrw.ipf_lk) == 0);
 
 	if (ipe->ipn_pnext != NULL)
 		*ipe->ipn_pnext = ipe->ipn_next;
@@ -788,8 +775,6 @@ ip_pool_t *ipo;
 void ip_pool_deref(ipo)
 ip_pool_t *ipo;
 {
-
-	ASSERT(rw_read_locked(&ip_poolrw.ipf_lk) == 0);
 
 	ipo->ipo_ref--;
 

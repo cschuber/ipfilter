@@ -287,8 +287,9 @@ caddr_t data;
 	ip_pool_t *p;
 	int err;
 
-	err = 0;
-	BCOPYIN(data, &op, sizeof(op));
+	err = BCOPYIN(data, &op, sizeof(op));
+	if (err != 0)
+		return EFAULT;
 
 	if (op.iplo_unit < 0 || op.iplo_unit > IPL_LOGMAX)
 		return EINVAL;

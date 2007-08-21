@@ -10,6 +10,27 @@
 # and especially those who have found the time to port IP Filter to new
 # platforms.
 #
+4.1.24 - Released July 2007
+
+patch from Stuart Remphrey to address recursive mutex lock with TCP state
+
+add hash table bucket stats display to ipnat -s
+
+give ASSERT some teeth for user compiles
+
+initialising ipf_global, ipf_frcache, ipf_mutex should all be done very
+early on
+
+do some caddr_t cleanup, where possible
+
+fr_ref no longer tracks the number of children rules in a group for head rules
+
+make sure all BCOPY* have a value assigned to something
+
+fix possible use of icmp pointer after pullup makes it invalid
+
+resolve compile problems related to FreeBSD tree
+
 4.1.23 - Released 31 May 2007
 
 NAT was not always correctly fixing ICMP headers for errors

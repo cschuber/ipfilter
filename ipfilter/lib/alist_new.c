@@ -53,12 +53,14 @@ alist_new(int v, char *host)
 	}
 
 	if (gethost(host, &al->al_addr) == -1) {
-		*slash = '/';
+		if (slash != NULL)
+			*slash = '/';
 		fprintf(stderr, "Cannot parse hostname\n");
 		free(al);
 		return NULL;
 	}
 	al->al_mask = htonl(mask);
-	*slash = '/';
+	if (slash != NULL)
+		*slash = '/';
 	return al;
 }

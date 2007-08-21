@@ -177,9 +177,17 @@ ipf_modload()
 	char *defpass, *c, *str;
 	int i, j, error;
 
+	RWLOCK_INIT(&ipf_global, "ipf filter load/unload mutex");
+	RWLOCK_INIT(&ipf_mutex, "ipf filter rwlock");
+	RWLOCK_INIT(&ipf_frcache, "ipf cache rwlock");
+
 	error = ipfattach();
-	if (error)
+	if (error) {
+		RW_DESTROY(&ipf_global);
+		RW_DESTROY(&ipf_mutex);
+		RW_DESTROY(&ipf_frcache);
 		return error;
+	}
 
 	for (i = 0; i < IPL_LOGSIZE; i++)
 		ipf_devs[i] = NULL;
@@ -234,6 +242,10 @@ ipf_modunload()
 			return error;
 	} else
 		error = 0;
+
+	RW_DESTROY(&ipf_global);
+	RW_DESTROY(&ipf_mutex);
+	RW_DESTROY(&ipf_frcache);
 
 	fr_running = -2;
 

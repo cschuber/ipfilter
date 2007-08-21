@@ -444,7 +444,7 @@ void *ctx;
 			error = EPERM;
 			break;
 		}
-		fr_lock(data, &fr_auth_lock);
+		error = fr_lock(data, &fr_auth_lock);
 		break;
 
 	case SIOCATHST:
@@ -884,8 +884,6 @@ fr_authioctlloop:
 			}
 		}
 		RWLOCK_EXIT(&ipf_auth);
-		if (error != 0)
-			return error;
 
 		SPL_NET(s);
 		WRITE_ENTER(&ipf_auth);

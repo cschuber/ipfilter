@@ -427,6 +427,9 @@ int v;
 	}
 	ifp = ifneta[nifs - 1];
 
+#if defined(__NetBSD__) || defined(__OpenBSD__) || defined(__FreeBSD__)
+	TAILQ_INIT(&ifp->if_addrlist);
+#endif
 #if (defined(NetBSD) && (NetBSD <= 1991011) && (NetBSD >= 199606)) || \
     (defined(OpenBSD) && (OpenBSD >= 199603)) || defined(linux) || \
     (defined(__FreeBSD__) && (__FreeBSD_version >= 501113))

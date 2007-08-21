@@ -307,10 +307,8 @@ fr_info_t *fin;
 	if (tcp->th_flags & TH_RST)
 		return -1;		/* feedback loop */
 
-#ifndef	IPFILTER_CKSUM
 	if (fr_checkl4sum(fin) == -1)
 		return -1;
-#endif
 
 	m = m_get(M_DONTWAIT, MT_HEADER);
 	if (m == NULL)
@@ -461,10 +459,8 @@ int dst;
 		return -1;
 #endif
 
-#ifndef	IPFILTER_CKSUM
 	if (fr_checkl4sum(fin) == -1)
 		return -1;
-#endif
 
 	avail = 0;
 	ifp = fin->fin_ifp;

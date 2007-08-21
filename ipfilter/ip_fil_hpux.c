@@ -80,12 +80,6 @@ int ipfdetach()
 
 	RW_DESTROY(&ipf_tokens);
 	RW_DESTROY(&ipf_ipidfrag);
-	RW_DESTROY(&ipf_mutex);
-	RW_DESTROY(&ipf_frcache);
-	/* NOTE: This lock is acquired in ipf_detach */
-	RWLOCK_EXIT(&ipf_global);
-	RW_DESTROY(&ipf_global);
-
 	MUTEX_DESTROY(&ipf_timeoutlock);
 	MUTEX_DESTROY(&ipf_rw);
 
@@ -103,9 +97,6 @@ int ipfattach __P((void))
 	bzero((char *)frcache, sizeof(frcache));
 	MUTEX_INIT(&ipf_rw, "ipf_rw");
 	MUTEX_INIT(&ipf_timeoutlock, "ipf_timeoutlock");
-	RWLOCK_INIT(&ipf_global, "ipf filter load/unload mutex");
-	RWLOCK_INIT(&ipf_mutex, "ipf filter rwlock");
-	RWLOCK_INIT(&ipf_frcache, "ipf cache rwlock");
 	RWLOCK_INIT(&ipf_ipidfrag, "ipf IP NAT-Frag rwlock");
 	RWLOCK_INIT(&ipf_tokens, "ipf token rwlock");
 
@@ -304,10 +295,8 @@ fr_info_t *fin;
 	if (tcp->th_flags & TH_RST)
 		return -1;
 
-#ifndef	IPFILTER_CKSUM
 	if (fr_checkl4sum(fin) == -1)
 		return -1;
-#endif
 
 	tlen = (tcp->th_flags & (TH_SYN|TH_FIN)) ? 1 : 0;
 #ifdef	USE_INET6
@@ -424,10 +413,8 @@ int dst;
 		return -1;
 #endif
 
-#ifndef	IPFILTER_CKSUM
 	if (fr_checkl4sum(fin) == -1)
 		return -1;
-#endif
 
 	qpi = fin->fin_qpi;
 	mb = fin->fin_qfm;

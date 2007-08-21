@@ -14,12 +14,13 @@
 #include <sys/param.h>
 #include <sys/time.h>
 #include <sys/file.h>
-#if (__NetBSD_Version__ >= 399002000) && defined(_KERNEL)
+#if defined(_KERNEL) && defined(__NetBSD_Version__) && \
+    (__NetBSD_Version__ >= 399002000)
 # include <sys/kauth.h>
 #endif
 #if defined(__NetBSD__) && (NetBSD >= 199905) && !defined(IPFILTER_LKM) && \
     defined(_KERNEL)
-# if (__NetBSD_Version__ < 399001400)
+#if defined(__NetBSD_Version__) && (__NetBSD_Version__ < 399001400)
 #  include "opt_ipfilter_log.h"
 # else
 #  include "opt_ipfilter.h"
@@ -191,6 +192,7 @@ static	int	fr_natgetent __P((caddr_t));
 static	int	fr_natgetsz __P((caddr_t));
 static	int	fr_natputent __P((caddr_t, int));
 static	int	nat_extraflush __P((int));
+static	int	nat_gettable __P((char *));
 static	void	nat_tabmove __P((nat_t *));
 static	int	nat_match __P((fr_info_t *, ipnat_t *));
 static	INLINE	int nat_newmap __P((fr_info_t *, nat_t *, natinfo_t *));
@@ -650,7 +652,7 @@ void *ctx;
 	SPL_INT(s);
 
 #if (BSD >= 199306) && defined(_KERNEL)
-# if (__NetBSD_Version__ >= 399002000)
+# if defined(__NetBSD_Version__) && (__NetBSD_Version__ >= 399002000)
 	if ((mode & FWRITE) &&
 	     kauth_authorize_network(curlwp->l_cred, KAUTH_NETWORK_FIREWALL,
 				     KAUTH_REQ_NETWORK_FIREWALL_FW,
@@ -870,7 +872,7 @@ void *ctx;
 		if (!(mode & FWRITE)) {
 			error = EPERM;
 		} else {
-			fr_lock(data, &fr_nat_lock);
+			error = fr_lock(data, &fr_nat_lock);
 		}
 		break;
 
@@ -939,6 +941,10 @@ void *ctx;
 
 	case SIOCGTQTAB :
 		error = fr_outobj(data, nat_tqb, IPFOBJ_STATETQTAB);
+		break;
+
+	case SIOCGTABL :
+		error = nat_gettable(data);
 		break;
 
 	default :
@@ -5333,4 +5339,45 @@ void *entry;
 {
 	nat_delete(entry, NL_FLUSH);
 	return 0;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    nat_gettable                                                */
+/* Returns:     int     - 0 = success, else error                           */
+/* Parameters:  data(I) - pointer to ioctl data                             */
+/*                                                                          */
+/* This function handles ioctl requests for tables of nat information.      */
+/* At present the only table it deals with is the hash bucket statistics.   */
+/* ------------------------------------------------------------------------ */
+static int nat_gettable(data)
+char *data;
+{
+	ipftable_t table;
+	int error;
+
+	error = fr_inobj(data, &table, IPFOBJ_GTABLE);
+	if (error != 0)
+		return error;
+
+	switch (table.ita_type)
+	{
+	case IPFTABLE_BUCKETS_NATIN :
+		error = COPYOUT(nat_stats.ns_bucketlen[0], table.ita_table, 
+				ipf_nattable_sz * sizeof(u_long));
+		break;
+
+	case IPFTABLE_BUCKETS_NATOUT :
+		error = COPYOUT(nat_stats.ns_bucketlen[1], table.ita_table, 
+				ipf_nattable_sz * sizeof(u_long));
+		break;
+
+	default :
+		return EINVAL;
+	}
+
+	if (error != 0) {
+		error = EFAULT;
+	}
+	return error;
 }

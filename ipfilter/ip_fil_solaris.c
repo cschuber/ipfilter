@@ -388,10 +388,8 @@ fr_info_t *fin;
 	if (tcp->th_flags & TH_RST)
 		return -1;
 
-#ifndef	IPFILTER_CKSUM
 	if (fr_checkl4sum(fin) == -1)
 		return -1;
-#endif
 
 	tlen = (tcp->th_flags & (TH_SYN|TH_FIN)) ? 1 : 0;
 #ifdef	USE_INET6
@@ -552,10 +550,8 @@ int dst;
 		return -1;
 #endif
 
-#ifndef	IPFILTER_CKSUM
 	if (fr_checkl4sum(fin) == -1)
 		return -1;
-#endif
 
 	qpi = fin->fin_qpi;
 

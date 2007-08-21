@@ -220,10 +220,7 @@ int ipfattach()
 	}
 
 	MUTEX_INIT(&ipf_rw, "ipf rw mutex");
-	RWLOCK_INIT(&ipf_global, "ipf filter load/unload mutex");
 	MUTEX_INIT(&ipf_timeoutlock, "ipf timeout queue mutex");
-	RWLOCK_INIT(&ipf_mutex, "ipf filter rwlock");
-	RWLOCK_INIT(&ipf_frcache, "ipf cache rwlock");
 	RWLOCK_INIT(&ipf_ipidfrag, "ipf IP NAT-Frag rwlock");
 	RWLOCK_INIT(&ipf_tokens, "ipf token rwlock");
 	ipf_locks_done = 1;
@@ -426,11 +423,8 @@ int ipfdetach()
 	if (ipf_locks_done == 1) {
 		MUTEX_DESTROY(&ipf_timeoutlock);
 		MUTEX_DESTROY(&ipf_rw);
-		RW_DESTROY(&ipf_mutex);
-		RW_DESTROY(&ipf_frcache);
 		RW_DESTROY(&ipf_ipidfrag);
 		RW_DESTROY(&ipf_tokens);
-		RW_DESTROY(&ipf_global);
 		ipf_locks_done = 0;
 	}
 
@@ -696,10 +690,8 @@ fr_info_t *fin;
 	if (tcp->th_flags & TH_RST)
 		return -1;		/* feedback loop */
 
-#ifndef	IPFILTER_CKSUM
 	if (fr_checkl4sum(fin) == -1)
 		return -1;
-#endif
 
 	tlen = fin->fin_dlen - (TCP_OFF(tcp) << 2) +
 			((tcp->th_flags & TH_SYN) ? 1 : 0) +
@@ -867,10 +859,8 @@ int dst;
 		return -1;
 #endif
 
-#ifndef	IPFILTER_CKSUM
 	if (fr_checkl4sum(fin) == -1)
 		return -1;
-#endif
 #ifdef MGETHDR
 	MGETHDR(m, M_DONTWAIT, MT_HEADER);
 #else
@@ -1474,6 +1464,9 @@ fr_info_t *fin;
 	if ((fin->fin_flx & FI_NOCKSUM) != 0)
 		return;
 
+	if (fin->fin_cksum != 0)
+		return;
+
 	m = fin->fin_m;
 	if (m == NULL) {
 		manual = 1;
@@ -1489,8 +1482,12 @@ fr_info_t *fin;
 					htonl(m->m_pkthdr.csum_data +
 					fin->fin_ip->ip_len + fin->fin_p));
 		sum ^= 0xffff;
-		if (sum != 0)
+		if (sum != 0) {
 			fin->fin_flx |= FI_BAD;
+			fin->fin_cksum = -1;
+		} else {
+			fin->fin_cksum = 1;
+		}
 	} else
 		manual = 1;
 skipauto:

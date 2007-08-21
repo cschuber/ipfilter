@@ -744,10 +744,8 @@ fr_info_t *fin;
 	if (tcp->th_flags & TH_RST)
 		return -1;		/* feedback loop */
 
-#ifndef	IPFILTER_CKSUM
 	if (fr_checkl4sum(fin) == -1)
 		return -1;
-#endif
 
 	tlen = fin->fin_dlen - (TCP_OFF(tcp) << 2) +
 			((tcp->th_flags & TH_SYN) ? 1 : 0) +
@@ -921,10 +919,8 @@ int dst;
 		return -1;
 #endif
 
-#ifndef	IPFILTER_CKSUM
 	if (fr_checkl4sum(fin) == -1)
 		return -1;
-#endif
 #ifdef MGETHDR
 	MGETHDR(m, M_DONTWAIT, MT_HEADER);
 #else
@@ -1130,7 +1126,7 @@ frdest_t *fdp;
 	 * Route packet.
 	 */
 	ro = &iproute;
-	bzero((caddr_t)ro, sizeof (*ro));
+	bzero(ro, sizeof (*ro));
 
 	if (fdp != NULL)
 		ifp = fdp->fd_ifp;
@@ -1421,7 +1417,7 @@ frdest_t *fdp;
 		ifp = fdp->fd_ifp;
 	else
 		ifp = fin->fin_ifp;
-	bzero((caddr_t)ro, sizeof(*ro));
+	bzero(ro, sizeof(*ro));
 # if __NetBSD_Version__ >= 499001100
 	if (fdp != NULL && IP6_NOTZERO(&fdp->fd_ip6))
 		sockaddr_in6_init(&u.dst6, &fdp->fd_ip6.in6, 0, 0, 0);
@@ -1705,6 +1701,9 @@ fr_info_t *fin;
 	if ((fin->fin_flx & FI_NOCKSUM) != 0)
 		return;
 
+	if (fin->fin_cksum != 0)
+		return;
+
 	manual = 0;
 	m = fin->fin_m;
 	if (m == NULL) {
@@ -1733,10 +1732,16 @@ fr_info_t *fin;
 	if (pflag != 0) {
 		if (cflags == (pflag | M_CSUM_TCP_UDP_BAD)) {
 			fin->fin_flx |= FI_BAD;
+			fin->fin_cksum = -1;
 		} else if (cflags == (pflag | M_CSUM_DATA)) {
-			if ((m->m_pkthdr.csum_data ^ 0xffff) != 0)
+			if ((m->m_pkthdr.csum_data ^ 0xffff) != 0) {
 				fin->fin_flx |= FI_BAD;
+				fin->fin_cksum = -1;
+			} else {
+				fin->fin_cksum = 1;
+			}
 		} else if (cflags == pflag) {
+			fin->fin_cksum = 1;
 			;
 		} else {
 			manual = 1;

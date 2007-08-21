@@ -1084,7 +1084,7 @@ struct ip6_ext {
 #   define	SLEEP(x,s)	0, interruptible_sleep_on(x##_linux)
 #  endif
 #   define	WAKEUP(x,y)	wake_up(x##_linux + y)
-#  define	UIOMOVE(a,b,c,d)	uiomove(a,b,c,d)
+#  define	UIOMOVE(a,b,c,d)	uiomove((caddr_t)a,b,c,d)
 #  define	USE_MUTEXES
 #  define	KRWLOCK_T		rwlock_t
 #  define	KMUTEX_T		spinlock_t
@@ -1459,7 +1459,7 @@ typedef	struct	mb_s	{
 # define	COPYBACK(m, o, l, b)	bcopy((b), \
 					      MTOD((mb_t *)m, char *) + (o), \
 					      (l))
-# define	UIOMOVE(a,b,c,d)	ipfuiomove(a,b,c,d)
+# define	UIOMOVE(a,b,c,d)	ipfuiomove((caddr_t)a,b,c,d)
 extern	void	m_copydata __P((mb_t *, int, int, caddr_t));
 extern	int	ipfuiomove __P((caddr_t, int, int, struct uio *));
 extern	int	bcopywrap __P((void *, void *, size_t));
@@ -1589,7 +1589,7 @@ MALLOC_DECLARE(M_IPFILTER);
 #  endif
 #  define	KFREE(x)	FREE((x), _M_IPF)
 #  define	KFREES(x,s)	FREE((x), _M_IPF)
-#  define	UIOMOVE(a,b,c,d)	uiomove(a,b,d)
+#  define	UIOMOVE(a,b,c,d)	uiomove((caddr_t)a,b,d)
 #  define	SLEEP(id, n)	tsleep((id), PPAUSE|PCATCH, n, 0)
 #  define	WAKEUP(id,x)	wakeup(id+x)
 #  define	POLLWAKEUP(x)	selwakeup(ipfselwait+x)
@@ -1644,7 +1644,11 @@ extern	char	*fr_getifname __P((struct ifnet *, char *));
 #endif
 
 #ifndef ASSERT
-# define	ASSERT(x)
+# ifdef _KERNEL
+#  define	ASSERT(x)
+# else
+#  define	ASSERT(x)	do { if (!(x)) abort(); } while (0)
+# endif
 #endif
 
 #ifndef BCOPYIN

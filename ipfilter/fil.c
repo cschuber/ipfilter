@@ -761,6 +761,7 @@ fr_info_t *fin;
 			 * source of the original packet then this packet is
 			 * not correct.
 			 */
+			icmp6 = fin->fin_dp;
 			ip6 = (ip6_t *)((char *)icmp6 + ICMPERR_ICMPHLEN);
 			if (IP6_NEQ(&fin->fin_fi.fi_dst,
 				    (i6addr_t *)&ip6->ip6_src))
@@ -995,6 +996,9 @@ fr_info_t *fin;
 
 		fin->fin_data[0] = *(u_short *)icmp;
 
+		if (fin->fin_dlen >= 6)				/* ID field */
+			fin->fin_data[1] = icmp->icmp_id;
+
 		switch (icmp->icmp_type)
 		{
 		case ICMP_ECHOREPLY :
@@ -1065,9 +1069,6 @@ fr_info_t *fin;
 		default :
 			break;
 		}
-
-		if (fin->fin_dlen >= 6)				/* ID field */
-			fin->fin_data[1] = icmp->icmp_id;
 	}
 
 	frpr_short(fin, minicmpsz);
@@ -1188,6 +1189,7 @@ fr_info_t *fin;
 		return -1;
 
 #if 0
+	tcp = fin->fin_dp;
 	ip = fin->fin_ip;
 	s = (u_char *)(tcp + 1);
 	off = IP_HL(ip) << 2;
@@ -1945,7 +1947,7 @@ int fr_scanlist(fin, pass)
 fr_info_t *fin;
 u_32_t pass;
 {
-	int rulen, portcmp, off, logged, skip;
+	int rulen, portcmp, off, skip;
 	struct frentry *fr, *fnext;
 	u_32_t passt, passo;
 
@@ -1964,7 +1966,6 @@ u_32_t pass;
 		return pass;
 
 	skip = 0;
-	logged = 0;
 	portcmp = 0;
 	fin->fin_depth++;
 	fin->fin_fr = NULL;
@@ -2098,7 +2099,7 @@ u_32_t pass;
 				ATOMIC_INCL(frstats[fin->fin_out].fr_skip);
 			}
 			ATOMIC_INCL(frstats[fin->fin_out].fr_pkl);
-			logged = 1;
+			fin->fin_flx |= FI_DONTCACHE;
 		}
 #endif /* IPFILTER_LOG */
 		fr->fr_bytes += (U_QUAD_T)fin->fin_plen;
@@ -2123,8 +2124,6 @@ u_32_t pass;
 				fin->fin_fr = fr;
 				passt = pass;
 			}
-			if (fin->fin_flx & FI_DONTCACHE)
-				logged = 1;
 			pass = passt;
 		}
 
@@ -2152,8 +2151,6 @@ u_32_t pass;
 			break;
 		}
 	}
-	if (logged)
-		fin->fin_flx |= FI_DONTCACHE;
 	fin->fin_depth--;
 	return pass;
 }
@@ -3065,8 +3062,8 @@ void *l4hdr;
 	 * In case we had to copy the IP & TCP header out of mbufs,
 	 * skip over the mbuf bits which are the header
 	 */
-	if ((caddr_t)ip != mtod(m, caddr_t)) {
-		hlen = (caddr_t)sp - (caddr_t)ip;
+	if ((char *)ip != mtod(m, char *)) {
+		hlen = (char *)sp - (char *)ip;
 		while (hlen) {
 			add = MIN(hlen, m->m_len);
 			sp = (u_short *)(mtod(m, caddr_t) + add);
@@ -3089,12 +3086,12 @@ void *l4hdr;
 		goto nodata;
 
 	while (len > 1) {
-		if (((caddr_t)sp - mtod(m, caddr_t)) >= m->m_len) {
+		if (((char *)sp - mtod(m, char *)) >= m->m_len) {
 			m = m->m_next;
 			PANIC((!m),("fr_cksum(2): not enough data"));
 			sp = mtod(m, u_short *);
 		}
-		if (((caddr_t)(sp + 1) - mtod(m, caddr_t)) > m->m_len) {
+		if (((char *)(sp + 1) - mtod(m, char *)) > m->m_len) {
 			bytes.c[0] = *(u_char *)sp;
 			m = m->m_next;
 			PANIC((!m),("fr_cksum(3): not enough data"));
@@ -3478,7 +3475,7 @@ minor_t unit;
 int *nfreedp;
 frentry_t **listp;
 {
-	int freed = 0, i;
+	int freed = 0;
 	frentry_t *fp;
 
 	while ((fp = *listp) != NULL) {
@@ -3489,8 +3486,7 @@ frentry_t **listp;
 		}
 		*listp = fp->fr_next;
 		if (fp->fr_grp != NULL) {
-			i = frflushlist(set, unit, nfreedp, fp->fr_grp);
-			fp->fr_ref -= i;
+			(void) frflushlist(set, unit, nfreedp, fp->fr_grp);
 		}
 
 		if (fp->fr_grhead != NULL) {
@@ -3846,7 +3842,7 @@ size_t size;
 	int error;
 
 # if SOLARIS
-	error = COPYIN(src, (caddr_t)&ca, sizeof(ca));
+	error = COPYIN(src, &ca, sizeof(ca));
 	if (error != 0)
 		return error;
 # else
@@ -3888,22 +3884,27 @@ size_t size;
 
 /* ------------------------------------------------------------------------ */
 /* Function:    fr_lock                                                     */
-/* Returns:     (void)                                                      */
+/* Returns:     int      - 0 = success, else error                          */
 /* Parameters:  data(I)  - pointer to lock value to set                     */
 /*              lockp(O) - pointer to location to store old lock value      */
 /*                                                                          */
 /* Get the new value for the lock integer, set it and return the old value  */
 /* in *lockp.                                                               */
 /* ------------------------------------------------------------------------ */
-void fr_lock(data, lockp)
+int fr_lock(data, lockp)
 caddr_t data;
 int *lockp;
 {
-	int arg;
+	int arg, err;
 
-	BCOPYIN(data, (caddr_t)&arg, sizeof(arg));
-	BCOPYOUT((caddr_t)lockp, data, sizeof(*lockp));
+	err = BCOPYIN(data, &arg, sizeof(arg));
+	if (err != 0)
+		return EFAULT;
+	err = BCOPYOUT(lockp, data, sizeof(*lockp));
+	if (err != 0)
+		return EFAULT;
 	*lockp = arg;
+	return 0;
 }
 
 
@@ -4542,7 +4543,7 @@ caddr_t data;
 
 			/*
 			 * Return EBUSY if the rule is being reference by
-			 * something else (eg state information.
+			 * something else (eg state information.)
 			 */
 			if (f->fr_ref > 1) {
 				error = EBUSY;
@@ -4553,8 +4554,6 @@ caddr_t data;
 			    (f->fr_isc != (struct ipscan *)-1))
 				ipsc_detachfr(f);
 #endif
-			if ((fg != NULL) && (fg->fg_head != NULL))
-				fg->fg_head->fr_ref--;
 			if (unit == IPL_LOGAUTH) {
 				error = fr_preauthcmd(req, f, ftail);
 				goto done;
@@ -4582,8 +4581,6 @@ caddr_t data;
 			} else
 				f = fp;
 			if (f != NULL) {
-				if (fg != NULL && fg->fg_head != NULL)
-					fg->fg_head->fr_ref++;
 				if (fp != f)
 					bcopy((char *)fp, (char *)f,
 					      sizeof(*f));
@@ -4683,8 +4680,11 @@ int fr_resolvefunc(data)
 void *data;
 {
 	ipfunc_resolve_t res, *ft;
+	int err;
 
-	BCOPYIN(data, &res, sizeof(res));
+	err = BCOPYIN(data, &res, sizeof(res));
+	if (err != 0)
+		return EFAULT;
 
 	if (res.ipfu_addr == NULL && res.ipfu_name[0] != '\0') {
 		for (ft = fr_availfuncs; ft->ipfu_addr != NULL; ft++)
@@ -5453,7 +5453,9 @@ int type;
 	if ((type < 0) || (type >= IPFOBJ_COUNT))
 		return EINVAL;
 
-	BCOPYIN((caddr_t)data, (caddr_t)&obj, sizeof(obj));
+	error = BCOPYIN(data, &obj, sizeof(obj));
+	if (error != 0)
+		return EFAULT;
 
 	if (obj.ipfo_type != type)
 		return EINVAL;
@@ -5479,11 +5481,9 @@ int type;
 #endif
 
 	if ((fr_objbytes[type][0] & 1) != 0) {
-		error = COPYIN((caddr_t)obj.ipfo_ptr, (caddr_t)ptr,
-				fr_objbytes[type][1]);
+		error = COPYIN(obj.ipfo_ptr, ptr, fr_objbytes[type][1]);
 	} else {
-		error = COPYIN((caddr_t)obj.ipfo_ptr, (caddr_t)ptr,
-				obj.ipfo_size);
+		error = COPYIN(obj.ipfo_ptr, ptr, obj.ipfo_size);
 	}
 	if (error != 0)
 		error = EFAULT;
@@ -5518,7 +5518,9 @@ int type, sz;
 	if (((fr_objbytes[type][0] & 1) == 0) || (sz < fr_objbytes[type][1]))
 		return EINVAL;
 
-	BCOPYIN((caddr_t)data, (caddr_t)&obj, sizeof(obj));
+	error = BCOPYIN(data, &obj, sizeof(obj));
+	if (error != 0)
+		return EFAULT;
 
 	if (obj.ipfo_type != type)
 		return EINVAL;
@@ -5535,7 +5537,7 @@ int type, sz;
 		return EINVAL;
 #endif
 
-	error = COPYIN((caddr_t)obj.ipfo_ptr, (caddr_t)ptr, sz);
+	error = COPYIN(obj.ipfo_ptr, ptr, sz);
 	if (error != 0)
 		error = EFAULT;
 	return error;
@@ -5564,12 +5566,14 @@ int type, sz;
 	ipfobj_t obj;
 	int error;
 
-	if ((type < 0) || (type > IPFOBJ_COUNT) ||
+	if ((type < 0) || (type >= IPFOBJ_COUNT) ||
 	    ((fr_objbytes[type][0] & 1) == 0) ||
 	    (sz < fr_objbytes[type][1]))
 		return EINVAL;
 
-	BCOPYIN((caddr_t)data, (caddr_t)&obj, sizeof(obj));
+	error = BCOPYIN(data, &obj, sizeof(obj));
+	if (error != 0)
+		return EFAULT;
 
 	if (obj.ipfo_type != type)
 		return EINVAL;
@@ -5586,7 +5590,7 @@ int type, sz;
 		return EINVAL;
 #endif
 
-	error = COPYOUT((caddr_t)ptr, (caddr_t)obj.ipfo_ptr, sz);
+	error = COPYOUT(ptr, obj.ipfo_ptr, sz);
 	if (error != 0)
 		error = EFAULT;
 	return error;
@@ -5612,10 +5616,12 @@ int type;
 	ipfobj_t obj;
 	int error;
 
-	if ((type < 0) || (type > IPFOBJ_COUNT))
+	if ((type < 0) || (type >= IPFOBJ_COUNT))
 		return EINVAL;
 
-	BCOPYIN((caddr_t)data, (caddr_t)&obj, sizeof(obj));
+	error = BCOPYIN(data, &obj, sizeof(obj));
+	if (error != 0)
+		return EFAULT;
 
 	if (obj.ipfo_type != type)
 		return EINVAL;
@@ -5639,7 +5645,7 @@ int type;
 		return EINVAL;
 #endif
 
-	error = COPYOUT((caddr_t)ptr, (caddr_t)obj.ipfo_ptr, obj.ipfo_size);
+	error = COPYOUT(ptr, obj.ipfo_ptr, obj.ipfo_size);
 	if (error != 0)
 		error = EFAULT;
 	return error;
@@ -5664,6 +5670,12 @@ fr_info_t *fin;
 
 	if ((fin->fin_flx & FI_NOCKSUM) != 0)
 		return 0;
+
+	if (fin->fin_cksum == 1)
+		return 0;
+
+	if (fin->fin_cksum == -1)
+		return -1;
 
 	/*
 	 * If the TCP packet isn't a fragment, isn't too short and otherwise
@@ -5727,8 +5739,11 @@ fr_info_t *fin;
 		FR_DEBUG(("checkl4sum: %hx != %hx\n", sum, hdrsum));
 	}
 #endif
-	if (hdrsum == sum)
+	if (hdrsum == sum) {
+		fin->fin_cksum = 1;
 		return 0;
+	}
+	fin->fin_cksum = -1;
 	return -1;
 }
 
@@ -6424,7 +6439,7 @@ void fr_deinitialise()
 /* the copyout may result in paging (ie network activity.)                  */
 /* ------------------------------------------------------------------------ */
 int	fr_zerostats(data)
-caddr_t	data;
+void	*data;
 {
 	friostat_t fio;
 	int error;
@@ -6964,8 +6979,7 @@ void *ctx;
 		if (!(mode & FWRITE))
 			error = EPERM;
 		else {
-			error = BCOPYIN((caddr_t)data, (caddr_t)&tmp,
-					sizeof(tmp));
+			error = BCOPYIN(data, &tmp, sizeof(tmp));
 			if (error != 0) {
 				error = EFAULT;
 				break;
@@ -7005,16 +7019,14 @@ void *ctx;
 		if (!(mode & FWRITE))
 			error = EPERM;
 		else {
-			error = BCOPYIN((caddr_t)data, (caddr_t)&fr_flags,
-					sizeof(fr_flags));
+			error = BCOPYIN(data, &fr_flags, sizeof(fr_flags));
 			if (error != 0)
 				error = EFAULT;
 		}
 		break;
 
 	case SIOCGETFF :
-		error = BCOPYOUT((caddr_t)&fr_flags, (caddr_t)data,
-				 sizeof(fr_flags));
+		error = BCOPYOUT(&fr_flags, data, sizeof(fr_flags));
 		if (error != 0)
 			error = EFAULT;
 		break;
@@ -7030,8 +7042,7 @@ void *ctx;
 		if (!(mode & FWRITE))
 			error = EPERM;
 		else
-			error = frrequest(IPL_LOGIPF, cmd, (caddr_t)data,
-					  fr_active, 1);
+			error = frrequest(IPL_LOGIPF, cmd, data, fr_active, 1);
 		break;
 
 	case SIOCINIFR :
@@ -7040,7 +7051,7 @@ void *ctx;
 		if (!(mode & FWRITE))
 			error = EPERM;
 		else
-			error = frrequest(IPL_LOGIPF, cmd, (caddr_t)data,
+			error = frrequest(IPL_LOGIPF, cmd, data,
 					  1 - fr_active, 1);
 		break;
 
@@ -7050,8 +7061,7 @@ void *ctx;
 		else {
 			WRITE_ENTER(&ipf_mutex);
 			bzero((char *)frcache, sizeof(frcache[0]) * 2);
-			error = BCOPYOUT((caddr_t)&fr_active, (caddr_t)data,
-					 sizeof(fr_active));
+			error = BCOPYOUT(&fr_active, data, sizeof(fr_active));
 			if (error != 0)
 				error = EFAULT;
 			else
@@ -7069,19 +7079,17 @@ void *ctx;
 		if (!(mode & FWRITE))
 			error = EPERM;
 		else
-			error = fr_zerostats((caddr_t)data);
+			error = fr_zerostats(data);
 		break;
 
 	case SIOCIPFFL :
 		if (!(mode & FWRITE))
 			error = EPERM;
 		else {
-			error = BCOPYIN((caddr_t)data, (caddr_t)&tmp,
-				        sizeof(tmp));
+			error = BCOPYIN(data, &tmp, sizeof(tmp));
 			if (!error) {
 				tmp = frflush(IPL_LOGIPF, 4, tmp);
-				error = BCOPYOUT((caddr_t)&tmp, (caddr_t)data,
-						 sizeof(tmp));
+				error = BCOPYOUT(&tmp, data, sizeof(tmp));
 				if (error != 0)
 					error = EFAULT;
 			} else
@@ -7094,12 +7102,10 @@ void *ctx;
 		if (!(mode & FWRITE))
 			error = EPERM;
 		else {
-			error = BCOPYIN((caddr_t)data, (caddr_t)&tmp,
-				        sizeof(tmp));
+			error = BCOPYIN(data, &tmp, sizeof(tmp));
 			if (!error) {
 				tmp = frflush(IPL_LOGIPF, 6, tmp);
-				error = BCOPYOUT((caddr_t)&tmp, (caddr_t)data,
-						 sizeof(tmp));
+				error = BCOPYOUT(&tmp, data, sizeof(tmp));
 				if (error != 0)
 					error = EFAULT;
 			} else
@@ -7109,7 +7115,7 @@ void *ctx;
 #endif
 
 	case SIOCSTLCK :
-		error = BCOPYIN((caddr_t)data, (caddr_t)&tmp, sizeof(tmp));
+		error = BCOPYIN(data, &tmp, sizeof(tmp));
 		if (error == 0) {
 			fr_state_lock = tmp;
 			fr_nat_lock = tmp;
@@ -7125,8 +7131,7 @@ void *ctx;
 			error = EPERM;
 		else {
 			tmp = ipflog_clear(IPL_LOGIPF);
-			error = BCOPYOUT((caddr_t)&tmp, (caddr_t)data,
-					 sizeof(tmp));
+			error = BCOPYOUT(&tmp, data, sizeof(tmp));
 			if (error)
 				error = EFAULT;
 		}
@@ -7158,7 +7163,7 @@ void *ctx;
 	case FIONREAD :
 		tmp = (int)iplused[IPL_LOGIPF];
 
-		error = BCOPYOUT((caddr_t)&tmp, (caddr_t)data, sizeof(tmp));
+		error = BCOPYOUT(&tmp, data, sizeof(tmp));
 		break;
 #endif
 
@@ -7177,7 +7182,7 @@ void *ctx;
 
 	case SIOCIPFDELTOK :
 		SPL_SCHED(s);
-		error = BCOPYIN((caddr_t)data, (caddr_t)&tmp, sizeof(tmp));
+		error = BCOPYIN(data, &tmp, sizeof(tmp));
 		if (error == 0)
 			error = ipf_deltoken(tmp, uid, ctx);
 		SPL_X(s);

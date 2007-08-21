@@ -34,7 +34,7 @@
 #endif
 
 #include "ipf.h"
-#include "ipl.h"
+#include "netinet/ipl.h"
 #include "netinet/ip_lookup.h"
 #include "netinet/ip_pool.h"
 #include "netinet/ip_htable.h"
