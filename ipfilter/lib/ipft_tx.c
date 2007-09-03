@@ -257,19 +257,30 @@ int	*out;
 	}
 	ip->ip_dst.s_addr = tx_hostnum(*cpp, &r);
 	cpp++;
-	if (*cpp && ip->ip_p == IPPROTO_TCP) {
-		char	*s, *t;
+	if (ip->ip_p == IPPROTO_TCP) {
+		if (*cpp != NULL) {
+			char	*s, *t;
 
-		tcp->th_flags = 0;
-		for (s = *cpp; *s; s++)
-			if ((t  = strchr(myflagset, *s)))
-				tcp->th_flags |= myflags[t - myflagset];
-		if (tcp->th_flags)
-			cpp++;
-		if (tcp->th_flags == 0)
-			abort();
+			tcp->th_flags = 0;
+			for (s = *cpp; *s; s++)
+				if ((t  = strchr(myflagset, *s)))
+					tcp->th_flags |= myflags[t-myflagset];
+			if (tcp->th_flags)
+				cpp++;
+		}
+
 		if (tcp->th_flags & TH_URG)
 			tcp->th_urp = htons(1);
+
+		if (*cpp && !strncasecmp(*cpp, "seq=", 4)) {
+			tcp->th_seq = htonl(atoi(*cpp + 4));
+			cpp++;
+		}
+
+		if (*cpp && !strncasecmp(*cpp, "ack=", 4)) {
+			tcp->th_ack = htonl(atoi(*cpp + 4));
+			cpp++;
+		}
 	} else if (*cpp && ip->ip_p == IPPROTO_ICMP) {
 		extern	char	*tx_icmptypes[];
 		char	**s, *t;
