@@ -1272,7 +1272,7 @@ u_int flags;
 		* timer on it as we'll never see an error if it fails to
 		* connect.
 		*/
-		(void) fr_tcp_age(&is->is_sti, fin, ips_tqtqb, is->is_flags);
+		(void) fr_tcp_age(&is->is_sti, fin, ips_tqtqb, is->is_flags, 1);
 		MUTEX_EXIT(&is->is_lock);
 #ifdef	IPFILTER_SCAN
 		if ((is->is_flags & SI_CLONE) == 0)
@@ -1440,7 +1440,8 @@ ipstate_t *is;
 		}
 	}
 
-	if (fr_tcpinwindow(fin, fdata, tdata, tcp, is->is_flags)) {
+	ret = fr_tcpinwindow(fin, fdata, tdata, tcp, is->is_flags);
+	if (ret > 0) {
 #ifdef	IPFILTER_SCAN
 		if (is->is_flags & (IS_SC_CLIENT|IS_SC_SERVER)) {
 			ipsc_packet(fin, is);
@@ -1454,7 +1455,8 @@ ipstate_t *is;
 		/*
 		 * Nearing end of connection, start timeout.
 		 */
-		ret = fr_tcp_age(&is->is_sti, fin, ips_tqtqb, is->is_flags);
+		ret = fr_tcp_age(&is->is_sti, fin, ips_tqtqb, is->is_flags,
+				 (ret == 2));
 		if (ret == 0) {
 			MUTEX_EXIT(&is->is_lock);
 			return 0;
@@ -1536,7 +1538,8 @@ ipstate_t *is;
 
 /* ------------------------------------------------------------------------ */
 /* Function:    fr_tcpinwindow                                              */
-/* Returns:     int - 1 == packet inside TCP "window", 0 == not inside.     */
+/* Returns:     int - 1 == packet inside TCP "window", 0 == not inside,     */
+/*                    2 == packet seq number matches next expected          */
 /* Parameters:  fin(I)   - pointer to packet information                    */
 /*              fdata(I) - pointer to tcp state informatio (forward)        */
 /*              tdata(I) - pointer to tcp state informatio (reverse)        */
@@ -1552,10 +1555,10 @@ tcpdata_t  *fdata, *tdata;
 tcphdr_t *tcp;
 int flags;
 {
+	int dsize, inseq, rval;
 	tcp_seq seq, ack, end;
 	int ackskew, tcpflags;
 	u_32_t win, maxwin;
-	int dsize, inseq;
 
 	/*
 	 * Find difference between last checked packet and this packet.
@@ -1620,14 +1623,15 @@ int flags;
 	/*
 	 * Strict sequencing only allows in-order delivery.
 	 */
-	if ((flags & IS_STRICT) != 0) {
-		if (seq != fdata->td_end) {
+	if (seq != fdata->td_end) {
+		if ((flags & IS_STRICT) != 0) {
 			return 0;
 		}
+		rval = 1;
+	} else {
+		rval = 2;
 	}
 
-#define	SEQ_GE(a,b)	((int)((a) - (b)) >= 0)
-#define	SEQ_GT(a,b)	((int)((a) - (b)) > 0)
 	inseq = 0;
 	if ((SEQ_GE(fdata->td_maxend, end)) &&
 	    (SEQ_GE(seq, fdata->td_end - maxwin)) &&
@@ -1706,7 +1710,7 @@ int flags;
 			fdata->td_end = end;
 		if (SEQ_GE(ack + win, tdata->td_maxend))
 			tdata->td_maxend = ack + win;
-		return 1;
+		return rval;
 	}
 	return 0;
 }
@@ -1773,7 +1777,7 @@ ipstate_t *is;
 	clone->is_ref = 2;
 	if (clone->is_p == IPPROTO_TCP) {
 		(void) fr_tcp_age(&clone->is_sti, fin, ips_tqtqb,
-				  clone->is_flags);
+				  clone->is_flags, 1);
 	}
 	MUTEX_EXIT(&clone->is_lock);
 #ifdef	IPFILTER_SCAN
@@ -3268,11 +3272,11 @@ void *entry;
 /*                                                                          */
 /* Locking: it is assumed that the parent of the tqe structure is locked.   */
 /* ------------------------------------------------------------------------ */
-int fr_tcp_age(tqe, fin, tqtab, flags)
+int fr_tcp_age(tqe, fin, tqtab, flags, seqnext)
 ipftqent_t *tqe;
 fr_info_t *fin;
 ipftq_t *tqtab;
-int flags;
+int flags, seqnext;
 {
 	int dlen, ostate, nstate, rval, dir;
 	u_char tcpflags;
@@ -3608,7 +3612,8 @@ int flags;
 	if (rval == 2)
 		rval = 1;
 	else if (rval == 1) {
-		tqe->tqe_state[dir] = nstate;
+		if (seqnext)
+			tqe->tqe_state[dir] = nstate;
 		if ((tqe->tqe_flags & TQE_RULEBASED) == 0)
 			fr_movequeue(tqe, tqe->tqe_ifq, tqtab + nstate);
 	}

@@ -122,6 +122,7 @@ typedef	struct	nat	{
 	char		nat_ifnames[2][LIFNAMSIZ];
 	int		nat_rev;		/* 0 = forward, 1 = reverse */
 	int		nat_redir;		/* copy of in_redir */
+	u_32_t		nat_seqnext[2];
 } nat_t;
 
 #define	nat_inip	nat_inip6.in4
