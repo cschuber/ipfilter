@@ -13,8 +13,8 @@ Hostmap table:
 3.3.3.1,2.2.2.2 -> 4.4.4.4,0.0.0.0 (use = 1 hv = 1758)
 List of active state sessions:
 4:udp src:3.3.3.1,6700 dst:2.2.2.2,4500 24
-	FWD:IN pkts 1 bytes 28 OUT pkts 1 bytes 28
-	REV:IN pkts 1 bytes 28 OUT pkts 1 bytes 28
+	FWD: IN pkts 1 bytes 28 OUT pkts 1 bytes 28
+	REV: IN pkts 1 bytes 28 OUT pkts 1 bytes 28
 	tag 0 pass 0x2008402 = pass in keep state
 	interfaces: in X[le0],X[hme0] out X[ppp0],X[bge0]
 	Sync status: not synchronized

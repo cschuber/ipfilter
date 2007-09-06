@@ -57,9 +57,9 @@ u_long now;
 			PRINTF("\tcmsk %04x smsk %04x isc %p s0 %08x/%08x\n",
 				sp->is_smsk[0], sp->is_smsk[1], sp->is_isc,
 				sp->is_s0[0], sp->is_s0[1]);
-			PRINTF("\tFWD:ISN inc %x sumd %x\n",
+			PRINTF("\tFWD: ISN inc %x sumd %x\n",
 				sp->is_isninc[0], sp->is_sumd[0]);
-			PRINTF("\tREV:ISN inc %x sumd %x\n",
+			PRINTF("\tREV: ISN inc %x sumd %x\n",
 				sp->is_isninc[1], sp->is_sumd[1]);
 #ifdef	IPFILTER_SCAN
 			PRINTF("\tsbuf[0] [");
@@ -81,13 +81,13 @@ u_long now;
 			sp->is_icmp.ici_seq, sp->is_icmp.ici_type);
 
 #ifdef        USE_QUAD_T
-	PRINTF("\tFWD:IN pkts %qu bytes %qu OUT pkts %qu bytes %qu\n\tREV:IN pkts %qu bytes %qu OUT pkts %qu bytes %qu\n",
+	PRINTF("\tFWD: IN pkts %qu bytes %qu OUT pkts %qu bytes %qu\n\tREV: IN pkts %qu bytes %qu OUT pkts %qu bytes %qu\n",
 		sp->is_pkts[0], sp->is_bytes[0],
 		sp->is_pkts[1], sp->is_bytes[1],
 		sp->is_pkts[2], sp->is_bytes[2],
 		sp->is_pkts[3], sp->is_bytes[3]);
 #else
-	PRINTF("\tFWD:IN pkts %lu bytes %lu OUT pkts %lu bytes %lu\n\tREV:IN pkts %lu bytes %lu OUT pkts %lu bytes %lu\n",
+	PRINTF("\tFWD: IN pkts %lu bytes %lu OUT pkts %lu bytes %lu\n\tREV: IN pkts %lu bytes %lu OUT pkts %lu bytes %lu\n",
 		sp->is_pkts[0], sp->is_bytes[0],
 		sp->is_pkts[1], sp->is_bytes[1],
 		sp->is_pkts[2], sp->is_bytes[2],

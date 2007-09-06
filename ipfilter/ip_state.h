@@ -280,7 +280,7 @@ extern	ipftq_t	*ips_utqe;
 extern	ipftq_t	ips_tqtqb[IPF_TCP_NSTATES];
 
 extern	int	ipf_tcp_age __P((struct ipftqent *, struct fr_info *,
-				struct ipftq *, int));
+				struct ipftq *, int, int));
 extern	int	ipf_tcpinwindow __P((struct fr_info *, struct tcpdata *,
 				    struct tcpdata *, tcphdr_t *, int));
 

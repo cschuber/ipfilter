@@ -235,6 +235,8 @@ int opts;
 			printf("\tpmax %u\n", np->in_dpmax);
 
 	} else {
+		int protoprinted = 0;
+
 		if (!(np->in_flags & IPN_FILTER)) {
 			printaddr(AF_INET, np->in_osrcatype, np->in_ifnames[0],
 				  (u_32_t *)&np->in_osrcaddr,
@@ -272,6 +274,7 @@ int opts;
 			printf(" %.*s/", (int)sizeof(np->in_plabel),
 				np->in_plabel);
 			printproto(pr, proto, NULL);
+			protoprinted = 1;
 		} else if (np->in_redir == NAT_MAPBLK) {
 			if ((np->in_spmin == 0) &&
 			    (np->in_flags & IPN_AUTOPORTMAP))
@@ -288,6 +291,7 @@ int opts;
 				printf(" portmap ");
 			}
 			printproto(pr, proto, np);
+			protoprinted = 1;
 			if (np->in_flags & IPN_AUTOPORTMAP) {
 				printf(" auto");
 				if (opts & OPT_DEBUG)
@@ -297,9 +301,6 @@ int opts;
 			} else {
 				printf(" %d:%d", np->in_spmin, np->in_spmax);
 			}
-		} else if ((np->in_flags & IPN_TCPUDP) || proto) {
-			putchar(' ');
-			printproto(pr, proto, np);
 		}
 
 		if (np->in_flags & IPN_FRAG)
@@ -311,6 +312,10 @@ int opts;
 			printf(" mssclamp %d", np->in_mssclamp);
 		if (np->in_tag.ipt_tag[0] != '\0')
 			printf(" tag %s", np->in_tag.ipt_tag);
+		if (!protoprinted && (np->in_flags & IPN_TCPUDP || proto)) {
+			putchar(' ');
+			printproto(pr, proto, np);
+		}
 		printf("\n");
 		if (opts & OPT_DEBUG) {
 			struct in_addr nip;

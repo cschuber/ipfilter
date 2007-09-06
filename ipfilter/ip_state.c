@@ -1346,7 +1346,8 @@ ipf_state_add(fin, stsave, flags)
 		* timer on it as we'll never see an error if it fails to
 		* connect.
 		*/
-		(void) ipf_tcp_age(&is->is_sti, fin, ips_tqtqb, is->is_flags);
+		(void) ipf_tcp_age(&is->is_sti, fin, ips_tqtqb,
+				   is->is_flags, 2);
 		MUTEX_EXIT(&is->is_lock);
 #ifdef	IPFILTER_SCAN
 		if ((is->is_flags & SI_CLONE) == 0)
@@ -1496,8 +1497,8 @@ ipf_state_tcp(fin, tcp, is)
 	tcphdr_t *tcp;
 	ipstate_t *is;
 {
-	int source, ret = 0, flags;
 	tcpdata_t  *fdata, *tdata;
+	int source, ret, flags;
 
 	source = !fin->fin_rev;
 	if (((is->is_flags & IS_TCPFSM) != 0) && (source == 1) && 
@@ -1524,7 +1525,8 @@ ipf_state_tcp(fin, tcp, is)
 		}
 	}
 
-	if (ipf_tcpinwindow(fin, fdata, tdata, tcp, is->is_flags)) {
+	ret = ipf_tcpinwindow(fin, fdata, tdata, tcp, is->is_flags);
+	if (ret > 0) {
 #ifdef	IPFILTER_SCAN
 		if (is->is_flags & (IS_SC_CLIENT|IS_SC_SERVER)) {
 			ipf_scan_packet(fin, is);
@@ -1539,7 +1541,8 @@ ipf_state_tcp(fin, tcp, is)
 		/*
 		 * Nearing end of connection, start timeout.
 		 */
-		ret = ipf_tcp_age(&is->is_sti, fin, ips_tqtqb, is->is_flags);
+		ret = ipf_tcp_age(&is->is_sti, fin, ips_tqtqb,
+				  is->is_flags, ret);
 		if (ret == 0) {
 			MUTEX_EXIT(&is->is_lock);
 			ATOMIC_INCL(ipf_state_stats.iss_tcp_fsm);
@@ -1582,6 +1585,7 @@ ipf_state_tcp(fin, tcp, is)
 	} else {
 		ATOMIC_INCL(ipf_state_stats.iss_tcp_oow);
 		fin->fin_flx |= FI_OOW;
+		ret = 0;
 	}
 	MUTEX_EXIT(&is->is_lock);
 	return ret;
@@ -1872,7 +1876,7 @@ ipf_state_clone(fin, tcp, is)
 	clone->is_ref = 2;
 	if (clone->is_p == IPPROTO_TCP) {
 		(void) ipf_tcp_age(&clone->is_sti, fin, ips_tqtqb,
-				  clone->is_flags);
+				  clone->is_flags, 2);
 	}
 	MUTEX_EXIT(&clone->is_lock);
 #ifdef	IPFILTER_SCAN
@@ -3474,11 +3478,11 @@ ipf_state_flush_entry(entry)
 /* Locking: it is assumed that the parent of the tqe structure is locked.   */
 /* ------------------------------------------------------------------------ */
 int
-ipf_tcp_age(tqe, fin, tqtab, flags)
+ipf_tcp_age(tqe, fin, tqtab, flags, ok)
 	ipftqent_t *tqe;
 	fr_info_t *fin;
 	ipftq_t *tqtab;
-	int flags;
+	int flags, ok;
 {
 	int dlen, ostate, nstate, rval, dir;
 	u_char tcpflags;
@@ -3814,7 +3818,8 @@ ipf_tcp_age(tqe, fin, tqtab, flags)
 	if (rval == 2)
 		rval = 1;
 	else if (rval == 1) {
-		tqe->tqe_state[dir] = nstate;
+		if (ok)
+			tqe->tqe_state[dir] = nstate;
 		if ((tqe->tqe_flags & TQE_RULEBASED) == 0)
 			ipf_movequeue(tqe, tqe->tqe_ifq, tqtab + nstate);
 	}
