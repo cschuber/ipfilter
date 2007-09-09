@@ -1073,7 +1073,8 @@ fr_info_t *fin;
 
 	frpr_short(fin, minicmpsz);
 
-	fr_checkv4sum(fin);
+	if ((fin->fin_flx & FI_FRAG) == 0)
+		fr_checkv4sum(fin);
 }
 
 
@@ -1277,8 +1278,10 @@ fr_info_t *fin;
 
 	frpr_short(fin, sizeof(tcphdr_t));
 
-	if (frpr_tcpcommon(fin) == 0)
-		fr_checkv4sum(fin);
+	if (frpr_tcpcommon(fin) == 0) {
+		if ((fin->fin_flx & FI_FRAG) == 0)
+			fr_checkv4sum(fin);
+	}
 }
 
 
@@ -1296,8 +1299,10 @@ fr_info_t *fin;
 
 	frpr_short(fin, sizeof(udphdr_t));
 
-	if (frpr_udpcommon(fin) == 0)
-		fr_checkv4sum(fin);
+	if (frpr_udpcommon(fin) == 0) {
+		if ((fin->fin_flx & FI_FRAG) == 0)
+			fr_checkv4sum(fin);
+	}
 }
 
 
@@ -2557,11 +2562,20 @@ int out;
 	if (!out)
 		(void) fr_acctpkt(fin, NULL);
 
-	if (fr == NULL)
-		if ((fin->fin_flx & (FI_FRAG|FI_BAD)) == FI_FRAG)
+	if (fr == NULL) {
+		if ((fin->fin_flx & (FI_FRAG|FI_BAD)) == FI_FRAG) {
 			fr = fr_knownfrag(fin, &pass);
-	if (fr == NULL)
-		fr = fr_checkstate(fin, &pass);
+			/*
+			 * Reset the keep state flag here so that we don't
+			 * try and add a new state entry because of it, leading
+			 * to a blocked packet because the add will fail.
+			 */
+			if (fr != NULL)
+				pass &= ~FR_KEEPSTATE;
+		}
+		if (fr == NULL)
+			fr = fr_checkstate(fin, &pass);
+	}
 
 	if ((pass & FR_NOMATCH) || (fr == NULL))
 		fr = fr_firewall(fin, &pass);

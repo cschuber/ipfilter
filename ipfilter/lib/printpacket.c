@@ -54,7 +54,7 @@ struct ip *ip;
 	printf("ip #%d %d(%d) %d", ntohs(ip->ip_id), ntohs(ip->ip_len),
 	       IP_HL(ip) << 2, ip->ip_p);
 	if (off & IP_OFFMASK)
-		printf(" @%d", off << 3);
+		printf(" @%d", (off & IP_OFFMASK) << 3);
 	printf(" %s", inet_ntoa(ip->ip_src));
 	if (!(off & IP_OFFMASK))
 		if (ip->ip_p == IPPROTO_TCP || ip->ip_p == IPPROTO_UDP)
