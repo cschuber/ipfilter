@@ -1000,7 +1000,10 @@ int	blen;
 	ipflog_t *ipf;
 	iplog_t	*ipl;
 #ifdef	USE_INET6
+	struct ip6_ext *ehp;
+	u_short ehl;
 	ip6_t *ip6;
+	int go;
 #endif
 
 	ipl = (iplog_t *)buf;
@@ -1109,6 +1112,29 @@ int	blen;
 		s = (u_32_t *)&ip6->ip6_src;
 		d = (u_32_t *)&ip6->ip6_dst;
 		plen = hl + ntohs(ip6->ip6_plen);
+		go = 1;
+		ehp = (struct ip6_ext *)((char *)ip6 + hl);
+		while (go == 1) {
+			switch (p)
+			{
+			case IPPROTO_HOPOPTS :
+			case IPPROTO_MOBILITY :
+			case IPPROTO_DSTOPTS :
+			case IPPROTO_ROUTING :
+			case IPPROTO_AH :
+				p = ehp->ip6e_nxt;
+				ehl = 8 + (ehp->ip6e_len << 3);
+				hl += ehl;
+				ehp = (struct ip6_ext *)((char *)ehp + ehl);
+				break;
+			case IPPROTO_FRAGMENT :
+				hl += sizeof(struct ip6_frag);
+				/* FALLTHROUGH */
+			default :
+				go = 0;
+				break;
+			}
+		}
 #else
 		sprintf(t, "ipv6");
 		goto printipflog;
