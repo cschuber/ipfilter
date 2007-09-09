@@ -2865,11 +2865,20 @@ ipf_check(ip, hlen, ifp, out
 	if (!out)
 		(void) ipf_acctpkt(fin, NULL);
 
-	if (fr == NULL)
-		if ((fin->fin_flx & (FI_FRAG|FI_BAD)) == FI_FRAG)
+	if (fr == NULL) {
+		if ((fin->fin_flx & (FI_FRAG|FI_BAD)) == FI_FRAG) {
 			fr = ipf_frag_known(fin, &pass);
-	if ((fr == NULL) && (ipf_specfuncref[0][ipf_active] == 0))
-		fr = ipf_state_check(fin, &pass);
+			/*
+			 * Reset the keep state flag here so that we don't
+			 * try and add a new state entry because of it, leading
+			 * to a blocked packet because the add will fail.
+			 */
+			if (fr != NULL)
+				pass &= ~FR_KEEPSTATE;
+		}
+		if ((fr == NULL) && (ipf_specfuncref[0][ipf_active] == 0))
+			fr = ipf_state_check(fin, &pass);
+	}
 
 	if ((pass & FR_NOMATCH) || (fr == NULL))
 		fr = ipf_firewall(fin, &pass);
