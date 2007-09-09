@@ -191,6 +191,13 @@ static	size_t	hdrsizes[57][2] = {
 
 static dev_info_t *ipf_dev_info = NULL;
 
+#if defined(_INET_IP_STACK_H)
+static hook_t ipfhook;
+static int ipf_hook(hook_event_token_t, hook_data_t, netstack_t *);
+net_data_t ipfipv4, ipfipv6;
+#endif
+
+#define	IPFDEBUG	1
 
 int _init()
 {
@@ -255,11 +262,14 @@ ddi_attach_cmd_t cmd;
 	cmn_err(CE_NOTE, "IP Filter: ipf_attach(%x,%x)", dip, cmd);
 #endif
 
+#if !defined(_INET_IP_STACK_H)
 	if ((pfilinterface != PFIL_INTERFACE) || (PFIL_INTERFACE < 2000000)) {
 		cmn_err(CE_NOTE, "pfilinterface(%d) != %d\n", pfilinterface,
 			PFIL_INTERFACE);
 		return EINVAL;
 	}
+#else
+#endif
 
 	switch (cmd)
 	{
@@ -304,17 +314,36 @@ ddi_attach_cmd_t cmd;
 			goto attach_failed;
 		}
 
+#if !defined(_INET_IP_STACK_H)
 		if (pfil_add_hook(fr_check, PFIL_IN|PFIL_OUT, &pfh_inet4))
 			cmn_err(CE_WARN, "IP Filter: %s(pfh_inet4) failed",
 				"pfil_add_hook");
-#ifdef USE_INET6
+# ifdef USE_INET6
 		if (pfil_add_hook(fr_check, PFIL_IN|PFIL_OUT, &pfh_inet6))
 			cmn_err(CE_WARN, "IP Filter: %s(pfh_inet6) failed",
 				"pfil_add_hook");
-#endif
+# endif
 		if (pfil_add_hook(fr_qifsync, PFIL_IN|PFIL_OUT, &pfh_sync))
 			cmn_err(CE_WARN, "IP Filter: %s(pfh_sync) failed",
 				"pfil_add_hook");
+#else
+		HOOK_INIT(&ipfhook, ipf_hook, "ipf_v4");
+
+		if (!(ipfipv4 = net_lookup(NHF_INET, GLOBAL_NETSTACKID)))
+			goto attach_failed;
+		if (net_register_hook(ipfipv4, NH_PHYSICAL_IN, &ipfhook))
+			goto attach_failed;
+		if (net_register_hook(ipfipv4, NH_PHYSICAL_OUT, &ipfhook))
+			goto attach_failed;
+# ifdef USE_INET6
+		if (!(ipfipv6 = net_lookup(NHF_INET6, GLOBAL_NETSTACKID)))
+			goto attach_failed;
+		if (net_register_hook(ipfipv6, NH_PHYSICAL_IN, &ipfhook))
+			goto attach_failed;
+		if (net_register_hook(ipfipv6, NH_PHYSICAL_OUT, &ipfhook))
+			goto attach_failed;
+# endif
+#endif
 
 		fr_timer_id = timeout(fr_slowtimer, NULL,
 				      drv_usectohz(500000));
@@ -371,17 +400,34 @@ ddi_detach_cmd_t cmd;
 		}
 		fr_running = -2;
 
+#if !defined(_INET_IP_STACK_H)
 		if (pfil_remove_hook(fr_check, PFIL_IN|PFIL_OUT, &pfh_inet4))
 			cmn_err(CE_WARN, "IP Filter: %s(pfh_inet4) failed",
 				"pfil_remove_hook");
-#ifdef USE_INET6
+# ifdef USE_INET6
 		if (pfil_remove_hook(fr_check, PFIL_IN|PFIL_OUT, &pfh_inet6))
 			cmn_err(CE_WARN, "IP Filter: %s(pfh_inet6) failed",
 				"pfil_add_hook");
-#endif
+# endif
 		if (pfil_remove_hook(fr_qifsync, PFIL_IN|PFIL_OUT, &pfh_sync))
 			cmn_err(CE_WARN, "IP Filter: %s(pfh_sync) failed",
 				"pfil_remove_hook");
+#else
+		if (net_unregister_hook(ipfipv4, NH_PHYSICAL_IN, &ipfhook))
+			cmn_err(CE_WARN, "IP Filter: v4-IN unregister failed");
+		if (net_unregister_hook(ipfipv4, NH_PHYSICAL_OUT, &ipfhook))
+			cmn_err(CE_WARN, "IP Filter: v4-OUT unregister failed");
+		if (net_release(ipfipv4))
+			cmn_err(CE_WARN, "IP Filter: v4 net_release failed");
+# ifdef USE_INET6
+		if (net_unregister_hook(ipfipv6, NH_PHYSICAL_IN, &ipfhook))
+			cmn_err(CE_WARN, "IP Filter: v6-IN unregister failed");
+		if (net_unregister_hook(ipfipv6, NH_PHYSICAL_OUT, &ipfhook))
+			cmn_err(CE_WARN, "IP Filter: v6-OUT unregister failed");
+		if (net_release(ipfipv6))
+			cmn_err(CE_WARN, "IP Filter: v6 net_release failed");
+# endif
+#endif
 
 		RWLOCK_EXIT(&ipf_global);
 
@@ -620,6 +666,50 @@ struct pollhead **phpp;
 		*reventsp = 0;
 		if (!anyyet)
 			*phpp = &iplpollhead[xmin];
+	}
+	return 0;
+}
+
+
+static int
+ipf_hook(hook_event_token_t event, hook_data_t data, netstack_t *stp)
+{
+	hook_pkt_event_t *hpe;
+	qpktinfo_t qpi;
+	int out, hlen;
+	ip_t *ip;
+
+	hpe = (hook_pkt_event_t *)data;
+	qpi.qpi_data = hpe->hpe_hdr;
+	qpi.qpi_mp = hpe->hpe_mp;
+	qpi.qpi_m = hpe->hpe_mb;
+
+	if (hpe->hpe_ifp > 0) {
+		qpi.qpi_real = hpe->hpe_ifp;
+		out = 0;
+	} else {
+		qpi.qpi_real = hpe->hpe_ofp;
+		out = 1;
+	}
+	qpi.qpi_flags = 0;
+	qpi.qpi_num = hpe->hpe_ifp;
+	qpi.qpi_off = 0;
+
+	ip = hpe->hpe_hdr;
+	if (ip->ip_v == 4) {
+		hlen = ip->ip_hl << 2;
+		ip->ip_off = ntohs(ip->ip_off);
+		ip->ip_len = ntohs(ip->ip_len);
+	} else {
+		hlen = sizeof(ip6_t);
+	}
+
+	if (fr_check(hpe->hpe_hdr, hlen, qpi.qpi_real, out, &qpi, qpi.qpi_mp))
+		return -1;
+	ip = hpe->hpe_hdr;
+	if (ip->ip_v == 4) {
+		ip->ip_off = htons(ip->ip_off);
+		ip->ip_len = htons(ip->ip_len);
 	}
 	return 0;
 }

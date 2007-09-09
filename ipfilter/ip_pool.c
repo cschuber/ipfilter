@@ -53,6 +53,9 @@ struct file;
 # include <sys/malloc.h>
 #endif
 
+#if defined(SOLARIS2) && !defined(_KERNEL)
+# include "radix_ipf.h"
+#endif
 #if defined(_KERNEL) && (defined(__osf__) || defined(AIX) || \
      defined(__hpux) || defined(__sgi))
 # include "radix_ipf_local.h"
@@ -80,6 +83,12 @@ static const char rcsid[] = "@(#)$Id$";
 
 #ifdef IPFILTER_LOOKUP
 
+# ifndef _KERNEL
+#  undef RADIX_NODE_HEAD_LOCK
+#  undef RADIX_NODE_HEAD_UNLOCK
+#  define RADIX_NODE_HEAD_LOCK(x)	;
+#  define RADIX_NODE_HEAD_UNLOCK(x)	;
+# endif
 # ifndef RADIX_NODE_HEAD_LOCK
 #  define RADIX_NODE_HEAD_LOCK(x)	;
 # endif

@@ -80,7 +80,7 @@ struct file;
 #ifdef sun
 # include <net/af.h>
 #endif
-#if !defined(_KERNEL) && defined(__FreeBSD__)
+#if !defined(_KERNEL) && (defined(__FreeBSD__) || defined(SOLARIS2))
 # if (__FreeBSD_version >= 504000)
 #  undef _RADIX_H_
 # endif
@@ -2401,8 +2401,10 @@ int out;
 # ifdef MENTAT
 	qpktinfo_t *qpi = qif;
 
+#  if !defined(_INET_IP_STACK_H)
 	if ((u_int)ip & 0x3)
 		return 2;
+#  endif
 # else
 	SPL_INT(s);
 # endif

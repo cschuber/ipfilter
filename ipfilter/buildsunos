@@ -21,7 +21,7 @@ testcc()
 }
 
 if [ $rev = 5 ] ; then
-	if [ ! -d ../pfil ] ; then
+	if [ ! -f /usr/include/sys/neti.h -a ! -d ../pfil ] ; then
 		cat << __EOF__
 pfil directory in .. missing, please download pfil package and extract that
 into the parent directory.

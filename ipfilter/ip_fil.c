@@ -79,7 +79,7 @@ struct file;
 #include <sys/hashing.h>
 # endif
 #endif
-#if defined(__FreeBSD__)
+#if defined(__FreeBSD__) || defined(SOLARIS2)
 # include "radix_ipf.h"
 #endif
 #ifndef __osf__
@@ -388,7 +388,7 @@ int v;
 		*addr++ = '\0';
 
 	for (ifpp = ifneta; ifpp && (ifp = *ifpp); ifpp++) {
-		COPYIFNAME(ifp, ifname);
+		COPYIFNAME(v, ifp, ifname);
 		if (!strcmp(name, ifname)) {
 			if (addr != NULL)
 				fr_setifpaddr(ifp, addr);

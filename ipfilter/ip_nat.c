@@ -176,7 +176,7 @@ u_long	fr_defnatage = DEF_NAT_AGE,
 natstat_t nat_stats;
 int	fr_nat_lock = 0;
 int	fr_nat_init = 0;
-#if SOLARIS
+#if SOLARIS && !defined(_INET_IP_STACK_H)
 extern	int		pfil_delayed_copy;
 #endif
 
@@ -1084,7 +1084,7 @@ int getlock;
 
 	n = NULL;
 	nat_stats.ns_rules++;
-#if SOLARIS
+#if SOLARIS && !defined(_INET_IP_STACK_H)
 	pfil_delayed_copy = 0;
 #endif
 	if (getlock) {
@@ -1174,7 +1174,7 @@ int getlock;
 			appr_free(n->in_apr);
 		KFREE(n);
 		nat_stats.ns_rules--;
-#if SOLARIS
+#if SOLARIS && !defined(_INET_IP_STACK_H)
 		if (nat_stats.ns_rules == 0)
 			pfil_delayed_copy = 1;
 #endif
@@ -1820,7 +1820,7 @@ static int nat_clearlist()
 		}
 		i++;
 	}
-#if SOLARIS
+#if SOLARIS && !defined(_INET_IP_STACK_H)
 	pfil_delayed_copy = 1;
 #endif
 	nat_masks = 0;
@@ -2530,10 +2530,10 @@ int direction;
 	np = ni->nai_np;
 
 	if (np->in_ifps[0] != NULL) {
-		COPYIFNAME(np->in_ifps[0], nat->nat_ifnames[0]);
+		COPYIFNAME(4, np->in_ifps[0], nat->nat_ifnames[0]);
 	}
 	if (np->in_ifps[1] != NULL) {
-		COPYIFNAME(np->in_ifps[1], nat->nat_ifnames[1]);
+		COPYIFNAME(4, np->in_ifps[1], nat->nat_ifnames[1]);
 	}
 #ifdef	IPFILTER_SYNC
 	if ((nat->nat_flags & SI_CLONE) == 0)
@@ -4674,7 +4674,7 @@ ipnat_t **inp;
 			appr_free(in->in_apr);
 		KFREE(in);
 		nat_stats.ns_rules--;
-#if SOLARIS
+#if SOLARIS && !defined(_INET_IP_STACK_H)
 		if (nat_stats.ns_rules == 0)
 			pfil_delayed_copy = 1;
 #endif

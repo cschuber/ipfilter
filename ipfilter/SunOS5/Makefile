@@ -228,7 +228,11 @@ $(OBJ)/ipfrule: $(OBJ)/ip_rulesx.o $(OBJ)/mlso_rule.o
 	ld -r $(OBJ)/ip_rulesx.o $(OBJ)/mlso_rule.o -o $@
 
 $(OBJ)/ipf: $(MODOBJS)
-	ld -dy -Ndrv/ip -Ndrv/pfil -Nmisc/md5 -r $(MODOBJS) -o $@
+	if [ -f /kernel/misc/neti ] ; then \
+		ld -dy -Ndrv/ip -Nmisc/neti -Nmisc/md5 -r $(MODOBJS) -o $@; \
+	else \
+		ld -dy -Ndrv/ip -Ndrv/pfil -Nmisc/md5 -r $(MODOBJS) -o $@; \
+	fi
 
 $(OBJ)/md5.o: $(TOP)/md5.c $(TOP)/md5.h
 	$(CC) -I$(TOP) $(DFLAGS) -c $(TOP)/md5.c -o $@

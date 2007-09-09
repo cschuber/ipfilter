@@ -256,7 +256,8 @@ u_int flags;
 	ipflog_t ipfl;
 	u_char p;
 	mb_t *m;
-# if (SOLARIS || defined(__hpux)) && defined(_KERNEL)
+# if (SOLARIS || defined(__hpux)) && defined(_KERNEL) && \
+  !defined(_INET_IP_STACK_H)
 	qif_t *ifp;
 # else
 	struct ifnet *ifp;
@@ -329,14 +330,16 @@ u_int flags;
 	 * Get the interface number and name to which this packet is
 	 * currently associated.
 	 */
-# if (SOLARIS || defined(__hpux)) && defined(_KERNEL)
+# if (SOLARIS || defined(__hpux)) && defined(_KERNEL) && \
+     !defined(_INET_IP_STACK_H)
 	ipfl.fl_unit = (u_int)ifp->qf_ppa;
-	COPYIFNAME(ifp, ipfl.fl_ifname);
+	COPYIFNAME(fin->fin_v, ifp, ipfl.fl_ifname);
 # else
 #  if (defined(NetBSD) && (NetBSD <= 1991011) && (NetBSD >= 199603)) || \
       (defined(OpenBSD) && (OpenBSD >= 199603)) || defined(linux) || \
-      (defined(__FreeBSD__) && (__FreeBSD_version >= 501113))
-	COPYIFNAME(ifp, ipfl.fl_ifname);
+      (defined(__FreeBSD__) && (__FreeBSD_version >= 501113)) || \
+      (SOLARIS && defined(_INET_IP_STACK_H))
+	COPYIFNAME(fin->fin_v, ifp, ipfl.fl_ifname);
 #  else
 	ipfl.fl_unit = (u_int)ifp->if_unit;
 #   if defined(_KERNEL)
@@ -345,7 +348,7 @@ u_int flags;
 			if ((ipfl.fl_ifname[2] = ifp->if_name[2]))
 				ipfl.fl_ifname[3] = ifp->if_name[3];
 #   else
-	(void) strncpy(ipfl.fl_ifname, IFNAME(ifp), sizeof(ipfl.fl_ifname));
+	COPYIFNAME(fin->fin_v, ifp, ipfl.fl_ifname);
 	ipfl.fl_ifname[sizeof(ipfl.fl_ifname) - 1] = '\0';
 #   endif
 #  endif

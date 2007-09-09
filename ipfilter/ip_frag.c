@@ -400,7 +400,7 @@ u_32_t ipid;
 	WRITE_ENTER(&ipf_ipidfrag);
 	fra = ipfr_newfrag(fin, 0, ipfr_ipidtab);
 	if (fra != NULL) {
-		fra->ipfr_data = (void *)ipid;
+		fra->ipfr_data = (void *)((u_long)ipid);
 		*ipfr_ipidtail = fra;
 		fra->ipfr_prev = ipfr_ipidtail;
 		ipfr_ipidtail = &fra->ipfr_next;
@@ -585,7 +585,7 @@ fr_info_t *fin;
 	READ_ENTER(&ipf_ipidfrag);
 	ipf = fr_fraglookup(fin, ipfr_ipidtab);
 	if (ipf != NULL)
-		id = (u_32_t)ipf->ipfr_data;
+		id = (u_32_t)((u_long)ipf->ipfr_data & 0xffffffff);
 	else
 		id = 0xffffffff;
 	RWLOCK_EXIT(&ipf_ipidfrag);

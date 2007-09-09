@@ -370,10 +370,12 @@ fr_info_t *fin;
 	}
 #endif
 #if SOLARIS && defined(_KERNEL)
-	COPYIFNAME(fin->fin_ifp, fra->fra_info.fin_ifname);
+	COPYIFNAME(fin->fin_v, fin->fin_ifp, fra->fra_info.fin_ifname);
 	m->b_rptr -= qpi->qpi_off;
 	fr_authpkts[i] = *(mblk_t **)fin->fin_mp;
+# if !defined(_INET_IP_STACK_H)
 	fra->fra_q = qpi->qpi_q;	/* The queue can disappear! */
+# endif
 	fra->fra_m = *fin->fin_mp;
 	fra->fra_info.fin_mp = &fra->fra_m;
 	cv_signal(&ipfauthwait);

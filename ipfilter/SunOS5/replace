@@ -1,0 +1,113 @@
+#!/bin/ksh
+SBIN=/usr/sbin
+debug=echo
+undo=0
+
+update() {
+	echo "UPDATE $1 $2 $3"
+	base=$1
+	dir=$2
+	file=$3
+	Z=$IFS
+	IFS=:
+	set $file
+	IFS=$Z
+	if [[ -z $2 ]] ; then
+		o=$1
+		n=$1
+	else
+		o=$1
+		n=$2
+	fi
+
+	prog=${base}/${dir}/${o}
+	if [[ $undo -eq 0 ]] ; then
+		if [[ -d ${base}/${dir} ]] ; then
+			if [[ ! -f ${prog}.dist ]] ; then
+				$debug /bin/mv ${prog} ${prog}.dist
+				$debug /bin/cp -p ${prog}.dist ${prog}
+			fi
+			$debug /bin/cp ${dir}/${o} ${prog}
+		else
+			prog=${base}/${o}
+			links=$(/bin/ls -dl ${prog} | awk ' { print $2; } ' -)
+			if [[ $links -eq 1 ]] ; then
+				if [[ ! -f ${prog}.dist ]] ; then
+					$debug /bin/mv ${prog} ${prog}.dist
+					$debug /bin/cp -p ${prog}.dist ${prog}
+				fi
+				$debug /bin/cp ${dir}/${o} ${prog}
+			fi
+		fi
+	else
+		if [[ -f ${prog}.dist ]] ; then
+			$debug /bin/mv -f ${prog}.dist ${prog}
+		fi
+	fi
+}
+
+while [[ $# -gt 0 ]] ; do
+	case $1 in
+	undo)
+		undo=1
+		;;
+	-f)
+		debug=
+		;;
+	-d)
+		debug=echo
+		;;
+	esac
+	shift
+done
+
+case $(pwd) in
+*/SunOS5)
+	;;
+*/SunOS5/*)
+	exit 1
+	;;
+*)
+	cd SunOS5
+	;;
+esac
+cpu=`uname -p`
+cpudir=${cpu}-`uname -r`
+
+echo $cpudir
+
+if [[ -d ${cpudir}/amd64 ]] ; then
+	big=amd64
+fi
+if [[ -d ${cpudir}/sparcv9 ]] ; then
+	big=sparcv9
+fi
+if [[ -d ${cpudir}/i86 ]] ; then
+	small=i86
+fi
+if [[ -d ${cpudir}/sparc ]] ; then
+	small=sparc
+fi
+
+if [[ -n ${big} ]] ; then
+	for i in ipf:ipf.exe ipfs ipfstat ipmon ipnat ippool; do
+		update $SBIN $big $i
+	done
+	update /usr/lib/ipf $big ipftest
+	update /usr/kernel/drv $big ipf
+fi
+
+if [[ -n ${small} ]] ; then
+	for i in ipf:ipf.exe ipfs ipfstat ipmon ipnat ippool; do
+		update $SBIN $small $i
+	done
+	update /usr/lib/ipf $small ipftest
+	update /usr/kernel/drv $small ipf
+fi
+if [[ -z ${big} && -z ${small} ]] ; then
+	for i in ipf:ipf.exe ipfs ipfstat ipmon ipnat ippool; do
+		update $SBIN "" $i
+	done
+	update /usr/lib/ipf "" ipftest
+	update /usr/kernel/drv "" ipf
+fi
