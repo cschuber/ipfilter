@@ -36,6 +36,7 @@ extern int	yydebug;
 
 char		*yystr = NULL;
 int		yytext[YYBUFSIZ+1];
+char		yychars[YYBUFSIZ+1];
 int		yylineNum = 1;
 int		yypos = 0;
 int		yylast = -1;
@@ -50,13 +51,15 @@ wordtab_t	*yysavewords[30];
 
 
 static	wordtab_t	*yyfindkey __P((char *));
-static	int		yygetc __P((void));
+static	int		yygetc __P((int));
 static	void		yyunputc __P((int));
 static	int		yyswallow __P((int));
 static	char		*yytexttostr __P((int, int));
 static	void		yystrtotext __P((char *));
+static	char		*yytexttochar __P((void));
 
-static int yygetc()
+static int yygetc(docont)
+int docont;
 {
 	int c;
 
@@ -75,6 +78,13 @@ static int yygetc()
 		yypos++;
 	} else {
 		c = fgetc(yyin);
+		if (docont && (c == '\\')) {
+			c = fgetc(yyin);
+			if (c == '\n') {
+				yylineNum++;
+				c = fgetc(yyin);
+			}
+		}
 	}
 	if (c == '\n')
 		yylineNum++;
@@ -100,7 +110,7 @@ int last;
 {
 	int c;
 
-	while (((c = yygetc()) > '\0') && (c != last))
+	while (((c = yygetc(0)) > '\0') && (c != last))
 		;
 
 	if (c != EOF)
@@ -108,6 +118,17 @@ int last;
 	if (c == last)
 		return 0;
 	return -1;
+}
+
+
+static char *yytexttochar()
+{
+	int i;
+
+	for (i = 0; i < yypos; i++)
+		yychars[i] = (char)(yytext[i] & 0xff);
+	yychars[i] = '\0';
+	return yychars;
 }
 
 
@@ -166,7 +187,9 @@ int yylex()
 	}
 
 nextchar:
-	c = yygetc();
+	c = yygetc(0);
+	if (yydebug > 1)
+		printf("yygetc = (%x) %c [%*.*s]\n", c, c, yypos, yypos, yytexttochar());
 
 	switch (c)
 	{
@@ -229,20 +252,20 @@ nextchar:
 			yyunputc(c);
 			goto done;
 		}
-		n = yygetc();
+		n = yygetc(0);
 		if (n == '{') {
 			if (yyswallow('}') == -1) {
 				rval = -2;
 				goto done;
 			}
-			(void) yygetc();
+			(void) yygetc(0);
 		} else {
 			if (!ISALPHA(n)) {
 				yyunputc(n);
 				break;
 			}
 			do {
-				n = yygetc();
+				n = yygetc(1);
 			} while (ISALPHA(n) || ISDIGIT(n) || n == '_');
 			yyunputc(n);
 		}
@@ -274,7 +297,7 @@ nextchar:
 			goto done;
 		}
 		do {
-			n = yygetc();
+			n = yygetc(1);
 			if (n == EOF || n == TOOLONG) {
 				rval = -2;
 				goto done;
@@ -326,7 +349,7 @@ nextchar:
 			break;
 		if (isbuilding == 1)
 			break;
-		n = yygetc();
+		n = yygetc(0);
 		if (n == '>') {
 			isbuilding = 1;
 			goto done;
@@ -340,7 +363,7 @@ nextchar:
 			yyunputc(c);
 			goto done;
 		}
-		n = yygetc();
+		n = yygetc(0);
 		if (n == '=') {
 			rval = YY_CMP_NE;
 			goto done;
@@ -356,7 +379,7 @@ nextchar:
 			yyunputc(c);
 			goto done;
 		}
-		n = yygetc();
+		n = yygetc(0);
 		if (n == '=') {
 			rval = YY_CMP_LE;
 			goto done;
@@ -376,7 +399,7 @@ nextchar:
 			yyunputc(c);
 			goto done;
 		}
-		n = yygetc();
+		n = yygetc(0);
 		if (n == '=') {
 			rval = YY_CMP_GE;
 			goto done;
@@ -413,7 +436,7 @@ nextchar:
 		 */
 		do {
 			*s++ = c;
-			c = yygetc();
+			c = yygetc(1);
 		} while ((ishex(c) || c == ':' || c == '.') &&
 			 (s - ipv6buf < 46));
 		yyunputc(c);
@@ -439,10 +462,10 @@ nextchar:
 	}
 
 	if (isbuilding == 0 && c == '0') {
-		n = yygetc();
+		n = yygetc(0);
 		if (n == 'x') {
 			do {
-				n = yygetc();
+				n = yygetc(1);
 			} while (ishex(n));
 			yyunputc(n);
 			rval = YY_HEX;
@@ -456,7 +479,7 @@ nextchar:
 	 */
 	if (isbuilding == 0 && ISDIGIT(c)) {
 		do {
-			n = yygetc();
+			n = yygetc(1);
 		} while (ISDIGIT(n));
 		yyunputc(n);
 		rval = YY_NUMBER;
