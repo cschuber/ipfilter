@@ -20,6 +20,9 @@ typedef	int	boolean_t;
 #endif
 #include <sys/time.h>
 #if !defined(__osf__)
+# ifdef __NetBSD__ 
+#  include <machine/lock.h>
+# endif
 # define _KERNEL
 # define KERNEL
 # if !defined(solaris) && !defined(linux) && !defined(__sgi) && !defined(hpux)

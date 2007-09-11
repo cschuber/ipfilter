@@ -29,6 +29,9 @@ typedef int     boolean_t;
 # include <sys/dir.h>
 #endif
 #if !defined(__osf__)
+# ifdef __NetBSD__ 
+#  include <machine/lock.h>
+# endif
 # define _KERNEL
 # define	KERNEL
 # ifdef	ultrix
