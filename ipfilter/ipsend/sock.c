@@ -387,7 +387,8 @@ struct	in_addr	gwip;
 {
 	struct	sockaddr_in	rsin, lsin;
 	struct	tcpcb	*t, tcb;
-	int	fd, nfd, len;
+	int	fd, nfd;
+	socklen_t len;
 
 	printf("Dest. Port: %d\n", ti->ti_dport);
 
