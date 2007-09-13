@@ -2547,11 +2547,8 @@ int direction;
 	nat->nat_ptr = np;
 	nat->nat_p = fin->fin_p;
 	nat->nat_mssclamp = np->in_mssclamp;
-	if (nat->nat_p == IPPROTO_TCP) {
-		tcphdr_t *tcp = fin->fin_dp;
-
+	if (nat->nat_p == IPPROTO_TCP)
 		nat->nat_seqnext[0] = ntohl(tcp->th_seq);
-	}
 
 	if ((np->in_apr != NULL) && ((ni->nai_flags & NAT_SLAVE) == 0))
 		if (appr_new(fin, nat) == -1)
@@ -2999,10 +2996,22 @@ int dir;
 			}
 
 			if (sumd2 != 0) {
+				ipnat_t *np;
+
+				np = nat->nat_ptr;
 				sumd2 = (sumd2 & 0xffff) + (sumd2 >> 16);
 				sumd2 = (sumd2 & 0xffff) + (sumd2 >> 16);
 				sumd2 = (sumd2 & 0xffff) + (sumd2 >> 16);
-				fix_incksum(fin, &icmp->icmp_cksum, sumd2);
+
+				if ((odst == 0) && (dir == NAT_OUTBOUND) &&
+				    (fin->fin_rev == 0) && (np != NULL) &&
+				    (np->in_redir & NAT_REDIRECT)) {
+					fix_outcksum(fin, &icmp->icmp_cksum,
+						     sumd2);
+				} else {
+					fix_incksum(fin, &icmp->icmp_cksum,
+						    sumd2);
+				}
 			}
 		}
 	} else if (((flags & IPN_ICMPQUERY) != 0) && (dlen >= 8)) {
@@ -5104,9 +5113,8 @@ ipfgeniter_t *itp;
 		}
 		RWLOCK_EXIT(&ipf_nat);
 
-		if (freet != NULL) {
+		if (freet != NULL)
 			ipf_freetoken(freet);
-		}
 
 		switch (itp->igi_type)
 		{
@@ -5116,7 +5124,7 @@ ipfgeniter_t *itp;
 				error = EFAULT;
 			else
 				dst += sizeof(*nexthm);
-			if (freet != NULL) {
+			if (freet == NULL) {
 				t->ipt_data = nexthm;
 				hm = nexthm;
 				nexthm = hm->hm_next;
@@ -5129,7 +5137,7 @@ ipfgeniter_t *itp;
 				error = EFAULT;
 			else
 				dst += sizeof(*nextipnat);
-			if (freet != NULL) {
+			if (freet == NULL) {
 				t->ipt_data = nextipnat;
 				ipn = nextipnat;
 				nextipnat = ipn->in_next;
@@ -5142,7 +5150,7 @@ ipfgeniter_t *itp;
 				error = EFAULT;
 			else
 				dst += sizeof(*nextnat);
-			if (freet != NULL) {
+			if (freet == NULL) {
 				t->ipt_data = nextnat;
 				nat = nextnat;
 				nextnat = nat->nat_next;

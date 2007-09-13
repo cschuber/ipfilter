@@ -6840,7 +6840,7 @@ int ipf_getnextrule(ipftoken_t *t, void *ptr)
 		}
 		RWLOCK_EXIT(&ipf_mutex);
 
-		if ((count == 1) || (next->fr_next == NULL)) {
+		if (next->fr_next == NULL) {
 			ipf_freetoken(t);
 		} else {
 			t->ipt_data = next;
