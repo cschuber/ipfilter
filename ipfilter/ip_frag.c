@@ -941,11 +941,11 @@ ipfrwlock_t *lock;
 	RWLOCK_EXIT(lock);
 
 	if (frag != NULL) {
-		WRITE_ENTER(lock);
-		frag->ipfr_ref--;
-		if (frag->ipfr_ref <= 0)
-			fr_fragfree(frag);
-		RWLOCK_EXIT(lock);
+#ifdef USE_MUTEXES
+		fr_fragderef(&frag, lock);
+#else
+		fr_fragderef(&frag);
+#endif
 	}
 
 	error = COPYOUT(next, itp->igi_data, sizeof(*next));

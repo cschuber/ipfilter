@@ -4071,13 +4071,14 @@ ipftoken_t *token;
 ipfgeniter_t *itp;
 {
 	ipstate_t *is, *next, zero;
+	ipftoken_t *freet;
 	int error, count;
 	char *dst;
 
 	if (itp->igi_data == NULL)
 		return EFAULT;
 
-	if (itp->igi_nitems == 0)
+	if (itp->igi_nitems < 1)
 		return ENOSPC;
 
 	if (itp->igi_type != IPFGENITER_STATE)
@@ -4090,6 +4091,7 @@ ipfgeniter_t *itp;
 	}
 
 	error = 0;
+	freet = NULL;
 	dst = itp->igi_data;
 
 	READ_ENTER(&ipf_state);
@@ -4099,21 +4101,23 @@ ipfgeniter_t *itp;
 		next = is->is_next;
 	}
 
-	for (count = itp->igi_nitems; count > 0; count--) {
+	count = itp->igi_nitems;
+	for (;;) {
 		if (next != NULL) {
 			/*
 			 * If we find a state entry to use, bump its
 			 * reference count so that it can be used for
 			 * is_next when we come back.
 			 */
-			MUTEX_ENTER(&next->is_lock);
-			next->is_ref++;
-			MUTEX_EXIT(&next->is_lock);
-			token->ipt_data = next;
+			if (count == 1) {
+				MUTEX_ENTER(&next->is_lock);
+				next->is_ref++;
+				MUTEX_EXIT(&next->is_lock);
+			}
 		} else {
 			bzero(&zero, sizeof(zero));
 			next = &zero;
-			token->ipt_data = (void *)-1;
+			freet = token;
 			count = 1;
 		}
 		RWLOCK_EXIT(&ipf_state);
@@ -4121,8 +4125,11 @@ ipfgeniter_t *itp;
 		/*
 		 * If we had a prior pointer to a state entry, release it.
 		 */
-		if (is != NULL) {
-			fr_statederef(&is);
+		if (freet != NULL) {
+			ipf_freetoken(freet);
+			freet = NULL;
+		} else {
+			token->ipt_data = next;
 		}
 
 		/*
@@ -4136,9 +4143,11 @@ ipfgeniter_t *itp;
 			break;
 
 		dst += sizeof(*next);
+
 		READ_ENTER(&ipf_state);
 		is = next;
 		next = is->is_next;
+		count--;
 	}
 
 	return error;

@@ -6561,14 +6561,11 @@ ipftoken_t *ipftokenhead = NULL, **ipftokentail = &ipftokenhead;
 void ipf_expiretokens()
 {
 	ipftoken_t *it;
-	void *data;
 
 	WRITE_ENTER(&ipf_tokens);
 	while ((it = ipftokenhead) != NULL) {
 		if (it->ipt_die > fr_ticks)
 			break;
-
-		data = it->ipt_data;
 
 		ipf_freetoken(it);
 	}
@@ -6746,7 +6743,9 @@ ipftoken_t *token;
 #endif
 			break;
 		case IPFGENITER_HOSTMAP :
+			WRITE_ENTER(&ipf_nat);
 			fr_hostmapdel((hostmap_t **)datap);
+			RWLOCK_EXIT(&ipf_nat);
 			break;
 		default :
 #ifdef IPFILTER_LOOKUP
@@ -6834,19 +6833,17 @@ int ipf_getnextrule(ipftoken_t *t, void *ptr)
 			MUTEX_ENTER(&next->fr_lock);
 			next->fr_ref++;
 			MUTEX_EXIT(&next->fr_lock);
-			t->ipt_data = next;
 		} else {
 			bzero(&zero, sizeof(zero));
 			next = &zero;
-			ipf_freetoken(t);
-			fr = NULL;
-			t = NULL;
 			count = 1;
 		}
 		RWLOCK_EXIT(&ipf_mutex);
 
-		if (fr != NULL) {
-			(void) fr_derefrule(&fr);
+		if ((count == 1) || (next->fr_next == NULL)) {
+			ipf_freetoken(t);
+		} else {
+			t->ipt_data = next;
 		}
 
 		error = COPYOUT(next, dst, sizeof(*next));

@@ -5005,6 +5005,9 @@ ipfgeniter_t *itp;
 	char *dst;
 
 	freet = NULL;
+	count = itp->igi_nitems;
+	if (count < 1)
+		return ENOSPC;
 
 	READ_ENTER(&ipf_nat);
 
@@ -5042,7 +5045,7 @@ ipfgeniter_t *itp;
 	}
 
 	dst = itp->igi_data;
-	for (count = itp->igi_nitems; count > 0; count--) {
+	for (;;) {
 		switch (itp->igi_type)
 		{
 		case IPFGENITER_HOSTMAP :
@@ -5050,7 +5053,6 @@ ipfgeniter_t *itp;
 				if (nexthm->hm_next == NULL) {
 					freet = t;
 					count = 1;
-					hm = NULL;
 				}
 				if (count == 1) {
 					ATOMIC_INC32(nexthm->hm_ref);
@@ -5067,7 +5069,6 @@ ipfgeniter_t *itp;
 				if (nextipnat->in_next == NULL) {
 					freet = t;
 					count = 1;
-					ipn = NULL;
 				}
 				if (count == 1) {
 					MUTEX_ENTER(&nextipnat->in_lock);
@@ -5086,7 +5087,6 @@ ipfgeniter_t *itp;
 				if (nextnat->nat_next == NULL) {
 					count = 1;
 					freet = t;
-					nat = NULL;
 				}
 				if (count == 1) {
 					MUTEX_ENTER(&nextnat->nat_lock);
@@ -5106,45 +5106,47 @@ ipfgeniter_t *itp;
 
 		if (freet != NULL) {
 			ipf_freetoken(freet);
-			freet = NULL;
 		}
 
 		switch (itp->igi_type)
 		{
 		case IPFGENITER_HOSTMAP :
-			if (hm != NULL) {
-				WRITE_ENTER(&ipf_nat);
-				fr_hostmapdel(&hm);
-				RWLOCK_EXIT(&ipf_nat);
-			}
-			t->ipt_data = nexthm;
 			error = COPYOUT(nexthm, dst, sizeof(*nexthm));
 			if (error != 0)
 				error = EFAULT;
 			else
 				dst += sizeof(*nexthm);
+			if (freet != NULL) {
+				t->ipt_data = nexthm;
+				hm = nexthm;
+				nexthm = hm->hm_next;
+			}
 			break;
 
 		case IPFGENITER_IPNAT :
-			if (ipn != NULL)
-				fr_ipnatderef(&ipn);
-			t->ipt_data = nextipnat;
 			error = COPYOUT(nextipnat, dst, sizeof(*nextipnat));
 			if (error != 0)
 				error = EFAULT;
 			else
 				dst += sizeof(*nextipnat);
+			if (freet != NULL) {
+				t->ipt_data = nextipnat;
+				ipn = nextipnat;
+				nextipnat = ipn->in_next;
+			}
 			break;
 
 		case IPFGENITER_NAT :
-			if (nat != NULL)
-				fr_natderef(&nat);
-			t->ipt_data = nextnat;
 			error = COPYOUT(nextnat, dst, sizeof(*nextnat));
 			if (error != 0)
 				error = EFAULT;
 			else
 				dst += sizeof(*nextnat);
+			if (freet != NULL) {
+				t->ipt_data = nextnat;
+				nat = nextnat;
+				nextnat = nat->nat_next;
+			}
 			break;
 		}
 
@@ -5152,26 +5154,6 @@ ipfgeniter_t *itp;
 			break;
 
 		READ_ENTER(&ipf_nat);
-
-		switch (itp->igi_type)
-		{
-		case IPFGENITER_HOSTMAP :
-			hm = nexthm;
-			nexthm = hm->hm_next;
-			break;
-
-		case IPFGENITER_IPNAT :
-			ipn = nextipnat;
-			nextipnat = ipn->in_next;
-			break;
-
-		case IPFGENITER_NAT :
-			nat = nextnat;
-			nextnat = nat->nat_next;
-			break;
-		default :
-			break;
-		}
 	}
 
 	return error;
