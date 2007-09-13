@@ -6285,7 +6285,7 @@ ipf_nat_getnext(t, itp)
 			} else {
 				dst += sizeof(*nexthm);
 			}
-			if (freet != NULL) {
+			if (freet == NULL) {
 				t->ipt_data = nexthm;
 				hm = nexthm;
 				nexthm = hm->hm_next;
@@ -6300,7 +6300,7 @@ ipf_nat_getnext(t, itp)
 			} else {
 				dst += sizeof(*nextipnat);
 			}
-			if (freet != NULL) {
+			if (freet == NULL) {
 				t->ipt_data = nextipnat;
 				ipn = nextipnat;
 				nextipnat = ipn->in_next;
@@ -6315,7 +6315,7 @@ ipf_nat_getnext(t, itp)
 			} else {
 				dst += sizeof(*nextnat);
 			}
-			if (freet != NULL) {
+			if (freet == NULL) {
 				t->ipt_data = nextnat;
 				nat = nextnat;
 				nextnat = nat->nat_next;
