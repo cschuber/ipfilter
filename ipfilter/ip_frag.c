@@ -1052,11 +1052,11 @@ ipf_frag_next(token, itp, top, tail
 	RWLOCK_EXIT(lock);
 
 	if (frag != NULL) {
-		WRITE_ENTER(lock);
-		frag->ipfr_ref--;
-		if (frag->ipfr_ref <= 0)
-			ipf_frag_free(frag);
-		RWLOCK_EXIT(lock);
+#ifdef USE_MUTEXES
+		ipf_frag_deref(&frag, lock);
+#else
+		ipf_frag_deref(&frag);
+#endif
 	}
 
 	error = COPYOUT(next, itp->igi_data, sizeof(*next));

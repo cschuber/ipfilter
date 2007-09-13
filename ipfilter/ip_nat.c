@@ -4214,7 +4214,7 @@ ipf_nat_update(fin, nat, np)
 		ifq2 = NULL;
 
 	if (nat->nat_pr[0] == IPPROTO_TCP && ifq2 == NULL) {
-		(void) ipf_tcp_age(&nat->nat_tqe, fin, ipf_nat_tqb, 0);
+		(void) ipf_tcp_age(&nat->nat_tqe, fin, ipf_nat_tqb, 0, 2);
 	} else {
 		if (ifq2 == NULL) {
 			if (nat->nat_pr[0] == IPPROTO_UDP)
@@ -5950,7 +5950,7 @@ ipf_nat_clone(fin, nat)
 	 */
 	if (clone->nat_pr[0] == IPPROTO_TCP) {
 		(void) ipf_tcp_age(&clone->nat_tqe, fin, ipf_nat_tqb,
-				  clone->nat_flags);
+				  clone->nat_flags, 2);
 	}
 #ifdef	IPFILTER_SYNC
 	clone->nat_sync = ipf_sync_new(SMC_NAT, fin, clone);
@@ -6171,6 +6171,9 @@ ipf_nat_getnext(t, itp)
 	char *dst;
 
 	freet = NULL;
+	count = itp->igi_nitems;
+	if (count < 1)
+		return ENOSPC;
 
 	READ_ENTER(&ipf_nat);
 
@@ -6209,7 +6212,7 @@ ipf_nat_getnext(t, itp)
 	}
 
 	dst = itp->igi_data;
-	for (count = itp->igi_nitems; count > 0; count--) {
+	for (;;) {
 		switch (itp->igi_type)
 		{
 		case IPFGENITER_HOSTMAP :
@@ -6217,7 +6220,6 @@ ipf_nat_getnext(t, itp)
 				if (nexthm->hm_next == NULL) {
 					freet = t;
 					count = 1;
-					hm = NULL;
 				}
 				if (count == 1) {
 					ATOMIC_INC32(nexthm->hm_ref);
@@ -6234,7 +6236,6 @@ ipf_nat_getnext(t, itp)
 				if (nextipnat->in_next == NULL) {
 					freet = t;
 					count = 1;
-					ipn = NULL;
 				}
 				if (count == 1) {
 					MUTEX_ENTER(&nextipnat->in_lock);
@@ -6253,7 +6254,6 @@ ipf_nat_getnext(t, itp)
 				if (nextnat->nat_next == NULL) {
 					count = 1;
 					freet = t;
-					nat = NULL;
 				}
 				if (count == 1) {
 					MUTEX_ENTER(&nextnat->nat_lock);
@@ -6273,18 +6273,11 @@ ipf_nat_getnext(t, itp)
 
 		if (freet != NULL) {
 			ipf_freetoken(freet);
-			freet = NULL;
 		}
 
 		switch (itp->igi_type)
 		{
 		case IPFGENITER_HOSTMAP :
-			if (hm != NULL) {
-				WRITE_ENTER(&ipf_nat);
-				ipf_nat_hostmapdel(&hm);
-				RWLOCK_EXIT(&ipf_nat);
-			}
-			t->ipt_data = nexthm;
 			error = COPYOUT(nexthm, dst, sizeof(*nexthm));
 			if (error != 0) {
 				ipf_interror = 60049;
@@ -6292,12 +6285,14 @@ ipf_nat_getnext(t, itp)
 			} else {
 				dst += sizeof(*nexthm);
 			}
+			if (freet != NULL) {
+				t->ipt_data = nexthm;
+				hm = nexthm;
+				nexthm = hm->hm_next;
+			}
 			break;
 
 		case IPFGENITER_IPNAT :
-			if (ipn != NULL)
-				ipf_nat_rulederef(&ipn);
-			t->ipt_data = nextipnat;
 			error = COPYOUT(nextipnat, dst, sizeof(*nextipnat));
 			if (error != 0) {
 				ipf_interror = 60050;
@@ -6305,18 +6300,25 @@ ipf_nat_getnext(t, itp)
 			} else {
 				dst += sizeof(*nextipnat);
 			}
+			if (freet != NULL) {
+				t->ipt_data = nextipnat;
+				ipn = nextipnat;
+				nextipnat = ipn->in_next;
+			}
 			break;
 
 		case IPFGENITER_NAT :
-			if (nat != NULL)
-				ipf_nat_deref(&nat);
-			t->ipt_data = nextnat;
 			error = COPYOUT(nextnat, dst, sizeof(*nextnat));
 			if (error != 0) {
 				ipf_interror = 60051;
 				error = EFAULT;
 			} else {
 				dst += sizeof(*nextnat);
+			}
+			if (freet != NULL) {
+				t->ipt_data = nextnat;
+				nat = nextnat;
+				nextnat = nat->nat_next;
 			}
 			break;
 		}
@@ -6325,26 +6327,6 @@ ipf_nat_getnext(t, itp)
 			break;
 
 		READ_ENTER(&ipf_nat);
-
-		switch (itp->igi_type)
-		{
-		case IPFGENITER_HOSTMAP :
-			hm = nexthm;
-			nexthm = hm->hm_next;
-			break;
-
-		case IPFGENITER_IPNAT :
-			ipn = nextipnat;
-			nextipnat = ipn->in_next;
-			break;
-
-		case IPFGENITER_NAT :
-			nat = nextnat;
-			nextnat = nat->nat_next;
-			break;
-		default :
-			break;
-		}
 	}
 
 	return error;

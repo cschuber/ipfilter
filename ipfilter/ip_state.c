@@ -3435,6 +3435,7 @@ ipf_state_flush_entry(entry)
 /*              fin(I)   - pointer to packet information                    */
 /*              tqtab(I) - TCP timeout queue table this is in               */
 /*              flags(I) - flags from state/NAT entry                       */
+/*              ok(I)    - can we advance state                             */
 /*                                                                          */
 /* Rewritten by Arjan de Vet <Arjan.deVet@adv.iae.nl>, 2000-07-29:          */
 /*                                                                          */
@@ -4294,6 +4295,7 @@ ipf_stateiter(token, itp)
 	ipfgeniter_t *itp;
 {
 	ipstate_t *is, *next, zero;
+	ipftoken_t *freet;
 	int error, count;
 	char *dst;
 
@@ -4302,7 +4304,7 @@ ipf_stateiter(token, itp)
 		return EFAULT;
 	}
 
-	if (itp->igi_nitems == 0) {
+	if (itp->igi_nitems < 1) {
 		ipf_interror = 100027;
 		return ENOSPC;
 	}
@@ -4320,6 +4322,7 @@ ipf_stateiter(token, itp)
 	}
 
 	error = 0;
+	freet = NULL;
 	dst = itp->igi_data;
 
 	READ_ENTER(&ipf_state);
@@ -4329,21 +4332,23 @@ ipf_stateiter(token, itp)
 		next = is->is_next;
 	}
 
-	for (count = itp->igi_nitems; count > 0; count--) {
+	count = itp->igi_nitems;
+	for (;;) {
 		if (next != NULL) {
 			/*
 			 * If we find a state entry to use, bump its
 			 * reference count so that it can be used for
 			 * is_next when we come back.
 			 */
-			MUTEX_ENTER(&next->is_lock);
-			next->is_ref++;
-			MUTEX_EXIT(&next->is_lock);
-			token->ipt_data = next;
+			if (count == 1) {
+				MUTEX_ENTER(&next->is_lock);
+				next->is_ref++;
+				MUTEX_EXIT(&next->is_lock);
+			}
 		} else {
 			bzero(&zero, sizeof(zero));
 			next = &zero;
-			token->ipt_data = (void *)-1;
+			freet = token;
 			count = 1;
 		}
 		RWLOCK_EXIT(&ipf_state);
@@ -4351,8 +4356,9 @@ ipf_stateiter(token, itp)
 		/*
 		 * If we had a prior pointer to a state entry, release it.
 		 */
-		if (is != NULL) {
-			ipf_state_deref(&is);
+		if (freet != NULL) {
+			ipf_freetoken(freet);
+			freet = NULL;
 		}
 
 		/*
@@ -4368,9 +4374,11 @@ ipf_stateiter(token, itp)
 			break;
 
 		dst += sizeof(*next);
+
 		READ_ENTER(&ipf_state);
 		is = next;
 		next = is->is_next;
+		count--;
 	}
 
 	return error;
