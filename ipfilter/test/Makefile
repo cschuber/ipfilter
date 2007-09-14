@@ -41,7 +41,7 @@ logtests: l1
 
 pools: p1 p2 p3 p4 ip1 ip2
 
-ipv6: ipv6.1 ipv6.2 ipv6.3 ipv6.4 ipv6.5
+ipv6: ipv6.1 ipv6.2 ipv6.3 ipv6.4 ipv6.5 ipv6.6
 
 bpf: bpf1 bpf-f1
 
@@ -361,6 +361,9 @@ ipv6.4: expected/ipv6.4 input/ipv6.4 regress/ipv6.4
 	@/bin/sh ./dotest6 `awk "/^$@ / { print; } " test.format`
 
 ipv6.5: expected/ipv6.5 input/ipv6.5 regress/ipv6.5
+	@/bin/sh ./dotest6 `awk "/^$@ / { print; } " test.format`
+
+ipv6.6: expected/ipv6.6 input/ipv6.6 regress/ipv6.6
 	@/bin/sh ./dotest6 `awk "/^$@ / { print; } " test.format`
 
 p1: expected/p1 input/p1 regress/p1.ipf regress/p1.pool
