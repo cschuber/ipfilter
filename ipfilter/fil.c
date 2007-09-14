@@ -357,7 +357,7 @@ static	INLINE int	frpr_hopopts6 __P((fr_info_t *));
 static	INLINE int	frpr_mobility6 __P((fr_info_t *));
 static	INLINE int	frpr_routing6 __P((fr_info_t *));
 static	INLINE int	frpr_dstopts6 __P((fr_info_t *));
-static	INLINE void	frpr_fragment6 __P((fr_info_t *));
+static	INLINE int	frpr_fragment6 __P((fr_info_t *));
 static	INLINE int	frpr_ipv6exthdr __P((fr_info_t *, int, int));
 
 
@@ -475,8 +475,9 @@ fr_info_t *fin;
 			break;
 
 		case IPPROTO_FRAGMENT :
-			frpr_fragment6(fin);
-			go = 0;
+			p = frpr_fragment6(fin);
+			if (fin->fin_off != 0)
+				go = 0;
 			break;
 
 		default :
@@ -647,7 +648,7 @@ fr_info_t *fin;
 
 /* ------------------------------------------------------------------------ */
 /* Function:    frpr_fragment6                                              */
-/* Returns:     void                                                        */
+/* Returns:     int    - value of the next header or IPPROTO_NONE if error  */
 /* Parameters:  fin(I) - pointer to packet information                      */
 /*                                                                          */
 /* IPv6 Only                                                                */
@@ -659,7 +660,7 @@ fr_info_t *fin;
 /* upper layer header has been seen (or where it ends) and thus we are not  */
 /* able to continue processing beyond this header with any confidence.      */
 /* ------------------------------------------------------------------------ */
-static INLINE void frpr_fragment6(fin)
+static INLINE int frpr_fragment6(fin)
 fr_info_t *fin;
 {
 	struct ip6_frag *frag;
@@ -668,12 +669,12 @@ fr_info_t *fin;
 	fin->fin_flx |= FI_FRAG;
 
 	if (frpr_ipv6exthdr(fin, 0, IPPROTO_FRAGMENT) == IPPROTO_NONE)
-		return;
+		return IPPROTO_NONE;
 
 	extoff = (char *)fin->fin_exthdr - (char *)fin->fin_dp;
 
 	if (frpr_pullup(fin, sizeof(*frag)) == -1)
-		return;
+		return IPPROTO_NONE;
 
 	fin->fin_exthdr = (char *)fin->fin_dp + extoff;
 	frag = fin->fin_exthdr;
@@ -682,16 +683,18 @@ fr_info_t *fin;
 	 */
 	if (frag->ip6f_offlg == 0) {
 		fin->fin_flx |= FI_BAD;
-		return;
+		return IPPROTO_NONE;
 	}
 
-	fin->fin_off = frag->ip6f_offlg & IP6F_OFF_MASK;
+	fin->fin_off = ntohs(frag->ip6f_offlg & IP6F_OFF_MASK);
 	fin->fin_off <<= 3;
 	if (fin->fin_off != 0)
 		fin->fin_flx |= FI_FRAGBODY;
 
 	fin->fin_dp = (char *)fin->fin_dp + sizeof(*frag);
 	fin->fin_dlen -= sizeof(*frag);
+
+	return frag->ip6f_nxt;
 }
 
 
@@ -6012,7 +6015,7 @@ ipftuneable_t ipf_tuneables[] = {
 	{ { &ipf_hostmap_sz },	"ipf_hostmap_sz",	1,	0x7fffffff,
 		sizeof(ipf_hostmap_sz),		IPFT_WRDISABLED,	NULL },
 	{ { &fr_nat_maxbucket }, "fr_nat_maxbucket",	1,	0x7fffffff,
-		sizeof(fr_nat_maxbucket),	IPFT_WRDISABLED,	NULL },
+		sizeof(fr_nat_maxbucket),	0,			NULL },
 	{ { &fr_nat_maxbucket_reset },	"fr_nat_maxbucket_reset",	0, 1,
 		sizeof(fr_nat_maxbucket_reset),	IPFT_WRDISABLED,	NULL },
 	{ { &nat_logging },		"nat_logging",		0,	1,
