@@ -151,6 +151,7 @@ retest:
 	else echo test directory not present, sorry; fi
 
 include:
+	-mkdir -p net netinet
 	if [ ! -f netinet/done ] ; then \
 		(cd netinet; ln -s ../*.h .; ln -s ../ip_*_pxy.c .;); \
 		(cd netinet; ln -s ../ipsend/tcpip.h tcpip.h); \
@@ -165,6 +166,9 @@ include:
 sunos solaris: include
 	MAKE="$(MAKE)" MAKEFLAGS="$(MAKEFLAGS)" BPFILTER=$(BPFILTER) \
 		CC="$(CC)" DEBUG="$(DEBUG)" ./buildsunos
+
+freebsd:
+	make freebsd`uname -r|cut -c1`
 
 freebsd22: include
 	make setup "TARGOS=BSD" "CPUDIR=$(CPUDIR)"
