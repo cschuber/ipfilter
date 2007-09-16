@@ -197,7 +197,6 @@ static int ipf_hook(hook_event_token_t, hook_data_t, netstack_t *);
 net_data_t ipfipv4, ipfipv6;
 #endif
 
-#define	IPFDEBUG	1
 
 int _init()
 {
