@@ -3545,14 +3545,7 @@ int flags, seqnext;
 
 		case IPF_TCPS_LAST_ACK: /* 8 */
 			if (tcpflags & TH_ACK) {
-				if ((tcpflags & TH_PUSH) || dlen)
-					/*
-					 * there is still data to be delivered,
-					 * reset timeout
-					 */
-					rval = 1;
-				else
-					rval = 2;
+				rval = 1;
 			}
 			/*
 			 * we cannot detect when we go out of LAST_ACK state to
@@ -3564,23 +3557,15 @@ int flags, seqnext;
 
 		case IPF_TCPS_FIN_WAIT_2: /* 9 */
 			/* NOT USED */
-#if 0
-			rval = 1;
-			if ((tcpflags & TH_OPENING) == TH_OPENING) {
-				nstate = IPF_TCPS_SYN_RECEIVED;
-			} else if (tcpflags & TH_SYN) {
-				nstate = IPF_TCPS_SYN_SENT;
-			} else if ((tcpflags & (TH_FIN|TH_ACK)) != 0) {
-				nstate = IPF_TCPS_TIME_WAIT;
-			}
-#endif
 			break;
 
 		case IPF_TCPS_TIME_WAIT: /* 10 */
 			/* we're in 2MSL timeout now */
-			rval = 2;
 			if (ostate == IPF_TCPS_LAST_ACK) {
 				nstate = IPF_TCPS_CLOSED;
+				rval = 1;
+			} else {
+				rval = 2;
 			}
 			break;
 
