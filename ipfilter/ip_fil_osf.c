@@ -1193,11 +1193,16 @@ ipf_pullup(min, fin, len)
 			m = m_pullup(m, len);
 		}
 		*fin->fin_mp = m;
-		fin->fin_m = m;
 		if (m == NULL) {
+			fin->fin_m = NULL;
 			ATOMIC_INCL(frstats[out].fr_pull[1]);
 			return NULL;
 		}
+
+		while (M_LEN(m) == 0) {
+			m = m->m_next;
+		}
+		fin->fin_m = m;
 		ip = MTOD(m, char *) + ipoff;
 	}
 

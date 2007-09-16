@@ -843,8 +843,11 @@ ipf_pr_icmp6(fin)
 		case ICMP6_TIME_EXCEEDED :
 		case ICMP6_PARAM_PROB :
 			fin->fin_flx |= FI_ICMPERR;
-			if ((fin->fin_m != NULL) &&
-			    (M_LEN(fin->fin_m) < fin->fin_plen)) {
+			minicmpsz = ICMP6ERR_IPICMPHLEN - sizeof(ip6_t);
+			if (fin->fin_plen < ICMP6ERR_IPICMPHLEN)
+				break;
+
+			if (M_LEN(fin->fin_m) < fin->fin_plen) {
 				if (ipf_coalesce(fin) != 1)
 					return;
 			}
@@ -863,7 +866,6 @@ ipf_pr_icmp6(fin)
 				    (i6addr_t *)&ip6->ip6_src))
 				fin->fin_flx |= FI_BAD;
 
-			minicmpsz = ICMP6ERR_IPICMPHLEN - sizeof(ip6_t);
 			break;
 		default :
 			break;
@@ -1013,6 +1015,14 @@ ipf_pr_gre6(fin)
 /* Short inline function to cut down on code duplication to perform a call  */
 /* to ipf_pullup to ensure there is the required amount of data,            */
 /* consecutively in the packet buffer.                                      */
+/*                                                                          */
+/* This function pulls up 'extra' data at the location of fin_dp.  fin_dp   */
+/* points to the first byte after the complete layer 3 header, which will   */
+/* include all of the known extension headers for IPv6 or options for IPv4. */
+/*                                                                          */
+/* Since fr_pullup() expects the total length of bytes to be pulled up, it  */
+/* is necessary to add those we can already assume to be pulled up (fin_dp  */
+/* - fin_ip) to what is passed through.                                     */
 /* ------------------------------------------------------------------------ */
 int
 ipf_pr_pullup(fin, plen)
