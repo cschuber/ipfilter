@@ -7286,15 +7286,16 @@ ipftq_t *ipfqs, *userqs;
 		return 0;
 	}
 	if (istart > fr_ticks) {
-		istart = (fr_ticks / interval) * interval;
+		if (fr_ticks - interval < interval)
+			istart = interval;
+		else
+			istart = (fr_ticks / interval) * interval;
 	}
 
 	iend = fr_ticks - interval;
-	if (istart > iend)
-		istart = iend - interval;
 	removed = 0;
 
-	while (removed == 0) {
+	for (;;) {
 		u_long try;
 
 		try = fr_ticks - istart; 
@@ -7321,8 +7322,9 @@ ipftq_t *ipfqs, *userqs;
 			}
 		}
 
-		istart -= interval;
 		if (try >= iend) {
+			if (removed > 0)
+				break;
 			if (interval == IPF_TTLVAL(43200)) {
 				interval = IPF_TTLVAL(1800);
 			} else if (interval == IPF_TTLVAL(1800)) {
@@ -7335,6 +7337,7 @@ ipftq_t *ipfqs, *userqs;
 
 			iend = fr_ticks - interval;
 		}
+		istart -= interval;
 	}
 
 	return removed;
