@@ -1172,6 +1172,7 @@ int getlock;
 	if (n->in_use == 0) {
 		if (n->in_apr)
 			appr_free(n->in_apr);
+		MUTEX_DESTROY(&n->in_lock);
 		KFREE(n);
 		nat_stats.ns_rules--;
 #if SOLARIS && !defined(_INET_IP_STACK_H)
@@ -1812,6 +1813,7 @@ static int nat_clearlist()
 		if (n->in_use == 0) {
 			if (n->in_apr != NULL)
 				appr_free(n->in_apr);
+			MUTEX_DESTROY(&n->in_lock);
 			KFREE(n);
 			nat_stats.ns_rules--;
 		} else {
@@ -2484,6 +2486,7 @@ int direction;
 	}
 
 	if (nat_finalise(fin, nat, &ni, tcp, natsave, direction) == -1) {
+		fr_nat_doflush = 1;
 		goto badnat;
 	}
 	if (flags & SI_WILDP)
@@ -4681,6 +4684,7 @@ ipnat_t **inp;
 	if (in->in_use == 0 && (in->in_flags & IPN_DELETE)) {
 		if (in->in_apr)
 			appr_free(in->in_apr);
+		MUTEX_DESTROY(&in->in_lock);
 		KFREE(in);
 		nat_stats.ns_rules--;
 #if SOLARIS && !defined(_INET_IP_STACK_H)
