@@ -225,7 +225,7 @@ List of active state sessions:
 1.1.1.1 -> 2.1.2.2 pass 0x40008402 pr 6 state 3/4
 	tag 0 ttl 864000
 	1 -> 25 2:66 4096<<0:16384<<0
-	cmsk 0000 smsk 0000 isc 0x0 s0 00000000/00000000
+	cmsk 0000 smsk 0000 s0 00000000/00000000
 	FWD:ISN inc 0 sumd 0
 	REV:ISN inc 0 sumd 0
 	forward: pkts in 1 bytes in 40 pkts out 0 bytes out 0
