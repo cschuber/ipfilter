@@ -156,14 +156,14 @@ typedef	union	i6addr	{
 #define	iplookupptr	vptr[0]
 #define	iplookupfunc	lptr[1]
 
-#define	I60(x)	(((i6addr_t *)(x))->i6[0])
-#define	I61(x)	(((i6addr_t *)(x))->i6[1])
-#define	I62(x)	(((i6addr_t *)(x))->i6[2])
-#define	I63(x)	(((i6addr_t *)(x))->i6[3])
-#define	HI60(x)	ntohl(((i6addr_t *)(x))->i6[0])
-#define	HI61(x)	ntohl(((i6addr_t *)(x))->i6[1])
-#define	HI62(x)	ntohl(((i6addr_t *)(x))->i6[2])
-#define	HI63(x)	ntohl(((i6addr_t *)(x))->i6[3])
+#define	I60(x)	(((u_32_t *)(x))[0])
+#define	I61(x)	(((u_32_t *)(x))[1])
+#define	I62(x)	(((u_32_t *)(x))[2])
+#define	I63(x)	(((u_32_t *)(x))[3])
+#define	HI60(x)	ntohl(((u_32_t *)(x))[0])
+#define	HI61(x)	ntohl(((u_32_t *)(x))[1])
+#define	HI62(x)	ntohl(((u_32_t *)(x))[2])
+#define	HI63(x)	ntohl(((u_32_t *)(x))[3])
 
 #define	IP6_EQ(a,b)	((I63(a) == I63(b)) && (I62(a) == I62(b)) && \
 			 (I61(a) == I61(b)) && (I60(a) == I60(b)))
@@ -181,14 +181,14 @@ typedef	union	i6addr	{
 			      HI63(a) < HI63(b)))))))
 #define	NLADD(n,x)	htonl(ntohl(n) + (x))
 #define	IP6_INC(a)	\
-		{ i6addr_t *_i6 = (i6addr_t *)(a); \
-		  _i6->i6[0] = NLADD(_i6->i6[0], 1); \
-		  if (_i6->i6[0] == 0) { \
-			_i6->i6[0] = NLADD(_i6->i6[1], 1); \
-			if (_i6->i6[1] == 0) { \
-				_i6->i6[0] = NLADD(_i6->i6[2], 1); \
-				if (_i6->i6[2] == 0) { \
-					_i6->i6[0] = NLADD(_i6->i6[3], 1); \
+		{ u_32_t *_i6 = (u_32_t *)(a); \
+		  _i6[3] = NLADD(_i6[3], 1); \
+		  if (_i6[3] == 0) { \
+			_i6[2] = NLADD(_i6[2], 1); \
+			if (_i6[2] == 0) { \
+				_i6[1] = NLADD(_i6[1], 1); \
+				if (_i6[1] == 0) { \
+					_i6[0] = NLADD(_i6[0], 1); \
 				} \
 			} \
 		  } \
@@ -267,6 +267,7 @@ typedef	struct	fr_ip	{
 #define	FI_WITH		0xeffe	/* Not FI_TCPUDP */
 #define	FI_V6EXTHDR	0x10000
 #define	FI_COALESCE	0x20000
+#define	FI_NEWNAT	0x40000
 #define	FI_NOCKSUM	0x20000000	/* don't do a L4 checksum validation */
 #define	FI_DONTCACHE	0x40000000	/* don't cache the result */
 #define	FI_IGNORE	0x80000000
@@ -1404,6 +1405,13 @@ extern	int	iplwrite __P((dev_t, struct uio *));
 #   endif /* BSD >= 199306 */
 #  endif /* __ sgi */
 # endif /* MENTAT */
+
+# if defined(__FreeBSD_version)
+extern	int	ipf_pfil_hook __P((void));
+extern	int	ipf_pfil_unhook __P((void));
+extern	void	ipf_event_reg __P((void));
+extern	void	ipf_event_dereg __P((void));
+# endif
 
 #endif /* #ifndef _KERNEL */
 

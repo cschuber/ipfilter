@@ -936,7 +936,7 @@ ipfrwlock_t *lock;
 	} else {
 		bzero(&zero, sizeof(zero));
 		next = &zero;
-		token->ipt_data = (void *)-1;
+		token->ipt_data = NULL;
 	}
 	RWLOCK_EXIT(lock);
 

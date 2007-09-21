@@ -539,11 +539,11 @@ ipflookupiter_t *ilp;
 
 		if (nextiph != NULL) {
 			ATOMIC_INC(nextiph->iph_ref);
-			if (nextiph->iph_next == NULL)
-				token->ipt_alive = 0;
+			token->ipt_data = nextiph;
 		} else {
 			bzero((char *)&zp, sizeof(zp));
 			nextiph = &zp;
+			token->ipt_data = NULL;
 		}
 		break;
 
@@ -562,11 +562,11 @@ ipflookupiter_t *ilp;
 
 		if (nextnode != NULL) {
 			ATOMIC_INC(nextnode->ipe_ref);
-			if (nextnode->ipe_next == NULL)
-				token->ipt_alive = 0;
+			token->ipt_data = nextnode;
 		} else {
 			bzero((char *)&zn, sizeof(zn));
 			nextnode = &zn;
+			token->ipt_data = NULL;
 		}
 		break;
 	default :
@@ -586,7 +586,6 @@ ipflookupiter_t *ilp;
 			fr_derefhtable(iph);
 			RWLOCK_EXIT(&ip_poolrw);
 		}
-		token->ipt_data = nextiph;
 		err = COPYOUT(nextiph, ilp->ili_data, sizeof(*nextiph));
 		if (err != 0)
 			err = EFAULT;
@@ -598,7 +597,6 @@ ipflookupiter_t *ilp;
 			fr_derefhtent(node);
 			RWLOCK_EXIT(&ip_poolrw);
 		}
-		token->ipt_data = nextnode;
 		err = COPYOUT(nextnode, ilp->ili_data, sizeof(*nextnode));
 		if (err != 0)
 			err = EFAULT;

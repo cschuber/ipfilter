@@ -750,6 +750,8 @@ int	blen;
 		strcpy(t, "NAT:MAPBLOCK ");
 	else if (nl->nl_type == NL_CLONE)
 		strcpy(t, "NAT:CLONE ");
+	else if (nl->nl_type == NL_DESTROY)
+		strcpy(t, "NAT:DESTROY ");
 	else
 		sprintf(t, "Type: %d ", nl->nl_type);
 	t += strlen(t);
@@ -762,8 +764,9 @@ int	blen;
 	(void) sprintf(t, "%s,%s ", HOSTNAME_V4(res, nl->nl_outip),
 		portname(res, proto, (u_int)nl->nl_outport));
 	t += strlen(t);
-	(void) sprintf(t, "[%s,%s]", HOSTNAME_V4(res, nl->nl_origip),
-		portname(res, proto, (u_int)nl->nl_origport));
+	(void) sprintf(t, "[%s,%s PR %s]", HOSTNAME_V4(res, nl->nl_origip),
+		portname(res, proto, (u_int)nl->nl_origport),
+		getproto(nl->nl_p));
 	t += strlen(t);
 	if (nl->nl_type == NL_EXPIRE) {
 #ifdef	USE_QUAD_T

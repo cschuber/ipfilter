@@ -4056,7 +4056,6 @@ ipftoken_t *token;
 ipfgeniter_t *itp;
 {
 	ipstate_t *is, *next, zero;
-	ipftoken_t *freet;
 	int error, count;
 	char *dst;
 
@@ -4076,7 +4075,6 @@ ipfgeniter_t *itp;
 	}
 
 	error = 0;
-	freet = NULL;
 	dst = itp->igi_data;
 
 	READ_ENTER(&ipf_state);
@@ -4098,24 +4096,15 @@ ipfgeniter_t *itp;
 				MUTEX_ENTER(&next->is_lock);
 				next->is_ref++;
 				MUTEX_EXIT(&next->is_lock);
+				token->ipt_data = next;
 			}
 		} else {
 			bzero(&zero, sizeof(zero));
 			next = &zero;
-			freet = token;
 			count = 1;
+			token->ipt_data = NULL;
 		}
 		RWLOCK_EXIT(&ipf_state);
-
-		/*
-		 * If we had a prior pointer to a state entry, release it.
-		 */
-		if (freet != NULL) {
-			ipf_freetoken(freet);
-			freet = NULL;
-		} else {
-			token->ipt_data = next;
-		}
 
 		/*
 		 * This should arguably be via fr_outobj() so that the state
@@ -4128,11 +4117,14 @@ ipfgeniter_t *itp;
 			break;
 
 		dst += sizeof(*next);
+		count--;
 
 		READ_ENTER(&ipf_state);
-		is = next;
-		next = is->is_next;
-		count--;
+		next = next->is_next;
+	}
+
+	if (is != NULL) {
+		fr_statederef(&is);
 	}
 
 	return error;
