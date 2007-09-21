@@ -943,10 +943,7 @@ fr_info_t *fin;
 	ire_refrele(dir);
 # endif
 #else
-	if (fin->fin_v == 4)
-		result = (ipf_route_lookupv4(fin->fin_dst) == fin->fin_ifp);
-	else
-		result = (ipf_route_lookupv6(&fin->fin_dst6) == fin->fin_ifp);
+	result = (qif_illrouteto(fin->fin_v, &fin->fin_dst) == fin->fin_ifp);
 #endif
 	return result;
 }
