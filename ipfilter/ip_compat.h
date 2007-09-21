@@ -959,6 +959,8 @@ typedef	u_int32_t	u_32_t;
 #   define	SPL_IMP(x)	;
 #   define	SPL_SCHED(x)	;
 extern	int	in_cksum __P((struct mbuf *, int));
+#  else
+#   define	SPL_SCHED(x)	x = splhigh()
 #  endif /* __FreeBSD_version >= 500043 */
 #  define	MSGDSIZE(x)	mbufchainlen(x)
 #  define	M_LEN(x)	(x)->m_len
@@ -1664,7 +1666,9 @@ MALLOC_DECLARE(M_IPFILTER);
 #   define	SPL_IMP(x)	x = splimp()
 #   define	SPL_NET(x)	x = splnet()
 #  endif /* NetBSD && (NetBSD <= 1991011) && (NetBSD >= 199407) */
-#  define	SPL_SCHED(x)	x = splsched()
+#  if !defined(SPL_SCHED)
+#   define	SPL_SCHED(x)	x = splsched()
+#  endif
 #  define	SPL_X(x)	(void) splx(x)
 # endif /* !USE_MUTEXES */
 
