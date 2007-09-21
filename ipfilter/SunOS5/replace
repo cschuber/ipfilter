@@ -27,7 +27,7 @@ update() {
 				$debug /bin/mv ${prog} ${prog}.dist
 				$debug /bin/cp -p ${prog}.dist ${prog}
 			fi
-			$debug /bin/cp ${dir}/${o} ${prog}
+			$debug /bin/cp ${cpudir}/${dir}/${n} ${prog}
 		else
 			prog=${base}/${o}
 			links=$(/bin/ls -dl ${prog} | awk ' { print $2; } ' -)
@@ -36,7 +36,7 @@ update() {
 					$debug /bin/mv ${prog} ${prog}.dist
 					$debug /bin/cp -p ${prog}.dist ${prog}
 				fi
-				$debug /bin/cp ${dir}/${o} ${prog}
+				$debug /bin/cp ${cpudir}/${dir}/${n} ${prog}
 			fi
 		fi
 	else
