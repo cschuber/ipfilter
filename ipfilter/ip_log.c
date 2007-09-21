@@ -269,7 +269,10 @@ u_int flags;
 
 	ipfl.fl_nattag.ipt_num[0] = 0;
 	ifp = fin->fin_ifp;
-	hlen = fin->fin_hlen;
+	if (fin->fin_exthdr != NULL)
+		hlen = (char *)fin->fin_dp - (char *)fin->fin_ip;
+	else
+		hlen = fin->fin_hlen;
 	/*
 	 * calculate header size.
 	 */
