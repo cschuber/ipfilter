@@ -579,7 +579,7 @@ void *ctx;
 	if (err != 0)
 		return err;
 
-	if (iter.ili_unit < 0 || iter.ili_unit > IPL_LOGMAX)
+	if (iter.ili_unit > IPL_LOGMAX)
 		return EINVAL;
 
 	if (iter.ili_ival != IPFGENITER_LOOKUP)

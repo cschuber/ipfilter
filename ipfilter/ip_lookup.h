@@ -64,7 +64,7 @@ typedef	union	{
 		char	ilik_ival;
 		u_char	ilik_type;	/* IPLT_* */
 		u_char	ilik_otype;
-		char	ilik_unit;	/* IPL_LOG* */
+		u_char	ilik_unit;	/* IPL_LOG* */
 	} ilik_unstr;
 	u_32_t	ilik_key;
 } iplookupiterkey_t;
