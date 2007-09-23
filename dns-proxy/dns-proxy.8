@@ -1,0 +1,83 @@
+.TH DNS-PROXY 8
+.SH NAME
+dns-proxy \- proxy for DNS packets, optionally transparent
+.SH SYNOPSIS
+.B dns-proxy
+[
+.B \-dV
+] [
+.B \-f
+<configfile>
+]
+.SH DESCRIPTION
+.PP
+\fBdns-proxy\fP relays proxy requests on to a host that is part of a set
+of forwarders and optionally filters out reqests/replies for names that
+are administratively prohibited.
+.PP
+It enforces rules such as only queries are allowed from \fIinterior\fP
+hosts and only replies are allowed from the forwarders.
+.PP
+The acls defined in the \fBdns-proxy.conf\fP file determine whether or not
+a query is let through (allow/pass), dropped and forgotten about (block)
+or if a DNS error is sent back, pretending to indicate that the domain
+name in question does not exist.
+.PP
+The ACLs are searched until a match is found.
+The search stops at the first match and that ACL is used.
+The searching of ACLs includes first checking that the port name specified
+in the ACL matches the incoming port, in next checks to see if the source
+address of the query matches the hostlist for that ACL and then 
+the name being sought (question name) in the list of domain names
+for the ACL.
+If no match is found then by default the query is allowed through.
+.PP
+Through use of \fIrdr\fP rules in \fBipnat\fP, it is possible to operate
+\fBdns-proxy\fP as a transparent proxy for DNS queries.
+.PP
+Although it is required to be started as root, after opening relevant ports
+and other files, it will drop privileges to be \fInobody\fP if this user
+exists in /etc/passwd.
+.PP
+At this point in time it does not respond to \fBSIGHUP\fP.  Changes to
+the configuration file require restarting the process.
+.SH OPTIONS
+.TP
+.B \-d
+Turn up the debugging output.  Turning on debugging prevents
+\fBdns-proxy\fP from operating as a daemon.
+.TP
+.BR \-f \0<configfile>
+Specify an alternate path for the configuration file.  The default location
+is \fB/etc/dns-proxy.conf\fP.
+.TP
+.B \-V
+Display the version infromation for \fBdns-proxy\fP.
+.SH MATCHING
+In the \fBdns-proxy.conf\fP file, it is possible to list hostnames that
+start with a '*' or '.', in addition to letters.
+.PP
+Matching of questions with names in the ACLs is done starting at the
+end of the name being searched for.  So if an \fBacl\fP were to specify
+"block com;", then \fB\fIall\fP\fP hostnames that ended in com would be
+blocked.
+.PP
+If you want match hosts inside a domain (and not the domain itself) then
+you must use a leading '.' immediately prior to the domain name.  If I
+say "block .cnn.com;" then queries for www.cnn.com are blocked but
+queries for cnn.com are not.  If I removed the leading '.', then both
+only queries that exactly match "cnn.com" wll be blocked.  If I want
+to block all queries ending in "cnn.com" then "*cnn.com" must be used.
+.SH FILES
+/etc/dns-proxy.conf
+.br
+/dev/ipnat
+.br
+/etc/passwd
+.SH SEE ALSO
+dns-proxy(5), ipnat(8), ipnat(5)
+.SH BUGS
+.PP
+Hostname compression used in DNS packets is not currently understood.
+.PP
+If you find any, please send email to me at darrenr@pobox.com
