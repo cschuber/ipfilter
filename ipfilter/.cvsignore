@@ -38,3 +38,6 @@ i86
 ipsyncm
 ipsyncs
 ipscan
+net
+opt_bpf.h
+opt_pfil.h
