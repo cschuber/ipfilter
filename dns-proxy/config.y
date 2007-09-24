@@ -56,7 +56,7 @@ static acl_t		*new_acl(hostlist_t *h, char *port, domain_t *d);
 static domain_t		*new_domains(action_t act, name_t *names);
 static hostlist_t	*new_iphost(u_int addr, u_int mask);
 static name_t		*new_name(char *str1, char *str2);
-static inbound_t *	new_port(char *, hostlist_t *, u_short, int);
+static inbound_t *	new_port(char *, hostlist_t *, u_short, portopt_t *);
 static int		tosecs(char *units);
 static qtypelist_t	*add_qtype(qtypelist_t *q1, qtypelist_t *q2);
 static qtypelist_t	*new_qtype(int type);
@@ -75,9 +75,10 @@ static void		add_qmatch_qtypes(querymatch_t *qm, qtypelist_t *qt);
 	forward_t	*fwd;
 	querymatch_t	*qm;
 	qtypelist_t	*qt;
+	portopt_t	*popt;
 };
 
-%token  <num>   YY_NUMBER YY_HEX
+%token  <num>   YY_NUMBER YY_HEX YY_ON YY_OFF
 %token  <str>   YY_STR
 %token          YY_COMMENT
 
@@ -92,7 +93,7 @@ static void		add_qmatch_qtypes(querymatch_t *qm, qtypelist_t *qt);
 %token		YY_Q_A6 YY_Q_DNAME YY_Q_SINK YY_Q_OPT YY_Q_TKEY YY_Q_TSIG
 %token		YY_Q_IXFR YY_Q_AXFR YY_Q_MAILB YY_Q_MAILA YY_Q_ANY YY_Q_ZXFR
 
-%type	<num>	octet mask
+%type	<num>	octet mask onoff actionword
 %type	<host>	ipaddress hlist
 %type	<acl>	acl
 %type	<dom>	action actions
@@ -102,6 +103,7 @@ static void		add_qmatch_qtypes(querymatch_t *qm, qtypelist_t *qt);
 %type	<fwd>	forward
 %type	<qm>	query
 %type	<qt>	qtypes qtype qtist
+%type	<popt>	portoptionlist portoptions portoption
 %%
 
 file:	line
@@ -126,9 +128,9 @@ acl:	YY_ACL YY_ALL YY_PORT YY_STR optlist '{' actions ';' '}'
 	;
 
 port:	YY_PORT YY_STR ipaddress YY_NUMBER
-				{ $$ = new_port($2, $3, $4, 0); }
-	| YY_PORT YY_STR ipaddress YY_NUMBER YY_TRANSPARENT
-				{ $$ = new_port($2, $3, $4, 1); }
+				{ $$ = new_port($2, $3, $4, NULL); }
+	| YY_PORT YY_STR ipaddress YY_NUMBER '{' portoptionlist '}'
+				{ $$ = new_port($2, $3, $4, $6); }
 	;
 
 forward:
@@ -147,6 +149,43 @@ query:	YY_QUERY qtypes '{' forward ';' '}'
 					}
 				  }
 				}
+	| YY_QUERY qtypes '{' actionword ';' '}'
+				{ $$ = new_querymatch();
+				  if ($$ != NULL) {
+					if ($2 != NULL) {
+						add_qmatch_qtypes($$, $2);
+					}
+					$$->qm_action = $4;
+				  }
+				}
+	;
+
+actions:
+	action			{ $$ = add_domains($1, NULL); }
+	| actions ';' action	{ $$ = add_domains($1, $3); }
+	;
+
+action:	actionword names	{ $$ = new_domains($1, $2); }
+	;
+
+actionword:
+	YY_BLOCK		{ $$ = Q_BLOCK; }
+	| YY_ALLOW		{ $$ = Q_ALLOW; }
+	| YY_REJECT		{ $$ = Q_REJECT; }
+	;
+
+portoptionlist:			{ $$ = NULL; }
+	| portoptions ';'	{ $$ = $1; }
+	;
+
+portoptions:
+	portoption		{ $$ = add_portopt($1, NULL); }
+	| portoptions ';' portoption
+				{ $$ = add_portopt($1, $3); }
+	;
+
+portoption:
+	YY_TRANSPARENT onoff	{ $$ = new_portopt(YY_TRANSPARENT, &$2); }
 	;
 
 qtypes:				{ $$ = NULL; }
@@ -158,7 +197,7 @@ qtypes:				{ $$ = NULL; }
 				}
 	;
 
-qtist:	qtype			{ $$ = add_qtype(NULL, $1); }
+qtist:	qtype			{ $$ = add_qtype($1, NULL); }
 	| qtist ',' qtype	{ $$ = add_qtype($1, $3); }
 	;
 
@@ -174,16 +213,6 @@ option:	YY_MAXTTL YY_NUMBER YY_STR
 				{ $$.acl_maxttl = $2 * tosecs($3); }
 	;
 
-actions:
-	action			{ $$ = add_domains($1, NULL); }
-	| actions ';' action	{ $$ = add_domains($1, $3); }
-	;
-
-action:	YY_BLOCK names		{ $$ = new_domains(Q_BLOCK, $2); }
-	| YY_ALLOW names	{ $$ = new_domains(Q_ALLOW, $2); }
-	| YY_REJECT names	{ $$ = new_domains(Q_REJECT, $2); }
-	;
-
 hlist:	ipaddress		{ $$ = add_host($1, NULL); }
 	| hlist ',' ipaddress	{ $$ = add_host($1, $3); }
 	;
@@ -197,6 +226,10 @@ hname:	YY_STR			{ $$ = new_name(NULL, $1); free($1); }
 	| '=' YY_STR		{ $$ = new_name("=", $2); free($2); }
 	| '*' YY_STR		{ $$ = new_name("*", $2); free($2); }
 	| '*' '.' YY_STR	{ $$ = new_name("*.", $3); free($3); }
+	;
+
+onoff:	YY_ON			{ $$ = 1; }
+	| YY_OFF		{ $$ = 0; }
 	;
 
 qtype:	YY_Q_A			{ $$ = new_qtype(T_A); }
@@ -308,6 +341,8 @@ static struct wordtab words[26] = {
 	{ "deny",		YY_BLOCK },
 	{ "forwarders",		YY_FORWARDERS },
 	{ "maxttl",		YY_MAXTTL },
+	{ "off",		YY_OFF },
+	{ "on",			YY_ON },
 	{ "pass",		YY_ALLOW },
 	{ "port",		YY_PORT },
 	{ "query",		YY_QUERY },
@@ -519,12 +554,8 @@ new_qtype(int type)
 static qtypelist_t *
 add_qtype(qtypelist_t *q1, qtypelist_t *q2)
 {
-	if (q1 != NULL) {
-		STAILQ_NEXT(q1, qt_next) = q2;
-		return (q1);
-	}
-
-	return (q2);
+	STAILQ_NEXT(q1, qt_next) = q2;
+	return (q1);
 }
 
 
@@ -541,6 +572,8 @@ new_querymatch()
 
 	STAILQ_INIT(&qm->qm_types);
 	CIRCLEQ_INIT(&qm->qm_forwards);
+
+	qm->qm_action = Q_ALLOW;
 
 	return (qm);
 }
@@ -666,45 +699,78 @@ add_acl(acl_t *a)
 
 
 static inbound_t *
-new_port(char *name, hostlist_t *addr, u_short port, int transparent)
+new_port(char *name, hostlist_t *addr, u_short port, portopt_t *options)
 {
+	portopt_t *po1, *po2;
 	inbound_t *in;
 
-	logit(4, "new_port(%s,%s,%d,%d)\n", name, inet_ntoa(addr->hl_ipaddr),
-	      port, transparent);
+	logit(4, "new_port(%s,%s,%d,%p)\n", name, inet_ntoa(addr->hl_ipaddr),
+	      port, options);
 
 	if (find_port(name) != NULL) {
 		logit(1, "port '%s' already exists\n", name);
-		return (NULL);
+		goto badnewport;
 	}
 
 	if (addr->hl_mask.s_addr != 0xffffffff) {
-		return (NULL);
+		goto badnewport;
 	}
 
 	in = calloc(1, sizeof(*in));
-	if (in != NULL) {
-		in->i_name = name;
-		in->i_portspec.sin_family = AF_INET;
-		in->i_portspec.sin_addr = addr->hl_ipaddr;
-		in->i_portspec.sin_port = htons(port & 0xffff);
-		in->i_transparent = transparent;
-		in->i_fd = socket(AF_INET, SOCK_DGRAM, 0);
-		if (in->i_fd >= 0) {
-			if (bind(in->i_fd, (struct sockaddr *)&in->i_portspec,
-				 sizeof(in->i_portspec)) != 0) {
-				logit(-1, "cannot bind UDP Port (%s,%d): %s\n",
-				      inet_ntoa(addr->hl_ipaddr), port,
-				      strerror(errno));
-				close(in->i_fd);
-				in->i_fd = -1;
-				free(name);
-				free(in);
-				in = NULL;
-			}
+	if (in == NULL) {
+		logit(1, "Could not allocate memory for new port\n");
+		goto badnewport;
+	}
+
+	in->i_name = name;
+	in->i_portspec.sin_family = AF_INET;
+	in->i_portspec.sin_addr = addr->hl_ipaddr;
+	in->i_portspec.sin_port = htons(port & 0xffff);
+	in->i_fd = socket(AF_INET, SOCK_DGRAM, 0);
+	if (in->i_fd >= 0) {
+		if (bind(in->i_fd, (struct sockaddr *)&in->i_portspec,
+			 sizeof(in->i_portspec)) != 0) {
+			logit(-1, "cannot bind UDP Port (%s,%d): %s\n",
+			      inet_ntoa(addr->hl_ipaddr), port,
+			      strerror(errno));
+			close(in->i_fd);
+			in->i_fd = -1;
+			free(in);
+			in = NULL;
+
+			goto badnewport;
 		}
 	}
+
+	free(addr);
+
+	for (po1 = options; po1 != NULL; po1 = po2) {
+		po2 = SLIST_NEXT(po1, po_next);
+
+		switch(po1->po_type)
+		{
+		case YY_TRANSPARENT :
+			in->i_transparent = po1->po_int;
+			break;
+		default :
+			break;
+		}
+		free(po1);
+	}
 	return (in);
+
+badnewport:
+	for (po1 = options; po1 != NULL; po1 = po2) {
+		po2 = SLIST_NEXT(po1, po_next);
+		free(po1);
+	}
+
+	if (name != NULL)
+		free(name);
+
+	if (addr != NULL)
+		free(addr);
+	return (NULL);
 }
 
 
@@ -712,6 +778,8 @@ static inbound_t *
 find_port(char *name)
 {
 	inbound_t *i;
+
+	logit(8, "find_port(%s)\n", name);
 
 	STAILQ_FOREACH(i, &config.c_ports, i_next) {
 		if (!strcmp(name, i->i_name))
@@ -731,6 +799,40 @@ add_port(inbound_t *in)
 		in = STAILQ_NEXT(i, i_next);
 		STAILQ_INSERT_TAIL(&config.c_ports, i, i_next);
 	}
+}
+
+
+static portopt_t *
+add_portopt(portopt_t *po1, portopt_t *po2)
+{
+	SLIST_NEXT(po1, po_next) = po2;
+	return (po1);
+}
+
+
+static portopt_t *
+new_portopt(int option, void *arg)
+{
+	portopt_t *popt;
+
+	popt = calloc(1, sizeof(*popt));
+	if (popt == NULL) {
+		return (NULL);
+	}
+
+	popt->po_option = option;
+
+	switch (option)
+	{
+	case YY_TRANSPARENT :
+		popt->po_type = PO_T_INTEGER;
+		popt->po_int = *(int *)arg;
+		break;
+	default :
+		break;
+	}
+
+	return (popt);
 }
 
 
@@ -986,12 +1088,24 @@ dump_querymatches(struct qmtop *qmtop)
 			printf(")");
 		}
 
-		printf(" {");
+		printf(" { ");
 
 		if (!CIRCLEQ_EMPTY(&qm->qm_forwards)) {
 			dump_forwarders(&qm->qm_forwards, 0);
+			putchar(' ');
 		}
-		printf(" };\n");
+		switch (qm->qm_action)
+		{
+		case Q_BLOCK :
+			printf("block; ");
+			break;
+		case Q_REJECT :
+			printf("reject; ");
+			break;
+		default :
+			break;
+		}
+		printf("};\n");
 	}
 }
 

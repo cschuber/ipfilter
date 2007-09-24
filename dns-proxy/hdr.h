@@ -48,6 +48,29 @@
 #include "ip_compat.h"
 #include "ip_fil.h"
 
+
+typedef	enum	action {
+	Q_ALLOW = 1,
+	Q_NOMATCH = 0,
+	Q_BLOCK = -1,
+	Q_REJECT = -2
+} action_t;
+
+
+typedef enum popttype {
+	PO_T_INTEGER = 1
+} popttype_t;
+
+typedef struct portopt {
+	SLIST_ENTRY(portopt)	po_next;
+	int			po_option;
+	popttype_t		po_type;
+	int			po_int;
+	long			po_long;
+	void			*po_ptr;
+} portopt_t;
+
+
 typedef struct qinfo {
 	int	qi_qtcount;
 	int	*qi_qtypes;
@@ -75,14 +98,6 @@ typedef	struct	name {
 } name_t;
 
 STAILQ_HEAD(ntop, name);
-
-
-typedef	enum	action {
-	Q_ALLOW = 1,
-	Q_NOMATCH = 0,
-	Q_BLOCK = -1,
-	Q_REJECT = -2
-} action_t;
 
 
 typedef	struct domain {
@@ -151,6 +166,7 @@ typedef	struct querymatch {
 	struct qttop		qm_types;
 	struct ftop		qm_forwards;
 	forward_t		*qm_currentfwd;
+	action_t		qm_action;
 } querymatch_t;
 
 STAILQ_HEAD(qmtop, querymatch);

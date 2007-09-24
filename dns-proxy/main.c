@@ -54,7 +54,7 @@ static void	do_reply(void);
 static void	drop_privs(void);
 static void	expire_queries(time_t now);
 static query_t *find_query(struct sockaddr_in *sin, char *buffer, int buflen);
-static int	find_query_forward(qinfo_t *qi, struct ftop **top,
+static action_t	find_query_forward(qinfo_t *qi, struct ftop **top,
 				   forward_t ***current);
 static int	get_name(void *start, int len, void *buffer, int buflen);
 static int	get_transparent(inbound_t *in, struct sockaddr_in *dst);
@@ -537,8 +537,38 @@ add_query(inbound_t *in, int buflen)
 	forward_t *f, **current;
 	ipf_dns_hdr_t *dns;
 	struct ftop *ftop;
+	action_t match;
 	query_t *q;
 	int ok;
+
+	f = NULL;
+
+	match = find_query_forward(&in->i_qinfo, &ftop, &current);
+	switch (match)
+	{
+	case Q_NOMATCH :
+		logit(2, "Using default forwarding hosts\n");
+		ftop = &config.c_forwards;
+		current = &config.c_currentforward;
+		break;
+
+	case Q_ALLOW :
+		if (CIRCLEQ_EMPTY(ftop)) {
+			ftop = &config.c_forwards;
+			current = &config.c_currentforward;
+		}
+		logit(2, "Matched query to forwarder (%d)\n", match);
+		break;
+
+	case Q_REJECT :
+		logit(2, "Query rejected\n");
+		send_reject(in, buflen);
+		return;
+
+	case Q_BLOCK :
+		logit(2, "Query blocked\n");
+		return;
+	}
 
 	q = query_exists(in, buflen);
 	if (q == NULL) {
@@ -560,15 +590,6 @@ add_query(inbound_t *in, int buflen)
 	STAILQ_INSERT_TAIL(&config.c_queries, q, q_next);
 
 	ok = -1;
-	f = NULL;
-
-	if (find_query_forward(&in->i_qinfo, &ftop, &current) == 0) {
-		logit(1, "Matched query to forwarder\n");
-	} else {
-		logit(1, "Using default forwarding hosts\n");
-		ftop = &config.c_forwards;
-		current = &config.c_currentforward;
-	}
 
 	if (in->i_transparent == 1) {
 		ok = get_transparent(in, &q->q_dst);
@@ -591,7 +612,8 @@ add_query(inbound_t *in, int buflen)
 		logit(4, "query %d -> %d for %s,%d\n", q->q_origid,
 		      q->q_newid, inet_ntoa(in->i_sender.sin_addr),
 		      ntohs(in->i_sender.sin_port));
-		logit(3, "Query destination %s\n", inet_ntoa(q->q_dst.sin_addr));
+		logit(3, "Query destination %s\n",
+		      inet_ntoa(q->q_dst.sin_addr));
 
 		(void) sendto(config.c_outfd, in->i_buffer, buflen, 0,
 			      (struct sockaddr *)&q->q_dst, sizeof(q->q_dst));
@@ -599,7 +621,7 @@ add_query(inbound_t *in, int buflen)
 }
 
 
-static int
+static action_t
 find_query_forward(qinfo_t *qi, struct ftop **top, forward_t ***current)
 {
 	querymatch_t *qm;
@@ -611,16 +633,17 @@ find_query_forward(qinfo_t *qi, struct ftop **top, forward_t ***current)
 			STAILQ_FOREACH(qt, &qm->qm_types, qt_next) {
 				logit(2, "Query type match.%d %d =? %d\n", i,
 				      qt->qt_type, qi->qi_qtypes[i]);
-				if (qt->qt_type == qi->qi_qtypes[i]) {
+				if ((qt->qt_type == qi->qi_qtypes[i]) ||
+				    (qi->qi_qtypes[i] == 0)) {
 					*top = &qm->qm_forwards;
 					*current = &qm->qm_currentfwd;
-					return (0);
+					return (qm->qm_action);
 				}
 			}
 		}
 	}
 
-	return (-1);
+	return (Q_NOMATCH);
 }
 
 
