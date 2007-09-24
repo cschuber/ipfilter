@@ -190,6 +190,7 @@ typedef struct config {
 	fd_set			c_mfdr;
 	int			c_debug;
 	char			*c_cffile;
+	int			c_keepprivs;
 } config_t;
 
 

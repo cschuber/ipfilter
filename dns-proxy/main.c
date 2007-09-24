@@ -71,6 +71,8 @@ static void	make_background();
 static int	match_name(name_t *n, char *query, int qlen);
 static action_t match_names(domain_t *d, char *query, int qlen);
 static void	process_packets(void);
+static int	query_match_name(struct ntop *names, char *name);
+static int	query_match_type(struct qttop *types, int type);
 static query_t	*query_exists(inbound_t *in, int buflen);
 static void	send_reject(inbound_t *in, int buflen);
 static void	start_logging(char *execname);
@@ -107,7 +109,8 @@ main(int argc, char *argv[])
 
 	write_pid();
 
-	drop_privs();
+	if (!config.c_keepprivs)
+		drop_privs();
 
 	build_aio();
 
@@ -136,7 +139,7 @@ do_args(int argc, char *argv[])
 {
 	int c;
 
-	while ((c = getopt(argc, argv, "df:V")) >= 0) {
+	while ((c = getopt(argc, argv, "dkf:V")) >= 0) {
 		switch (c)
 		{
 		case 'd' :
@@ -144,6 +147,9 @@ do_args(int argc, char *argv[])
 			break;
 		case 'f' :
 			config.c_cffile = optarg;
+			break;
+		case 'k' :
+			config.c_keepprivs = 1;
 			break;
 		case 'V' :
 			printf("Version 1.0\n");
@@ -234,7 +240,6 @@ build_aio()
 static void
 drop_privs()
 {
-#if 0
 	struct passwd *p;
 
 	p = getpwnam("nobody");
@@ -243,7 +248,6 @@ drop_privs()
 		if (geteuid() == 0)
 			setuid(p->pw_uid);
 	}
-#endif
 }
 
 
@@ -420,6 +424,8 @@ free_qinfo(qinfo_t *qip)
 			qip->qi_names[i] = NULL;
 		}
 		free(qip->qi_names);
+		qip->qi_names = NULL;
+		qip->qi_ncount = 0;
 	}
 
 
@@ -675,56 +681,85 @@ static action_t
 find_query_forward(qinfo_t *qi, struct ftop **top, forward_t ***current)
 {
 	action_t act, act2;
-	int i, j, namelen;
 	querymatch_t *qm;
-	qtypelist_t *qt;
-	char *name;
-	name_t *n;
+	int i;
 
 	STAILQ_FOREACH(qm, &config.c_qmatches, qm_next) {
+		logit(3, "Query match: types %d names %d\n",
+			STAILQ_EMPTY(&qm->qm_types) ? 0 : 1,
+			STAILQ_EMPTY(&qm->qm_names) ? 0 : 1);
+
 		act = Q_NOMATCH;
 		for (i = 0; i < qi->qi_qtcount; i++) {
-			STAILQ_FOREACH(qt, &qm->qm_types, qt_next) {
-				logit(2, "Query type match.%d %d =? %d\n", i,
-				      qt->qt_type, qi->qi_qtypes[i]);
-				if ((qt->qt_type == qi->qi_qtypes[i]) ||
-				    (qi->qi_qtypes[i] == 0)) {
-					act = qm->qm_action;
-				}
+			if (query_match_type(&qm->qm_types, qi->qi_qtypes[i])) {
+				act = qm->qm_action;
+				break;
 			}
 		}
 
-		if ((act == Q_NOMATCH) && (qi->qi_qtcount > 0))
+		if ((act == Q_NOMATCH) && !STAILQ_EMPTY(&qm->qm_types))
 			continue;
 
 		act2 = Q_NOMATCH;
 
 		for (i = 0; i < qi->qi_ncount; i++) {
-			STAILQ_FOREACH(n, &qm->qm_names, n_next) {
-				name = qi->qi_names[i];
-				namelen = strlen(name);
-
-				for (j = 0; j < qi->qi_ncount; j++) {
-					switch (match_name(n, name, namelen))
-					{
-					case 0 :
-						act2 = qm->qm_action;
-						break;
-					default :
-						break;
-					}
-				}
+			if (query_match_name(&qm->qm_names, qi->qi_names[i])) {
+				act2 = qm->qm_action;
+				break;
 			}
 		}
 
-		if ((act2 != Q_NOMATCH) || (qi->qi_ncount == 0)) {
+		logit(3, "Query match act %d act2 %d\n", act, act2);
+
+		if ((act2 != Q_NOMATCH) || STAILQ_EMPTY(&qm->qm_names)) {
 			*top = &qm->qm_forwards;
 			*current = &qm->qm_currentfwd;
-			break;
+
+			if (act2 == Q_NOMATCH)
+				return (act);
+			return (act2);
 		}
 	}
 
 	return (Q_NOMATCH);
+}
+
+
+static int
+query_match_type(struct qttop *types, int type)
+{
+	qtypelist_t *qt;
+
+	STAILQ_FOREACH(qt, types, qt_next) {
+		logit(2, "Query type match %d =? %d\n", qt->qt_type, type);
+
+		if ((qt->qt_type == type) || (qt->qt_type == 0)) {
+			return (1);
+		}
+	}
+
+	return (0);
+
+}
+
+
+static int
+query_match_name(struct ntop *names, char *name)
+{
+	int namelen;
+	name_t *n;
+
+	namelen = strlen(name);
+	STAILQ_FOREACH(n, names, n_next) {
+		logit(2, "Query name match %s =? %s\n", n->n_name, name);
+
+		if (match_name(n, name, namelen) == 0) {
+			return (1);
+		}
+	}
+
+	return (0);
+
 }
 
 
