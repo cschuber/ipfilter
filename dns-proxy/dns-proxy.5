@@ -29,9 +29,10 @@ The \fIportnumber\fP specifies which UDP port will be opened at the
 address given by \fIlocaladdress\fP for receipt of DNS packets.
 .TP
 .I transparent\fP
-Specifying this option on the end of a \fBport\fP rule indicates that
-packets are being redirected to this \fIportnumber\fP using \fBipnat\fP's
-\fIrdr\fP rules.  \fBdns-proxy\fP will attempt to get the original
+Specifying this option on the end of a \fBport\fP rule is an explicit
+indication of whether or not packets are being redirected to this
+\fIportnumber\fP using \fBipnat\fP's \fIrdr\fP rules.  If it is set
+to \fBon\fP, \fBdns-proxy\fP will attempt to get the original
 destination from IPFilter in order to forward it to the correct
 destination.
 .PP
@@ -39,7 +40,7 @@ Two examples of what a port line looks like are:
 .nf
 
 port locals 10.22.113.1 53;
-port redirs 10.22.113.1 5053 transparent;
+port redirs 10.22.113.1 5053 { transparent on; };
 .fi
 .SS forwarders
 The \fBforwarders\fP line defines which IP addresses to use for resolving
@@ -85,7 +86,7 @@ Allow the DNS packet through
 Silently discard the DNS packet
 .TP
 .B reject
-Retrun an error to the querier, indicating that the naem does not exist.
+Retrun an error to the querier, indicating that the name does not exist.
 .PP
 When specifying a name with one of \fBallow\fP, \fBblock\fP or \fBreject\fP,
 it is possible to have it start with either a '*' or '.'.  The only wildcard
@@ -96,6 +97,33 @@ Some example lines are as follows:
 
 acl 10.1.1.1/32,10.2.2.0/24 port locals { allow .com, .net; };
 acl all port locals { block .microsoft.com; block *cnn.com; };
+.fi
+.SS query
+The \fBquery\fP line is used to do explicit matching and policy enforcement
+depending on the contents of the DNS query.  These lines are \fBoptional\fP.
+The \fBquery\fP line allows you to match on the following DNS fields:
+.TP
+.B type
+A list of DNS resource record types may be specified.  Abbreviations are
+used and must be present in upper case.  So, for example, the Start of
+Authority record would be reprsented by \fISOA\fP.  A list of \fItypes\fP
+may be given, with each one seperated by a comma.  To match all, an
+asterix (*) can be used.
+.PP
+Following the matching statements, it is possible to specify an action.
+If no action is specified, an empty pair of {}'s must be present and the
+global set of forwarders is used.  An action is either an explicit
+\fBblock\fP, \fBreject\fP, \fBallow\fP or a list of forwarders.  The list
+of forwarders in a \fBquery\fP line is independant of other forwarder lists.
+Thus it is possible to forward DNS queries to different destinations,
+depending on the nature of the query.
+.PP
+.nf
+
+query type=(AAAA) { forwarders { 2.2.2.1; }; };
+query type=(A,NS) { forwarders { 2.2.2.2; }; };
+# Block ionode IP over DNS (hides in NULL DNS RRs)
+query type=(NULL) { block; };
 .fi
 .SH FILES
 /etc/dns-proxy.conf
