@@ -4,3 +4,6 @@ netinet
 opt_bpf.h
 opt_inet6.h
 opt_pfil.h
+net
+opt_bpf.h
+opt_pfil.h
