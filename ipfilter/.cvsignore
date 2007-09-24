@@ -1,6 +1,0 @@
-ip_rules.h
-net
-netinet
-opt_bpf.h
-opt_inet6.h
-opt_pfil.h
