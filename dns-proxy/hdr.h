@@ -216,11 +216,77 @@ typedef struct {
 /*
  * Compat section
  */
+#ifndef	T_MX
+# define	T_MX	15
+#endif
+#ifndef	T_TXT
+# define	T_TXT	16
+#endif
+#ifndef	T_RP
+# define	T_RP	17
+#endif
+#ifndef	T_AFSDB
+# define	T_AFSDB	18
+#endif
+#ifndef	T_X25
+# define	T_X25	19
+#endif
+#ifndef	T_ISDN
+# define	T_ISDN	20
+#endif
+#ifndef	T_RT
+# define	T_RT	21
+#endif
+#ifndef	T_NSAP
+# define	T_NSAP	22
+#endif
+#ifndef	T_NSAP_PTR
+# define	T_NSAP_PTR	23
+#endif
+#ifndef	T_SIG
+# define	T_SIG	24
+#endif
+#ifndef	T_KEY
+# define	T_KEY	25
+#endif
+#ifndef	T_PX
+# define	T_PX	26
+#endif
+#ifndef	T_GPOS
+# define	T_GPOS	27
+#endif
+#ifndef	T_AAAA
+# define	T_AAAA	28
+#endif
+#ifndef	T_LOC
+# define	T_LOC	29
+#endif
+#ifndef	T_NXT
+# define	T_NXT	30
+#endif
+#ifndef	T_EID
+# define	T_EID	31
+#endif
+#ifndef	T_NIMLOC
+# define	T_NIMLOC 32
+#endif
+#ifndef	T_SRV
+# define	T_SRV	33
+#endif
+#ifndef	T_ATMA
+# define	T_ATMA	34
+#endif
+#ifndef	T_NAPTR
+# define	T_NAPTR	35
+#endif
 #ifndef	T_KX
 # define	T_KX	36
 #endif
 #ifndef T_CERT
 # define	T_CERT	37
+#endif
+#ifndef T_A6
+# define	T_A6	38
 #endif
 #ifndef T_DNAME
 # define	T_DNAME	39
@@ -228,8 +294,32 @@ typedef struct {
 #ifndef T_SINK
 # define	T_SINK	40
 #endif
+#ifndef T_OPT
+# define	T_OPT	41
+#endif
+#ifndef T_APL
+# define	T_APL	42
+#endif
 #ifndef T_TKEY
 # define	T_TKEY	249
+#endif
+#ifndef T_TSIG
+# define	T_TSIG	250
+#endif
+#ifndef T_IXFR
+# define	T_IXFR	251
+#endif
+#ifndef T_AXFR
+# define	T_AXFR	252
+#endif
+#ifndef T_MAILB
+# define	T_MAILB	253
+#endif
+#ifndef T_MAILA
+# define	T_MAILA	254
+#endif
+#ifndef T_ANY
+# define	T_ANY	255
 #endif
 #ifndef T_ZXFR
 # define	T_ZXFR	256
