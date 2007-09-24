@@ -34,7 +34,9 @@
 #include <pwd.h>
 #include <arpa/inet.h>
 
+#ifndef NO_IPFILTER
 #include "ip_nat.h"
+#endif
 
 static void	add_qname(qinfo_t *qip, char *name);
 static void	add_qtype(qinfo_t *qip, int type);
@@ -178,10 +180,11 @@ write_pid()
 static void
 init_ipf()
 {
+#ifndef NO_IPFILTER
 	inbound_t *in;
 
 	STAILQ_FOREACH(in, &config.c_ports, i_next) {
-		if (in->i_transparent) {
+		if (in->i_transparent && (config.c_natfd < 0)) {
 			config.c_natfd = open(IPNAT_NAME, O_RDWR);
 			if (config.c_natfd == -1) {
 				perror("open(/dev/ipnat) failed");
@@ -189,6 +192,7 @@ init_ipf()
 			}
 		}
 	}
+#endif
 }
 
 
@@ -781,6 +785,7 @@ choose_forward(struct ftop *ftop, forward_t **currentp, struct sockaddr_in *dst)
 static int
 get_transparent(inbound_t *in, struct sockaddr_in *dst)
 {
+#ifndef NO_IPFILTER
 	natlookup_t nat;
 	ipfobj_t obj;
 
@@ -804,6 +809,9 @@ get_transparent(inbound_t *in, struct sockaddr_in *dst)
 	dst->sin_addr = nat.nl_realip;
 	dst->sin_port = nat.nl_realport;
 	return (0);
+#else
+	return (-1);
+#endif
 }
 
 

@@ -489,6 +489,8 @@ config_init()
 		logit(-1, "failed to create outbound UDP socket\n");
 		exit(1);
 	}
+
+	config.c_natfd = -1;
 }
 
 void

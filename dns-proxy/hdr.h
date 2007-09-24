@@ -45,8 +45,10 @@
 
 #include "queue.h"
 
-#include "ip_compat.h"
-#include "ip_fil.h"
+#ifndef NO_IPFILTER
+# include "ip_compat.h"
+# include "ip_fil.h"
+#endif
 
 
 typedef	enum	action {
