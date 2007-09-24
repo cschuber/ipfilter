@@ -670,6 +670,7 @@ struct pollhead **phpp;
 }
 
 
+#if defined(_INET_IP_STACK_H)
 static int
 ipf_hook(hook_event_token_t event, hook_data_t data, netstack_t *stp)
 {
@@ -712,3 +713,4 @@ ipf_hook(hook_event_token_t event, hook_data_t data, netstack_t *stp)
 	}
 	return 0;
 }
+#endif

@@ -495,7 +495,7 @@ mblk_t *m, **mpp;
 #endif
 			ip->ip_ttl = 63;
 #if !defined(_INET_IP_STACK_H)
-		if (ip_mtudisc != NULL) && (*ip_mtudisc == 0))
+		if ((ip_mtudisc != NULL) && (*ip_mtudisc == 0))
 #else
 		if (!net_getpmtuenabled(ipfipv4))
 #endif
