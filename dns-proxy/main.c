@@ -36,6 +36,7 @@
 
 #include "ip_nat.h"
 
+static void	add_qname(qinfo_t *qip, char *name);
 static void	add_qtype(qinfo_t *qip, int type);
 static void	add_query(inbound_t *in, int buflen);
 static void	add_reply(struct sockaddr_in *, char *buffer, int buflen);
@@ -56,6 +57,7 @@ static void	expire_queries(time_t now);
 static query_t *find_query(struct sockaddr_in *sin, char *buffer, int buflen);
 static action_t	find_query_forward(qinfo_t *qi, struct ftop **top,
 				   forward_t ***current);
+static void	free_qinfo(qinfo_t *qip);
 static int	get_name(void *start, int len, void *buffer, int buflen);
 static int	get_transparent(inbound_t *in, struct sockaddr_in *dst);
 static void	handle_alarm(int info);
@@ -64,6 +66,7 @@ static void	handle_term(int info);
 static void	init_ipf(void);
 static void	init_signals();
 static void	make_background();
+static int	match_name(name_t *n, char *query, int qlen);
 static action_t match_names(domain_t *d, char *query, int qlen);
 static void	process_packets(void);
 static query_t	*query_exists(inbound_t *in, int buflen);
@@ -398,10 +401,28 @@ check_query(inbound_t *in, int buflen)
 		break;
 	}
 
-	if (in->i_qinfo.qi_qtypes != NULL) {
-		free(in->i_qinfo.qi_qtypes);
-		in->i_qinfo.qi_qtypes = NULL;
-		in->i_qinfo.qi_qtcount = 0;
+	free_qinfo(&in->i_qinfo);
+}
+
+
+static void
+free_qinfo(qinfo_t *qip)
+{
+	int i;
+
+	if (qip->qi_names != NULL) {
+		for (i = 0; i < qip->qi_ncount; i++) {
+			free(qip->qi_names[i]);
+			qip->qi_names[i] = NULL;
+		}
+		free(qip->qi_names);
+	}
+
+
+	if (qip->qi_qtypes != NULL) {
+		free(qip->qi_qtypes);
+		qip->qi_qtypes = NULL;
+		qip->qi_qtcount = 0;
 	}
 }
 
@@ -440,6 +461,7 @@ check_questions(qinfo_t *qip, struct sockaddr_in *sin, char *buffer, int buflen)
 			break;
 		data += len + 1;
 		dlen -= len + 1;
+		add_qname(qip, qname);
 
 		type = (data[0] << 8) | data[1];
 		data += 2;
@@ -452,6 +474,7 @@ check_questions(qinfo_t *qip, struct sockaddr_in *sin, char *buffer, int buflen)
 		dlen -= 2;
 
 		if (class != C_IN) {	/* C_IN = Internet class */
+			logit(1, "blocking non-Internet class query\n");
 			rc = Q_BLOCK;
 			break;
 		}
@@ -481,6 +504,29 @@ add_qtype(qinfo_t *qip, int type)
 
 	qip->qi_qtypes[qip->qi_qtcount - 1] = type;
 	logit(3, "Added question for type %d\n", type);
+}
+
+
+static void
+add_qname(qinfo_t *qip, char *name)
+{
+	int i;
+
+	for (i = 0; i < qip->qi_ncount; i++)
+		if (!strcasecmp(qip->qi_names[i], name) == 0)
+			return;
+
+	qip->qi_ncount++;
+
+	if (qip->qi_names == NULL) {
+		qip->qi_names = malloc(sizeof(*qip->qi_names));
+	} else {
+		qip->qi_names = realloc(qip->qi_names, qip->qi_qtcount *
+					 sizeof(*qip->qi_names));
+	}
+
+	qip->qi_names[qip->qi_ncount - 1] = strdup(name);
+	logit(3, "Added question for name %s\n", name);
 }
 
 
@@ -624,22 +670,53 @@ add_query(inbound_t *in, int buflen)
 static action_t
 find_query_forward(qinfo_t *qi, struct ftop **top, forward_t ***current)
 {
+	action_t act, act2;
+	int i, j, namelen;
 	querymatch_t *qm;
 	qtypelist_t *qt;
-	int i;
+	char *name;
+	name_t *n;
 
 	STAILQ_FOREACH(qm, &config.c_qmatches, qm_next) {
+		act = Q_NOMATCH;
 		for (i = 0; i < qi->qi_qtcount; i++) {
 			STAILQ_FOREACH(qt, &qm->qm_types, qt_next) {
 				logit(2, "Query type match.%d %d =? %d\n", i,
 				      qt->qt_type, qi->qi_qtypes[i]);
 				if ((qt->qt_type == qi->qi_qtypes[i]) ||
 				    (qi->qi_qtypes[i] == 0)) {
-					*top = &qm->qm_forwards;
-					*current = &qm->qm_currentfwd;
-					return (qm->qm_action);
+					act = qm->qm_action;
 				}
 			}
+		}
+
+		if ((act == Q_NOMATCH) && (qi->qi_qtcount > 0))
+			continue;
+
+		act2 = Q_NOMATCH;
+
+		for (i = 0; i < qi->qi_ncount; i++) {
+			STAILQ_FOREACH(n, &qm->qm_names, n_next) {
+				name = qi->qi_names[i];
+				namelen = strlen(name);
+
+				for (j = 0; j < qi->qi_ncount; j++) {
+					switch (match_name(n, name, namelen))
+					{
+					case 0 :
+						act2 = qm->qm_action;
+						break;
+					default :
+						break;
+					}
+				}
+			}
+		}
+
+		if ((act2 != Q_NOMATCH) || (qi->qi_ncount == 0)) {
+			*top = &qm->qm_forwards;
+			*current = &qm->qm_currentfwd;
+			break;
 		}
 	}
 
@@ -905,45 +982,66 @@ dump_status(int info)
 }
 #endif
 
+
+/*
+ * 0 = name maches
+ * 1 = no match possible
+ * -1 = didn't match
+ */
+static int
+match_name(name_t *n, char *query, int qlen)
+{
+	char *base;
+	int blen;
+
+	blen = n->n_namelen;
+	base = n->n_name;
+
+	if (blen > qlen)
+		return (1);
+
+	if (blen == qlen) {
+		if (strncasecmp(base, query, qlen) == 0)
+			return (0);
+	}
+
+	/*
+	 * If the base string string is shorter than the query,
+	 * allow the tail of the base to match the same length
+	 * tail of the query *if*:
+	 * - the base string starts with a '*' (*cnn.com)
+	 * - the base string represents a domain (.cnn.com)
+	 * as otherwise it would not be possible to block just
+	 * "cnn.com" without also impacting "foocnn.com", etc.
+	 */
+	if (*base == '*') {
+		base++;
+		blen--;
+	} else if (*base != '.')
+		return (1);
+
+	if (strncasecmp(base, query + qlen - blen, blen) == 0)
+		return (0);
+
+	return (-1);
+}
+
 /*
  * Tries to match the base string (in our ACL) with the query from a packet.
  */
 static action_t
 match_names(domain_t *d, char *query, int qlen)
 {
-	char *base;
 	name_t *n;
-	int blen;
 
 	STAILQ_FOREACH(n, &d->d_names, n_next) {
-		blen = n->n_namelen;
-		base = n->n_name;
-
-		if (blen > qlen)
-			return (1);
-
-		if (blen == qlen) {
-			if (strncasecmp(base, query, qlen) == 0)
-				return (0);
+		switch (match_name(n, query, qlen))
+		{
+		case 0 :
+			return 0;
+		default :
+			break;
 		}
-
-		/*
-		 * If the base string string is shorter than the query,
-		 * allow the tail of the base to match the same length
-		 * tail of the query *if*:
-		 * - the base string starts with a '*' (*cnn.com)
-		 * - the base string represents a domain (.cnn.com)
-		 * as otherwise it would not be possible to block just
-		 * "cnn.com" without also impacting "foocnn.com", etc.
-		 */
-		if (*base == '*') {
-			base++;
-			blen--;
-		} else if (*base != '.')
-			return (1);
-
-		if (strncasecmp(base, query + qlen - blen, blen) == 0)
-			return (0);
 	}
 	return (1);
 }

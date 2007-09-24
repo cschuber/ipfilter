@@ -83,7 +83,7 @@ static void		add_qmatch_qtypes(querymatch_t *qm, qtypelist_t *qt);
 %token          YY_COMMENT
 
 %token		YY_ACL YY_ALLOW YY_BLOCK YY_REJECT YY_ALL YY_MAXTTL
-%token		YY_PORT YY_TRANSPARENT YY_FORWARDERS YY_QUERY YY_TYPE
+%token		YY_PORT YY_TRANSPARENT YY_FORWARDERS YY_QUERY YY_TYPE YY_NAME
 %token		YY_Q_A YY_Q_NS YY_Q_MD YY_Q_MF YY_Q_CNAME YY_Q_SOA YY_Q_MB
 %token		YY_Q_MG YY_Q_MR YY_Q_NULL YY_Q_WKS YY_Q_PTR YY_Q_HINFO
 %token		YY_Q_MINFO YY_Q_MX YY_Q_TXT YY_Q_RP YY_Q_AFSDB YY_Q_X25
@@ -97,7 +97,7 @@ static void		add_qmatch_qtypes(querymatch_t *qm, qtypelist_t *qt);
 %type	<host>	ipaddress hlist
 %type	<acl>	acl
 %type	<dom>	action actions
-%type	<name>	names hname
+%type	<name>	names hname qnames
 %type	<aopt>	opts option optlist
 %type	<in>	port
 %type	<fwd>	forward
@@ -138,24 +138,30 @@ forward:
 				{ $$ = hosts_to_forward($3); }
 	;
 
-query:	YY_QUERY qtypes '{' forward ';' '}'
+query:	YY_QUERY qtypes qnames '{' forward ';' '}'
 				{ $$ = new_querymatch();
 				  if ($$ != NULL) {
 					if ($2 != NULL) {
 						add_qmatch_qtypes($$, $2);
 					}
-					if ($4 != NULL) {
-						add_qmatch_forwards($$, $4);
+					if ($3 != NULL) {
+						add_qmatch_qnames($$, $3);
+					}
+					if ($5 != NULL) {
+						add_qmatch_forwards($$, $5);
 					}
 				  }
 				}
-	| YY_QUERY qtypes '{' actionword ';' '}'
+	| YY_QUERY qtypes qnames '{' actionword ';' '}'
 				{ $$ = new_querymatch();
 				  if ($$ != NULL) {
 					if ($2 != NULL) {
 						add_qmatch_qtypes($$, $2);
 					}
-					$$->qm_action = $4;
+					if ($3 != NULL) {
+						add_qmatch_qnames($$, $3);
+					}
+					$$->qm_action = $5;
 				  }
 				}
 	;
@@ -195,6 +201,10 @@ qtypes:				{ $$ = NULL; }
 				{ yyresetdict();
 				  $$ = $5;
 				}
+	;
+qnames:				{ $$ = NULL; }
+	| YY_NAME '=' '(' names ')'
+				{ $$ = $4; }
 	;
 
 qtist:	qtype			{ $$ = add_qtype($1, NULL); }
@@ -341,6 +351,7 @@ static struct wordtab words[26] = {
 	{ "deny",		YY_BLOCK },
 	{ "forwarders",		YY_FORWARDERS },
 	{ "maxttl",		YY_MAXTTL },
+	{ "name",		YY_NAME },
 	{ "off",		YY_OFF },
 	{ "on",			YY_ON },
 	{ "pass",		YY_ALLOW },
@@ -571,6 +582,7 @@ new_querymatch()
 	}
 
 	STAILQ_INIT(&qm->qm_types);
+	STAILQ_INIT(&qm->qm_names);
 	CIRCLEQ_INIT(&qm->qm_forwards);
 
 	qm->qm_action = Q_ALLOW;
@@ -588,6 +600,19 @@ add_qmatch_qtypes(querymatch_t *qm, qtypelist_t *qt)
 		qt2 = STAILQ_NEXT(qt1, qt_next);
 		STAILQ_NEXT(qt1, qt_next) = NULL;
 		STAILQ_INSERT_TAIL(&qm->qm_types, qt1, qt_next);
+	}
+}
+
+
+static void
+add_qmatch_qnames(querymatch_t *qm, name_t *names)
+{
+	name_t *n1, *n2;
+
+	for (n1 = names; n1 != NULL; n1 = n2) {
+		n2 = STAILQ_NEXT(n1, n_next);
+		STAILQ_NEXT(n1, n_next) = NULL;
+		STAILQ_INSERT_TAIL(&qm->qm_names, n1, n_next);
 	}
 }
 
@@ -1047,7 +1072,7 @@ dump_forwarders(struct ftop *ftop, int eol)
 		if (f != CIRCLEQ_LAST(ftop))
 			putchar(',');
 	}
-	printf(";};");
+	printf("; };");
 	if (eol)
 		putchar('\n');
 }
@@ -1074,17 +1099,23 @@ dump_querymatches(struct qmtop *qmtop)
 	querymatch_t *qm;
 
 	STAILQ_FOREACH(qm, qmtop, qm_next) {
-		printf("query ");
+		printf("query");
 		if (!STAILQ_EMPTY(&qm->qm_types)) {
 			qtypelist_t *qt;
 
-			printf("type=(");
+			printf(" type=(");
 			STAILQ_FOREACH(qt, &qm->qm_types, qt_next) {
 				printf("%s", qtype_to_name(qt->qt_type));
 				if (STAILQ_NEXT(qt, qt_next) != NULL) {
 					printf(",");
 				}
 			}
+			printf(")");
+		}
+
+		if (!STAILQ_EMPTY(&qm->qm_names)) {
+			printf(" name=(");
+			dump_names(&qm->qm_names);
 			printf(")");
 		}
 

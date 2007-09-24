@@ -74,6 +74,8 @@ typedef struct portopt {
 typedef struct qinfo {
 	int	qi_qtcount;
 	int	*qi_qtypes;
+	int	qi_ncount;
+	char	**qi_names;
 } qinfo_t;
 
 
@@ -165,6 +167,7 @@ typedef	struct querymatch {
 	STAILQ_ENTRY(querymatch) qm_next;
 	struct qttop		qm_types;
 	struct ftop		qm_forwards;
+	struct ntop		qm_names;
 	forward_t		*qm_currentfwd;
 	action_t		qm_action;
 } querymatch_t;
