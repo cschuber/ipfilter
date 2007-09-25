@@ -2652,6 +2652,7 @@ filterdone:
 			WRITE_ENTER(&ipf_nat);
 			nat_delete((nat_t *)fin->fin_nat, NL_DESTROY);
 			RWLOCK_EXIT(&ipf_nat);
+			fin->fin_nat = NULL;
 		} else {
 			fr_natderef((nat_t **)&fin->fin_nat);
 		}

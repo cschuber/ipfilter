@@ -361,6 +361,7 @@ typedef	struct	natstat	{
 	hostmap_t *ns_maplist;
 	u_long	*ns_bucketlen[2];
 	u_long	ns_ticks;
+	u_int	ns_orphans;
 } natstat_t;
 
 typedef	struct	natlog {

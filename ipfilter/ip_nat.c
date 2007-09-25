@@ -1653,6 +1653,7 @@ struct nat *nat;
 int logtype;
 {
 	struct ipnat *ipn;
+	int removed = 0;
 
 	if (logtype != 0 && nat_logging != 0)
 		nat_log(nat, logtype);
@@ -1662,6 +1663,8 @@ int logtype;
 	 * nat_pnext is set.
 	 */
 	if (nat->nat_pnext != NULL) {
+		removed = 1;
+
 		nat_stats.ns_bucketlen[0][nat->nat_hv[0]]--;
 		nat_stats.ns_bucketlen[1][nat->nat_hv[1]]--;
 
@@ -1702,9 +1705,24 @@ int logtype;
 		nat_stats.ns_expire++;
 
 	MUTEX_ENTER(&nat->nat_lock);
-	if (nat->nat_ref > 1) {
+	/*
+	 * NL_DESTROY should only be passed in when we've got nat_ref >= 2.
+	 * This happens when a nat'd packet is blocked and we want to throw
+	 * away the NAT session.
+	 */
+	if (logtype == NL_DESTROY) {
+		if (nat->nat_ref > 2) {
+			nat->nat_ref -= 2;
+			MUTEX_EXIT(&nat->nat_lock);
+			if (removed)
+				nat_stats.ns_orphans++;
+			return;
+		}
+	} else if (nat->nat_ref > 1) {
 		nat->nat_ref--;
 		MUTEX_EXIT(&nat->nat_lock);
+		if (removed)
+			nat_stats.ns_orphans++;
 		return;
 	}
 	MUTEX_EXIT(&nat->nat_lock);
@@ -1713,6 +1731,8 @@ int logtype;
 	 * At this point, nat_ref is 1, doing "--" would make it 0..
 	 */
 	nat->nat_ref = 0;
+	if (!removed)
+		nat_stats.ns_orphans--;
 
 #ifdef	IPFILTER_SYNC
 	if (nat->nat_sync)
