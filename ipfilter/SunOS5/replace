@@ -11,7 +11,6 @@ update() {
 	Z=$IFS
 	IFS=:
 	set $file
-	IFS=$Z
 	if [[ -z $2 ]] ; then
 		o=$1
 		n=$1
@@ -19,29 +18,38 @@ update() {
 		o=$1
 		n=$2
 	fi
+	set $dir
+	sdir=$1
+	ddir=$2
+	IFS=$Z
 
-	prog=${base}/${dir}/${o}
+	if [[ -z ${sdir} && ! -d ${base}/${ddir} ]] ; then
+		ddir=
+	fi
+
+	sprog=${cpudir}/${sdir}/${n}
+	dprog=${base}/${ddir}/${o}
+
 	if [[ $undo -eq 0 ]] ; then
-		if [[ -d ${base}/${dir} ]] ; then
-			if [[ ! -f ${prog}.dist ]] ; then
-				$debug /bin/mv ${prog} ${prog}.dist
-				$debug /bin/cp -p ${prog}.dist ${prog}
+		if [[ -d ${base}/${ddir} ]] ; then
+			if [[ ! -f ${dprog}.dist ]] ; then
+				$debug /bin/mv ${dprog} ${dprog}.dist
+				$debug /bin/cp -p ${dprog}.dist ${dprog}
 			fi
-			$debug /bin/cp ${cpudir}/${dir}/${n} ${prog}
+			$debug /bin/cp ${sprog} ${dprog}
 		else
-			prog=${base}/${o}
-			links=$(/bin/ls -dl ${prog} | awk ' { print $2; } ' -)
+			links=$(/bin/ls -dl ${dprog} | awk ' { print $2; } ' -)
 			if [[ $links -eq 1 ]] ; then
-				if [[ ! -f ${prog}.dist ]] ; then
-					$debug /bin/mv ${prog} ${prog}.dist
-					$debug /bin/cp -p ${prog}.dist ${prog}
+				if [[ ! -f ${dprog}.dist ]] ; then
+					$debug /bin/mv ${dprog} ${dprog}.dist
+					$debug /bin/cp -p ${dprog}.dist ${dprog}
 				fi
-				$debug /bin/cp ${cpudir}/${dir}/${n} ${prog}
+				$debug /bin/cp ${sprog} ${dprog}
 			fi
 		fi
 	else
-		if [[ -f ${prog}.dist ]] ; then
-			$debug /bin/mv -f ${prog}.dist ${prog}
+		if [[ -f ${dprog}.dist ]] ; then
+			$debug /bin/mv -f ${dprog}.dist ${dprog}
 		fi
 	fi
 }
@@ -74,8 +82,6 @@ esac
 cpu=`uname -p`
 cpudir=${cpu}-`uname -r`
 
-echo $cpudir
-
 if [[ -d ${cpudir}/amd64 ]] ; then
 	big=amd64
 fi
@@ -88,26 +94,37 @@ fi
 if [[ -d ${cpudir}/sparc ]] ; then
 	small=sparc
 fi
+echo "$cpudir.$big.$small."
 
 if [[ -n ${big} ]] ; then
 	for i in ipf:ipf.exe ipfs ipfstat ipmon ipnat ippool; do
-		update $SBIN $big $i
+		update $SBIN ${big}:${big} $i
 	done
-	update /usr/lib/ipf $big ipftest
-	update /usr/kernel/drv $big ipf
+	update /usr/lib/ipf ${big}:${big} ipftest
+	update /usr/kernel/drv ${big}:${big} ipf
 fi
-
 if [[ -n ${small} ]] ; then
 	for i in ipf:ipf.exe ipfs ipfstat ipmon ipnat ippool; do
-		update $SBIN $small $i
+		update $SBIN ${small}:${small} $i
 	done
-	update /usr/lib/ipf $small ipftest
-	update /usr/kernel/drv $small ipf
+	update /usr/lib/ipf ${small}:${small} ipftest
+	update /usr/kernel/drv ":" ipf
 fi
-if [[ -z ${big} && -z ${small} ]] ; then
+if [[ -z ${small} && -z ${big} ]] ; then
+	if [[ -z ${small} ]] ; then
+		case ${cpu} in
+		i386)
+			small=i86
+			;;
+		sparc)
+			small=sparc
+			;;
+		esac
+	fi
 	for i in ipf:ipf.exe ipfs ipfstat ipmon ipnat ippool; do
-		update $SBIN "" $i
+		update $SBIN :${small} $i
 	done
-	update /usr/lib/ipf "" ipftest
-	update /usr/kernel/drv "" ipf
+	update /usr/lib/ipf :${small} ipftest
+	update /usr/kernel/drv :${small} ipf
 fi
+exit 0
