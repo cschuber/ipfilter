@@ -84,16 +84,19 @@ __EOF__
 
 	case "$CC" in
 	*gcc*)	# gcc
-		XARCH32=""
+		XARCH32_i386=""
+		XARCH32_sparc=""
 		XARCH64_sparc="-m64 -mcmodel=medlow"
 		XARCH64_i386="-m64 -mcmodel=kernel -mno-red-zone -ffreestanding"
 		;;
 	*)	# Sun C
-		XARCH32="-Xa -xildoff -xarch=v8 -xmemalign=8s"
+		XARCH32_i386="-Xa -xildoff"
+		XARCH32_sparc="-Xa -xildoff -xarch=v8 -xmemalign=8s"
 		XARCH64_sparc="-Xa -xildoff -xarch=v9 -xchip=ultra -xmemalign=8s -xcode=abs32"
 		XARCH64_i386="$XARCH32 -xarch=amd64 -xcode=abs32"
 		;;
 	esac
+	XARCH32="`eval echo '$XARCH32_'$cpu`"
 	XARCH64="`eval echo '$XARCH64_'$cpu`"
 	OBJ32_sparc=sparcv7
 	OBJ64_sparc=sparcv9
