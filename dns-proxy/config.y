@@ -52,7 +52,7 @@ static hostlist_t *host_add(hostlist_t *h1, hostlist_t *h2);
 static name_t *name_add(name_t *n1, name_t *n2);
 static domain_t *domains_new(action_t act, name_t *names);
 static domain_t *domains_add(domain_t *d1, domain_t *d2);
-static acl_t *acl_new(char *name, hostlist_t *hosts, name_t *ports, domain_t *domains);
+static acl_t *acl_new(char *, hostlist_t *, name_t *, int, domain_t *);
 static acl_t *acl_find(char *name);
 static void acl_add(acl_t *a);
 static inbound_t *port_new(char *name, hostlist_t *addr, u_short port, portopt_t *options);
@@ -60,7 +60,8 @@ static inbound_t *port_find(char *name);
 static void port_add(inbound_t *in);
 static portopt_t *portopt_new(int option, void *arg);
 static portopt_t *portopt_add(portopt_t *po1, portopt_t *po2);
-static modify_t *modify_new(char *name, int type, name_t *acls, rrlist_t *keep, rrlist_t *strip);
+static modify_t *modify_new(char *name, int type, name_t *acls,
+			    rrlist_t *keep, rrlist_t *strip, rrlist_t *clean);
 static void rrarray_set(int type, u_char array[256]);
 static forward_t *forward_new(name_t *acls, name_t *fwdrs);
 static void names_to_acllist(name_t *names, struct acllisttop *top);
@@ -71,7 +72,7 @@ static void forwarder_add(forwarder_t *fwdr);
 static void modify_add(modify_t *m);
 static rrlist_t * rrtype_add(rrlist_t *r1, rrlist_t *r2);
 static rrlist_t * rrtype_new(int type);
-static char *qtype_to_name(int type);
+static char *rrtype_to_name(int type);
 char *get_action(action_t act);
 static void hosts_dump(struct htop *hosts);
 void names_dump(struct ntop *ntop);
@@ -100,15 +101,18 @@ void port_dump(inbound_t *port);
 	forwarder_t	*fwdr;
 	rrlist_t	*rr;
 	portopt_t	*popt;
+	modopt_t	mopt;
 };
 
 %token  <num>   YY_NUMBER YY_HEX YY_ON YY_OFF
 %token  <str>   YY_STR
 %token          YY_COMMENT
 
-%token		YY_ACL YY_ALL YY_ALLOW YY_BLOCK YY_FORWARD YY_FORWARDERS
+%token		YY_ACL YY_ALL YY_ALLOW YY_BLOCK YY_CLEAR YY_DISABLE
+%token		YY_ENABLE YY_FORWARD YY_FORWARDERS
 %token		YY_KEEP YY_MODIFY YY_NOMATCH YY_OFF YY_ON YY_PORT YY_POLICY
-%token		YY_REJECT YY_SOURCE YY_STRIP YY_TO YY_TRANSPARENT YY_UDP
+%token		YY_PRESERVE YY_RECURSION YY_REJECT
+%token		YY_SOURCE YY_STRIP YY_TO YY_TRANSPARENT YY_UDP
 %token		YY_QUESTION YY_ADDITIONAL YY_NAMESERVER YY_ANSWER
 
 %token		YY_Q_A YY_Q_NS YY_Q_MD YY_Q_MF YY_Q_CNAME YY_Q_SOA YY_Q_MB
@@ -127,8 +131,9 @@ void port_dump(inbound_t *port);
 %type	<host>	ipaddress hlist
 %type	<in>	port
 %type	<mods>	modify
+%type	<mopt>	modopt
 %type	<name>	names hname namelist dnames dname
-%type	<num>	octet mask onoff actionword rrtype rtype
+%type	<num>	octet mask anyonoff onoff actionword rrtype rtype
 %type	<popt>	portoptionlist portoptions portoption
 %type	<rr>	rrlist
 %%
@@ -157,8 +162,9 @@ assign:	YY_STR '=' { yyvarnext = 1; } YY_STR
 acl:	YY_ACL YY_STR '{' YY_SOURCE '(' { yyexpectaddr = 1; } hlist ')' ';'
 			  { yyexpectaddr = 0; }
 			  YY_PORT '(' namelist ')' ';'
+			  YY_RECURSION anyonoff ';';
 			  YY_POLICY '{' actions ';' '}' ';' '}'
-				{ $$ = acl_new($2, $7, $13, $18); }
+				{ $$ = acl_new($2, $7, $13, $17, $21); }
 	;
 
 port:	YY_PORT YY_STR '{' YY_UDP { yyexpectaddr = 1; }
@@ -181,12 +187,19 @@ forward:
 	;
 
 modify:	YY_MODIFY YY_STR rtype '{' YY_ACL '(' namelist ')' ';'
+				   YY_RECURSION modopt ';'
 				   YY_KEEP '('
 				   { yysetdict(queries); } rrlist ')' ';'
 				   YY_STRIP '('
 				   { yysetdict(queries); } rrlist ')' ';'
+				   YY_CLEAR '('
+				   { yysetdict(queries); } rrlist ')' ';'
 				   '}'
-				{ $$ = modify_new($2, $3, $7, $13, $19); }
+				{ $$ = modify_new($2, $3, $7, $16, $22, $28);
+				  if ($$ != NULL) {
+					$$->m_recursion = $11;
+				  }
+				}
 	;
 
 namelist:
@@ -250,12 +263,23 @@ hname:	YY_STR			{ $$ = name_new(NULL, $1, NULL); free($1); }
 	| '*'			{ $$ = name_new(NULL, "*", NULL); }
 	;
 
+anyonoff:
+	'*'			{ $$ = -1; }
+	| onoff			{ $$ = $1; }
+	;
+
 onoff:	YY_ON			{ $$ = 1; }
 	| YY_OFF		{ $$ = 0; }
 	;
 
+modopt:	YY_ENABLE		{ $$ = M_ENABLE; }
+	| YY_DISABLE		{ $$ = M_DISABLE; }
+	| YY_PRESERVE		{ $$ = M_PRESERVE; }
+	;
+
 rrlist:	rrtype			{ $$ = rrtype_add(rrtype_new($1), NULL); }
 	| rrlist ',' rrtype	{ $$ = rrtype_add(rrtype_new($3), $1); }
+	|			{ $$ = NULL; }
 	;
 
 rtype:	YY_QUESTION		{ $$ = Q_QUESTION; }
@@ -365,14 +389,17 @@ mask:
 	;
 %%
 
-static struct wordtab words[26] = {
+static struct wordtab words[31] = {
 	{ "acl",		YY_ACL },
 	{ "additional",		YY_ADDITIONAL },
 	{ "all",		YY_ALL },
 	{ "answer",		YY_ANSWER },
 	{ "allow",		YY_ALLOW },
 	{ "block",		YY_BLOCK },
+	{ "clear",		YY_CLEAR },
 	{ "deny",		YY_BLOCK },
+	{ "disable",		YY_DISABLE },
+	{ "enable",		YY_ENABLE },
 	{ "forward",		YY_FORWARD },
 	{ "forwarders",		YY_FORWARDERS },
 	{ "keep",		YY_KEEP },
@@ -384,7 +411,9 @@ static struct wordtab words[26] = {
 	{ "pass",		YY_ALLOW },
 	{ "policy",		YY_POLICY },
 	{ "port",		YY_PORT },
+	{ "preserve",		YY_PRESERVE },
 	{ "question",		YY_QUESTION },
+	{ "recursion",		YY_RECURSION },
 	{ "reject",		YY_REJECT },
 	{ "source",		YY_SOURCE },
 	{ "strip",		YY_STRIP },
@@ -729,7 +758,8 @@ acl_find(char *name)
 
 
 static acl_t *
-acl_new(char *name, hostlist_t *hosts, name_t *ports, domain_t *domains)
+acl_new(char *name, hostlist_t *hosts, name_t *ports, int recursion,
+	domain_t *domains)
 {
 	inlist_t *i, *ilist;
 	hostlist_t *h;
@@ -793,6 +823,7 @@ acl_new(char *name, hostlist_t *hosts, name_t *ports, domain_t *domains)
 		goto badacl;
 	}
 	a->acl_name = name;
+	a->acl_recursion = recursion;
 
 	STAILQ_INIT(&a->acl_domains);
 	STAILQ_FROM_LIST(&a->acl_domains, domain, d_next, domains);
@@ -975,7 +1006,8 @@ portopt_new(int option, void *arg)
 
 
 static modify_t *
-modify_new(char *name, int type, name_t *acls, rrlist_t *keep, rrlist_t *strip)
+modify_new(char *name, int type, name_t *acls, rrlist_t *keep, rrlist_t *strip,
+	   rrlist_t *clean)
 {
 	modify_t *m;
 	rrlist_t *r, *next;
@@ -999,6 +1031,12 @@ modify_new(char *name, int type, name_t *acls, rrlist_t *keep, rrlist_t *strip)
 	for (r = strip; r != NULL; r = next) {
 		next = STAILQ_NEXT(r, rr_next);
 		rrarray_set(r->rr_qtype, m->m_strip);
+		free(r);
+	}
+
+	for (r = clean; r != NULL; r = next) {
+		next = STAILQ_NEXT(r, rr_next);
+		rrarray_set(r->rr_qtype, m->m_clean);
 		free(r);
 	}
 
@@ -1032,7 +1070,7 @@ rrarray_set(int type, u_char array[256])
 	}
 
 	if (type == -1) {
-		memset(array, 1, sizeof(array));
+		memset(array, 1, 256);
 	} else {
 		if (array[type] != 0) {
 			logit(2, "RR type (%d) already set\n", type);
@@ -1226,7 +1264,7 @@ badnewforwarders:
 
 
 static char *
-qtype_to_name(int type)
+rrtype_to_name(int type)
 {
 	static char buffer[10];
 	wordtab_t *w;
@@ -1292,12 +1330,13 @@ rrtypes_dump(u_char *rrarray)
 		if (rrarray[i] != 0)
 			count++;
 	}
+
 	if (count == 256) {
 		putchar('*');
 	} else {
 		for (i = 0; i < 256; i++) {
 			if (rrarray[i] != 0) {
-				printf("%s", qtype_to_name(i));
+				printf("%s", rrtype_to_name(i));
 				count--;
 				if (count > 0)
 					putchar(',');
@@ -1372,6 +1411,74 @@ forwarders_dump(struct frtop *frtop)
 }
 
 
+char *
+qtype_to_name(qtype_t qt)
+{
+	switch (qt)
+	{
+	case Q_QUESTION :
+		return ("question");
+	case Q_NAMESERVER :
+		return ("nameserver");
+	case Q_ANSWER :
+		return ("answer");
+	case Q_ADDITIONAL :
+		return ("additional");
+	default :
+		break;
+	}
+
+	return ("???");
+}
+
+
+const char *
+modopt_print(modopt_t opt)
+{
+	switch (opt)
+	{
+	case M_DISABLE :
+		return ("disable");
+	case M_PRESERVE :
+		return ("preserve");
+	case M_ENABLE :
+		return ("enable");
+	}
+
+	return ("???");
+}
+
+
+void
+modify_dump(struct mtop *mtop)
+{
+	acllist_t *a;
+	modify_t *m;
+
+	STAILQ_FOREACH(m, mtop, m_next) {
+		printf("modify default %s { acls (", qtype_to_name(m->m_type));
+		STAILQ_FOREACH(a, &m->m_acls, acll_next) {
+			if (a->acll_acl == NULL) {
+				putchar('*');
+			} else {
+				printf("%s", a->acll_acl->acl_name);
+			}
+			if (STAILQ_NEXT(a, acll_next))
+				putchar(',');
+		}
+		printf("); ");
+		printf("recursion %s; ", modopt_print(m->m_recursion));
+		printf("keep (");
+		rrtypes_dump(m->m_keep);
+		printf("); strip (");
+		rrtypes_dump(m->m_strip);
+		printf("); clean (");
+		rrtypes_dump(m->m_clean);
+		printf("); };\n");
+	}
+}
+
+
 void
 forwarder_dump(forwarder_t *fr)
 {
@@ -1384,6 +1491,24 @@ forwarder_dump(forwarder_t *fr)
 			putchar(',');
 	}
 	printf("; };\n");
+}
+
+
+char *
+onoff_dump(int onoff)
+{
+
+	switch (onoff)
+	{
+	case 0 :
+		return ("off");
+	case 1 :
+		return ("on");
+	case -1 :
+		return ("*");
+	}
+
+	return ("???");
 }
 
 
@@ -1411,7 +1536,9 @@ acls_dump(struct atop *atop)
 			if (STAILQ_NEXT(il, il_next))
 				putchar(',');
 		}
-		printf("); policy {");
+		printf("); ");
+		printf("recursion %s; ", onoff_dump(a->acl_recursion));
+		printf("policy {");
 		domains_dump(&a->acl_domains);
 		printf(" };\n");
 	}
@@ -1424,4 +1551,5 @@ config_dump()
 	ports_dump(&config.c_ports);
 	acls_dump(&config.c_acls);
 	forwarders_dump(&config.c_forwarders);
+	modify_dump(&config.c_modifies);
 }

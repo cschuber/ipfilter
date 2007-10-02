@@ -50,6 +50,26 @@
 # include "ip_fil.h"
 #endif
 
+
+typedef struct {
+	u_short		dns_id;
+	u_short		dns_ctlword;
+	u_short		dns_qdcount;
+	u_short		dns_ancount;
+	u_short		dns_nscount;
+	u_short		dns_arcount;
+} dns_hdr_t;
+
+#define DNS_QR(x)	((ntohs(x) & 0x8000) >> 15)
+#define DNS_OPCODE(x)	((ntohs(x) & 0x7800) >> 11) 
+#define DNS_AA(x)	((ntohs(x) & 0x0400) >> 10)
+#define DNS_TC(x)	((ntohs(x) & 0x0200) >> 9)
+#define DNS_RD(x)	((ntohs(x) & 0x0100) >> 8)
+#define DNS_RA(x)	((ntohs(x) & 0x0080) >> 7)
+#define DNS_Z(x)	((ntohs(x) & 0x0070) >> 4)
+#define DNS_RCODE(x)	((ntohs(x) & 0x000f) >> 0)
+
+
 /*
  * inbound_t               acl_t                 modify_t
  * +--------+  iltop_t   +-------+  acllist_t  +----------+
@@ -71,6 +91,12 @@ typedef	enum	action {
 	Q_BLOCK = -1,
 	Q_REJECT = -2
 } action_t;
+
+typedef	enum	modopt	{
+	M_DISABLE = -1,
+	M_PRESERVE = 0,
+	M_ENABLE = 1
+} modopt_t;
 
 
 typedef enum popttype {
@@ -101,17 +127,20 @@ typedef enum qtype_e {
 	Q_QUESTION = 1,
 	Q_ANSWER,
 	Q_NAMESERVER,
-	Q_ADDITIONAL
+	Q_ADDITIONAL,
+	Q_MATCHED
 } qtype_t;
 
 typedef	struct	qrec {
 	STAILQ_ENTRY(qrec)	qir_next;
 	u_char			*qir_data;
+	u_char			*qir_rdata;
 	char			*qir_name;
 	qtype_t			qir_qtype;
 	int			qir_rrtype;
 	int			qir_class;
 	int			qir_ttl;
+	int			qir_rdlen;
 } qrec_t;
 
 STAILQ_HEAD(qrtop, qrec);
@@ -120,6 +149,10 @@ typedef struct qinfo {
 	struct qrtop		qi_recs;
 	action_t		qi_result;
 	struct acl		*qi_acl;
+	int			qi_recursion;
+	dns_hdr_t		*qi_dns;
+	void			*qi_buffer;
+	int			qi_buflen;
 } qinfo_t;
 
 /* -------------------------------------------------- */
@@ -132,7 +165,6 @@ typedef	struct inbound {
 	int			i_transparent;
 	struct sockaddr_in	i_sender;
 	char			i_buffer[2048];
-	qinfo_t			i_qinfo;
 	u_long			i_errors;
 } inbound_t;
 
@@ -185,6 +217,7 @@ typedef	struct acl	{
 	struct iltop		acl_ports;
 	struct dtop		acl_domains;
 	char			*acl_name;
+	int			acl_recursion;
 } acl_t;
 
 STAILQ_HEAD(atop, acl);
@@ -203,7 +236,9 @@ typedef	struct modify {
 	struct acllisttop	m_acls;
 	u_char			m_keep[256];
 	u_char			m_strip[256];
+	u_char			m_clean[256];
 	qtype_t			m_type;
+	modopt_t		m_recursion;
 } modify_t;
 
 STAILQ_HEAD(mtop, modify);
@@ -261,6 +296,7 @@ typedef	struct query	{
 	time_t			q_recvd;
 	time_t			q_dies;
 	acl_t			*q_acl;
+	qinfo_t			*q_info;
 } query_t;
 
 STAILQ_HEAD(qtop, query);
@@ -283,25 +319,6 @@ typedef struct config {
 	char			*c_cffile;
 	int			c_keepprivs;
 } config_t;
-
-
-typedef struct {
-	u_short		dns_id;
-	u_short		dns_ctlword;
-	u_short		dns_qdcount;
-	u_short		dns_ancount;
-	u_short		dns_nscount;
-	u_short		dns_arcount;
-} ipf_dns_hdr_t;
-
-#define DNS_QR(x)	((ntohs(x) & 0x8000) >> 15)
-#define DNS_OPCODE(x)	((ntohs(x) & 0x7800) >> 11) 
-#define DNS_AA(x)	((ntohs(x) & 0x0400) >> 10)
-#define DNS_TC(x)	((ntohs(x) & 0x0200) >> 9)
-#define DNS_RD(x)	((ntohs(x) & 0x0100) >> 8)
-#define DNS_RA(x)	((ntohs(x) & 0x0080) >> 7)
-#define DNS_Z(x)	((ntohs(x) & 0x0070) >> 4)
-#define DNS_RCODE(x)	((ntohs(x) & 0x000f) >> 0)
 
 
 /*
@@ -452,6 +469,7 @@ extern void	logit(int level, char *string, ...);
 extern void	load_config(char *filename);
 extern void	name_free(name_t *);
 extern void	qrec_free(qrec_t *qir);
-extern qinfo_t	*qinfo_alloc(void);
+extern qinfo_t	*qinfo_alloc(void *buffer, size_t buflen);
 extern void	qinfo_free(qinfo_t *qi);
+extern void	query_free(query_t *q);
 extern void	rrtop_free(struct rrtop *rrtop);

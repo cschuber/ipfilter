@@ -39,10 +39,10 @@
 #endif
 
 static acl_t	*acl_determine(inbound_t *in, qinfo_t *qip);
-static query_t	*add_query(inbound_t *in, int buflen);
+static query_t	*add_query(inbound_t *in, qinfo_t *qip, int buflen);
 static void	add_reply(struct sockaddr_in *, char *buffer, int buflen);
 static void	build_aio(void);
-static action_t	check_answers(struct sockaddr_in *, char *buffer, int buflen);
+static action_t	check_answers(query_t *, qinfo_t *, void *buffer);
 static void	check_events(void);
 static void	check_query(inbound_t *in, int buflen);
 static action_t	check_questions(qinfo_t *qip, struct sockaddr_in *,
@@ -61,9 +61,10 @@ static void	handle_term(int info);
 static void	init_ipf(void);
 static void	init_signals();
 static void	make_background();
+static void	modify_packet(qinfo_t *qip);
 static int	name_match(name_t *n, char *query, int qlen);
 static void	process_packets(void);
-static int	qinfo_build(qinfo_t *qip, char *buffer, int buflen);
+static int	qinfo_build(qinfo_t *qip);
 static int	name_qrec_match(name_t *name, qrec_t *qr);
 static query_t	*query_exists(inbound_t *in, int buflen);
 static int	query_validate(inbound_t *in, int buflen);
@@ -280,7 +281,7 @@ expire_queries(time_t now)
 			break;
 
 		STAILQ_REMOVE_HEAD(&config.c_queries, q_next);
-		free(q);
+		query_free(q);
 	}
 }
 
@@ -366,14 +367,14 @@ do_reply()
 static int
 query_validate(inbound_t *in, int len)
 {
-	ipf_dns_hdr_t *dns;
+	dns_hdr_t *dns;
 
-	if (len <= sizeof(ipf_dns_hdr_t)) {
+	if (len <= sizeof(dns_hdr_t)) {
 		logit(1, "query too short (%d)\n", len);
 		return (-1);
 	}
 
-	dns = (ipf_dns_hdr_t *)in->i_buffer;
+	dns = (dns_hdr_t *)in->i_buffer;
 
 	switch (DNS_OPCODE(dns->dns_ctlword))
 	{
@@ -435,11 +436,11 @@ check_query(inbound_t *in, int buflen)
 	acl_t *acl;
 	query_t *q;
 
-	qip = qinfo_alloc();
+	qip = qinfo_alloc(in->i_buffer, buflen);
 	if (qip == NULL)
 		return;
 
-	if (qinfo_build(qip, in->i_buffer, buflen) == -1) {
+	if (qinfo_build(qip) == -1) {
 		logit(2, "qinfo_build failed - blocking\n");
 		qinfo_free(qip);
 		return;
@@ -449,8 +450,7 @@ check_query(inbound_t *in, int buflen)
 	if (acl == NULL) {
 		rc = Q_BLOCK;
 	} else {
-		rc = check_questions(&in->i_qinfo, &in->i_sender,
-				     in->i_buffer, buflen);
+		rc = check_questions(qip, &in->i_sender, in->i_buffer, buflen);
 	}
 
 	logit(6, "check_query acl %p rc %d\n", acl, rc);
@@ -459,9 +459,12 @@ check_query(inbound_t *in, int buflen)
 	{
 	case Q_NOMATCH :
 	case Q_ALLOW :
-		q = add_query(in, buflen);
-		if (q != NULL)
+		q = add_query(in, qip, buflen);
+		if (q != NULL) {
 			q->q_acl = acl;
+			q->q_info = qip;
+			qip = NULL;
+		}
 		break;
 	case Q_BLOCK :
 		/* Do nothing - just drop the query */
@@ -471,7 +474,8 @@ check_query(inbound_t *in, int buflen)
 		break;
 	}
 
-	qinfo_free(qip);
+	if (qip != NULL)
+		qinfo_free(qip);
 }
 
 
@@ -502,6 +506,10 @@ acl_determine(inbound_t *in, qinfo_t *qip)
 	pass = 0;
 
 	STAILQ_FOREACH(a, &config.c_acls, acl_next) {
+		if ((a->acl_recursion >= 0) &&
+		    (a->acl_recursion != qip->qi_recursion))
+			continue;
+
 		STAILQ_FOREACH(il, &a->acl_ports, il_next) {
 			if ((il->il_port == NULL) || (il->il_port == in))
 				break;
@@ -520,11 +528,6 @@ acl_determine(inbound_t *in, qinfo_t *qip)
 		STAILQ_FOREACH(qr, &qip->qi_recs, qir_next) {
 			if (qr->qir_qtype != Q_QUESTION)
 				continue;
-
-			if (qr->qir_class != C_IN) {
-				logit(2, "non Internet-Class query\n");
-				reject++;
-			}
 
 			STAILQ_FOREACH(d, &a->acl_domains, d_next) {
 				STAILQ_FOREACH(n, &d->d_names, n_next) {
@@ -555,15 +558,15 @@ acl_determine(inbound_t *in, qinfo_t *qip)
 			}
 
 			if (reject > 0) {
-				in->i_qinfo.qi_result = Q_REJECT;
+				qip->qi_result = Q_REJECT;
 				return (a);
 			}
 			if (block > 0) {
-				in->i_qinfo.qi_result = Q_BLOCK;
+				qip->qi_result = Q_BLOCK;
 				return (a);
 			}
 			if (pass > 0) {
-				in->i_qinfo.qi_result = Q_ALLOW;
+				qip->qi_result = Q_ALLOW;
 				return (a);
 			}
 			if (nomatch > 0) {
@@ -601,24 +604,30 @@ name_qrec_match(name_t *name, qrec_t *qr)
  * XXX - TODO: decompress names
  */
 static int
-qinfo_build(qinfo_t *qip, char *buffer, int buflen)
+qinfo_build(qinfo_t *qip)
 {
 	int dlen, len, count, rdlen;
-	ipf_dns_hdr_t *dns;
+	dns_hdr_t *dns;
 	char qname[1024];
 	u_char *data;
 	qtype_t qt;
 	qrec_t *qr;
 
-	dns = (ipf_dns_hdr_t *)buffer;
+	dns = qip->qi_dns;
 
-	if (config.c_debug > 8)
-		hex_dump(buffer, buflen);
+	if (config.c_debug > 8) {
+		printf("opcode %x rcode %x\n",
+		DNS_OPCODE(dns->dns_ctlword), DNS_RCODE(dns->dns_ctlword));
+		hex_dump(qip->qi_buffer, qip->qi_buflen);
+	}
+
+	if (DNS_RD(dns->dns_ctlword))
+		qip->qi_recursion = 1;
 
 	count = ntohs(dns->dns_qdcount);
 	qt = Q_QUESTION;
 	data = (u_char *)(dns + 1);
-	dlen = buflen - sizeof(*dns);
+	dlen = qip->qi_buflen - sizeof(*dns);
 
 	while (dlen > 0) {
 		if (count == 0) {
@@ -640,6 +649,7 @@ qinfo_build(qinfo_t *qip, char *buffer, int buflen)
 				break;
 
 			case Q_ADDITIONAL :
+			default :
 				/*
 				 * Force the while loop to exit.
 				 */
@@ -661,14 +671,13 @@ qinfo_build(qinfo_t *qip, char *buffer, int buflen)
 		STAILQ_INSERT_TAIL(&qip->qi_recs, qr, qir_next);
 
 		memset(qname, 0, sizeof(qname));
-		len = get_name(buffer, data, dlen, qname, sizeof(qname));
-		logit(3, "%d.question name [%s] len %d, dlen %d\n",
-		      qt, qname, len, dlen);
+		len = get_name(qip->qi_buffer, data, dlen,
+			       qname, sizeof(qname));
 
 		qr->qir_data = data;
 		qr->qir_name = strdup(qname);
 		if (qr->qir_name == NULL) {
-			logit(1, "cannot allocate qret_t\n");
+			logit(1, "cannot allocate qret_t name(%s)\n", qname);
 			goto badqbuild;
 		}
 
@@ -680,12 +689,22 @@ qinfo_build(qinfo_t *qip, char *buffer, int buflen)
 		dlen -= 2;
 
 		qr->qir_class = (data[0] << 8) | data[1];
+
+		logit(3, "%d.question name [%s] len %d, dlen %d rr %d cl %d\n",
+		      qt, qname, len, dlen, qr->qir_rrtype, qr->qir_class);
+
+		if (qr->qir_class != C_IN) {
+			logit(2, "blocking non-Internet class(%d/%s) query\n",
+			      qr->qir_class, qr->qir_name);
+			goto badqbuild;
+		}
 		data += 2;
 		dlen -= 2;
 
 		switch (qt)
 		{
 		case Q_QUESTION :
+		default :
 			break;
 		case Q_ANSWER :
 		case Q_NAMESERVER :
@@ -696,9 +715,11 @@ qinfo_build(qinfo_t *qip, char *buffer, int buflen)
 			dlen -= 4;
 
 			rdlen = (data[0] << 8) | data[1];
+			qr->qir_rdlen = rdlen;
 			data += 2;
 			dlen -= 2;
 
+			qr->qir_rdata = data;
 			data += rdlen;
 			dlen -= rdlen;
 			break;
@@ -719,11 +740,11 @@ badqbuild:
 static action_t
 check_questions(qinfo_t *qip, struct sockaddr_in *sin, char *buffer, int buflen)
 {
-	ipf_dns_hdr_t *dns;
+	dns_hdr_t *dns;
 	action_t rc;
 	qrec_t *qr;
 
-	dns = (ipf_dns_hdr_t *)buffer;
+	dns = (dns_hdr_t *)buffer;
 	rc = Q_NOMATCH;
 
 	if (ntohs(dns->dns_qdcount) == 0) {
@@ -732,16 +753,11 @@ check_questions(qinfo_t *qip, struct sockaddr_in *sin, char *buffer, int buflen)
 	}
 
 	STAILQ_FOREACH(qr, &qip->qi_recs, qir_next) {
+		if (qr->qir_qtype != Q_QUESTION)
+			continue;
 		if ((qr->qir_name == NULL) || (*qr->qir_name == '\0')) {
 			logit(2, "blocking zero-length name for %d/%d\n",
 			      qr->qir_qtype, qr->qir_class);
-/*			rc = Q_BLOCK;*/
-/*			break;*/
-		}
-
-		if (qr->qir_class != C_IN) {
-			logit(2, "blocking non-Internet class(%d/%s) query\n",
-			      qr->qir_class, qr->qir_name);
 			rc = Q_BLOCK;
 			break;
 		}
@@ -752,33 +768,73 @@ check_questions(qinfo_t *qip, struct sockaddr_in *sin, char *buffer, int buflen)
 
 
 static action_t
-check_answers(struct sockaddr_in *sin, char *buffer, int buflen)
+check_answers(query_t *q, qinfo_t *qip, void *buffer)
 {
-	ipf_dns_hdr_t *dns;
+	dns_hdr_t *dns;
 	action_t rc;
-	qinfo_t *qip;
-
-	qip = qinfo_alloc();
-	if (qip == NULL)
-		return (Q_BLOCK);
-
-	if (qinfo_build(qip, buffer, buflen) == -1) {
-		logit(2, "qinfo_build failed - blocking\n");
-		rc = Q_BLOCK;
-		goto escapecheckanswers;
-	}
-
-	dns = (ipf_dns_hdr_t *)buffer;
-
-	if (dns->dns_ancount == 0) {
-		logit(1, "no answers, dropping\n");
-		rc = Q_BLOCK;
-		goto escapecheckanswers;
-	}
+	qrec_t *qr, *qra;
 
 	rc = Q_NOMATCH;
+	dns = (dns_hdr_t *)buffer;
+
+	if ((dns->dns_ancount == 0) && (DNS_RCODE(dns->dns_ctlword) == 0)) {
+		/*
+		 * If there are no answers, allow the reply if nameservers
+		 * are present and recursion is disabled.
+		 */
+		if (!DNS_RD(dns->dns_ctlword) && (dns->dns_nscount != 0)) {
+			;
+		} else {
+			STAILQ_FOREACH(qr, &qip->qi_recs, qir_next) {
+				if (qr->qir_rrtype == T_CNAME)
+					break;
+			}
+
+#if 0
+			if (qr == NULL) {
+				logit(1, "no answers, dropping\n");
+				rc = Q_BLOCK; 
+				goto escapecheckanswers;
+			}
+#endif
+		}
+	}
+
+	/*
+	 * Make sure that the questions in the query and reply match up 1:1
+	 */
+	STAILQ_FOREACH(qr, &qip->qi_recs, qir_next) {
+		if (qr->qir_qtype != Q_QUESTION)
+			continue;
+
+		STAILQ_FOREACH(qra, &q->q_info->qi_recs, qir_next) {
+			if (qra->qir_qtype != Q_QUESTION)
+				continue;
+			if (!strcmp(qra->qir_name, qr->qir_name)) {
+				qra->qir_qtype = Q_MATCHED;
+				qr->qir_qtype = Q_MATCHED;
+				break;
+			}
+		}
+
+		if (qr->qir_qtype != Q_MATCHED) {
+			logit(2, "reply question %s not in query\n",
+				qr->qir_name);
+			rc = Q_BLOCK;
+			goto escapecheckanswers;
+		}
+	}
+
+	STAILQ_FOREACH(qra, &q->q_info->qi_recs, qir_next) {
+		if (qra->qir_qtype == Q_QUESTION) {
+			logit(2, "query question %s not in reply\n",
+				qra->qir_name);
+			rc = Q_BLOCK;
+			break;
+		}
+	}
+
 escapecheckanswers:
-	qinfo_free(qip);
 	return (rc);
 }
 
@@ -815,7 +871,8 @@ server_determine(qinfo_t *qip)
 		f->f_fwdr = CIRCLEQ_LOOP_NEXT(&f->f_to, fl, fl_next);
 		f->f_server = CIRCLEQ_FIRST(&fl->fl_fwd->fr_servers);
 	} else {
-		f->f_server = CIRCLEQ_LOOP_NEXT(&fl->fl_fwd->fr_servers, s, s_next);
+		f->f_server = CIRCLEQ_LOOP_NEXT(&fl->fl_fwd->fr_servers,
+						s, s_next);
 	}
 
 	return (s);
@@ -823,9 +880,9 @@ server_determine(qinfo_t *qip)
 
 
 static query_t *
-add_query(inbound_t *in, int buflen)
+add_query(inbound_t *in, qinfo_t *qip, int buflen)
 {
-	ipf_dns_hdr_t *dns;
+	dns_hdr_t *dns;
 	server_t *s;
 	query_t *q;
 	int ok;
@@ -839,7 +896,7 @@ add_query(inbound_t *in, int buflen)
 			logit(1, "malloc failed for new query\n");
 			return (NULL);
 		}
-		dns = (ipf_dns_hdr_t *)in->i_buffer;
+		dns = (dns_hdr_t *)in->i_buffer;
 		q->q_arrived = in;
 		q->q_origid = dns->dns_id;
 		memcpy(&q->q_src, &in->i_sender, sizeof(q->q_src));
@@ -856,10 +913,10 @@ add_query(inbound_t *in, int buflen)
 		ok = get_transparent(in, &q->q_dst);
 
 	if (ok == -1) {
-		s = server_determine(&in->i_qinfo);
+		s = server_determine(qip);
 		if (s == NULL) {
 			logit(1, "no server for the query\n");
-			free(q);
+			query_free(q);
 			return (NULL);
 		}
 
@@ -883,9 +940,15 @@ add_query(inbound_t *in, int buflen)
 		      ntohs(in->i_sender.sin_port));
 	}
 
+	modify_packet(qip);
+
+	if (config.c_debug > 9)
+		hex_dump(in->i_buffer, buflen);
+
 	ok = sendto(config.c_outfd, in->i_buffer, buflen, 0,
 		    (struct sockaddr *)&q->q_dst, sizeof(q->q_dst));
-	logit(3, "Query destination %s = %d (%d)\n", inet_ntoa(q->q_dst.sin_addr), ok, errno);
+	logit(3, "Query destination %s = %d (%d)\n",
+	      inet_ntoa(q->q_dst.sin_addr), ok, errno);
 
 	if ((s != NULL) && (ok != buflen))
 		s->s_errors++;
@@ -897,10 +960,10 @@ add_query(inbound_t *in, int buflen)
 query_t *
 query_exists(inbound_t *in, int buflen)
 {
-	ipf_dns_hdr_t *dns;
+	dns_hdr_t *dns;
 	query_t *q;
 
-	dns = (ipf_dns_hdr_t *)in->i_buffer;
+	dns = (dns_hdr_t *)in->i_buffer;
 
 	STAILQ_FOREACH(q, &config.c_queries,  q_next) {
 		if ((dns->dns_id == q->q_origid) && (q->q_arrived == in) &&
@@ -948,17 +1011,17 @@ get_transparent(inbound_t *in, struct sockaddr_in *dst)
 static void
 add_reply(struct sockaddr_in *sin, char *buffer, int buflen)
 {
-	ipf_dns_hdr_t *dns;
+	dns_hdr_t *dns;
 	forwarder_t *fr;
 	qinfo_t *qip;
 	server_t *s;
 	query_t *q;
 	int ok;
 
-	if (buflen <= sizeof(ipf_dns_hdr_t))
+	if (buflen <= sizeof(dns_hdr_t))
 		return;
 
-	dns = (ipf_dns_hdr_t *)buffer;
+	dns = (dns_hdr_t *)buffer;
 
 	STAILQ_FOREACH(fr, &config.c_forwarders, fr_next) {
 		CIRCLEQ_FOREACH(s, &fr->fr_servers, s_next) {
@@ -992,12 +1055,12 @@ add_reply(struct sockaddr_in *sin, char *buffer, int buflen)
 		return;
 	}
 
-	qip = qinfo_alloc();
+	qip = qinfo_alloc(buffer, buflen);
 	if (qip == NULL) {
 		logit(1, "cannot allocate memory for qinfo_t, blocking\n");
 		return;
 	}
-	if (qinfo_build(qip, buffer, buflen) == -1) {
+	if (qinfo_build(qip) == -1) {
 		logit(2, "qinfo_build failed - blocking\n");
 		qinfo_free(qip);
 		return;
@@ -1008,22 +1071,27 @@ add_reply(struct sockaddr_in *sin, char *buffer, int buflen)
 	case Q_BLOCK :
 	case Q_REJECT :
 		logit(1, "reply dropped because of question\n");
-		return;
+		goto answersdone;
 	default :
 		break;
 	}
 
-	switch (check_answers(&q->q_src, buffer, buflen))
+	switch (check_answers(q, qip, buffer))
 	{
 	case Q_BLOCK :
 	case Q_REJECT :
 		logit(1, "reply dropped because of answer\n");
-		return;
+		goto answersdone;
 	default :
 		break;
 	}
 
+	modify_packet(qip);
+
 	dns->dns_id = q->q_origid;
+
+	if (config.c_debug > 9)
+		hex_dump(buffer, buflen);
 
 	ok = sendto(q->q_arrived->i_fd, buffer, buflen, 0,
 		    (struct sockaddr *)&q->q_src, sizeof(q->q_src));
@@ -1031,18 +1099,20 @@ add_reply(struct sockaddr_in *sin, char *buffer, int buflen)
 	if (ok != buflen)
 		q->q_arrived->i_errors++;
 
+answersdone:
 	STAILQ_REMOVE(&config.c_queries, q, query, q_next);
-	free(q);
+	query_free(q);
+	qinfo_free(qip);
 }
 
 
 static query_t *
 find_query(struct sockaddr_in *sin, char *buffer, int buflen)
 {
-	ipf_dns_hdr_t *dns;
+	dns_hdr_t *dns;
 	query_t *q;
 
-	dns = (ipf_dns_hdr_t *)buffer;
+	dns = (dns_hdr_t *)buffer;
 
 	logit(6, "find query %s,%d id %d\n", inet_ntoa(sin->sin_addr),
 	      ntohs(sin->sin_port), dns->dns_id);
@@ -1057,6 +1127,73 @@ find_query(struct sockaddr_in *sin, char *buffer, int buflen)
 	}
 
 	return (q);
+}
+
+
+static void
+modify_packet(qinfo_t *qip)
+{
+	acllist_t *a;
+	modify_t *m;
+	qrec_t *qr;
+	dns_hdr_t *dns;
+
+	dns = qip->qi_dns;
+
+	STAILQ_FOREACH(qr, &qip->qi_recs, qir_next) {
+		if (qr->qir_qtype == Q_MATCHED) {
+			/*
+			 * Convert MATCHED back to QUESTION
+			 */
+			qr->qir_qtype = Q_QUESTION;
+		}
+		STAILQ_FOREACH(m, &config.c_modifies, m_next) {
+			if (m->m_type != qr->qir_qtype)
+				continue;
+			STAILQ_FOREACH(a, &m->m_acls, acll_next) {
+				if ((a->acll_acl == NULL) ||
+				    (a->acll_acl == qip->qi_acl))
+					break;
+			}
+
+			if (a != NULL)
+				break;
+		}
+
+		if (m != NULL) {
+			if (m->m_keep[qr->qir_rrtype]) {
+				;
+			} else if (m->m_clean[qr->qir_rrtype]) {
+				if (qr->qir_rdlen > 0) {
+					memset(qr->qir_rdata, 0,
+					       qr->qir_rdlen);;
+				}
+				if ((*qr->qir_data & 0xc0) == 0xc0) {
+					/* Point at last byte in packet */
+					;
+				} else {
+					memset(qr->qir_data + 1, 0,
+					       *qr->qir_data);
+					memset(qr->qir_name, 0,
+					       strlen(qr->qir_name));
+				}
+			} else if (m->m_strip[qr->qir_rrtype]) {
+				;
+			}
+
+			switch (m->m_recursion)
+			{
+			case M_DISABLE :
+				dns->dns_ctlword &= htons(0xfe7f);
+				break;
+			case M_PRESERVE :
+				break;
+			case M_ENABLE :
+				dns->dns_ctlword |= htons(0x0100);
+				break;
+			}
+		}
+	}
 }
 
 
@@ -1283,12 +1420,15 @@ get_name(void *base, void *start, int len, void *buffer, int buflen)
 static void
 send_reject(inbound_t *in, int buflen)
 {
-	ipf_dns_hdr_t *dns;
+	dns_hdr_t *dns;
 
 	logit(2, "rejecting dns query\n");
 
-	dns = (ipf_dns_hdr_t *)in->i_buffer;
+	dns = (dns_hdr_t *)in->i_buffer;
 	dns->dns_ctlword |= htons(0x8003);	/* Response + name error(3) */
+
+	if (config.c_debug > 9)
+		hex_dump(in->i_buffer, buflen);
 
 	(void) sendto(in->i_fd, in->i_buffer, buflen, 0,
 		      (struct sockaddr *)&in->i_sender, sizeof(in->i_sender));
