@@ -58,12 +58,14 @@ char *name;
 char *
 get_variable(char *string, char **after, int line)
 {
-	char c, *s, *t, *value;
+	char *s, *t, *value, temp;
 	variable_t *v;
+	int c;
 
 	s = string;
+	c = *s;
 
-	if (*s == '{') {
+	if (c == '{') {
 		s++;
 		for (t = s; *t != '\0'; t++)
 			if (*t == '}')
@@ -72,10 +74,12 @@ get_variable(char *string, char **after, int line)
 			fprintf(stderr, "%d: { without }\n", line);
 			return NULL;
 		}
-	} else if (isalpha(*s)) {
-		for (t = s + 1; *t != '\0'; t++)
-			if (!isalpha(*t) && !isdigit(*t) && (*t != '_'))
+	} else if (isalpha(c)) {
+		for (t = s + 1; *t != '\0'; t++) {
+			c = *t;
+			if (!isalpha(c) && !isdigit(c) && (*t != '_'))
 				break;
+		}
 	} else {
 		fprintf(stderr, "%d: variables cannot start with '%c'\n",
 			line, *s);
@@ -84,10 +88,10 @@ get_variable(char *string, char **after, int line)
 
 	if (after != NULL)
 		*after = t;
-	c = *t;
+	temp = *t;
 	*t = '\0';
 	v = find_var(s);
-	*t = c;
+	*t = temp;
 	if (v == NULL) {
 		fprintf(stderr, "%d: unknown variable '%s'\n", line, s);
 		return NULL;

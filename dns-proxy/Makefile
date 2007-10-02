@@ -30,7 +30,7 @@ CFLAGS=-g -I/usr/include/netinet -Wall -Werror
 #-DNO_IPFILTER=1
 LDFLAGS=-g
 
-OBJS=y.tab.o main.o lexer.o var.o
+OBJS=y.tab.o main.o lexer.o var.o misc.o
 
 all: dns-proxy
 

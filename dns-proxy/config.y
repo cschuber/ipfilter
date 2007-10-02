@@ -44,23 +44,44 @@ extern  int     yydebug;
 extern  FILE    *yyin;
 extern  int     yylineNum;
 
-static void		add_acl(acl_t *a);
-static domain_t		*add_domains(domain_t *d1, domain_t *d2);
-static void		add_forward(forward_t *forwards);
-static hostlist_t	*add_host(hostlist_t *h1, hostlist_t *h2);
-static name_t		*add_name(name_t *n1, name_t *n2);
-static void		dump_hosts(struct htop *htop);
-static inbound_t	*find_port(char *name);
-static forward_t	*hosts_to_forward(hostlist_t *hosts);
-static acl_t		*new_acl(hostlist_t *h, char *port, domain_t *d);
-static domain_t		*new_domains(action_t act, name_t *names);
-static hostlist_t	*new_iphost(u_int addr, u_int mask);
-static name_t		*new_name(char *str1, char *str2);
-static inbound_t *	new_port(char *, hostlist_t *, u_short, portopt_t *);
-static int		tosecs(char *units);
-static qtypelist_t	*add_qtype(qtypelist_t *q1, qtypelist_t *q2);
-static qtypelist_t	*new_qtype(int type);
-static void		add_qmatch_qtypes(querymatch_t *qm, qtypelist_t *qt);
+static forwarder_t *forwarder_find(char *name);
+static forwarder_t *forwarder_new(char *name, hostlist_t *hosts);
+static hostlist_t *iphost_new(u_int addr, u_int mask);
+static hostlist_t *iphost_new(u_int addr, u_int mask);
+static hostlist_t *host_add(hostlist_t *h1, hostlist_t *h2);
+static name_t *name_add(name_t *n1, name_t *n2);
+static domain_t *domains_new(action_t act, name_t *names);
+static domain_t *domains_add(domain_t *d1, domain_t *d2);
+static acl_t *acl_new(char *name, hostlist_t *hosts, name_t *ports, domain_t *domains);
+static acl_t *acl_find(char *name);
+static void acl_add(acl_t *a);
+static inbound_t *port_new(char *name, hostlist_t *addr, u_short port, portopt_t *options);
+static inbound_t *port_find(char *name);
+static void port_add(inbound_t *in);
+static portopt_t *portopt_new(int option, void *arg);
+static portopt_t *portopt_add(portopt_t *po1, portopt_t *po2);
+static modify_t *modify_new(char *name, int type, name_t *acls, rrlist_t *keep, rrlist_t *strip);
+static void rrarray_set(int type, u_char array[256]);
+static forward_t *forward_new(name_t *acls, name_t *fwdrs);
+static void names_to_acllist(name_t *names, struct acllisttop *top);
+static void names_to_fwdlist(name_t *names, struct fwdlisttop *top);
+static void names_to_fwdlist(name_t *names, struct fwdlisttop *top);
+static void forward_add(forward_t *forward);
+static void forwarder_add(forwarder_t *fwdr);
+static void modify_add(modify_t *m);
+static rrlist_t * rrtype_add(rrlist_t *r1, rrlist_t *r2);
+static rrlist_t * rrtype_new(int type);
+static char *qtype_to_name(int type);
+char *get_action(action_t act);
+static void hosts_dump(struct htop *hosts);
+void names_dump(struct ntop *ntop);
+void domains_dump(struct dtop *dtop);
+void ports_dump(struct intop *ptop);
+void acls_dump(struct atop *atop);
+void forwarder_dump(forwarder_t *fr);
+void forwarders_dump(struct frtop *frtop);
+void port_dump(inbound_t *port);
+
 %}
 
 %union {
@@ -68,13 +89,16 @@ static void		add_qmatch_qtypes(querymatch_t *qm, qtypelist_t *qt);
 	char		*str;
 	hostlist_t	*host;
 	acl_t		*acl;
+	acl_t		aopt;
+	modify_t	*mods;
+	server_t	*srv;
 	domain_t	*dom;
 	name_t		*name;
-	acl_t		aopt;
 	inbound_t	*in;
+	inlist_t	*inl;
 	forward_t	*fwd;
-	querymatch_t	*qm;
-	qtypelist_t	*qt;
+	forwarder_t	*fwdr;
+	rrlist_t	*rr;
 	portopt_t	*popt;
 };
 
@@ -82,8 +106,11 @@ static void		add_qmatch_qtypes(querymatch_t *qm, qtypelist_t *qt);
 %token  <str>   YY_STR
 %token          YY_COMMENT
 
-%token		YY_ACL YY_ALLOW YY_BLOCK YY_REJECT YY_ALL YY_MAXTTL
-%token		YY_PORT YY_TRANSPARENT YY_FORWARDERS YY_QUERY YY_TYPE YY_NAME
+%token		YY_ACL YY_ALL YY_ALLOW YY_BLOCK YY_FORWARD YY_FORWARDERS
+%token		YY_KEEP YY_MODIFY YY_NOMATCH YY_OFF YY_ON YY_PORT YY_POLICY
+%token		YY_REJECT YY_SOURCE YY_STRIP YY_TO YY_TRANSPARENT YY_UDP
+%token		YY_QUESTION YY_ADDITIONAL YY_NAMESERVER YY_ANSWER
+
 %token		YY_Q_A YY_Q_NS YY_Q_MD YY_Q_MF YY_Q_CNAME YY_Q_SOA YY_Q_MB
 %token		YY_Q_MG YY_Q_MR YY_Q_NULL YY_Q_WKS YY_Q_PTR YY_Q_HINFO
 %token		YY_Q_MINFO YY_Q_MX YY_Q_TXT YY_Q_RP YY_Q_AFSDB YY_Q_X25
@@ -93,17 +120,17 @@ static void		add_qmatch_qtypes(querymatch_t *qm, qtypelist_t *qt);
 %token		YY_Q_A6 YY_Q_DNAME YY_Q_SINK YY_Q_OPT YY_Q_TKEY YY_Q_TSIG
 %token		YY_Q_IXFR YY_Q_AXFR YY_Q_MAILB YY_Q_MAILA YY_Q_ANY YY_Q_ZXFR
 
-%type	<num>	octet mask onoff actionword
-%type	<host>	ipaddress hlist
 %type	<acl>	acl
-%type	<dom>	action actions
-%type	<name>	names hname qnames
-%type	<aopt>	opts option optlist
-%type	<in>	port
+%type	<dom>	actions action
 %type	<fwd>	forward
-%type	<qm>	query
-%type	<qt>	qtypes qtype qtist
+%type	<fwdr>	forwarders
+%type	<host>	ipaddress hlist
+%type	<in>	port
+%type	<mods>	modify
+%type	<name>	names hname namelist dnames dname
+%type	<num>	octet mask onoff actionword rrtype rtype
 %type	<popt>	portoptionlist portoptions portoption
+%type	<rr>	rrlist
 %%
 
 file:	line
@@ -111,73 +138,89 @@ file:	line
 	;
 
 line:	comment
-	| acl ';'		{ add_acl($1); }
-	| port ';'		{ add_port($1); }
-	| forward ';'		{ add_forward($1); }
-	| query ';'		{ add_query($1); }
+	| assign ';'
+	| acl ';'		{ acl_add($1); }
+	| port ';'		{ port_add($1); }
+	| forward ';'		{ forward_add($1); }
+	| forwarders ';'	{ forwarder_add($1); }
+	| modify ';'		{ modify_add($1); }
 	;
 
 comment:
 	YY_COMMENT
 	;
 
-acl:	YY_ACL YY_ALL YY_PORT YY_STR optlist '{' actions ';' '}'
-				{ $$ = new_acl(NULL, $4, $7); }
-	| YY_ACL hlist YY_PORT YY_STR optlist '{' actions ';' '}'
-				{ $$ = new_acl($2, $4, $7); }
+assign:	YY_STR '=' { yyvarnext = 1; } YY_STR
+				{ set_variable($1, $4); yyvarnext = 0; }
 	;
 
-port:	YY_PORT YY_STR ipaddress YY_NUMBER
-				{ $$ = new_port($2, $3, $4, NULL); }
-	| YY_PORT YY_STR ipaddress YY_NUMBER '{' portoptionlist '}'
-				{ $$ = new_port($2, $3, $4, $6); }
+acl:	YY_ACL YY_STR '{' YY_SOURCE '(' { yyexpectaddr = 1; } hlist ')' ';'
+			  { yyexpectaddr = 0; }
+			  YY_PORT '(' namelist ')' ';'
+			  YY_POLICY '{' actions ';' '}' ';' '}'
+				{ $$ = acl_new($2, $7, $13, $18); }
+	;
+
+port:	YY_PORT YY_STR '{' YY_UDP { yyexpectaddr = 1; }
+			   ipaddress { yyexpectaddr = 0; } ',' YY_NUMBER ';'
+			   portoptionlist '}'
+				{ $$ = port_new($2, $6, $9, $11); }
+	;
+
+forwarders:
+	YY_FORWARDERS YY_STR '{' { yyexpectaddr = 1; } hlist ';' '}'    
+				{ $$ = forwarder_new($2, $5);
+				  yyexpectaddr = 0;
+				}
 	;
 
 forward:
-	YY_FORWARDERS '{' hlist ';' '}'    
-				{ $$ = hosts_to_forward($3); }
+	YY_FORWARD '{' YY_ACL '(' namelist ')' ';'
+		       YY_TO '(' namelist ')' ';' '}'
+				{ $$ = forward_new($5, $10); }
 	;
 
-query:	YY_QUERY qtypes qnames '{' forward ';' '}'
-				{ $$ = new_querymatch();
-				  if ($$ != NULL) {
-					if ($2 != NULL) {
-						add_qmatch_qtypes($$, $2);
-					}
-					if ($3 != NULL) {
-						add_qmatch_qnames($$, $3);
-					}
-					if ($5 != NULL) {
-						add_qmatch_forwards($$, $5);
-					}
-				  }
-				}
-	| YY_QUERY qtypes qnames '{' actionword ';' '}'
-				{ $$ = new_querymatch();
-				  if ($$ != NULL) {
-					if ($2 != NULL) {
-						add_qmatch_qtypes($$, $2);
-					}
-					if ($3 != NULL) {
-						add_qmatch_qnames($$, $3);
-					}
-					$$->qm_action = $5;
-				  }
-				}
+modify:	YY_MODIFY YY_STR rtype '{' YY_ACL '(' namelist ')' ';'
+				   YY_KEEP '('
+				   { yysetdict(queries); } rrlist ')' ';'
+				   YY_STRIP '('
+				   { yysetdict(queries); } rrlist ')' ';'
+				   '}'
+				{ $$ = modify_new($2, $3, $7, $13, $19); }
+	;
+
+namelist:
+	YY_ALL			{ $$ = name_new(NULL, "*", NULL); }
+	| '*'			{ $$ = name_new(NULL, "*", NULL); }
+	| names;		{ $$ = $1; }
+	;
+
+names:	YY_STR			{ $$ = name_new(NULL, $1, NULL); }
+	| names ',' YY_STR	{ $$ = name_add($1, name_new(NULL, $3, NULL)); }
 	;
 
 actions:
-	action			{ $$ = add_domains($1, NULL); }
-	| actions ';' action	{ $$ = add_domains($1, $3); }
+	action			{ $$ = domains_add($1, NULL); }
+	| actions ';' action	{ $$ = domains_add($1, $3); }
 	;
 
-action:	actionword names	{ $$ = new_domains($1, $2); }
+action:	actionword dnames	{ $$ = domains_new($1, $2); }
 	;
 
 actionword:
 	YY_BLOCK		{ $$ = Q_BLOCK; }
 	| YY_ALLOW		{ $$ = Q_ALLOW; }
 	| YY_REJECT		{ $$ = Q_REJECT; }
+	| YY_NOMATCH		{ $$ = Q_NOMATCH; }
+	;
+
+dnames:	dname			{ $$ = name_add($1, NULL); }
+	| dnames ',' dname	{ $$ = name_add($1, $3); }
+	;
+
+dname:	hname			{ $$ = $1; }
+	| hname '(' { yysetdict(queries); } rrlist ')'
+				{ $$ = $1; name_set_rrs($1, $4); }
 	;
 
 portoptionlist:			{ $$ = NULL; }
@@ -185,149 +228,128 @@ portoptionlist:			{ $$ = NULL; }
 	;
 
 portoptions:
-	portoption		{ $$ = add_portopt($1, NULL); }
+	portoption		{ $$ = portopt_add($1, NULL); }
 	| portoptions ';' portoption
-				{ $$ = add_portopt($1, $3); }
+				{ $$ = portopt_add($1, $3); }
 	;
 
 portoption:
-	YY_TRANSPARENT onoff	{ $$ = new_portopt(YY_TRANSPARENT, &$2); }
+	YY_TRANSPARENT onoff	{ $$ = portopt_new(YY_TRANSPARENT, &$2); }
 	;
 
-qtypes:				{ $$ = NULL; }
-	| YY_TYPE '='
-				{ yysetdict(queries); }
-	'(' qtist ')'
-				{ yyresetdict();
-				  $$ = $5;
-				}
-	;
-qnames:				{ $$ = NULL; }
-	| YY_NAME '=' '(' names ')'
-				{ $$ = $4; }
+hlist:	YY_ALL			{ $$ = host_add(iphost_new(0, 0), NULL); }
+	| ipaddress		{ $$ = host_add($1, NULL); }
+	| hlist ';' ipaddress	{ $$ = host_add($1, $3); }
 	;
 
-qtist:	qtype			{ $$ = add_qtype($1, NULL); }
-	| qtist ',' qtype	{ $$ = add_qtype($1, $3); }
-	;
-
-optlist: 			{ memset(&$$, 0, sizeof($$)); }
-	| '(' opts ')'		{ $$ = $2; }
-	;
-
-opts:	option			{ $$ = $1; }
-	| option ',' opts	{ merge_options(&$1, &$3, &$$); }
-	;
-
-option:	YY_MAXTTL YY_NUMBER YY_STR
-				{ $$.acl_maxttl = $2 * tosecs($3); }
-	;
-
-hlist:	ipaddress		{ $$ = add_host($1, NULL); }
-	| hlist ',' ipaddress	{ $$ = add_host($1, $3); }
-	;
-
-names:	hname			{ $$ = add_name($1, NULL); }
-	| names ',' hname	{ $$ = add_name($1, $3); }
-	;
-
-hname:	YY_STR			{ $$ = new_name(NULL, $1); free($1); }
-	| '.' YY_STR		{ $$ = new_name(".", $2); free($2); }
-	| '=' YY_STR		{ $$ = new_name("=", $2); free($2); }
-	| '*' YY_STR		{ $$ = new_name("*", $2); free($2); }
-	| '*' '.' YY_STR	{ $$ = new_name("*.", $3); free($3); }
+hname:	YY_STR			{ $$ = name_new(NULL, $1, NULL); free($1); }
+	| '.' YY_STR		{ $$ = name_new(".", $2, NULL); free($2); }
+	| '=' YY_STR		{ $$ = name_new("=", $2, NULL); free($2); }
+	| '*' YY_STR		{ $$ = name_new("*", $2, NULL); free($2); }
+	| '*' '.' YY_STR	{ $$ = name_new("*.", $3, NULL); free($3); }
+	| '*'			{ $$ = name_new(NULL, "*", NULL); }
 	;
 
 onoff:	YY_ON			{ $$ = 1; }
 	| YY_OFF		{ $$ = 0; }
 	;
 
-qtype:	YY_Q_A			{ $$ = new_qtype(T_A); }
-	| YY_Q_NS		{ $$ = new_qtype(T_NS); }
-	| YY_Q_MD		{ $$ = new_qtype(T_MD); }
-	| YY_Q_MF		{ $$ = new_qtype(T_MF); }
-	| YY_Q_CNAME		{ $$ = new_qtype(T_CNAME); }
-	| YY_Q_SOA		{ $$ = new_qtype(T_SOA); }
-	| YY_Q_MB		{ $$ = new_qtype(T_MB); }
-	| YY_Q_MG		{ $$ = new_qtype(T_MG); }
-	| YY_Q_MR		{ $$ = new_qtype(T_MR); }
-	| YY_Q_NULL		{ $$ = new_qtype(T_NULL); }
-	| YY_Q_WKS		{ $$ = new_qtype(T_WKS); }
-	| YY_Q_PTR		{ $$ = new_qtype(T_PTR); }
-	| YY_Q_HINFO		{ $$ = new_qtype(T_HINFO); }
-	| YY_Q_MINFO		{ $$ = new_qtype(T_MINFO); }
-	| YY_Q_MX		{ $$ = new_qtype(T_MX); }
-	| YY_Q_TXT		{ $$ = new_qtype(T_TXT); }
-	| YY_Q_RP		{ $$ = new_qtype(T_RP); }
-	| YY_Q_AFSDB		{ $$ = new_qtype(T_AFSDB); }
-	| YY_Q_X25		{ $$ = new_qtype(T_X25); }
-	| YY_Q_ISDN		{ $$ = new_qtype(T_ISDN); }
-	| YY_Q_RT		{ $$ = new_qtype(T_RT); }
-	| YY_Q_NSAP		{ $$ = new_qtype(T_NSAP); }
-	| YY_Q_NSAP_PTR		{ $$ = new_qtype(T_NSAP_PTR); }
-	| YY_Q_SIG		{ $$ = new_qtype(T_SIG); }
-	| YY_Q_KEY		{ $$ = new_qtype(T_KEY); }
-	| YY_Q_PX		{ $$ = new_qtype(T_PX); }
-	| YY_Q_GPOS		{ $$ = new_qtype(T_GPOS); }
-	| YY_Q_AAAA		{ $$ = new_qtype(T_AAAA); }
-	| YY_Q_LOC		{ $$ = new_qtype(T_LOC); }
-	| YY_Q_NXT		{ $$ = new_qtype(T_NXT); }
-	| YY_Q_EID		{ $$ = new_qtype(T_EID); }
-	| YY_Q_NIMLOC		{ $$ = new_qtype(T_NIMLOC); }
-	| YY_Q_SRV		{ $$ = new_qtype(T_SRV); }
-	| YY_Q_ATMA		{ $$ = new_qtype(T_ATMA); }
-	| YY_Q_NAPTR		{ $$ = new_qtype(T_NAPTR); }
-	| YY_Q_KX		{ $$ = new_qtype(T_KX); }
-	| YY_Q_CERT		{ $$ = new_qtype(T_CERT); }
-	| YY_Q_A6		{ $$ = new_qtype(T_A6); }
-	| YY_Q_DNAME		{ $$ = new_qtype(T_DNAME); }
-	| YY_Q_SINK		{ $$ = new_qtype(T_SINK); }
-	| YY_Q_OPT		{ $$ = new_qtype(T_OPT); }
-	| YY_Q_TKEY		{ $$ = new_qtype(T_TKEY); }
-	| YY_Q_TSIG		{ $$ = new_qtype(T_TSIG); }
-	| YY_Q_IXFR		{ $$ = new_qtype(T_IXFR); }
-	| YY_Q_AXFR		{ $$ = new_qtype(T_AXFR); }
-	| YY_Q_MAILB		{ $$ = new_qtype(T_MAILB); }
-	| YY_Q_MAILA		{ $$ = new_qtype(T_MAILA); }
-	| YY_Q_ANY		{ $$ = new_qtype(T_ANY); }
-	| YY_Q_ZXFR		{ $$ = new_qtype(T_ZXFR); }
-	| '*'			{ $$ = new_qtype(0); }
+rrlist:	rrtype			{ $$ = rrtype_add(rrtype_new($1), NULL); }
+	| rrlist ',' rrtype	{ $$ = rrtype_add(rrtype_new($3), $1); }
+	;
+
+rtype:	YY_QUESTION		{ $$ = Q_QUESTION; }
+	| YY_ADDITIONAL		{ $$ = Q_ADDITIONAL; }
+	| YY_ANSWER		{ $$ = Q_ANSWER; }
+	| YY_NAMESERVER		{ $$ = Q_NAMESERVER; }
+	;
+
+rrtype:	YY_Q_A			{ $$ = T_A; }
+	| YY_Q_NS		{ $$ = T_NS; }
+	| YY_Q_MD		{ $$ = T_MD; }
+	| YY_Q_MF		{ $$ = T_MF; }
+	| YY_Q_CNAME		{ $$ = T_CNAME; }
+	| YY_Q_SOA		{ $$ = T_SOA; }
+	| YY_Q_MB		{ $$ = T_MB; }
+	| YY_Q_MG		{ $$ = T_MG; }
+	| YY_Q_MR		{ $$ = T_MR; }
+	| YY_Q_NULL		{ $$ = T_NULL; }
+	| YY_Q_WKS		{ $$ = T_WKS; }
+	| YY_Q_PTR		{ $$ = T_PTR; }
+	| YY_Q_HINFO		{ $$ = T_HINFO; }
+	| YY_Q_MINFO		{ $$ = T_MINFO; }
+	| YY_Q_MX		{ $$ = T_MX; }
+	| YY_Q_TXT		{ $$ = T_TXT; }
+	| YY_Q_RP		{ $$ = T_RP; }
+	| YY_Q_AFSDB		{ $$ = T_AFSDB; }
+	| YY_Q_X25		{ $$ = T_X25; }
+	| YY_Q_ISDN		{ $$ = T_ISDN; }
+	| YY_Q_RT		{ $$ = T_RT; }
+	| YY_Q_NSAP		{ $$ = T_NSAP; }
+	| YY_Q_NSAP_PTR		{ $$ = T_NSAP_PTR; }
+	| YY_Q_SIG		{ $$ = T_SIG; }
+	| YY_Q_KEY		{ $$ = T_KEY; }
+	| YY_Q_PX		{ $$ = T_PX; }
+	| YY_Q_GPOS		{ $$ = T_GPOS; }
+	| YY_Q_AAAA		{ $$ = T_AAAA; }
+	| YY_Q_LOC		{ $$ = T_LOC; }
+	| YY_Q_NXT		{ $$ = T_NXT; }
+	| YY_Q_EID		{ $$ = T_EID; }
+	| YY_Q_NIMLOC		{ $$ = T_NIMLOC; }
+	| YY_Q_SRV		{ $$ = T_SRV; }
+	| YY_Q_ATMA		{ $$ = T_ATMA; }
+	| YY_Q_NAPTR		{ $$ = T_NAPTR; }
+	| YY_Q_KX		{ $$ = T_KX; }
+	| YY_Q_CERT		{ $$ = T_CERT; }
+	| YY_Q_A6		{ $$ = T_A6; }
+	| YY_Q_DNAME		{ $$ = T_DNAME; }
+	| YY_Q_SINK		{ $$ = T_SINK; }
+	| YY_Q_OPT		{ $$ = T_OPT; }
+	| YY_Q_TKEY		{ $$ = T_TKEY; }
+	| YY_Q_TSIG		{ $$ = T_TSIG; }
+	| YY_Q_IXFR		{ $$ = T_IXFR; }
+	| YY_Q_AXFR		{ $$ = T_AXFR; }
+	| YY_Q_MAILB		{ $$ = T_MAILB; }
+	| YY_Q_MAILA		{ $$ = T_MAILA; }
+	| YY_Q_ANY		{ $$ = T_ANY; }
+	| YY_Q_ZXFR		{ $$ = T_ZXFR; }
+	| '*'			{ $$ = -1; }
 	;
 
 ipaddress:
 	octet '.' octet '.' octet '.' octet
 				{ int x = $1 << 24 | $3 << 16 | $5 <<8 | $7;
-				  $$ = new_iphost(x, 0xffffffff);
+				  $$ = iphost_new(x, 0xffffffff);
 				}
 	| octet '.' octet '.' octet '.' octet '/' mask
 				{ int x = $1 << 24 | $3 << 16 | $5 <<8 | $7;
-				  $$ = new_iphost(x, 0xfffffff << (32 - $9));
+				  $$ = iphost_new(x, 0xfffffff << (32 - $9));
 				}
 	| octet '.' octet '.' octet '/' mask
 				{ int x = $1 << 24 | $3 << 16 | $5 <<8;
-				  $$ = new_iphost(x, 0xfffffff << (32 - $7));
+				  $$ = iphost_new(x, 0xfffffff << (32 - $7));
 				}
 	| octet '.' octet '/' mask
 				{ int x = $1 << 24 | $3 << 16;
-				  $$ = new_iphost(x, 0xfffffff << (32 - $5));
+				  $$ = iphost_new(x, 0xfffffff << (32 - $5));
 				}
 	| octet '/' mask
 				{ int x = $1 << 24;
-				  $$ = new_iphost(x, 0xfffffff << (32 - $3));
+				  $$ = iphost_new(x, 0xfffffff << (32 - $3));
 				}
 	| octet '.' octet '.' octet '.' '*'
 				{ int x = $1 << 24 | $3 << 16 | $5 <<8;
-				  $$ = new_iphost(x, 0xffffff00);
+				  $$ = iphost_new(x, 0xffffff00);
 				}
 	| octet '.' octet '.' '*'
 				{ int x = $1 << 24 | $3 << 16;
-				  $$ = new_iphost(x, 0xffff0000);
+				  $$ = iphost_new(x, 0xffff0000);
 				}
 	| octet '.' '*'
 				{ int x = $1 << 24;
-				  $$ = new_iphost(x, 0xff000000);
+				  $$ = iphost_new(x, 0xff000000);
 				}
-	| '*'			{ $$ = new_iphost(0, 0); }
+	| '*'			{ $$ = iphost_new(0, 0); }
 	;
 
 octet:	YY_NUMBER		{ if ($1 < 0 || $1 > 255)
@@ -345,21 +367,30 @@ mask:
 
 static struct wordtab words[26] = {
 	{ "acl",		YY_ACL },
+	{ "additional",		YY_ADDITIONAL },
 	{ "all",		YY_ALL },
+	{ "answer",		YY_ANSWER },
 	{ "allow",		YY_ALLOW },
 	{ "block",		YY_BLOCK },
 	{ "deny",		YY_BLOCK },
+	{ "forward",		YY_FORWARD },
 	{ "forwarders",		YY_FORWARDERS },
-	{ "maxttl",		YY_MAXTTL },
-	{ "name",		YY_NAME },
+	{ "keep",		YY_KEEP },
+	{ "modify",		YY_MODIFY },
 	{ "off",		YY_OFF },
 	{ "on",			YY_ON },
+	{ "nameserver",		YY_NAMESERVER },
+	{ "nomatch",		YY_NOMATCH },
 	{ "pass",		YY_ALLOW },
+	{ "policy",		YY_POLICY },
 	{ "port",		YY_PORT },
-	{ "query",		YY_QUERY },
+	{ "question",		YY_QUESTION },
 	{ "reject",		YY_REJECT },
+	{ "source",		YY_SOURCE },
+	{ "strip",		YY_STRIP },
+	{ "to",			YY_TO },
 	{ "transparent",	YY_TRANSPARENT },
-	{ "type",		YY_TYPE },
+	{ "udp",		YY_UDP },
 	{ NULL,			0 }
 };
 
@@ -416,7 +447,7 @@ static struct wordtab queries[50] = {
 	{ NULL,			0 }
 };
 
-static struct wordtab dnsqtypes[50] = {
+static struct wordtab dnsqtpyes[50] = {
 	{ "A",			T_A },
 	{ "NS",			T_NS },
 	{ "MD",			T_MD },
@@ -481,8 +512,9 @@ config_init()
 	STAILQ_INIT(&config.c_acls);
 	STAILQ_INIT(&config.c_ports);
 	STAILQ_INIT(&config.c_queries);
-	STAILQ_INIT(&config.c_qmatches);
-	CIRCLEQ_INIT(&config.c_forwards);
+	STAILQ_INIT(&config.c_modifies);
+	STAILQ_INIT(&config.c_forwards);
+	STAILQ_INIT(&config.c_forwarders);
 
 	config.c_outfd = socket(AF_INET, SOCK_DGRAM, 0);
 	if (config.c_outfd == -1) {
@@ -523,14 +555,43 @@ load_config(char *filename)
 }
 
 
+static rrlist_t *
+rrtype_new(int type)
+{
+	rrlist_t *r;
+
+	r = calloc(1, sizeof(*r));
+	if (r == NULL) {
+		logit(1, "rrtype_new(%d): cannot allocate memory\n", type);
+		return (NULL);
+	}
+
+	r->rr_qtype = type;
+
+	return (r);
+}
+
+
+static rrlist_t *
+rrtype_add(rrlist_t *r1, rrlist_t *r2)
+{
+
+	if (r1 != NULL) {
+		STAILQ_NEXT(r1, rr_next) = r2;
+	}
+
+	return (r1);
+}
+
+
 static hostlist_t *
-new_iphost(u_int addr, u_int mask)
+iphost_new(u_int addr, u_int mask)
 {
 	hostlist_t *h;
 
 	h = calloc(1, sizeof(*h));
 	if (h == NULL) {
-		logit(-1, "new_iphost cannot allocate another hostlist_t\n");
+		logit(-1, "iphost_new cannot allocate another hostlist_t\n");
 		return (NULL);
 	}
 
@@ -541,110 +602,51 @@ new_iphost(u_int addr, u_int mask)
 
 
 static hostlist_t *
-add_host(hostlist_t *h1, hostlist_t *h2)
+host_add(hostlist_t *h1, hostlist_t *h2)
 {
 	STAILQ_NEXT(h1, hl_next) = h2;
 	return (h1);
 }
 
 
-static qtypelist_t *
-new_qtype(int type)
-{
-	qtypelist_t *qt;
-
-	qt = calloc(1, sizeof(*qt));
-	if (qt == NULL) {
-		logit(-1, "new_qtype cannot allocate another qtypelist_t\n");
-		return (NULL);
-	}
-
-	qt->qt_type = type;
-	return (qt);
-}
-
-
-static qtypelist_t *
-add_qtype(qtypelist_t *q1, qtypelist_t *q2)
-{
-	STAILQ_NEXT(q1, qt_next) = q2;
-	return (q1);
-}
-
-
-static querymatch_t *
-new_querymatch()
-{
-	querymatch_t *qm;
-
-	qm = calloc(1, sizeof(*qm));
-	if (qm == NULL) {
-		logit(-1, "new_querymatch cannot allocate memory\n");
-		return (NULL);
-	}
-
-	STAILQ_INIT(&qm->qm_types);
-	STAILQ_INIT(&qm->qm_names);
-	CIRCLEQ_INIT(&qm->qm_forwards);
-
-	qm->qm_action = Q_ALLOW;
-
-	return (qm);
-}
-
-
-static void
-add_qmatch_qtypes(querymatch_t *qm, qtypelist_t *qt)
-{
-	qtypelist_t *qt1, *qt2;
-
-	for (qt1 = qt; qt1 != NULL; qt1 = qt2) {
-		qt2 = STAILQ_NEXT(qt1, qt_next);
-		STAILQ_NEXT(qt1, qt_next) = NULL;
-		STAILQ_INSERT_TAIL(&qm->qm_types, qt1, qt_next);
-	}
-}
-
-
-static void
-add_qmatch_qnames(querymatch_t *qm, name_t *names)
-{
-	name_t *n1, *n2;
-
-	for (n1 = names; n1 != NULL; n1 = n2) {
-		n2 = STAILQ_NEXT(n1, n_next);
-		STAILQ_NEXT(n1, n_next) = NULL;
-		STAILQ_INSERT_TAIL(&qm->qm_names, n1, n_next);
-	}
-}
-
-
-static void
-add_qmatch_forwards(querymatch_t *qm, forward_t *forwards)
-{
-	forward_t *f, *fn;
-
-	if (config.c_debug > 1)
-		printf("# add_qmatch_forwards %p %p\n", qm, forwards);
-
-	for (f = forwards; f != NULL; f = fn) {
-		fn = CIRCLEQ_NEXT(f, f_next);
-		CIRCLEQ_NEXT(f, f_next) = NULL;
-		CIRCLEQ_INSERT_TAIL(&qm->qm_forwards, f, f_next);
-	}
-}
-
-
 static name_t *
-add_name(name_t *n1, name_t *n2)
+name_add(name_t *n1, name_t *n2)
 {
 	STAILQ_NEXT(n1, n_next) = n2;
 	return (n1);
 }
 
 
+static void
+name_set_rrs(name_t *n, rrlist_t *rrs)
+{
+	rrlist_t *r, *next;
+
+	if (n == NULL)
+		return;
+
+	n->n_rrtypes = calloc(1, 256 * sizeof(*n->n_rrtypes));
+	if (n->n_rrtypes == NULL) {
+		logit(1, "name_set_rrs(%s): failed to allocate memory\n",
+		      n->n_name);
+		goto badnamesetrrs;
+	}
+
+	for (r = rrs; r != NULL; r = next) {
+		next = STAILQ_NEXT(r, rr_next);
+		rrarray_set(r->rr_qtype, n->n_rrtypes);
+		free(r);
+	}
+	return;
+
+badnamesetrrs:
+	STAILQ_FREE_LIST(rrs, rrlist, rr_next, free);
+	return;
+}
+
+
 static name_t *
-new_name(char *str1, char *str2)
+name_new(char *str1, char *str2, rrlist_t *rrs)
 {
 	int namelen;
 	name_t *n;
@@ -657,33 +659,55 @@ new_name(char *str1, char *str2)
 		namelen += strlen(str2);
 
 	n = calloc(1, sizeof(*n));
-	if (n != NULL) {
-		n->n_name = malloc(namelen + 1);
-		snprintf(n->n_name, namelen + 1, "%s%s",
-			 str1 ? str1 : "", str2 ? str2 : "");
-		n->n_namelen = namelen;
+	if (n == NULL) {
+		logit(1, "cannot create new name \"%s+%s\"\n",
+			str1 ? str1 : "", str2 ? str2 : "");
+		goto badnewname;
 	}
+
+	n->n_name = malloc(namelen + 1);
+	if (n->n_name == NULL) {
+		goto badnewname;
+	}
+	snprintf(n->n_name, namelen + 1, "%s%s",
+		 str1 ? str1 : "", str2 ? str2 : "");
+	n->n_namelen = namelen;
+
+	STAILQ_INIT(&n->n_rtypes);
+	STAILQ_FROM_LIST(&n->n_rtypes, rrlist, rr_next, rrs);
+
 	return (n);
+
+badnewname:
+	STAILQ_FREE_LIST(rrs, rrlist, rr_next, free);
+	return (NULL);
 }
 
 
 static domain_t *
-new_domains(action_t act, name_t *names)
+domains_new(action_t act, name_t *names)
 {
 	domain_t *d;
 
 	d = calloc(1, sizeof(*d));
-	if (d != NULL) {
-		STAILQ_INIT(&d->d_names);
-		STAILQ_FIRST(&d->d_names) = names;
-		d->d_pass = act;
+	if (d == NULL) {
+		logit(1, "Cannot allocate new domain_t structure\n");
+		goto badnewdomains;
 	}
+
+	STAILQ_INIT(&d->d_names);
+	STAILQ_FROM_LIST(&d->d_names, name, n_next, names);
+	d->d_pass = act;
 	return (d);
+
+badnewdomains:
+	STAILQ_FREE_LIST(names, name, n_next, name_free);
+	return (NULL);
 }
 
 
 static domain_t *
-add_domains(domain_t *d1, domain_t *d2)
+domains_add(domain_t *d1, domain_t *d2)
 {
 	STAILQ_NEXT(d1, d_next) = d2;
 	return (d1);
@@ -691,34 +715,120 @@ add_domains(domain_t *d1, domain_t *d2)
 
 
 static acl_t *
-new_acl(hostlist_t *h, char *port, domain_t *d)
+acl_find(char *name)
 {
 	acl_t *a;
 
-	if (find_port(port) == NULL) {
-		logit(-1, "unknown port '%s' in acl rule\n", port);
-		return (NULL);
+	STAILQ_FOREACH(a, &config.c_acls, acl_next) {
+		if (!strcmp(a->acl_name, name))
+			return (a);
+	}
+
+	return (NULL);
+}
+
+
+static acl_t *
+acl_new(char *name, hostlist_t *hosts, name_t *ports, domain_t *domains)
+{
+	inlist_t *i, *ilist;
+	hostlist_t *h;
+	inbound_t *p;
+	domain_t *d;
+	name_t *n;
+	acl_t *a;
+	void *next;
+
+	ilist = NULL;
+
+	if (name == NULL || *name == '\0') {
+		fprintf(stderr, "ACL with NULL name\n");
+		goto badacl;
+	}
+
+	if (ports == NULL) {
+		fprintf(stderr, "acl(%s): no ports defined\n", name);
+		goto badacl;
+	}
+
+	/*
+	 * Validate the ports first so that cleanup does not need to worry
+	 * about whether a host is on the acl or not.
+	 */
+	for (n = ports; n != NULL; n = STAILQ_NEXT(n, n_next)) {
+		if (!strcmp(n->n_name, "*")) {
+			p = NULL;
+		} else {
+			p = port_find(n->n_name);
+			if (p == NULL) {
+				logit(-1, "acl(%s): unknown port '%s'\n",
+				      name, n->n_name);
+				goto badacl;
+			}
+		}
+
+		i = calloc(1, sizeof(*i));
+		if (i == NULL) {
+			fprintf(stderr, "acl(%s): cannot add another port\n",
+				name);
+			goto badacl;
+		}
+		i->il_port = p;
+		STAILQ_NEXT(i, il_next) = ilist;
+		ilist = i;
+	}
+
+	if (hosts == NULL) {
+		hosts = iphost_new(0, 0);
+		if (hosts == NULL) {
+			fprintf(stderr,
+				"acl(%s): cannot allocate NULL hosts\n", name);
+			goto badacl;
+		}
 	}
 
 	a = calloc(1, sizeof(*a));
-	if (a != NULL) {
-		STAILQ_INIT(&a->acl_hosts);
-		if (h == NULL) {
-			STAILQ_FIRST(&a->acl_hosts) = new_iphost(0, 0);
-		} else {
-			STAILQ_FIRST(&a->acl_hosts) = h;
-		}
-		STAILQ_INIT(&a->acl_domains);
-		STAILQ_FIRST(&a->acl_domains) = d;
-		a->acl_portname = port;
+	if (a == NULL) {
+		fprintf(stderr, "acl(%s): could not allocate new acl\n", name);
+		goto badacl;
 	}
+	a->acl_name = name;
+
+	STAILQ_INIT(&a->acl_domains);
+	STAILQ_FROM_LIST(&a->acl_domains, domain, d_next, domains);
+
+	STAILQ_INIT(&a->acl_ports);
+	STAILQ_FROM_LIST(&a->acl_ports, inlist, il_next, ilist);
+
+	STAILQ_INIT(&a->acl_sources);
+	STAILQ_FROM_LIST(&a->acl_sources, hostlist, hl_next, hosts);
+
 	return (a);
+
+badacl:
+	for (h = hosts; h != NULL; h = next) {
+		next = STAILQ_NEXT(h, hl_next);
+		hostlist_free(h);
+	}
+
+	for (n = ports; n != NULL; n = next) {
+		next = STAILQ_NEXT(n, n_next);
+		name_free(n);
+	}
+
+	for (d = domains; d != NULL; d = next) {
+		next = STAILQ_NEXT(d, d_next);
+		domain_free(d);
+	}
+
+	return (NULL);
 }
 
 
 static void
-add_acl(acl_t *a)
+acl_add(acl_t *a)
 {
+
 	if (a != NULL) {
 		STAILQ_INSERT_TAIL(&config.c_acls, a, acl_next);
 	}
@@ -726,15 +836,15 @@ add_acl(acl_t *a)
 
 
 static inbound_t *
-new_port(char *name, hostlist_t *addr, u_short port, portopt_t *options)
+port_new(char *name, hostlist_t *addr, u_short port, portopt_t *options)
 {
 	portopt_t *po1, *po2;
 	inbound_t *in;
 
-	logit(4, "new_port(%s,%s,%d,%p)\n", name, inet_ntoa(addr->hl_ipaddr),
+	logit(4, "port_new(%s,%s,%d,%p)\n", name, inet_ntoa(addr->hl_ipaddr),
 	      port, options);
 
-	if (find_port(name) != NULL) {
+	if (port_find(name) != NULL) {
 		logit(1, "port '%s' already exists\n", name);
 		goto badnewport;
 	}
@@ -802,11 +912,11 @@ badnewport:
 
 
 static inbound_t *
-find_port(char *name)
+port_find(char *name)
 {
 	inbound_t *i;
 
-	logit(8, "find_port(%s)\n", name);
+	logit(8, "port_find(%s)\n", name);
 
 	STAILQ_FOREACH(i, &config.c_ports, i_next) {
 		if (!strcmp(name, i->i_name))
@@ -818,7 +928,7 @@ find_port(char *name)
 
 
 static void
-add_port(inbound_t *in)
+port_add(inbound_t *in)
 {
 	inbound_t *i;
 
@@ -830,15 +940,16 @@ add_port(inbound_t *in)
 
 
 static portopt_t *
-add_portopt(portopt_t *po1, portopt_t *po2)
+portopt_add(portopt_t *po1, portopt_t *po2)
 {
+
 	SLIST_NEXT(po1, po_next) = po2;
 	return (po1);
 }
 
 
 static portopt_t *
-new_portopt(int option, void *arg)
+portopt_new(int option, void *arg)
 {
 	portopt_t *popt;
 
@@ -863,61 +974,254 @@ new_portopt(int option, void *arg)
 }
 
 
-static void
-add_forward(forward_t *forwards)
+static modify_t *
+modify_new(char *name, int type, name_t *acls, rrlist_t *keep, rrlist_t *strip)
 {
-	forward_t *f, *fn;
+	modify_t *m;
+	rrlist_t *r, *next;
 
-	if (config.c_debug > 1)
-		printf("# add_forward %p\n", forwards);
+	m = calloc(1, sizeof(*m));
+	if (m == NULL) {
+		logit(1, "modify_new(%s): cannot allocate memory for modify\n",
+		      name);
+		goto badmodify;
+	}
 
-	for (f = forwards; f != NULL; f = fn) {
-		fn = CIRCLEQ_NEXT(f, f_next);
-		CIRCLEQ_NEXT(f, f_next) = NULL;
-		CIRCLEQ_INSERT_TAIL(&config.c_forwards, f, f_next);
+	STAILQ_INIT(&m->m_acls);
+	names_to_acllist(acls, &m->m_acls);
 
-		if (config.c_debug > 1)
-			printf("# forward added (%p,%p) %s\n", f, fn,
-			       inet_ntoa(f->f_ipaddr));
+	for (r = keep; r != NULL; r = next) {
+		next = STAILQ_NEXT(r, rr_next);
+		rrarray_set(r->rr_qtype, m->m_keep);
+		free(r);
+	}
+
+	for (r = strip; r != NULL; r = next) {
+		next = STAILQ_NEXT(r, rr_next);
+		rrarray_set(r->rr_qtype, m->m_strip);
+		free(r);
+	}
+
+	m->m_type = type;
+
+	return (m);
+
+badmodify:
+	STAILQ_FREE_LIST(acls, name, n_next, name_free);
+	STAILQ_FREE_LIST(keep, rrlist, rr_next, free);
+	STAILQ_FREE_LIST(strip, rrlist, rr_next, free);
+	return (NULL);
+}
+
+
+static void
+modify_add(modify_t *m)
+{
+
+	STAILQ_INSERT_TAIL(&config.c_modifies, m, m_next);
+}
+
+
+static void
+rrarray_set(int type, u_char array[256])
+{
+
+	if (type < -1 || type > 255) {
+		logit(1, "RR type (%d) out of bounds\n", type);
+		return;
+	}
+
+	if (type == -1) {
+		memset(array, 1, sizeof(array));
+	} else {
+		if (array[type] != 0) {
+			logit(2, "RR type (%d) already set\n", type);
+		} else {		
+			array[type] = 1;
+		}
+	}
+}
+
+
+static forward_t *
+forward_new(name_t *acls, name_t *fwdrs)
+{
+	forward_t *f;
+
+	f = calloc(1, sizeof(*f));
+	if (f == NULL) {
+		logit(-1, "cannot allocate memory for forward_t\n");
+		goto badforward;
+	}
+
+	STAILQ_INIT(&f->f_acls);
+	names_to_acllist(acls, &f->f_acls);
+
+	CIRCLEQ_INIT(&f->f_to);
+	names_to_fwdlist(fwdrs, &f->f_to);
+
+	return (f);
+
+badforward:
+	STAILQ_FREE_LIST(acls, name, n_next, name_free);
+	STAILQ_FREE_LIST(fwdrs, name, n_next, name_free);
+
+	return (NULL);
+}
+
+
+static void
+names_to_acllist(name_t *names, struct acllisttop *top)
+{
+	name_t *n, *next;
+	acllist_t *a;
+	acl_t *acl;
+
+	for (n = names; n != NULL; n = next) {
+		next = STAILQ_NEXT(n, n_next);
+
+		if (!strcmp("*", n->n_name)) {
+			acl = NULL;
+		} else {
+			acl = acl_find(n->n_name);
+			if (acl == NULL) {
+				logit(1, "cannot find acl '%s'\n", n->n_name);
+				name_free(n);
+				continue;
+			}
+		}
+
+		/*
+		 * Do not need n from here on.
+		 */
+		name_free(n);
+
+		a = calloc(1, sizeof(*a));
+		if (a == NULL) {
+			logit(1, "cannot allocate acllist memory\n");
+			continue;
+		}
+		a->acll_acl = acl;
+		STAILQ_INSERT_TAIL(top, a, acll_next);
 	}
 }
 
 
 static void
-add_query(querymatch_t *qmatch)
+names_to_fwdlist(name_t *names, struct fwdlisttop *top)
 {
-	STAILQ_INSERT_TAIL(&config.c_qmatches, qmatch, qm_next);
+	name_t *n, *next;
+	fwdlist_t *f;
+	forwarder_t *fwd;
+
+	for (n = names; n != NULL; n = next) {
+		next = STAILQ_NEXT(n, n_next);
+
+		fwd = forwarder_find(n->n_name);
+		if (fwd == NULL) {
+			logit(1, "cannot find forwarder '%s'\n", n->n_name);
+			name_free(n);
+			continue;
+		}
+
+		/*
+		 * Do not need n from here on.
+		 */
+		name_free(n);
+
+		f = calloc(1, sizeof(*f));
+		if (f == NULL) {
+			logit(1, "cannot allocate fwdlist memory\n");
+			continue;
+		}
+		f->fl_fwd = fwd;
+		CIRCLEQ_INSERT_TAIL(top, f, fl_next);
+	}
 }
 
 
-static int
-tosecs(char *units)
+static forwarder_t *
+forwarder_find(char *name)
 {
-	if (!strcasecmp(units, "s"))
-		return (1);
-	if (!strcasecmp(units, "sec"))
-		return (1);
-	if (!strcasecmp(units, "secs"))
-		return (1);
-	if (!strcasecmp(units, "seconds"))
-		return (1);
-	if (!strcasecmp(units, "m"))
-		return (60);
-	if (!strcasecmp(units, "min"))
-		return (60);
-	if (!strcasecmp(units, "mins"))
-		return (60);
-	if (!strcasecmp(units, "minutes"))
-		return (60);
-	if (!strcasecmp(units, "h"))
-		return (3600);
-	if (!strcasecmp(units, "hr"))
-		return (3600);
-	if (!strcasecmp(units, "hrs"))
-		return (3600);
-	if (!strcasecmp(units, "hours"))
-		return (3600);
-	return (0);
+	forwarder_t *f;
+
+	STAILQ_FOREACH(f, &config.c_forwarders, fr_next) {
+		if (!strcmp(f->fr_name, name))
+			return (f);
+	}
+
+	return (NULL);
+}
+
+
+static void
+forward_add(forward_t *forward)
+{
+	fwdlist_t *fl;
+
+	STAILQ_INSERT_TAIL(&config.c_forwards, forward, f_next);
+
+	fl = CIRCLEQ_FIRST(&forward->f_to);
+	if (fl != NULL) {
+		forward->f_server = CIRCLEQ_FIRST(&fl->fl_fwd->fr_servers);
+	}
+	forward->f_fwdr = fl;
+}
+
+
+static void
+forwarder_add(forwarder_t *fwdr)
+{
+
+	STAILQ_INSERT_TAIL(&config.c_forwarders, fwdr, fr_next);
+}
+
+
+static forwarder_t *
+forwarder_new(char *name, hostlist_t *hosts)
+{
+	hostlist_t *hl, *hltop;
+	forwarder_t *fr;
+	server_t *s;
+
+	hltop = hosts;
+
+	fr = calloc(1, sizeof(*fr));
+	if (fr == NULL) {
+		logit(1, "forwarders(%s): cannot allocate memory\n", name);
+		goto badnewforwarders;
+	}
+
+	CIRCLEQ_INIT(&fr->fr_servers);
+
+	while ((hl = hltop) != NULL) {
+		s = calloc(1, sizeof(*s));
+		if (s == NULL) {
+			logit(1, "forwarder(%s): cannot allocate new server\n",
+			      name);
+			goto badnewforwarders;
+		}
+		s->s_ipaddr = hl->hl_ipaddr;
+		CIRCLEQ_INSERT_TAIL(&fr->fr_servers, s, s_next);
+
+		hltop = STAILQ_NEXT(hl, hl_next);
+		STAILQ_NEXT(hl, hl_next) = NULL;
+		hostlist_free(hl);
+	}
+
+	fr->fr_name = name;
+	return (fr);
+
+badnewforwarders:
+	if (fr != NULL) {
+		while ((s = CIRCLEQ_FIRST(&fr->fr_servers)) != NULL) {
+			CIRCLEQ_REMOVE(&fr->fr_servers, s, s_next);
+			free(s);
+		}
+		free(fr);
+	}
+	STAILQ_FREE_LIST(hltop, hostlist, hl_next, hostlist_free);
+	return (NULL);
 }
 
 
@@ -927,58 +1231,13 @@ qtype_to_name(int type)
 	static char buffer[10];
 	wordtab_t *w;
 
-	for (w = dnsqtypes; w->w_word != NULL; w++)
+	for (w = dnsqtpyes; w->w_word != NULL; w++)
 		if (w->w_value == type)
 			return (w->w_word);
 
 	(void) snprintf(buffer, sizeof(buffer), "%d", type);
 
 	return (buffer);
-}
-
-
-static void
-merge_options(acl_t *as1, acl_t *as2, acl_t *ad)
-{
-	if (as1->acl_maxttl != 0)
-		ad->acl_maxttl = as1->acl_maxttl;
-	else if (as2->acl_maxttl != 0)
-		ad->acl_maxttl = as2->acl_maxttl;
-}
-
-
-static forward_t *
-hosts_to_forward(hostlist_t *hosts)
-{
-	forward_t *f, *top, *last;
-	hostlist_t *h;
-
-	top = NULL;
-
-	while ((h = hosts) != NULL) {
-		hosts = STAILQ_NEXT(h, hl_next);
-		f = calloc(1, sizeof(*f));
-		if (f == NULL) {
-			logit(-1, "no memory for host->forward\n");
-		} else {
-			f->f_ipaddr = h->hl_ipaddr;
-			if (top == NULL) {
-				top = f;
-			} else {
-				CIRCLEQ_NEXT(last, f_next) = f;
-			}
-			last = f;
-
-			if (config.c_debug > 1)
-				printf("# hosts_to_forward f=%p\n", f);
-		}
-		free(h);
-	}
-
-	if (config.c_debug > 1)
-		printf("# hosts_to_forward top=%p\n", top);
-
-	return (top);
 }
 
 
@@ -1003,9 +1262,8 @@ get_action(action_t act)
 }
 
 
-
 static void
-dump_hosts(struct htop *hosts)
+hosts_dump(struct htop *hosts)
 {
 	hostlist_t *h;
 
@@ -1013,24 +1271,54 @@ dump_hosts(struct htop *hosts)
 		if ((h->hl_mask.s_addr == 0) && (h->hl_ipaddr.s_addr == 0)) {
 			printf("all");
 		} else if (h->hl_mask.s_addr == 0xffffffff) {
-			printf("%s%s", inet_ntoa(h->hl_ipaddr),
-			       STAILQ_NEXT(h, hl_next) ? "," : "");
+			printf("%s", inet_ntoa(h->hl_ipaddr));
 		} else {
-			printf("%s/%d%s", inet_ntoa(h->hl_ipaddr),
-			       countv4bits(h->hl_mask.s_addr),
-			       STAILQ_NEXT(h, hl_next) ? "," : "");
+			printf("%s/%d", inet_ntoa(h->hl_ipaddr),
+			       countv4bits(h->hl_mask.s_addr));
+		}
+
+		if (STAILQ_NEXT(h, hl_next) != NULL)
+			putchar(',');
+	}
+}
+
+
+static void
+rrtypes_dump(u_char *rrarray)
+{
+	int i, count;
+
+	for (i = 0, count = 0; i < 256; i++) {
+		if (rrarray[i] != 0)
+			count++;
+	}
+	if (count == 256) {
+		putchar('*');
+	} else {
+		for (i = 0; i < 256; i++) {
+			if (rrarray[i] != 0) {
+				printf("%s", qtype_to_name(i));
+				count--;
+				if (count > 0)
+					putchar(',');
+			}
 		}
 	}
 }
 
 
 void
-dump_names(struct ntop *ntop)
+names_dump(struct ntop *ntop)
 {
 	name_t *n;
 
 	STAILQ_FOREACH(n, ntop, n_next) {
 		printf("%s", n->n_name);
+		if (n->n_rrtypes != NULL) {
+			putchar('(');
+			rrtypes_dump(n->n_rrtypes);
+			putchar(')');
+		}
 		if (STAILQ_NEXT(n, n_next) != NULL)
 			putchar(',');
 	}
@@ -1038,116 +1326,102 @@ dump_names(struct ntop *ntop)
 
 
 void
-dump_domains(struct dtop *dtop)
+domains_dump(struct dtop *dtop)
 {
 	domain_t *d;
 
 	STAILQ_FOREACH(d, dtop, d_next) {
 		printf(" %s ", get_action(d->d_pass));
-		dump_names(&d->d_names);
+		names_dump(&d->d_names);
 		printf(";");
 	}
 }
 
 
 void
-dump_ports(struct intop *ptop)
+ports_dump(struct intop *ptop)
 {
 	inbound_t *in;
 
 	STAILQ_FOREACH(in, ptop, i_next) {
-		printf("port %s %s %d;\n", in->i_name,
-		       inet_ntoa(in->i_portspec.sin_addr),
-		       ntohs(in->i_portspec.sin_port));
+		port_dump(in);
 	}
 }
 
 
 void
-dump_forwarders(struct ftop *ftop, int eol)
+port_dump(inbound_t *port)
 {
-	forward_t *f;
+	printf("port %s { udp %s,%d;", port->i_name,
+	       inet_ntoa(port->i_portspec.sin_addr),
+	       ntohs(port->i_portspec.sin_port));
+	if (port->i_transparent)
+		printf(" transparent on;");
+	printf(" };\n");
+}
 
-	printf("forwarders {");
-	CIRCLEQ_FOREACH(f, ftop, f_next) {
-		printf(" %s", inet_ntoa(f->f_ipaddr));
-		if (f != CIRCLEQ_LAST(ftop))
+
+void
+forwarders_dump(struct frtop *frtop)
+{
+	forwarder_t *fr;
+
+	STAILQ_FOREACH(fr, frtop, fr_next) {
+		forwarder_dump(fr);
+	}
+}
+
+
+void
+forwarder_dump(forwarder_t *fr)
+{
+	server_t *s;
+
+	printf("forwarder %s {", fr->fr_name);
+	CIRCLEQ_FOREACH(s, &fr->fr_servers, s_next) {
+		printf(" %s", inet_ntoa(s->s_ipaddr));
+		if (s != CIRCLEQ_LAST(&fr->fr_servers))
 			putchar(',');
 	}
-	printf("; };");
-	if (eol)
-		putchar('\n');
+	printf("; };\n");
 }
 
 
 void
-dump_acls(struct atop *atop)
+acls_dump(struct atop *atop)
 {
+	inlist_t *il;
 	acl_t *a;
 
 	STAILQ_FOREACH(a, atop, acl_next) {
-		printf("acl ");
-		dump_hosts(&a->acl_hosts);
-		printf(" port %s {", a->acl_portname);
-		dump_domains(&a->acl_domains);
+		printf("acl %s {", a->acl_name);
+		printf(" source (");
+		if (!STAILQ_EMPTY(&a->acl_sources)) {
+			hosts_dump(&a->acl_sources);
+		} else {
+			putchar('*');
+		}
+		printf("); port (");
+		STAILQ_FOREACH(il, &a->acl_ports, il_next) {
+			if (il->il_port == NULL) {
+				putchar('*');
+			} else {
+				printf("%s", il->il_port->i_name);
+			}
+			if (STAILQ_NEXT(il, il_next))
+				putchar(',');
+		}
+		printf("); policy {");
+		domains_dump(&a->acl_domains);
 		printf(" };\n");
 	}
 }
 
 
 void
-dump_querymatches(struct qmtop *qmtop)
+config_dump()
 {
-	querymatch_t *qm;
-
-	STAILQ_FOREACH(qm, qmtop, qm_next) {
-		printf("query");
-		if (!STAILQ_EMPTY(&qm->qm_types)) {
-			qtypelist_t *qt;
-
-			printf(" type=(");
-			STAILQ_FOREACH(qt, &qm->qm_types, qt_next) {
-				printf("%s", qtype_to_name(qt->qt_type));
-				if (STAILQ_NEXT(qt, qt_next) != NULL) {
-					printf(",");
-				}
-			}
-			printf(")");
-		}
-
-		if (!STAILQ_EMPTY(&qm->qm_names)) {
-			printf(" name=(");
-			dump_names(&qm->qm_names);
-			printf(")");
-		}
-
-		printf(" { ");
-
-		if (!CIRCLEQ_EMPTY(&qm->qm_forwards)) {
-			dump_forwarders(&qm->qm_forwards, 0);
-			putchar(' ');
-		}
-		switch (qm->qm_action)
-		{
-		case Q_BLOCK :
-			printf("block; ");
-			break;
-		case Q_REJECT :
-			printf("reject; ");
-			break;
-		default :
-			break;
-		}
-		printf("};\n");
-	}
-}
-
-
-void
-dump_config()
-{
-	dump_ports(&config.c_ports);
-	dump_acls(&config.c_acls);
-	dump_forwarders(&config.c_forwards, 1);
-	dump_querymatches(&config.c_qmatches);
+	ports_dump(&config.c_ports);
+	acls_dump(&config.c_acls);
+	forwarders_dump(&config.c_forwarders);
 }

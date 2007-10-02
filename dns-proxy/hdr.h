@@ -25,6 +25,8 @@
  *
  * $Id$
  */
+#include "queue.h"
+
 #include <sys/types.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
@@ -43,13 +45,25 @@
 
 #include <arpa/nameser.h>
 
-#include "queue.h"
-
 #ifndef NO_IPFILTER
 # include "ip_compat.h"
 # include "ip_fil.h"
 #endif
 
+/*
+ * inbound_t               acl_t                 modify_t
+ * +--------+  iltop_t   +-------+  acllist_t  +----------+
+ * |  port  |----M:N-----|  acl  |-----M:N-----|  modify  |
+ * +--------+            +-------+             +----------+
+ *                           |
+ *                           |
+ *                          M:N acllist_t
+ *                           |
+ *                           |                    forwarder_t
+ *                      +---------+  fwdlist_t  +------------+
+ *                      | forward |-----M:N-----| forwarders |
+ *                      +---------+             +------------+
+ */
 
 typedef	enum	action {
 	Q_ALLOW = 1,
@@ -72,14 +86,43 @@ typedef struct portopt {
 	void			*po_ptr;
 } portopt_t;
 
+/* -------------------------------------------------- */
+
+typedef	struct rrlist {
+	STAILQ_ENTRY(rrlist)	rr_next;
+	int			rr_qtype;
+} rrlist_t;
+
+STAILQ_HEAD(rrtop, rrlist);
+
+/* -------------------------------------------------- */
+
+typedef enum qtype_e {
+	Q_QUESTION = 1,
+	Q_ANSWER,
+	Q_NAMESERVER,
+	Q_ADDITIONAL
+} qtype_t;
+
+typedef	struct	qrec {
+	STAILQ_ENTRY(qrec)	qir_next;
+	u_char			*qir_data;
+	char			*qir_name;
+	qtype_t			qir_qtype;
+	int			qir_rrtype;
+	int			qir_class;
+	int			qir_ttl;
+} qrec_t;
+
+STAILQ_HEAD(qrtop, qrec);
 
 typedef struct qinfo {
-	int	qi_qtcount;
-	int	*qi_qtypes;
-	int	qi_ncount;
-	char	**qi_names;
+	struct qrtop		qi_recs;
+	action_t		qi_result;
+	struct acl		*qi_acl;
 } qinfo_t;
 
+/* -------------------------------------------------- */
 
 typedef	struct inbound {
 	STAILQ_ENTRY(inbound)	i_next;
@@ -90,14 +133,26 @@ typedef	struct inbound {
 	struct sockaddr_in	i_sender;
 	char			i_buffer[2048];
 	qinfo_t			i_qinfo;
+	u_long			i_errors;
 } inbound_t;
 
 STAILQ_HEAD(intop, inbound);
 
 
+typedef struct inlist {
+	STAILQ_ENTRY(inlist)	il_next;
+	inbound_t		*il_port;
+} inlist_t;
+
+STAILQ_HEAD(iltop, inlist);
+
+/* -------------------------------------------------- */
+
 typedef	struct	name {
 	STAILQ_ENTRY(name)	n_next;
+	struct rrtop		n_rtypes;
 	char			*n_name;
+	u_char			*n_rrtypes;
 	int			n_namelen;
 } name_t;
 
@@ -106,12 +161,13 @@ STAILQ_HEAD(ntop, name);
 
 typedef	struct domain {
 	STAILQ_ENTRY(domain)	d_next;
-	action_t		d_pass;
 	struct ntop		d_names;
+	action_t		d_pass;
 } domain_t;
 
 STAILQ_HEAD(dtop, domain);
 
+/* -------------------------------------------------- */
 
 typedef struct hostlist {
 	STAILQ_ENTRY(hostlist)	hl_next;
@@ -121,17 +177,79 @@ typedef struct hostlist {
 
 STAILQ_HEAD(htop, hostlist);
 
+/* -------------------------------------------------- */
 
 typedef	struct acl	{
 	STAILQ_ENTRY(acl)	acl_next;
-	struct htop		acl_hosts;
+	struct htop		acl_sources;
+	struct iltop		acl_ports;
 	struct dtop		acl_domains;
-	int			acl_maxttl;
-	char			*acl_portname;
+	char			*acl_name;
 } acl_t;
 
 STAILQ_HEAD(atop, acl);
 
+typedef struct acllist	{
+	STAILQ_ENTRY(acllist)	acll_next;
+	acl_t			*acll_acl;
+} acllist_t;
+
+STAILQ_HEAD(acllisttop, acllist);
+
+/* -------------------------------------------------- */
+
+typedef	struct modify {
+	STAILQ_ENTRY(modify)	m_next;
+	struct acllisttop	m_acls;
+	u_char			m_keep[256];
+	u_char			m_strip[256];
+	qtype_t			m_type;
+} modify_t;
+
+STAILQ_HEAD(mtop, modify);
+
+/* -------------------------------------------------- */
+
+
+typedef	struct server {
+	CIRCLEQ_ENTRY(server)	s_next;
+	struct in_addr		s_ipaddr;
+	u_long			s_sends;
+	u_long			s_recvs;
+	u_long			s_errors;
+} server_t;
+
+CIRCLEQ_HEAD(srtop, server);
+
+
+typedef	struct forwarder {
+	STAILQ_ENTRY(forwarder)	fr_next;
+	struct srtop		fr_servers;
+	char			*fr_name;
+} forwarder_t;
+
+STAILQ_HEAD(frtop, forwarder);
+
+
+typedef struct	fwdlist	{
+	CIRCLEQ_ENTRY(fwdlist)	fl_next;
+	forwarder_t		*fl_fwd;
+} fwdlist_t;
+
+CIRCLEQ_HEAD(fwdlisttop, fwdlist);
+
+
+typedef struct forward {
+	STAILQ_ENTRY(forward)	f_next;
+	struct acllisttop	f_acls;
+	struct fwdlisttop	f_to;
+	server_t		*f_server;
+	fwdlist_t		*f_fwdr;
+} forward_t;
+
+STAILQ_HEAD(ftop, forward);
+
+/* -------------------------------------------------- */
 
 typedef	struct query	{
 	STAILQ_ENTRY(query)	q_next;
@@ -142,47 +260,20 @@ typedef	struct query	{
 	u_short			q_newid;
 	time_t			q_recvd;
 	time_t			q_dies;
+	acl_t			*q_acl;
 } query_t;
 
 STAILQ_HEAD(qtop, query);
 
-
-typedef	struct forward {
-	CIRCLEQ_ENTRY(forward)	f_next;
-	struct in_addr		f_ipaddr;
-	u_long			f_sends;
-	u_long			f_recvs;
-} forward_t;
-
-CIRCLEQ_HEAD(ftop, forward);
-
-
-typedef	struct qtypelist {
-	STAILQ_ENTRY(qtypelist)	qt_next;
-	int			qt_type;
-} qtypelist_t;
-
-STAILQ_HEAD(qttop, qtypelist);
-
-
-typedef	struct querymatch {
-	STAILQ_ENTRY(querymatch) qm_next;
-	struct qttop		qm_types;
-	struct ftop		qm_forwards;
-	struct ntop		qm_names;
-	forward_t		*qm_currentfwd;
-	action_t		qm_action;
-} querymatch_t;
-
-STAILQ_HEAD(qmtop, querymatch);
-
+/* -------------------------------------------------- */
 
 typedef struct config {
 	struct atop		c_acls;
 	struct intop		c_ports;
 	struct qtop		c_queries;
 	struct ftop		c_forwards;
-	struct qmtop		c_qmatches;
+	struct frtop		c_forwarders;
+	struct mtop		c_modifies;
 	forward_t		*c_currentforward;
 	int			c_natfd;
 	int			c_outfd;
@@ -325,10 +416,42 @@ typedef struct {
 # define	T_ZXFR	256
 #endif
 
-extern void config_init(void);
-extern int countv4bits(u_int);
-extern char *get_variable(char *string, char **after, int line);
-extern void logit(int level, char *string, ...);
-extern void load_config(char *filename);
-extern void dump_config(void);
+#define STAILQ_FROM_LIST(head, type, field, start) 		\
+	do {							\
+		void *_next;					\
+		struct type *_e;				\
+		for (_e = (start); _e != NULL; _e = _next) {	\
+			_next = STAILQ_NEXT(_e, field);		\
+			STAILQ_NEXT(_e, field) = NULL;		\
+			STAILQ_INSERT_TAIL(head, _e, field);	\
+		}						\
+	} while (0)
 
+#define	STAILQ_FREE_LIST(top, type, field, freefunc)		\
+	do {							\
+		struct type *_n;				\
+		void *_next;					\
+		for (_n = (top); _n != NULL; _n = _next) {	\
+			_next = STAILQ_NEXT(_n, field);		\
+			STAILQ_NEXT(_n, field) = NULL;		\
+			freefunc(_n);				\
+		}						\
+	} while (0)
+
+extern void	acl_free(acl_t *a);
+extern void	config_dump(void);
+extern void	config_init(void);
+extern int	countv4bits(u_int);
+extern void	domain_free(domain_t *);
+extern void	dtop_free(struct dtop *top);
+extern char	*get_variable(char *string, char **after, int line);
+extern void	hex_dump(void *buffer, size_t buflen);
+extern void	hostlist_free(hostlist_t *);
+extern void	inlist_free(struct iltop *top);
+extern void	logit(int level, char *string, ...);
+extern void	load_config(char *filename);
+extern void	name_free(name_t *);
+extern void	qrec_free(qrec_t *qir);
+extern qinfo_t	*qinfo_alloc(void);
+extern void	qinfo_free(qinfo_t *qi);
+extern void	rrtop_free(struct rrtop *rrtop);

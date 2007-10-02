@@ -40,6 +40,7 @@ extern	void		yyerror __P((char *));
 extern	char		*yykeytostr __P((int));
 extern	void		yyresetdict __P((void));
 extern	void		yysetstr __P((void));
+extern	void		set_variable __P((char *, char *));
 
 extern	FILE	*yyin;
 extern	int	yylineNum;

@@ -443,9 +443,12 @@ done:
 
 	yytokentype = rval;
 
-	if (yydebug)
-		printf("lexed(%s) [%d,%d,%d] => %d\n", yystr, string_start,
-			string_end, pos, rval);
+	if (yydebug) {
+		printf("lexed(%s) [%d,%d,%d]{%d,%d} => %d\n",
+			yystr, string_start, string_end, pos,
+			yyexpectaddr, yysavedepth,
+			rval);
+	}
 
 	switch (rval)
 	{

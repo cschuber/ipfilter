@@ -38,29 +38,22 @@
 #include "ip_nat.h"
 #endif
 
-static void	add_qname(qinfo_t *qip, char *name);
-static void	add_qtype(qinfo_t *qip, int type);
-static void	add_query(inbound_t *in, int buflen);
+static acl_t	*acl_determine(inbound_t *in, qinfo_t *qip);
+static query_t	*add_query(inbound_t *in, int buflen);
 static void	add_reply(struct sockaddr_in *, char *buffer, int buflen);
-static action_t	allow_query(struct sockaddr_in *, char *qname);
 static void	build_aio(void);
 static action_t	check_answers(struct sockaddr_in *, char *buffer, int buflen);
 static void	check_events(void);
 static void	check_query(inbound_t *in, int buflen);
 static action_t	check_questions(qinfo_t *qip, struct sockaddr_in *,
 				char *buffer, int buflen);
-static forward_t *choose_forward(struct ftop *ftop, forward_t **currentp,
-				 struct sockaddr_in *dst);
 static void	do_args(int argc, char *argv[]);
 static void	do_query(inbound_t *in);
 static void	do_reply(void);
 static void	drop_privs(void);
 static void	expire_queries(time_t now);
 static query_t *find_query(struct sockaddr_in *sin, char *buffer, int buflen);
-static action_t	find_query_forward(qinfo_t *qi, struct ftop **top,
-				   forward_t ***current);
-static void	free_qinfo(qinfo_t *qip);
-static int	get_name(void *start, int len, void *buffer, int buflen);
+static int	get_name(void *, void *, int, void *, int);
 static int	get_transparent(inbound_t *in, struct sockaddr_in *dst);
 static void	handle_alarm(int info);
 static void	handle_int(int info);
@@ -68,12 +61,12 @@ static void	handle_term(int info);
 static void	init_ipf(void);
 static void	init_signals();
 static void	make_background();
-static int	match_name(name_t *n, char *query, int qlen);
-static action_t match_names(domain_t *d, char *query, int qlen);
+static int	name_match(name_t *n, char *query, int qlen);
 static void	process_packets(void);
-static int	query_match_name(struct ntop *names, char *name);
-static int	query_match_type(struct qttop *types, int type);
+static int	qinfo_build(qinfo_t *qip, char *buffer, int buflen);
+static int	name_qrec_match(name_t *name, qrec_t *qr);
 static query_t	*query_exists(inbound_t *in, int buflen);
+static int	query_validate(inbound_t *in, int buflen);
 static void	send_reject(inbound_t *in, int buflen);
 static void	start_logging(char *execname);
 static void	usage(char *prog);
@@ -99,7 +92,7 @@ main(int argc, char *argv[])
 	load_config(config.c_cffile);
 
 	if (config.c_debug)
-		dump_config();
+		config_dump();
 
 	init_ipf();
 	init_signals();
@@ -247,6 +240,9 @@ drop_privs()
 	if (p != NULL) {
 		if (geteuid() == 0)
 			setuid(p->pw_uid);
+	} else {
+		if (geteuid() == 0)
+			setuid(65534);
 	}
 }
 
@@ -317,14 +313,15 @@ check_events()
 	if (nfd > 0) {
 		STAILQ_FOREACH(in, &config.c_ports, i_next) {
 			if ((in->i_fd >= 0) && FD_ISSET(in->i_fd, &rd)) {
-				logit(7, "active in fd %d\n", in->i_fd);
+				logit(5, "active in fd %s/%d\n",
+				      in->i_name, in->i_fd);
 				do_query(in);
 				nfd--;
 			}
 		}
 
 		if ((nfd > 0) && FD_ISSET(config.c_outfd, &rd)) {
-			logit(7, "active out fd %d\n", config.c_outfd);
+			logit(5, "active out fd %d\n", config.c_outfd);
 			do_reply();
 		}
 	}
@@ -335,7 +332,6 @@ check_events()
 static void
 do_query(inbound_t *in)
 {
-	ipf_dns_hdr_t *dns;
 	socklen_t slen;
 	int n;
 
@@ -343,30 +339,9 @@ do_query(inbound_t *in)
 
 	n = recvfrom(in->i_fd, in->i_buffer, sizeof(in->i_buffer), 0,
 		     (struct sockaddr *)&in->i_sender, &slen);
-	if (n > 0) {
-		if (n <= sizeof(ipf_dns_hdr_t)) {
-			logit(1, "query too short (%d)\n", n);
-			return;
-		}
-		dns = (ipf_dns_hdr_t *)in->i_buffer;
 
-		/*
-		 * Check that we received a query on the query side.
-		 */
-		if (DNS_QR(dns->dns_ctlword)) {
-			logit(1, "inbound not a query %x\n",
-			      ntohs(dns->dns_ctlword));
-			return;
-		}
-
-		if (DNS_OPCODE(dns->dns_ctlword) != 0) {
-			logit(2, "non-name query, allow\n");
-			add_query(in, n);
-			return;
-		}
-
+	if (query_validate(in, n) == 0)
 		check_query(in, n);
-	}
 }
 
 
@@ -388,18 +363,105 @@ do_reply()
 }
 
 
+static int
+query_validate(inbound_t *in, int len)
+{
+	ipf_dns_hdr_t *dns;
+
+	if (len <= sizeof(ipf_dns_hdr_t)) {
+		logit(1, "query too short (%d)\n", len);
+		return (-1);
+	}
+
+	dns = (ipf_dns_hdr_t *)in->i_buffer;
+
+	switch (DNS_OPCODE(dns->dns_ctlword))
+	{
+	case NS_NOTIFY_OP :
+		logit(1, "inbound query for notify - dropping\n");
+		return (-1);
+	case NS_UPDATE_OP :
+		logit(1, "inbound query for update - dropping\n");
+		return (-1);
+	case STATUS :
+		logit(1, "inbound query for status - dropping\n");
+		return (-1);
+	case IQUERY :
+	case QUERY :
+	default :
+		break;
+	}
+
+	/*
+	 * Check that we received a query on the query side.
+	 */
+	if (DNS_QR(dns->dns_ctlword)) {
+		logit(1, "inbound not a query %x - dropping\n",
+		      ntohs(dns->dns_ctlword));
+		return (-1);
+	}
+
+	if (dns->dns_ancount) {
+		logit(1, "query from %s with answers %d - dropping\n",
+		      inet_ntoa(in->i_sender.sin_addr),
+		      ntohs(dns->dns_ancount));
+		return (-1);
+	}
+	if (dns->dns_nscount) {
+		logit(1, "query from %s with servers %d - dropping\n",
+		      inet_ntoa(in->i_sender.sin_addr),
+		      ntohs(dns->dns_nscount));
+		return (-1);
+	}
+	if (dns->dns_arcount) {
+		logit(1, "query from %s with additional %d - dropping\n",
+		      inet_ntoa(in->i_sender.sin_addr),
+		      ntohs(dns->dns_arcount));
+		return (-1);
+	}
+
+	return (0);
+}
+
+
+/*
+ * Check what to do with a DNS query
+ */
 static void
 check_query(inbound_t *in, int buflen)
 {
+	qinfo_t *qip;
 	action_t rc;
+	acl_t *acl;
+	query_t *q;
 
-	rc = check_questions(&in->i_qinfo, &in->i_sender, in->i_buffer,
-			     buflen);
+	qip = qinfo_alloc();
+	if (qip == NULL)
+		return;
+
+	if (qinfo_build(qip, in->i_buffer, buflen) == -1) {
+		logit(2, "qinfo_build failed - blocking\n");
+		qinfo_free(qip);
+		return;
+	}
+
+	acl = acl_determine(in, qip);
+	if (acl == NULL) {
+		rc = Q_BLOCK;
+	} else {
+		rc = check_questions(&in->i_qinfo, &in->i_sender,
+				     in->i_buffer, buflen);
+	}
+
+	logit(6, "check_query acl %p rc %d\n", acl, rc);
+
 	switch (rc)
 	{
 	case Q_NOMATCH :
 	case Q_ALLOW :
-		add_query(in, buflen);
+		q = add_query(in, buflen);
+		if (q != NULL)
+			q->q_acl = acl;
 		break;
 	case Q_BLOCK :
 		/* Do nothing - just drop the query */
@@ -409,229 +471,373 @@ check_query(inbound_t *in, int buflen)
 		break;
 	}
 
-	free_qinfo(&in->i_qinfo);
+	qinfo_free(qip);
 }
 
 
-static void
-free_qinfo(qinfo_t *qip)
+/*
+ * Find a matching acl_t.
+ * Need to check:
+ * - list of ports associated with the acl
+ * - the source addresses allowed by the acl
+ * - the list of names in the policy section has at least one match
+ *   with the questions in the packet.
+ */
+static acl_t *
+acl_determine(inbound_t *in, qinfo_t *qip)
 {
-	int i;
+	int block, pass, reject, nomatch;
+	struct sockaddr_in *sin;
+	hostlist_t *hl;
+	inlist_t *il;
+	domain_t *d;
+	qrec_t *qr;
+	name_t *n;
+	acl_t *a;
 
-	if (qip->qi_names != NULL) {
-		for (i = 0; i < qip->qi_ncount; i++) {
-			free(qip->qi_names[i]);
-			qip->qi_names[i] = NULL;
+	sin = &in->i_sender;
+	nomatch = 0;
+	reject = 0;
+	block = 0;
+	pass = 0;
+
+	STAILQ_FOREACH(a, &config.c_acls, acl_next) {
+		STAILQ_FOREACH(il, &a->acl_ports, il_next) {
+			if ((il->il_port == NULL) || (il->il_port == in))
+				break;
 		}
-		free(qip->qi_names);
-		qip->qi_names = NULL;
-		qip->qi_ncount = 0;
+		if (il == NULL)
+			continue;
+
+		STAILQ_FOREACH(hl, &a->acl_sources, hl_next) {
+			if ((sin->sin_addr.s_addr & hl->hl_mask.s_addr) ==
+			    hl->hl_ipaddr.s_addr)
+				break;
+		}
+		if (hl == NULL)
+			continue;
+
+		STAILQ_FOREACH(qr, &qip->qi_recs, qir_next) {
+			if (qr->qir_qtype != Q_QUESTION)
+				continue;
+
+			if (qr->qir_class != C_IN) {
+				logit(2, "non Internet-Class query\n");
+				reject++;
+			}
+
+			STAILQ_FOREACH(d, &a->acl_domains, d_next) {
+				STAILQ_FOREACH(n, &d->d_names, n_next) {
+					if (name_qrec_match(n, qr) == 0) {
+						switch (d->d_pass)
+						{
+						case Q_REJECT :
+							reject++;
+							break;
+						case Q_BLOCK :
+							block++;
+							break;
+						case Q_ALLOW :
+							pass++;
+							break;
+						case Q_NOMATCH :
+							nomatch++;
+							break;
+						default :
+							break;
+						}
+					}
+					if (reject || block || pass || nomatch)
+						break;
+				}
+				if (reject || block || pass || nomatch)
+					break;
+			}
+
+			if (reject > 0) {
+				in->i_qinfo.qi_result = Q_REJECT;
+				return (a);
+			}
+			if (block > 0) {
+				in->i_qinfo.qi_result = Q_BLOCK;
+				return (a);
+			}
+			if (pass > 0) {
+				in->i_qinfo.qi_result = Q_ALLOW;
+				return (a);
+			}
+			if (nomatch > 0) {
+				nomatch = 0;
+			}
+		}
 	}
 
+	return (NULL);
+}
 
-	if (qip->qi_qtypes != NULL) {
-		free(qip->qi_qtypes);
-		qip->qi_qtypes = NULL;
-		qip->qi_qtcount = 0;
+
+static int
+name_qrec_match(name_t *name, qrec_t *qr)
+{
+	int rc;
+
+	logit(9, "name_qrec_match(%s,%s)\n", name->n_name, qr->qir_name);
+
+	if (name->n_rrtypes != NULL) {
+		if (name->n_rrtypes[qr->qir_rrtype] == 0) {
+			logit(9, "name_qrec_match: ignore rrtype %d\n",
+			      qr->qir_rrtype);
+			return (-1);
+		}
 	}
+	rc = name_match(name, qr->qir_name, strlen(qr->qir_name));
+	printf("rc = %d\n", rc);
+	return (rc);
+}
+
+
+/*
+ * Process the packet and store all of the records on qip.
+ * XXX - TODO: decompress names
+ */
+static int
+qinfo_build(qinfo_t *qip, char *buffer, int buflen)
+{
+	int dlen, len, count, rdlen;
+	ipf_dns_hdr_t *dns;
+	char qname[1024];
+	u_char *data;
+	qtype_t qt;
+	qrec_t *qr;
+
+	dns = (ipf_dns_hdr_t *)buffer;
+
+	if (config.c_debug > 8)
+		hex_dump(buffer, buflen);
+
+	count = ntohs(dns->dns_qdcount);
+	qt = Q_QUESTION;
+	data = (u_char *)(dns + 1);
+	dlen = buflen - sizeof(*dns);
+
+	while (dlen > 0) {
+		if (count == 0) {
+			switch (qt)
+			{
+			case Q_QUESTION :
+				count = ntohs(dns->dns_ancount);
+				qt = Q_ANSWER;
+				break;
+
+			case Q_ANSWER :
+				count = ntohs(dns->dns_nscount);
+				qt = Q_NAMESERVER;
+				break;
+
+			case Q_NAMESERVER :
+				count = ntohs(dns->dns_arcount);
+				qt = Q_ADDITIONAL;
+				break;
+
+			case Q_ADDITIONAL :
+				/*
+				 * Force the while loop to exit.
+				 */
+				dlen = 0;
+				break;
+			}
+			continue;
+		}
+
+		count--;
+
+		qr = calloc(1, sizeof(*qr));
+		if (qr == NULL) {
+			logit(1, "cannot allocate qrec_t\n");
+			goto badqbuild;
+		}
+
+		qr->qir_qtype = qt;
+		STAILQ_INSERT_TAIL(&qip->qi_recs, qr, qir_next);
+
+		memset(qname, 0, sizeof(qname));
+		len = get_name(buffer, data, dlen, qname, sizeof(qname));
+		logit(3, "%d.question name [%s] len %d, dlen %d\n",
+		      qt, qname, len, dlen);
+
+		qr->qir_data = data;
+		qr->qir_name = strdup(qname);
+		if (qr->qir_name == NULL) {
+			logit(1, "cannot allocate qret_t\n");
+			goto badqbuild;
+		}
+
+		data += len;
+		dlen -= len;
+
+		qr->qir_rrtype = (data[0] << 8) | data[1];
+		data += 2;
+		dlen -= 2;
+
+		qr->qir_class = (data[0] << 8) | data[1];
+		data += 2;
+		dlen -= 2;
+
+		switch (qt)
+		{
+		case Q_QUESTION :
+			break;
+		case Q_ANSWER :
+		case Q_NAMESERVER :
+		case Q_ADDITIONAL :
+			qr->qir_ttl = (data[0] << 24) | (data[1] << 16) |
+				      (data[2] << 8) | (data[3]);
+			data += 4;	/* TTL */
+			dlen -= 4;
+
+			rdlen = (data[0] << 8) | data[1];
+			data += 2;
+			dlen -= 2;
+
+			data += rdlen;
+			dlen -= rdlen;
+			break;
+		}
+	}
+
+	return (0);
+
+badqbuild:
+	while ((qr = STAILQ_FIRST(&qip->qi_recs)) != NULL) {
+		STAILQ_REMOVE_HEAD(&qip->qi_recs, qir_next);
+		qrec_free(qr);
+	}
+	return (-1);
 }
 
 
 static action_t
 check_questions(qinfo_t *qip, struct sockaddr_in *sin, char *buffer, int buflen)
 {
-	u_short type, class;
 	ipf_dns_hdr_t *dns;
-	int dlen, len, qc;
-	char qname[1024];
-	u_char *data;
 	action_t rc;
+	qrec_t *qr;
 
 	dns = (ipf_dns_hdr_t *)buffer;
+	rc = Q_NOMATCH;
 
-	qc = ntohs(dns->dns_qdcount);
-	if (qc == 0) {
+	if (ntohs(dns->dns_qdcount) == 0) {
 		logit(1, "no questions, dropping\n");
 		return (Q_BLOCK);
 	}
 
-	data = (u_char *)(dns + 1);
-	dlen = buflen - sizeof(*dns);
-
-	for (rc = Q_NOMATCH; (dlen > 0) && (qc > 0); qc--) {
-		len = get_name(data, dlen, qname, sizeof(qname));
-		if (len == 0) {
-			logit(1, "zero length name, block\n");
-			rc = Q_BLOCK;
-			break;
+	STAILQ_FOREACH(qr, &qip->qi_recs, qir_next) {
+		if ((qr->qir_name == NULL) || (*qr->qir_name == '\0')) {
+			logit(2, "blocking zero-length name for %d/%d\n",
+			      qr->qir_qtype, qr->qir_class);
+/*			rc = Q_BLOCK;*/
+/*			break;*/
 		}
-		logit(3, "question name [%s]\n", qname);
-		rc = allow_query(sin, qname);
-		if (rc != Q_NOMATCH)
-			break;
-		data += len + 1;
-		dlen -= len + 1;
-		add_qname(qip, qname);
 
-		type = (data[0] << 8) | data[1];
-		data += 2;
-		dlen -= 2;
-		if (qip != NULL)
-			add_qtype(qip, type);
-
-		class = (data[0] << 8) | data[1];
-		data += 2;
-		dlen -= 2;
-
-		if (class != C_IN) {	/* C_IN = Internet class */
-			logit(1, "blocking non-Internet class query\n");
+		if (qr->qir_class != C_IN) {
+			logit(2, "blocking non-Internet class(%d/%s) query\n",
+			      qr->qir_class, qr->qir_name);
 			rc = Q_BLOCK;
 			break;
 		}
 	}
 
 	return (rc);
-}
-
-
-static void
-add_qtype(qinfo_t *qip, int type)
-{
-	int i;
-
-	for (i = 0; i < qip->qi_qtcount; i++)
-		if (qip->qi_qtypes[i] == type)
-			return;
-
-	qip->qi_qtcount++;
-
-	if (qip->qi_qtypes == NULL) {
-		qip->qi_qtypes = malloc(sizeof(*qip->qi_qtypes));
-	} else {
-		qip->qi_qtypes = realloc(qip->qi_qtypes, qip->qi_qtcount *
-					 sizeof(*qip->qi_qtypes));
-	}
-
-	qip->qi_qtypes[qip->qi_qtcount - 1] = type;
-	logit(3, "Added question for type %d\n", type);
-}
-
-
-static void
-add_qname(qinfo_t *qip, char *name)
-{
-	int i;
-
-	for (i = 0; i < qip->qi_ncount; i++)
-		if (!strcasecmp(qip->qi_names[i], name) == 0)
-			return;
-
-	qip->qi_ncount++;
-
-	if (qip->qi_names == NULL) {
-		qip->qi_names = malloc(sizeof(*qip->qi_names));
-	} else {
-		qip->qi_names = realloc(qip->qi_names, qip->qi_qtcount *
-					 sizeof(*qip->qi_names));
-	}
-
-	qip->qi_names[qip->qi_ncount - 1] = strdup(name);
-	logit(3, "Added question for name %s\n", name);
 }
 
 
 static action_t
 check_answers(struct sockaddr_in *sin, char *buffer, int buflen)
 {
-	char *data, qname[1024];
-	int dlen, len, qc, ac;
 	ipf_dns_hdr_t *dns;
 	action_t rc;
+	qinfo_t *qip;
+
+	qip = qinfo_alloc();
+	if (qip == NULL)
+		return (Q_BLOCK);
+
+	if (qinfo_build(qip, buffer, buflen) == -1) {
+		logit(2, "qinfo_build failed - blocking\n");
+		rc = Q_BLOCK;
+		goto escapecheckanswers;
+	}
 
 	dns = (ipf_dns_hdr_t *)buffer;
 
-	qc = ntohs(dns->dns_qdcount);
-	data = (char *)(dns + 1);
-	dlen = buflen - sizeof(*dns);
-	/*
-	 * The only way to get to the answers is to go through all
-	 * of the questions first.
-	 */
-	for (; (dlen > 0) && (qc > 0); qc--) {
-		len = get_name(data, dlen, qname, sizeof(qname));
-		data += len;
-		dlen -= len;
-	}
-
-	ac = ntohs(dns->dns_ancount);
-	if (ac == 0) {
+	if (dns->dns_ancount == 0) {
 		logit(1, "no answers, dropping\n");
-		return (Q_BLOCK);
+		rc = Q_BLOCK;
+		goto escapecheckanswers;
 	}
 
-	for (rc = Q_NOMATCH; (dlen > 0) && (qc > 0); qc--) {
-		len = get_name(data, dlen, qname, sizeof(qname));
-		if (len == 0) {
-			logit(1, "zero length name, block\n");
-			return (Q_BLOCK);
-		}
-		logit(3, "answer name [%s]\n", qname);
-		rc = allow_query(sin, qname);
-		if (rc != Q_NOMATCH)
-			break;
-		data += len;
-		dlen -= len;
-	}
-
+	rc = Q_NOMATCH;
+escapecheckanswers:
+	qinfo_free(qip);
 	return (rc);
 }
 
 
-static void
+static server_t *
+server_determine(qinfo_t *qip)
+{
+	fwdlist_t *fl;
+	acllist_t *al;
+	forward_t *f;
+	server_t *s;
+
+	STAILQ_FOREACH(f, &config.c_forwards, f_next) {
+		STAILQ_FOREACH(al, &f->f_acls, acll_next) {
+			if (al->acll_acl == qip->qi_acl)
+				break;
+		}
+
+		/*
+		 * Only stop if we have an ACL match that has a server.
+		 */
+		if ((al != NULL) && (f->f_server != NULL))
+			break;
+	}
+
+	if (f == NULL)
+		return (NULL);
+
+	s = f->f_server;
+
+	fl = f->f_fwdr;
+
+	if (s == CIRCLEQ_LAST(&fl->fl_fwd->fr_servers)) {
+		f->f_fwdr = CIRCLEQ_LOOP_NEXT(&f->f_to, fl, fl_next);
+		f->f_server = CIRCLEQ_FIRST(&fl->fl_fwd->fr_servers);
+	} else {
+		f->f_server = CIRCLEQ_LOOP_NEXT(&fl->fl_fwd->fr_servers, s, s_next);
+	}
+
+	return (s);
+}
+
+
+static query_t *
 add_query(inbound_t *in, int buflen)
 {
-	forward_t *f, **current;
 	ipf_dns_hdr_t *dns;
-	struct ftop *ftop;
-	action_t match;
+	server_t *s;
 	query_t *q;
 	int ok;
 
-	f = NULL;
-
-	match = find_query_forward(&in->i_qinfo, &ftop, &current);
-	switch (match)
-	{
-	case Q_NOMATCH :
-		logit(2, "Using default forwarding hosts\n");
-		ftop = &config.c_forwards;
-		current = &config.c_currentforward;
-		break;
-
-	case Q_ALLOW :
-		if (CIRCLEQ_EMPTY(ftop)) {
-			ftop = &config.c_forwards;
-			current = &config.c_currentforward;
-		}
-		logit(2, "Matched query to forwarder (%d)\n", match);
-		break;
-
-	case Q_REJECT :
-		logit(2, "Query rejected\n");
-		send_reject(in, buflen);
-		return;
-
-	case Q_BLOCK :
-		logit(2, "Query blocked\n");
-		return;
-	}
+	s = NULL;
 
 	q = query_exists(in, buflen);
 	if (q == NULL) {
 		q = calloc(1, sizeof(*q));
 		if (q == NULL) {
 			logit(1, "malloc failed for new query\n");
-			return;
+			return (NULL);
 		}
 		dns = (ipf_dns_hdr_t *)in->i_buffer;
 		q->q_arrived = in;
@@ -646,124 +852,49 @@ add_query(inbound_t *in, int buflen)
 	STAILQ_INSERT_TAIL(&config.c_queries, q, q_next);
 
 	ok = -1;
-
-	if (in->i_transparent == 1) {
+	if (in->i_transparent == 1)
 		ok = get_transparent(in, &q->q_dst);
-		if (ok == 0)
-			f = choose_forward(ftop, current, NULL);
+
+	if (ok == -1) {
+		s = server_determine(&in->i_qinfo);
+		if (s == NULL) {
+			logit(1, "no server for the query\n");
+			free(q);
+			return (NULL);
+		}
+
+		q->q_dst.sin_addr = s->s_ipaddr;
+		q->q_dst.sin_port = htons(53);
+		ok = 0;
 	}
 
-	if (ok == -1)
-		f = choose_forward(ftop, current, &q->q_dst);
+	q->q_dst.sin_family = AF_INET;
+	logit(5, "ok %d s %p\n", ok, s);
 
-	logit(5, "ok %d f %p\n", ok, f);
-
-	if (f != NULL) {
+	if (s != NULL) {
 		/*
 		 * The query id returned here should become a random number
 		 * that is not currently in use.
 		 */
-		q->q_newid = (u_short)(f->f_sends & 0xffff);
+		q->q_newid = (u_short)(s->s_sends & 0xffff);
 		dns->dns_id = q->q_newid;
 		logit(4, "query %d -> %d for %s,%d\n", q->q_origid,
 		      q->q_newid, inet_ntoa(in->i_sender.sin_addr),
 		      ntohs(in->i_sender.sin_port));
-		logit(3, "Query destination %s\n",
-		      inet_ntoa(q->q_dst.sin_addr));
-
-		(void) sendto(config.c_outfd, in->i_buffer, buflen, 0,
-			      (struct sockaddr *)&q->q_dst, sizeof(q->q_dst));
 	}
+
+	ok = sendto(config.c_outfd, in->i_buffer, buflen, 0,
+		    (struct sockaddr *)&q->q_dst, sizeof(q->q_dst));
+	logit(3, "Query destination %s = %d (%d)\n", inet_ntoa(q->q_dst.sin_addr), ok, errno);
+
+	if ((s != NULL) && (ok != buflen))
+		s->s_errors++;
+
+	return (q);
 }
 
 
-static action_t
-find_query_forward(qinfo_t *qi, struct ftop **top, forward_t ***current)
-{
-	action_t act, act2;
-	querymatch_t *qm;
-	int i;
-
-	STAILQ_FOREACH(qm, &config.c_qmatches, qm_next) {
-		logit(3, "Query match: types %d names %d\n",
-			STAILQ_EMPTY(&qm->qm_types) ? 0 : 1,
-			STAILQ_EMPTY(&qm->qm_names) ? 0 : 1);
-
-		act = Q_NOMATCH;
-		for (i = 0; i < qi->qi_qtcount; i++) {
-			if (query_match_type(&qm->qm_types, qi->qi_qtypes[i])) {
-				act = qm->qm_action;
-				break;
-			}
-		}
-
-		if ((act == Q_NOMATCH) && !STAILQ_EMPTY(&qm->qm_types))
-			continue;
-
-		act2 = Q_NOMATCH;
-
-		for (i = 0; i < qi->qi_ncount; i++) {
-			if (query_match_name(&qm->qm_names, qi->qi_names[i])) {
-				act2 = qm->qm_action;
-				break;
-			}
-		}
-
-		logit(3, "Query match act %d act2 %d\n", act, act2);
-
-		if ((act2 != Q_NOMATCH) || STAILQ_EMPTY(&qm->qm_names)) {
-			*top = &qm->qm_forwards;
-			*current = &qm->qm_currentfwd;
-
-			if (act2 == Q_NOMATCH)
-				return (act);
-			return (act2);
-		}
-	}
-
-	return (Q_NOMATCH);
-}
-
-
-static int
-query_match_type(struct qttop *types, int type)
-{
-	qtypelist_t *qt;
-
-	STAILQ_FOREACH(qt, types, qt_next) {
-		logit(2, "Query type match %d =? %d\n", qt->qt_type, type);
-
-		if ((qt->qt_type == type) || (qt->qt_type == 0)) {
-			return (1);
-		}
-	}
-
-	return (0);
-
-}
-
-
-static int
-query_match_name(struct ntop *names, char *name)
-{
-	int namelen;
-	name_t *n;
-
-	namelen = strlen(name);
-	STAILQ_FOREACH(n, names, n_next) {
-		logit(2, "Query name match %s =? %s\n", n->n_name, name);
-
-		if (match_name(n, name, namelen) == 0) {
-			return (1);
-		}
-	}
-
-	return (0);
-
-}
-
-
-static query_t *
+query_t *
 query_exists(inbound_t *in, int buflen)
 {
 	ipf_dns_hdr_t *dns;
@@ -778,42 +909,6 @@ query_exists(inbound_t *in, int buflen)
 	}
 
 	return (NULL);
-}
-
-
-static forward_t *
-choose_forward(struct ftop *ftop, forward_t **currentp, struct sockaddr_in *dst)
-{
-	forward_t *f, *fn;
-
-	f = *currentp;
-	logit(5, "choose_forward(%p,%p,%p) f=%p\n", ftop, currentp, dst, f);
-
-	if (f == NULL) {
-		fn = CIRCLEQ_FIRST(ftop);
-		if (fn == NULL) {
-			logit(1, "no forwarders\n");
-			return (NULL);
-		}
-	} else {
-		fn = CIRCLEQ_LOOP_NEXT(ftop, f, f_next);
-	}
-	*currentp = fn;
-	fn->f_sends++;
-
-	if (dst != NULL) {
-		logit(4, "Found forwarder %s (Use %d)\n",
-		      inet_ntoa(fn->f_ipaddr), fn->f_sends);
-
-		dst->sin_family = AF_INET;
-		dst->sin_addr = fn->f_ipaddr;
-		dst->sin_port = htons(53);
-	} else {
-		logit(4, "Found forwarder %p %s (Use %d) Not Used\n",
-		      fn, inet_ntoa(fn->f_ipaddr), fn->f_sends);
-	}
-
-	return (fn);
 }
 
 
@@ -854,23 +949,34 @@ static void
 add_reply(struct sockaddr_in *sin, char *buffer, int buflen)
 {
 	ipf_dns_hdr_t *dns;
-	forward_t *f;
+	forwarder_t *fr;
+	qinfo_t *qip;
+	server_t *s;
 	query_t *q;
+	int ok;
+
+	if (buflen <= sizeof(ipf_dns_hdr_t))
+		return;
 
 	dns = (ipf_dns_hdr_t *)buffer;
 
-	CIRCLEQ_FOREACH(f, &config.c_forwards, f_next) {
-		if (sin->sin_addr.s_addr == f->f_ipaddr.s_addr)
+	STAILQ_FOREACH(fr, &config.c_forwarders, fr_next) {
+		CIRCLEQ_FOREACH(s, &fr->fr_servers, s_next) {
+			if (sin->sin_addr.s_addr == s->s_ipaddr.s_addr)
+				break;
+		}
+
+		if (s != NULL)
 			break;
 	}
 
-	if (f == NULL) {
+	if (s == NULL) {
 		logit(1, "reply from unknown forwarder %s\n",
 		      inet_ntoa(sin->sin_addr));
 		return;
 	}
 
-	f->f_recvs++;
+	s->s_recvs++;
 
 	q = find_query(sin, buffer, buflen);
 	if (q == NULL) {
@@ -886,7 +992,18 @@ add_reply(struct sockaddr_in *sin, char *buffer, int buflen)
 		return;
 	}
 
-	switch (check_questions(NULL, &q->q_src, buffer, buflen))
+	qip = qinfo_alloc();
+	if (qip == NULL) {
+		logit(1, "cannot allocate memory for qinfo_t, blocking\n");
+		return;
+	}
+	if (qinfo_build(qip, buffer, buflen) == -1) {
+		logit(2, "qinfo_build failed - blocking\n");
+		qinfo_free(qip);
+		return;
+	}
+
+	switch (check_questions(qip, &q->q_src, buffer, buflen))
 	{
 	case Q_BLOCK :
 	case Q_REJECT :
@@ -908,8 +1025,11 @@ add_reply(struct sockaddr_in *sin, char *buffer, int buflen)
 
 	dns->dns_id = q->q_origid;
 
-	(void) sendto(q->q_arrived->i_fd, buffer, buflen, 0,
-		      (struct sockaddr *)&q->q_src, sizeof(q->q_src));
+	ok = sendto(q->q_arrived->i_fd, buffer, buflen, 0,
+		    (struct sockaddr *)&q->q_src, sizeof(q->q_src));
+
+	if (ok != buflen)
+		q->q_arrived->i_errors++;
 
 	STAILQ_REMOVE(&config.c_queries, q, query, q_next);
 	free(q);
@@ -1032,7 +1152,7 @@ dump_status(int info)
  * -1 = didn't match
  */
 static int
-match_name(name_t *n, char *query, int qlen)
+name_match(name_t *n, char *query, int qlen)
 {
 	char *base;
 	int blen;
@@ -1042,6 +1162,9 @@ match_name(name_t *n, char *query, int qlen)
 
 	if (blen > qlen)
 		return (1);
+
+	if (blen == 1 && *base == '*')
+		return (0);
 
 	if (blen == qlen) {
 		if (strncasecmp(base, query, qlen) == 0)
@@ -1069,32 +1192,12 @@ match_name(name_t *n, char *query, int qlen)
 	return (-1);
 }
 
-/*
- * Tries to match the base string (in our ACL) with the query from a packet.
- */
-static action_t
-match_names(domain_t *d, char *query, int qlen)
-{
-	name_t *n;
-
-	STAILQ_FOREACH(n, &d->d_names, n_next) {
-		switch (match_name(n, query, qlen))
-		{
-		case 0 :
-			return 0;
-		default :
-			break;
-		}
-	}
-	return (1);
-}
-
 
 static int
-get_name(void *start, int len, void *buffer, int buflen)
+get_name(void *base, void *start, int len, void *buffer, int buflen)
 {
-	u_char *s, *t, clen;
-	int slen, blen;
+	u_char *s, *t, clen, *from;
+	int slen, blen, pos;
 
 	s = (u_char *)start;
 	t = (u_char *)buffer;
@@ -1112,60 +1215,68 @@ get_name(void *start, int len, void *buffer, int buflen)
 		return (0);
 	}
 
+	if (*s == '\0') {
+		snprintf(buffer, buflen, ".");
+		return (1);
+	}
+
 	while (*s != '\0') {
 		clen = *s;
-		logit(8, "clen = %d\n", clen);
-		if ((clen & 0xc0) == 0xc0) {	/* Doesn't do compression */
-			logit(5, "compressed name (%x)\n", clen);
-			return (0);
-		}
+		logit(8, "clen %d slen %d blen %d\n", clen, slen, blen);
 
-		if (clen > slen) {
-			logit(4, "name too long (%d vs %d)\n", clen, slen);
-			return (0);	/* Does the name run off the end? */
-		}
+		if ((clen & 0xc0) == 0xc0) {
+			if (slen < 2) {
+				logit(3, "not enough room for compression\n");
+				return (0);
+			}
+			pos = ((s[0] & 0x3f) << 8) | s[1];
 
-		if ((clen + 1) > blen) {
-			logit(4, "buffer too small (%d vs %d)\n", clen, blen);
-			return (0);	/* Enough room for name+.? */
-		}
+			logit(5, "compressed name (%d)\n", pos);
 
-		s++;
-		bcopy(s, t, clen);
+			if (pos > (u_char *)start - (u_char *)base + len) {
+				logit(3, "name beyond end of packet\n");
+				return (0);
+			}
+
+			from = (u_char *)base + pos;
+			clen = *(from + 1);
+			s += 2;
+			slen -= 2;
+			(void) get_name(base, from,
+				        len - ((char *)from - (char *)start),
+				        t, blen);
+			return (2);
+		} else {
+			if (clen > slen) {
+				logit(4, "name too long (%d vs %d)\n",
+				      clen, slen);
+				/* Does the name run off the end? */
+				return (0);
+			}
+
+			if ((clen + 1) > blen) {
+				logit(4, "buffer too small (%d vs %d)\n",
+				      clen, blen);
+				return (0);	/* Enough room for name+.? */
+			}
+
+			s++;
+			from = s;
+			s += clen;
+			slen -= clen;
+		}
+		bcopy(from, t, clen);
 		t += clen;
-		s += clen;
 		*t++ = '.';
-		slen -= clen;
 		blen -= (clen + 1);
 	}
 
+	/*
+	 * Most include the trailing \0! in space we've looked at.
+	 */
+	s++;
 	*(t - 1) = '\0';
 	return (s - (u_char *)start);
-}
-
-
-static action_t
-allow_query(struct sockaddr_in *sin, char *qname)
-{
-	hostlist_t *h;
-	domain_t *d;
-	acl_t *a;
-	int len;
-
-	len = strlen(qname);
-
-	STAILQ_FOREACH(a, &config.c_acls, acl_next) {
-		STAILQ_FOREACH(h, &a->acl_hosts, hl_next) {
-			if ((sin->sin_addr.s_addr & h->hl_mask.s_addr) !=
-			    h->hl_ipaddr.s_addr)
-				continue;
-			STAILQ_FOREACH(d, &a->acl_domains, d_next) {
-				if (match_names(d, qname, len) == 0)
-					return (d->d_pass);
-			}
-		}
-	}
-	return (Q_NOMATCH);
 }
 
 
