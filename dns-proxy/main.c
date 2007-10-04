@@ -61,6 +61,7 @@ static void	handle_term(int info);
 static void	init_ipf(void);
 static void	init_signals();
 static void	make_background();
+static	void	modify_apply(modify_t *m, qinfo_t *qip, qrec_t *qr);
 static void	modify_packet(qinfo_t *qip);
 static int	name_match(name_t *n, char *query, int qlen);
 static void	process_packets(void);
@@ -1147,55 +1148,62 @@ modify_packet(qinfo_t *qip)
 			 */
 			qr->qir_qtype = Q_QUESTION;
 		}
-		STAILQ_FOREACH(m, &config.c_modifies, m_next) {
-			if (m->m_type != qr->qir_qtype)
-				continue;
-			STAILQ_FOREACH(a, &m->m_acls, acll_next) {
-				if ((a->acll_acl == NULL) ||
-				    (a->acll_acl == qip->qi_acl))
-					break;
-			}
+	}
 
-			if (a != NULL)
-				break;
-		}
-
-		if (m != NULL) {
-			if (m->m_keep[qr->qir_rrtype]) {
-				;
-			} else if (m->m_clean[qr->qir_rrtype]) {
-				if (qr->qir_rdlen > 0) {
-					memset(qr->qir_rdata, 0,
-					       qr->qir_rdlen);;
+	STAILQ_FOREACH(m, &config.c_modifies, m_next) {
+		STAILQ_FOREACH(qr, &qip->qi_recs, qir_next) {
+			if (m->m_type == qr->qir_qtype) {
+				STAILQ_FOREACH(a, &m->m_acls, acll_next) {
+					if ((a->acll_acl == NULL) ||
+					    (a->acll_acl == qip->qi_acl))
+						break;
 				}
-				if ((*qr->qir_data & 0xc0) == 0xc0) {
-					/* Point at last byte in packet */
-					;
-				} else {
-					memset(qr->qir_data + 1, 0,
-					       *qr->qir_data);
-					memset(qr->qir_name, 0,
-					       strlen(qr->qir_name));
-				}
-			} else if (m->m_strip[qr->qir_rrtype]) {
-				;
-			}
 
-			switch (m->m_recursion)
-			{
-			case M_DISABLE :
-				dns->dns_ctlword &= htons(0xfe7f);
-				break;
-			case M_PRESERVE :
-				break;
-			case M_ENABLE :
-				dns->dns_ctlword |= htons(0x0100);
-				break;
+				if (a != NULL)
+					modify_apply(m, qip, qr);
 			}
 		}
 	}
 }
 
+
+void
+modify_apply(modify_t *m, qinfo_t *qip, qrec_t *qr)
+{
+	dns_hdr_t *dns = qip->qi_dns;
+
+	switch (m->m_recursion)
+	{
+	case M_DISABLE :
+		dns->dns_ctlword &= htons(0xfe7f);
+		break;
+	case M_PRESERVE :
+		break;
+	case M_ENABLE :
+		dns->dns_ctlword |= htons(0x0100);
+		break;
+	}
+
+	if (m->m_keep[qr->qir_rrtype]) {
+		;
+	} else if (m->m_clean[qr->qir_rrtype]) {
+		if (qr->qir_rdlen > 0) {
+			memset(qr->qir_rdata, 0,
+			       qr->qir_rdlen);;
+		}
+		if ((*qr->qir_data & 0xc0) == 0xc0) {
+			/* Find a \0 to point to */
+			;
+		} else {
+			memset(qr->qir_data + 1, 0,
+			       *qr->qir_data);
+			memset(qr->qir_name, 0,
+			       strlen(qr->qir_name));
+		}
+	} else if (m->m_strip[qr->qir_rrtype]) {
+		;
+	}
+}
 
 void
 logit(int level, char *string, ...)
