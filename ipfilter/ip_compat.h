@@ -170,6 +170,8 @@ struct file;
 # endif
 # ifndef _KERNEL
 #  include "radix_ipf.h"
+# else
+#  include "radix_ipf_local.h"
 # endif
 # include <inet/ip.h>
 # undef COPYOUT

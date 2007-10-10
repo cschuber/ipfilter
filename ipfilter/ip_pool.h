@@ -16,7 +16,7 @@ extern void rn_freehead __P((struct radix_node_head *));
 # define FreeS(p, z)		KFREES(p, z)
 extern int max_keylen;
 #else
-# if defined(__osf__) || defined(__hpux)
+# if defined(__osf__) || defined(__hpux) || defined(sun)
 #  include "radix_ipf_local.h"
 #  define radix_mask ipf_radix_mask
 #  define radix_node ipf_radix_node

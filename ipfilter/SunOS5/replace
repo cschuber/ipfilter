@@ -127,4 +127,11 @@ if [[ -z ${small} && -z ${big} ]] ; then
 	update /usr/lib/ipf :${small} ipftest
 	update /usr/kernel/drv :${small} ipf
 fi
+
+cpudir=..
+for i in ip_compat.h ip_fil.h ipl.h ip_nat.h ip_state.h ip_sync.h ip_scan.h \
+	 ip_pool.h ip_lookup.h; do
+	update /usr/include/netinet : $i
+	update /usr/sfw/lib/gcc/i386-pc-solaris2.10/3.4.3/include/netinet/ : $i
+done
 exit 0
