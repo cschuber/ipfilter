@@ -82,17 +82,11 @@ static const char rcsid[] = "@(#)$Id$";
 #endif
 
 #ifdef IPFILTER_LOOKUP
-
-# ifndef _KERNEL
+# if !defined(RADIX_NODE_HEAD_LOCK) || !defined(RADIX_NODE_HEAD_UNLOCK) || \
+     !defined(_KERNEL)
 #  undef RADIX_NODE_HEAD_LOCK
 #  undef RADIX_NODE_HEAD_UNLOCK
 #  define RADIX_NODE_HEAD_LOCK(x)	;
-#  define RADIX_NODE_HEAD_UNLOCK(x)	;
-# endif
-# ifndef RADIX_NODE_HEAD_LOCK
-#  define RADIX_NODE_HEAD_LOCK(x)	;
-# endif
-# ifndef RADIX_NODE_HEAD_UNLOCK
 #  define RADIX_NODE_HEAD_UNLOCK(x)	;
 # endif
 
