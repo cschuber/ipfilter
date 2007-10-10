@@ -7212,7 +7212,6 @@ void *ctx;
 		error = ipf_genericiter(data, uid, ctx);
 		SPL_X(s);
 		break;
-		break;
 
 	case SIOCIPFDELTOK :
 		SPL_SCHED(s);
@@ -7220,7 +7219,6 @@ void *ctx;
 		if (error == 0)
 			error = ipf_deltoken(tmp, uid, ctx);
 		SPL_X(s);
-		break;
 		break;
 
 	default :
