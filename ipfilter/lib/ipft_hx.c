@@ -18,7 +18,7 @@ extern	int	opts;
 
 static	int	hex_open __P((char *));
 static	int	hex_close __P((void));
-static	int	hex_readip __P((char *, int, char **, int *));
+static	int	hex_readip __P((mb_t *, char **, int *));
 static	char	*readhex __P((char *, char *));
 
 struct	ipread	iphex = { hex_open, hex_close, hex_readip, 0 };
@@ -54,14 +54,19 @@ static	int	hex_close()
 }
 
 
-static	int	hex_readip(buf, cnt, ifn, dir)
-char	*buf, **ifn;
-int	cnt, *dir;
+static	int	hex_readip(mb, ifn, dir)
+mb_t	*mb;
+char	**ifn;
+int	*dir;
 {
 	register char *s, *t, *u;
 	char	line[513];
 	ip_t	*ip;
+	char	*buf;
+	int	cnt;
 
+	buf = (char *)mb->mb_buf;
+	cnt = sizeof(mb->mb_buf);
 	/*
 	 * interpret start of line as possibly "[ifname]" or
 	 * "[in/out,ifname]".

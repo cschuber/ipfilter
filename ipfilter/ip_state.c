@@ -1055,6 +1055,11 @@ ipf_state_add(fin, stsave, flags)
 		hv += is->is_src.i6[3];
 	}
 #endif
+	if ((fin->fin_v == 4) &&
+	    (fin->fin_flx & (FI_MULTICAST|FI_BROADCAST|FI_MBCAST))) {
+		flags |= SI_W_DADDR;
+		hv -= is->is_daddr;
+	}
 
 	switch (is->is_p)
 	{
@@ -1109,6 +1114,16 @@ ipf_state_add(fin, stsave, flags)
 		}
 		break;
 #endif
+	if ((fin->fin_v == 4) &&
+	    (fin->fin_flx & (FI_MULTICAST|FI_BROADCAST|FI_MBCAST))) {
+		if (fin->fin_out == 0) {
+			flags |= SI_W_DADDR|SI_CLONE;
+			hv -= is->is_daddr;
+		} else {
+			flags |= SI_W_SADDR|SI_CLONE;
+			hv -= is->is_saddr;
+		}
+	}
 
 	case IPPROTO_TCP :
 		tcp = fin->fin_dp;
@@ -2538,6 +2553,11 @@ ipf_state_lookup(fin, tcp, ifqp)
 		}
 	}
 #endif
+	if ((v == 4) &&
+ 	    (fin->fin_flx & (FI_MULTICAST|FI_BROADCAST|FI_MBCAST))) {
+ 		hv -= dst.in4.s_addr;
+ 	}
+
 	/* TRACE fin_saddr, fin_daddr, hv */
 
 	/*
@@ -2620,6 +2640,14 @@ icmp6again:
 			return is;
 		break;
 #endif
+	if ((v == 4) &&
+	    (fin->fin_flx & (FI_MULTICAST|FI_BROADCAST|FI_MBCAST))) {
+		if (fin->fin_out == 0) {
+			hv -= src.in4.s_addr;
+		} else {
+			hv -= dst.in4.s_addr;
+		}
+	}
 
 	case IPPROTO_ICMP :
 		if (v == 4) {
@@ -2690,13 +2718,32 @@ retry_tcpudp:
 			break;
 		}
 		RWLOCK_EXIT(&ipf_state);
-
-		if (!tryagain && ipf_state_stats.iss_wild) {
-			hv -= dport;
-			hv -= sport;
-			tryagain = 1;
-			WRITE_ENTER(&ipf_state);
-			goto retry_tcpudp;
+  
+		if (ipf_state_stats.iss_wild) {
+			if (tryagain == 0) {
+				hv -= dport;
+				hv -= sport;
+			} else if (tryagain == 1) {
+				hv = fin->fin_fi.fi_p;
+				/*
+				 * If we try to pretend this is a reply to a
+				 * multicast/broadcast packet then we need to
+				 * exclude part of the address from the hash
+				 * calculation.
+				 */
+				if (fin->fin_out == 0) {
+					hv += src.in4.s_addr;
+				} else {
+					hv += dst.in4.s_addr;
+				}
+				hv += dport;
+				hv += sport;
+			}
+			tryagain++;
+			if (tryagain <= 2) {
+				WRITE_ENTER(&ipf_state);
+				goto retry_tcpudp;
+			}
 		}
 		fin->fin_flx |= oow;
 		break;
@@ -4280,7 +4327,6 @@ ipf_stateiter(token, itp)
 	ipfgeniter_t *itp;
 {
 	ipstate_t *is, *next, zero;
-	ipftoken_t *freet;
 	int error, count;
 	char *dst;
 
@@ -4301,13 +4347,11 @@ ipf_stateiter(token, itp)
 
 	is = token->ipt_data;
 	if (is == (void *)-1) {
-		ipf_freetoken(token);
 		ipf_interror = 100029;
 		return ESRCH;
 	}
 
 	error = 0;
-	freet = NULL;
 	dst = itp->igi_data;
 
 	READ_ENTER(&ipf_state);
@@ -4329,22 +4373,15 @@ ipf_stateiter(token, itp)
 				MUTEX_ENTER(&next->is_lock);
 				next->is_ref++;
 				MUTEX_EXIT(&next->is_lock);
+				token->ipt_data = next;
 			}
 		} else {
 			bzero(&zero, sizeof(zero));
 			next = &zero;
-			freet = token;
 			count = 1;
+			token->ipt_data = NULL;
 		}
 		RWLOCK_EXIT(&ipf_state);
-
-		/*
-		 * If we had a prior pointer to a state entry, release it.
-		 */
-		if (freet != NULL) {
-			ipf_freetoken(freet);
-			freet = NULL;
-		}
 
 		/*
 		 * This should arguably be via ipf_outobj() so that the state
@@ -4359,11 +4396,14 @@ ipf_stateiter(token, itp)
 			break;
 
 		dst += sizeof(*next);
+		count--;
 
 		READ_ENTER(&ipf_state);
-		is = next;
-		next = is->is_next;
-		count--;
+		next = next->is_next;
+	}
+
+	if (is != NULL) {
+		ipf_state_deref(&is);
 	}
 
 	return error;

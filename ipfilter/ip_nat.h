@@ -510,6 +510,7 @@ typedef	struct	natstat	{
 	u_32_t		ns_ticks;
 	u_int		ns_trpntab_sz;
 	u_int		ns_wilds;
+	u_long		ns_proto[256];
 	nat_stat_side_t	ns_side[2];
 } natstat_t;
 
@@ -535,6 +536,7 @@ typedef	struct	natlog {
 
 #define	NL_NEW		0
 #define	NL_CLONE	1
+#define	NL_DESTROY	0xfffd
 #define	NL_FLUSH	0xfffe
 #define	NL_EXPIRE	0xffff
 
@@ -588,6 +590,7 @@ extern	void	ipf_fix_outcksum __P((fr_info_t *, u_short *, u_32_t));
 
 extern	int	ipf_nat_checkin __P((fr_info_t *, u_32_t *));
 extern	int	ipf_nat_checkout __P((fr_info_t *, u_32_t *));
+extern	void	ipf_nat_delete __P((struct nat *, int));
 extern	void	ipf_nat_deref __P((nat_t **));
 extern	void	ipf_nat_expire __P((void));
 extern	void	ipf_nat_hostmapdel __P((hostmap_t **));
@@ -626,5 +629,6 @@ extern	int	ipf_nat_in __P((fr_info_t *, nat_t *, int, u_32_t));
 extern	int	ipf_nat_out __P((fr_info_t *, nat_t *, int, u_32_t));
 extern	void	ipf_nat_sync __P((void *));
 extern	void	ipf_nat_rulederef __P((ipnat_t **));
+
 
 #endif /* __IP_NAT_H__ */

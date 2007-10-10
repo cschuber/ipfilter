@@ -42,7 +42,7 @@ static	struct	llc	llcs[SDL_MAX+1] = {
 
 static	int	snoop_open __P((char *));
 static	int	snoop_close __P((void));
-static	int	snoop_readip __P((char *, int, char **, int *));
+static	int	snoop_readip __P((mb_t *, char **, int *));
 
 static	int	sfd = -1, s_type = -1;
 static	int	snoop_read_rec __P((struct snooppkt *));
@@ -151,15 +151,21 @@ int	cnt;
 /*
  * return only an IP packet read into buf
  */
-static	int	snoop_readip(buf, cnt, ifn, dir)
-char	*buf, **ifn;
-int	cnt, *dir;
+static	int	snoop_readip(mb, ifn, dir)
+mb_t	*mb;
+char	**ifn;
+int	*dir;
 {
 	static	char	*bufp = NULL;
 	struct	snooppkt rec;
 	struct	llc	*l;
 	char	ty[4], *s;
 	int	i, n;
+	char	*buf;
+	int	cnt;
+
+	buf = (char *)mb->mb_buf;
+	cnt = sizeof(mb->mb_buf);
 
 	do {
 		if ((i = snoop_read_rec(&rec)) <= 0)

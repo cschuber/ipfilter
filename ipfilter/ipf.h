@@ -347,6 +347,9 @@ extern void set_variable __P((char *, char *));
 extern char *get_variable __P((char *, char **, int));
 extern void resetlexer __P((void));
 
+extern void debug __P((char *, ...));
+extern void verbose __P((char *, ...));
+
 #if SOLARIS
 extern int gethostname __P((char *, int ));
 extern void sync __P((void));

@@ -197,7 +197,6 @@ static	void	ipf_nat_addrdr __P((struct ipnat *));
 static	int	ipf_nat_builddivertmp __P((ipnat_t *));
 static	int	ipf_nat_clearlist __P((void));
 static	int	ipf_nat_decap __P((fr_info_t *, nat_t *));
-static	void	ipf_nat_delete __P((struct nat *, int));
 static	void	ipf_nat_delnat __P((struct ipnat *));
 static	void	ipf_nat_delrdr __P((struct ipnat *));
 static	void	ipf_nat_delrule __P((struct ipnat *));
@@ -1882,12 +1881,12 @@ junkput:
 /* Delete a nat entry from the various lists and table.  If NAT logging is  */
 /* enabled then generate a NAT log record for this event.                   */
 /* ------------------------------------------------------------------------ */
-static void
+void
 ipf_nat_delete(nat, logtype)
 	struct nat *nat;
 	int logtype;
 {
-	int madeorphan = 0, bkt;
+	int madeorphan = 0, bkt, removed = 0;
 	struct ipnat *ipn;
 
 	if (logtype != 0 && ipf_nat_logging != 0)
@@ -1898,6 +1897,8 @@ ipf_nat_delete(nat, logtype)
 	 * nat_pnext is set.
 	 */
 	if (nat->nat_pnext != NULL) {
+		removed = 1;
+
 		bkt = nat->nat_hv[0];
 		ipf_nat_stats.ns_side[0].ns_bucketlen[bkt]--;
 		if (ipf_nat_stats.ns_side[0].ns_bucketlen[bkt] == 0) {
@@ -1948,7 +1949,20 @@ ipf_nat_delete(nat, logtype)
 		ipf_nat_stats.ns_expire++;
 
 	MUTEX_ENTER(&nat->nat_lock);
-	if (nat->nat_ref > 1) {
+	/*
+	 * NL_DESTROY should only be passed in when we've got nat_ref >= 2.
+	 * This happens when a nat'd packet is blocked and we want to throw
+	 * away the NAT session.
+	 */
+	if (logtype == NL_DESTROY) {
+		if (nat->nat_ref > 2) {
+			nat->nat_ref -= 2;
+			MUTEX_EXIT(&nat->nat_lock);
+			if (removed)
+				ipf_nat_stats.ns_orphans++;
+			return;
+		}
+	} else if (nat->nat_ref > 1) {
 		nat->nat_ref--;
 		MUTEX_EXIT(&nat->nat_lock);
 		if (madeorphan == 1)
@@ -1965,6 +1979,9 @@ ipf_nat_delete(nat, logtype)
 	/*
 	 * At this point, nat_ref can be either 0 or -1
 	 */
+	if (nat->nat_flags & SI_WILDP)
+		ipf_nat_stats.ns_wilds--;
+	ipf_nat_stats.ns_proto[nat->nat_pr[0]]--;
 
 #ifdef	IPFILTER_SYNC
 	if (nat->nat_sync)
@@ -2733,6 +2750,8 @@ ipf_nat_add(fin, np, natsave, flags, direction)
 
 	if (flags & SI_WILDP)
 		ipf_nat_stats.ns_wilds++;
+	ipf_nat_stats.ns_proto[nat->nat_pr[0]]++;
+
 	goto done;
 badnat:
 	ipf_nat_stats.ns_side[fin->fin_out].ns_badnatnew++;

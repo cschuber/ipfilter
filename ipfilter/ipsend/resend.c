@@ -36,7 +36,6 @@ static const char rcsid[] = "@(#)$Id$";
 
 extern	int	opts;
 
-static	u_char	pbuf[65536];	/* 1 big packet */
 void	dumppacket __P((ip_t *));
 
 
@@ -81,6 +80,7 @@ char	*datain;
 	char	dhost[6];
 	ip_t	*ip;
 	int	fd, wfd = initdevice(dev, 5), len, i;
+	mb_t	mb;
 
 	if (wfd == -1)
 		return -1;
@@ -93,7 +93,7 @@ char	*datain;
 	if (fd < 0)
 		exit(-1);
 
-	ip = (struct ip *)pbuf;
+	ip = (struct ip *)mb.mb_buf;
 	eh = (ether_header_t *)malloc(sizeof(*eh));
 	if(!eh)
 	    {
@@ -109,7 +109,7 @@ char	*datain;
 		return -2;
 	    }
 
-	while ((i = (*r->r_readip)((char *)pbuf, sizeof(pbuf), NULL, NULL)) > 0)
+	while ((i = (*r->r_readip)(&mb, NULL, NULL)) > 0)
 	    {
 		if (!(opts & OPT_RAW)) {
 			len = ntohs(ip->ip_len);
@@ -131,7 +131,7 @@ char	*datain;
 			len += sizeof(*eh);
 			dumppacket(ip);
 		} else {
-			eh = (ether_header_t *)pbuf;
+			eh = (ether_header_t *)mb.mb_buf;
 			len = i;
 		}
 

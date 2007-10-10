@@ -36,7 +36,7 @@ static const char rcsid[] = "@(#)$Id$";
 
 static	int	etherf_open __P((char *));
 static	int	etherf_close __P((void));
-static	int	etherf_readip __P((char *, int, char **, int *));
+static	int	etherf_readip __P((mb_t *, char **, int *));
 
 struct	ipread	etherf = { etherf_open, etherf_close, etherf_readip, 0 };
 
@@ -67,15 +67,21 @@ static	int	etherf_close()
 }
 
 
-static	int	etherf_readip(buf, cnt, ifn, dir)
-char	*buf, **ifn;
-int	cnt, *dir;
+static	int	etherf_readip(mb, ifn, dir)
+mb_t	*mb;
+char	**ifn;
+int	*dir;
 {
 	struct	tcpiphdr pkt;
 	ip_t	*ip = (ip_t *)&pkt;
 	char	src[16], dst[16], sprt[16], dprt[16];
 	char	lbuf[128], len[8], prot[8], time[8], *s;
 	int	slen, extra = 0, i;
+	char	*buf;
+	int	cnt;
+
+	buf = (char *)mb->mb_buf;
+	cnt = sizeof(mb->mb_buf);
 
 	if (!fgets(lbuf, sizeof(lbuf) - 1, efp))
 		return 0;

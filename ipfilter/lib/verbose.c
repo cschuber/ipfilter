@@ -13,7 +13,7 @@
 #endif
 #include <stdio.h>
 
-#include "ipt.h"
+#include "ipf.h"
 #include "opts.h"
 
 

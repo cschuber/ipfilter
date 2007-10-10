@@ -286,9 +286,10 @@ typedef	struct	fr_ip	{
 #define	FI_WITH		0x5effe	/* Not FI_TCPUDP */
 #define	FI_V6EXTHDR	0x10000
 #define	FI_COALESCE	0x20000
-#define	FI_AH		0x40000	/* AH header present */
+#define	FI_NEWNAT	0x40000
 #define	FI_ICMPQUERY	0x80000
 #define	FI_ENCAP	0x100000	/* encap/decap with NAT */
+#define	FI_AH		0x200000	/* AH header present */
 #define	FI_NOCKSUM	0x20000000	/* don't do a L4 checksum validation */
 #define	FI_DONTCACHE	0x40000000	/* don't cache the result */
 #define	FI_IGNORE	0x80000000
@@ -1478,6 +1479,13 @@ extern	int	ipfioctl __P((dev_t, int, caddr_t, int));
 #   endif /* (_BSDI_VERSION >= 199510) */
 #  endif /* __ sgi */
 # endif /* MENTAT */
+
+# if defined(__FreeBSD_version)
+extern	int	ipf_pfil_hook __P((void));
+extern	int	ipf_pfil_unhook __P((void));
+extern	void	ipf_event_reg __P((void));
+extern	void	ipf_event_dereg __P((void));
+# endif
 
 #endif /* #ifndef _KERNEL */
 

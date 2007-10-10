@@ -45,7 +45,7 @@ static const char rcsid[] = "@(#)$Id$";
 
 static	int	tcpd_open __P((char *));
 static	int	tcpd_close __P((void));
-static	int	tcpd_readip __P((char *, int, char **, int *));
+static	int	tcpd_readip __P((mb_t *, char **, int *));
 static	int	count_dots __P((char *));
 
 struct	ipread	tcpd = { tcpd_open, tcpd_close, tcpd_readip, 0 };
@@ -90,15 +90,21 @@ char	*str;
 }
 
 
-static	int	tcpd_readip(buf, cnt, ifn, dir)
-char	*buf, **ifn;
-int	cnt, *dir;
+static	int	tcpd_readip(mb, ifn, dir)
+mb_t	*mb;
+char	**ifn;
+int	*dir;
 {
 	struct	tcpiphdr pkt;
 	ip_t	*ip = (ip_t *)&pkt;
 	char	src[32], dst[32], misc[256], time[32], link1[32], link2[32];
 	char	lbuf[160], *s;
 	int	n, slen, extra = 0;
+	char	*buf;
+	int	cnt;
+
+	buf = (char *)mb->mb_buf;
+	cnt = sizeof(mb->mb_buf);
 
 	if (!fgets(lbuf, sizeof(lbuf) - 1, tfp))
 		return 0;

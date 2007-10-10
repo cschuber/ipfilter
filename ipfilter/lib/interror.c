@@ -15,7 +15,7 @@ typedef	struct	{
 	char	*iee_text;
 } ipf_error_entry_t;
 
-#define	IPF_NUM_ERRORS	345
+#define	IPF_NUM_ERRORS	350
 
 /*
  * NO REUSE OF NUMBERS!
@@ -309,6 +309,10 @@ log" },
 	{	70007,	"could not malloc memory for new pool" },
 	{	70008,	"could not allocate radix tree for new pool" },
 	{	70009,	"could not find pool" },
+	{	70010,	"unknown pool name for iteration" },
+	{	70011,	"unknown pool iterator" },
+	{	70012,	"error copying out pool head" },
+	{	70013,	"error copying out pool node" },
 /* -------------------------------------------------------------------------- */
 	{	80001,	"could not find proxy" },
 	{	80002,	"proxy does not support control operations" },

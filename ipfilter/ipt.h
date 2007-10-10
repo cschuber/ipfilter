@@ -24,14 +24,11 @@
 struct	ipread	{
 	int	(*r_open) __P((char *));
 	int	(*r_close) __P((void));
-	int	(*r_readip) __P((char *, int, char **, int *));
+	int	(*r_readip) __P((mb_t *, char **, int *));
 	int	r_flags;
 };
 
 #define	R_DO_CKSUM	0x01
-
-extern	void	debug __P((char *, ...));
-extern	void	verbose __P((char *, ...));
 
 #ifdef P_DEF
 # undef	__P

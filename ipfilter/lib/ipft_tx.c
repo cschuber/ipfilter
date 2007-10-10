@@ -26,7 +26,7 @@ extern	int	opts;
 static	char	*tx_proto = "";
 
 static	int	text_open __P((char *)), text_close __P((void));
-static	int	text_readip __P((char *, int, char **, int *));
+static	int	text_readip __P((mb_t *, char **, int *));
 static	int	parseline __P((char *, ip_t *, char **, int *));
 
 static	char	myflagset[] = "FSRPAUEC";
@@ -121,13 +121,19 @@ static	int	text_close()
 }
 
 
-static	int	text_readip(buf, cnt, ifn, dir)
-char	*buf, **ifn;
-int	cnt, *dir;
+static	int	text_readip(mb, ifn, dir)
+mb_t	*mb;
+char	**ifn;
+int	*dir;
 {
 	register char *s;
 	char	line[513];
 	ip_t	*ip;
+	char	*buf;
+	int	cnt;
+
+	buf = (char *)mb->mb_buf;
+	cnt = sizeof(mb->mb_buf);
 
 	*ifn = NULL;
 	while (fgets(line, sizeof(line)-1, tfp)) {

@@ -211,8 +211,7 @@ char *argv[];
 		exit(-1);
 
 	m->m_data = (char *)m->mb_buf;
-	while ((i = (*r->r_readip)(MTOD(m, char *), sizeof(m->mb_buf),
-				    &iface, &dir)) > 0) {
+	while ((i = (*r->r_readip)(m, &iface, &dir)) > 0) {
 
 		if ((iface == NULL) || (*iface == '\0'))
 			iface = ifname;

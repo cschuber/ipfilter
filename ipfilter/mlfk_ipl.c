@@ -226,6 +226,11 @@ ipf_modload()
 		ipf_devs[i] = make_dev(&ipf_cdevsw, i, 0, 0, 0600, c);
 	}
 
+	error = ipf_pfil_hook();
+	if (error != 0)
+		return error;
+	ipf_event_reg();
+
 	if (FR_ISPASS(ipf_pass))
 		defpass = "pass";
 	else if (FR_ISBLOCK(ipf_pass))

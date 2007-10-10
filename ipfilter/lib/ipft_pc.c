@@ -71,7 +71,7 @@ static	struct	llc	llcs[] = {
 
 static	int	pcap_open __P((char *));
 static	int	pcap_close __P((void));
-static	int	pcap_readip __P((char *, int, char **, int *));
+static	int	pcap_readip __P((mb_t *, char **, int *));
 static	void	swap_hdr __P((pcaphdr_t *));
 static	int	pcap_read_rec __P((struct pcap_pkthdr *));
 
@@ -225,16 +225,21 @@ int	cnt;
 /*
  * return only an IP packet read into buf
  */
-static	int	pcap_readip(buf, cnt, ifn, dir)
-char	*buf, **ifn;
-int	cnt, *dir;
+static	int	pcap_readip(mb, ifn, dir)
+mb_t	*mb;
+char	**ifn;
+int	*dir;
 {
 	static	char	*bufp = NULL;
 	struct	pcap_pkthdr rec;
 	struct	llc	*l;
 	char	*s, ty[4];
 	int	i, j, n;
+	char	*buf;
+	int	cnt;
 
+	buf = (char *)mb->mb_buf;
+	cnt = sizeof(mb->mb_buf);
 	l = llcp;
 
 	/* do { */

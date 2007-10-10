@@ -623,11 +623,11 @@ ipf_htable_getnext(token, ilp)
 
 		if (nextiph != NULL) {
 			ATOMIC_INC(nextiph->iph_ref);
-			if (nextiph->iph_next == NULL)
-				token->ipt_alive = 0;
+			token->ipt_data = nextiph;
 		} else {
 			bzero((char *)&zp, sizeof(zp));
 			nextiph = &zp;
+			token->ipt_data = NULL;
 		}
 		break;
 
@@ -647,11 +647,11 @@ ipf_htable_getnext(token, ilp)
 
 		if (nextnode != NULL) {
 			ATOMIC_INC(nextnode->ipe_ref);
-			if (nextnode->ipe_next == NULL)
-				token->ipt_alive = 0;
+			token->ipt_data = nextnode;
 		} else {
 			bzero((char *)&zn, sizeof(zn));
 			nextnode = &zn;
+			token->ipt_data = NULL;
 		}
 		break;
 	default :
@@ -673,7 +673,6 @@ ipf_htable_getnext(token, ilp)
 			RWLOCK_EXIT(&ipf_poolrw);
 		}
 
-		token->ipt_data = nextiph;
 		err = COPYOUT(nextiph, ilp->ili_data, sizeof(*nextiph));
 		if (err != 0) {
 			ipf_interror = 30011;
@@ -688,7 +687,6 @@ ipf_htable_getnext(token, ilp)
 			RWLOCK_EXIT(&ipf_poolrw);
 		}
 
-		token->ipt_data = nextnode;
 		err = COPYOUT(nextnode, ilp->ili_data, sizeof(*nextnode));
 		if (err != 0) {
 			ipf_interror = 30012;
