@@ -79,12 +79,12 @@ static const char rcsid[] = "@(#)$Id$";
 #endif
 
 #ifdef IPFILTER_LOOKUP
-
-# ifndef RADIX_NODE_HEAD_LOCK
+# if !defined(RADIX_NODE_HEAD_LOCK) || !defined(RADIX_NODE_HEAD_UNLOCK) || \
+     !defined(_KERNEL)
+#  undef RADIX_NODE_HEAD_LOCK
+#  undef RADIX_NODE_HEAD_UNLOCK
 #  define RADIX_NODE_HEAD_LOCK(x)	;
-# endif
-# ifndef RADIX_NODE_HEAD_UNLOCK
-#  define RADIX_NODE_HEAD_UNLOCK(x)	;
+#  define RADIX_NODE_HEAD_UNLOCK(x)	;    
 # endif
 
 static void ipf_pool_clearnodes __P((ip_pool_t *));
