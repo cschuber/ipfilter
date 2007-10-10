@@ -184,6 +184,10 @@ void *ctx;
 		err = ip_lookup_iterate(data, uid, ctx);
 		break;
 
+	case SIOCIPFDELTOK :
+		err = ip_lookup_deltok(data, uid, ctx);
+		break;
+
 	default :
 		err = EINVAL;
 		break;
@@ -562,6 +566,8 @@ void *ptr;
 /* Function:    ip_lookup_iterate                                           */
 /* Returns:     int     - 0 = success, else error                           */
 /* Parameters:  data(I) - pointer to data from ioctl call                   */
+/*              uid(I)  - uid of caller                                     */
+/*              ctx(I)  - pointer to give the uid context                   */
 /*                                                                          */
 /* Decodes ioctl request to step through either hash tables or pools.       */
 /* ------------------------------------------------------------------------ */
@@ -644,6 +650,33 @@ void *data;
 	}
 }
 
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ip_lookup_deltok                                            */
+/* Returns:     int     - 0 = success, else error                           */
+/* Parameters:  data(I) - pointer to data from ioctl call                   */
+/*              uid(I)  - uid of caller                                     */
+/*              ctx(I)  - pointer to give the uid context                   */
+/*                                                                          */
+/* Deletes the token identified by the combination of (type,uid,ctx)        */
+/* "key" is a combination of the table type, iterator type and the unit for */
+/* which the token was being used.                                          */
+/* ------------------------------------------------------------------------ */
+int ip_lookup_deltok(data, uid, ctx)
+void *data;
+int uid;
+void *ctx;
+{
+	int error, key;
+	SPL_INT(s);
+
+	SPL_SCHED(s);
+	error = BCOPYIN(data, &key, sizeof(key)); 
+	if (error == 0)
+		error = ipf_deltoken(key, uid, ctx);
+	SPL_X(s);
+	return error;
+}
 
 
 #else /* IPFILTER_LOOKUP */
