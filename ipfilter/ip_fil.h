@@ -262,7 +262,7 @@ typedef	struct	fr_ip	{
 #define	FI_FRAGBODY	0x2000
 #define	FI_BADSRC	0x4000
 #define	FI_LOWTTL	0x8000
-#define	FI_CMP		0xcfe3	/* Not FI_FRAG,FI_NATED,FI_FRAGTAIL */
+#define	FI_CMP		0xcf03	/* Not FI_FRAG,FI_NATED,FI_FRAGTAIL,broadcast */
 #define	FI_ICMPCMP	0x0003	/* Flags we can check for ICMP error packets */
 #define	FI_WITH		0xeffe	/* Not FI_TCPUDP */
 #define	FI_V6EXTHDR	0x10000

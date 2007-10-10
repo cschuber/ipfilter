@@ -989,6 +989,16 @@ u_int flags;
 		hv += is->is_src.i6[3];
 	}
 #endif
+	if ((fin->fin_v == 4) &&
+	    (fin->fin_flx & (FI_MULTICAST|FI_BROADCAST|FI_MBCAST))) {
+		if (fin->fin_out == 0) {
+			flags |= SI_W_DADDR|SI_CLONE;
+			hv -= is->is_daddr;
+		} else {
+			flags |= SI_W_SADDR|SI_CLONE;
+			hv -= is->is_saddr;
+		}
+	}
 
 	switch (is->is_p)
 	{
@@ -2383,6 +2393,14 @@ ipftq_t **ifqp;
 		}
 	}
 #endif
+	if ((v == 4) &&
+	    (fin->fin_flx & (FI_MULTICAST|FI_BROADCAST|FI_MBCAST))) {
+		if (fin->fin_out == 0) {
+			hv -= src.in4.s_addr;
+		} else {
+			hv -= dst.in4.s_addr;
+		}
+	}
 
 	/*
 	 * Search the hash table for matching packet header info.
@@ -2531,12 +2549,31 @@ retry_tcpudp:
 		}
 		RWLOCK_EXIT(&ipf_state);
 
-		if (!tryagain && ips_stats.iss_wild) {
-			hv -= dport;
-			hv -= sport;
-			tryagain = 1;
-			WRITE_ENTER(&ipf_state);
-			goto retry_tcpudp;
+		if (ips_stats.iss_wild) {
+			if (tryagain == 0) {
+				hv -= dport;
+				hv -= sport;
+			} else if (tryagain == 1) {
+				hv = fin->fin_fi.fi_p;
+				/*
+				 * If we try to pretend this is a reply to a
+				 * multicast/broadcast packet then we need to
+				 * exclude part of the address from the hash
+				 * calculation.
+				 */
+				if (fin->fin_out == 0) {
+					hv += src.in4.s_addr;
+				} else {
+					hv += dst.in4.s_addr;
+				}
+				hv += dport;
+				hv += sport;
+			}
+			tryagain++;
+			if (tryagain <= 2) {
+				WRITE_ENTER(&ipf_state);
+				goto retry_tcpudp;
+			}
 		}
 		fin->fin_flx |= oow;
 		break;
