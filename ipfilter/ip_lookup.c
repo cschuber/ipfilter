@@ -70,6 +70,8 @@ static int ipf_lookup_addtable __P((caddr_t));
 static int ipf_lookup_deltable __P((caddr_t));
 static int ipf_lookup_stats __P((caddr_t));
 static int ipf_lookup_flush __P((caddr_t));
+static int ipf_lookup_iterate __P((void *, int, void *));
+static int ipf_lookup_deltok __P((void *, int, void *));
 
 
 /* ------------------------------------------------------------------------ */
@@ -188,7 +190,7 @@ ipf_lookup_ioctl(data, cmd, mode, uid, ctx)
 		break;
 
 	case SIOCIPFDELTOK :
-		err = ip_lookup_deltok(data, uid, ctx);
+		err = ipf_lookup_deltok(data, uid, ctx);
 		break;
 
 	default :
@@ -652,7 +654,7 @@ ipf_lookup_deref(type, ptr)
 /*                                                                          */
 /* Decodes ioctl request to step through either hash tables or pools.       */
 /* ------------------------------------------------------------------------ */
-int
+static int
 ipf_lookup_iterate(data, uid, ctx)
 	void *data;
 	int uid;
@@ -741,7 +743,7 @@ ipf_lookup_iterderef(type, data)
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    ip_lookup_deltok                                            */
+/* Function:    ipf_lookup_deltok                                           */
 /* Returns:     int     - 0 = success, else error                           */
 /* Parameters:  data(I) - pointer to data from ioctl call                   */
 /*              uid(I)  - uid of caller                                     */
@@ -751,10 +753,11 @@ ipf_lookup_iterderef(type, data)
 /* "key" is a combination of the table type, iterator type and the unit for */
 /* which the token was being used.                                          */
 /* ------------------------------------------------------------------------ */
-int ip_lookup_deltok(data, uid, ctx)
-void *data;
-int uid;
-void *ctx;
+int
+ipf_lookup_deltok(data, uid, ctx)
+	void *data;
+	int uid;
+	void *ctx;
 {
 	int error, key;
 	SPL_INT(s);

@@ -90,7 +90,6 @@ extern int ipf_lookup_init __P((void));
 extern int ipf_lookup_ioctl __P((caddr_t, ioctlcmd_t, int, int, void *));
 extern void ipf_lookup_unload __P((void));
 extern void ipf_lookup_deref __P((int, void *));
-extern int ipf_lookup_iterate __P((void *, int, void *));
 extern void ipf_lookup_iterderef __P((u_32_t, void *));
 
 #endif /* __IP_LOOKUP_H__ */
