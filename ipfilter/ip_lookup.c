@@ -70,6 +70,8 @@ static int iplookup_addtable __P((caddr_t));
 static int iplookup_deltable __P((caddr_t));
 static int iplookup_stats __P((caddr_t));
 static int iplookup_flush __P((caddr_t));
+static int iplookup_iterate __P((void *, int, void *));
+static int iplookup_deltok __P((void *, int, void *));
 
 
 /* ------------------------------------------------------------------------ */
@@ -181,11 +183,11 @@ void *ctx;
 		break;
 
 	case SIOCLOOKUPITER :
-		err = ip_lookup_iterate(data, uid, ctx);
+		err = iplookup_iterate(data, uid, ctx);
 		break;
 
 	case SIOCIPFDELTOK :
-		err = ip_lookup_deltok(data, uid, ctx);
+		err = iplookup_deltok(data, uid, ctx);
 		break;
 
 	default :
@@ -563,7 +565,7 @@ void *ptr;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    ip_lookup_iterate                                           */
+/* Function:    iplookup_iterate                                            */
 /* Returns:     int     - 0 = success, else error                           */
 /* Parameters:  data(I) - pointer to data from ioctl call                   */
 /*              uid(I)  - uid of caller                                     */
@@ -571,7 +573,7 @@ void *ptr;
 /*                                                                          */
 /* Decodes ioctl request to step through either hash tables or pools.       */
 /* ------------------------------------------------------------------------ */
-int ip_lookup_iterate(data, uid, ctx)
+static int iplookup_iterate(data, uid, ctx)
 void *data;
 int uid;
 void *ctx;
@@ -652,7 +654,7 @@ void *data;
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    ip_lookup_deltok                                            */
+/* Function:    iplookup_deltok                                             */
 /* Returns:     int     - 0 = success, else error                           */
 /* Parameters:  data(I) - pointer to data from ioctl call                   */
 /*              uid(I)  - uid of caller                                     */
@@ -662,7 +664,7 @@ void *data;
 /* "key" is a combination of the table type, iterator type and the unit for */
 /* which the token was being used.                                          */
 /* ------------------------------------------------------------------------ */
-int ip_lookup_deltok(data, uid, ctx)
+static int iplookup_deltok(data, uid, ctx)
 void *data;
 int uid;
 void *ctx;
