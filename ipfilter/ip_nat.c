@@ -3662,9 +3662,9 @@ ipnat_t *np;
 
 	if (nat->nat_p == IPPROTO_TCP && ifq2 == NULL) {
 		u_32_t end, ack;
-		tcphdr_t *tcp;
-		int dsize, ok;
 		u_char tcpflags;
+		tcphdr_t *tcp;
+		int dsize;
 
 		tcp = fin->fin_dp;
 		tcpflags = tcp->th_flags;
