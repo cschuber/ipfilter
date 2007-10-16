@@ -1284,7 +1284,7 @@ u_int flags;
 		* timer on it as we'll never see an error if it fails to
 		* connect.
 		*/
-		(void) fr_tcp_age(&is->is_sti, fin, ips_tqtqb, is->is_flags, 1);
+		(void) fr_tcp_age(&is->is_sti, fin, ips_tqtqb, is->is_flags);
 		MUTEX_EXIT(&is->is_lock);
 #ifdef	IPFILTER_SCAN
 		if ((is->is_flags & SI_CLONE) == 0)
@@ -1467,8 +1467,7 @@ ipstate_t *is;
 		/*
 		 * Nearing end of connection, start timeout.
 		 */
-		ret = fr_tcp_age(&is->is_sti, fin, ips_tqtqb, is->is_flags,
-				 (ret == 2));
+		ret = fr_tcp_age(&is->is_sti, fin, ips_tqtqb, is->is_flags);
 		if (ret == 0) {
 			MUTEX_EXIT(&is->is_lock);
 			return 0;
@@ -1567,10 +1566,10 @@ tcpdata_t  *fdata, *tdata;
 tcphdr_t *tcp;
 int flags;
 {
-	int dsize, inseq, rval;
 	tcp_seq seq, ack, end;
 	int ackskew, tcpflags;
 	u_32_t win, maxwin;
+	int dsize, inseq;
 
 	/*
 	 * Find difference between last checked packet and this packet.
@@ -1639,9 +1638,6 @@ int flags;
 		if ((flags & IS_STRICT) != 0) {
 			return 0;
 		}
-		rval = 1;
-	} else {
-		rval = 2;
 	}
 
 	inseq = 0;
@@ -1722,7 +1718,7 @@ int flags;
 			fdata->td_end = end;
 		if (SEQ_GE(ack + win, tdata->td_maxend))
 			tdata->td_maxend = ack + win;
-		return rval;
+		return 1;
 	}
 	return 0;
 }
@@ -1789,7 +1785,7 @@ ipstate_t *is;
 	clone->is_ref = 2;
 	if (clone->is_p == IPPROTO_TCP) {
 		(void) fr_tcp_age(&clone->is_sti, fin, ips_tqtqb,
-				  clone->is_flags, 1);
+				  clone->is_flags);
 	}
 	MUTEX_EXIT(&clone->is_lock);
 #ifdef	IPFILTER_SCAN
@@ -3311,11 +3307,11 @@ void *entry;
 /*                                                                          */
 /* Locking: it is assumed that the parent of the tqe structure is locked.   */
 /* ------------------------------------------------------------------------ */
-int fr_tcp_age(tqe, fin, tqtab, flags, seqnext)
+int fr_tcp_age(tqe, fin, tqtab, flags)
 ipftqent_t *tqe;
 fr_info_t *fin;
 ipftq_t *tqtab;
-int flags, seqnext;
+int flags;
 {
 	int dlen, ostate, nstate, rval, dir;
 	u_char tcpflags;
@@ -3577,12 +3573,19 @@ int flags, seqnext;
 			if ((tcpflags & (TH_FIN|TH_ACK)) == TH_ACK) {
 				nstate = IPF_TCPS_TIME_WAIT;
 			}
-			rval = 1;
+			rval = 2;
 			break;
 
 		case IPF_TCPS_LAST_ACK: /* 8 */
 			if (tcpflags & TH_ACK) {
-				rval = 1;
+				if ((tcpflags & TH_PUSH) || dlen)
+					/*
+					 * there is still data to be delivered,
+					 * reset timeout
+					 */
+					rval = 1;
+				else
+					rval = 2;
 			}
 			/*
 			 * we cannot detect when we go out of LAST_ACK state to
@@ -3600,10 +3603,8 @@ int flags, seqnext;
 			/* we're in 2MSL timeout now */
 			if (ostate == IPF_TCPS_LAST_ACK) {
 				nstate = IPF_TCPS_CLOSED;
-				rval = 1;
-			} else {
-				rval = 2;
 			}
+			rval = 1;
 			break;
 
 		case IPF_TCPS_CLOSED: /* 11 */
@@ -3636,8 +3637,7 @@ int flags, seqnext;
 	if (rval == 2)
 		rval = 1;
 	else if (rval == 1) {
-		if (seqnext)
-			tqe->tqe_state[dir] = nstate;
+		tqe->tqe_state[dir] = nstate;
 		if ((tqe->tqe_flags & TQE_RULEBASED) == 0)
 			fr_movequeue(tqe, tqe->tqe_ifq, tqtab + nstate);
 	}

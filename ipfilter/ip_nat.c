@@ -3681,9 +3681,7 @@ ipnat_t *np;
 		if (nat->nat_seqnext[fin->fin_rev] == 0)
 			nat->nat_seqnext[fin->fin_rev] = end;
 
-		ok = (nat->nat_seqnext[fin->fin_rev] == end);
-
-		(void) fr_tcp_age(&nat->nat_tqe, fin, nat_tqb, 0, ok);
+		(void) fr_tcp_age(&nat->nat_tqe, fin, nat_tqb, 0);
 	} else {
 		if (ifq2 == NULL) {
 			if (nat->nat_p == IPPROTO_UDP)
@@ -4817,7 +4815,7 @@ nat_t *nat;
 	 */
 	if (clone->nat_p == IPPROTO_TCP) {
 		(void) fr_tcp_age(&clone->nat_tqe, fin, nat_tqb,
-				  clone->nat_flags, 1);
+				  clone->nat_flags);
 	}
 #ifdef	IPFILTER_SYNC
 	clone->nat_sync = ipfsync_new(SMC_NAT, fin, clone);
