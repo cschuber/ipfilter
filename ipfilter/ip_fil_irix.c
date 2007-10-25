@@ -159,12 +159,12 @@ int ipl_detach()
  * Filter ioctl interface.
  */
 int iplioctl(dev, cmd, data, mode, cp, rp)
-dev_t dev;
-int cmd;
-caddr_t data;
-int mode;
-cred_t *cp;
-int *rp;
+	dev_t dev;
+	int cmd;
+	caddr_t data;
+	int mode;
+	cred_t *cp;
+	int *rp;
 {
 	int error = 0, unit = 0;
 	SPL_INT(s);
@@ -197,7 +197,7 @@ int *rp;
 
 #if 0
 void fr_forgetifp(ifp)
-void *ifp;
+	void *ifp;
 {
 	register frentry_t *f;
 
@@ -238,9 +238,9 @@ void *ifp;
  * routines below for saving IP headers to buffer
  */
 int iplopen(pdev, flags, devtype, cp)
-dev_t *pdev;
-int flags, devtype;
-cred_t *cp;
+	dev_t *pdev;
+	int flags, devtype;
+	cred_t *cp;
 {
 	u_int min = geteminor(*pdev);
 
@@ -253,9 +253,9 @@ cred_t *cp;
 
 
 int iplclose(dev, flags, devtype, cp)
-dev_t dev;
-int flags, devtype;
-cred_t *cp;
+	dev_t dev;
+	int flags, devtype;
+	cred_t *cp;
 {
 	u_int	min = GET_MINOR(dev);
 
@@ -273,9 +273,9 @@ cred_t *cp;
  * the filter lists.
  */
 int iplread(dev, uio, crp)
-dev_t dev;
-register struct uio *uio;
-cred_t *crp;
+	dev_t dev;
+	register struct uio *uio;
+	cred_t *crp;
 {
 	if (fr_running < 1)
 		return EIO;
@@ -293,7 +293,7 @@ cred_t *crp;
  * requires a large amount of setting up and isn't any more efficient.
  */
 int fr_send_reset(fin)
-fr_info_t *fin;
+	fr_info_t *fin;
 {
 	struct tcphdr *tcp, *tcp2;
 	int tlen = 0, hlen;
@@ -379,8 +379,8 @@ fr_info_t *fin;
 
 
 static int fr_send_ip(fin, m, mpp)
-fr_info_t *fin;
-struct mbuf *m, **mpp;
+	fr_info_t *fin;
+	struct mbuf *m, **mpp;
 {
 	fr_info_t fnew;
 	ip_t *ip;
@@ -434,9 +434,9 @@ struct mbuf *m, **mpp;
 
 
 int fr_send_icmp_err(type, fin, dst)
-int type;
-fr_info_t *fin;
-int dst;
+	int type;
+	fr_info_t *fin;
+	int dst;
 {
 	int err, hlen = 0, xtra = 0, iclen, ohlen = 0, avail;
 	struct in_addr dst4;
@@ -608,11 +608,16 @@ int dst;
 
 void iplinit(void)
 {
-int i;
+	int i;
 
-for (i = 0; i < 256; i++)
-if (cdevsw[i].d_open == iplopen){printf("iplinit:ipfilter @%d\n", i); break;}
-if (i==256)printf("iplinit:ipfilter not found\n");
+	for (i = 0; i < 256; i++) {
+		if (cdevsw[i].d_open == iplopen) {
+			printf("iplinit:ipfilter @%d\n", i);
+			break;
+		}
+	}
+	if (i==256)
+		printf("iplinit:ipfilter not found\n");
 	if (ipl_attach() != 0)
 		printf("IP Filter failed to attach\n");
 	else
@@ -620,26 +625,36 @@ if (i==256)printf("iplinit:ipfilter not found\n");
 }
 int ipfattach(void)
 {
-int i;
+	int i;
 
-for (i = 0; i < 256; i++)
-if (cdevsw[i].d_open == iplopen){printf("ipfattach:ipfilter @%d\n", i); break;}
-if (i==256)printf("ipfattach:ipfilter not found\n");
-return 0;
+	for (i = 0; i < 256; i++) {
+		if (cdevsw[i].d_open == iplopen) {
+			printf("ipfattach:ipfilter @%d\n", i);
+			break;
+		}
+	}
+	if (i==256)
+		printf("ipfattach:ipfilter not found\n");
+	return 0;
 }
 
 void iplstart(void)
 {
-int i;
+	int i;
 
-for (i = 0; i < 256; i++)
-if (cdevsw[i].d_open == iplopen){printf("iplstart:ipfilter @%d\n", i); break;}
-if (i==256)printf("iplstart:ipfilter not found\n");
+	for (i = 0; i < 256; i++) {
+		if (cdevsw[i].d_open == iplopen) {
+			printf("iplstart:ipfilter @%d\n", i);
+			break;
+		}
+	}
+	if (i==256)
+		printf("iplstart:ipfilter not found\n");
 }
 
 
 size_t mbufchainlen(m0)
-register struct mbuf *m0;
+	register struct mbuf *m0;
 {
 	register size_t len = 0;
 
@@ -650,9 +665,9 @@ register struct mbuf *m0;
 
 
 int fr_fastroute(m0, mpp, fin, fdp)
-struct mbuf *m0, **mpp;
-fr_info_t *fin;
-frdest_t *fdp;
+	struct mbuf *m0, **mpp;
+	fr_info_t *fin;
+	frdest_t *fdp;
 {
 	register struct ip *ip, *mhip;
 	register struct mbuf *m = m0;
@@ -891,7 +906,7 @@ bad:
 
 
 int fr_verifysrc(fin)
-fr_info_t *fin;
+	fr_info_t *fin;
 {
 	struct sockaddr_in *dst;
 	struct route iproute;
@@ -911,9 +926,9 @@ fr_info_t *fin;
  * return the first IP Address associated with an interface
  */
 int fr_ifpaddr(v, atype, ifptr, inp, inpmask)
-int v, atype;
-void *ifptr;
-struct in_addr *inp, *inpmask;
+	int v, atype;
+	void *ifptr;
+	struct in_addr *inp, *inpmask;
 {
 #ifdef USE_INET6
 	struct in6_addr *inp6 = NULL;
@@ -1017,7 +1032,7 @@ void fr_slowtimer()
 
 
 u_32_t fr_newisn(fin)
-fr_info_t *fin;
+	fr_info_t *fin;
 {
 	static iss_seq_off = 0;
 	u_char hash[16];
@@ -1063,7 +1078,7 @@ fr_info_t *fin;
 /* Returns the next IPv4 ID to use for this packet.                         */
 /* ------------------------------------------------------------------------ */
 u_short fr_nextipid(fin)
-fr_info_t *fin;
+	fr_info_t *fin;
 {
 	static u_short ipid = 0;
 	u_short id;
@@ -1077,7 +1092,7 @@ fr_info_t *fin;
 
 
 void fr_checkv4sum(fin)
-fr_info_t *fin;
+	fr_info_t *fin;
 {
 #ifdef IPFILTER_CKSUM
 	if (fr_checkl4sum(fin) == -1)
@@ -1088,7 +1103,7 @@ fr_info_t *fin;
 
 #ifdef USE_INET6
 INLINE void fr_checkv6sum(fin)
-fr_info_t *fin;
+	fr_info_t *fin;
 {
 #ifdef IPFILTER_CKSUM
 	if (fr_checkl4sum(fin) == -1)
@@ -1116,9 +1131,9 @@ fr_info_t *fin;
 /* of buffers that starts at *fin->fin_mp.                                  */
 /* ------------------------------------------------------------------------ */
 void *fr_pullup(min, fin, len)
-mb_t *min;
-fr_info_t *fin;
-int len;
+	mb_t *min;
+	fr_info_t *fin;
+	int len;
 {
 	int out = fin->fin_out, dpoff;
 	mb_t *m = min;
@@ -1159,8 +1174,8 @@ int len;
 
 
 int ipf_inject(fin, m)
-fr_info_t *fin;
-mb_t *m;
+	fr_info_t *fin;
+	mb_t *m;
 {
 	int error;
 

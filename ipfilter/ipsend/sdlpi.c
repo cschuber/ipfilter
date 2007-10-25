@@ -59,8 +59,8 @@ static const char rcsid[] = "@(#)$Id$";
  * interface are included in the header size.
  */
 int	initdevice(device, tout)
-char	*device;
-int	tout;
+	char	*device;
+	int	tout;
 {
 	char	devname[16], *s, buf[256];
 	int	i, fd;
@@ -134,8 +134,8 @@ int	tout;
  * output an IP packet onto a fd opened for /dev/nit
  */
 int	sendip(fd, pkt, len)
-int	fd, len;
-char	*pkt;
+	int	fd, len;
+	char	*pkt;
 {
 	struct strbuf dbuf, *dp = &dbuf, *cp = NULL;
 	int pri = 0;

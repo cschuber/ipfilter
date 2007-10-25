@@ -17,8 +17,8 @@
 
 
 int	initdevice(device, sport, tout)
-char	*device;
-int	sport, tout;
+	char	*device;
+	int	sport, tout;
 {
 	int	fd;
 
@@ -32,8 +32,8 @@ int	sport, tout;
  * output an IP packet onto a fd opened for /dev/bpf
  */
 int	sendip(fd, pkt, len)
-int	fd, len;
-char	*pkt;
+	int	fd, len;
+	char	*pkt;
 {
 	if (send(fd, pkt, len, 0) == -1)
 	    {
@@ -46,7 +46,7 @@ char	*pkt;
 
 
 char *strdup(str)
-char *str;
+	char *str;
 {
 	char	*s;
 
@@ -73,8 +73,8 @@ char *str;
 
 
 int	initdevice(device, sport, tout)
-char	*device;
-int	sport, tout;
+	char	*device;
+	int	sport, tout;
 {
 	int	fd;
 
@@ -88,8 +88,8 @@ int	sport, tout;
  * output an IP packet onto a fd opened for /dev/bpf
  */
 int	sendip(fd, pkt, len)
-int	fd, len;
-char	*pkt;
+	int	fd, len;
+	char	*pkt;
 {
 	if (send(fd, pkt, len, 0) == -1)
 	    {
@@ -102,7 +102,7 @@ char	*pkt;
 
 
 char *strdup(str)
-char *str;
+	char *str;
 {
 	char	*s;
 

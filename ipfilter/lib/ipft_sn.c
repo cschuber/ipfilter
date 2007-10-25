@@ -51,7 +51,7 @@ struct	ipread	snoop = { snoop_open, snoop_close, snoop_readip, 0 };
 
 
 static	int	snoop_open(fname)
-char	*fname;
+	char	*fname;
 {
 	struct	snoophdr sh;
 	int	fd;
@@ -96,7 +96,7 @@ static	int	snoop_close()
  * in a snoop file.
  */
 static	int	snoop_read_rec(rec)
-struct	snooppkt *rec;
+	struct	snooppkt *rec;
 {
 	int	n, plen, ilen;
 
@@ -123,8 +123,8 @@ struct	snooppkt *rec;
  * the available buffer, with the number of bytes copied returned.
  */
 static	int	snoop_read(buf, cnt)
-char	*buf;
-int	cnt;
+	char	*buf;
+	int	cnt;
 {
 	struct	snooppkt rec;
 	static	char	*bufp = NULL;
@@ -152,8 +152,8 @@ int	cnt;
  * return only an IP packet read into buf
  */
 static	int	snoop_readip(buf, cnt, ifn, dir)
-char	*buf, **ifn;
-int	cnt, *dir;
+	char	*buf, **ifn;
+	int	cnt, *dir;
 {
 	static	char	*bufp = NULL;
 	struct	snooppkt rec;

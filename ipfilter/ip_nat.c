@@ -339,7 +339,7 @@ int fr_natinit()
 /* use by redirect rules.                                                   */
 /* ------------------------------------------------------------------------ */
 static void nat_addrdr(n)
-ipnat_t *n;
+	ipnat_t *n;
 {
 	ipnat_t **np;
 	u_32_t j;
@@ -371,7 +371,7 @@ ipnat_t *n;
 /* redirect rules.                                                          */
 /* ------------------------------------------------------------------------ */
 static void nat_addnat(n)
-ipnat_t *n;
+	ipnat_t *n;
 {
 	ipnat_t **np;
 	u_32_t j;
@@ -401,7 +401,7 @@ ipnat_t *n;
 /* Removes a redirect rule from the hash table of redirect rules.           */
 /* ------------------------------------------------------------------------ */
 static void nat_delrdr(n)
-ipnat_t *n;
+	ipnat_t *n;
 {
 	if (n->in_rnext)
 		n->in_rnext->in_prnext = n->in_prnext;
@@ -417,7 +417,7 @@ ipnat_t *n;
 /* Removes a NAT map rule from the hash table of NAT map rules.             */
 /* ------------------------------------------------------------------------ */
 static void nat_delnat(n)
-ipnat_t *n;
+	ipnat_t *n;
 {
 	if (n->in_mnext != NULL)
 		n->in_mnext->in_pmnext = n->in_pmnext;
@@ -440,11 +440,11 @@ ipnat_t *n;
 /* create a new entry if a non-NULL NAT rule pointer has been supplied.     */
 /* ------------------------------------------------------------------------ */
 static struct hostmap *nat_hostmap(np, src, dst, map, port)
-ipnat_t *np;
-struct in_addr src;
-struct in_addr dst;
-struct in_addr map;
-u_32_t port;
+	ipnat_t *np;
+	struct in_addr src;
+	struct in_addr dst;
+	struct in_addr map;
+	u_32_t port;
 {
 	hostmap_t *hm;
 	u_int hv;
@@ -498,7 +498,7 @@ u_32_t port;
 /* reaches zero then remove it and free it.                                 */
 /* ------------------------------------------------------------------------ */
 void fr_hostmapdel(hmp)
-struct hostmap **hmp;
+	struct hostmap **hmp;
 {
 	struct hostmap *hm;
 
@@ -528,9 +528,9 @@ struct hostmap **hmp;
 /* Adjusts the 16bit checksum by "n" for packets going out.                 */
 /* ------------------------------------------------------------------------ */
 void fix_outcksum(fin, sp, n)
-fr_info_t *fin;
-u_short *sp;
-u_32_t n;
+	fr_info_t *fin;
+	u_short *sp;
+	u_32_t n;
 {
 	u_short sumshort;
 	u_32_t sum1;
@@ -565,9 +565,9 @@ u_32_t n;
 /* Adjusts the 16bit checksum by "n" for packets going in.                  */
 /* ------------------------------------------------------------------------ */
 void fix_incksum(fin, sp, n)
-fr_info_t *fin;
-u_short *sp;
-u_32_t n;
+	fr_info_t *fin;
+	u_short *sp;
+	u_32_t n;
 {
 	u_short sumshort;
 	u_32_t sum1;
@@ -611,8 +611,8 @@ u_32_t n;
 /* kernel on the data section.                                              */
 /* ------------------------------------------------------------------------ */
 void fix_datacksum(sp, n)
-u_short *sp;
-u_32_t n;
+	u_short *sp;
+	u_32_t n;
 {
 	u_short sumshort;
 	u_32_t sum1;
@@ -640,10 +640,10 @@ u_32_t n;
 /* Processes an ioctl call made to operate on the IP Filter NAT device.     */
 /* ------------------------------------------------------------------------ */
 int fr_nat_ioctl(data, cmd, mode, uid, ctx)
-ioctlcmd_t cmd;
-caddr_t data;
-int mode, uid;
-void *ctx;
+	ioctlcmd_t cmd;
+	caddr_t data;
+	int mode, uid;
+	void *ctx;
 {
 	ipnat_t *nat, *nt, *n = NULL, **np = NULL;
 	int error = 0, ret, arg, getlock;
@@ -970,8 +970,8 @@ done:
 /* NAT rule table(s).                                                       */
 /* ------------------------------------------------------------------------ */
 static int nat_siocaddnat(n, np, getlock)
-ipnat_t *n, **np;
-int getlock;
+	ipnat_t *n, **np;
+	int getlock;
 {
 	int error = 0, i, j;
 
@@ -1104,7 +1104,7 @@ int getlock;
 /* NAT rule table(s).                                                       */
 /* ------------------------------------------------------------------------ */
 static int nat_resolverule(n)
-ipnat_t *n;
+	ipnat_t *n;
 {
 	n->in_ifnames[0][LIFNAMSIZ - 1] = '\0';
 	n->in_ifps[0] = fr_resolvenic(n->in_ifnames[0], 4);
@@ -1139,8 +1139,8 @@ ipnat_t *n;
 /* NAT rule table(s).                                                       */
 /* ------------------------------------------------------------------------ */
 static void nat_siocdelnat(n, np, getlock)
-ipnat_t *n, **np;
-int getlock;
+	ipnat_t *n, **np;
+	int getlock;
 {
 	if (getlock) {
 		WRITE_ENTER(&ipf_nat);
@@ -1200,7 +1200,7 @@ int getlock;
 /* structure is copied back to the user.                                    */
 /* ------------------------------------------------------------------------ */
 static int fr_natgetsz(data)
-caddr_t data;
+	caddr_t data;
 {
 	ap_session_t *aps;
 	nat_t *nat, *n;
@@ -1262,7 +1262,7 @@ caddr_t data;
 /* proxy is also copied, as to is the NAT rule which was responsible for it */
 /* ------------------------------------------------------------------------ */
 static int fr_natgetent(data)
-caddr_t data;
+	caddr_t data;
 {
 	int error, outsize;
 	ap_session_t *aps;
@@ -1374,8 +1374,8 @@ finished:
 /* firewall rule data structures, if pointers to them indicate so.          */
 /* ------------------------------------------------------------------------ */
 static int fr_natputent(data, getlock)
-caddr_t data;
-int getlock;
+	caddr_t data;
+	int getlock;
 {
 	nat_save_t ipn, *ipnn;
 	ap_session_t *aps;
@@ -1649,8 +1649,8 @@ junkput:
 /* enabled then generate a NAT log record for this event.                   */
 /* ------------------------------------------------------------------------ */
 void nat_delete(nat, logtype)
-struct nat *nat;
-int logtype;
+	struct nat *nat;
+	int logtype;
 {
 	struct ipnat *ipn;
 	int removed = 0;
@@ -1864,9 +1864,9 @@ static int nat_clearlist()
 /* to the new IP address for the translation.                               */
 /* ------------------------------------------------------------------------ */
 static INLINE int nat_newmap(fin, nat, ni)
-fr_info_t *fin;
-nat_t *nat;
-natinfo_t *ni;
+	fr_info_t *fin;
+	nat_t *nat;
+	natinfo_t *ni;
 {
 	u_short st_port, dport, sport, port, sp, dp;
 	struct in_addr in, inb;
@@ -2124,9 +2124,9 @@ natinfo_t *ni;
 /* to the new IP address for the translation.                               */
 /* ------------------------------------------------------------------------ */
 static INLINE int nat_newrdr(fin, nat, ni)
-fr_info_t *fin;
-nat_t *nat;
-natinfo_t *ni;
+	fr_info_t *fin;
+	nat_t *nat;
+	natinfo_t *ni;
 {
 	u_short nport, dport, sport;
 	struct in_addr in, inb;
@@ -2323,11 +2323,11 @@ natinfo_t *ni;
 /*       as it can result in memory being corrupted.                        */
 /* ------------------------------------------------------------------------ */
 nat_t *nat_new(fin, np, natsave, flags, direction)
-fr_info_t *fin;
-ipnat_t *np;
-nat_t **natsave;
-u_int flags;
-int direction;
+	fr_info_t *fin;
+	ipnat_t *np;
+	nat_t **natsave;
+	u_int flags;
+	int direction;
 {
 	u_short port = 0, sport = 0, dport = 0, nport = 0;
 	tcphdr_t *tcp = NULL;
@@ -2540,12 +2540,12 @@ done:
 /* ------------------------------------------------------------------------ */
 /*ARGSUSED*/
 static int nat_finalise(fin, nat, ni, tcp, natsave, direction)
-fr_info_t *fin;
-nat_t *nat;
-natinfo_t *ni;
-tcphdr_t *tcp;
-nat_t **natsave;
-int direction;
+	fr_info_t *fin;
+	nat_t *nat;
+	natinfo_t *ni;
+	tcphdr_t *tcp;
+	nat_t **natsave;
+	int direction;
 {
 	frentry_t *fr;
 	ipnat_t *np;
@@ -2609,8 +2609,8 @@ int direction;
 /* list of active NAT entries.  Adjust global counters when complete.       */
 /* ------------------------------------------------------------------------ */
 int	nat_insert(nat, rev)
-nat_t	*nat;
-int	rev;
+	nat_t	*nat;
+	int	rev;
 {
 	u_int hv1, hv2;
 	nat_t **natp;
@@ -2706,8 +2706,8 @@ int	rev;
 /* the required length.                                                     */
 /* ------------------------------------------------------------------------ */
 nat_t *nat_icmperrorlookup(fin, dir)
-fr_info_t *fin;
-int dir;
+	fr_info_t *fin;
+	int dir;
 {
 	int flags = 0, type, minlen;
 	icmphdr_t *icmp, *orgicmp;
@@ -2839,9 +2839,9 @@ int dir;
 /* a NAT'd ICMP packet gets correctly recognised.                           */
 /* ------------------------------------------------------------------------ */
 nat_t *nat_icmperror(fin, nflags, dir)
-fr_info_t *fin;
-u_int *nflags;
-int dir;
+	fr_info_t *fin;
+	u_int *nflags;
+	int dir;
 {
 	u_32_t sum1, sum2, sumd, sumd2;
 	struct in_addr a1, a2;
@@ -3101,9 +3101,9 @@ int dir;
 /*            the packet is of said protocol                                */
 /* ------------------------------------------------------------------------ */
 nat_t *nat_inlookup(fin, flags, p, src, mapdst)
-fr_info_t *fin;
-u_int flags, p;
-struct in_addr src , mapdst;
+	fr_info_t *fin;
+	u_int flags, p;
+	struct in_addr src , mapdst;
 {
 	u_short sport, dport;
 	grehdr_t *gre;
@@ -3272,7 +3272,7 @@ find_in_wild_ports:
 /* want to include hashing on port numbers.                                 */
 /* ------------------------------------------------------------------------ */
 static void nat_tabmove(nat)
-nat_t *nat;
+	nat_t *nat;
 {
 	nat_t **natp;
 	u_int hv;
@@ -3346,9 +3346,9 @@ nat_t *nat;
 /*            the packet is of said protocol                                */
 /* ------------------------------------------------------------------------ */
 nat_t *nat_outlookup(fin, flags, p, src, dst)
-fr_info_t *fin;
-u_int flags, p;
-struct in_addr src , dst;
+	fr_info_t *fin;
+	u_int flags, p;
+	struct in_addr src , dst;
 {
 	u_short sport, dport;
 	u_int sflags;
@@ -3515,7 +3515,7 @@ find_out_wild_ports:
 /*     nl_out* = destination information (translated)                       */
 /* ------------------------------------------------------------------------ */
 nat_t *nat_lookupredir(np)
-natlookup_t *np;
+	natlookup_t *np;
 {
 	fr_info_t fi;
 	nat_t *nat;
@@ -3586,8 +3586,8 @@ natlookup_t *np;
 /* loop inside fr_checknatin() and lay it out properly in its own function. */
 /* ------------------------------------------------------------------------ */
 static int nat_match(fin, np)
-fr_info_t *fin;
-ipnat_t *np;
+	fr_info_t *fin;
+	ipnat_t *np;
 {
 	frtuc_t *ft;
 
@@ -3639,9 +3639,9 @@ ipnat_t *np;
 /* called with fin_rev updated - i.e. after calling nat_proto().            */
 /* ------------------------------------------------------------------------ */
 void nat_update(fin, nat, np)
-fr_info_t *fin;
-nat_t *nat;
-ipnat_t *np;
+	fr_info_t *fin;
+	nat_t *nat;
+	ipnat_t *np;
 {
 	ipftq_t *ifq, *ifq2;
 	ipftqent_t *tqe;
@@ -3714,8 +3714,8 @@ ipnat_t *np;
 /* packet header(s) as required.                                            */
 /* ------------------------------------------------------------------------ */
 int fr_checknatout(fin, passp)
-fr_info_t *fin;
-u_32_t *passp;
+	fr_info_t *fin;
+	u_32_t *passp;
 {
 	struct ifnet *ifp, *sifp;
 	icmphdr_t *icmp = NULL;
@@ -3878,10 +3878,10 @@ maskloop:
 /* Translate a packet coming "out" on an interface.                         */
 /* ------------------------------------------------------------------------ */
 int fr_natout(fin, nat, natadd, nflags)
-fr_info_t *fin;
-nat_t *nat;
-int natadd;
-u_32_t nflags;
+	fr_info_t *fin;
+	nat_t *nat;
+	int natadd;
+	u_32_t nflags;
 {
 	icmphdr_t *icmp;
 	u_short *csump;
@@ -4008,8 +4008,8 @@ u_32_t nflags;
 /* packet header(s) as required.                                            */
 /* ------------------------------------------------------------------------ */
 int fr_checknatin(fin, passp)
-fr_info_t *fin;
-u_32_t *passp;
+	fr_info_t *fin;
+	u_32_t *passp;
 {
 	u_int nflags, natadd;
 	int rval, natfailed;
@@ -4173,10 +4173,10 @@ maskloop:
 /* Translate a packet coming "in" on an interface.                          */
 /* ------------------------------------------------------------------------ */
 int fr_natin(fin, nat, natadd, nflags)
-fr_info_t *fin;
-nat_t *nat;
-int natadd;
-u_32_t nflags;
+	fr_info_t *fin;
+	nat_t *nat;
+	int natadd;
+	u_32_t nflags;
 {
 	icmphdr_t *icmp;
 	u_short *csump;
@@ -4293,9 +4293,9 @@ u_32_t nflags;
 /* TCP down to a specific value, then do it from here.                      */
 /* ------------------------------------------------------------------------ */
 u_short *nat_proto(fin, nat, nflags)
-fr_info_t *fin;
-nat_t *nat;
-u_int nflags;
+	fr_info_t *fin;
+	nat_t *nat;
+	u_int nflags;
 {
 	icmphdr_t *icmp;
 	u_short *csump;
@@ -4489,7 +4489,7 @@ void fr_natexpire()
 /* which need to have their translated address updated.                     */
 /* ------------------------------------------------------------------------ */
 void fr_natsync(ifp)
-void *ifp;
+	void *ifp;
 {
 	u_32_t sum1, sum2, sumd;
 	struct in_addr in;
@@ -4579,7 +4579,7 @@ void *ifp;
 /* not.                                                                     */
 /* ------------------------------------------------------------------------ */
 static int nat_icmpquerytype4(icmptype)
-int icmptype;
+	int icmptype;
 {
 
 	/*
@@ -4621,8 +4621,8 @@ int icmptype;
 /* Creates a NAT log entry.                                                 */
 /* ------------------------------------------------------------------------ */
 void nat_log(nat, type)
-struct nat *nat;
-u_int type;
+	struct nat *nat;
+	u_int type;
 {
 #ifdef	IPFILTER_LOG
 # ifndef LARGE_NAT
@@ -4675,7 +4675,7 @@ u_int type;
 /* interface references within IPFilter.                                    */
 /* ------------------------------------------------------------------------ */
 void nat_ifdetach(ifp)
-void *ifp;
+	void *ifp;
 {
 	frsync(ifp);
 	return;
@@ -4691,7 +4691,7 @@ void *ifp;
 /*                                                                          */
 /* ------------------------------------------------------------------------ */
 void fr_ipnatderef(inp)
-ipnat_t **inp;
+	ipnat_t **inp;
 {
 	ipnat_t *in;
 
@@ -4730,7 +4730,7 @@ ipnat_t **inp;
 /* called from a NAT flush ioctl with a deref happening because of a packet.*/
 /* ------------------------------------------------------------------------ */
 void fr_natderef(natp)
-nat_t **natp;
+	nat_t **natp;
 {
 	nat_t *nat;
 
@@ -4762,8 +4762,8 @@ nat_t **natp;
 /* Create a "duplcate" state table entry from the master.                   */
 /* ------------------------------------------------------------------------ */
 static nat_t *fr_natclone(fin, nat)
-fr_info_t *fin;
-nat_t *nat;
+	fr_info_t *fin;
+	nat_t *nat;
 {
 	frentry_t *fr;
 	nat_t *clone;
@@ -4840,11 +4840,11 @@ nat_t *nat;
 /* wildcard flags should be used.                                           */
 /* ------------------------------------------------------------------------ */
 static int nat_wildok(nat, sport, dport, flags, dir)
-nat_t *nat;
-int sport;
-int dport;
-int flags;
-int dir;
+	nat_t *nat;
+	int sport;
+	int dport;
+	int flags;
+	int dir;
 {
 	/*
 	 * When called by       dir is set to
@@ -4907,10 +4907,10 @@ int dir;
 /* the MSS.                                                                 */
 /* ------------------------------------------------------------------------ */
 static void nat_mssclamp(tcp, maxmss, fin, csump)
-tcphdr_t *tcp;
-u_32_t maxmss;
-fr_info_t *fin;
-u_short *csump;
+	tcphdr_t *tcp;
+	u_32_t maxmss;
+	fr_info_t *fin;
+	u_short *csump;
 {
 	u_char *cp, *ep, opt;
 	int hlen, advance;
@@ -4970,8 +4970,8 @@ u_short *csump;
 /* determining which queue it should be placed on.                          */
 /* ------------------------------------------------------------------------ */
 void fr_setnatqueue(nat, rev)
-nat_t *nat;
-int rev;
+	nat_t *nat;
+	int rev;
 {
 	ipftq_t *oifq, *nifq;
 
@@ -5025,8 +5025,8 @@ int rev;
 /* that twice (second time would be in the second switch statement below.   */
 /* ------------------------------------------------------------------------ */
 static int nat_getnext(t, itp)
-ipftoken_t *t;
-ipfgeniter_t *itp;
+	ipftoken_t *t;
+	ipfgeniter_t *itp;
 {
 	hostmap_t *hm, *nexthm = NULL, zerohm;
 	ipnat_t *ipn, *nextipnat = NULL, zeroipn;
@@ -5222,8 +5222,8 @@ ipfgeniter_t *itp;
 /* NAT mappings and the NAT fragment cache.                                 */
 /* ------------------------------------------------------------------------ */
 static int nat_iterator(token, itp)
-ipftoken_t *token;
-ipfgeniter_t *itp;
+	ipftoken_t *token;
+	ipfgeniter_t *itp;
 {
 	int error;
 
@@ -5275,7 +5275,7 @@ ipfgeniter_t *itp;
 /*            for the last 30 minutes to at worst 30 seconds idle.          */
 /* ------------------------------------------------------------------------ */
 static int nat_extraflush(which)
-int which;
+	int which;
 {
 	ipftq_t *ifq, *ifqnext;
 	nat_t *nat, **natp;
@@ -5409,7 +5409,7 @@ int which;
 /* we translate that to mean it always succeeds in deleting something.      */
 /* ------------------------------------------------------------------------ */
 static int nat_flush_entry(entry)
-void *entry;
+	void *entry;
 {
 	nat_delete(entry, NL_FLUSH);
 	return 0;
@@ -5425,7 +5425,7 @@ void *entry;
 /* At present the only table it deals with is the hash bucket statistics.   */
 /* ------------------------------------------------------------------------ */
 static int nat_gettable(data)
-char *data;
+	char *data;
 {
 	ipftable_t table;
 	int error;

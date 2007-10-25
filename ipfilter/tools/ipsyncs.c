@@ -52,8 +52,8 @@ static void handleterm(int sig)
 #define BUFFERLEN 1400
 
 int main(argc, argv)
-int argc;
-char *argv[];
+	int argc;
+	char *argv[];
 {
 	int nfd = -1 , lfd = -1;
 	int n1, n2, n3, magic, len, inbuf;

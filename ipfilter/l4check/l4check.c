@@ -66,7 +66,7 @@ int opts = 0;
 
 
 char *copystr(dst, src)
-char *dst, *src;
+	char *dst, *src;
 {
 	register char *s, *t, c;
 	register int esc = 0;
@@ -95,7 +95,7 @@ char *dst, *src;
 }
 
 void addnat(l4)
-l4cfg_t *l4;
+	l4cfg_t *l4;
 {
 
 	ipnat_t *ipn = &l4->l4_nat;
@@ -118,7 +118,7 @@ l4cfg_t *l4;
 
 
 void delnat(l4)
-l4cfg_t *l4;
+	l4cfg_t *l4;
 {
 	ipnat_t *ipn = &l4->l4_nat;
 
@@ -140,7 +140,7 @@ l4cfg_t *l4;
 
 
 void connectl4(l4)
-l4cfg_t *l4;
+	l4cfg_t *l4;
 {
 	l4->l4_rw = 1;
 	l4->l4_rlen = 0;
@@ -154,8 +154,8 @@ l4cfg_t *l4;
 
 
 void closel4(l4, dead)
-l4cfg_t *l4;
-int dead;
+	l4cfg_t *l4;
+	int dead;
 {
 	close(l4->l4_fd);
 	l4->l4_fd = -1;
@@ -168,7 +168,7 @@ int dead;
 
 
 void connectfd(l4)
-l4cfg_t *l4;
+	l4cfg_t *l4;
 {
 	if (connect(l4->l4_fd, (struct sockaddr *)&l4->l4_sin,
 		    sizeof(l4->l4_sin)) == -1) {
@@ -190,7 +190,7 @@ l4cfg_t *l4;
 
 
 void writefd(l4)
-l4cfg_t *l4;
+	l4cfg_t *l4;
 {
 	int n, i, fd;
 
@@ -221,7 +221,7 @@ l4cfg_t *l4;
 
 
 void readfd(l4)
-l4cfg_t *l4;
+	l4cfg_t *l4;
 {
 	char buf[80], *ptr;
 	int n, i, fd;
@@ -415,10 +415,10 @@ int runconfig()
 
 
 int gethostport(str, lnum, ipp, portp)
-char *str;
-int lnum;
-u_32_t *ipp;
-u_short *portp;
+	char *str;
+	int lnum;
+	u_32_t *ipp;
+	u_short *portp;
 {
 	struct servent *sp;
 	struct hostent *hp;
@@ -465,8 +465,8 @@ u_short *portp;
 
 
 char *mapfile(file, sizep)
-char *file;
-size_t *sizep;
+	char *file;
+	size_t *sizep;
 {
 	struct stat sb;
 	caddr_t addr;
@@ -497,7 +497,7 @@ size_t *sizep;
 
 
 int readconfig(filename)
-char *filename;
+	char *filename;
 {
 	char c, buf[512], *s, *t, *errtxt = NULL, *line;
 	int num, err = 0;
@@ -766,7 +766,7 @@ char *filename;
 
 
 void usage(prog)
-char *prog;
+	char *prog;
 {
 	fprintf(stderr, "Usage: %s -f <configfile>\n", prog);
 	exit(1);
@@ -774,8 +774,8 @@ char *prog;
 
 
 int main(argc, argv)
-int argc;
-char *argv[];
+	int argc;
+	char *argv[];
 {
 	char *config = NULL;
 	int c;

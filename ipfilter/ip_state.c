@@ -394,7 +394,7 @@ static ips_stat_t *fr_statetstats()
 /* the IP addresses and other protocol specific information.                */
 /* ------------------------------------------------------------------------ */
 static int fr_state_remove(data)
-caddr_t data;
+	caddr_t data;
 {
 	ipstate_t *sp, st;
 	int error;
@@ -432,10 +432,10 @@ caddr_t data;
 /* Processes an ioctl call made to operate on the IP Filter state device.   */
 /* ------------------------------------------------------------------------ */
 int fr_state_ioctl(data, cmd, mode, uid, ctx)
-caddr_t data;
-ioctlcmd_t cmd;
-int mode, uid;
-void *ctx;
+	caddr_t data;
+	ioctlcmd_t cmd;
+	int mode, uid;
+	void *ctx;
 {
 	int arg, ret, error = 0;
 	SPL_INT(s);
@@ -643,7 +643,7 @@ void *ctx;
 /* state entries, the retrieval fails.                                      */
 /* ------------------------------------------------------------------------ */
 int fr_stgetent(data)
-caddr_t data;
+	caddr_t data;
 {
 	ipstate_t *is, *isn;
 	ipstate_save_t ips;
@@ -695,7 +695,7 @@ caddr_t data;
 /* output.                                                                  */
 /* ------------------------------------------------------------------------ */
 int fr_stputent(data)
-caddr_t data;
+	caddr_t data;
 {
 	ipstate_t *is, *isn;
 	ipstate_save_t ips;
@@ -816,8 +816,8 @@ caddr_t data;
 /*          Exits with is_lock initialised and held.                        */
 /* ------------------------------------------------------------------------ */
 void fr_stinsert(is, rev)
-ipstate_t *is;
-int rev;
+	ipstate_t *is;
+	int rev;
 {
 	frentry_t *fr;
 	u_int hv;
@@ -900,9 +900,9 @@ int rev;
 /*       when they are deleted.                                             */
 /* ------------------------------------------------------------------------ */
 ipstate_t *fr_addstate(fin, stsave, flags)
-fr_info_t *fin;
-ipstate_t **stsave;
-u_int flags;
+	fr_info_t *fin;
+	ipstate_t **stsave;
+	u_int flags;
 {
 	ipstate_t *is, ips;
 	struct icmp *ic;
@@ -1323,9 +1323,9 @@ u_int flags;
 /* present.  Record details about those that we recogise.                   */
 /* ------------------------------------------------------------------------ */
 static int fr_tcpoptions(fin, tcp, td)
-fr_info_t *fin;
-tcphdr_t *tcp;
-tcpdata_t *td;
+	fr_info_t *fin;
+	tcphdr_t *tcp;
+	tcpdata_t *td;
 {
 	int off, mlen, ol, i, len, retval;
 	char buf[64], *s, opt;
@@ -1421,9 +1421,9 @@ tcpdata_t *td;
 /* for a SYN or a RST or FIN which indicate time to close up shop.          */
 /* ------------------------------------------------------------------------ */
 static int fr_tcpstate(fin, tcp, is)
-fr_info_t *fin;
-tcphdr_t *tcp;
-ipstate_t *is;
+	fr_info_t *fin;
+	tcphdr_t *tcp;
+	ipstate_t *is;
 {
 	int source, ret = 0, flags;
 	tcpdata_t  *fdata, *tdata;
@@ -1524,8 +1524,8 @@ ipstate_t *is;
 /* one ready.                                                               */
 /* ------------------------------------------------------------------------ */
 static void fr_checknewisn(fin, is)
-fr_info_t *fin;
-ipstate_t *is;
+	fr_info_t *fin;
+	ipstate_t *is;
 {
 	u_32_t sumd, old, new;
 	tcphdr_t *tcp;
@@ -1561,10 +1561,10 @@ ipstate_t *is;
 /* are within the window space behind the current sequence # as well.       */
 /* ------------------------------------------------------------------------ */
 int fr_tcpinwindow(fin, fdata, tdata, tcp, flags)
-fr_info_t *fin;
-tcpdata_t  *fdata, *tdata;
-tcphdr_t *tcp;
-int flags;
+	fr_info_t *fin;
+	tcpdata_t  *fdata, *tdata;
+	tcphdr_t *tcp;
+	int flags;
 {
 	tcp_seq seq, ack, end;
 	int ackskew, tcpflags;
@@ -1735,9 +1735,9 @@ int flags;
 /* Create a "duplcate" state table entry from the master.                   */
 /* ------------------------------------------------------------------------ */
 static ipstate_t *fr_stclone(fin, tcp, is)
-fr_info_t *fin;
-tcphdr_t *tcp;
-ipstate_t *is;
+	fr_info_t *fin;
+	tcphdr_t *tcp;
+	ipstate_t *is;
 {
 	ipstate_t *clone;
 	u_32_t send;
@@ -1813,11 +1813,11 @@ ipstate_t *is;
 /* still 0 after the test. no match.                                        */
 /* ------------------------------------------------------------------------ */
 static ipstate_t *fr_matchsrcdst(fin, is, src, dst, tcp, cmask)
-fr_info_t *fin;
-ipstate_t *is;
-i6addr_t *src, *dst;
-tcphdr_t *tcp;
-u_32_t cmask;
+	fr_info_t *fin;
+	ipstate_t *is;
+	i6addr_t *src, *dst;
+	tcphdr_t *tcp;
+	u_32_t cmask;
 {
 	int ret = 0, rev, out, flags, flx = 0, idx;
 	u_short sp, dp;
@@ -2055,7 +2055,7 @@ u_32_t cmask;
 /* If we return non-null then a read-lock on ipf_state is held.             */
 /* ------------------------------------------------------------------------ */
 static ipstate_t *fr_checkicmpmatchingstate(fin)
-fr_info_t *fin;
+	fr_info_t *fin;
 {
 	ipstate_t *is, **isp;
 	u_short sport, dport;
@@ -2301,8 +2301,8 @@ fr_info_t *fin;
 /* Move a state entry from one position in the hash table to another.       */
 /* ------------------------------------------------------------------------ */
 static void fr_ipsmove(is, hv)
-ipstate_t *is;
-u_int hv;
+	ipstate_t *is;
+	u_int hv;
 {
 	ipstate_t **isp;
 	u_int hvm;
@@ -2350,9 +2350,9 @@ u_int hv;
 /* If we return non-null then a read-lock on ipf_state is held.             */
 /* ------------------------------------------------------------------------ */
 ipstate_t *fr_stlookup(fin, tcp, ifqp)
-fr_info_t *fin;
-tcphdr_t *tcp;
-ipftq_t **ifqp;
+	fr_info_t *fin;
+	tcphdr_t *tcp;
+	ipftq_t **ifqp;
 {
 	u_int hv, hvm, pr, v, tryagain;
 	ipstate_t *is, **isp;
@@ -2624,9 +2624,9 @@ retry_tcpudp:
 /* fragment cache with a new entry as required.                             */
 /* ------------------------------------------------------------------------ */
 void fr_updatestate(fin, is, ifq)
-fr_info_t *fin;
-ipstate_t *is;
-ipftq_t *ifq;
+	fr_info_t *fin;
+	ipstate_t *is;
+	ipftq_t *ifq;
 {
 	ipftqent_t *tqe;
 	int i, pass;
@@ -2678,8 +2678,8 @@ ipftq_t *ifq;
 /* Check if a packet is associated with an entry in the state table.        */
 /* ------------------------------------------------------------------------ */
 frentry_t *fr_checkstate(fin, passp)
-fr_info_t *fin;
-u_32_t *passp;
+	fr_info_t *fin;
+	u_32_t *passp;
 {
 	ipstate_t *is;
 	frentry_t *fr;
@@ -2797,8 +2797,8 @@ matched:
 /* TCP checksum to match that change.                                       */
 /* ------------------------------------------------------------------------ */
 static void fr_fixoutisn(fin, is)
-fr_info_t *fin;
-ipstate_t *is;
+	fr_info_t *fin;
+	ipstate_t *is;
 {
 	tcphdr_t *tcp;
 	int rev;
@@ -2835,8 +2835,8 @@ ipstate_t *is;
 /* TCP checksum to match that change.                                       */
 /* ------------------------------------------------------------------------ */
 static void fr_fixinisn(fin, is)
-fr_info_t *fin;
-ipstate_t *is;
+	fr_info_t *fin;
+	ipstate_t *is;
 {
 	tcphdr_t *tcp;
 	int rev;
@@ -2876,7 +2876,7 @@ ipstate_t *is;
 /* existing, matching, uses of it.                                          */
 /* ------------------------------------------------------------------------ */
 void fr_statesync(ifp)
-void *ifp;
+	void *ifp;
 {
 	ipstate_t *is;
 	int i;
@@ -2917,8 +2917,8 @@ void *ifp;
 /* global counters as required.                                             */
 /* ------------------------------------------------------------------------ */
 static int fr_delstate(is, why)
-ipstate_t *is;
-int why;
+	ipstate_t *is;
+	int why;
 {
 
 	/*
@@ -3106,7 +3106,7 @@ void fr_timeoutstate()
 /*            for the last 30 minutes to at worst 30 seconds idle.          */
 /* ------------------------------------------------------------------------ */
 static int fr_state_flush(which, proto)
-int which, proto;
+	int which, proto;
 {
 	ipftq_t *ifq, *ifqnext;
 	ipftqent_t *tqe, *tqn;
@@ -3252,7 +3252,7 @@ int which, proto;
 /* ipf_queueflush() function.                                               */
 /* ------------------------------------------------------------------------ */
 static int fr_state_flush_entry(entry)
-void *entry;
+	void *entry;
 {
 	return fr_delstate(entry, ISL_FLUSH);
 }
@@ -3308,10 +3308,10 @@ void *entry;
 /* Locking: it is assumed that the parent of the tqe structure is locked.   */
 /* ------------------------------------------------------------------------ */
 int fr_tcp_age(tqe, fin, tqtab, flags)
-ipftqent_t *tqe;
-fr_info_t *fin;
-ipftq_t *tqtab;
-int flags;
+	ipftqent_t *tqe;
+	fr_info_t *fin;
+	ipftq_t *tqtab;
+	int flags;
 {
 	int dlen, ostate, nstate, rval, dir;
 	u_char tcpflags;
@@ -3657,8 +3657,8 @@ int flags;
 /* protocol specific information.                                           */
 /* ------------------------------------------------------------------------ */
 void ipstate_log(is, type)
-struct ipstate *is;
-u_int type;
+	struct ipstate *is;
+	u_int type;
 {
 #ifdef	IPFILTER_LOG
 	struct	ipslog	ipsl;
@@ -3729,7 +3729,7 @@ u_int type;
 /* the ICMPv6 packet, look for a matching state table entry.                */
 /* ------------------------------------------------------------------------ */
 static ipstate_t *fr_checkicmp6matchingstate(fin)
-fr_info_t *fin;
+	fr_info_t *fin;
 {
 	struct icmp6_hdr *ic6, *oic;
 	int type, backward, i;
@@ -3905,7 +3905,7 @@ fr_info_t *fin;
 /* Initialise the array of timeout queues for TCP.                          */
 /* ------------------------------------------------------------------------ */
 void fr_sttab_init(tqp)
-ipftq_t *tqp;
+	ipftq_t *tqp;
 {
 	int i;
 
@@ -3942,7 +3942,7 @@ ipftq_t *tqp;
 /* of timeout queues for TCP.                                               */
 /* ------------------------------------------------------------------------ */
 void fr_sttab_destroy(tqp)
-ipftq_t *tqp;
+	ipftq_t *tqp;
 {
 	int i;
 
@@ -3983,7 +3983,7 @@ ipftq_t *tqp;
 /*    dir == 1 : a packet from dest to source                               */
 /* ------------------------------------------------------------------------ */
 void fr_statederef(isp)
-ipstate_t **isp;
+	ipstate_t **isp;
 {
 	ipstate_t *is;
 
@@ -4021,8 +4021,8 @@ ipstate_t **isp;
 /* determining which queue it should be placed on.                          */
 /* ------------------------------------------------------------------------ */
 void fr_setstatequeue(is, rev)
-ipstate_t *is;
-int rev;
+	ipstate_t *is;
+	int rev;
 {
 	ipftq_t *oifq, *nifq;
 
@@ -4089,8 +4089,8 @@ int rev;
 /* walks through the list of entries in the state table list (ips_list.)    */
 /* ------------------------------------------------------------------------ */
 static int fr_stateiter(token, itp)
-ipftoken_t *token;
-ipfgeniter_t *itp;
+	ipftoken_t *token;
+	ipfgeniter_t *itp;
 {
 	ipstate_t *is, *next, zero;
 	int error, count;
@@ -4177,7 +4177,7 @@ ipfgeniter_t *itp;
 /* At present the only table it deals with is the hash bucket statistics.   */
 /* ------------------------------------------------------------------------ */
 static int fr_stgettable(data)
-char *data;
+	char *data;
 {
 	ipftable_t table;
 	int error;

@@ -84,10 +84,10 @@ struct vdldrv vd =
 
 
 xxxinit(fc, vdp, data, vds)
-u_int	fc;
-struct	vddrv	*vdp;
-caddr_t	data;
-struct	vdstat	*vds;
+	u_int	fc;
+	struct	vddrv	*vdp;
+	caddr_t	data;
+	struct	vdstat	*vds;
 {
 	struct vdioctl_load *vdi = (struct vdioctl_load *)data;
 	int err;

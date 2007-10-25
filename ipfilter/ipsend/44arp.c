@@ -42,7 +42,7 @@
  * (4 bytes)
  */
 int	resolve(host, address)
-char	*host, *address;
+	char	*host, *address;
 {
         struct	hostent	*hp;
         u_long	add;
@@ -64,7 +64,7 @@ char	*host, *address;
 
 
 int	arp(addr, eaddr)
-char	*addr, *eaddr;
+	char	*addr, *eaddr;
 {
 	int	mib[6];
 	size_t	needed;

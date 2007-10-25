@@ -12,8 +12,8 @@
 
 
 void printbuf(buf, len, zend)
-char *buf;
-int len, zend;
+	char *buf;
+	int len, zend;
 {
 	char *s, c;
 	int i;

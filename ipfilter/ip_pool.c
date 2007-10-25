@@ -172,7 +172,7 @@ main(argc, argv)
 	ip_pool_insert(ipo, &a.adf_addr, &b.adf_addr, 1);
 	ip_pool_insert(ipo, &a.adf_addr, &b.adf_addr, 1);
 #ifdef	DEBUG_POOL
-treeprint(ipo);
+	treeprint(ipo);
 #endif
 	ip.in4.s_addr = 0x0a00aabb;
 	printf("search(%#x) = %d (0)\n", ip.in4.s_addr,
@@ -211,7 +211,7 @@ treeprint(ipo);
 		ip_pool_search(ipo, 4, &ip));
 
 #ifdef	DEBUG_POOL
-treeprint(ipo);
+	treeprint(ipo);
 #endif
 
 	ip_pool_fini();
@@ -222,7 +222,7 @@ treeprint(ipo);
 
 void
 treeprint(ipo)
-ip_pool_t *ipo;
+	ip_pool_t *ipo;
 {
 	ip_pool_node_t *c;
 
@@ -289,7 +289,7 @@ void ip_pool_fini()
 /* pointers as appropriate for later use.                                   */
 /* ------------------------------------------------------------------------ */
 int ip_pool_statistics(op)
-iplookupop_t *op;
+	iplookupop_t *op;
 {
 	ip_pool_stat_t stats;
 	int unit, i, err = 0;
@@ -325,8 +325,8 @@ iplookupop_t *op;
 /* device, indicated by the unit number.                                    */
 /* ------------------------------------------------------------------------ */
 static void *ip_pool_exists(unit, name)
-int unit;
-char *name;
+	int unit;
+	char *name;
 {
 	ip_pool_t *p;
 
@@ -347,8 +347,8 @@ char *name;
 /* pretend it does not exist.                                               */
 /* ------------------------------------------------------------------------ */
 void *ip_pool_find(unit, name)
-int unit;
-char *name;
+	int unit;
+	char *name;
 {
 	ip_pool_t *p;
 
@@ -370,8 +370,8 @@ char *name;
 /* Searches for an exact match of an entry in the pool.                     */
 /* ------------------------------------------------------------------------ */
 ip_pool_node_t *ip_pool_findeq(ipo, addr, mask)
-ip_pool_t *ipo;
-addrfamily_t *addr, *mask;
+	ip_pool_t *ipo;
+	addrfamily_t *addr, *mask;
 {
 	struct radix_node *n;
 	SPL_INT(s);
@@ -395,9 +395,9 @@ addrfamily_t *addr, *mask;
 /* Search the pool for a given address and return a search result.          */
 /* ------------------------------------------------------------------------ */
 int ip_pool_search(tptr, ipversion, dptr)
-void *tptr;
-int ipversion;
-void *dptr;
+	void *tptr;
+	int ipversion;
+	void *dptr;
 {
 	struct radix_node *rn;
 	ip_pool_node_t *m;
@@ -457,9 +457,9 @@ void *dptr;
 /* in (addr, mask, info) shold all be stored in the node.                   */
 /* ------------------------------------------------------------------------ */
 int ip_pool_insert(ipo, addr, mask, info)
-ip_pool_t *ipo;
-i6addr_t *addr, *mask;
-int info;
+	ip_pool_t *ipo;
+	i6addr_t *addr, *mask;
+	int info;
 {
 	struct radix_node *rn;
 	ip_pool_node_t *x;
@@ -522,7 +522,7 @@ int info;
 /* and now want to repopulate it with "new" data.                           */
 /* ------------------------------------------------------------------------ */
 int ip_pool_create(op)
-iplookupop_t *op;
+	iplookupop_t *op;
 {
 	char name[FR_GROUPLEN];
 	int poolnum, unit;
@@ -608,8 +608,8 @@ iplookupop_t *op;
 /* Remove a node from the pool given by ipo.                                */
 /* ------------------------------------------------------------------------ */
 int ip_pool_remove(ipo, ipe)
-ip_pool_t *ipo;
-ip_pool_node_t *ipe;
+	ip_pool_t *ipo;
+	ip_pool_node_t *ipe;
 {
 
 	if (ipe->ipn_pnext != NULL)
@@ -643,8 +643,8 @@ ip_pool_node_t *ipe;
 /* assertion that one of the two (ip_poolrw,ipf_global) is held.            */
 /* ------------------------------------------------------------------------ */
 int ip_pool_destroy(unit, name)
-int unit;
-char *name;
+	int unit;
+	char *name;
 {
 	ip_pool_t *ipo;
 
@@ -677,7 +677,7 @@ char *name;
 /* assertion that one of the two (ip_poolrw,ipf_global) is held.            */
 /* ------------------------------------------------------------------------ */
 int ip_pool_flush(fp)
-iplookupflush_t *fp;
+	iplookupflush_t *fp;
 {
 	int i, num = 0, unit, err;
 	ip_pool_t *p, *q;
@@ -719,7 +719,7 @@ iplookupflush_t *fp;
 /* assertion that one of the two (ip_poolrw,ipf_global) is held.            */
 /* ------------------------------------------------------------------------ */
 void ip_pool_free(ipo)
-ip_pool_t *ipo;
+	ip_pool_t *ipo;
 {
 
 	ip_pool_clearnodes(ipo);
@@ -743,7 +743,7 @@ ip_pool_t *ipo;
 /* Deletes all nodes stored in a pool structure.                            */
 /* ------------------------------------------------------------------------ */
 static void ip_pool_clearnodes(ipo)
-ip_pool_t *ipo;
+	ip_pool_t *ipo;
 {
 	ip_pool_node_t *n;
 
@@ -776,7 +776,7 @@ ip_pool_t *ipo;
 /* we arrive at zero known references, free it.                             */
 /* ------------------------------------------------------------------------ */
 void ip_pool_deref(ipo)
-ip_pool_t *ipo;
+	ip_pool_t *ipo;
 {
 
 	ipo->ipo_ref--;
@@ -799,7 +799,7 @@ ip_pool_t *ipo;
 /* it all up and adjust the stats accordingly.                              */
 /* ------------------------------------------------------------------------ */
 void ip_pool_node_deref(ipn)
-ip_pool_node_t *ipn;
+	ip_pool_node_t *ipn;
 {
 
 	ipn->ipn_ref--;
@@ -819,8 +819,8 @@ ip_pool_node_t *ipn;
 /*                                                                          */
 /* ------------------------------------------------------------------------ */
 int ip_pool_getnext(token, ilp)
-ipftoken_t *token;
-ipflookupiter_t *ilp;
+	ipftoken_t *token;
+	ipflookupiter_t *ilp;
 {
 	ip_pool_node_t *node, zn, *nextnode;
 	ip_pool_t *ipo, zp, *nextipo;
@@ -924,9 +924,9 @@ ipflookupiter_t *ilp;
 /*                                                                          */
 /* ------------------------------------------------------------------------ */
 void ip_pool_iterderef(otype, unit, data)
-u_int otype;
-int unit;
-void *data;
+	u_int otype;
+	int unit;
+	void *data;
 {
 
 	if (data == NULL)

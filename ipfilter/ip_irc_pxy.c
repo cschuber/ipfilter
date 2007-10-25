@@ -65,9 +65,9 @@ const char *ippr_irc_dcctypes[] = {
 
 
 int ippr_irc_complete(ircp, buf, len)
-ircinfo_t *ircp;
-char *buf;
-size_t len;
+	ircinfo_t *ircp;
+	char *buf;
+	size_t len;
 {
 	register char *s, c;
 	register size_t i;
@@ -223,9 +223,9 @@ size_t len;
 
 
 int ippr_irc_new(fin, aps, nat)
-fr_info_t *fin;
-ap_session_t *aps;
-nat_t *nat;
+	fr_info_t *fin;
+	ap_session_t *aps;
+	nat_t *nat;
 {
 	ircinfo_t *irc;
 
@@ -245,8 +245,8 @@ nat_t *nat;
 
 
 int ippr_irc_send(fin, nat)
-fr_info_t *fin;
-nat_t *nat;
+	fr_info_t *fin;
+	nat_t *nat;
 {
 	char ctcpbuf[IPF_IRCBUFSZ], newbuf[IPF_IRCBUFSZ];
 	tcphdr_t *tcp, tcph, *tcp2 = &tcph;
@@ -424,9 +424,9 @@ nat_t *nat;
 
 
 int ippr_irc_out(fin, aps, nat)
-fr_info_t *fin;
-ap_session_t *aps;
-nat_t *nat;
+	fr_info_t *fin;
+	ap_session_t *aps;
+	nat_t *nat;
 {
 	aps = aps;	/* LINT */
 	return ippr_irc_send(fin, nat);

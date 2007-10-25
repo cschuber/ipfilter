@@ -164,8 +164,8 @@ int ipfsync_init()
 /* need to be used at both ends by the host in their native byte order.     */
 /* ------------------------------------------------------------------------ */
 void ipfsync_tcporder(way, td)
-int way;
-tcpdata_t *td;
+	int way;
+	tcpdata_t *td;
 {
 	if (way) {
 		td->td_maxwin = htons(td->td_maxwin);
@@ -189,8 +189,8 @@ tcpdata_t *td;
 /* used at both ends by the host in their native byte order.                */
 /* ------------------------------------------------------------------------ */
 void ipfsync_natorder(way, n)
-int way;
-nat_t *n;
+	int way;
+	nat_t *n;
 {
 	if (way) {
 		n->nat_age = htonl(n->nat_age);
@@ -218,8 +218,8 @@ nat_t *n;
 /* be used at both ends by the host in their native byte order.             */
 /* ------------------------------------------------------------------------ */
 void ipfsync_storder(way, ips)
-int way;
-ipstate_t *ips;
+	int way;
+	ipstate_t *ips;
 {
 	ipfsync_tcporder(way, &ips->is_tcp.ts_data[0]);
 	ipfsync_tcporder(way, &ips->is_tcp.ts_data[1]);
@@ -278,7 +278,7 @@ ipstate_t *ips;
 /* structures in the state/NAT tables.                                      */
 /* ------------------------------------------------------------------------ */
 int ipfsync_write(uio)
-struct uio *uio;
+	struct uio *uio;
 {
 	synchdr_t sh;
 
@@ -417,7 +417,7 @@ struct uio *uio;
 /* put to sleep, pending a wakeup from the "lower half" of this code.       */
 /* ------------------------------------------------------------------------ */
 int ipfsync_read(uio)
-struct uio *uio;
+	struct uio *uio;
 {
 	syncupdent_t *su;
 	synclogent_t *sl;
@@ -510,8 +510,8 @@ struct uio *uio;
 /* structures being timed out correctly.                                    */
 /* ------------------------------------------------------------------------ */
 int ipfsync_state(sp, data)
-synchdr_t *sp;
-void *data;
+	synchdr_t *sp;
+	void *data;
 {
 	synctcp_update_t su;
 	ipstate_t *is, sn;
@@ -673,7 +673,7 @@ void *data;
 /* Deletes an object from the synclist table and free's its memory.         */
 /* ------------------------------------------------------------------------ */
 void ipfsync_del(sl)
-synclist_t *sl;
+	synclist_t *sl;
 {
 	WRITE_ENTER(&ipf_syncstate);
 	*sl->sl_pnext = sl->sl_next;
@@ -699,8 +699,8 @@ synclist_t *sl;
 /* structures being timed out correctly.                                    */
 /* ------------------------------------------------------------------------ */
 int ipfsync_nat(sp, data)
-synchdr_t *sp;
-void *data;
+	synchdr_t *sp;
+	void *data;
 {
 	syncupdent_t su;
 	nat_t *n, *nat;
@@ -793,9 +793,9 @@ void *data;
 /* waiting to be processed.                                                 */
 /* ------------------------------------------------------------------------ */
 synclist_t *ipfsync_new(tab, fin, ptr)
-int tab;
-fr_info_t *fin;
-void *ptr;
+	int tab;
+	fr_info_t *fin;
+	void *ptr;
 {
 	synclist_t *sl, *ss;
 	synclogent_t *sle;
@@ -909,9 +909,9 @@ void *ptr;
 /* process to read.                                                         */
 /* ------------------------------------------------------------------------ */
 void ipfsync_update(tab, fin, sl)
-int tab;
-fr_info_t *fin;
-synclist_t *sl;
+	int tab;
+	fr_info_t *fin;
+	synclist_t *sl;
 {
 	synctcp_update_t *st;
 	syncupdent_t *slu;
@@ -996,10 +996,10 @@ synclist_t *sl;
 /* EINVAL on all occasions.                                                 */
 /* ------------------------------------------------------------------------ */
 int fr_sync_ioctl(data, cmd, mode, uid, ctx)
-caddr_t data;
-ioctlcmd_t cmd;
-int mode, uid;
-void *ctx;
+	caddr_t data;
+	ioctlcmd_t cmd;
+	int mode, uid;
+	void *ctx;
 {
 	return EINVAL;
 }

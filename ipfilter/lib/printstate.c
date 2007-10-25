@@ -11,9 +11,9 @@
 #define	FPRINTF	(void)fprintf
 
 ipstate_t *printstate(sp, opts, now)
-ipstate_t *sp;
-int opts;
-u_long now;
+	ipstate_t *sp;
+	int opts;
+	u_long now;
 {
 	synclist_t ipsync;
 

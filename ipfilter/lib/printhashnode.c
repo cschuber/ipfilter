@@ -10,10 +10,10 @@
 #define	FPRINTF	(void)fprintf
 
 iphtent_t *printhashnode(iph, ipep, copyfunc, opts)
-iphtable_t *iph;
-iphtent_t *ipep;
-copyfunc_t copyfunc;
-int opts;
+	iphtable_t *iph;
+	iphtent_t *ipep;
+	copyfunc_t copyfunc;
+	int opts;
 {
 	iphtent_t ipe;
 

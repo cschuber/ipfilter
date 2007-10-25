@@ -9,8 +9,8 @@
 #include "ipf.h"
 
 void printhostmap(hmp, hv)
-hostmap_t *hmp;
-u_int hv;
+	hostmap_t *hmp;
+	u_int hv;
 {
 
 	printf("%s,", inet_ntoa(hmp->hm_srcip));

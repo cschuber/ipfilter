@@ -82,9 +82,9 @@ void ippr_ipsec_fini()
  * Setup for a new IPSEC proxy.
  */
 int ippr_ipsec_new(fin, aps, nat)
-fr_info_t *fin;
-ap_session_t *aps;
-nat_t *nat;
+	fr_info_t *fin;
+	ap_session_t *aps;
+	nat_t *nat;
 {
 	ipsec_pxy_t *ipsec;
 	fr_info_t fi;
@@ -189,9 +189,9 @@ nat_t *nat;
  * we can.  If they have disappeared, recreate them.
  */
 int ippr_ipsec_inout(fin, aps, nat)
-fr_info_t *fin;
-ap_session_t *aps;
-nat_t *nat;
+	fr_info_t *fin;
+	ap_session_t *aps;
+	nat_t *nat;
 {
 	ipsec_pxy_t *ipsec;
 	fr_info_t fi;
@@ -271,9 +271,9 @@ nat_t *nat;
  * UDP/TCP port numbers).
  */
 int ippr_ipsec_match(fin, aps, nat)
-fr_info_t *fin;
-ap_session_t *aps;
-nat_t *nat;
+	fr_info_t *fin;
+	ap_session_t *aps;
+	nat_t *nat;
 {
 	ipsec_pxy_t *ipsec;
 	u_32_t cookies[4];
@@ -315,7 +315,7 @@ nat_t *nat;
  * clean up after ourselves.
  */
 void ippr_ipsec_del(aps)
-ap_session_t *aps;
+	ap_session_t *aps;
 {
 	ipsec_pxy_t *ipsec;
 

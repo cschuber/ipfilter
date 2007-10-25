@@ -93,7 +93,7 @@ void	showtqtable_live __P((int));
 int	opts;
 
 void usage(name)
-char *name;
+	char *name;
 {
 	fprintf(stderr, "Usage: %s [-CFhlnrRsv] [-f filename]\n", name);
 	exit(1);
@@ -101,8 +101,8 @@ char *name;
 
 
 int main(argc, argv)
-int argc;
-char *argv[];
+	int argc;
+	char *argv[];
 {
 	char *file, *core, *kernel;
 	natstat_t ns, *nsp;
@@ -229,8 +229,8 @@ char *argv[];
  * rather than doing ioctl's.
  */
 void natstat_dead(nsp, kernel)
-natstat_t *nsp;
-char *kernel;
+	natstat_t *nsp;
+	char *kernel;
 {
 	struct nlist nat_nlist[10] = {
 		{ "nat_table" },		/* 0 */
@@ -284,7 +284,7 @@ char *kernel;
  * table or both.
  */
 void flushtable(fd, opts)
-int fd, opts;
+	int fd, opts;
 {
 	int n = 0;
 
@@ -310,8 +310,8 @@ int fd, opts;
  * Display NAT statistics.
  */
 void dostats_dead(nsp, opts)
-natstat_t *nsp;
-int opts;
+	natstat_t *nsp;
+	int opts;
 {
 	nat_t *np, nat;
 	ipnat_t	ipn;
@@ -345,8 +345,8 @@ int opts;
 
 
 void dostats(fd, nsp, opts, alive)
-natstat_t *nsp;
-int fd, opts, alive;
+	natstat_t *nsp;
+	int fd, opts, alive;
 {
 	/*
 	 * Show statistics ?
@@ -379,8 +379,8 @@ int fd, opts, alive;
 
 
 void dotable(nsp, fd, alive)
-natstat_t *nsp;
-int fd, alive;
+	natstat_t *nsp;
+	int fd, alive;
 {
 	int sz, i, used, totallen, maxlen, minlen;
 	ipftable_t table;
@@ -439,8 +439,8 @@ int fd, alive;
  * Display NAT statistics.
  */
 void dostats_live(fd, nsp, opts)
-natstat_t *nsp;
-int fd, opts;
+	natstat_t *nsp;
+	int fd, opts;
 {
 	ipfgeniter_t iter;
 	ipfobj_t obj;
@@ -494,7 +494,7 @@ int fd, opts;
  * Display the active host mapping table.
  */
 void showhostmap_dead(nsp)
-natstat_t *nsp;
+	natstat_t *nsp;
 {
 	hostmap_t hm, *hmp, **maptable;
 	u_int hv;
@@ -530,8 +530,8 @@ natstat_t *nsp;
  * Display the active host mapping table.
  */
 void showhostmap_live(fd, nsp)
-int fd;
-natstat_t *nsp;
+	int fd;
+	natstat_t *nsp;
 {
 	ipfgeniter_t iter;
 	hostmap_t hm;
@@ -559,7 +559,7 @@ natstat_t *nsp;
 
 
 void showtqtable_live(fd)
-int fd;
+	int fd;
 {
 	ipftq_t table[IPF_TCP_NSTATES];
 	ipfobj_t obj;

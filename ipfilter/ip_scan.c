@@ -105,7 +105,7 @@ void fr_scanunload()
 
 
 int ipsc_add(data)
-caddr_t data;
+	caddr_t data;
 {
 	ipscan_t *i, *isc;
 	int err;
@@ -152,7 +152,7 @@ caddr_t data;
 
 
 int ipsc_delete(data)
-caddr_t data;
+	caddr_t data;
 {
 	ipscan_t isc, *i;
 	int err;
@@ -191,7 +191,7 @@ caddr_t data;
 
 
 struct ipscan *ipsc_lookup(tag)
-char *tag;
+	char *tag;
 {
 	ipscan_t *i;
 
@@ -203,7 +203,7 @@ char *tag;
 
 
 int ipsc_attachfr(fr)
-struct frentry *fr;
+	struct frentry *fr;
 {
 	ipscan_t *i;
 
@@ -223,7 +223,7 @@ struct frentry *fr;
 
 
 int ipsc_attachis(is)
-struct ipstate *is;
+	struct ipstate *is;
 {
 	frentry_t *fr;
 	ipscan_t *i;
@@ -251,7 +251,7 @@ struct ipstate *is;
 
 
 int ipsc_detachfr(fr)
-struct frentry *fr;
+	struct frentry *fr;
 {
 	ipscan_t *i;
 
@@ -264,7 +264,7 @@ struct frentry *fr;
 
 
 int ipsc_detachis(is)
-struct ipstate *is;
+	struct ipstate *is;
 {
 	ipscan_t *i;
 
@@ -283,9 +283,9 @@ struct ipstate *is;
  * 'string' compare for scanning
  */
 int ipsc_matchstr(sp, str, n)
-sinfo_t *sp;
-char *str;
-int n;
+	sinfo_t *sp;
+	char *str;
+	int n;
 {
 	char *s, *t, *up;
 	int i = n;
@@ -317,9 +317,9 @@ int n;
  * 1 if just client
  */
 int ipsc_matchisc(isc, is, cl, sl, maxm)
-ipscan_t *isc;
-ipstate_t *is;
-int cl, sl, maxm[2];
+	ipscan_t *isc;
+	ipstate_t *is;
+	int cl, sl, maxm[2];
 {
 	int i, j, k, n, ret = 0, flags;
 
@@ -382,7 +382,7 @@ int cl, sl, maxm[2];
 
 
 int ipsc_match(is)
-ipstate_t *is;
+	ipstate_t *is;
 {
 	int i, j, k, n, cl, sl, maxm[2];
 	ipscan_t *isc, *lm;
@@ -509,8 +509,8 @@ ipstate_t *is;
  * check if a packet matches what we're scanning for
  */
 int ipsc_packet(fin, is)
-fr_info_t *fin;
-ipstate_t *is;
+	fr_info_t *fin;
+	ipstate_t *is;
 {
 	int i, j, rv, dlen, off, thoff;
 	u_32_t seq, s0;
@@ -568,10 +568,10 @@ ipstate_t *is;
 
 
 int fr_scan_ioctl(data, cmd, mode, uid, ctx)
-caddr_t data;
-ioctlcmd_t cmd;
-int mode, uid;
-void *ctx;
+	caddr_t data;
+	ioctlcmd_t cmd;
+	int mode, uid;
+	void *ctx;
 {
 	ipscanstat_t ipscs;
 	int err = 0;

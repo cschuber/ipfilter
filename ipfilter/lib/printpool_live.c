@@ -13,10 +13,10 @@
 
 
 ip_pool_t *printpool_live(pool, fd, name, opts)
-ip_pool_t *pool;
-int fd;
-char *name;
-int opts;
+	ip_pool_t *pool;
+	int fd;
+	char *name;
+	int opts;
 {
 	ip_pool_node_t entry, *top, *node;
 	ipflookupiter_t iter;

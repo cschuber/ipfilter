@@ -46,8 +46,8 @@ static	u_short	tx_portnum __P((char *));
  * straight inet_addr() call
  */
 static	u_32_t	tx_hostnum(host, resolved)
-char	*host;
-int	*resolved;
+	char	*host;
+	int	*resolved;
 {
 	u_32_t	ipa;
 
@@ -71,7 +71,7 @@ int	*resolved;
  * straight atoi()
  */
 static	u_short	tx_portnum(name)
-char	*name;
+	char	*name;
 {
 	struct	servent	*sp;
 
@@ -93,7 +93,7 @@ char	*tx_icmptypes[] = {
 };
 
 static	int	text_open(fname)
-char	*fname;
+	char	*fname;
 {
 	if (tfp && tfd != -1) {
 		rewind(tfp);
@@ -122,8 +122,8 @@ static	int	text_close()
 
 
 static	int	text_readip(buf, cnt, ifn, dir)
-char	*buf, **ifn;
-int	cnt, *dir;
+	char	*buf, **ifn;
+	int	cnt, *dir;
 {
 	register char *s;
 	char	line[513];
@@ -154,10 +154,10 @@ int	cnt, *dir;
 }
 
 static	int	parseline(line, ip, ifn, out)
-char	*line;
-ip_t	*ip;
-char	**ifn;
-int	*out;
+	char	*line;
+	ip_t	*ip;
+	char	**ifn;
+	int	*out;
 {
 	tcphdr_t	th, *tcp = &th;
 	struct	icmp	icmp, *ic = &icmp;

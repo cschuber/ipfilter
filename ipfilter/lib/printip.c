@@ -10,7 +10,7 @@
 
 
 void	printip(addr)
-u_32_t	*addr;
+	u_32_t	*addr;
 {
 	struct in_addr ipa;
 

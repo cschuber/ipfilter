@@ -73,8 +73,8 @@ static	ioctlfunc_t	iocfunctions[IPL_LOGSIZE] = { ipftestioctl,
 
 
 int main(argc,argv)
-int argc;
-char *argv[];
+	int argc;
+	char *argv[];
 {
 	char	*datain, *iface, *ifname, *logout;
 	int	fd, i, dir, c, loaded, dump, hlen;
@@ -478,9 +478,9 @@ int ipooltestioctl(int dev, ioctlcmd_t cmd, ...)
 }
 #else
 int ipftestioctl(dev, cmd, data)
-dev_t dev;
-ioctlcmd_t cmd;
-void *data;
+	dev_t dev;
+	ioctlcmd_t cmd;
+	void *data;
 {
 	int i;
 
@@ -496,9 +496,9 @@ void *data;
 
 
 int ipnattestioctl(dev, cmd, data)
-dev_t dev;
-ioctlcmd_t cmd;
-void *data;
+	dev_t dev;
+	ioctlcmd_t cmd;
+	void *data;
 {
 	int i;
 
@@ -514,9 +514,9 @@ void *data;
 
 
 int ipstatetestioctl(dev, cmd, data)
-dev_t dev;
-ioctlcmd_t cmd;
-void *data;
+	dev_t dev;
+	ioctlcmd_t cmd;
+	void *data;
 {
 	int i;
 
@@ -532,9 +532,9 @@ void *data;
 
 
 int ipauthtestioctl(dev, cmd, data)
-dev_t dev;
-ioctlcmd_t cmd;
-void *data;
+	dev_t dev;
+	ioctlcmd_t cmd;
+	void *data;
 {
 	int i;
 
@@ -550,9 +550,9 @@ void *data;
 
 
 int ipsynctestioctl(dev, cmd, data)
-dev_t dev;
-ioctlcmd_t cmd;
-void *data;
+	dev_t dev;
+	ioctlcmd_t cmd;
+	void *data;
 {
 	int i;
 
@@ -568,9 +568,9 @@ void *data;
 
 
 int ipscantestioctl(dev, cmd, data)
-dev_t dev;
-ioctlcmd_t cmd;
-void *data;
+	dev_t dev;
+	ioctlcmd_t cmd;
+	void *data;
 {
 	int i;
 
@@ -586,9 +586,9 @@ void *data;
 
 
 int ipooltestioctl(dev, cmd, data)
-dev_t dev;
-ioctlcmd_t cmd;
-void *data;
+	dev_t dev;
+	ioctlcmd_t cmd;
+	void *data;
 {
 	int i;
 
@@ -605,9 +605,9 @@ void *data;
 
 
 int kmemcpy(addr, offset, size)
-char *addr;
-long offset;
-int size;
+	char *addr;
+	long offset;
+	int size;
 {
 	bcopy((char *)offset, addr, size);
 	return 0;
@@ -615,9 +615,9 @@ int size;
 
 
 int kstrncpy(buf, pos, n)
-char *buf;
-long pos;
-int n;
+	char *buf;
+	long pos;
+	int n;
 {
 	char *ptr;
 
@@ -725,7 +725,7 @@ void dumpgroups()
 
 
 void drain_log(filename)
-char *filename;
+	char *filename;
 {
 	char buffer[DEFAULT_IPFLOGSIZE];
 	struct iovec iov;
@@ -767,8 +767,8 @@ char *filename;
 
 
 void fixv4sums(m, ip)
-mb_t *m;
-ip_t *ip;
+	mb_t *m;
+	ip_t *ip;
 {
 	u_char *csump, *hdr;
 

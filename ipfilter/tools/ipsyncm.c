@@ -52,8 +52,8 @@ static void handleterm(int sig)
 #define BUFFERLEN 1400
 
 int main(argc, argv)
-int argc;
-char *argv[];
+	int argc;
+	char *argv[];
 {
 	struct sockaddr_in sin;
 	char buff[BUFFERLEN];

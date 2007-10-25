@@ -12,8 +12,8 @@
 #include <sys/ioctl.h>
 
 char *kvatoname(func, iocfunc)
-ipfunc_t func;
-ioctlfunc_t iocfunc;
+	ipfunc_t func;
+	ioctlfunc_t iocfunc;
 {
 	static char funcname[40];
 	ipfunc_resolve_t res;

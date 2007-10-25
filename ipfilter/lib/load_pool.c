@@ -16,8 +16,8 @@ static int poolfd = -1;
 
 
 int load_pool(plp, iocfunc)
-ip_pool_t *plp;
-ioctlfunc_t iocfunc;
+	ip_pool_t *plp;
+	ioctlfunc_t iocfunc;
 {
 	iplookupop_t op;
 	ip_pool_node_t *a;

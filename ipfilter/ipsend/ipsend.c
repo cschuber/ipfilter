@@ -66,7 +66,7 @@ int	main __P((int, char **));
 
 
 static	void	usage(prog)
-char	*prog;
+	char	*prog;
 {
 	fprintf(stderr, "Usage: %s [options] dest [flags]\n\
 \toptions:\n\
@@ -95,8 +95,8 @@ char	*prog;
 
 
 static void do_icmp(ip, args)
-ip_t *ip;
-char *args;
+	ip_t *ip;
+	char *args;
 {
 	struct	icmp	*ic;
 	char	*s;
@@ -146,10 +146,10 @@ char *args;
 
 
 int send_packets(dev, mtu, ip, gwip)
-char *dev;
-int mtu;
-ip_t *ip;
-struct in_addr gwip;
+	char *dev;
+	int mtu;
+	ip_t *ip;
+	struct in_addr gwip;
 {
 	int wfd;
 
@@ -192,8 +192,8 @@ udpcksum(ip_t *ip, struct udphdr *udp, int len)
 }
 
 int main(argc, argv)
-int	argc;
-char	**argv;
+	int	argc;
+	char	**argv;
 {
 	FILE	*langfile = NULL;
 	struct	in_addr	gwip;

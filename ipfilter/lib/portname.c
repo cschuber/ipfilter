@@ -9,7 +9,7 @@
 
 
 char	*portname(pr, port)
-int	pr, port;
+	int	pr, port;
 {
 	static	char	buf[32];
 	struct	protoent	*p = NULL;

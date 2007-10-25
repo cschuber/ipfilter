@@ -67,9 +67,9 @@ void ippr_netbios_fini()
 
 
 int ippr_netbios_out(fin, aps, nat)
-fr_info_t *fin;
-ap_session_t *aps;
-nat_t *nat;
+	fr_info_t *fin;
+	ap_session_t *aps;
+	nat_t *nat;
 {
 	char dgmbuf[6];
 	int off, dlen;

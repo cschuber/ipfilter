@@ -125,16 +125,16 @@ int if_ipl_lkmentry(lkmtp, cmd, ver)
 #else
 int xxxinit(lkmtp, cmd, ver)
 #endif
-struct lkm_table *lkmtp;
-int cmd, ver;
+	struct lkm_table *lkmtp;
+	int cmd, ver;
 {
 	DISPATCH(lkmtp, cmd, ver, iplaction, iplaction, iplaction);
 }
 
 
 static int iplaction(lkmtp, cmd)
-struct lkm_table *lkmtp;
-int cmd;
+	struct lkm_table *lkmtp;
+	int cmd;
 {
 #if !defined(__NetBSD__) || (__NetBSD_Version__ < 106080000)
 	int i;

@@ -56,8 +56,8 @@ static	int	timeout;
 
 
 int	initdevice(device, tout)
-char	*device;
-int	tout;
+	char	*device;
+	int	tout;
 {
 	struct	strioctl si;
 	struct	timeval to;
@@ -113,8 +113,8 @@ int	tout;
  * output an IP packet onto a fd opened for /dev/nit
  */
 int	sendip(fd, pkt, len)
-int	fd, len;
-char	*pkt;
+	int	fd, len;
+	char	*pkt;
 {
 	struct	sockaddr sk, *sa = &sk;
 	struct	strbuf	cbuf, *cp = &cbuf, dbuf, *dp = &dbuf;

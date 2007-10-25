@@ -91,7 +91,7 @@ int (*fr_checkp) __P((ip_t *ip, int hlen, void *ifp, int out, mb_t **mp));
 
 #if	defined(IPFILTER_LKM)
 int iplidentify(s)
-char *s;
+	char *s;
 {
 	if (strcmp(s, "ipl") == 0)
 		return 1;
@@ -160,11 +160,11 @@ int ipfdetach()
  * Filter ioctl interface.
  */
 int iplioctl(dev, cmd, data, mode , p)
-struct proc *p;
-dev_t dev;
-u_long cmd;
-caddr_t data;
-int mode;
+	struct proc *p;
+	dev_t dev;
+	u_long cmd;
+	caddr_t data;
+	int mode;
 {
 	int error = 0, unit = 0;
 	SPL_INT(s);
@@ -200,7 +200,7 @@ int mode;
 
 #if 0
 void fr_forgetifp(ifp)
-void *ifp;
+	void *ifp;
 {
 	register frentry_t *f;
 
@@ -241,10 +241,10 @@ void *ifp;
  * routines below for saving IP headers to buffer
  */
 int iplopen(dev, flags, devtype, p)
-dev_t dev;
-int flags;
-int devtype;
-struct proc *p;
+	dev_t dev;
+	int flags;
+	int devtype;
+	struct proc *p;
 {
 	u_int min = GET_MINOR(dev);
 
@@ -257,10 +257,10 @@ struct proc *p;
 
 
 int iplclose(dev, flags, devtype, p)
-dev_t dev;
-int flags;
-int devtype;
-struct proc *p;
+	dev_t dev;
+	int flags;
+	int devtype;
+	struct proc *p;
 {
 	u_int	min = GET_MINOR(dev);
 
@@ -278,9 +278,9 @@ struct proc *p;
  * the filter lists.
  */
 int iplread(dev, uio, ioflag)
-dev_t dev;
-register struct uio *uio;
-int ioflag;
+	dev_t dev;
+	register struct uio *uio;
+	int ioflag;
 {
 
 	if (fr_running < 1)
@@ -307,12 +307,12 @@ int ioflag;
  */
 #if (BSD >= 199306)
 int iplwrite(dev, uio, ioflag)
-int ioflag;
+	int ioflag;
 #else
 int iplwrite(dev, uio)
 #endif
-dev_t dev;
-register struct uio *uio;
+	dev_t dev;
+	register struct uio *uio;
 {
 
 	if (fr_running < 1)
@@ -331,7 +331,7 @@ register struct uio *uio;
  * requires a large amount of setting up and isn't any more efficient.
  */
 int fr_send_reset(fin)
-fr_info_t *fin;
+	fr_info_t *fin;
 {
 	struct tcphdr *tcp, *tcp2;
 	int tlen = 0, hlen;
@@ -426,8 +426,8 @@ fr_info_t *fin;
 
 
 static int fr_send_ip(fin, m, mpp)
-fr_info_t *fin;
-mb_t *m, **mpp;
+	fr_info_t *fin;
+	mb_t *m, **mpp;
 {
 	fr_info_t fnew;
 	ip_t *ip, *oip;
@@ -484,9 +484,9 @@ mb_t *m, **mpp;
 
 
 int fr_send_icmp_err(type, fin, dst)
-int type;
-fr_info_t *fin;
-int dst;
+	int type;
+	fr_info_t *fin;
+	int dst;
 {
 	int err, hlen, xtra, iclen, ohlen, avail, code;
 	struct in_addr dst4;
@@ -670,9 +670,9 @@ iplinit()
 
 
 int fr_fastroute(m0, mpp, fin, fdp)
-mb_t *m0, **mpp;
-fr_info_t *fin;
-frdest_t *fdp;
+	mb_t *m0, **mpp;
+	fr_info_t *fin;
+	frdest_t *fdp;
 {
 	register struct ip *ip, *mhip;
 	register struct mbuf *m = m0;
@@ -922,9 +922,9 @@ bad:
  * expected to be done by the called (ipfr_fastroute).
  */
 static int ipfr_fastroute6(m0, mpp, fin, fdp)
-struct mbuf *m0, **mpp;
-fr_info_t *fin;
-frdest_t *fdp;
+	struct mbuf *m0, **mpp;
+	fr_info_t *fin;
+	frdest_t *fdp;
 {
 	struct route_in6 ip6route;
 	struct sockaddr_in6 *dst6;
@@ -1000,7 +1000,7 @@ frdest_t *fdp;
 
 
 int fr_verifysrc(fin)
-fr_info_t *fin;
+	fr_info_t *fin;
 {
 	struct sockaddr_in *dst;
 	struct route iproute;
@@ -1021,9 +1021,9 @@ fr_info_t *fin;
  * return the first IP Address associated with an interface
  */
 int fr_ifpaddr(v, atype, ifptr, inp, inpmask)
-int v, atype;
-void *ifptr;
-struct in_addr *inp, *inpmask;
+	int v, atype;
+	void *ifptr;
+	struct in_addr *inp, *inpmask;
 {
 #ifdef USE_INET6
 	struct in6_addr *inp6 = NULL;
@@ -1083,7 +1083,7 @@ struct in_addr *inp, *inpmask;
 
 
 u_32_t fr_newisn(fin)
-fr_info_t *fin;
+	fr_info_t *fin;
 {
 	u_32_t newiss;
 #if OpenBSD > 200012
@@ -1133,7 +1133,7 @@ fr_info_t *fin;
 /* Returns the next IPv4 ID to use for this packet.                         */
 /* ------------------------------------------------------------------------ */
 u_short fr_nextipid(fin)
-fr_info_t *fin;
+	fr_info_t *fin;
 {
 	u_short id;
 
@@ -1144,7 +1144,7 @@ fr_info_t *fin;
 
 
 INLINE void fr_checkv4sum(fin)
-fr_info_t *fin;
+	fr_info_t *fin;
 {
 #ifdef M_CSUM_TCP_UDP_BAD
 	int manual, pflag, cflags, active;
@@ -1213,7 +1213,7 @@ skipauto:
 
 #ifdef USE_INET6
 INLINE void fr_checkv6sum(fin)
-fr_info_t *fin;
+	fr_info_t *fin;
 {
 	fr_checkv4sum(fin);
 }
@@ -1221,7 +1221,7 @@ fr_info_t *fin;
 
 
 size_t mbufchainlen(m0)
-struct mbuf *m0;
+	struct mbuf *m0;
 {
 	size_t len;
 
@@ -1255,9 +1255,9 @@ struct mbuf *m0;
 /* of buffers that starts at *fin->fin_mp.                                  */
 /* ------------------------------------------------------------------------ */
 void *fr_pullup(min, fin, len)
-mb_t *min;
-fr_info_t *fin;
-int len;
+	mb_t *min;
+	fr_info_t *fin;
+	int len;
 {
 	int out = fin->fin_out, dpoff, ipoff;
 	mb_t *m = min;
@@ -1325,8 +1325,8 @@ int len;
 
 
 int ipf_inject(fin, m)
-fr_info_t *fin;
-mb_t *m;
+	fr_info_t *fin;
+	mb_t *m;
 {
 	int error;
 

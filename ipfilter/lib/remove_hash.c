@@ -16,8 +16,8 @@ static int hashfd = -1;
 
 
 int remove_hash(iphp, iocfunc)
-iphtable_t *iphp;
-ioctlfunc_t iocfunc;
+	iphtable_t *iphp;
+	ioctlfunc_t iocfunc;
 {
 	iplookupop_t op;
 	iphtable_t iph;

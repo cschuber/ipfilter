@@ -21,8 +21,8 @@
 void	debug(char *fmt, ...)
 #else
 void	debug(fmt, va_alist)
-char *fmt;
-va_dcl
+	char *fmt;
+	va_dcl
 #endif
 {
 	va_list pvar;

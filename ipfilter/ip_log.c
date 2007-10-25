@@ -246,8 +246,8 @@ void fr_logunload()
 /* requested.                                                               */
 /* ------------------------------------------------------------------------ */
 int ipflog(fin, flags)
-fr_info_t *fin;
-u_int flags;
+	fr_info_t *fin;
+	u_int flags;
 {
 	register size_t hlen;
 	int types[2], mlen;
@@ -421,11 +421,11 @@ u_int flags;
 /* from the log device.                                                     */
 /* ------------------------------------------------------------------------ */
 int ipllog(dev, fin, items, itemsz, types, cnt)
-int dev;
-fr_info_t *fin;
-void **items;
-size_t *itemsz;
-int *types, cnt;
+	int dev;
+	fr_info_t *fin;
+	void **items;
+	size_t *itemsz;
+	int *types, cnt;
 {
 	u_char *buf, *ptr;
 	iplog_t *ipl;
@@ -547,8 +547,8 @@ int *types, cnt;
 /* there is none present.  Asynchronous I/O is not implemented.             */
 /* ------------------------------------------------------------------------ */
 int ipflog_read(unit, uio)
-minor_t unit;
-struct uio *uio;
+	minor_t unit;
+	struct uio *uio;
 {
 	size_t dlen, copied;
 	int error = 0;
@@ -661,7 +661,7 @@ struct uio *uio;
 /* Deletes all queued up log records for a given output device.             */
 /* ------------------------------------------------------------------------ */
 int ipflog_clear(unit)
-minor_t unit;
+	minor_t unit;
 {
 	iplog_t *ipl;
 	int used;
@@ -693,7 +693,7 @@ minor_t unit;
 /* current buffer for the selected ipf device.                              */
 /* ------------------------------------------------------------------------ */
 int ipflog_canread(unit)
-int unit;
+	int unit;
 {
 	return iplt[unit] != NULL;
 }

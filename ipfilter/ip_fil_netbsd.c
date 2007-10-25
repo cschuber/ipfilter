@@ -147,10 +147,10 @@ const struct cdevsw ipl_cdevsw = {
 static int fr_check_wrapper(void *, struct mbuf **, struct ifnet *, int );
 
 static int fr_check_wrapper(arg, mp, ifp, dir)
-void *arg;
-struct mbuf **mp;
-struct ifnet *ifp;
-int dir;
+	void *arg;
+	struct mbuf **mp;
+	struct ifnet *ifp;
+	int dir;
 {
 	struct ip *ip;
 	int rv, hlen;
@@ -218,10 +218,10 @@ int dir;
 static int fr_check_wrapper6(void *, struct mbuf **, struct ifnet *, int );
 
 static int fr_check_wrapper6(arg, mp, ifp, dir)
-void *arg;
-struct mbuf **mp;
-struct ifnet *ifp;
-int dir;
+	void *arg;
+	struct mbuf **mp;
+	struct ifnet *ifp;
+	int dir;
 {
 #  if defined(M_CSUM_TCPv6) && (__NetBSD_Version__ > 200000000)
 	/*
@@ -250,10 +250,10 @@ int dir;
 static int ipf_pfilsync(void *, struct mbuf **, struct ifnet *, int);
 
 static int ipf_pfilsync(hdr, mp, ifp, dir)
-void *hdr;
-struct mbuf **mp;
-struct ifnet *ifp;
-int dir;
+	void *hdr;
+	struct mbuf **mp;
+	struct ifnet *ifp;
+	int dir;
 {
 	/*
 	 * The interface pointer is useless for create (we have nothing to
@@ -272,7 +272,7 @@ int dir;
 
 #if	defined(IPFILTER_LKM)
 int iplidentify(s)
-char *s;
+	char *s;
 {
 	if (strcmp(s, "ipl") == 0)
 		return 1;
@@ -287,7 +287,7 @@ char *s;
 #if defined(PFIL_HOOKS)
 void
 ipfilterattach(count)
-int count;
+	int count;
 {
 # if 0
 	if (ipfattach() != 0)
@@ -511,27 +511,27 @@ int iplioctl(dev, cmd, data, mode
 #if (NetBSD >= 199511)
 , p)
 # if  (__NetBSD_Version__ >= 399001400)
-struct lwp *p;
+	struct lwp *p;
 #   if (__NetBSD_Version__ >= 399002000)
 #     define	UID(l)	kauth_cred_getuid((l)->l_cred)
 #  else
 #     define	UID(l)	((l)->l_proc->p_cred->p_ruid)
 #  endif
 # else
-struct proc *p;
+	struct proc *p;
 #  define	UID(p)	((p)->p_cred->p_ruid)
 # endif
 #else
 )
 #endif
-dev_t dev;
-u_long cmd;
+	dev_t dev;
+	u_long cmd;
 #if  (__NetBSD_Version__ >= 499001000)
-void *data;
+	void *data;
 #else
-caddr_t data;
+	caddr_t data;
 #endif
-int mode;
+	int mode;
 {
 	int error = 0, unit = 0;
 	SPL_INT(s);
@@ -577,7 +577,7 @@ int mode;
 
 #if 0
 void fr_forgetifp(ifp)
-void *ifp;
+	void *ifp;
 {
 	register frentry_t *f;
 
@@ -620,17 +620,17 @@ void *ifp;
 int iplopen(dev, flags
 #if (NetBSD >= 199511)
 , devtype, p)
-int devtype;
+	int devtype;
 # if  (__NetBSD_Version__ >= 399001400)
-struct lwp *p;
+	struct lwp *p;
 # else
-struct proc *p;
+	struct proc *p;
 # endif
 #else
 )
 #endif
-dev_t dev;
-int flags;
+	dev_t dev;
+	int flags;
 {
 	u_int xmin = GET_MINOR(dev);
 
@@ -645,17 +645,17 @@ int flags;
 int iplclose(dev, flags
 #if (NetBSD >= 199511)
 , devtype, p)
-int devtype;
+	int devtype;
 # if  (__NetBSD_Version__ >= 399001400)
-struct lwp *p;
+	struct lwp *p;
 # else
-struct proc *p;
+	struct proc *p;
 # endif
 #else
 )
 #endif
-dev_t dev;
-int flags;
+	dev_t dev;
+	int flags;
 {
 	u_int	xmin = GET_MINOR(dev);
 
@@ -674,12 +674,12 @@ int flags;
  */
 #if (BSD >= 199306)
 int iplread(dev, uio, ioflag)
-int ioflag;
+	int ioflag;
 #else
 int iplread(dev, uio)
 #endif
-dev_t dev;
-register struct uio *uio;
+	dev_t dev;
+	register struct uio *uio;
 {
 
 	if (fr_running < 1)
@@ -706,12 +706,12 @@ register struct uio *uio;
  */
 #if (BSD >= 199306)
 int iplwrite(dev, uio, ioflag)
-int ioflag;
+	int ioflag;
 #else
 int iplwrite(dev, uio)
 #endif
-dev_t dev;
-register struct uio *uio;
+	dev_t dev;
+	register struct uio *uio;
 {
 
 	if (fr_running < 1)
@@ -730,7 +730,7 @@ register struct uio *uio;
  * requires a large amount of setting up and isn't any more efficient.
  */
 int fr_send_reset(fin)
-fr_info_t *fin;
+	fr_info_t *fin;
 {
 	struct tcphdr *tcp, *tcp2;
 	int tlen = 0, hlen;
@@ -832,8 +832,8 @@ fr_info_t *fin;
 
 
 static int fr_send_ip(fin, m, mpp)
-fr_info_t *fin;
-mb_t *m, **mpp;
+	fr_info_t *fin;
+	mb_t *m, **mpp;
 {
 	fr_info_t fnew;
 #ifdef INET
@@ -895,9 +895,9 @@ mb_t *m, **mpp;
 
 
 int fr_send_icmp_err(type, fin, dst)
-int type;
-fr_info_t *fin;
-int dst;
+	int type;
+	fr_info_t *fin;
+	int dst;
 {
 	int err, hlen, xtra, iclen, ohlen, avail, code;
 	struct in_addr dst4;
@@ -1074,9 +1074,9 @@ int dst;
 
 
 int fr_fastroute(m0, mpp, fin, fdp)
-mb_t *m0, **mpp;
-fr_info_t *fin;
-frdest_t *fdp;
+	mb_t *m0, **mpp;
+	fr_info_t *fin;
+	frdest_t *fdp;
 {
 	register struct ip *ip, *mhip;
 	register struct mbuf *m = m0;
@@ -1386,9 +1386,9 @@ bad:
  * expected to be done by the called (ipfr_fastroute).
  */
 static int ipfr_fastroute6(m0, mpp, fin, fdp)
-struct mbuf *m0, **mpp;
-fr_info_t *fin;
-frdest_t *fdp;
+	struct mbuf *m0, **mpp;
+	fr_info_t *fin;
+	frdest_t *fdp;
 {
 # if __NetBSD_Version__ >= 499001100
 	struct route ip6route;
@@ -1514,7 +1514,7 @@ bad:
 
 
 int fr_verifysrc(fin)
-fr_info_t *fin;
+	fr_info_t *fin;
 {
 #if __NetBSD_Version__ >= 499001100
 	union {
@@ -1555,9 +1555,9 @@ fr_info_t *fin;
  * return the first IP Address associated with an interface
  */
 int fr_ifpaddr(v, atype, ifptr, inp, inpmask)
-int v, atype;
-void *ifptr;
-struct in_addr *inp, *inpmask;
+	int v, atype;
+	void *ifptr;
+	struct in_addr *inp, *inpmask;
 {
 #ifdef USE_INET6
 	struct in6_addr *inp6 = NULL;
@@ -1619,7 +1619,7 @@ struct in_addr *inp, *inpmask;
 
 
 u_32_t fr_newisn(fin)
-fr_info_t *fin;
+	fr_info_t *fin;
 {
 #if __NetBSD_Version__ >= 105190000	/* 1.5T */
 	size_t asz;
@@ -1678,7 +1678,7 @@ fr_info_t *fin;
 /* Returns the next IPv4 ID to use for this packet.                         */
 /* ------------------------------------------------------------------------ */
 u_short fr_nextipid(fin)
-fr_info_t *fin;
+	fr_info_t *fin;
 {
 	static u_short ipid = 0;
 	u_short id;
@@ -1692,7 +1692,7 @@ fr_info_t *fin;
 
 
 INLINE void fr_checkv4sum(fin)
-fr_info_t *fin;
+	fr_info_t *fin;
 {
 #ifdef M_CSUM_TCP_UDP_BAD
 	int manual, pflag, cflags, active;
@@ -1766,7 +1766,7 @@ skipauto:
 
 #ifdef USE_INET6
 INLINE void fr_checkv6sum(fin)
-fr_info_t *fin;
+	fr_info_t *fin;
 {
 # ifdef M_CSUM_TCP_UDP_BAD
 	int manual, pflag, cflags, active;
@@ -1824,7 +1824,7 @@ fr_info_t *fin;
 
 
 size_t mbufchainlen(m0)
-struct mbuf *m0;
+	struct mbuf *m0;
 {
 	size_t len;
 
@@ -1858,9 +1858,9 @@ struct mbuf *m0;
 /* of buffers that starts at *fin->fin_mp.                                  */
 /* ------------------------------------------------------------------------ */
 void *fr_pullup(xmin, fin, len)
-mb_t *xmin;
-fr_info_t *fin;
-int len;
+	mb_t *xmin;
+	fr_info_t *fin;
+	int len;
 {
 	int out = fin->fin_out, dpoff, ipoff;
 	mb_t *m = xmin;
@@ -1928,12 +1928,12 @@ int len;
 
 
 int iplpoll(dev, events, p)
-dev_t dev;
-int events;
+	dev_t dev;
+	int events;
 #if  (__NetBSD_Version__ >= 399001400)
-struct lwp *p;
+	struct lwp *p;
 #else
-struct proc *p;
+	struct proc *p;
 #endif
 {
 	u_int xmin = GET_MINOR(dev);
@@ -1977,8 +1977,8 @@ struct proc *p;
 
 
 int ipf_inject(fin, m)
-fr_info_t *fin;
-mb_t *m;
+	fr_info_t *fin;
+	mb_t *m;
 {
 	int error;
 
