@@ -167,16 +167,16 @@ int ipflkm_lkmentry(lkmtp, cmd, ver)
 #else
 int xxxinit(lkmtp, cmd, ver)
 #endif
-struct lkm_table *lkmtp;
-int cmd, ver;
+	struct lkm_table *lkmtp;
+	int cmd, ver;
 {
 	DISPATCH(lkmtp, cmd, ver, ipfaction, ipfaction, ipfaction);
 }
 
 
 static int ipfaction(lkmtp, cmd)
-struct lkm_table *lkmtp;
-int cmd;
+	struct lkm_table *lkmtp;
+	int cmd;
 {
 #if !defined(__NetBSD__) || (__NetBSD_Version__ < 106080000)
 	int i;
@@ -391,13 +391,13 @@ static int ipf_load()
 static int ipfopen(dev, flags
 #if (NetBSD >= 199511)
 , devtype, p)
-int devtype;
-PROC_T *p;
+	int devtype;
+	PROC_T *p;
 #else
 )
 #endif
-dev_t dev;
-int flags;
+	dev_t dev;
+	int flags;
 {
 	u_int xmin = GET_MINOR(dev);
 
@@ -412,13 +412,13 @@ int flags;
 static int ipfclose(dev, flags
 #if (NetBSD >= 199511)
 , devtype, p)
-int devtype;
-PROC_T *p;
+	int devtype;
+	PROC_T *p;
 #else
 )
 #endif
-dev_t dev;
-int flags;
+	dev_t dev;
+	int flags;
 {
 	u_int	xmin = GET_MINOR(dev);
 
@@ -436,9 +436,9 @@ int flags;
  * the filter lists.
  */
 static int ipfread(dev, uio, ioflag)
-int ioflag;
-dev_t dev;
-register struct uio *uio;
+	int ioflag;
+	dev_t dev;
+	register struct uio *uio;
 {
 
 	if (ipf_running < 1)
@@ -464,9 +464,9 @@ register struct uio *uio;
  * the filter lists.
  */
 static int ipfwrite(dev, uio, ioflag)
-int ioflag;
-dev_t dev;
-register struct uio *uio;
+	int ioflag;
+	dev_t dev;
+	register struct uio *uio;
 {
 
 	if (ipf_running < 1)
@@ -481,9 +481,9 @@ register struct uio *uio;
 
 
 static int ipfpoll(dev, events, p)
-dev_t dev;
-int events;
-PROC_T *p;
+	dev_t dev;
+	int events;
+	PROC_T *p;
 {
 	u_int xmin = GET_MINOR(dev);
 	int revents = 0;

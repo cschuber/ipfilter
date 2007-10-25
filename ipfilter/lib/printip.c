@@ -10,8 +10,8 @@
 
 
 void	printip(family, addr)
-int family;
-u_32_t *addr;
+	int family;
+	u_32_t *addr;
 {
 	struct in_addr ipa;
 

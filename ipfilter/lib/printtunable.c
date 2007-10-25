@@ -9,7 +9,7 @@
 #include "ipf.h"
 
 void printtunable(tup)
-ipftune_t *tup;
+	ipftune_t *tup;
 {
 	printf("%s\tmin %#lx\tmax %#lx\tcurrent ",
 		tup->ipft_name, tup->ipft_min, tup->ipft_max);

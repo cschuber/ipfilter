@@ -70,8 +70,8 @@ wordtab_t statefields[] = {
 
 
 void printstatefield(sp, fieldnum)
-ipstate_t *sp;
-int fieldnum;
+	ipstate_t *sp;
+	int fieldnum;
 {
 	int i;
 

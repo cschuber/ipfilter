@@ -9,7 +9,7 @@
 #include "ipf.h"
 
 size_t msgdsize(orig)
-mb_t *orig;
+	mb_t *orig;
 {
 	size_t sz;
 	mb_t *m;

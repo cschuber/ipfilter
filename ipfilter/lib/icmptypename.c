@@ -8,7 +8,7 @@
 #include "ipf.h"
 
 char *icmptypename(v, type)
-int v, type;
+	int v, type;
 {
 	icmptype_t *i;
 

@@ -45,7 +45,7 @@ static	int	efd = -1;
 
 
 static	int	etherf_open(fname)
-char	*fname;
+	char	*fname;
 {
 	if (efd != -1)
 		return efd;
@@ -68,9 +68,9 @@ static	int	etherf_close()
 
 
 static	int	etherf_readip(mb, ifn, dir)
-mb_t	*mb;
-char	**ifn;
-int	*dir;
+	mb_t	*mb;
+	char	**ifn;
+	int	*dir;
 {
 	struct	tcpiphdr pkt;
 	ip_t	*ip = (ip_t *)&pkt;

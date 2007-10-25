@@ -8,8 +8,8 @@
 #include "ipf.h"
 
 int geticmptype(v, name)
-int v;
-char *name;
+	int v;
+	char *name;
 {
 	icmptype_t *i;
 

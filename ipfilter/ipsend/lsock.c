@@ -64,9 +64,9 @@ struct	task_struct	*proc;
 #endif
 
 int	kmemcpy(buf, pos, n)
-char	*buf;
-void	*pos;
-int	n;
+	char	*buf;
+	void	*pos;
+	int	n;
 {
 	static	int	kfd = -1;
 
@@ -148,8 +148,8 @@ struct	task_struct	*getproc()
 
 
 struct	sock	*find_tcp(fd, ti)
-int	fd;
-struct	tcpiphdr *ti;
+	int	fd;
+	struct	tcpiphdr *ti;
 {
 	struct	sock	*s;
 	struct	inode	*i;
@@ -187,10 +187,10 @@ struct	tcpiphdr *ti;
 }
 
 int	do_socket(dev, mtu, ti, gwip)
-char	*dev;
-int	mtu;
-struct	tcpiphdr *ti;
-struct	in_addr	gwip;
+	char	*dev;
+	int	mtu;
+	struct	tcpiphdr *ti;
+	struct	in_addr	gwip;
 {
 	struct	sockaddr_in	rsin, lsin;
 	struct	sock	*s, sk;

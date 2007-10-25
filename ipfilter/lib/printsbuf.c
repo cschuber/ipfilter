@@ -14,7 +14,7 @@
 #include "netinet/ip_scan.h"
 
 void printsbuf(buf)
-char *buf;
+	char *buf;
 {
 	u_char *s;
 	int i;

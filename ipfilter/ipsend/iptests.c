@@ -120,11 +120,11 @@ typedef	int	boolean_t;
 
 
 void	ip_test1(dev, mtu, ip, gwip, ptest)
-char	*dev;
-int	mtu;
-ip_t	*ip;
-struct	in_addr	gwip;
-int	ptest;
+	char	*dev;
+	int	mtu;
+	ip_t	*ip;
+	struct	in_addr	gwip;
+	int	ptest;
 {
 #ifdef USE_NANOSLEEP
 	struct	timespec ts;
@@ -471,11 +471,11 @@ int	ptest;
 
 
 void	ip_test2(dev, mtu, ip, gwip, ptest)
-char	*dev;
-int	mtu;
-ip_t	*ip;
-struct	in_addr	gwip;
-int	ptest;
+	char	*dev;
+	int	mtu;
+	ip_t	*ip;
+	struct	in_addr	gwip;
+	int	ptest;
 {
 #ifdef USE_NANOSLEEP
 	struct	timespec ts;
@@ -567,11 +567,11 @@ int	ptest;
  * test 3 (ICMP)
  */
 void	ip_test3(dev, mtu, ip, gwip, ptest)
-char	*dev;
-int	mtu;
-ip_t	*ip;
-struct	in_addr	gwip;
-int	ptest;
+	char	*dev;
+	int	mtu;
+	ip_t	*ip;
+	struct	in_addr	gwip;
+	int	ptest;
 {
 	static	int	ict1[10] = { 8, 9, 10, 13, 14, 15, 16, 17, 18, 0 };
 	static	int	ict2[8] = { 3, 9, 10, 13, 14, 17, 18, 0 };
@@ -768,11 +768,11 @@ int	ptest;
 /* Perform test 4 (UDP) */
 
 void	ip_test4(dev, mtu, ip, gwip, ptest)
-char	*dev;
-int	mtu;
-ip_t	*ip;
-struct	in_addr	gwip;
-int	ptest;
+	char	*dev;
+	int	mtu;
+	ip_t	*ip;
+	struct	in_addr	gwip;
+	int	ptest;
 {
 #ifdef USE_NANOSLEEP
 	struct	timespec ts;
@@ -933,11 +933,11 @@ int	ptest;
 /* Perform test 5 (TCP) */
 
 void	ip_test5(dev, mtu, ip, gwip, ptest)
-char	*dev;
-int	mtu;
-ip_t	*ip;
-struct	in_addr	gwip;
-int	ptest;
+	char	*dev;
+	int	mtu;
+	ip_t	*ip;
+	struct	in_addr	gwip;
+	int	ptest;
 {
 #ifdef USE_NANOSLEEP
 	struct	timespec ts;
@@ -1283,11 +1283,11 @@ skip_five_and_six:
 /* Perform test 6 (exhaust mbuf test) */
 
 void	ip_test6(dev, mtu, ip, gwip, ptest)
-char	*dev;
-int	mtu;
-ip_t	*ip;
-struct	in_addr	gwip;
-int	ptest;
+	char	*dev;
+	int	mtu;
+	ip_t	*ip;
+	struct	in_addr	gwip;
+	int	ptest;
 {
 #ifdef USE_NANOSLEEP
 	struct	timespec ts;
@@ -1365,11 +1365,11 @@ int	ptest;
 static	u_long	tbuf[64];
 
 void	ip_test7(dev, mtu, ip, gwip, ptest)
-char	*dev;
-int	mtu;
-ip_t	*ip;
-struct	in_addr	gwip;
-int	ptest;
+	char	*dev;
+	int	mtu;
+	ip_t	*ip;
+	struct	in_addr	gwip;
+	int	ptest;
 {
 	ip_t	*pip;
 #ifdef USE_NANOSLEEP

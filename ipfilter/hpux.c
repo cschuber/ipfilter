@@ -404,12 +404,12 @@ static int ipf_detach()
  * possible about them and what they claim to hold.
  */
 void fr_donotip(out, qif, q, m, mt, ip, off)
-int out;
-qif_t *qif;
-queue_t *q;
-mblk_t *m, *mt;
-ip_t *ip;
-size_t off;
+	int out;
+	qif_t *qif;
+	queue_t *q;
+	mblk_t *m, *mt;
+	ip_t *ip;
+	size_t off;
 {
 	u_char *s, outb[256], *t;
 	int i, j;
@@ -472,12 +472,12 @@ size_t off;
  * about and those which are currently configured.
  */
 static int fr_qifsync(ip, hlen, il, out, qif, mp)
-ip_t *ip;
-int hlen;
-void *il;
-int out;
-qif_t *qif;
-mblk_t **mp;
+	ip_t *ip;
+	int hlen;
+	void *il;
+	int out;
+	qif_t *qif;
+	mblk_t **mp;
 {
 	register struct frentry *f;
 	register ipnat_t *np;
@@ -489,7 +489,7 @@ mblk_t **mp;
 
 #ifdef	IPFDEBUG
 void printiri(iri)
-irinfo_t *iri;
+	irinfo_t *iri;
 {
 	printf("iri: ll_hdr_mp %p rfq %p stq %p\n",
 		iri->ir_ll_hdr_mp, iri->ir_rfq, iri->ir_stq);
@@ -545,10 +545,10 @@ static int fr_slowtimer()
  * routines below for saving IP headers to buffer
  */
 int iplopen(dev, flag, dummy, mode)
-dev_t dev;
-int flag;
-intptr_t dummy;
-int mode;
+	dev_t dev;
+	int flag;
+	intptr_t dummy;
+	int mode;
 {
 	minor_t min = getminor(dev);
 
@@ -561,9 +561,9 @@ int mode;
 
 
 int iplclose(dev, flag, mode)
-dev_t dev;
-int flag;
-int mode;
+	dev_t dev;
+	int flag;
+	int mode;
 {
 	minor_t min = getminor(dev);
 
@@ -587,8 +587,8 @@ int mode;
  * the filter lists.
  */
 int iplread(dev, uio)
-dev_t dev;
-register struct uio *uio;
+	dev_t dev;
+	register struct uio *uio;
 {
 #ifdef	IPFDEBUG
 	cmn_err(CE_CONT, "iplread(%x,%x)\n", dev, uio);
@@ -610,9 +610,9 @@ register struct uio *uio;
  * the filter lists.
  */
 int iplwrite(dev, uio, cp)
-dev_t dev;
-register struct uio *uio;
-cred_t *cp;
+	dev_t dev;
+	register struct uio *uio;
+	cred_t *cp;
 {
 #ifdef	IPFDEBUG
 	cmn_err(CE_CONT, "iplwrite(%x,%x,%x)\n", dev, uio, cp);

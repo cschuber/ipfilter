@@ -6,7 +6,7 @@ static void printsingle __P((int *));
 
 
 void printipfexpr(array)
-int *array;
+	int *array;
 {
 	int i, nelems, j, not;
 	ipfexp_t *ipfe;
@@ -112,7 +112,7 @@ int *array;
 
 
 static void printsingle(array)
-int *array;
+	int *array;
 {
 	ipfexp_t *ipfe = (ipfexp_t *)array;
 	int i;
@@ -127,7 +127,7 @@ int *array;
 
 
 static void printport(array)
-int *array;
+	int *array;
 {
 	ipfexp_t *ipfe = (ipfexp_t *)array;
 	int i;
@@ -142,7 +142,7 @@ int *array;
 
 
 static void printhosts(array)
-int *array;
+	int *array;
 {
 	ipfexp_t *ipfe = (ipfexp_t *)array;
 	int i;

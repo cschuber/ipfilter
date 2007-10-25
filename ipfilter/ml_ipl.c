@@ -101,10 +101,10 @@ extern struct cdevsw cdevsw[];
 extern int nchrdev;
 
 xxxinit(fc, vdp, vdi, vds)
-u_int	fc;
-struct	vddrv	*vdp;
-caddr_t	vdi;
-struct	vdstat	*vds;
+	u_int	fc;
+	struct	vddrv	*vdp;
+	caddr_t	vdi;
+	struct	vdstat	*vds;
 {
 	struct	vdlinkage *v;
 	int	i;

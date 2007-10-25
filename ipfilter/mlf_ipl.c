@@ -190,8 +190,8 @@ static char *ipf_devfiles[] = { IPL_NAME, IPL_NAT, IPL_STATE, IPL_AUTH,
 extern	int	lkmenodev __P((void));
 
 static int iplaction(lkmtp, cmd)
-struct lkm_table *lkmtp;
-int cmd;
+	struct lkm_table *lkmtp;
+	int cmd;
 {
 #if !defined(__FreeBSD_version) || (__FreeBSD_version < 220000)
 	int i = ipl_major;
@@ -291,8 +291,8 @@ static int if_ipl_remove __P((void))
 
 
 static int if_ipl_unload(lkmtp, cmd)
-struct lkm_table *lkmtp;
-int cmd;
+	struct lkm_table *lkmtp;
+	int cmd;
 {
 	int error = 0;
 
@@ -304,8 +304,8 @@ int cmd;
 
 
 static int if_ipl_load(lkmtp, cmd)
-struct lkm_table *lkmtp;
-int cmd;
+	struct lkm_table *lkmtp;
+	int cmd;
 {
 	struct nameidata nd;
 	struct vattr vattr;
@@ -352,7 +352,7 @@ int cmd;
  * strlen isn't present in 2.1.* kernels.
  */
 size_t strlen(string)
-char *string;
+	char *string;
 {
 	register char *s;
 
@@ -363,8 +363,8 @@ char *string;
 
 
 int xxxinit(lkmtp, cmd, ver)
-struct lkm_table *lkmtp;
-int cmd, ver;
+	struct lkm_table *lkmtp;
+	int cmd, ver;
 {
 	DISPATCH(lkmtp, cmd, ver, iplaction, iplaction, iplaction);
 }
@@ -393,8 +393,8 @@ int if_ipl __P((struct lkm_table *, int, int));
 
 
 int if_ipl(lkmtp, cmd, ver)
-struct lkm_table *lkmtp;
-int cmd, ver;
+	struct lkm_table *lkmtp;
+	int cmd, ver;
 {
 #  if (__FreeBSD_version >= 300000)
 	MOD_DISPATCH(if_ipl, lkmtp, cmd, ver, iplaction, iplaction, iplaction);
@@ -473,21 +473,21 @@ SYSINIT(ipldev,SI_SUB_DRIVERS,SI_ORDER_MIDDLE+CDEV_MAJOR,ipl_drvinit,NULL)
 int iplopen(dev, flags
 #if ((BSD >= 199506) || (__FreeBSD_version >= 220000))
 , devtype, p)
-int devtype;
+	int devtype;
 # if (__FreeBSD_version >= 500024)
-struct thread *p;
+	struct thread *p;
 # else
-struct proc *p;
+	struct proc *p;
 # endif /* __FreeBSD_version >= 500024 */
 #else
 )
 #endif
 #if (__FreeBSD_version >= 502116)
-struct cdev *dev;
+	struct cdev *dev;
 #else
-dev_t dev;
+	dev_t dev;
 #endif
-int flags;
+	int flags;
 {
 	u_int min = GET_MINOR(dev);
 
@@ -502,21 +502,21 @@ int flags;
 int iplclose(dev, flags
 #if ((BSD >= 199506) || (__FreeBSD_version >= 220000))
 , devtype, p)
-int devtype;
+	int devtype;
 # if (__FreeBSD_version >= 500024)
-struct thread *p;
+	struct thread *p;
 # else
-struct proc *p;
+	struct proc *p;
 # endif /* __FreeBSD_version >= 500024 */
 #else
 )
 #endif
 #if (__FreeBSD_version >= 502116)
-struct cdev *dev;
+	struct cdev *dev;
 #else
-dev_t dev;
+	dev_t dev;
 #endif
-int flags;
+	int flags;
 {
 	u_int	min = GET_MINOR(dev);
 
@@ -535,16 +535,16 @@ int flags;
  */
 #if (BSD >= 199306)
 int iplread(dev, uio, ioflag)
-int ioflag;
+	int ioflag;
 #else
 int iplread(dev, uio)
 #endif
 #if (__FreeBSD_version >= 502116)
-struct cdev *dev;
+	struct cdev *dev;
 #else
-dev_t dev;
+	dev_t dev;
 #endif
-register struct uio *uio;
+	register struct uio *uio;
 {
 	u_int	xmin = GET_MINOR(dev);
 
@@ -575,16 +575,16 @@ register struct uio *uio;
  */
 #if (BSD >= 199306)
 int iplwrite(dev, uio, ioflag)
-int ioflag;
+	int ioflag;
 #else
 int iplwrite(dev, uio)
 #endif
 #if (__FreeBSD_version >= 502116)
-struct cdev *dev;
+	struct cdev *dev;
 #else
-dev_t dev;
+	dev_t dev;
 #endif
-register struct uio *uio;
+	register struct uio *uio;
 {
 
 	if (fr_running < 1)

@@ -300,7 +300,7 @@ iplwrite(dev, uio)
  * requires a large amount of setting up and isn't any more efficient.
  */
 int ipf_send_reset(fin)
-fr_info_t *fin;
+	fr_info_t *fin;
 {
 	struct tcphdr *tcp, *tcp2;
 	int tlen = 0, hlen;

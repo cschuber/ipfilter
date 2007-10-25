@@ -10,8 +10,8 @@
 
 
 void print_toif(tag, fdp)
-char *tag;
-frdest_t *fdp;
+	char *tag;
+	frdest_t *fdp;
 {
 	printf("%s %s%s", tag, fdp->fd_ifname,
 		     (fdp->fd_ifp || (long)fdp->fd_ifp == -1) ? "" : "(!)");

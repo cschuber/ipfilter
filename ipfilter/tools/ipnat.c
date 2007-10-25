@@ -95,7 +95,7 @@ int		nohdrfields = 0;
 wordtab_t	*nat_fields = NULL;
 
 void usage(name)
-char *name;
+	char *name;
 {
 	fprintf(stderr, "Usage: %s [-CFhlnrRsv] [-f filename]\n", name);
 	exit(1);
@@ -103,8 +103,8 @@ char *name;
 
 
 int main(argc, argv)
-int argc;
-char *argv[];
+	int argc;
+	char *argv[];
 {
 	int fd, c, mode, *natfilter;
 	char *file, *core, *kernel;
@@ -240,8 +240,8 @@ char *argv[];
  * rather than doing ioctl's.
  */
 void natstat_dead(nsp, kernel)
-natstat_t *nsp;
-char *kernel;
+	natstat_t *nsp;
+	char *kernel;
 {
 	struct nlist nat_nlist[10] = {
 		{ "nat_table" },		/* 0 */
@@ -295,7 +295,7 @@ char *kernel;
  * table or both.
  */
 void flushtable(fd, opts, match)
-int fd, opts, *match;
+	int fd, opts, *match;
 {
 	int n = 0;
 
@@ -338,8 +338,8 @@ int fd, opts, *match;
  * Display NAT statistics.
  */
 void dostats_dead(nsp, opts, filter)
-natstat_t *nsp;
-int opts, *filter;
+	natstat_t *nsp;
+	int opts, *filter;
 {
 	nat_t *np, nat;
 	ipnat_t	ipn;
@@ -397,9 +397,9 @@ int opts, *filter;
 
 
 void dotable(nsp, fd, alive, which, side)
-natstat_t *nsp;
-int fd, alive, which;
-char *side;
+	natstat_t *nsp;
+	int fd, alive, which;
+	char *side;
 {
 	int sz, i, used, maxlen, minlen, totallen;
 	ipftable_t table;
@@ -460,8 +460,8 @@ char *side;
 
 
 void dostats(fd, nsp, opts, alive, filter)
-natstat_t *nsp;
-int fd, opts, alive, *filter;
+	natstat_t *nsp;
+	int fd, opts, alive, *filter;
 {
 	/*
 	 * Show statistics ?
@@ -495,8 +495,8 @@ int fd, opts, alive, *filter;
  * Display NAT statistics.
  */
 void dostats_live(fd, nsp, opts, filter)
-natstat_t *nsp;
-int fd, opts, *filter;
+	natstat_t *nsp;
+	int fd, opts, *filter;
 {
 	ipfgeniter_t iter;
 	ipfobj_t obj;
@@ -575,7 +575,7 @@ int fd, opts, *filter;
  * Display the active host mapping table.
  */
 void showhostmap_dead(nsp)
-natstat_t *nsp;
+	natstat_t *nsp;
 {
 	hostmap_t hm, *hmp, **maptable;
 	u_int hv;
@@ -611,8 +611,8 @@ natstat_t *nsp;
  * Display the active host mapping table.
  */
 void showhostmap_live(fd, nsp)
-int fd;
-natstat_t *nsp;
+	int fd;
+	natstat_t *nsp;
 {
 	ipfgeniter_t iter;
 	hostmap_t hm;
@@ -640,8 +640,8 @@ natstat_t *nsp;
 
 
 int nat_matcharray(nat, array)
-nat_t *nat;
-int *array;
+	nat_t *nat;
+	int *array;
 {
 	int i, n, *x, e, p;
 

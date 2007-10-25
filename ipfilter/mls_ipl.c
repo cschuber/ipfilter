@@ -133,10 +133,10 @@ extern struct cdevsw cdevsw[];
 extern int nchrdev;
 
 xxxinit(fc, vdp, data, vds)
-u_int	fc;
-struct	vddrv	*vdp;
-caddr_t	data;
-struct	vdstat	*vds;
+	u_int	fc;
+	struct	vddrv	*vdp;
+	caddr_t	data;
+	struct	vdstat	*vds;
 {
 	struct vdioctl_load *vdi = (struct vdioctl_load *)data;
 
@@ -253,8 +253,8 @@ static	int	ipl_attach()
  * routines below for saving IP headers to buffer
  */
 static int iplopen(dev, flags)
-dev_t dev;
-int flags;
+	dev_t dev;
+	int flags;
 {
 	u_int min = GET_MINOR(dev);
 
@@ -267,8 +267,8 @@ int flags;
 
 
 static int iplclose(dev, flags)
-dev_t dev;
-int flags;
+	dev_t dev;
+	int flags;
 {
 	u_int	min = GET_MINOR(dev);
 
@@ -287,8 +287,8 @@ int flags;
  * the filter lists.
  */
 static int iplread(dev, uio)
-dev_t dev;
-register struct uio *uio;
+	dev_t dev;
+	register struct uio *uio;
 {
 
 	if (fr_running < 1)
@@ -306,8 +306,8 @@ register struct uio *uio;
  * iplwrite
  */
 static int iplwrite(dev, uio)
-dev_t dev;
-register struct uio *uio;
+	dev_t dev;
+	register struct uio *uio;
 {
 
 	if (fr_running < 1)

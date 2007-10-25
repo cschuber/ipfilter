@@ -1,7 +1,7 @@
 #include "ipf.h"
 
 void printtcpflags(tcpf, tcpfm)
-u_32_t tcpf, tcpfm;
+	u_32_t tcpf, tcpfm;
 {
 	u_char *t;
 	char *s;

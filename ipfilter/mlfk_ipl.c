@@ -383,21 +383,21 @@ ipfpoll(dev_t dev, int events, struct proc *td)
 static int ipfopen(dev, flags
 #if ((BSD >= 199506) || (__FreeBSD_version >= 220000))
 , devtype, p)
-int devtype;
+	int devtype;
 # if (__FreeBSD_version >= 500024)
-struct thread *p;
+	struct thread *p;
 # else
-struct proc *p;
+	struct proc *p;
 # endif /* __FreeBSD_version >= 500024 */
 #else
 )
 #endif
 #if (__FreeBSD_version >= 502116)
-struct cdev *dev;
+	struct cdev *dev;
 #else
-dev_t dev;
+	dev_t dev;
 #endif
-int flags;
+	int flags;
 {
 	u_int min = GET_MINOR(dev);
 
@@ -412,21 +412,21 @@ int flags;
 static int ipfclose(dev, flags
 #if ((BSD >= 199506) || (__FreeBSD_version >= 220000))
 , devtype, p)
-int devtype;
+	int devtype;
 # if (__FreeBSD_version >= 500024)
-struct thread *p;
+	struct thread *p;
 # else
-struct proc *p;
+	struct proc *p;
 # endif /* __FreeBSD_version >= 500024 */
 #else
 )
 #endif
 #if (__FreeBSD_version >= 502116)
-struct cdev *dev;
+	struct cdev *dev;
 #else
-dev_t dev;
+	dev_t dev;
 #endif
-int flags;
+	int flags;
 {
 	u_int	min = GET_MINOR(dev);
 
@@ -445,16 +445,16 @@ int flags;
  */
 #if (BSD >= 199306)
 static int ipfread(dev, uio, ioflag)
-int ioflag;
+	int ioflag;
 #else
 static int ipfread(dev, uio)
 #endif
 #if (__FreeBSD_version >= 502116)
-struct cdev *dev;
+	struct cdev *dev;
 #else
-dev_t dev;
+	dev_t dev;
 #endif
-struct uio *uio;
+	struct uio *uio;
 {
 	u_int	xmin = GET_MINOR(dev);
 
@@ -485,16 +485,16 @@ struct uio *uio;
  */
 #if (BSD >= 199306)
 static int ipfwrite(dev, uio, ioflag)
-int ioflag;
+	int ioflag;
 #else
 static int ipfwrite(dev, uio)
 #endif
 #if (__FreeBSD_version >= 502116)
-struct cdev *dev;
+	struct cdev *dev;
 #else
-dev_t dev;
+	dev_t dev;
 #endif
-struct uio *uio;
+	struct uio *uio;
 {
 
 	if (ipf_running < 1)

@@ -13,8 +13,8 @@
  * print the filter structure in a useful way
  */
 void	printfr(fp, iocfunc)
-struct	frentry	*fp;
-ioctlfunc_t	iocfunc;
+	struct	frentry	*fp;
+	ioctlfunc_t	iocfunc;
 {
 	struct protoent	*p;
 	u_short	sec[2];

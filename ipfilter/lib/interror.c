@@ -391,7 +391,7 @@ log" },
 
 
 char *ipf_geterror(fd)
-int fd;
+	int fd;
 {
 	static char text[80];
 	ipf_error_entry_t *ie;

@@ -17,8 +17,8 @@ static const char rcsid[] = "@(#)$Id$";
  * Get a nat filter type given its kernel address.
  */
 char *getnattype(nat, alive)
-nat_t *nat;
-int alive;
+	nat_t *nat;
+	int alive;
 {
 	static char unknownbuf[20];
 	ipnat_t *ipn, ipnat;

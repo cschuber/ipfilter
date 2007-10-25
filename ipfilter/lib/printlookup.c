@@ -10,7 +10,7 @@
 
 
 void printlookup(addr, mask)
-i6addr_t *addr, *mask;
+	i6addr_t *addr, *mask;
 {
 	switch (addr->iplookuptype)
 	{

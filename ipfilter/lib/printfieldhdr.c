@@ -10,7 +10,7 @@
 
 
 void printfieldhdr(words, field)
-wordtab_t *words, *field;
+	wordtab_t *words, *field;
 {
 	wordtab_t *w;
 	char *s, *t;

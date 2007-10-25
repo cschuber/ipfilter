@@ -3,8 +3,8 @@
 #include <sys/ioctl.h>
 
 void ipferror(fd, msg)
-int fd;
-char *msg;
+	int fd;
+	char *msg;
 {
 	int err, save;
 

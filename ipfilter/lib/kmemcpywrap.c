@@ -10,8 +10,8 @@
 #include "kmem.h"
 
 int kmemcpywrap(from, to, size)
-void *from, *to;
-size_t size;
+	void *from, *to;
+	size_t size;
 {
 	int ret;
 

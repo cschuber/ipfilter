@@ -357,9 +357,9 @@ static icmp_type_t icmptypes6[] = {
 };
 
 static icmp_subtype_t *find_icmpsubtype(type, table, tablesz)
-int type;
-icmp_subtype_t *table;
-size_t tablesz;
+	int type;
+	icmp_subtype_t *table;
+	size_t tablesz;
 {
 	icmp_subtype_t *ist;
 	int i;
@@ -382,9 +382,9 @@ size_t tablesz;
 
 
 static icmp_type_t *find_icmptype(type, table, tablesz)
-int type;
-icmp_type_t *table;
-size_t tablesz;
+	int type;
+	icmp_type_t *table;
+	size_t tablesz;
 {
 	icmp_type_t *it;
 	int i;
@@ -407,7 +407,7 @@ size_t tablesz;
 
 
 static void handlehup(sig)
-int sig;
+	int sig;
 {
 	signal(SIGHUP, handlehup);
 	donehup = 1;
@@ -500,7 +500,7 @@ static void init_tabs()
 
 
 static char *getproto(p)
-u_int p;
+	u_int p;
 {
 	static char pnum[4];
 	char *s;
@@ -516,8 +516,8 @@ u_int p;
 
 
 static int read_log(fd, lenp, buf, bufsize)
-int fd, bufsize, *lenp;
-char *buf;
+	int fd, bufsize, *lenp;
+	char *buf;
 {
 	int	nr;
 
@@ -532,8 +532,8 @@ char *buf;
 
 
 char *hostname(res, v, ip)
-int res, v;
-u_32_t *ip;
+	int res, v;
+	u_32_t *ip;
 {
 # define MAX_INETA	16
 	static char hname[MAXHOSTNAMELEN + MAX_INETA + 3];
@@ -565,9 +565,9 @@ u_32_t *ip;
 
 
 char *portname(res, proto, port)
-int res;
-char *proto;
-u_int port;
+	int res;
+	char *proto;
+	u_int port;
 {
 	static char pname[8];
 	char *s;
@@ -589,8 +589,8 @@ u_int port;
 
 
 static char *icmpname(type, code)
-u_int type;
-u_int code;
+	u_int type;
+	u_int code;
 {
 	static char name[80];
 	icmp_subtype_t *ist;
@@ -620,8 +620,8 @@ u_int code;
 }
 
 static char *icmpname6(type, code)
-u_int type;
-u_int code;
+	u_int type;
+	u_int code;
 {
 	static char name[80];
 	icmp_subtype_t *ist;
@@ -652,10 +652,10 @@ u_int code;
 
 
 void dumphex(log, dopts, buf, len)
-FILE *log;
-int dopts;
-char *buf;
-int len;
+	FILE *log;
+	int dopts;
+	char *buf;
+	int len;
 {
 	char	hline[80];
 	int	i, j, k;
@@ -717,9 +717,9 @@ int len;
 
 static struct tm *get_tm(sec)
 #ifdef __hpux
-u_32_t sec;
+	u_32_t sec;
 #else
-time_t sec;
+	time_t sec;
 #endif
 {
 	struct tm *tm;
@@ -731,9 +731,9 @@ time_t sec;
 }
 
 static void print_natlog(conf, buf, blen)
-config_t *conf;
-char *buf;
-int blen;
+	config_t *conf;
+	char *buf;
+	int blen;
 {
 	struct natlog *nl;
 	int res, i, len;
@@ -890,9 +890,9 @@ int blen;
 
 
 static void print_statelog(conf, buf, blen)
-config_t *conf;
-char *buf;
-int blen;
+	config_t *conf;
+	char *buf;
+	int blen;
 {
 	struct ipslog *sl;
 	char *t, *proto;
@@ -1031,10 +1031,10 @@ int blen;
 
 
 static void print_log(conf, log, buf, blen)
-config_t *conf;
-logsource_t *log;
-char *buf;
-int blen;
+	config_t *conf;
+	logsource_t *log;
+	char *buf;
+	int blen;
 {
 	char *bp, *bpo;
 	iplog_t	*ipl;
@@ -1090,9 +1090,9 @@ int blen;
 
 
 static void print_ipflog(conf, buf, blen)
-config_t *conf;
-char *buf;
-int blen;
+	config_t *conf;
+	char *buf;
+	int blen;
 {
 	int i, v, lvl, res, len, off, plen, ipoff, defaction;
 	struct icmp *icmp;
@@ -1477,7 +1477,7 @@ printipflog:
 
 
 static void usage(prog)
-char *prog;
+	char *prog;
 {
 	fprintf(stderr, "%s: [-NFhstvxX] [-f <logfile>]\n", prog);
 	exit(1);
@@ -1485,7 +1485,7 @@ char *prog;
 
 
 static void write_pid(file)
-char *file;
+	char *file;
 {
 	FILE *fp = NULL;
 	int fd;
@@ -1505,8 +1505,8 @@ char *file;
 
 
 static void flushlogs(file, log)
-char *file;
-FILE *log;
+	char *file;
+	FILE *log;
 {
 	int	fd, flushed = 0;
 
@@ -1536,8 +1536,8 @@ FILE *log;
 
 
 static void logopts(turnon, options)
-int turnon;
-char *options;
+	int turnon;
+	char *options;
 {
 	int flags = 0;
 	char *s;
@@ -1589,8 +1589,8 @@ static void initconfig(config_t *conf)
 
 
 int main(argc, argv)
-int argc;
-char *argv[];
+	int argc;
+	char *argv[];
 {
 	int	doread, c, make_daemon = 0;
 	char	*s;

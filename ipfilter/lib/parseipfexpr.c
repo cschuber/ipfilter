@@ -27,8 +27,8 @@ static ipfopentry_t opwords[14] = {
 
 
 int *parseipfexpr(line, errorptr)
-char *line;
-char **errorptr;
+	char *line;
+	char **errorptr;
 {
 	int not, items, asize, *oplist, osize, i;
 	char *temp, *arg, *s, *t, *ops, *error;

@@ -1485,7 +1485,7 @@ ipf_checkv6sum(fin)
 
 
 size_t mbufchainlen(m0)
-struct mbuf *m0;
+	struct mbuf *m0;
 {
 	size_t len;
 

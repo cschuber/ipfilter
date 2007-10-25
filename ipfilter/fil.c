@@ -8532,9 +8532,9 @@ ipf_queueflush(deletefn, ipfqs, userqs, activep, size, low)
 /* the network interface represented by ifp.                                */
 /* ------------------------------------------------------------------------ */
 static int ipf_deliverlocal(ipversion, ifp, sinaddr)
-int ipversion;
-void *ifp;
-void *sinaddr;
+	int ipversion;
+	void *ifp;
+	void *sinaddr;
 {
 	i6addr_t addr;
 	int islocal = 0;

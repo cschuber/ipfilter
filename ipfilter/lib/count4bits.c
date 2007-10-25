@@ -15,7 +15,7 @@
  * of bits.
  */
 int	count4bits(ip)
-u_int	ip;
+	u_int	ip;
 {
 	int cnt = 0, i, j;
 	u_int ipn;

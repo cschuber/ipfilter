@@ -16,10 +16,10 @@ static int poolfd = -1;
 
 
 int remove_poolnode(unit, name, node, iocfunc)
-int unit;
-char *name;
-ip_pool_node_t *node;
-ioctlfunc_t iocfunc;
+	int unit;
+	char *name;
+	ip_pool_node_t *node;
+	ioctlfunc_t iocfunc;
 {
 	ip_pool_node_t pn;
 	iplookupop_t op;

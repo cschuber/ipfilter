@@ -172,7 +172,7 @@ main(argc, argv)
 	node.ipn_info = 1;
 	ipf_pool_insert(ipo, &node);
 #ifdef	DEBUG_POOL
-treeprint(ipo);
+	treeprint(ipo);
 #endif
 	ip.in4.s_addr = 0x0a00aabb;
 	printf("search(%#x) = %d (0)\n", ip.in4.s_addr,
@@ -211,7 +211,7 @@ treeprint(ipo);
 		ipf_pool_search(ipo, 4, &ip));
 
 #ifdef	DEBUG_POOL
-treeprint(ipo);
+	treeprint(ipo);
 #endif
 
 	ipf_pool_fini();
@@ -222,7 +222,7 @@ treeprint(ipo);
 
 void
 treeprint(ipo)
-ip_pool_t *ipo;
+	ip_pool_t *ipo;
 {
 	ip_pool_node_t *c;
 

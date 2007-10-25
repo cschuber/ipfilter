@@ -157,7 +157,7 @@ static eventhandler_tag ipf_arrivetag, ipf_departtag, ipf_clonetag;
 static void ipf_ifevent(void *arg);
 
 static void ipf_ifevent(arg)
-void *arg;
+	void *arg;
 {
         ipf_sync(NULL);
 }
@@ -196,7 +196,7 @@ ipf_check_wrapper6(void *arg, struct mbuf **mp, struct ifnet *ifp, int dir)
 #endif /* __FreeBSD_version >= 501108 */
 #if	defined(IPFILTER_LKM)
 int ipf_identify(s)
-char *s;
+	char *s;
 {
 	if (strcmp(s, "ipl") == 0)
 		return 1;
@@ -1173,7 +1173,7 @@ ipf_nextipid(fin)
 
 INLINE void
 ipf_checkv4sum(fin)
-fr_info_t *fin;
+	fr_info_t *fin;
 {
 #ifdef CSUM_DATA_VALID
 	int manual = 0;

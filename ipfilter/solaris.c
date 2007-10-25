@@ -220,7 +220,7 @@ int _fini(void)
 
 
 int _info(modinfop)
-struct modinfo *modinfop;
+	struct modinfo *modinfop;
 {
 	int ipfinst;
 
@@ -234,7 +234,7 @@ struct modinfo *modinfop;
 
 #if SOLARIS2 < 10
 static int ipf_identify(dip)
-dev_info_t *dip;
+	dev_info_t *dip;
 {
 # ifdef	IPFDEBUG
 	cmn_err(CE_NOTE, "IP Filter: ipf_identify(%x)", dip);
@@ -247,8 +247,8 @@ dev_info_t *dip;
 
 
 static int ipf_attach(dip, cmd)
-dev_info_t *dip;
-ddi_attach_cmd_t cmd;
+	dev_info_t *dip;
+	ddi_attach_cmd_t cmd;
 {
 	char *s;
 	int i;
@@ -346,8 +346,8 @@ attach_failed:
 
 
 static int ipf_detach(dip, cmd)
-dev_info_t *dip;
-ddi_detach_cmd_t cmd;
+	dev_info_t *dip;
+	ddi_detach_cmd_t cmd;
 {
 	int i;
 
@@ -426,9 +426,9 @@ ddi_detach_cmd_t cmd;
 
 /*ARGSUSED*/
 static int ipf_getinfo(dip, infocmd, arg, result)
-dev_info_t *dip;
-ddi_info_cmd_t infocmd;
-void *arg, **result;
+	dev_info_t *dip;
+	ddi_info_cmd_t infocmd;
+	void *arg, **result;
 {
 	int error;
 
@@ -460,12 +460,12 @@ void *arg, **result;
  */
 /*ARGSUSED*/
 static int fr_qifsync(ip, hlen, il, out, qif, mp)
-ip_t *ip;
-int hlen;
-void *il;
-int out;
-void *qif;
-mblk_t **mp;
+	ip_t *ip;
+	int hlen;
+	void *il;
+	int out;
+	void *qif;
+	mblk_t **mp;
 {
 
 	frsync(qif);
@@ -494,7 +494,7 @@ int ipfsync()
  * driver file.
  */
 static int ipf_property_update(dip)
-dev_info_t *dip;
+	dev_info_t *dip;
 {
 	ipftuneable_t *ipft;
 	int64_t *i64p;
@@ -575,11 +575,11 @@ dev_info_t *dip;
 
 
 static int iplpoll(dev, events, anyyet, reventsp, phpp)
-dev_t dev;
-short events;
-int anyyet;
-short *reventsp;
-struct pollhead **phpp;
+	dev_t dev;
+	short events;
+	int anyyet;
+	short *reventsp;
+	struct pollhead **phpp;
 {
 	u_int xmin = getminor(dev);
 	int revents = 0;
@@ -631,9 +631,9 @@ struct pollhead **phpp;
  */
 /*ARGSUSED*/
 static int iplopen(devp, flags, otype, cred)
-dev_t *devp;
-int flags, otype;
-cred_t *cred;
+	dev_t *devp;
+	int flags, otype;
+	cred_t *cred;
 {
 	minor_t min = getminor(*devp);
 
@@ -650,9 +650,9 @@ cred_t *cred;
 
 /*ARGSUSED*/
 static int iplclose(dev, flags, otype, cred)
-dev_t dev;
-int flags, otype;
-cred_t *cred;
+	dev_t dev;
+	int flags, otype;
+	cred_t *cred;
 {
 	minor_t	min = getminor(dev);
 
@@ -673,9 +673,9 @@ cred_t *cred;
  */
 /*ARGSUSED*/
 static int iplread(dev, uio, cp)
-dev_t dev;
-register struct uio *uio;
-cred_t *cp;
+	dev_t dev;
+	register struct uio *uio;
+	cred_t *cp;
 {
 #ifdef	IPFDEBUG
 	cmn_err(CE_CONT, "iplread(%x,%x,%x)\n", dev, uio, cp);
@@ -704,9 +704,9 @@ cred_t *cp;
  * the filter lists.
  */
 static int iplwrite(dev, uio, cp)
-dev_t dev;
-register struct uio *uio;
-cred_t *cp;
+	dev_t dev;
+	register struct uio *uio;
+	cred_t *cp;
 {
 #ifdef	IPFDEBUG
 	cmn_err(CE_CONT, "iplwrite(%x,%x,%x)\n", dev, uio, cp);

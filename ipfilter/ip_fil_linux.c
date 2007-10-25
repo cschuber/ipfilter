@@ -837,7 +837,7 @@ ipf_rw_downgrade(ipfrwlock_t *rwlk)
 
 #if 0
 void dumpskbuff(sk)
-struct sk_buff *sk;
+	struct sk_buff *sk;
 {
 	char line[80], *t;
 	u_char *s1, *s2;

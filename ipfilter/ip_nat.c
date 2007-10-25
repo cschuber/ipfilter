@@ -7772,7 +7772,7 @@ ipf_nat_matcharray(nat, array)
 /* At present the only table it deals with is the hash bucket statistics.   */
 /* ------------------------------------------------------------------------ */
 static int ipf_nat_gettable(data)
-char *data;
+	char *data;
 {
 	ipftable_t table;
 	int error;

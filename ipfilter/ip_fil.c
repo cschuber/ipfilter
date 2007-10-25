@@ -241,7 +241,7 @@ no_output(ifp, m, s)
 #else
 # if TRU64 >= 1885
 no_output (ifp, m, s, rt, cp)
-char *cp;
+	char *cp;
 # else
 no_output(ifp, m, s, rt)
 # endif
@@ -261,7 +261,7 @@ write_output(ifp, m, s)
 #else
 # if TRU64 >= 1885
 write_output (ifp, m, s, rt, cp)
-char *cp;
+	char *cp;
 # else
 write_output(ifp, m, s, rt)
 # endif

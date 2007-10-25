@@ -40,7 +40,7 @@ void	dumppacket __P((ip_t *));
 
 
 void dumppacket(ip)
-ip_t	*ip;
+	ip_t	*ip;
 {
 	tcphdr_t *t;
 	int i, j;
@@ -70,11 +70,11 @@ ip_t	*ip;
 
 
 int	ip_resend(dev, mtu, r, gwip, datain)
-char	*dev;
-int	mtu;
-struct	in_addr	gwip;
-struct	ipread	*r;
-char	*datain;
+	char	*dev;
+	int	mtu;
+	struct	in_addr	gwip;
+	struct	ipread	*r;
+	char	*datain;
 {
 	ether_header_t	*eh;
 	char	dhost[6];

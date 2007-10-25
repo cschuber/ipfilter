@@ -9,7 +9,7 @@
 #include "ipf.h"
 
 void assigndefined(env)
-char *env;
+	char *env;
 {
 	char *s, *t;
 

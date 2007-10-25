@@ -10,9 +10,9 @@
 
 
 int genmask(family, msk, mskp)
-int family;
-char *msk;
-u_32_t *mskp;
+	int family;
+	char *msk;
+	u_32_t *mskp;
 {
 	char *endptr = 0L;
 	int bits;

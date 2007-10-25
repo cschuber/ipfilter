@@ -69,8 +69,8 @@ static void usage()
 
 
 int main(argc,argv)
-int argc;
-char *argv[];
+	int argc;
+	char *argv[];
 {
 	int c, *filter = NULL;
 
@@ -174,8 +174,8 @@ char *argv[];
 
 
 static int opendevice(ipfdev, check)
-char *ipfdev;
-int check;
+	char *ipfdev;
+	int check;
 {
 	if (opts & OPT_DONOTHING)
 		return -2;
@@ -217,7 +217,7 @@ static	int	get_flags()
 
 
 static	void	set_state(enable)
-u_int	enable;
+	u_int	enable;
 {
 	if (opendevice(ipfname, 0) != -2) {
 		if (ioctl(fd, SIOCFRENB, &enable) == -1) {
@@ -234,7 +234,7 @@ u_int	enable;
 
 
 static	void	procfile(name, file)
-char	*name, *file;
+	char	*name, *file;
 {
 	(void) opendevice(ipfname, 1);
 
@@ -251,9 +251,9 @@ char	*name, *file;
 
 
 static void ipf_interceptadd(fd, ioctlfunc, ptr)
-int fd;
-ioctlfunc_t ioctlfunc;
-void *ptr;
+	int fd;
+	ioctlfunc_t ioctlfunc;
+	void *ptr;
 {
 	if (outputc)
 		printc(ptr);
@@ -263,7 +263,7 @@ void *ptr;
 
 
 static void packetlogon(opt)
-char	*opt;
+	char	*opt;
 {
 	int	flag, xfd, logopt, change = 0;
 
@@ -347,8 +347,8 @@ char	*opt;
 
 
 static void flushfilter(arg, filter)
-char *arg;
-int *filter;
+	char *arg;
+	int *filter;
 {
 	int	fl = 0, rem;
 
@@ -504,7 +504,7 @@ void zerostats()
  * read the kernel stats for packets blocked and passed
  */
 static void showstats(fp)
-friostat_t	*fp;
+	friostat_t	*fp;
 {
 	printf("bad packets:\t\tin %lu\tout %lu\n",
 			fp->f_st[0].fr_bad, fp->f_st[1].fr_bad);

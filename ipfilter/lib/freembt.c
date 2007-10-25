@@ -9,7 +9,7 @@
 #include "ipf.h"
 
 void freembt(m)
-mb_t *m;
+	mb_t *m;
 {
 
 	free(m);
