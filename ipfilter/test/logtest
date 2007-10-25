@@ -27,7 +27,7 @@ esac
 /bin/cp /dev/null results/$1.b
 
 ( while read rule; do
-	echo $rule >> results/$1 
+	echo $rule >> results/$1
 	echo $rule | ../ipftest -br - -F $format -i input/$1 -l logout > /dev/null
 	if [ $? -ne 0 ] ; then
 		/bin/rm -f logout

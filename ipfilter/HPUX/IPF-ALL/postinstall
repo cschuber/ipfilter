@@ -64,7 +64,7 @@ done
 ln -s /sbin/init.d/ipfboot /sbin/rc2.d/S020ipfboot
 
 . /usr/lbin/sw/control_utils
-mod_pathfile -a MP /opt/ipf/man 
-mod_pathfile -a P /opt/ipf/bin 
+mod_pathfile -a MP /opt/ipf/man
+mod_pathfile -a P /opt/ipf/bin
 
 exit $exitval

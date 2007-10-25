@@ -34,7 +34,7 @@ int	sport, tout;
 int	sendip(fd, pkt, len)
 int	fd, len;
 char	*pkt;
-{			
+{
 	if (send(fd, pkt, len, 0) == -1)
 	    {
 		perror("send");
@@ -90,7 +90,7 @@ int	sport, tout;
 int	sendip(fd, pkt, len)
 int	fd, len;
 char	*pkt;
-{			
+{
 	if (send(fd, pkt, len, 0) == -1)
 	    {
 		perror("send");

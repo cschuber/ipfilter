@@ -8,13 +8,13 @@
 
 #include "ipf.h"
 
-alist_t *     
+alist_t *
 alist_new(int v, char *host)
 {
 	int a, b, c, d, bits;
-	char *slash;    
-	alist_t *al;  
-	u_int mask;     
+	char *slash;
+	alist_t *al;
+	u_int mask;
 
 	al = calloc(1, sizeof(*al));
 	if (al == NULL) {
@@ -22,7 +22,7 @@ alist_new(int v, char *host)
 		return NULL;
 	}
 
-	bits = -1;      
+	bits = -1;
 	slash = strchr(host, '/');
 	if (slash != NULL) {
 		*slash = '\0';
@@ -36,7 +36,7 @@ alist_new(int v, char *host)
 		mask = 0xffffffff << (32 - bits);
 	} else if (b == -1) {
 		mask = 0xff000000;
-		b = c = d = 0;  
+		b = c = d = 0;
 	} else if (c == -1) {
 		mask = 0xffff0000;
 		c = d = 0;

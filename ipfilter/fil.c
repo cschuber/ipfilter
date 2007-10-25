@@ -1458,12 +1458,12 @@ fr_info_t *fin;
 		if (off != 0) {
 			fin->fin_flx |= FI_FRAGBODY;
 			off <<= 3;
-			if ((off + fin->fin_dlen > 65535) || 
+			if ((off + fin->fin_dlen > 65535) ||
 			    (fin->fin_dlen == 0) ||
 			    ((morefrag != 0) && ((fin->fin_dlen & 7) != 0))) {
-				/* 
+				/*
 				 * The length of the packet, starting at its
-				 * offset cannot exceed 65535 (0xffff) as the 
+				 * offset cannot exceed 65535 (0xffff) as the
 				 * length of an IP packet is only 16 bits.
 				 *
 				 * Any fragment that isn't the last fragment
@@ -7307,7 +7307,7 @@ ipftq_t *ipfqs, *userqs;
 	for (;;) {
 		u_long try;
 
-		try = fr_ticks - istart; 
+		try = fr_ticks - istart;
 
 		for (ifq = ipfqs; ifq != NULL; ifq = ifq->ifq_next) {
 			for (tqn = ifq->ifq_head; ((tqe = tqn) != NULL); ) {

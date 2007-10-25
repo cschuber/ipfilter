@@ -433,7 +433,7 @@ $(OBJ)/iptrafcon: $(IPTRAFCON) $(OBJ)/libipf.a
 
 $(TOP)/ip_pool.h: radix_ipf_local.h
 
-radix_ipf_local.h: $(TOP)/radix_ipf.h Makefile  
+radix_ipf_local.h: $(TOP)/radix_ipf.h Makefile
 	sed -e 's/^\([^#].*\)\([	]\)radix_node/\1\2ipf_radix_node/g' \
 	    -e 's/^\([^#].*\)\([	]\)radix_mask/\1\2ipf_radix_mask/g' \
 	    -e 's/struct radix/struct ipf_radix/g' \

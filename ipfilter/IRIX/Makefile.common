@@ -165,7 +165,7 @@ $(TOP)/ip_rules.h: ip_rules.c
 		touch $(TOP)/ip_rules.h; \
 	fi
 
-$(LKM): $(MODOBJS) 
+$(LKM): $(MODOBJS)
 	ld $(MLFLAGS) -r -d $(MODOBJS) -o $(LKM)
 
 ip_nat.o: $(TOP)/ip_nat.c $(TOP)/ip_nat.h $(TOP)/ip_compat.h $(TOP)/ip_fil.h

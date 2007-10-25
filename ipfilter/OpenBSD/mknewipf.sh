@@ -1,6 +1,6 @@
 #!/bin/sh
 # documented from
-# http://www.tfsb.org/ipf-openbsd/ 
+# http://www.tfsb.org/ipf-openbsd/
 ARCH=sparc
 KERNEL=MULAN
 IPF=ip-fil3.4.17

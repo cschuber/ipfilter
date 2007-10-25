@@ -223,22 +223,22 @@ static	int	ipl_attach()
 			defpass = "pass";
 		else if (FR_ISBLOCK(fr_pass))
 			defpass = "block";
-		else                
+		else
 			defpass = "no-match -> block";
 
 		printf("%s initialized.  Default = %s all, Logging = %s%s\n",
 			ipfilter_version, defpass,
 #ifdef IPFILTER_LOG
 			"enabled",
-#else             
+#else
 			"disabled",
-#endif 
+#endif
 #ifdef IPFILTER_COMPILED
 			" (COMPILED)"
-#else 
+#else
 			""
 #endif
-			);            
+			);
 		fr_running = 1;
 	}
 	return error;

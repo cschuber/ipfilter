@@ -47,7 +47,7 @@ static void handleterm(int sig)
 }
 #endif
 
- 
+
 /* should be large enough to hold header + any datatype */
 #define BUFFERLEN 1400
 
@@ -64,14 +64,14 @@ char *argv[];
 	u_32_t magic;
 	synchdr_t *sh;
 	char *progname;
-	
+
 	progname = strrchr(argv[0], '/');
 	if (progname) {
 		progname++;
 	} else {
 		progname = argv[0];
 	}
-	
+
 
 	if (argc < 2) {
 		usage(progname);
@@ -106,13 +106,13 @@ char *argv[];
 			syslog(LOG_ERR, "Opening %s :%m", IPSYNC_NAME);
 			goto tryagain;
 		}
-		
+
 		nfd = socket(AF_INET, SOCK_DGRAM, 0);
 		if (nfd == -1) {
 			syslog(LOG_ERR, "Socket :%m");
 			goto tryagain;
 		}
-	
+
 		if (connect(nfd, (struct sockaddr *)&sin, sizeof(sin)) == -1) {
 			syslog(LOG_ERR, "Connect: %m");
 			goto tryagain;
@@ -120,15 +120,15 @@ char *argv[];
 
 		syslog(LOG_INFO, "Sending data to %s",
 		       inet_ntoa(sin.sin_addr));
-	
-		inbuf = 0;	
+
+		inbuf = 0;
 		while (1) {
 
 			n1 = read(lfd, buff+inbuf, BUFFERLEN-inbuf);
-		
+
 			printf("header : %d bytes read (header = %d bytes)\n",
 			       n1, sizeof(*sh));
-	
+
 			if (n1 < 0) {
 				syslog(LOG_ERR, "Read error (header): %m");
 				goto tryagain;
@@ -141,8 +141,8 @@ char *argv[];
 				sleep(1);
 				continue;
 			}
-			
-			inbuf += n1;		
+
+			inbuf += n1;
 
 moreinbuf:
 			if (inbuf < sizeof(*sh)) {
@@ -151,7 +151,7 @@ moreinbuf:
 
 			sh = (synchdr_t *)buff;
 			len = ntohl(sh->sm_len);
-			magic = ntohl(sh->sm_magic);		
+			magic = ntohl(sh->sm_magic);
 
 			if (magic != SYNHDRMAGIC) {
 				syslog(LOG_ERR,
@@ -179,8 +179,8 @@ moreinbuf:
 				printf(" table:Unknown(%d)", sh->sm_table);
 
 			printf(" num:%d\n", (u_32_t)ntohl(sh->sm_num));
-#endif			
-			
+#endif
+
 			if (inbuf < sizeof(*sh) + len) {
 				continue; /* need more data */
 				goto tryagain;
@@ -193,9 +193,9 @@ moreinbuf:
 			} else if (sh->sm_cmd == SMC_UPDATE) {
 				su = (syncupdent_t *)buff;
 				if (sh->sm_p == IPPROTO_TCP) {
-					printf(" TCP Update: age %lu state %d/%d\n", 
+					printf(" TCP Update: age %lu state %d/%d\n",
 						su->sup_tcp.stu_age,
-						su->sup_tcp.stu_state[0], 
+						su->sup_tcp.stu_state[0],
 						su->sup_tcp.stu_state[1]);
 				}
 			} else {
@@ -210,7 +210,7 @@ moreinbuf:
 				goto tryagain;
 			}
 
-			
+
 			if (n3 != n2) {
 				syslog(LOG_ERR, "Incomplete write (%d/%d)",
 				       n3, n2);
@@ -224,7 +224,7 @@ moreinbuf:
 			/* move buffer to the front,we might need to make
 			 * this more efficient, by using a rolling pointer
 			 * over the buffer and only copying it, when
-			 * we are reaching the end 
+			 * we are reaching the end
 			 */
 			inbuf -= n2;
 			if (inbuf) {

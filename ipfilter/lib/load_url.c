@@ -13,11 +13,11 @@ load_url(char *url)
 {
 	alist_t *hosts = NULL;
 
-	if (strncmp(url, "file://", 7) == 0) { 
-		/*      
+	if (strncmp(url, "file://", 7) == 0) {
+		/*
 		 * file:///etc/passwd
 		 *        ^------------s
-		 */     
+		 */
 		hosts = load_file(url);
 
 	} else if (*url == '/' || *url == '.') {
@@ -27,5 +27,5 @@ load_url(char *url)
 		hosts = load_http(url);
 	}
 
-	return hosts;  
+	return hosts;
 }

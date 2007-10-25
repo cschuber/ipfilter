@@ -1429,7 +1429,7 @@ ipstate_t *is;
 	tcpdata_t  *fdata, *tdata;
 
 	source = !fin->fin_rev;
-	if (((is->is_flags & IS_TCPFSM) != 0) && (source == 1) && 
+	if (((is->is_flags & IS_TCPFSM) != 0) && (source == 1) &&
 	    (ntohs(is->is_sport) != fin->fin_data[0]))
 		source = 0;
 	fdata = &is->is_tcp.ts_data[!source];
@@ -1676,7 +1676,7 @@ int flags;
 			 * accepted, even if it appears out of sequence.
 			 */
 			inseq = 1;
-		} else 
+		} else
 #endif
 		if (!(fdata->td_winflags &
 			    (TCP_WSCALE_SEEN|TCP_WSCALE_FIRST))) {
@@ -3177,7 +3177,7 @@ int which, proto;
 	case 2 :
 		break;
 
-		/*  
+		/*
 		 * Args 5-11 correspond to flushing those particular states
 		 * for TCP connections.
 		 */
@@ -3202,7 +3202,7 @@ int which, proto;
 		if (which < 30)
 			break;
 
-		/* 
+		/*
 		 * Take a large arbitrary number to mean the number of seconds
 		 * for which which consider to be the maximum value we'll allow
 		 * the expiration to be.
@@ -3255,7 +3255,7 @@ static int fr_state_flush_entry(entry)
 void *entry;
 {
 	return fr_delstate(entry, ISL_FLUSH);
-}     
+}
 
 
 /* ------------------------------------------------------------------------ */
@@ -4189,7 +4189,7 @@ char *data;
 	if (table.ita_type != IPFTABLE_BUCKETS)
 		return EINVAL;
 
-	error = COPYOUT(ips_stats.iss_bucketlen, table.ita_table, 
+	error = COPYOUT(ips_stats.iss_bucketlen, table.ita_table,
 			fr_statesize * sizeof(u_long));
 	if (error != 0)
 		error = EFAULT;

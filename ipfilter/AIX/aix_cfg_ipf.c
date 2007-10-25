@@ -132,7 +132,7 @@ int checkarg(int argc, char *arg)
 
 	if (!strcmp(arg, "-l") && (argc <= 3))
 		return 1;
-	
+
 	if (!strcmp(arg, "-u") && (argc == 2))
 		return 2;
 

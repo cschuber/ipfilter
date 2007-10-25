@@ -1045,7 +1045,7 @@ frdest_t *fdp;
 	 */
 	if (*mpp != mb) {
 		mblk_t *mp;
-		
+
 		mp = unlinkb(*mpp);
 		freeb(*mpp);
 		*mpp = mp;

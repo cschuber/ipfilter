@@ -292,7 +292,7 @@ $(OBJ)/ip_fil_u.o: $(TOP)/ip_fil.c $(TOP)/ip_fil.h $(TOP)/ip_compat.h
 $(OBJ)/ip_log_u.o: $(TOP)/ip_log.c $(TOP)/ip_fil.h $(TOP)/ip_compat.h
 	$(CC) $(CCARGS) -c $(TOP)/ip_log.c -o $@
 
-$(OBJ)/ipfilter.o: $(MODOBJS) 
+$(OBJ)/ipfilter.o: $(MODOBJS)
 	ld -r $(MODOBJS) -o $(OBJ)/ipfilter.o
 	${RM} -f $(OBJ)/ipfilter
 
@@ -452,7 +452,7 @@ clean:
 	${RM} -f *.core *.o ipt fils ipf ipfstat ipftest ipmon ippool ipnat \
 		ipfilter.o
 	${RM} -f fil.c ip_auth.c ip_frag.c ip_htable.c ip_lookup.c ip_log.c
-	${RM} -f ip_lookup.c ip_nat.c ip_pool.c ip_proxy.c ip_scan.c 
+	${RM} -f ip_lookup.c ip_nat.c ip_pool.c ip_proxy.c ip_scan.c
 	${RM} -f ip_state.c ip_sync.c radix.c ip_rules.c ip_rules.h
 	${MAKE} -f Makefile.ipsend ${MFLAGS} clean
 	-(for i in Linux*; do \

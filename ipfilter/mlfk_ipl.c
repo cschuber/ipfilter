@@ -15,7 +15,7 @@
 #include <sys/select.h>
 #if __FreeBSD_version >= 500000
 # include <sys/selinfo.h>
-#endif                  
+#endif
 #include <net/if.h>
 #include <netinet/in_systm.h>
 #include <netinet/in.h>
@@ -213,11 +213,11 @@ ipf_modload()
 		defpass = "pass";
 	else if (FR_ISBLOCK(fr_pass))
 		defpass = "block";
-	else          
+	else
 		defpass = "no-match -> block";
 
 	printf("%s initialized.  Default = %s all, Logging = %s%s\n",
-		ipfilter_version, defpass,                
+		ipfilter_version, defpass,
 #ifdef IPFILTER_LOG
 		"enabled",
 #else
@@ -228,7 +228,7 @@ ipf_modload()
 #else
 		""
 #endif
-		);         
+		);
 	return 0;
 }
 
@@ -324,7 +324,7 @@ iplpoll(dev_t dev, int events, struct proc *td)
 
 	revents = 0;
 
-	switch (xmin) 
+	switch (xmin)
 	{
 	case IPL_LOGIPF :
 	case IPL_LOGNAT :
@@ -332,12 +332,12 @@ iplpoll(dev_t dev, int events, struct proc *td)
 #ifdef IPFILTER_LOG
 		if ((events & (POLLIN | POLLRDNORM)) && ipflog_canread(xmin))
 			revents |= events & (POLLIN | POLLRDNORM);
-#endif  
+#endif
 		break;
 	case IPL_LOGAUTH :
 		if ((events & (POLLIN | POLLRDNORM)) && fr_auth_waiting())
 			revents |= events & (POLLIN | POLLRDNORM);
-		break; 
+		break;
 	case IPL_LOGSYNC :
 #ifdef IPFILTER_SYNC
 		if ((events & (POLLIN | POLLRDNORM)) && ipfsync_canread())

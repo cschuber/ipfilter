@@ -103,6 +103,6 @@ dlcommon.o: $(TOP)/ipsend/dlcommon.c
 sdlpi.o: $(TOP)/ipsend/sdlpi.c
 	$(CC) $(DEBUG) $(CFLAGS) -c $(TOP)/ipsend/sdlpi.c -o $@
 
-install:  
+install:
 	-$(INSTALL) -cs -g wheel -m 755 -o root ipsend ipresend iptest $(BINDEST)
 

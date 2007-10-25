@@ -1466,7 +1466,7 @@ int getlock;
 	 * For NAT_OUTBOUND, we're lookup for a duplicate MAP entry.  To do
 	 * this, we check to see if the inbound combination of addresses and
 	 * ports is already known.  Similar logic is applied for NAT_INBOUND.
-	 * 
+	 *
 	 */
 	bzero((char *)&fin, sizeof(fin));
 	fin.fin_p = nat->nat_p;
@@ -2795,7 +2795,7 @@ int dir;
 			return nat;
 		}
 	}
-		
+
 	if (flags & IPN_TCPUDP) {
 		minlen += 8;		/* + 64bits of data to get ports */
 		if (fin->fin_plen < ICMPERR_IPICMPHLEN + minlen)
@@ -2967,7 +2967,7 @@ int dir;
 		 *
 		 * Since the port fields are part of the TCP/UDP checksum
 		 * of the offending IP packet, you need to adjust that checksum
-		 * as well... except that the change in the port numbers should 
+		 * as well... except that the change in the port numbers should
 		 * be offset by the checksum change.  However, the TCP/UDP
 		 * checksum will also need to change if there has been an
 		 * IP address change.
@@ -3763,7 +3763,7 @@ u_32_t *passp;
 		default :
 			break;
 		}
-		
+
 		if ((nflags & IPN_TCPUDP))
 			tcp = fin->fin_dp;
 	}
@@ -4051,12 +4051,12 @@ u_32_t *passp;
 			 */
 			if (nat_icmpquerytype4(icmp->icmp_type)) {
 				nflags = IPN_ICMPQUERY;
-				dport = icmp->icmp_id;	
+				dport = icmp->icmp_id;
 			} break;
 		default :
 			break;
 		}
-		
+
 		if ((nflags & IPN_TCPUDP)) {
 			tcp = fin->fin_dp;
 			dport = tcp->th_dport;
@@ -4591,10 +4591,10 @@ int icmptype;
 	 * altough it seems silly to call a reply a query, this is exactly
 	 * as it is defined in the IPv4 specification
 	 */
-	
+
 	switch (icmptype)
 	{
-	
+
 	case ICMP_ECHOREPLY:
 	case ICMP_ECHO:
 	/* route aedvertisement/solliciation is currently unsupported: */
@@ -5358,11 +5358,11 @@ int which;
 			removed++;
 		}
 		break;
-	 
+
 	default :
 		if (which < 30)
 			break;
-	   
+
 		/*
 		 * Take a large arbitrary number to mean the number of seconds
 		 * for which which consider to be the maximum value we'll allow
@@ -5437,12 +5437,12 @@ char *data;
 	switch (table.ita_type)
 	{
 	case IPFTABLE_BUCKETS_NATIN :
-		error = COPYOUT(nat_stats.ns_bucketlen[0], table.ita_table, 
+		error = COPYOUT(nat_stats.ns_bucketlen[0], table.ita_table,
 				ipf_nattable_sz * sizeof(u_long));
 		break;
 
 	case IPFTABLE_BUCKETS_NATOUT :
-		error = COPYOUT(nat_stats.ns_bucketlen[1], table.ita_table, 
+		error = COPYOUT(nat_stats.ns_bucketlen[1], table.ita_table,
 				ipf_nattable_sz * sizeof(u_long));
 		break;
 

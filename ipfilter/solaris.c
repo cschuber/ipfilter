@@ -631,7 +631,7 @@ struct pollhead **phpp;
 	if (xmin < 0 || xmin > IPL_LOGMAX)
 		return ENXIO;
 
-	switch (xmin) 
+	switch (xmin)
 	{
 	case IPL_LOGIPF :
 	case IPL_LOGNAT :
@@ -639,12 +639,12 @@ struct pollhead **phpp;
 #ifdef IPFILTER_LOG
 		if ((events & (POLLIN | POLLRDNORM)) && ipflog_canread(xmin))
 			revents |= events & (POLLIN | POLLRDNORM);
-#endif  
+#endif
 		break;
 	case IPL_LOGAUTH :
 		if ((events & (POLLIN | POLLRDNORM)) && fr_auth_waiting())
 			revents |= events & (POLLIN | POLLRDNORM);
-		break; 
+		break;
 	case IPL_LOGSYNC :
 #ifdef IPFILTER_SYNC
 		if ((events & (POLLIN | POLLRDNORM)) && ipfsync_canread())

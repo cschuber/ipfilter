@@ -874,7 +874,7 @@ frdest_t *fdp;
 				if (fr_checkstate(fin, &pass) != NULL)
 					fr_statederef((ipstate_t **)&fin->fin_state);
 			}
-			
+
 			switch (fr_checknatout(fin, NULL))
 			{
 			case 0 :

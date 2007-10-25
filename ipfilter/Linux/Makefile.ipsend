@@ -74,6 +74,6 @@ slinux.o: $(TOP)/ipsend/slinux.c
 larp.o: $(TOP)/ipsend/larp.c
 	$(CC) $(DEBUG) $(CFLAGS) $(INC) $(LINUXK) -c $(TOP)/ipsend/larp.c -o $@
 
-install:  
+install:
 	-$(INSTALL) -cs -g wheel -m 755 -o root ipsend ipresend iptest $(BINDEST)
 

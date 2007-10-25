@@ -282,11 +282,11 @@ struct uio *uio;
 {
 	synchdr_t sh;
 
-	/* 
+	/*
 	 * THIS MUST BE SUFFICIENT LARGE TO STORE
-	 * ANY POSSIBLE DATA TYPE 
+	 * ANY POSSIBLE DATA TYPE
 	 */
-	char data[2048]; 
+	char data[2048];
 
 	int err = 0;
 
@@ -357,7 +357,7 @@ struct uio *uio;
 
 
 		/*
-		 * We have a header, so try to read the amount of data 
+		 * We have a header, so try to read the amount of data
 		 * needed for the request
 		 */
 
@@ -400,7 +400,7 @@ struct uio *uio;
 					sh.sm_len, uio->uio_resid);
 			return EAGAIN;
 		}
-	}	 
+	}
 
 	/* no more data */
 	return 0;
@@ -613,8 +613,8 @@ void *data;
 		READ_ENTER(&ipf_state);
 
 		if (ipf_sync_debug > 6)
-			printf("[%d] Data from state v:%d p:%d cmd:%d table:%d rev:%d\n", 
-				sp->sm_num, sl->sl_hdr.sm_v, sl->sl_hdr.sm_p, 
+			printf("[%d] Data from state v:%d p:%d cmd:%d table:%d rev:%d\n",
+				sp->sm_num, sl->sl_hdr.sm_v, sl->sl_hdr.sm_p,
 				sl->sl_hdr.sm_cmd, sl->sl_hdr.sm_table,
 				sl->sl_hdr.sm_rev);
 
