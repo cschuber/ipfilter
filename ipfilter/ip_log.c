@@ -286,7 +286,7 @@ ipf_log_pkt(fin, flags)
 			struct icmp *icmp;
 
 			icmp = (struct icmp *)fin->fin_dp;
-	
+
 			/*
 			 * For ICMP, if the packet is an error packet, also
 			 * include the information about the packet which

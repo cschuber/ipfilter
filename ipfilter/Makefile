@@ -78,7 +78,7 @@ ALLOPTS=-DIPFILTER_LOG -DIPFILTER_LOOKUP \
 # (requires that you have installed ncurses).
 #STATETOP_CFLAGS=-DSTATETOP
 #
-# Where to find the ncurses include files (if not in default path), 
+# Where to find the ncurses include files (if not in default path),
 #
 #STATETOP_INC=
 #STATETOP_INC=-I/usr/local/include

@@ -2,7 +2,7 @@
 #
 PATH=/sbin:/usr/sbin:/bin:/usr/bin; export PATH
 argv0=`basename $0`
- 
+
 os=`uname -s`
 rev=`uname -r`
 maj=`expr $rev : '\([0-9]*\)\.'`
@@ -30,7 +30,7 @@ if [ -f /dev/ipnat ] ; then
 else
 	major=x
 fi
- 
+
 if [ ! -f ip_rules.c -o ! -f ip_rules.h ] ; then
 	echo "Trying to build ip_rules.c and ip_rules.h"
 	make ip_rules.c
@@ -241,7 +241,7 @@ cat | (cd /usr/src/sys/modules/ipfilter; patch) <<__EOF__
   KMOD=	ipl
   SRCS=	mlfk_ipl.c ip_nat.c ip_frag.c ip_state.c ip_proxy.c ip_auth.c \\
 ! 	ip_log.c ip_fil.c fil.c
-  
+
   .if !defined(NOINET6)
   CFLAGS+= -DUSE_INET6
   .endif
@@ -252,7 +252,7 @@ cat | (cd /usr/src/sys/modules/ipfilter; patch) <<__EOF__
   SRCS=	mlfk_ipl.c ip_nat.c ip_frag.c ip_state.c ip_proxy.c ip_auth.c \\
 ! 	ip_log.c ip_fil.c fil.c ip_lookup.c ip_pool.c ip_htable.c \\
 ! 	ip_sync.c ip_scan.c ip_rules.c
-  
+
   .if !defined(NOINET6)
   CFLAGS+= -DUSE_INET6
   .endif

@@ -311,7 +311,7 @@ ipl_ipfilter_attach(void)
 	MUTEX_ENTER(&ipfi_mutex); /* sets interrupt priority level to splhi */
 
 	ipff_addr = (int *)addr_ff;
-	
+
 	ipff_value = *ipff_addr;
 	*ipff_addr = 0;
 

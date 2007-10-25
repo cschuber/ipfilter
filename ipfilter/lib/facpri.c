@@ -94,7 +94,7 @@ fac_toname(facpri)
 /*
  * map a facility name to its number
  */
-int     
+int
 fac_findname(name)
 	char *name;
 {
@@ -119,7 +119,7 @@ table_t	pris[] = {
 /*
  * map a facility name to its number
  */
-int     
+int
 pri_findname(name)
 	char *name;
 {

@@ -869,7 +869,7 @@ sendorfree:
 		else
 			m_freem(m);
 	}
-    }	
+    }
 done:
 	if (!error)
 		ipf_frouteok[0]++;

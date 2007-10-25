@@ -274,7 +274,7 @@ map-block ppp0 172.192.0.0/16 -> 209.1.2.0/24 ports auto
 .PP
 would result in 172.192.0.0/24 being mapped to 209.1.2.0/32
 with each address, from 172.192.0.0 to 172.192.0.255 having 252 ports of its
-own.  As opposed to the above use of \fBmap\fP, if for some reason the user 
+own.  As opposed to the above use of \fBmap\fP, if for some reason the user
 of (say) 172.192.0.2 wanted 260 simultaneous connections going out, they would
 be limited to 252 with \fBmap-block\fP but would just \fImove on\fP to the next
 IP address with the \fBmap\fP command.

@@ -1,10 +1,10 @@
 #
 # Copyright (C) 1993-2001 by Darren Reed.
-# 
-# See the IPFILTER.LICENCE file for details on licencing.  
-#   
-# $Id$ 
-#     
+#
+# See the IPFILTER.LICENCE file for details on licencing.
+#
+# $Id$
+#
 INCDEP=$(TOP)/ip_compat.h $(TOP)/ip_fil.h $(TOP)/ipf.h
 
 LIBOBJS=$(DEST)/addicmp.o \

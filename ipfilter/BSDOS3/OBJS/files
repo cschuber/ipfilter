@@ -104,9 +104,9 @@ file	kern/sys_generic.c
 file	kern/sys_process.c
 file	kern/sys_socket.c
 file	kern/sys_sem.c		compat_semaphore
-file	kern/sysv_ipc.c		
-file	kern/sysv_msg.c	
-file	kern/sysv_sem.c	
+file	kern/sysv_ipc.c
+file	kern/sysv_msg.c
+file	kern/sysv_sem.c
 file	kern/sysv_shm.c
 file	kern/tty.c
 file	kern/tty_compat.c

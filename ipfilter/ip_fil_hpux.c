@@ -812,7 +812,7 @@ ipf_fastroute(mb, mpp, fin, fdp)
 				if (ipf_state_check(fin, &pass) != NULL)
 					ipf_state_deref((ipstate_t **)&fin->fin_state);
 			}
-			
+
 			switch (ipf_nat_checkout(fin, NULL))
 			{
 			case 0 :

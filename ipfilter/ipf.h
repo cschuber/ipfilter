@@ -161,7 +161,7 @@ typedef struct  {
 	char	*it_name;
 	int	it_v4;
 	int	it_v6;
-} icmptype_t;   
+} icmptype_t;
 
 
 typedef	struct	wordtab {
@@ -250,7 +250,7 @@ extern u_32_t getv6optbyname __P((char *));
 extern u_32_t getv6optbyvalue __P((int));
 extern char *icmptypename __P((int, int));
 extern void initparse __P((void));
-extern void ipf_dotuning __P((int, char *, ioctlfunc_t)); 
+extern void ipf_dotuning __P((int, char *, ioctlfunc_t));
 extern void ipf_addrule __P((int, ioctlfunc_t, void *));
 extern int ipf_parsefile __P((int, addfunc_t, ioctlfunc_t *, char *));
 extern int ipf_parsesome __P((int, addfunc_t, ioctlfunc_t *, FILE *));

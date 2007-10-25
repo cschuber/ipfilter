@@ -8449,8 +8449,8 @@ ipf_queueflush(deletefn, ipfqs, userqs, activep, size, low)
 	}
 
 	/*
-	 * NOTE: Use of "* 15 / 10" is required here because if "* 1.5" is    
-	 *       used then the operations are upgraded to floating point      
+	 * NOTE: Use of "* 15 / 10" is required here because if "* 1.5" is
+	 *       used then the operations are upgraded to floating point
 	 *       and kernels don't like floating point...
 	 */
 	if (ipf_ticks > IPF_TTLVAL(43200 * 15 / 10)) {
@@ -8477,7 +8477,7 @@ ipf_queueflush(deletefn, ipfqs, userqs, activep, size, low)
 	while ((*activep * 100 / size) > low) {
 		u_long try;
 
-		try = ipf_ticks - istart; 
+		try = ipf_ticks - istart;
 
 		for (ifq = ipfqs; ifq != NULL; ifq = ifq->ifq_next) {
 			for (tqn = ifq->ifq_head; ((tqe = tqn) != NULL); ) {

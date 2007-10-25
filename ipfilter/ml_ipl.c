@@ -122,7 +122,7 @@ struct	vdstat	*vds;
 		return ipl_attach(vdi);
 	case VDUNLOAD:
 		return unload(vdp, vdi);
-		
+
 	case VDSTAT:
 		return 0;
 

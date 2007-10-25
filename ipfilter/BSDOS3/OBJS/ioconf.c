@@ -14,7 +14,7 @@
  *	BSDI $Id$
  *
  * WILDBOAR $Wildboar: ioconf.c.i386,v 1.8 1996/02/13 13:01:15 shigeya Exp $
- * 
+ *
  *  Portions or all of this file are Copyright(c) 1994,1995,1996
  *  Yoichi Shinoda, Yoshitaka Tokugawa, WIDE Project, Wildboar Project
  *  and Foretune.  All rights reserved.

@@ -70,7 +70,7 @@ ether_hostton(hostname, e)
 		if (len == 1 && *p == '+') {
 			char *ypbuf, *ypdom;
 			int ypbuflen;
-	
+
 			if (yp_get_default_domain(&ypdom))
 				continue;
 			if (yp_match(ypdom, "ethers.byname", hostname, hostlen,
@@ -84,7 +84,7 @@ ether_hostton(hostname, e)
 			free(ypbuf);
 			continue;
 		}
-#endif		
+#endif
 		if (ether_line(p, e, try) == 0 && strcmp(hostname, try) == 0) {
 			(void)fclose(f);
 			return 0;
@@ -93,7 +93,7 @@ ether_hostton(hostname, e)
 	(void)fclose(f);
 	errno = ENOENT;
 	return -1;
-}			
+}
 
 
 int

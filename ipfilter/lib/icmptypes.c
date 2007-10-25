@@ -68,7 +68,7 @@
 #  define	MLD_LISTENER_DONE	MLD_LISTENER_REDUCTION
 # endif
 #endif
- 
+
 icmptype_t icmptypelist[] = {
 	{ "echo",	ICMP_ECHO,		ICMP6_ECHO_REQUEST },
 	{ "echorep",	ICMP_ECHOREPLY,		ICMP6_ECHO_REPLY },

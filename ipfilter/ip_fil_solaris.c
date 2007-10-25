@@ -874,7 +874,7 @@ ipf_fastroute(mb, mpp, fin, fdp)
 	 */
 	if (*mpp != mb) {
 		mblk_t *mp;
-		
+
 		mp = unlinkb(*mpp);
 		freeb(*mpp);
 		*mpp = mp;

@@ -373,7 +373,7 @@ int *filter;
 					"IPv6 rules are no longer seperate\n");
 			} else if (filter != NULL) {
 				ipfobj_t obj;
-  
+
 				obj.ipfo_rev = IPFILTER_VERSION;
 				obj.ipfo_size = filter[0] * sizeof(int);
 				obj.ipfo_type = IPFOBJ_IPFEXPR;

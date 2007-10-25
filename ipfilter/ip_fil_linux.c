@@ -328,7 +328,7 @@ ipf_send_icmp_err(int type, fr_info_t *fin, int isdst)
         m = alloc_skb(sz + leader, GFP_ATOMIC);
         if (m == NULL)
                 return -1;
-                
+
         /* Set the data pointer */
         skb_reserve(m, leader);
 

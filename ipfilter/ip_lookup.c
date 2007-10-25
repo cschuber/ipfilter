@@ -763,7 +763,7 @@ ipf_lookup_deltok(data, uid, ctx)
 	SPL_INT(s);
 
 	SPL_SCHED(s);
-	error = BCOPYIN(data, &key, sizeof(key)); 
+	error = BCOPYIN(data, &key, sizeof(key));
 	if (error == 0)
 		error = ipf_deltoken(key, uid, ctx);
 	SPL_X(s);

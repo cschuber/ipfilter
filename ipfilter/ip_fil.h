@@ -573,7 +573,7 @@ typedef	struct	frentry {
 	u_32_t	fr_flags;	/* per-rule flags && options (see below) */
 	u_32_t	fr_logtag;	/* user defined log tag # */
 	u_32_t	fr_collect;	/* collection number */
-	u_int	fr_arg;		/* misc. numeric arg for rule */ 
+	u_int	fr_arg;		/* misc. numeric arg for rule */
 	u_int	fr_loglevel;	/* syslog log facility + priority */
 	u_int	fr_age[2];	/* non-TCP state timeouts */
 	int	fr_nostatelog;

@@ -1,5 +1,5 @@
 Installation instructions:
-========================= 
+=========================
 
 1. Update HP-UX Kernel
 ----------------------

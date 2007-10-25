@@ -763,7 +763,7 @@ aps_free(aps)
 
 /* ------------------------------------------------------------------------ */
 /* Function:    appr_fixseqack                                              */
-/* Returns:     int -  2 if TCP ack/seq is changed, else 0                  */ 
+/* Returns:     int -  2 if TCP ack/seq is changed, else 0                  */
 /* Parameters:  fin(I) - pointer to packet information                      */
 /*              nat(I) - pointer to current NAT session                     */
 /*                                                                          */

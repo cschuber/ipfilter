@@ -221,7 +221,7 @@ md5_u.o: $(TOP)/md5.c $(TOP)/md5.h
 radix_u.o: $(TOP)/radix.c $(TOP)/radix_ipf.h
 	$(CC) $(CCARGS) -c $(TOP)/radix.c -o $@
 
-if_ipl.o: $(MODOBJS) 
+if_ipl.o: $(MODOBJS)
 	ld -r -dc $(MODOBJS) -o $(LKM)
 	${RM} -f if_ipl
 

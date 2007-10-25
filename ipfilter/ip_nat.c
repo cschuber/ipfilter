@@ -1691,7 +1691,7 @@ ipf_nat_putent(data, getlock)
 	 * For NAT_OUTBOUND, we're lookup for a duplicate MAP entry.  To do
 	 * this, we check to see if the inbound combination of addresses and
 	 * ports is already known.  Similar logic is applied for NAT_INBOUND.
-	 * 
+	 *
 	 */
 	bzero((char *)&fin, sizeof(fin));
 	fin.fin_p = nat->nat_pr[0];
@@ -2126,7 +2126,7 @@ ipf_nat_delrule(np)
 		np->in_flags |= IPN_DELETE;
 		np->in_next = NULL;
 	}
-	
+
 }
 
 
@@ -2542,7 +2542,7 @@ ipf_nat_newrdr(fin, nat, ni)
 	}
 
 	/*
-	 * Check to see if this redirect mapping already exists and if 
+	 * Check to see if this redirect mapping already exists and if
 	 * it does, return "failure" (allowing it to be created will just
 	 * cause one or both of these "connections" to stop working.)
 	 */
@@ -3159,7 +3159,7 @@ ipf_nat_icmperrorlookup(fin, dir)
 			return nat;
 		}
 	}
-		
+
 	if (flags & IPN_TCPUDP) {
 		minlen += 8;		/* + 64bits of data to get ports */
 		/* TRACE (fin,minlen) */
@@ -3394,7 +3394,7 @@ ipf_nat_icmperror(fin, nflags, dir)
 		 *
 		 * Since the port fields are part of the TCP/UDP checksum
 		 * of the offending IP packet, you need to adjust that checksum
-		 * as well... except that the change in the port numbers should 
+		 * as well... except that the change in the port numbers should
 		 * be offset by the checksum change.  However, the TCP/UDP
 		 * checksum will also need to change if there has been an
 		 * IP address change.
@@ -4363,7 +4363,7 @@ ipf_nat_checkout(fin, passp)
 		default :
 			break;
 		}
-		
+
 		if ((nflags & IPN_TCPUDP))
 			tcp = fin->fin_dp;
 	}
@@ -4923,12 +4923,12 @@ ipf_nat_checkin(fin, passp)
 			 */
 			if ((fin->fin_flx & FI_ICMPQUERY) != 0) {
 				nflags = IPN_ICMPQUERY;
-				dport = icmp->icmp_id;	
+				dport = icmp->icmp_id;
 			} break;
 		default :
 			break;
 		}
-		
+
 		if ((nflags & IPN_TCPUDP)) {
 			tcp = fin->fin_dp;
 			dport = fin->fin_data[1];
@@ -5673,7 +5673,7 @@ ipf_nat_sync(ifp)
 			n->in_ifps[0] = ipf_resolvenic(n->in_ifnames[0],
 						      n->in_v);
 		if ((ifp == NULL) || (n->in_ifps[1] == ifp))
-			n->in_ifps[1] = ipf_resolvenic(n->in_ifnames[1], 
+			n->in_ifps[1] = ipf_resolvenic(n->in_ifnames[1],
 						      n->in_v);
 
 		if (n->in_redir & NAT_REDIRECT)
@@ -5718,10 +5718,10 @@ ipf_nat_icmpquerytype4(icmptype)
 	 * altough it seems silly to call a reply a query, this is exactly
 	 * as it is defined in the IPv4 specification
 	 */
-	
+
 	switch (icmptype)
 	{
-	
+
 	case ICMP_ECHOREPLY:
 	case ICMP_ECHO:
 	/* route aedvertisement/solliciation is currently unsupported: */
@@ -6458,11 +6458,11 @@ ipf_nat_extraflush(which)
 			removed++;
 		}
 		break;
-	 
+
 	default :
 		if (which < 30)
 			break;
-	   
+
 		ipf_nat_stats.ns_flush_timeout++;
 		/*
 		 * Take a large arbitrary number to mean the number of seconds
@@ -7785,13 +7785,13 @@ char *data;
 	{
 	case IPFTABLE_BUCKETS_NATIN :
 		error = COPYOUT(ipf_nat_stats.ns_side[0].ns_bucketlen,
-				table.ita_table, 
+				table.ita_table,
 				ipf_nat_table_sz * sizeof(u_long));
 		break;
 
 	case IPFTABLE_BUCKETS_NATOUT :
 		error = COPYOUT(ipf_nat_stats.ns_side[1].ns_bucketlen,
-				table.ita_table, 
+				table.ita_table,
 				ipf_nat_table_sz * sizeof(u_long));
 		break;
 

@@ -186,10 +186,10 @@ case "$1" in
 		if [ -f $PIDFILE ] ; then
 			if kill -0 $pid; then
 				kill -TERM $pid
-			else    
+			else
 				cp /dev/null $PIDFILE
 			fi
-		fi      
+		fi
 		;;
 
 	resume)

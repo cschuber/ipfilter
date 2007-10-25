@@ -961,7 +961,7 @@ ipf_fastroute(m0, mpp, fin, fdp)
 		case 0 :
 			break;
 		case 1 :
-			ipf_nat_deref((nat_t **)&fin->fin_nat);  
+			ipf_nat_deref((nat_t **)&fin->fin_nat);
 			ip->ip_sum = 0;
 			break;
 		case -1 :

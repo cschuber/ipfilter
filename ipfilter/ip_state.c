@@ -1516,7 +1516,7 @@ ipf_state_tcp(fin, tcp, is)
 	int source, ret, flags;
 
 	source = !fin->fin_rev;
-	if (((is->is_flags & IS_TCPFSM) != 0) && (source == 1) && 
+	if (((is->is_flags & IS_TCPFSM) != 0) && (source == 1) &&
 	    (ntohs(is->is_sport) != fin->fin_data[0]))
 		source = 0;
 	fdata = &is->is_tcp.ts_data[!source];
@@ -1777,7 +1777,7 @@ ipf_tcpinwindow(fin, fdata, tdata, tcp, flags)
 			 * accepted, even if it appears out of sequence.
 			 */
 			inseq = 1;
-		} else 
+		} else
 #endif
 		if (!(fdata->td_winflags &
 			    (TCP_WSCALE_SEEN|TCP_WSCALE_FIRST))) {
@@ -2718,7 +2718,7 @@ retry_tcpudp:
 			break;
 		}
 		RWLOCK_EXIT(&ipf_state);
-  
+
 		if (ipf_state_stats.iss_wild) {
 			if (tryagain == 0) {
 				hv -= dport;
@@ -3194,7 +3194,7 @@ ipf_state_del(is, why)
 	(void) ipf_scan_detachis(is);
 #endif
 
-	/* 
+	/*
 	 * Now remove it from the linked list of known states
 	 */
 	if (is->is_pnext != NULL) {
@@ -3385,10 +3385,10 @@ ipf_state_flush(which, proto)
 	case 2 :
 		break;
 
-		/* 
+		/*
 		 * Args 5-11 correspond to flushing those particular states
 		 * for TCP connections.
-		 */  
+		 */
 	case IPF_TCPS_CLOSE_WAIT :
 	case IPF_TCPS_FIN_WAIT_1 :
 	case IPF_TCPS_CLOSING :
@@ -3416,7 +3416,7 @@ ipf_state_flush(which, proto)
 		 * Take a large arbitrary number to mean the number of seconds
 		 * for which which consider to be the maximum value we'll allow
 		 * the expiration to be.
-		 */  
+		 */
 		which = IPF_TTLVAL(which);
 		for (isp = &ipf_state_list; ((is = *isp) != NULL); ) {
 			if ((proto == 0) || (is->is_v == proto)) {
@@ -3464,7 +3464,7 @@ ipf_state_flush(which, proto)
 /* Write Locks: ipf_state                                                   */
 /*                                                                          */
 /* This function is a stepping stone between ipf_queueflush() and           */
-/* fr_delstate().  It is used so we can provide a uniform interface via the */  
+/* fr_delstate().  It is used so we can provide a uniform interface via the */
 /* ipf_queueflush() function.                                               */
 /* ------------------------------------------------------------------------ */
 static int
@@ -4021,7 +4021,7 @@ ipf_checkicmp6matchingstate(fin)
 		/*
 		 * an ICMP error can only be generated as a result of an
 		 * ICMP query, not as the response on an ICMP error
-		 * 
+		 *
 		 * XXX theoretically ICMP_ECHOREP and the other reply's are
 		 * ICMP query's as well, but adding them here seems strange XXX
 		 */
@@ -4037,7 +4037,7 @@ ipf_checkicmp6matchingstate(fin)
 		src.in6 = oip6->ip6_src;
 		hv += src.in4.s_addr;
 		dst.in6 = oip6->ip6_dst;
-		hv += dst.in4.s_addr; 
+		hv += dst.in4.s_addr;
 		hv += oic->icmp6_id;
 		hv += oic->icmp6_seq;
 		hv = DOUBLE_HASH(hv);
@@ -4434,7 +4434,7 @@ ipf_stgettable(data)
 		return EINVAL;
 	}
 
-	error = COPYOUT(ipf_state_stats.iss_bucketlen, table.ita_table, 
+	error = COPYOUT(ipf_state_stats.iss_bucketlen, table.ita_table,
 			ipf_state_size * sizeof(u_int));
 	if (error != 0) {
 		ipf_interror = 100032;

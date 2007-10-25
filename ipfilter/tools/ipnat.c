@@ -369,7 +369,7 @@ int opts, *filter;
 			if (nat_fields[i + 1].w_value != 0)
 				printf("\t");
 		}
-		printf("\n"); 
+		printf("\n");
 	}
 
 	for (np = nsp->ns_instances; np; np = nat.nat_next) {
@@ -383,7 +383,7 @@ int opts, *filter;
 				if (nat_fields[i + 1].w_value != 0)
 					printf("\t");
 			}
-			printf("\n"); 
+			printf("\n");
 		} else {
 			printactivenat(&nat, opts, 0, nsp->ns_ticks);
 			if (nat.nat_aps)
@@ -538,7 +538,7 @@ int fd, opts, *filter;
 			if (nat_fields[i + 1].w_value != 0)
 				printf("\t");
 		}
-		printf("\n"); 
+		printf("\n");
 	}
 
 
@@ -557,7 +557,7 @@ int fd, opts, *filter;
 				if (nat_fields[i + 1].w_value != 0)
 					printf("\t");
 			}
-			printf("\n"); 
+			printf("\n");
 		} else {
 			printactivenat(&nat, opts, 1, nsp->ns_ticks);
 			if (nat.nat_aps)

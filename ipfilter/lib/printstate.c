@@ -152,7 +152,7 @@ u_long now;
 	/* a given; no? */
 	if (sp->is_pass & FR_KEEPSTATE) {
 		PRINTF(" keep state");
-		if (sp->is_pass & FR_STATESYNC)	
+		if (sp->is_pass & FR_STATESYNC)
 			PRINTF(" ( sync )");
 	}
 	PRINTF("\n");

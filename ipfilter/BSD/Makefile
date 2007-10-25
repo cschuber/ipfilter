@@ -241,13 +241,14 @@ radix_u.o: $(TOP)/md5.c $(TOP)/radix_ipf.h
 bpf_filter_u.o: $(TOP)/bpf_filter.c $(TOP)/pcap-ipf.h
 	$(CC) $(CCARGS) $(EXTRA) -c $(TOP)/bpf_filter.c -o $@
 
-ipflkm.o: $(MODOBJS) 
+ipflkm.o: $(MODOBJS)
 	ld -r $(MODOBJS) -o $(LKM)
 	${RM} -f ipflkm
 
 ipfrule.ko.5: ip_rulesx.o $(MLR)
 	ld -warn-common -r -d -o $(.TARGET:S/.ko/.kld/) ip_rulesx.o $(MLR)
-	ld -Bshareable -d -warn-common -o $(LKMR:S/.5$//) $(.TARGET:S/.ko/.kld/) 
+	ld -Bshareable -d -warn-common -o $(LKMR:S/.5$//) $(.TARGET:S/.ko/.kld/)
+
 ipfrule.ko: ip_rulesx.o $(MLR)
 	gensetdefs ip_rulesx.o $(MLR)
 	$(CC) $(KCARGS) -c setdef0.c
@@ -258,7 +259,7 @@ ipf.ko.5 ipl.ko.5: $(MODOBJS)
 	ld -warn-common -r -d -o $(.TARGET:S/.ko/.kld/) $(MODOBJS)
 	ld -Bshareable -d -warn-common -o $(LKM:S/.5$//) $(.TARGET:S/.ko/.kld/)
 
-ipf.ko ipl.ko: $(MODOBJS) 
+ipf.ko ipl.ko: $(MODOBJS)
 	gensetdefs $(MODOBJS)
 	$(CC) $(KCARGS) -c setdef0.c
 	$(CC) $(KCARGS) -c setdef1.c
@@ -448,7 +449,7 @@ iptrafcon: $(IPTRAFCON) $(OBJ)/libipf.a
 .l.c:
 
 clean:
-	${RM} -f ../ipf ../ipnat ../ipmon ../ippool ../ipftest 
+	${RM} -f ../ipf ../ipnat ../ipmon ../ippool ../ipftest
 	${RM} -f ../ipscan ../ipsyncm ../ipsyncs
 	${RM} -f *.core *.o *.a ipt ipfstat ipf ipfstat ipftest ipmon
 	${RM} -f ipflkm ipnat ipfrule.ko* ipf.kld* ipfrule.kld*

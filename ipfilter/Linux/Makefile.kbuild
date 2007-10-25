@@ -39,7 +39,7 @@ ipflkm:
 		make $(OBJ)/ipflkm.o ; \
 	fi
 
-$(OBJ)/ipfilter.o: $(MODOBJS) 
+$(OBJ)/ipfilter.o: $(MODOBJS)
 	ld -r $(MODOBJS) -o $(OBJ)/ipfilter.o
 	${RM} -f $(OBJ)/ipfilter
 

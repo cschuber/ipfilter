@@ -84,7 +84,7 @@ static const char rcsid[] = "@(#)$Id$";
 #  undef RADIX_NODE_HEAD_LOCK
 #  undef RADIX_NODE_HEAD_UNLOCK
 #  define RADIX_NODE_HEAD_LOCK(x)	;
-#  define RADIX_NODE_HEAD_UNLOCK(x)	;    
+#  define RADIX_NODE_HEAD_UNLOCK(x)	;
 # endif
 
 static void ipf_pool_clearnodes __P((ip_pool_t *));

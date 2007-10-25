@@ -26,7 +26,7 @@ options for IPFilter.
 cd /usr/src
 gunzip -c sys.tar.gz | tar xpf -
 
-2. Unpack IPFilter and apply the patches to the kernel source 
+2. Unpack IPFilter and apply the patches to the kernel source
 
 cd ~
 gunzip -c ip_fil4next.tar.gz | tar xpf -

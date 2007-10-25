@@ -519,7 +519,7 @@ ipfioctl(dev, cmd, data, mode
 		return EPERM;
 	}
 #endif
-  
+
   	unit = GET_MINOR(dev);
   	if ((IPL_LOGMAX < unit) || (unit < 0))
 		return ENXIO;
