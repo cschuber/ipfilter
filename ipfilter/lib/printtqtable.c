@@ -10,7 +10,7 @@
 
 
 void printtqtable(table)
-	ipftq_t *table;
+ipftq_t *table;
 {
 	int i;
 

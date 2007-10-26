@@ -53,9 +53,9 @@ void ippr_rcmd_fini()
  * Setup for a new RCMD proxy.
  */
 int ippr_rcmd_new(fin, aps, nat)
-	fr_info_t *fin;
-	ap_session_t *aps;
-	nat_t *nat;
+fr_info_t *fin;
+ap_session_t *aps;
+nat_t *nat;
 {
 	tcphdr_t *tcp = (tcphdr_t *)fin->fin_dp;
 
@@ -81,7 +81,7 @@ int ippr_rcmd_new(fin, aps, nat)
  * ipf_rcmd_atoi - implement a simple version of atoi
  */
 u_short ipf_rcmd_atoi(ptr)
-	char *ptr;
+char *ptr;
 {
 	register char *s = ptr, c;
 	register u_short i = 0;
@@ -95,9 +95,9 @@ u_short ipf_rcmd_atoi(ptr)
 
 
 int ippr_rcmd_portmsg(fin, aps, nat)
-	fr_info_t *fin;
-	ap_session_t *aps;
-	nat_t *nat;
+fr_info_t *fin;
+ap_session_t *aps;
+nat_t *nat;
 {
 	tcphdr_t *tcp, tcph, *tcp2 = &tcph;
 	struct in_addr swip, swip2;
@@ -215,9 +215,9 @@ int ippr_rcmd_portmsg(fin, aps, nat)
 
 
 int ippr_rcmd_out(fin, aps, nat)
-	fr_info_t *fin;
-	ap_session_t *aps;
-	nat_t *nat;
+fr_info_t *fin;
+ap_session_t *aps;
+nat_t *nat;
 {
 	if (nat->nat_dir == NAT_OUTBOUND)
 		return ippr_rcmd_portmsg(fin, aps, nat);
@@ -226,9 +226,9 @@ int ippr_rcmd_out(fin, aps, nat)
 
 
 int ippr_rcmd_in(fin, aps, nat)
-	fr_info_t *fin;
-	ap_session_t *aps;
-	nat_t *nat;
+fr_info_t *fin;
+ap_session_t *aps;
+nat_t *nat;
 {
 	if (nat->nat_dir == NAT_INBOUND)
 		return ippr_rcmd_portmsg(fin, aps, nat);

@@ -9,8 +9,8 @@
 #include "ipf.h"
 
 int gethost(name, hostp)
-	char *name;
-	u_32_t *hostp;
+char *name;
+u_32_t *hostp;
 {
 	struct hostent *h;
 	struct netent *n;

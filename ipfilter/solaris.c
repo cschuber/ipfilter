@@ -223,7 +223,7 @@ int _fini(void)
 
 
 int _info(modinfop)
-	struct modinfo *modinfop;
+struct modinfo *modinfop;
 {
 	int ipfinst;
 
@@ -237,7 +237,7 @@ int _info(modinfop)
 
 #if SOLARIS2 < 10
 static int ipf_identify(dip)
-	dev_info_t *dip;
+dev_info_t *dip;
 {
 # ifdef	IPFDEBUG
 	cmn_err(CE_NOTE, "IP Filter: ipf_identify(%x)", dip);
@@ -250,8 +250,8 @@ static int ipf_identify(dip)
 
 
 static int ipf_attach(dip, cmd)
-	dev_info_t *dip;
-	ddi_attach_cmd_t cmd;
+dev_info_t *dip;
+ddi_attach_cmd_t cmd;
 {
 	char *s;
 	int i;
@@ -373,8 +373,8 @@ attach_failed:
 
 
 static int ipf_detach(dip, cmd)
-	dev_info_t *dip;
-	ddi_detach_cmd_t cmd;
+dev_info_t *dip;
+ddi_detach_cmd_t cmd;
 {
 	int i;
 
@@ -470,9 +470,9 @@ static int ipf_detach(dip, cmd)
 
 /*ARGSUSED*/
 static int ipf_getinfo(dip, infocmd, arg, result)
-	dev_info_t *dip;
-	ddi_info_cmd_t infocmd;
-	void *arg, **result;
+dev_info_t *dip;
+ddi_info_cmd_t infocmd;
+void *arg, **result;
 {
 	int error;
 
@@ -504,12 +504,12 @@ static int ipf_getinfo(dip, infocmd, arg, result)
  */
 /*ARGSUSED*/
 static int fr_qifsync(ip, hlen, il, out, qif, mp)
-	ip_t *ip;
-	int hlen;
-	void *il;
-	int out;
-	void *qif;
-	mblk_t **mp;
+ip_t *ip;
+int hlen;
+void *il;
+int out;
+void *qif;
+mblk_t **mp;
 {
 
 	frsync(qif);
@@ -538,7 +538,7 @@ int ipfsync()
  * driver file.
  */
 static int ipf_property_update(dip)
-	dev_info_t *dip;
+dev_info_t *dip;
 {
 	ipftuneable_t *ipft;
 	int64_t *i64p;
@@ -619,11 +619,11 @@ static int ipf_property_update(dip)
 
 
 static int iplpoll(dev, events, anyyet, reventsp, phpp)
-	dev_t dev;
-	short events;
-	int anyyet;
-	short *reventsp;
-	struct pollhead **phpp;
+dev_t dev;
+short events;
+int anyyet;
+short *reventsp;
+struct pollhead **phpp;
 {
 	u_int xmin = getminor(dev);
 	int revents = 0;

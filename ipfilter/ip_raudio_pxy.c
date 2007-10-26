@@ -48,9 +48,9 @@ void ippr_raudio_fini()
  * Setup for a new proxy to handle Real Audio.
  */
 int ippr_raudio_new(fin, aps, nat)
-	fr_info_t *fin;
-	ap_session_t *aps;
-	nat_t *nat;
+fr_info_t *fin;
+ap_session_t *aps;
+nat_t *nat;
 {
 	raudio_t *rap;
 
@@ -71,9 +71,9 @@ int ippr_raudio_new(fin, aps, nat)
 
 
 int ippr_raudio_out(fin, aps, nat)
-	fr_info_t *fin;
-	ap_session_t *aps;
-	nat_t *nat;
+fr_info_t *fin;
+ap_session_t *aps;
+nat_t *nat;
 {
 	raudio_t *rap = aps->aps_data;
 	unsigned char membuf[512 + 1], *s;
@@ -177,9 +177,9 @@ int ippr_raudio_out(fin, aps, nat)
 
 
 int ippr_raudio_in(fin, aps, nat)
-	fr_info_t *fin;
-	ap_session_t *aps;
-	nat_t *nat;
+fr_info_t *fin;
+ap_session_t *aps;
+nat_t *nat;
 {
 	unsigned char membuf[IPF_MAXPORTLEN + 1], *s;
 	tcphdr_t *tcp, tcph, *tcp2 = &tcph;

@@ -26,7 +26,7 @@ static	FILE	*tfp = NULL;
 static	int	tfd = -1;
 
 static	int	hex_open(fname)
-	char	*fname;
+char	*fname;
 {
 	if (tfp && tfd != -1) {
 		rewind(tfp);
@@ -55,8 +55,8 @@ static	int	hex_close()
 
 
 static	int	hex_readip(buf, cnt, ifn, dir)
-	char	*buf, **ifn;
-	int	cnt, *dir;
+char	*buf, **ifn;
+int	cnt, *dir;
 {
 	register char *s, *t, *u;
 	char	line[513];
@@ -129,7 +129,7 @@ static	int	hex_readip(buf, cnt, ifn, dir)
 
 
 static	char	*readhex(src, dst)
-	register char	*src, *dst;
+register char	*src, *dst;
 {
 	int	state = 0;
 	char	c;

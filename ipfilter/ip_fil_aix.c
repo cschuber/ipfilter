@@ -134,9 +134,9 @@ const struct devsw ipfdevsw  = {
 
 
 int ipfconfig(devno, cmd, uiop)
-	dev_t devno;
-	int cmd;
-	struct uio *uiop;
+dev_t devno;
+int cmd;
+struct uio *uiop;
 {
 	int error = EINVAL;
 
@@ -228,9 +228,9 @@ int ipfdetach()
  * explicit inbound hook to call fr_check from
  */
 void fr_check_inbound(ifp, m, args)
-	struct ifnet *ifp;
-	struct mbuf *m;
-	inbound_fw_args_t *args;
+struct ifnet *ifp;
+struct mbuf *m;
+inbound_fw_args_t *args;
 {
 	ip_t *ip;
 
@@ -263,9 +263,9 @@ void fr_check_inbound(ifp, m, args)
  * explicit outbound hook to call fr_check from
  */
 int fr_check_outbound(ifp, m, args)
-	struct ifnet *ifp;
-	struct mbuf *m;
-	outbound_fw_args_t *args;
+struct ifnet *ifp;
+struct mbuf *m;
+outbound_fw_args_t *args;
 {
 	ip_t *ip;
 
@@ -294,7 +294,7 @@ int fr_check_outbound(ifp, m, args)
 }
 
 int fr_check_mbuf(mp)
-	struct mbuf **mp;
+struct mbuf **mp;
 {
 	struct mbuf *m, *m0;
 	int i, hlen;
@@ -384,10 +384,10 @@ int fr_check_mbuf(mp)
  * Filter ioctl interface.
  */
 int ipfioctl(dev, cmd, data, mode)
-	dev_t dev;
-	int cmd;
-	caddr_t data;
-	int mode;
+dev_t dev;
+int cmd;
+caddr_t data;
+int mode;
 {
 	int error = 0, unit = 0;
 	SPL_INT(s);
@@ -420,7 +420,7 @@ int ipfioctl(dev, cmd, data, mode)
 
 #if 0
 void fr_forgetifp(ifp)
-	void *ifp;
+void *ifp;
 {
 	register frentry_t *f;
 
@@ -527,7 +527,7 @@ int ipfwrite(dev_t dev, struct uio *uio, chan_t chan, int ext)
  * requires a large amount of setting up and isn't any more efficient.
  */
 int fr_send_reset(fin)
-	fr_info_t *fin;
+fr_info_t *fin;
 {
 	struct tcphdr *tcp, *tcp2;
 	int tlen = 0, hlen;
@@ -629,8 +629,8 @@ int fr_send_reset(fin)
 
 
 static int fr_send_ip(fin, m, mpp)
-	fr_info_t *fin;
-	mb_t *m, **mpp;
+fr_info_t *fin;
+mb_t *m, **mpp;
 {
 	fr_info_t fnew;
 #ifdef INET
@@ -692,9 +692,9 @@ static int fr_send_ip(fin, m, mpp)
 
 
 int fr_send_icmp_err(type, fin, dst)
-	int type;
-	fr_info_t *fin;
-	int dst;
+int type;
+fr_info_t *fin;
+int dst;
 {
 	int err, hlen, xtra, iclen, ohlen, avail, code;
 	struct in_addr dst4;
@@ -871,9 +871,9 @@ int fr_send_icmp_err(type, fin, dst)
 
 
 int fr_fastroute(m0, mpp, fin, fdp)
-	mb_t *m0, **mpp;
-	fr_info_t *fin;
-	frdest_t *fdp;
+mb_t *m0, **mpp;
+fr_info_t *fin;
+frdest_t *fdp;
 {
 	register struct ip *ip, *mhip;
 	register struct mbuf *m = m0;
@@ -1141,9 +1141,9 @@ bad:
  * expected to be done by the called (ipfr_fastroute).
  */
 static int ipfr_fastroute6(m0, mpp, fin, fdp)
-	struct mbuf *m0, **mpp;
-	fr_info_t *fin;
-	frdest_t *fdp;
+struct mbuf *m0, **mpp;
+fr_info_t *fin;
+frdest_t *fdp;
 {
 	struct route_in6 ip6route;
 	struct sockaddr_in6 *dst6;
@@ -1211,7 +1211,7 @@ bad:
 
 
 int fr_verifysrc(fin)
-	fr_info_t *fin;
+fr_info_t *fin;
 {
 	struct sockaddr_in *dst;
 	struct route iproute;
@@ -1232,9 +1232,9 @@ int fr_verifysrc(fin)
  * return the first IP Address associated with an interface
  */
 int fr_ifpaddr(v, atype, ifptr, inp, inpmask)
-	int v, atype;
-	void *ifptr;
-	struct in_addr *inp, *inpmask;
+int v, atype;
+void *ifptr;
+struct in_addr *inp, *inpmask;
 {
 #ifdef USE_INET6
 	struct in6_addr *inp6 = NULL;
@@ -1296,7 +1296,7 @@ int fr_ifpaddr(v, atype, ifptr, inp, inpmask)
 
 
 u_32_t fr_newisn(fin)
-	fr_info_t *fin;
+fr_info_t *fin;
 {
 	u_32_t newiss;
 #if 0
@@ -1344,7 +1344,7 @@ u_32_t fr_newisn(fin)
 /* Returns the next IPv4 ID to use for this packet.                         */
 /* ------------------------------------------------------------------------ */
 u_short fr_nextipid(fin)
-	fr_info_t *fin;
+fr_info_t *fin;
 {
 	static u_short ipid = 0;
 	u_short id;
@@ -1358,7 +1358,7 @@ u_short fr_nextipid(fin)
 
 
 INLINE void fr_checkv4sum(fin)
-	fr_info_t *fin;
+fr_info_t *fin;
 {
 #ifdef M_CSUM_TCP_UDP_BAD
 	int manual, pflag, cflags, active;
@@ -1431,7 +1431,7 @@ skipauto:
 
 #ifdef USE_INET6
 INLINE void fr_checkv6sum(fin)
-	fr_info_t *fin;
+fr_info_t *fin;
 {
 # ifdef M_CSUM_TCP_UDP_BAD
 	int manual, pflag, cflags, active;
@@ -1489,7 +1489,7 @@ INLINE void fr_checkv6sum(fin)
 
 
 size_t mbufchainlen(m0)
-	struct mbuf *m0;
+struct mbuf *m0;
 {
 	size_t len;
 
@@ -1523,9 +1523,9 @@ size_t mbufchainlen(m0)
 /* of buffers that starts at *fin->fin_mp.                                  */
 /* ------------------------------------------------------------------------ */
 void *fr_pullup(min, fin, len)
-	mb_t *min;
-	fr_info_t *fin;
-	int len;
+mb_t *min;
+fr_info_t *fin;
+int len;
 {
 	int out = fin->fin_out, dpoff, ipoff;
 	mb_t *m = min;
@@ -1583,16 +1583,16 @@ void *fr_pullup(min, fin, len)
 
 
 void *getifp(name, v)
-	char *name;
-	int v;
+char *name;
+int v;
 {
 	return NULL;
 }
 
 
 int ipf_inject(fin, m)
-	fr_info_t *fin;
-	mb_t *m;
+fr_info_t *fin;
+mb_t *m;
 {
 
 	FREE_MB_T(m);

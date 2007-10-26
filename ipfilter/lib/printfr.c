@@ -11,9 +11,9 @@
 static void printaddr(int, int, char *, u_32_t *, u_32_t *);
 
 static void printaddr(v, type, ifname, addr, mask)
-	int v, type;
-	char *ifname;
-	u_32_t *addr, *mask;
+int v, type;
+char *ifname;
+u_32_t *addr, *mask;
 {
 	char *suffix;
 
@@ -64,7 +64,7 @@ static void printaddr(v, type, ifname, addr, mask)
 
 
 void printlookup(addr, mask)
-	i6addr_t *addr, *mask;
+i6addr_t *addr, *mask;
 {
 	switch (addr->iplookuptype)
 	{
@@ -89,8 +89,8 @@ void printlookup(addr, mask)
  * print the filter structure in a useful way
  */
 void	printfr(fp, iocfunc)
-	struct	frentry	*fp;
-	ioctlfunc_t	iocfunc;
+struct	frentry	*fp;
+ioctlfunc_t	iocfunc;
 {
 	struct protoent	*p;
 	u_short	sec[2];

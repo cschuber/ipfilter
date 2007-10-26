@@ -60,10 +60,10 @@ static	int		ipfmajor = 0;
 
 
 int uiomove(address, nbytes, rwflag, uiop)
-	caddr_t address;
-	size_t nbytes;
-	int rwflag;
-	uio_t *uiop;
+caddr_t address;
+size_t nbytes;
+int rwflag;
+uio_t *uiop;
 {
 	int err = 0;
 

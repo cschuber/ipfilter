@@ -38,8 +38,8 @@ int	ipfrule __P((struct lkm_table *, int, int));
 MOD_MISC("IPFilter Rules");
 
 int ipfrule(lkmtp, cmd, ver)
-	struct lkm_table *lkmtp;
-	int cmd, ver;
+struct lkm_table *lkmtp;
+int cmd, ver;
 {
 	DISPATCH(lkmtp, cmd, ver, ipfruleaction, ipfruleaction, ipfruleaction);
 }
@@ -47,8 +47,8 @@ int ipfrule(lkmtp, cmd, ver)
 int lkmexists __P((struct lkm_table *)); /* defined in /sys/kern/kern_lkm.c */
 
 static int ipfruleaction(lkmtp, cmd)
-	struct lkm_table *lkmtp;
-	int cmd;
+struct lkm_table *lkmtp;
+int cmd;
 {
 	int err = 0;
 

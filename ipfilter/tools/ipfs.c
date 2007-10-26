@@ -98,7 +98,7 @@ void usage()
  * Change interface names in state information saved out to disk.
  */
 int changestateif(ifs, fname)
-	char *ifs, *fname;
+char *ifs, *fname;
 {
 	int fd, olen, nlen, rw;
 	ipstate_save_t ips;
@@ -161,7 +161,7 @@ int changestateif(ifs, fname)
  * Change interface names in NAT information saved out to disk.
  */
 int changenatif(ifs, fname)
-	char *ifs, *fname;
+char *ifs, *fname;
 {
 	int fd, olen, nlen, rw;
 	nat_save_t ipn;
@@ -223,8 +223,8 @@ int changenatif(ifs, fname)
 
 
 int main(argc,argv)
-	int argc;
-	char *argv[];
+int argc;
+char *argv[];
 {
 	int c, lock = -1, devfd = -1, err = 0, rw = -1, ns = -1, set = 0;
 	char *dirname = NULL, *filename = NULL, *ifs = NULL;
@@ -354,7 +354,7 @@ int main(argc,argv)
 
 
 int opendevice(ipfdev)
-	char *ipfdev;
+char *ipfdev;
 {
 	int fd = -1;
 
@@ -372,14 +372,14 @@ int opendevice(ipfdev)
 
 
 void closedevice(fd)
-	int fd;
+int fd;
 {
 	close(fd);
 }
 
 
 int setlock(fd, lock)
-	int fd, lock;
+int fd, lock;
 {
 	if (opts & OPT_VERBOSE)
 		printf("Turn lock %s\n", lock ? "on" : "off");
@@ -396,8 +396,8 @@ int setlock(fd, lock)
 
 
 int writestate(fd, file)
-	int fd;
-	char *file;
+int fd;
+char *file;
 {
 	ipstate_save_t ips, *ipsp;
 	ipfobj_t obj;
@@ -448,8 +448,8 @@ int writestate(fd, file)
 
 
 int readstate(fd, file)
-	int fd;
-	char *file;
+int fd;
+char *file;
 {
 	ipstate_save_t ips, *is, *ipshead = NULL, *is1, *ipstail = NULL;
 	int sfd = -1, i;
@@ -565,8 +565,8 @@ freeipshead:
 
 
 int readnat(fd, file)
-	int fd;
-	char *file;
+int fd;
+char *file;
 {
 	nat_save_t ipn, *in, *ipnhead = NULL, *in1, *ipntail = NULL;
 	ipfobj_t obj;
@@ -712,8 +712,8 @@ freenathead:
 
 
 int writenat(fd, file)
-	int fd;
-	char *file;
+int fd;
+char *file;
 {
 	nat_save_t *ipnp = NULL, *next = NULL;
 	ipfobj_t obj;
@@ -796,7 +796,7 @@ int writenat(fd, file)
 
 
 int writeall(dirname)
-	char *dirname;
+char *dirname;
 {
 	int fd, devfd;
 
@@ -847,7 +847,7 @@ bad:
 
 
 int readall(dirname)
-	char *dirname;
+char *dirname;
 {
 	int fd, devfd;
 

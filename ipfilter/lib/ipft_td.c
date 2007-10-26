@@ -55,7 +55,7 @@ static	int	tfd = -1;
 
 
 static	int	tcpd_open(fname)
-	char	*fname;
+char	*fname;
 {
 	if (tfd != -1)
 		return tfd;
@@ -79,7 +79,7 @@ static	int	tcpd_close()
 
 
 static	int	count_dots(str)
-	char	*str;
+char	*str;
 {
 	int	i = 0;
 
@@ -91,8 +91,8 @@ static	int	count_dots(str)
 
 
 static	int	tcpd_readip(buf, cnt, ifn, dir)
-	char	*buf, **ifn;
-	int	cnt, *dir;
+char	*buf, **ifn;
+int	cnt, *dir;
 {
 	struct	tcpiphdr pkt;
 	ip_t	*ip = (ip_t *)&pkt;

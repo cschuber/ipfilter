@@ -10,8 +10,8 @@
 #define	FPRINTF	(void)fprintf
 
 void printpooldata(pool, opts)
-	ip_pool_t *pool;
-	int opts;
+ip_pool_t *pool;
+int opts;
 {
 
 	if ((opts & OPT_DEBUG) == 0) {

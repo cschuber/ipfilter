@@ -10,7 +10,7 @@
 
 
 u_32_t getv6optbyname(optname)
-	char *optname;
+char *optname;
 {
 #ifdef	USE_INET6
 	struct ipopt_names *io;
@@ -24,7 +24,7 @@ u_32_t getv6optbyname(optname)
 
 
 u_32_t getv6optbyvalue(optval)
-	int optval;
+int optval;
 {
 #ifdef	USE_INET6
 	struct ipopt_names *io;

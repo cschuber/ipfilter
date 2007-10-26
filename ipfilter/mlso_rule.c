@@ -114,7 +114,7 @@ int _fini(void)
 
 
 int _info(modinfop)
-	struct modinfo *modinfop;
+struct modinfo *modinfop;
 {
 	int ipfruleinst;
 

@@ -9,7 +9,7 @@
 #include "ipf.h"
 
 int getproto(name)
-	char *name;
+char *name;
 {
 	struct protoent *p;
 	char *s;

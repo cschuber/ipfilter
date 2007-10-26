@@ -10,8 +10,8 @@
 #include "ipf.h"
 
 int getportproto(name, proto)
-	char *name;
-	int proto;
+char *name;
+int proto;
 {
 	struct servent *s;
 	struct protoent *p;

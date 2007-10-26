@@ -12,7 +12,7 @@
 
 
 void printlog(fp)
-	frentry_t *fp;
+frentry_t *fp;
 {
 	char *s, *u;
 

@@ -10,9 +10,9 @@
 
 
 u_32_t optname(cp, sp, linenum)
-	char ***cp;
-	u_short *sp;
-	int linenum;
+char ***cp;
+u_short *sp;
+int linenum;
 {
 	struct ipopt_names *io, *so;
 	u_long msk = 0;

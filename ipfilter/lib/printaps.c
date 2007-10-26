@@ -16,8 +16,8 @@ static const char rcsid[] = "@(#)$Id$";
 
 
 void printaps(aps, opts)
-	ap_session_t *aps;
-	int opts;
+ap_session_t *aps;
+int opts;
 {
 	ipsec_pxy_t ipsec;
 	ap_session_t ap;

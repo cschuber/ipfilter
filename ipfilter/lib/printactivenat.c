@@ -15,9 +15,9 @@ static const char rcsid[] = "@(#)$Id$";
 
 
 void printactivenat(nat, opts, alive, now)
-	nat_t *nat;
-	int opts, alive;
-	u_long now;
+nat_t *nat;
+int opts, alive;
+u_long now;
 {
 
 	printf("%s", getnattype(nat, alive));

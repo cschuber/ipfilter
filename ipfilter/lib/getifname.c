@@ -16,7 +16,7 @@
  */
 #if 0
 char *getifname(ptr)
-	struct ifnet *ptr;
+struct ifnet *ptr;
 {
 #if SOLARIS || defined(__hpux)
 # if SOLARIS
@@ -83,7 +83,7 @@ char *getifname(ptr)
 }
 #else
 char *getifname(ptr)
-	struct ifnet *ptr;
+struct ifnet *ptr;
 {
 	return "X";
 }

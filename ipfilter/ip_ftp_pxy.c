@@ -119,9 +119,9 @@ void ippr_ftp_fini()
 
 
 int ippr_ftp_new(fin, aps, nat)
-	fr_info_t *fin;
-	ap_session_t *aps;
-	nat_t *nat;
+fr_info_t *fin;
+ap_session_t *aps;
+nat_t *nat;
 {
 	ftpinfo_t *ftp;
 	ftpside_t *f;
@@ -150,11 +150,11 @@ int ippr_ftp_new(fin, aps, nat)
 
 
 int ippr_ftp_port(fin, ip, nat, f, dlen)
-	fr_info_t *fin;
-	ip_t *ip;
-	nat_t *nat;
-	ftpside_t *f;
-	int dlen;
+fr_info_t *fin;
+ip_t *ip;
+nat_t *nat;
+ftpside_t *f;
+int dlen;
 {
 	tcphdr_t *tcp, tcph, *tcp2 = &tcph;
 	char newbuf[IPF_FTPBUFSZ], *s;
@@ -379,11 +379,11 @@ int ippr_ftp_port(fin, ip, nat, f, dlen)
 
 
 int ippr_ftp_client(fin, ip, nat, ftp, dlen)
-	fr_info_t *fin;
-	nat_t *nat;
-	ftpinfo_t *ftp;
-	ip_t *ip;
-	int dlen;
+fr_info_t *fin;
+nat_t *nat;
+ftpinfo_t *ftp;
+ip_t *ip;
+int dlen;
 {
 	char *rptr, *wptr, cmd[6], c;
 	ftpside_t *f;
@@ -450,11 +450,11 @@ int ippr_ftp_client(fin, ip, nat, ftp, dlen)
 
 
 int ippr_ftp_pasv(fin, ip, nat, ftp, dlen)
-	fr_info_t *fin;
-	ip_t *ip;
-	nat_t *nat;
-	ftpinfo_t *ftp;
-	int dlen;
+fr_info_t *fin;
+ip_t *ip;
+nat_t *nat;
+ftpinfo_t *ftp;
+int dlen;
 {
 	u_int a1, a2, a3, a4, data_ip;
 	char newbuf[IPF_FTPBUFSZ];
@@ -589,14 +589,14 @@ int ippr_ftp_pasv(fin, ip, nat, ftp, dlen)
 }
 
 int ippr_ftp_pasvreply(fin, ip, nat, f, port, newmsg, s, data_ip)
-	fr_info_t *fin;
-	ip_t *ip;
-	nat_t *nat;
-	ftpside_t *f;
-	u_int port;
-	char *newmsg;
-	char *s;
-	u_int data_ip;
+fr_info_t *fin;
+ip_t *ip;
+nat_t *nat;
+ftpside_t *f;
+u_int port;
+char *newmsg;
+char *s;
+u_int data_ip;
 {
 	int inc, off, nflags, sflags;
 	tcphdr_t *tcp, tcph, *tcp2;
@@ -729,11 +729,11 @@ int ippr_ftp_pasvreply(fin, ip, nat, f, port, newmsg, s, data_ip)
 
 
 int ippr_ftp_server(fin, ip, nat, ftp, dlen)
-	fr_info_t *fin;
-	ip_t *ip;
-	nat_t *nat;
-	ftpinfo_t *ftp;
-	int dlen;
+fr_info_t *fin;
+ip_t *ip;
+nat_t *nat;
+ftpinfo_t *ftp;
+int dlen;
 {
 	char *rptr, *wptr;
 	ftpside_t *f;
@@ -796,9 +796,9 @@ server_cmd_ok:
  * being the correct syntax for the FTP protocol.
  */
 int ippr_ftp_client_valid(ftps, buf, len)
-	ftpside_t *ftps;
-	char *buf;
-	size_t len;
+ftpside_t *ftps;
+char *buf;
+size_t len;
 {
 	register char *s, c, pc;
 	register size_t i = len;
@@ -873,9 +873,9 @@ bad_client_command:
 
 
 int ippr_ftp_server_valid(ftps, buf, len)
-	ftpside_t *ftps;
-	char *buf;
-	size_t len;
+ftpside_t *ftps;
+char *buf;
+size_t len;
 {
 	register char *s, c, pc;
 	register size_t i = len;
@@ -942,10 +942,10 @@ search_eol:
 
 
 int ippr_ftp_valid(ftp, side, buf, len)
-	ftpinfo_t *ftp;
-	int side;
-	char *buf;
-	size_t len;
+ftpinfo_t *ftp;
+int side;
+char *buf;
+size_t len;
 {
 	ftpside_t *ftps;
 	int ret;
@@ -969,10 +969,10 @@ int ippr_ftp_valid(ftp, side, buf, len)
  * rv == 1 for outbound processing.
  */
 int ippr_ftp_process(fin, nat, ftp, rv)
-	fr_info_t *fin;
-	nat_t *nat;
-	ftpinfo_t *ftp;
-	int rv;
+fr_info_t *fin;
+nat_t *nat;
+ftpinfo_t *ftp;
+int rv;
 {
 	int mlen, len, off, inc, i, sel, sel2, ok, ackoff, seqoff;
 	char *rptr, *wptr, *s;
@@ -1291,9 +1291,9 @@ int ippr_ftp_process(fin, nat, ftp, rv)
 
 
 int ippr_ftp_out(fin, aps, nat)
-	fr_info_t *fin;
-	ap_session_t *aps;
-	nat_t *nat;
+fr_info_t *fin;
+ap_session_t *aps;
+nat_t *nat;
 {
 	ftpinfo_t *ftp;
 	int rev;
@@ -1311,9 +1311,9 @@ int ippr_ftp_out(fin, aps, nat)
 
 
 int ippr_ftp_in(fin, aps, nat)
-	fr_info_t *fin;
-	ap_session_t *aps;
-	nat_t *nat;
+fr_info_t *fin;
+ap_session_t *aps;
+nat_t *nat;
 {
 	ftpinfo_t *ftp;
 	int rev;
@@ -1337,7 +1337,7 @@ int ippr_ftp_in(fin, aps, nat)
  * LSB.
  */
 u_short ippr_ftp_atoi(ptr)
-	char **ptr;
+char **ptr;
 {
 	register char *s = *ptr, c;
 	register u_char i = 0, j = 0;
@@ -1362,11 +1362,11 @@ u_short ippr_ftp_atoi(ptr)
 
 
 int ippr_ftp_epsv(fin, ip, nat, f, dlen)
-	fr_info_t *fin;
-	ip_t *ip;
-	nat_t *nat;
-	ftpside_t *f;
-	int dlen;
+fr_info_t *fin;
+ip_t *ip;
+nat_t *nat;
+ftpside_t *f;
+int dlen;
 {
 	char newbuf[IPF_FTPBUFSZ];
 	char *s;

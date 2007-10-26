@@ -10,7 +10,7 @@ static const char rcsid[] = "@(#)$Id$";
 #include "ipf.h"
 
 void nat_setgroupmap(n)
-	ipnat_t *n;
+ipnat_t *n;
 {
 	if (n->in_outmsk == n->in_inmsk)
 		n->in_ippip = 1;

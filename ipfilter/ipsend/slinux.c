@@ -44,8 +44,8 @@ static	char	*eth_dev = NULL;
 
 
 int	initdevice(dev, spare)
-	char	*dev;
-	int	spare;
+char	*dev;
+int	spare;
 {
 	int fd;
 
@@ -64,8 +64,8 @@ int	initdevice(dev, spare)
  * output an IP packet onto a fd opened for /dev/nit
  */
 int	sendip(fd, pkt, len)
-	int	fd, len;
-	char	*pkt;
+int	fd, len;
+char	*pkt;
 {
 	struct	sockaddr	s;
 	struct	ifreq	ifr;

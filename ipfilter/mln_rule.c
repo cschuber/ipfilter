@@ -45,15 +45,15 @@ int ipfrule_lkmentry(lkmtp, cmd, ver)
 # else
 int xxxinit(lkmtp, cmd, ver)
 # endif
-	struct lkm_table *lkmtp;
-	int cmd, ver;
+struct lkm_table *lkmtp;
+int cmd, ver;
 {
 	DISPATCH(lkmtp, cmd, ver, ipfruleaction, ipfruleaction, ipfruleaction);
 }
 
 static int ipfruleaction(lkmtp, cmd)
-	struct lkm_table *lkmtp;
-	int cmd;
+struct lkm_table *lkmtp;
+int cmd;
 {
 	int err = 0;
 

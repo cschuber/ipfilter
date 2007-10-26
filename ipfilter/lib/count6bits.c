@@ -10,7 +10,7 @@
 
 
 int count6bits(msk)
-	u_32_t *msk;
+u_32_t *msk;
 {
 	int i = 0, k;
 	u_32_t j;

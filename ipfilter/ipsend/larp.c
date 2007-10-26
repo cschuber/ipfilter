@@ -28,7 +28,7 @@ static const char rcsid[] = "@(#)$Id$";
  * (4 bytes)
  */
 int	resolve(host, address)
-	char	*host, *address;
+char	*host, *address;
 {
         struct	hostent	*hp;
         u_long	add;
@@ -54,8 +54,8 @@ int	resolve(host, address)
  * some BSD program, I cant remember which.
  */
 int	arp(ip, ether)
-	char	*ip;
-	char	*ether;
+char	*ip;
+char	*ether;
 {
 	static	int	s = -1;
 	struct	arpreq	ar;

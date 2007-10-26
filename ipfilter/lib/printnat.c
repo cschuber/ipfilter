@@ -18,8 +18,8 @@ static const char rcsid[] = "@(#)$Id$";
  * Print out a NAT rule
  */
 void printnat(np, opts)
-	ipnat_t *np;
-	int opts;
+ipnat_t *np;
+int opts;
 {
 	struct	protoent	*pr;
 	int	bits;

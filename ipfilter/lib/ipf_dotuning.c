@@ -11,9 +11,9 @@
 #include <sys/ioctl.h>
 
 void ipf_dotuning(fd, tuneargs, iocfn)
-	int fd;
-	char *tuneargs;
-	ioctlfunc_t iocfn;
+int fd;
+char *tuneargs;
+ioctlfunc_t iocfn;
 {
 	ipfobj_t obj;
 	ipftune_t tu;

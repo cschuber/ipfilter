@@ -9,8 +9,8 @@
 #include "ipf.h"
 
 int ntomask(v, nbits, ap)
-	int v, nbits;
-	u_32_t *ap;
+int v, nbits;
+u_32_t *ap;
 {
 	u_32_t mask;
 

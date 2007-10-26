@@ -58,7 +58,7 @@ static	void		yystrtotext __P((char *));
 static	char		*yytexttochar __P((void));
 
 static int yygetc(docont)
-	int docont;
+int docont;
 {
 	int c;
 
@@ -96,7 +96,7 @@ static int yygetc(docont)
 
 
 static void yyunputc(c)
-	int c;
+int c;
 {
 	if (c == '\n')
 		yylineNum--;
@@ -105,7 +105,7 @@ static void yyunputc(c)
 
 
 static int yyswallow(last)
-	int last;
+int last;
 {
 	int c;
 
@@ -132,7 +132,7 @@ static char *yytexttochar()
 
 
 static void yystrtotext(str)
-	char *str;
+char *str;
 {
 	int len;
 	char *s;
@@ -148,7 +148,7 @@ static void yystrtotext(str)
 
 
 static char *yytexttostr(offset, max)
-	int offset, max;
+int offset, max;
 {
 	char *str;
 	int i;
@@ -551,7 +551,7 @@ done:
 
 
 static wordtab_t *yyfindkey(key)
-	char *key;
+char *key;
 {
 	wordtab_t *w;
 
@@ -566,7 +566,7 @@ static wordtab_t *yyfindkey(key)
 
 
 char *yykeytostr(num)
-	int num;
+int num;
 {
 	wordtab_t *w;
 
@@ -581,7 +581,7 @@ char *yykeytostr(num)
 
 
 wordtab_t *yysettab(words)
-	wordtab_t *words;
+wordtab_t *words;
 {
 	wordtab_t *save;
 
@@ -592,7 +592,7 @@ wordtab_t *yysettab(words)
 
 
 void yyerror(msg)
-	char *msg;
+char *msg;
 {
 	char *txt, letter[2];
 	int freetxt = 0;
@@ -619,7 +619,7 @@ void yyerror(msg)
 
 
 void yysetdict(newdict)
-	wordtab_t *newdict;
+wordtab_t *newdict;
 {
 	if (yysavedepth == sizeof(yysavewords)/sizeof(yysavewords[0])) {
 		fprintf(stderr, "%d: at maximum dictionary depth\n",
@@ -647,8 +647,8 @@ void yyresetdict()
 
 #ifdef	TEST_LEXER
 int main(argc, argv)
-	int argc;
-	char *argv[];
+int argc;
+char *argv[];
 {
 	int n;
 

@@ -405,12 +405,12 @@ static int ipf_detach()
  * possible about them and what they claim to hold.
  */
 void fr_donotip(out, qif, q, m, mt, ip, off)
-	int out;
-	qif_t *qif;
-	queue_t *q;
-	mblk_t *m, *mt;
-	ip_t *ip;
-	size_t off;
+int out;
+qif_t *qif;
+queue_t *q;
+mblk_t *m, *mt;
+ip_t *ip;
+size_t off;
 {
 	u_char *s, outb[256], *t;
 	int i, j;
@@ -473,12 +473,12 @@ void fr_donotip(out, qif, q, m, mt, ip, off)
  * about and those which are currently configured.
  */
 static int fr_qifsync(ip, hlen, il, out, qif, mp)
-	ip_t *ip;
-	int hlen;
-	void *il;
-	int out;
-	qif_t *qif;
-	mblk_t **mp;
+ip_t *ip;
+int hlen;
+void *il;
+int out;
+qif_t *qif;
+mblk_t **mp;
 {
 	register struct frentry *f;
 	register ipnat_t *np;
@@ -490,7 +490,7 @@ static int fr_qifsync(ip, hlen, il, out, qif, mp)
 
 #ifdef	IPFDEBUG
 void printiri(iri)
-	irinfo_t *iri;
+irinfo_t *iri;
 {
 	printf("iri: ll_hdr_mp %p rfq %p stq %p\n",
 		iri->ir_ll_hdr_mp, iri->ir_rfq, iri->ir_stq);

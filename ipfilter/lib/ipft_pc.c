@@ -86,7 +86,7 @@ struct	ipread	pcap = { pcap_open, pcap_close, pcap_readip, 0 };
 	( (((y)&0xff)<<8) | (((y)&0xff00)>>8) )
 
 static	void	swap_hdr(p)
-	pcaphdr_t	*p;
+pcaphdr_t	*p;
 {
 	p->pc_v_maj = SWAPSHORT(p->pc_v_maj);
 	p->pc_v_min = SWAPSHORT(p->pc_v_min);
@@ -97,7 +97,7 @@ static	void	swap_hdr(p)
 }
 
 static	int	pcap_open(fname)
-	char	*fname;
+char	*fname;
 {
 	pcaphdr_t ph;
 	int fd, i;
@@ -158,7 +158,7 @@ static	int	pcap_close()
  * in a pcap file.
  */
 static	int	pcap_read_rec(rec)
-	struct	pcap_pkthdr *rec;
+struct	pcap_pkthdr *rec;
 {
 	int	n, p, i;
 	char	*s;
@@ -197,8 +197,8 @@ static	int	pcap_read_rec(rec)
  * the available buffer, with the number of bytes copied returned.
  */
 static	int	pcap_read(buf, cnt)
-	char	*buf;
-	int	cnt;
+char	*buf;
+int	cnt;
 {
 	struct	pcap_pkthdr rec;
 	static	char	*bufp = NULL;
@@ -226,8 +226,8 @@ static	int	pcap_read(buf, cnt)
  * return only an IP packet read into buf
  */
 static	int	pcap_readip(buf, cnt, ifn, dir)
-	char	*buf, **ifn;
-	int	cnt, *dir;
+char	*buf, **ifn;
+int	cnt, *dir;
 {
 	static	char	*bufp = NULL;
 	struct	pcap_pkthdr rec;

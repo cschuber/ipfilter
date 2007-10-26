@@ -94,7 +94,7 @@ extern ipnat_t *nat_list;
 
 #ifdef IPFDEBUG
 static void ipf_dumppacket(m)
-	struct mbuf *m;
+struct mbuf *m;
 {
 	u_char *s;
 	char *t, line[80];

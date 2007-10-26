@@ -83,8 +83,8 @@ int if_ipl_lkmentry (lkmtp, cmd, ver)
 #else
 int if_ipl(lkmtp, cmd, ver)
 #endif
-	struct lkm_table *lkmtp;
-	int cmd, ver;
+struct lkm_table *lkmtp;
+int cmd, ver;
 {
 	DISPATCH(lkmtp, cmd, ver, iplaction, iplaction, iplaction);
 }
@@ -92,8 +92,8 @@ int if_ipl(lkmtp, cmd, ver)
 int lkmexists __P((struct lkm_table *)); /* defined in /sys/kern/kern_lkm.c */
 
 static int iplaction(lkmtp, cmd)
-	struct lkm_table *lkmtp;
-	int cmd;
+struct lkm_table *lkmtp;
+int cmd;
 {
 	int i;
 	struct lkm_dev *args = lkmtp->private.lkm_dev;

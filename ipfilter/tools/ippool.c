@@ -69,7 +69,7 @@ int	use_inet6 = 0;
 
 
 void usage(prog)
-	char *prog;
+char *prog;
 {
 	fprintf(stderr, "Usage:\t%s\n", prog);
 	fprintf(stderr, "\t\t\t-a [-dnv] [-m <name>] [-o <role>] -i <ipaddr>[/netmask]\n");
@@ -85,8 +85,8 @@ void usage(prog)
 
 
 int main(argc, argv)
-	int argc;
-	char *argv[];
+int argc;
+char *argv[];
 {
 	int err;
 
@@ -130,8 +130,8 @@ int main(argc, argv)
 
 
 int poolnodecommand(remove, argc, argv)
-	int remove, argc;
-	char *argv[];
+int remove, argc;
+char *argv[];
 {
 	int err, c, ipset, role;
 	char *poolname = NULL;
@@ -198,8 +198,8 @@ int poolnodecommand(remove, argc, argv)
 
 
 int poolcommand(remove, argc, argv)
-	int remove, argc;
-	char *argv[];
+int remove, argc;
+char *argv[];
 {
 	int type, role, c, err;
 	char *poolname;
@@ -296,8 +296,8 @@ int poolcommand(remove, argc, argv)
 
 
 int loadpoolfile(argc, argv, infile)
-	int argc;
-	char *argv[], *infile;
+int argc;
+char *argv[], *infile;
 {
 	int c;
 
@@ -342,8 +342,8 @@ int loadpoolfile(argc, argv, infile)
 
 
 int poolstats(argc, argv)
-	int argc;
-	char *argv[];
+int argc;
+char *argv[];
 {
 	int c, type, role, live_kernel;
 	ip_pool_stat_t plstat;
@@ -439,8 +439,8 @@ int poolstats(argc, argv)
 
 
 int poolflush(argc, argv)
-	int argc;
-	char *argv[];
+int argc;
+char *argv[];
 {
 	int c, role, type, arg;
 	iplookupflush_t flush;
@@ -505,7 +505,7 @@ int poolflush(argc, argv)
 
 
 int getrole(rolename)
-	char *rolename;
+char *rolename;
 {
 	int role;
 
@@ -536,8 +536,8 @@ int getrole(rolename)
 
 
 int gettype(typename, minor)
-	char *typename;
-	u_int *minor;
+char *typename;
+u_int *minor;
 {
 	int type;
 
@@ -559,8 +559,8 @@ int gettype(typename, minor)
 
 
 int poollist(argc, argv)
-	int argc;
-	char *argv[];
+int argc;
+char *argv[];
 {
 	char *kernel, *core, *poolname;
 	int c, role, type, live_kernel;
@@ -639,8 +639,8 @@ int poollist(argc, argv)
 
 
 void poollist_dead(role, poolname, type, kernel, core)
-	int role, type;
-	char *poolname, *kernel, *core;
+int role, type;
+char *poolname, *kernel, *core;
 {
 	iphtable_t *hptr;
 	ip_pool_t *ptr;
@@ -707,8 +707,8 @@ void poollist_dead(role, poolname, type, kernel, core)
 
 
 void poollist_live(role, poolname, type, fd)
-	int role, type, fd;
-	char *poolname;
+int role, type, fd;
+char *poolname;
 {
 	ip_pool_stat_t plstat;
 	iphtstat_t htstat;
@@ -783,9 +783,9 @@ void poollist_live(role, poolname, type, fd)
 
 
 void showpools_live(fd, role, plstp, poolname)
-	int fd, role;
-	ip_pool_stat_t *plstp;
-	char *poolname;
+int fd, role;
+ip_pool_stat_t *plstp;
+char *poolname;
 {
 	ipflookupiter_t iter;
 	ip_pool_t pool;
@@ -817,9 +817,9 @@ void showpools_live(fd, role, plstp, poolname)
 
 
 void showhashs_live(fd, role, htstp, poolname)
-	int fd, role;
-	iphtstat_t *htstp;
-	char *poolname;
+int fd, role;
+iphtstat_t *htstp;
+char *poolname;
 {
 	ipflookupiter_t iter;
 	iphtable_t table;

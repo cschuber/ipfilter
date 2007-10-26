@@ -74,7 +74,7 @@ void fr_htable_unload()
 
 
 int fr_gethtablestat(op)
-	iplookupop_t *op;
+iplookupop_t *op;
 {
 	iphtstat_t stats;
 
@@ -95,7 +95,7 @@ int fr_gethtablestat(op)
  * Create a new hash table using the template passed.
  */
 int fr_newhtable(op)
-	iplookupop_t *op;
+iplookupop_t *op;
 {
 	iphtable_t *iph, *oiph;
 	char name[FR_GROUPLEN];
@@ -176,8 +176,8 @@ int fr_newhtable(op)
 /*
  */
 int fr_removehtable(unit, name)
-	int unit;
-	char *name;
+int unit;
+char *name;
 {
 	iphtable_t *iph;
 
@@ -202,7 +202,7 @@ int fr_removehtable(unit, name)
 
 
 int fr_clearhtable(iph)
-	iphtable_t *iph;
+iphtable_t *iph;
 {
 	iphtent_t *ipe;
 
@@ -214,7 +214,7 @@ int fr_clearhtable(iph)
 
 
 int fr_delhtable(iph)
-	iphtable_t *iph;
+iphtable_t *iph;
 {
 
 	if (fr_clearhtable(iph) != 0)
@@ -235,8 +235,8 @@ int fr_delhtable(iph)
  * Delete an entry from a hash table.
  */
 int fr_delhtent(iph, ipe)
-	iphtable_t *iph;
-	iphtent_t *ipe;
+iphtable_t *iph;
+iphtent_t *ipe;
 {
 
 	if (ipe->ipe_phnext != NULL)
@@ -267,7 +267,7 @@ int fr_delhtent(iph, ipe)
 
 
 int fr_derefhtable(iph)
-	iphtable_t *iph;
+iphtable_t *iph;
 {
 	int refs;
 
@@ -284,7 +284,7 @@ int fr_derefhtable(iph)
 
 
 int fr_derefhtent(ipe)
-	iphtent_t *ipe;
+iphtent_t *ipe;
 {
 
 	ipe->ipe_ref--;
@@ -301,8 +301,8 @@ int fr_derefhtent(ipe)
 
 
 iphtable_t *fr_existshtable(unit, name)
-	int unit;
-	char *name;
+int unit;
+char *name;
 {
 	iphtable_t *iph;
 
@@ -314,8 +314,8 @@ iphtable_t *fr_existshtable(unit, name)
 
 
 iphtable_t *fr_findhtable(unit, name)
-	int unit;
-	char *name;
+int unit;
+char *name;
 {
 	iphtable_t *iph;
 
@@ -328,7 +328,7 @@ iphtable_t *fr_findhtable(unit, name)
 
 
 size_t fr_flushhtable(op)
-	iplookupflush_t *op;
+iplookupflush_t *op;
 {
 	iphtable_t *iph;
 	size_t freed;
@@ -356,8 +356,8 @@ size_t fr_flushhtable(op)
  * Add an entry to a hash table.
  */
 int fr_addhtent(iph, ipeo)
-	iphtable_t *iph;
-	iphtent_t *ipeo;
+iphtable_t *iph;
+iphtent_t *ipeo;
 {
 	iphtent_t *ipe;
 	u_int hv;
@@ -414,7 +414,7 @@ int fr_addhtent(iph, ipeo)
 
 
 void *fr_iphmfindgroup(tptr, aptr)
-	void *tptr, *aptr;
+void *tptr, *aptr;
 {
 	struct in_addr *addr;
 	iphtable_t *iph;
@@ -445,8 +445,8 @@ void *fr_iphmfindgroup(tptr, aptr)
 /* Search the hash table for a given address and return a search result.    */
 /* ------------------------------------------------------------------------ */
 int fr_iphmfindip(tptr, ipversion, aptr)
-	void *tptr, *aptr;
-	int ipversion;
+void *tptr, *aptr;
+int ipversion;
 {
 	struct in_addr *addr;
 	iphtable_t *iph;
@@ -475,8 +475,8 @@ int fr_iphmfindip(tptr, ipversion, aptr)
 
 /* Locks:  ip_poolrw */
 static iphtent_t *fr_iphmfind(iph, addr)
-	iphtable_t *iph;
-	struct in_addr *addr;
+iphtable_t *iph;
+struct in_addr *addr;
 {
 	u_32_t hmsk, msk, ips;
 	iphtent_t *ipe;
@@ -512,8 +512,8 @@ maskloop:
 
 
 int fr_htable_getnext(token, ilp)
-	ipftoken_t *token;
-	ipflookupiter_t *ilp;
+ipftoken_t *token;
+ipflookupiter_t *ilp;
 {
 	iphtent_t *node, zn, *nextnode;
 	iphtable_t *iph, zp, *nextiph;
@@ -608,9 +608,9 @@ int fr_htable_getnext(token, ilp)
 
 
 void fr_htable_iterderef(otype, unit, data)
-	u_int otype;
-	int unit;
-	void *data;
+u_int otype;
+int unit;
+void *data;
 {
 
 	if (data == NULL)

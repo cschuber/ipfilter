@@ -16,10 +16,10 @@ static int poolfd = -1;
 
 
 int load_poolnode(role, name, node, iocfunc)
-	int role;
-	char *name;
-	ip_pool_node_t *node;
-	ioctlfunc_t iocfunc;
+int role;
+char *name;
+ip_pool_node_t *node;
+ioctlfunc_t iocfunc;
 {
 	ip_pool_node_t pn;
 	iplookupop_t op;

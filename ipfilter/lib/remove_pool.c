@@ -16,8 +16,8 @@ static int poolfd = -1;
 
 
 int remove_pool(poolp, iocfunc)
-	ip_pool_t *poolp;
-	ioctlfunc_t iocfunc;
+ip_pool_t *poolp;
+ioctlfunc_t iocfunc;
 {
 	iplookupop_t op;
 	ip_pool_t pool;

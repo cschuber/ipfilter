@@ -219,7 +219,7 @@ int ipf_ioctl(struct inode *in, struct file *fp, u_int cmd, u_long arg)
 
 
 u_32_t fr_newisn(fin)
-	fr_info_t *fin;
+fr_info_t *fin;
 {
 	u_32_t isn;
 
@@ -230,7 +230,7 @@ u_32_t fr_newisn(fin)
 
 
 int fr_send_reset(fin)
-	fr_info_t *fin;
+fr_info_t *fin;
 {
 	tcphdr_t *tcp, *tcp2;
 	int tlen, hlen;
@@ -301,8 +301,8 @@ int fr_send_reset(fin)
 
 
 static int fr_send_ip(fin, sk, skp)
-	fr_info_t *fin;
-	struct sk_buff *sk, **skp;
+fr_info_t *fin;
+struct sk_buff *sk, **skp;
 {
 	fr_info_t fnew;
 	ip_t *ip, *oip;
@@ -342,9 +342,9 @@ static int fr_send_ip(fin, sk, skp)
 
 
 int fr_send_icmp_err(type, fin, isdst)
-	int type;
-	fr_info_t *fin;
-	int isdst;
+int type;
+fr_info_t *fin;
+int isdst;
 {
 	int hlen, code, leader, dlen;
 	struct net_device *ifp;
@@ -489,14 +489,14 @@ int fr_send_icmp_err(type, fin, isdst)
 
 
 int fr_verifysrc(fin)
-	fr_info_t *fin;
+fr_info_t *fin;
 {
 	return 0;
 }
 
 
 void fr_checkv4sum(fin)
-	fr_info_t *fin;
+fr_info_t *fin;
 {
 	/*
 	 * Linux 2.4.20-8smp (RedHat 9)
@@ -512,7 +512,7 @@ void fr_checkv4sum(fin)
 
 
 u_short fr_nextipid(fin)
-	fr_info_t *fin;
+fr_info_t *fin;
 {
 #if 1
 	static u_short ipid = 0;
@@ -529,9 +529,9 @@ u_short fr_nextipid(fin)
 
 /*ARGSUSED*/
 int fr_fastroute(min, mp, fin, fdp)
-	mb_t *min, **mp;
-	fr_info_t *fin;
-	frdest_t *fdp;
+mb_t *min, **mp;
+fr_info_t *fin;
+frdest_t *fdp;
 {
 	struct net_device *ifp, *sifp;
 	struct in_addr dip;
@@ -655,9 +655,9 @@ bad:
 
 
 int fr_ifpaddr(v, atype, ifptr, inp, inpmask)
-	int v, atype;
-	void *ifptr;
-	struct in_addr *inp, *inpmask;
+int v, atype;
+void *ifptr;
+struct in_addr *inp, *inpmask;
 {
 	struct sockaddr_in sin, sinmask;
 	struct in_ifaddr *ifa;
@@ -702,19 +702,19 @@ int fr_ifpaddr(v, atype, ifptr, inp, inpmask)
 
 
 void m_copydata(m, off, len, cp)
-	mb_t *m;
-	int off, len;
-	caddr_t cp;
+mb_t *m;
+int off, len;
+caddr_t cp;
 {
 	bcopy(MTOD(m, char *) + off, cp, len);
 }
 
 
 static u_int ipf_linux_inout(hooknum, skbp, inifp, outifp, okfn)
-	u_int hooknum;
-	struct sk_buff **skbp;
-	const struct net_device *inifp, *outifp;
-	int (*okfn)(struct sk_buff *);
+u_int hooknum;
+struct sk_buff **skbp;
+const struct net_device *inifp, *outifp;
+int (*okfn)(struct sk_buff *);
 {
 	int result, hlen, dir;
 	void *ifp;
@@ -763,7 +763,7 @@ static u_int ipf_linux_inout(hooknum, skbp, inifp, outifp, okfn)
 
 
 INLINE void ipf_read_enter(rwlk)
-	ipfrwlock_t *rwlk;
+ipfrwlock_t *rwlk;
 {
 #if defined(IPFDEBUG) && !defined(_KERNEL)
 	if (rwlk->ipf_magic != 0x97dd8b3a) {
@@ -782,7 +782,7 @@ INLINE void ipf_read_enter(rwlk)
 
 
 INLINE void ipf_write_enter(rwlk)
-	ipfrwlock_t *rwlk;
+ipfrwlock_t *rwlk;
 {
 #if defined(IPFDEBUG) && !defined(_KERNEL)
 	if (rwlk->ipf_magic != 0x97dd8b3a) {
@@ -798,7 +798,7 @@ INLINE void ipf_write_enter(rwlk)
 
 
 INLINE void ipf_rw_exit(rwlk)
-	ipfrwlock_t *rwlk;
+ipfrwlock_t *rwlk;
 {
 #if defined(IPFDEBUG) && !defined(_KERNEL)
 	if (rwlk->ipf_magic != 0x97dd8b3a) {
@@ -829,7 +829,7 @@ INLINE void ipf_rw_exit(rwlk)
  * on the object of desire.
  */
 INLINE void ipf_rw_downgrade(rwlk)
-	ipfrwlock_t *rwlk;
+ipfrwlock_t *rwlk;
 {
 	ipf_rw_exit(rwlk);
 	ipf_read_enter(rwlk);
@@ -837,8 +837,8 @@ INLINE void ipf_rw_downgrade(rwlk)
 
 
 void ipf_rw_init(rwlck, name)
-	ipfrwlock_t *rwlck;
-	char *name;
+ipfrwlock_t *rwlck;
+char *name;
 {
 	memset(rwlck, 0, sizeof(*rwlck));
 	rwlck->ipf_lname = name;
@@ -848,7 +848,7 @@ void ipf_rw_init(rwlck, name)
 
 #if 0
 void dumpskbuff(sk)
-	struct sk_buff *sk;
+struct sk_buff *sk;
 {
 	char line[80], *t;
 	u_char *s1, *s2;
@@ -889,8 +889,8 @@ void dumpskbuff(sk)
 
 
 mb_t *m_pullup(m, len)
-	mb_t *m;
-	int len;
+mb_t *m;
+int len;
 {
 	if (len <= M_LEN(m))
 		return m;
@@ -917,9 +917,9 @@ mb_t *m_pullup(m, len)
 /* of buffers that starts at *fin->fin_mp.                                  */
 /* ------------------------------------------------------------------------ */
 void *fr_pullup(min, fin, len)
-	mb_t *min;
-	fr_info_t *fin;
-	int len;
+mb_t *min;
+fr_info_t *fin;
+int len;
 {
 	int out = fin->fin_out, dpoff, ipoff;
 	mb_t *m = min;
@@ -988,8 +988,8 @@ done:
 
 
 int ipf_inject(fin, m)
-	fr_info_t *fin;
-	mb_t *m;
+fr_info_t *fin;
+mb_t *m;
 {
 	FREE_MB_T(m);
 

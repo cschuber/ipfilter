@@ -11,9 +11,9 @@
 #define	EMM_MAGIC	0x9d7adba3
 
 void eMmutex_enter(mtx, file, line)
-	eMmutex_t *mtx;
-	char *file;
-	int line;
+eMmutex_t *mtx;
+char *file;
+int line;
 {
 	if (mtx->eMm_magic != EMM_MAGIC) {
 		fprintf(stderr, "%s:eMmutex_enter(%p): bad magic: %#x\n",
@@ -32,7 +32,7 @@ void eMmutex_enter(mtx, file, line)
 
 
 void eMmutex_exit(mtx)
-	eMmutex_t *mtx;
+eMmutex_t *mtx;
 {
 	if (mtx->eMm_magic != EMM_MAGIC) {
 		fprintf(stderr, "%s:eMmutex_exit(%p): bad magic: %#x\n",
@@ -51,8 +51,8 @@ void eMmutex_exit(mtx)
 
 
 void eMmutex_init(mtx, who)
-	eMmutex_t *mtx;
-	char *who;
+eMmutex_t *mtx;
+char *who;
 {
 	if (mtx->eMm_magic == EMM_MAGIC) {	/* safe bet ? */
 		fprintf(stderr,
@@ -70,7 +70,7 @@ void eMmutex_init(mtx, who)
 
 
 void eMmutex_destroy(mtx)
-	eMmutex_t *mtx;
+eMmutex_t *mtx;
 {
 	if (mtx->eMm_magic != EMM_MAGIC) {
 		fprintf(stderr, "%s:eMmutex_destroy(%p): bad magic: %#x\n",

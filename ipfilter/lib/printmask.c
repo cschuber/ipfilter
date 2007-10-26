@@ -10,7 +10,7 @@
 
 
 void	printmask(mask)
-	u_32_t	*mask;
+u_32_t	*mask;
 {
 	struct in_addr ipa;
 	int ones;

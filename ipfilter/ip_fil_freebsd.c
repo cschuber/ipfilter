@@ -160,7 +160,7 @@ static eventhandler_tag ipf_arrivetag, ipf_departtag, ipf_clonetag;
 static void ipf_ifevent(void *arg);
 
 static void ipf_ifevent(arg)
-	void *arg;
+void *arg;
 {
         frsync(NULL);
 }
@@ -189,7 +189,7 @@ fr_check_wrapper6(void *arg, struct mbuf **mp, struct ifnet *ifp, int dir)
 #endif /* __FreeBSD_version >= 501108 */
 #if	defined(IPFILTER_LKM)
 int iplidentify(s)
-	char *s;
+char *s;
 {
 	if (strcmp(s, "ipl") == 0)
 		return 1;
@@ -301,27 +301,27 @@ int iplioctl(dev, cmd, data, mode
 # if defined(_KERNEL) && ((BSD >= 199506) || (__FreeBSD_version >= 220000))
 , p)
 #  if (__FreeBSD_version >= 500024)
-	struct thread *p;
+struct thread *p;
 #   if (__FreeBSD_version >= 500043)
 #    define	p_uid	td_ucred->cr_ruid
 #   else
 #    define	p_uid	t_proc->p_cred->p_ruid
 #   endif
 #  else
-	struct proc *p;
+struct proc *p;
 #   define	p_uid	p_cred->p_ruid
 #  endif /* __FreeBSD_version >= 500024 */
 # else
 )
 # endif
 #if defined(_KERNEL) && (__FreeBSD_version >= 502116)
-	struct cdev *dev;
+struct cdev *dev;
 #else
-	dev_t dev;
+dev_t dev;
 #endif
-	ioctlcmd_t cmd;
-	caddr_t data;
-	int mode;
+ioctlcmd_t cmd;
+caddr_t data;
+int mode;
 {
 	int error = 0, unit = 0;
 	SPL_INT(s);
@@ -363,7 +363,7 @@ int iplioctl(dev, cmd, data, mode
 
 #if 0
 void fr_forgetifp(ifp)
-	void *ifp;
+void *ifp;
 {
 	register frentry_t *f;
 
@@ -406,21 +406,21 @@ void fr_forgetifp(ifp)
 int iplopen(dev, flags
 #if ((BSD >= 199506) || (__FreeBSD_version >= 220000)) && defined(_KERNEL)
 , devtype, p)
-	int devtype;
+int devtype;
 # if (__FreeBSD_version >= 500024)
-	struct thread *p;
+struct thread *p;
 # else
-	struct proc *p;
+struct proc *p;
 # endif /* __FreeBSD_version >= 500024 */
 #else
 )
 #endif
 #if defined(_KERNEL) && (__FreeBSD_version >= 502116)
-	struct cdev *dev;
+struct cdev *dev;
 #else
-	dev_t dev;
+dev_t dev;
 #endif
-	int flags;
+int flags;
 {
 	u_int min = GET_MINOR(dev);
 
@@ -435,21 +435,21 @@ int iplopen(dev, flags
 int iplclose(dev, flags
 #if ((BSD >= 199506) || (__FreeBSD_version >= 220000)) && defined(_KERNEL)
 , devtype, p)
-	int devtype;
+int devtype;
 # if (__FreeBSD_version >= 500024)
-	struct thread *p;
+struct thread *p;
 # else
-	struct proc *p;
+struct proc *p;
 # endif /* __FreeBSD_version >= 500024 */
 #else
 )
 #endif
 #if defined(_KERNEL) && (__FreeBSD_version >= 502116)
-	struct cdev *dev;
+struct cdev *dev;
 #else
-	dev_t dev;
+dev_t dev;
 #endif
-	int flags;
+int flags;
 {
 	u_int	min = GET_MINOR(dev);
 
@@ -468,16 +468,16 @@ int iplclose(dev, flags
  */
 #if (BSD >= 199306)
 int iplread(dev, uio, ioflag)
-	int ioflag;
+int ioflag;
 #else
 int iplread(dev, uio)
 #endif
 #if defined(_KERNEL) && (__FreeBSD_version >= 502116)
-	struct cdev *dev;
+struct cdev *dev;
 #else
-	dev_t dev;
+dev_t dev;
 #endif
-	register struct uio *uio;
+register struct uio *uio;
 {
 	u_int	xmin = GET_MINOR(dev);
 
@@ -508,16 +508,16 @@ int iplread(dev, uio)
  */
 #if (BSD >= 199306)
 int iplwrite(dev, uio, ioflag)
-	int ioflag;
+int ioflag;
 #else
 int iplwrite(dev, uio)
 #endif
 #if defined(_KERNEL) && (__FreeBSD_version >= 502116)
-	struct cdev *dev;
+struct cdev *dev;
 #else
-	dev_t dev;
+dev_t dev;
 #endif
-	register struct uio *uio;
+register struct uio *uio;
 {
 
 	if (fr_running < 1)
@@ -536,7 +536,7 @@ int iplwrite(dev, uio)
  * requires a large amount of setting up and isn't any more efficient.
  */
 int fr_send_reset(fin)
-	fr_info_t *fin;
+fr_info_t *fin;
 {
 	struct tcphdr *tcp, *tcp2;
 	int tlen = 0, hlen;
@@ -633,8 +633,8 @@ int fr_send_reset(fin)
 
 
 static int fr_send_ip(fin, m, mpp)
-	fr_info_t *fin;
-	mb_t *m, **mpp;
+fr_info_t *fin;
+mb_t *m, **mpp;
 {
 	fr_info_t fnew;
 	ip_t *ip, *oip;
@@ -695,9 +695,9 @@ static int fr_send_ip(fin, m, mpp)
 
 
 int fr_send_icmp_err(type, fin, dst)
-	int type;
-	fr_info_t *fin;
-	int dst;
+int type;
+fr_info_t *fin;
+int dst;
 {
 	int err, hlen, xtra, iclen, ohlen, avail, code;
 	struct in_addr dst4;
@@ -884,9 +884,9 @@ iplinit()
 
 
 int fr_fastroute(m0, mpp, fin, fdp)
-	mb_t *m0, **mpp;
-	fr_info_t *fin;
-	frdest_t *fdp;
+mb_t *m0, **mpp;
+fr_info_t *fin;
+frdest_t *fdp;
 {
 	register struct ip *ip, *mhip;
 	register struct mbuf *m = m0;
@@ -1145,7 +1145,7 @@ bad:
 
 
 int fr_verifysrc(fin)
-	fr_info_t *fin;
+fr_info_t *fin;
 {
 	struct sockaddr_in *dst;
 	struct route iproute;
@@ -1166,9 +1166,9 @@ int fr_verifysrc(fin)
  * return the first IP Address associated with an interface
  */
 int fr_ifpaddr(v, atype, ifptr, inp, inpmask)
-	int v, atype;
-	void *ifptr;
-	struct in_addr *inp, *inpmask;
+int v, atype;
+void *ifptr;
+struct in_addr *inp, *inpmask;
 {
 #ifdef USE_INET6
 	struct in6_addr *inp6 = NULL;
@@ -1243,7 +1243,7 @@ int fr_ifpaddr(v, atype, ifptr, inp, inpmask)
 
 
 u_32_t fr_newisn(fin)
-	fr_info_t *fin;
+fr_info_t *fin;
 {
 	u_32_t newiss;
 #if  (__FreeBSD_version >= 400000)
@@ -1293,7 +1293,7 @@ u_32_t fr_newisn(fin)
 /* Returns the next IPv4 ID to use for this packet.                         */
 /* ------------------------------------------------------------------------ */
 u_short fr_nextipid(fin)
-	fr_info_t *fin;
+fr_info_t *fin;
 {
 #ifndef	RANDOM_IP_ID
 	static u_short ipid = 0;
@@ -1313,7 +1313,7 @@ u_short fr_nextipid(fin)
 
 
 INLINE void fr_checkv4sum(fin)
-	fr_info_t *fin;
+fr_info_t *fin;
 {
 #ifdef CSUM_DATA_VALID
 	int manual = 0;
@@ -1369,7 +1369,7 @@ skipauto:
 
 #ifdef USE_INET6
 INLINE void fr_checkv6sum(fin)
-	fr_info_t *fin;
+fr_info_t *fin;
 {
 # ifdef IPFILTER_CKSUM
 	if (fr_checkl4sum(fin) == -1)
@@ -1380,7 +1380,7 @@ INLINE void fr_checkv6sum(fin)
 
 
 size_t mbufchainlen(m0)
-	struct mbuf *m0;
+struct mbuf *m0;
 {
 	size_t len;
 
@@ -1414,9 +1414,9 @@ size_t mbufchainlen(m0)
 /* of buffers that starts at *fin->fin_mp.                                  */
 /* ------------------------------------------------------------------------ */
 void *fr_pullup(min, fin, len)
-	mb_t *min;
-	fr_info_t *fin;
-	int len;
+mb_t *min;
+fr_info_t *fin;
+int len;
 {
 	int out = fin->fin_out, dpoff, ipoff;
 	mb_t *m = min;
@@ -1484,8 +1484,8 @@ void *fr_pullup(min, fin, len)
 
 
 int ipf_inject(fin, m)
-	fr_info_t *fin;
-	mb_t *m;
+fr_info_t *fin;
+mb_t *m;
 {
 	int error = 0;
 

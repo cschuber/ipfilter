@@ -10,8 +10,8 @@
 
 
 u_32_t buildopts(cp, op, len)
-	char *cp, *op;
-	int len;
+char *cp, *op;
+int len;
 {
 	struct ipopt_names *io;
 	u_32_t msk = 0;

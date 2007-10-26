@@ -177,7 +177,7 @@ aproxy_t	ap_proxies[] = {
  * collection compiled in and dynamically added.
  */
 int appr_add(ap)
-	aproxy_t *ap;
+aproxy_t *ap;
 {
 	aproxy_t *a;
 
@@ -214,7 +214,7 @@ int appr_add(ap)
  * control function.
  */
 int appr_ctl(ctl)
-	ap_ctl_t *ctl;
+ap_ctl_t *ctl;
 {
 	aproxy_t *a;
 	int error;
@@ -246,7 +246,7 @@ int appr_ctl(ctl)
  * if it cannot be matched.
  */
 int appr_del(ap)
-	aproxy_t *ap;
+aproxy_t *ap;
 {
 	aproxy_t *a, **app;
 
@@ -272,9 +272,9 @@ int appr_del(ap)
  * Return 1 if the packet is a good match against a proxy, else 0.
  */
 int appr_ok(fin, tcp, nat)
-	fr_info_t *fin;
-	tcphdr_t *tcp;
-	ipnat_t *nat;
+fr_info_t *fin;
+tcphdr_t *tcp;
+ipnat_t *nat;
 {
 	aproxy_t *apr = nat->in_apr;
 	u_short dport = nat->in_dport;
@@ -289,10 +289,10 @@ int appr_ok(fin, tcp, nat)
 
 
 int appr_ioctl(data, cmd, mode, ctx)
-	caddr_t data;
-	ioctlcmd_t cmd;
-	int mode;
-	void *ctx;
+caddr_t data;
+ioctlcmd_t cmd;
+int mode;
+void *ctx;
 {
 	ap_ctl_t ctl;
 	u_char *ptr;
@@ -343,8 +343,8 @@ int appr_ioctl(data, cmd, mode, ctx)
  * matching.
  */
 int appr_match(fin, nat)
-	fr_info_t *fin;
-	nat_t *nat;
+fr_info_t *fin;
+nat_t *nat;
 {
 	aproxy_t *apr;
 	ipnat_t *ipn;
@@ -389,8 +389,8 @@ int appr_match(fin, nat)
  * returning.
  */
 int appr_new(fin, nat)
-	fr_info_t *fin;
-	nat_t *nat;
+fr_info_t *fin;
+nat_t *nat;
 {
 	register ap_session_t *aps;
 	aproxy_t *apr;
@@ -455,8 +455,8 @@ int appr_new(fin, nat)
  * to be set.
  */
 int appr_check(fin, nat)
-	fr_info_t *fin;
-	nat_t *nat;
+fr_info_t *fin;
+nat_t *nat;
 {
 #if SOLARIS && defined(_KERNEL) && (SOLARIS2 >= 6)
 # if defined(ICK_VALID)
@@ -617,8 +617,8 @@ int appr_check(fin, nat)
  * Search for an proxy by the protocol it is being used with and its name.
  */
 aproxy_t *appr_lookup(pr, name)
-	u_int pr;
-	char *name;
+u_int pr;
+char *name;
 {
 	aproxy_t *ap;
 
@@ -645,14 +645,14 @@ aproxy_t *appr_lookup(pr, name)
 
 
 void appr_free(ap)
-	aproxy_t *ap;
+aproxy_t *ap;
 {
 	ap->apr_ref--;
 }
 
 
 void aps_free(aps)
-	ap_session_t *aps;
+ap_session_t *aps;
 {
 	ap_session_t *a, **ap;
 	aproxy_t *apr;
@@ -680,10 +680,10 @@ void aps_free(aps)
  * returns 2 if ack or seq number in TCP header is changed, returns 0 otherwise
  */
 static int appr_fixseqack(fin, ip, aps, inc)
-	fr_info_t *fin;
-	ip_t *ip;
-	ap_session_t *aps;
-	int inc;
+fr_info_t *fin;
+ip_t *ip;
+ap_session_t *aps;
+int inc;
 {
 	int sel, ch = 0, out, nlen;
 	u_32_t seq1, seq2;

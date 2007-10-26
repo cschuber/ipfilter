@@ -9,8 +9,8 @@
 #include "ipf.h"
 
 char *hostname(v, ip)
-	int v;
-	void *ip;
+int v;
+void *ip;
 {
 	static char hostbuf[MAXHOSTNAMELEN+1];
 	struct hostent *hp;

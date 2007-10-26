@@ -11,9 +11,9 @@
 #define	EMM_MAGIC	0x97dd8b3a
 
 void eMrwlock_read_enter(rw, file, line)
-	eMrwlock_t *rw;
-	char *file;
-	int line;
+eMrwlock_t *rw;
+char *file;
+int line;
 {
 	if (rw->eMrw_magic != EMM_MAGIC) {
 		fprintf(stderr, "%s:eMrwlock_read_enter(%p): bad magic: %#x\n",
@@ -33,9 +33,9 @@ void eMrwlock_read_enter(rw, file, line)
 
 
 void eMrwlock_write_enter(rw, file, line)
-	eMrwlock_t *rw;
-	char *file;
-	int line;
+eMrwlock_t *rw;
+char *file;
+int line;
 {
 	if (rw->eMrw_magic != EMM_MAGIC) {
 		fprintf(stderr, "%s:eMrwlock_write_enter(%p): bad magic: %#x\n",
@@ -55,9 +55,9 @@ void eMrwlock_write_enter(rw, file, line)
 
 
 void eMrwlock_downgrade(rw, file, line)
-	eMrwlock_t *rw;
-	char *file;
-	int line;
+eMrwlock_t *rw;
+char *file;
+int line;
 {
 	if (rw->eMrw_magic != EMM_MAGIC) {
 		fprintf(stderr, "%s:eMrwlock_write_enter(%p): bad magic: %#x\n",
@@ -78,7 +78,7 @@ void eMrwlock_downgrade(rw, file, line)
 
 
 void eMrwlock_exit(rw)
-	eMrwlock_t *rw;
+eMrwlock_t *rw;
 {
 	if (rw->eMrw_magic != EMM_MAGIC) {
 		fprintf(stderr, "%s:eMrwlock_exit(%p): bad magic: %#x\n",
@@ -100,8 +100,8 @@ void eMrwlock_exit(rw)
 
 
 void eMrwlock_init(rw, who)
-	eMrwlock_t *rw;
-	char *who;
+eMrwlock_t *rw;
+char *who;
 {
 	if (rw->eMrw_magic == EMM_MAGIC) {	/* safe bet ? */
 		fprintf(stderr,
@@ -120,7 +120,7 @@ void eMrwlock_init(rw, who)
 
 
 void eMrwlock_destroy(rw)
-	eMrwlock_t *rw;
+eMrwlock_t *rw;
 {
 	if (rw->eMrw_magic != EMM_MAGIC) {
 		fprintf(stderr, "%s:eMrwlock_destroy(%p): bad magic: %#x\n",

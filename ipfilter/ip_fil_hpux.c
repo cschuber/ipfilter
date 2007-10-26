@@ -137,10 +137,10 @@ int ipfattach __P((void))
  * Filter ioctl interface.
  */
 int iplioctl(dev, cmd, data, flags)
-	dev_t dev;
-	int cmd;
-	caddr_t data;
-	int flags;
+dev_t dev;
+int cmd;
+caddr_t data;
+int flags;
 {
 	int error = 0;
 	minor_t unit;
@@ -177,8 +177,8 @@ int iplioctl(dev, cmd, data, flags)
 
 
 void *get_unit(name, v)
-	char	*name;
-	int	v;
+char	*name;
+int	v;
 {
 	size_t len = strlen(name) + 1;	/* includes \0 */
 	qif_t *qf;
@@ -199,10 +199,10 @@ void *get_unit(name, v)
  * routines below for saving IP headers to buffer
  */
 int iplopen(dev, flag, dummy, mode)
-	dev_t dev;
-	int flag;
-	intptr_t dummy;
-	int mode;
+dev_t dev;
+int flag;
+intptr_t dummy;
+int mode;
 {
 	minor_t min = getminor(dev);
 
@@ -215,9 +215,9 @@ int iplopen(dev, flag, dummy, mode)
 
 
 int iplclose(dev, flag, mode)
-	dev_t dev;
-	int flag;
-	int mode;
+dev_t dev;
+int flag;
+int mode;
 {
 	minor_t min = getminor(dev);
 
@@ -237,8 +237,8 @@ int iplclose(dev, flag, mode)
  * the filter lists.
  */
 int iplread(dev, uio)
-	dev_t dev;
-	register struct uio *uio;
+dev_t dev;
+register struct uio *uio;
 {
 #ifdef	IPFDEBUG
 	cmn_err(CE_CONT, "iplread(%x,%x)\n", dev, uio);
@@ -259,9 +259,9 @@ int iplread(dev, uio)
  * the filter lists.
  */
 int iplwrite(dev, uio, cp)
-	dev_t dev;
-	register struct uio *uio;
-	cred_t *cp;
+dev_t dev;
+register struct uio *uio;
+cred_t *cp;
 {
 #ifdef	IPFDEBUG
 	cmn_err(CE_CONT, "iplwrite(%x,%x,%x)\n", dev, uio, cp);
@@ -281,7 +281,7 @@ int iplwrite(dev, uio, cp)
  * requires a large amount of setting up and isn't any more efficient.
  */
 int fr_send_reset(fin)
-	fr_info_t *fin;
+fr_info_t *fin;
 {
 	tcphdr_t *tcp, *tcp2;
 	int tlen, hlen;
@@ -389,9 +389,9 @@ static int fr_send_ip(fr_info_t *fin, mblk_t *m)
 
 
 int fr_send_icmp_err(type, fin, dst)
-	int type;
-	fr_info_t *fin;
-	int dst;
+int type;
+fr_info_t *fin;
+int dst;
 {
 	struct in_addr dst4;
 	struct icmp *icmp;
@@ -526,9 +526,9 @@ int fr_send_icmp_err(type, fin, dst)
  * return the first IP Address associated with an interface
  */
 int fr_ifpaddr(v, atype, qifptr, inp, inpmask)
-	int v, atype;
-	void *qifptr;
-	struct in_addr *inp, *inpmask;
+int v, atype;
+void *qifptr;
+struct in_addr *inp, *inpmask;
 {
 #ifdef	USE_INET6
 	struct sockaddr_in6 sin6, mask6;
@@ -571,7 +571,7 @@ extern	int		selwait;
  * iplog_input_ready and ipflog_select are both submissions from HP.
  */
 void iplog_input_ready(unit)
-	minor_t unit;
+minor_t unit;
 {
 	if (iplog_ss[unit].read_waiter) {
 		selwakeup(iplog_ss[unit].read_waiter,
@@ -583,8 +583,8 @@ void iplog_input_ready(unit)
 
 
 int iplselect(unit, flag)
-	minor_t unit;
-	int flag;
+minor_t unit;
+int flag;
 {
 	kthread_t * t;
 
@@ -616,7 +616,7 @@ int iplselect(unit, flag)
 
 
 u_32_t fr_newisn(fin)
-	fr_info_t *fin;
+fr_info_t *fin;
 {
 	static iss_seq_off = 0;
 	u_char hash[16];
@@ -662,7 +662,7 @@ u_32_t fr_newisn(fin)
 /* Returns the next IPv4 ID to use for this packet.                         */
 /* ------------------------------------------------------------------------ */
 INLINE u_short fr_nextipid(fin)
-	fr_info_t *fin;
+fr_info_t *fin;
 {
 	static u_short ipid = 0;
 	u_short id;
@@ -676,7 +676,7 @@ INLINE u_short fr_nextipid(fin)
 
 
 INLINE void fr_checkv4sum(fin)
-	fr_info_t *fin;
+fr_info_t *fin;
 {
 #ifdef IPFILTER_CKSUM
 	if (fr_checkl4sum(fin) == -1)
@@ -687,7 +687,7 @@ INLINE void fr_checkv4sum(fin)
 
 #ifdef USE_INET6
 INLINE void fr_checkv6sum(fin)
-	fr_info_t *fin;
+fr_info_t *fin;
 {
 # ifdef IPFILTER_CKSUM
 	if (fr_checkl4sum(fin) == -1)
@@ -715,9 +715,9 @@ INLINE void fr_checkv6sum(fin)
 /* of buffers that starts at *fin->fin_mp.                                  */
 /* ------------------------------------------------------------------------ */
 void *fr_pullup(min, fin, len)
-	mb_t *min;
-	fr_info_t *fin;
-	int len;
+mb_t *min;
+fr_info_t *fin;
+int len;
 {
 	qpktinfo_t *qpi = fin->fin_qpi;
 	int out = fin->fin_out, dpoff, ipoff;
@@ -799,9 +799,9 @@ void *fr_pullup(min, fin, len)
 
 
 int fr_fastroute(mb, mpp, fin, fdp)
-	mblk_t *mb, **mpp;
-	fr_info_t *fin;
-	frdest_t *fdp;
+mblk_t *mb, **mpp;
+fr_info_t *fin;
+frdest_t *fdp;
 {
 #ifdef	USE_INET6
 	ip6_t *ip6 = (ip6_t *)fin->fin_ip;
@@ -935,7 +935,7 @@ bad_fastroute:
 
 
 int fr_verifysrc(fin)
-	fr_info_t *fin;
+fr_info_t *fin;
 {
 	struct in_addr ips, ipa;
 	irinfo_t ir, *dir, *gw;

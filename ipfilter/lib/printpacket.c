@@ -14,7 +14,7 @@
 
 
 void printpacket(ip)
-	struct ip *ip;
+struct ip *ip;
 {
 	struct	tcphdr	*tcp;
 	u_short len;

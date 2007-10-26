@@ -9,9 +9,9 @@
 #include "ipf.h"
 
 int getport(fr, name, port)
-	frentry_t *fr;
-	char *name;
-	u_short *port;
+frentry_t *fr;
+char *name;
+u_short *port;
 {
 	struct protoent *p;
 	struct servent *s;

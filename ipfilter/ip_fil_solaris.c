@@ -216,16 +216,16 @@ int ipfattach __P((void))
  */
 /*ARGSUSED*/
 int iplioctl(dev, cmd, data, mode, cp, rp)
-	dev_t dev;
-	int cmd;
+dev_t dev;
+int cmd;
 #if SOLARIS2 >= 7
-	intptr_t data;
+intptr_t data;
 #else
-	int *data;
+int *data;
 #endif
-	int mode;
-	cred_t *cp;
-	int *rp;
+int mode;
+cred_t *cp;
+int *rp;
 {
 	int error = 0;
 	minor_t unit;
@@ -262,8 +262,8 @@ int iplioctl(dev, cmd, data, mode, cp, rp)
 
 
 void	*get_unit(name, v)
-	char	*name;
-	int	v;
+char	*name;
+int	v;
 {
 	void *ifp;
 #if !defined(_INET_IP_STACK_H)
@@ -293,9 +293,9 @@ void	*get_unit(name, v)
  */
 /*ARGSUSED*/
 int iplopen(devp, flags, otype, cred)
-	dev_t *devp;
-	int flags, otype;
-	cred_t *cred;
+dev_t *devp;
+int flags, otype;
+cred_t *cred;
 {
 	minor_t min = getminor(*devp);
 
@@ -312,9 +312,9 @@ int iplopen(devp, flags, otype, cred)
 
 /*ARGSUSED*/
 int iplclose(dev, flags, otype, cred)
-	dev_t dev;
-	int flags, otype;
-	cred_t *cred;
+dev_t dev;
+int flags, otype;
+cred_t *cred;
 {
 	minor_t	min = getminor(dev);
 
@@ -335,9 +335,9 @@ int iplclose(dev, flags, otype, cred)
  */
 /*ARGSUSED*/
 int iplread(dev, uio, cp)
-	dev_t dev;
-	register struct uio *uio;
-	cred_t *cp;
+dev_t dev;
+register struct uio *uio;
+cred_t *cp;
 {
 # ifdef	IPFDEBUG
 	cmn_err(CE_CONT, "iplread(%x,%x,%x)\n", dev, uio, cp);
@@ -363,9 +363,9 @@ int iplread(dev, uio, cp)
  * the filter lists.
  */
 int iplwrite(dev, uio, cp)
-	dev_t dev;
-	register struct uio *uio;
-	cred_t *cp;
+dev_t dev;
+register struct uio *uio;
+cred_t *cp;
 {
 #ifdef	IPFDEBUG
 	cmn_err(CE_CONT, "iplwrite(%x,%x,%x)\n", dev, uio, cp);
@@ -387,7 +387,7 @@ int iplwrite(dev, uio, cp)
  * requires a large amount of setting up and isn't any more efficient.
  */
 int fr_send_reset(fin)
-	fr_info_t *fin;
+fr_info_t *fin;
 {
 	tcphdr_t *tcp, *tcp2;
 	int tlen, hlen;
@@ -461,8 +461,8 @@ int fr_send_reset(fin)
 
 /*ARGSUSED*/
 static int fr_send_ip(fin, m, mpp)
-	fr_info_t *fin;
-	mblk_t *m, **mpp;
+fr_info_t *fin;
+mblk_t *m, **mpp;
 {
 #if !defined(_INET_IP_STACK_H)
 	qif_t *qif;
@@ -547,9 +547,9 @@ static int fr_send_ip(fin, m, mpp)
 
 
 int fr_send_icmp_err(type, fin, dst)
-	int type;
-	fr_info_t *fin;
-	int dst;
+int type;
+fr_info_t *fin;
+int dst;
 {
 #ifdef	USE_INET6
 	mblk_t *mb;
@@ -699,9 +699,9 @@ int fr_send_icmp_err(type, fin, dst)
  */
 /*ARGSUSED*/
 int fr_ifpaddr(v, atype, qifptr, inp, inpmask)
-	int v, atype;
-	void *qifptr;
-	struct in_addr *inp, *inpmask;
+int v, atype;
+void *qifptr;
+struct in_addr *inp, *inpmask;
 {
 #if !defined(_INET_IP_STACK_H)
 # ifdef	USE_INET6
@@ -809,7 +809,7 @@ int fr_ifpaddr(v, atype, qifptr, inp, inpmask)
 
 
 u_32_t fr_newisn(fin)
-	fr_info_t *fin;
+fr_info_t *fin;
 {
 	static int iss_seq_off = 0;
 	u_char hash[16];
@@ -855,7 +855,7 @@ u_32_t fr_newisn(fin)
 /* Returns the next IPv4 ID to use for this packet.                         */
 /* ------------------------------------------------------------------------ */
 u_short fr_nextipid(fin)
-	fr_info_t *fin;
+fr_info_t *fin;
 {
 	static u_short ipid = 0;
 	ipstate_t *is;
@@ -881,7 +881,7 @@ u_short fr_nextipid(fin)
 /* ARGSUSED */
 #endif
 INLINE void fr_checkv4sum(fin)
-	fr_info_t *fin;
+fr_info_t *fin;
 {
 #ifdef IPFILTER_CKSUM
 	if (fr_checkl4sum(fin) == -1)
@@ -895,7 +895,7 @@ INLINE void fr_checkv4sum(fin)
 /* ARGSUSED */
 # endif
 INLINE void fr_checkv6sum(fin)
-	fr_info_t *fin;
+fr_info_t *fin;
 {
 # ifdef IPFILTER_CKSUM
 	if (fr_checkl4sum(fin) == -1)
@@ -918,7 +918,7 @@ INLINE void fr_checkv6sum(fin)
  * against.
  */
 int fr_verifysrc(fin)
-	fr_info_t *fin;
+fr_info_t *fin;
 {
 	ire_t *dir;
 	int result;
@@ -1004,9 +1004,9 @@ void fr_slowtimer __P((void *ptr))
  *    address. Otherwise IP Packet's destination address is used
  */
 int fr_fastroute(mb, mpp, fin, fdp)
-	mblk_t *mb, **mpp;
-	fr_info_t *fin;
-	frdest_t *fdp;
+mblk_t *mb, **mpp;
+fr_info_t *fin;
+frdest_t *fdp;
 {
 	struct in_addr dst;
 	qpktinfo_t *qpi;
@@ -1178,9 +1178,9 @@ bad_fastroute:
 /* of buffers that starts at *fin->fin_mp.                                  */
 /* ------------------------------------------------------------------------ */
 void *fr_pullup(min, fin, len)
-	mb_t *min;
-	fr_info_t *fin;
-	int len;
+mb_t *min;
+fr_info_t *fin;
+int len;
 {
 	qpktinfo_t *qpi = fin->fin_qpi;
 	int out = fin->fin_out, dpoff, ipoff;
@@ -1281,7 +1281,7 @@ int ipf_inject(fr_info_t *fin, mb_t *m)
 
 
 static void ipf_fixl4sum(fin)
-	fr_info_t *fin;
+fr_info_t *fin;
 {
 	u_short *csump;
 	udphdr_t *udp;
@@ -1361,9 +1361,9 @@ static int pfil_sendbuf(void *ifp, mblk_t *mb, ip_t *ip, void *dstp)
 
 
 void mb_copydata(min, off, len, buf)
-	mblk_t *min;
-	size_t off, len;
-	char *buf;
+mblk_t *min;
+size_t off, len;
+char *buf;
 {
 	u_char *s, *bp = (u_char *)buf;
 	size_t mlen, olen, clen;
@@ -1392,9 +1392,9 @@ void mb_copydata(min, off, len, buf)
 
 
 void mb_copyback(min, off, len, buf)
-	mblk_t *min;
-	size_t off, len;
-	char *buf;
+mblk_t *min;
+size_t off, len;
+char *buf;
 {
 	u_char *s, *bp = (u_char *)buf;
 	size_t mlen, olen, clen;

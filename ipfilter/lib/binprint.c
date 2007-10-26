@@ -10,8 +10,8 @@
 
 
 void binprint(ptr, size)
-	void *ptr;
-	size_t size;
+void *ptr;
+size_t size;
 {
 	u_char *s;
 	int i, j;

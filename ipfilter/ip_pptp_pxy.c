@@ -83,9 +83,9 @@ void ippr_pptp_fini()
  * optimised into puts statements on FreeBSD (this doesn't exist in the kernel)
  */
 int ippr_pptp_new(fin, aps, nat)
-	fr_info_t *fin;
-	ap_session_t *aps;
-	nat_t *nat;
+fr_info_t *fin;
+ap_session_t *aps;
+nat_t *nat;
 {
 	pptp_pxy_t *pptp;
 	ipnat_t *ipn;
@@ -148,9 +148,9 @@ int ippr_pptp_new(fin, aps, nat)
 
 
 void ippr_pptp_donatstate(fin, nat, pptp)
-	fr_info_t *fin;
-	nat_t *nat;
-	pptp_pxy_t *pptp;
+fr_info_t *fin;
+nat_t *nat;
+pptp_pxy_t *pptp;
 {
 	fr_info_t fi;
 	grehdr_t gre;
@@ -236,10 +236,10 @@ void ippr_pptp_donatstate(fin, nat, pptp)
  * parsing function.
  */
 int ippr_pptp_nextmessage(fin, nat, pptp, rev)
-	fr_info_t *fin;
-	nat_t *nat;
-	pptp_pxy_t *pptp;
-	int rev;
+fr_info_t *fin;
+nat_t *nat;
+pptp_pxy_t *pptp;
+int rev;
 {
 	static const char *funcname = "ippr_pptp_nextmessage";
 	pptp_side_t *pptps;
@@ -360,10 +360,10 @@ int ippr_pptp_nextmessage(fin, nat, pptp, rev)
  * handle a complete PPTP message
  */
 int ippr_pptp_message(fin, nat, pptp, pptps)
-	fr_info_t *fin;
-	nat_t *nat;
-	pptp_pxy_t *pptp;
-	pptp_side_t *pptps;
+fr_info_t *fin;
+nat_t *nat;
+pptp_pxy_t *pptp;
+pptp_side_t *pptps;
 {
 	pptp_hdr_t *hdr = (pptp_hdr_t *)pptps->pptps_buffer;
 
@@ -384,10 +384,10 @@ int ippr_pptp_message(fin, nat, pptp, pptps)
  * handle a complete PPTP control message
  */
 int ippr_pptp_mctl(fin, nat, pptp, pptps)
-	fr_info_t *fin;
-	nat_t *nat;
-	pptp_pxy_t *pptp;
-	pptp_side_t *pptps;
+fr_info_t *fin;
+nat_t *nat;
+pptp_pxy_t *pptp;
+pptp_side_t *pptps;
 {
 	u_short *buffer = (u_short *)(pptps->pptps_buffer);
 	pptp_side_t *pptpo;
@@ -472,9 +472,9 @@ int ippr_pptp_mctl(fin, nat, pptp, pptps)
  * we can.  If they have disappeared, recreate them.
  */
 int ippr_pptp_inout(fin, aps, nat)
-	fr_info_t *fin;
-	ap_session_t *aps;
-	nat_t *nat;
+fr_info_t *fin;
+ap_session_t *aps;
+nat_t *nat;
 {
 	pptp_pxy_t *pptp;
 	tcphdr_t *tcp;
@@ -504,7 +504,7 @@ int ippr_pptp_inout(fin, aps, nat)
  * clean up after ourselves.
  */
 void ippr_pptp_del(aps)
-	ap_session_t *aps;
+ap_session_t *aps;
 {
 	pptp_pxy_t *pptp;
 

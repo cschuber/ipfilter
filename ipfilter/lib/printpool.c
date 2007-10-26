@@ -10,10 +10,10 @@
 #define	FPRINTF	(void)fprintf
 
 ip_pool_t *printpool(pp, copyfunc, name, opts)
-	ip_pool_t *pp;
-	copyfunc_t copyfunc;
-	char *name;
-	int opts;
+ip_pool_t *pp;
+copyfunc_t copyfunc;
+char *name;
+int opts;
 {
 	ip_pool_node_t *ipnp, *ipnpn, ipn;
 	ip_pool_t ipp;

@@ -13,7 +13,7 @@
  * the inet_ntop() library.
  */
 void printpacket6(ip)
-	struct ip *ip;
+struct ip *ip;
 {
 	u_char *buf, p;
 	u_short plen, *addrs;

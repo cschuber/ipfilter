@@ -220,9 +220,9 @@ ipfrstat_t *fr_fragstats()
 /* through this box, with the result of the filter operation.               */
 /* ------------------------------------------------------------------------ */
 static ipfr_t *ipfr_newfrag(fin, pass, table)
-	fr_info_t *fin;
-	u_32_t pass;
-	ipfr_t *table[];
+fr_info_t *fin;
+u_32_t pass;
+ipfr_t *table[];
 {
 	ipfr_t *fra, frag;
 	u_int idx, off;
@@ -322,8 +322,8 @@ static ipfr_t *ipfr_newfrag(fin, pass, table)
 /* Add a new entry to the fragment cache table based on the current packet  */
 /* ------------------------------------------------------------------------ */
 int fr_newfrag(fin, pass)
-	u_32_t pass;
-	fr_info_t *fin;
+u_32_t pass;
+fr_info_t *fin;
 {
 	ipfr_t	*fra;
 
@@ -355,9 +355,9 @@ int fr_newfrag(fin, pass)
 /* the NAT structure for this "session".                                    */
 /* ------------------------------------------------------------------------ */
 int fr_nat_newfrag(fin, pass, nat)
-	fr_info_t *fin;
-	u_32_t pass;
-	nat_t *nat;
+fr_info_t *fin;
+u_32_t pass;
+nat_t *nat;
 {
 	ipfr_t	*fra;
 
@@ -389,8 +389,8 @@ int fr_nat_newfrag(fin, pass, nat)
 /* pointer, the new IP ID value.                                            */
 /* ------------------------------------------------------------------------ */
 int fr_ipid_newfrag(fin, ipid)
-	fr_info_t *fin;
-	u_32_t ipid;
+fr_info_t *fin;
+u_32_t ipid;
 {
 	ipfr_t	*fra;
 
@@ -422,8 +422,8 @@ int fr_ipid_newfrag(fin, ipid)
 /* packet with its filter result known.                                     */
 /* ------------------------------------------------------------------------ */
 static ipfr_t *fr_fraglookup(fin, table)
-	fr_info_t *fin;
-	ipfr_t *table[];
+fr_info_t *fin;
+ipfr_t *table[];
 {
 	ipfr_t *f, frag;
 	u_int idx;
@@ -540,7 +540,7 @@ static ipfr_t *fr_fraglookup(fin, table)
 /* Functional interface for NAT lookups of the NAT fragment cache           */
 /* ------------------------------------------------------------------------ */
 nat_t *fr_nat_knownfrag(fin)
-	fr_info_t *fin;
+fr_info_t *fin;
 {
 	nat_t	*nat;
 	ipfr_t	*ipf;
@@ -574,7 +574,7 @@ nat_t *fr_nat_knownfrag(fin)
 /* Functional interface for IP ID lookups of the IP ID fragment cache       */
 /* ------------------------------------------------------------------------ */
 u_32_t fr_ipid_knownfrag(fin)
-	fr_info_t *fin;
+fr_info_t *fin;
 {
 	ipfr_t	*ipf;
 	u_32_t	id;
@@ -605,8 +605,8 @@ u_32_t fr_ipid_knownfrag(fin)
 /* that if FR_LOGFIRST is set, reset FR_LOG.                                */
 /* ------------------------------------------------------------------------ */
 frentry_t *fr_knownfrag(fin, passp)
-	fr_info_t *fin;
-	u_32_t *passp;
+fr_info_t *fin;
+u_32_t *passp;
 {
 	frentry_t *fr = NULL;
 	ipfr_t	*fra;
@@ -641,7 +641,7 @@ frentry_t *fr_knownfrag(fin, passp)
 /* is found to match ptr, reset it to NULL.                                 */
 /* ------------------------------------------------------------------------ */
 void fr_forget(ptr)
-	void *ptr;
+void *ptr;
 {
 	ipfr_t	*fr;
 
@@ -662,7 +662,7 @@ void fr_forget(ptr)
 /* pointer  is found to match ptr, reset it to NULL.                        */
 /* ------------------------------------------------------------------------ */
 void fr_forgetnat(ptr)
-	void *ptr;
+void *ptr;
 {
 	ipfr_t	*fr;
 
@@ -686,7 +686,7 @@ void fr_forgetnat(ptr)
 /* result of decreasing the reference count.                                */
 /* ------------------------------------------------------------------------ */
 static void fr_fragdelete(fra, tail)
-	ipfr_t *fra, ***tail;
+ipfr_t *fra, ***tail;
 {
 
 	if (fra->ipfr_next)
@@ -717,7 +717,7 @@ static void fr_fragdelete(fra, tail)
 /* cache.  Currently this just means bumping stats correctly after freeing  */
 /* ------------------------------------------------------------------------ */
 static void fr_fragfree(fra)
-	ipfr_t *fra;
+ipfr_t *fra;
 {
 	KFREE(fra);
 	ipfr_stats.ifs_expire++;
@@ -908,11 +908,11 @@ int fr_nextfrag(token, itp, top, tail
 , lock
 #endif
 )
-	ipftoken_t *token;
-	ipfgeniter_t *itp;
-	ipfr_t **top, ***tail;
+ipftoken_t *token;
+ipfgeniter_t *itp;
+ipfr_t **top, ***tail;
 #ifdef USE_MUTEXES
-	ipfrwlock_t *lock;
+ipfrwlock_t *lock;
 #endif
 {
 	ipfr_t *frag, *next, zero;
@@ -972,9 +972,9 @@ void fr_fragderef(frp
 , lock
 #endif
 )
-	ipfr_t **frp;
+ipfr_t **frp;
 #ifdef USE_MUTEXES
-	ipfrwlock_t *lock;
+ipfrwlock_t *lock;
 #endif
 {
 	ipfr_t *fra;

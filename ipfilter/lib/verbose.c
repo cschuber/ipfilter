@@ -21,8 +21,8 @@
 void	verbose(char *fmt, ...)
 #else
 void	verbose(fmt, va_alist)
-	char	*fmt;
-	va_dcl
+char	*fmt;
+va_dcl
 #endif
 {
 	va_list pvar;

@@ -10,10 +10,10 @@
 
 
 int addipopt(op, io, len, class)
-	char *op;
-	struct ipopt_names *io;
-	int len;
-	char *class;
+char *op;
+struct ipopt_names *io;
+int len;
+char *class;
 {
 	int olen = len;
 	struct in_addr ipadr;

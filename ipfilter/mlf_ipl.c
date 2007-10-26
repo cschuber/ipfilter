@@ -190,8 +190,8 @@ static char *ipf_devfiles[] = { IPL_NAME, IPL_NAT, IPL_STATE, IPL_AUTH,
 extern	int	lkmenodev __P((void));
 
 static int iplaction(lkmtp, cmd)
-	struct lkm_table *lkmtp;
-	int cmd;
+struct lkm_table *lkmtp;
+int cmd;
 {
 #if !defined(__FreeBSD_version) || (__FreeBSD_version < 220000)
 	int i = ipl_major;
@@ -291,8 +291,8 @@ static int if_ipl_remove __P((void))
 
 
 static int if_ipl_unload(lkmtp, cmd)
-	struct lkm_table *lkmtp;
-	int cmd;
+struct lkm_table *lkmtp;
+int cmd;
 {
 	int error = 0;
 
@@ -304,8 +304,8 @@ static int if_ipl_unload(lkmtp, cmd)
 
 
 static int if_ipl_load(lkmtp, cmd)
-	struct lkm_table *lkmtp;
-	int cmd;
+struct lkm_table *lkmtp;
+int cmd;
 {
 	struct nameidata nd;
 	struct vattr vattr;
@@ -352,7 +352,7 @@ static int if_ipl_load(lkmtp, cmd)
  * strlen isn't present in 2.1.* kernels.
  */
 size_t strlen(string)
-	char *string;
+char *string;
 {
 	register char *s;
 
@@ -363,8 +363,8 @@ size_t strlen(string)
 
 
 int xxxinit(lkmtp, cmd, ver)
-	struct lkm_table *lkmtp;
-	int cmd, ver;
+struct lkm_table *lkmtp;
+int cmd, ver;
 {
 	DISPATCH(lkmtp, cmd, ver, iplaction, iplaction, iplaction);
 }
@@ -393,8 +393,8 @@ int if_ipl __P((struct lkm_table *, int, int));
 
 
 int if_ipl(lkmtp, cmd, ver)
-	struct lkm_table *lkmtp;
-	int cmd, ver;
+struct lkm_table *lkmtp;
+int cmd, ver;
 {
 #  if (__FreeBSD_version >= 300000)
 	MOD_DISPATCH(if_ipl, lkmtp, cmd, ver, iplaction, iplaction, iplaction);

@@ -49,10 +49,10 @@ static int find_port __P((int, void *, int datlen, int *, u_short *));
 
 
 static int find_port(ipaddr, data, datlen, off, port)
-	int ipaddr;
-	void * data;
-	int datlen, *off;
-	unsigned short *port;
+int ipaddr;
+void * data;
+int datlen, *off;
+unsigned short *port;
 {
 	u_32_t addr, netaddr;
 	u_char *dp;
@@ -103,9 +103,9 @@ void ippr_h323_fini()
 
 
 int ippr_h323_new(fin, aps, nat)
-	fr_info_t *fin;
-	ap_session_t *aps;
-	nat_t *nat;
+fr_info_t *fin;
+ap_session_t *aps;
+nat_t *nat;
 {
 	fin = fin;	/* LINT */
 	nat = nat;	/* LINT */
@@ -118,7 +118,7 @@ int ippr_h323_new(fin, aps, nat)
 
 
 void ippr_h323_del(aps)
-	ap_session_t *aps;
+ap_session_t *aps;
 {
 	int i;
 	ipnat_t *ipn;
@@ -150,9 +150,9 @@ void ippr_h323_del(aps)
 
 
 int ippr_h323_in(fin, aps, nat)
-	fr_info_t *fin;
-	ap_session_t *aps;
-	nat_t *nat;
+fr_info_t *fin;
+ap_session_t *aps;
+nat_t *nat;
 {
 	int ipaddr, off, datlen;
 	unsigned short port;
@@ -216,9 +216,9 @@ int ippr_h323_in(fin, aps, nat)
 
 
 int ippr_h245_new(fin, aps, nat)
-	fr_info_t *fin;
-	ap_session_t *aps;
-	nat_t *nat;
+fr_info_t *fin;
+ap_session_t *aps;
+nat_t *nat;
 {
 	fin = fin;	/* LINT */
 	nat = nat;	/* LINT */
@@ -230,9 +230,9 @@ int ippr_h245_new(fin, aps, nat)
 
 
 int ippr_h245_out(fin, aps, nat)
-	fr_info_t *fin;
-	ap_session_t *aps;
-	nat_t *nat;
+fr_info_t *fin;
+ap_session_t *aps;
+nat_t *nat;
 {
 	int ipaddr, off, datlen;
 	tcphdr_t *tcp;

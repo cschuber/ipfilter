@@ -13,10 +13,10 @@
 
 
 iphtable_t *printhash_live(hp, fd, name, opts)
-	iphtable_t *hp;
-	int fd;
-	char *name;
-	int opts;
+iphtable_t *hp;
+int fd;
+char *name;
+int opts;
 {
 	iphtent_t entry, *top, *node;
 	ipflookupiter_t iter;

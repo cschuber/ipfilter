@@ -13,7 +13,7 @@
 #include "netinet/ipl.h"
 
 int checkrev(ipfname)
-	char *ipfname;
+char *ipfname;
 {
 	static int vfd = -1;
 	struct friostat fio, *fiop = &fio;

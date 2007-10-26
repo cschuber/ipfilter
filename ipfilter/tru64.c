@@ -253,11 +253,11 @@ cfg_subsys_attr_t ipfilter_attributes[] = {
  *          ESUCCESS for success
  *--------------------------------------------------------*/
 cfg_status_t ipfilter_configure(op, indata, indata_size, outdata, outdata_size)
-	cfg_op_t op;
-	caddr_t indata;
-	ulong indata_size;
-	caddr_t outdata;
-	ulong outdata_size;
+cfg_op_t op;
+caddr_t indata;
+ulong indata_size;
+caddr_t outdata;
+ulong outdata_size;
 {
 	int ipfilter_cfg_state;
 	cfg_attr_t *attr_ptr;
@@ -403,7 +403,7 @@ cfg_status_t ipfilter_configure(op, indata, indata_size, outdata, outdata_size)
 
 
 void ipfilter_configure_callback(conf, order, arg, evarg)
-	int conf, order, arg, evarg;
+int conf, order, arg, evarg;
 {
 	int status;
 
@@ -430,7 +430,7 @@ void ipfilter_configure_callback(conf, order, arg, evarg)
  * processing at a later time (if necesary).
 */
 void ipfilter_ip_input(m)
-	struct mbuf *m;
+struct mbuf *m;
 {
 	struct mbuf *m0;
 	struct ip *ip;
@@ -545,11 +545,11 @@ bad:
  * time (if necesary).
  */
 int ipfilter_ip_output(ifp, m, in_ro, flags, imo)
-	struct ifnet *ifp;
-	struct mbuf *m;
-	struct in_route *in_ro;
-	int flags;
-	struct ip_moptions *imo;
+struct ifnet *ifp;
+struct mbuf *m;
+struct in_route *in_ro;
+int flags;
+struct ip_moptions *imo;
 {
 	struct ip *ip;
 	int hlen;
@@ -588,10 +588,10 @@ int ipfilter_ip_output(ifp, m, in_ro, flags, imo)
  * changes on the interfaces.
  */
 void ipfilter_in_control(so, cmd, data, ifp)
-	struct socket *so;
-	u_int cmd;
-	caddr_t *data;
-	struct ifnet *ifp;
+struct socket *so;
+u_int cmd;
+caddr_t *data;
+struct ifnet *ifp;
 {
 #ifdef	IPFDEBUG
 	printf("ipfilter_in_control(%x,%x,%x,%x)\n", so, cmd, data, ifp);
@@ -879,9 +879,9 @@ void ipfilter_ifdetach(void)
  * Routine to handle protocol ioctls
  */
 int ipfilter_ifioctl(ifp, cmd, data)
-	register struct ifnet *ifp;
-	unsigned int cmd;
-	caddr_t data;
+register struct ifnet *ifp;
+unsigned int cmd;
+caddr_t data;
 {
 	return(EOPNOTSUPP);
 }
@@ -889,14 +889,14 @@ int ipfilter_ifioctl(ifp, cmd, data)
 /* Stub output routine.  Should never be called, but just in case... */
 #if TRU64 >= 1885
 int ipfilter_ifoutput(ifp, m0, dst, rt, cp)
-	char *cp;
+char *cp;
 #else
 int ipfilter_ifoutput(ifp, m0, dst, rt)
 #endif
-	struct ifnet *ifp;
-	struct mbuf *m0;
-	struct sockaddr *dst;
-	struct rtentry *rt;
+struct ifnet *ifp;
+struct mbuf *m0;
+struct sockaddr *dst;
+struct rtentry *rt;
 {
 	return(EOPNOTSUPP);
 }

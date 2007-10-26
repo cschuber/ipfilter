@@ -9,7 +9,7 @@
 
 
 u_32_t getoptbyname(optname)
-	char *optname;
+char *optname;
 {
 	struct ipopt_names *io;
 
@@ -21,7 +21,7 @@ u_32_t getoptbyname(optname)
 
 
 u_32_t getoptbyvalue(optval)
-	int optval;
+int optval;
 {
 	struct ipopt_names *io;
 

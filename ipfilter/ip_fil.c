@@ -186,10 +186,10 @@ int ipfdetach()
  * Filter ioctl interface.
  */
 int iplioctl(dev, cmd, data, mode)
-	int dev;
-	ioctlcmd_t cmd;
-	caddr_t data;
-	int mode;
+int dev;
+ioctlcmd_t cmd;
+caddr_t data;
+int mode;
 {
 	int error = 0, unit = 0, uid;
 	SPL_INT(s);
@@ -211,7 +211,7 @@ int iplioctl(dev, cmd, data, mode)
 
 
 void fr_forgetifp(ifp)
-	void *ifp;
+void *ifp;
 {
 	register frentry_t *f;
 
@@ -252,15 +252,15 @@ static int no_output(ifp, m, s)
 #else
 # if TRU64 >= 1885
 static int no_output (ifp, m, s, rt, cp)
-	char *cp;
+char *cp;
 # else
 static int no_output(ifp, m, s, rt)
 # endif
-	struct rtentry *rt;
+struct rtentry *rt;
 #endif
-	struct ifnet *ifp;
-	struct mbuf *m;
-	struct sockaddr *s;
+struct ifnet *ifp;
+struct mbuf *m;
+struct sockaddr *s;
 {
 	return 0;
 }
@@ -271,15 +271,15 @@ static int write_output(ifp, m, s)
 #else
 # if TRU64 >= 1885
 static int write_output (ifp, m, s, rt, cp)
-	char *cp;
+char *cp;
 # else
 static int write_output(ifp, m, s, rt)
 # endif
-	struct rtentry *rt;
+struct rtentry *rt;
 #endif
-	struct ifnet *ifp;
-	struct mbuf *m;
-	struct sockaddr *s;
+struct ifnet *ifp;
+struct mbuf *m;
+struct sockaddr *s;
 {
 	char fname[32];
 	mb_t *mb;
@@ -308,8 +308,8 @@ static int write_output(ifp, m, s, rt)
 
 
 static void fr_setifpaddr(ifp, addr)
-	struct ifnet *ifp;
-	char *addr;
+struct ifnet *ifp;
+char *addr;
 {
 #ifdef __sgi
 	struct in_ifaddr *ifa;
@@ -354,8 +354,8 @@ static void fr_setifpaddr(ifp, addr)
 }
 
 struct ifnet *get_unit(name, v)
-	char *name;
-	int v;
+char *name;
+int v;
 {
 	struct ifnet *ifp, **ifpp, **old_ifneta;
 	char *addr;
@@ -458,7 +458,7 @@ struct ifnet *get_unit(name, v)
 
 
 char *get_ifname(ifp)
-	struct ifnet *ifp;
+struct ifnet *ifp;
 {
 	static char ifname[LIFNAMSIZ];
 
@@ -507,9 +507,9 @@ void init_ifp()
 
 
 int fr_fastroute(m, mpp, fin, fdp)
-	mb_t *m, **mpp;
-	fr_info_t *fin;
-	frdest_t *fdp;
+mb_t *m, **mpp;
+fr_info_t *fin;
+frdest_t *fdp;
 {
 	struct ifnet *ifp = fdp->fd_ifp;
 	ip_t *ip = fin->fin_ip;
@@ -566,7 +566,7 @@ done:
 
 
 int fr_send_reset(fin)
-	fr_info_t *fin;
+fr_info_t *fin;
 {
 	verbose("- TCP RST sent\n");
 	return 0;
@@ -574,9 +574,9 @@ int fr_send_reset(fin)
 
 
 int fr_send_icmp_err(type, fin, dst)
-	int type;
-	fr_info_t *fin;
-	int dst;
+int type;
+fr_info_t *fin;
+int dst;
 {
 	verbose("- ICMP unreachable sent\n");
 	return 0;
@@ -584,32 +584,32 @@ int fr_send_icmp_err(type, fin, dst)
 
 
 void frsync(ifp)
-	void *ifp;
+void *ifp;
 {
 	return;
 }
 
 
 void m_freem(m)
-	mb_t *m;
+mb_t *m;
 {
 	return;
 }
 
 
 void m_copydata(m, off, len, cp)
-	mb_t *m;
-	int off, len;
-	caddr_t cp;
+mb_t *m;
+int off, len;
+caddr_t cp;
 {
 	bcopy((char *)m + off, cp, len);
 }
 
 
 int ipfuiomove(buf, len, rwflag, uio)
-	caddr_t buf;
-	int len, rwflag;
-	struct uio *uio;
+caddr_t buf;
+int len, rwflag;
+struct uio *uio;
 {
 	int left, ioc, num, offset;
 	struct iovec *io;
@@ -647,7 +647,7 @@ int ipfuiomove(buf, len, rwflag, uio)
 
 
 u_32_t fr_newisn(fin)
-	fr_info_t *fin;
+fr_info_t *fin;
 {
 	static int iss_seq_off = 0;
 	u_char hash[16];
@@ -693,7 +693,7 @@ u_32_t fr_newisn(fin)
 /* Returns the next IPv4 ID to use for this packet.                         */
 /* ------------------------------------------------------------------------ */
 INLINE u_short fr_nextipid(fin)
-	fr_info_t *fin;
+fr_info_t *fin;
 {
 	static u_short ipid = 0;
 	u_short id;
@@ -707,7 +707,7 @@ INLINE u_short fr_nextipid(fin)
 
 
 INLINE void fr_checkv4sum(fin)
-	fr_info_t *fin;
+fr_info_t *fin;
 {
 	if (fr_checkl4sum(fin) == -1)
 		fin->fin_flx |= FI_BAD;
@@ -716,7 +716,7 @@ INLINE void fr_checkv4sum(fin)
 
 #ifdef	USE_INET6
 INLINE void fr_checkv6sum(fin)
-	fr_info_t *fin;
+fr_info_t *fin;
 {
 	if (fr_checkl4sum(fin) == -1)
 		fin->fin_flx |= FI_BAD;
@@ -728,8 +728,8 @@ INLINE void fr_checkv6sum(fin)
  * See above for description, except that all addressing is in user space.
  */
 int copyoutptr(src, dst, size)
-	void *src, *dst;
-	size_t size;
+void *src, *dst;
+size_t size;
 {
 	caddr_t ca;
 
@@ -743,8 +743,8 @@ int copyoutptr(src, dst, size)
  * See above for description, except that all addressing is in user space.
  */
 int copyinptr(src, dst, size)
-	void *src, *dst;
-	size_t size;
+void *src, *dst;
+size_t size;
 {
 	caddr_t ca;
 
@@ -758,9 +758,9 @@ int copyinptr(src, dst, size)
  * return the first IP Address associated with an interface
  */
 int fr_ifpaddr(v, atype, ifptr, inp, inpmask)
-	int v, atype;
-	void *ifptr;
-	struct in_addr *inp, *inpmask;
+int v, atype;
+void *ifptr;
+struct in_addr *inp, *inpmask;
 {
 	struct ifnet *ifp = ifptr;
 #ifdef __sgi
