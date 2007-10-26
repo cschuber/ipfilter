@@ -187,7 +187,7 @@ if [ $cpu = i386 -a $solrev -lt 10 ] ; then
 	if [ -n "$BPFILTER" ] ; then
 		BPF="BPFILTER=./$BPFILTER"
 	fi
-	$MAKE $MAKEFLAGS ${1+"$@"} sunos5x86 SOLARIS2="-DSOLARIS2=$solrev" CPU= CPUDIR=${cpudir} CC="$CC $XARCH32" XARCH="$XARCH32" ARCHINC="$ARCHINC32" BITS=32 OBJ=. $BPF
+	$MAKE $MAKEFLAGS ${1+"$@"} sunos5 SOLARIS2="-DSOLARIS2=$solrev" CPU= CPUDIR=${cpudir} CC="$CC $XARCH32" XARCH="$XARCH32" ARCHINC="$ARCHINC32" BITS=32 OBJ=. $BPF
 	exit $?
 fi
 if [ x$solrev = x ] ; then
