@@ -527,6 +527,10 @@ fr_info_t *fin;
 }
 
 
+/*  
+ * min - pointer to mbuf where the IP packet starts  
+ * mpp - pointer to the mbuf pointer that is the start of the mbuf chain  
+ */  
 /*ARGSUSED*/
 int fr_fastroute(min, mp, fin, fdp)
 mb_t *min, **mp;

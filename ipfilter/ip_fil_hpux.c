@@ -794,6 +794,10 @@ int len;
 }
 
 
+/*  
+ * m0 - pointer to mbuf where the IP packet starts  
+ * mpp - pointer to the mbuf pointer that is the start of the mbuf chain  
+ */  
 int fr_fastroute(mb, mpp, fin, fdp)
 mblk_t *mb, **mpp;
 fr_info_t *fin;
