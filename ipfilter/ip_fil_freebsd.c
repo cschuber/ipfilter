@@ -345,16 +345,13 @@ int mode;
 	}
 
 	SPL_NET(s);
-	READ_ENTER(&ipf_global);
 
 	error = fr_ioctlswitch(unit, data, cmd, mode, p->p_uid, p);
 	if (error != -1) {
-		RWLOCK_EXIT(&ipf_global);
 		SPL_X(s);
 		return error;
 	}
 
-	RWLOCK_EXIT(&ipf_global);
 	SPL_X(s);
 
 	return error;

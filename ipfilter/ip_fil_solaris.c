@@ -247,16 +247,12 @@ int *rp;
 			return EIO;
 	}
 
-	READ_ENTER(&ipf_global);
-
 	error = fr_ioctlswitch(unit, (caddr_t)data, cmd, mode,
 			       cp->cr_uid, curproc);
 	if (error != -1) {
-		RWLOCK_EXIT(&ipf_global);
 		return error;
 	}
 
-	RWLOCK_EXIT(&ipf_global);
 	return error;
 }
 
