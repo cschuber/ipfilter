@@ -375,7 +375,11 @@ ipfattach()
 	SPL_X(s);
 
 #if (__NetBSD_Version__ >= 104010000)
+# if (__NetBSD_Version__ >= 499002000)
+	callout_init(&ipf_slowtimer_ch, 0);
+# else
 	callout_init(&ipf_slowtimer_ch);
+# endif
 	callout_reset(&ipf_slowtimer_ch, (hz / IPF_HZ_DIVIDE) * IPF_HZ_MULT,
 		     ipf_slowtimer, NULL);
 #else
