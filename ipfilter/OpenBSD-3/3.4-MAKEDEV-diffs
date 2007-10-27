@@ -604,8 +604,8 @@ diff -c -r1.106 MAKEDEV
 *** etc/etc.sparc/MAKEDEV	6 Jan 2003 17:19:59 -0000	1.106
 --- etc/etc.sparc/MAKEDEV	8 Jun 2003 07:40:34 -0000
 ***************
-*** 60,65 ****
---- 60,66 ----
+*** 67,72 ****
+--- 67,73 ----
   #	audio*	audio device
   #	openprom	
   #	bpf*	Berkeley Packet Filter
@@ -614,8 +614,8 @@ diff -c -r1.106 MAKEDEV
   #	lkm	loadable kernel modules interface
   #	tun*	network tunnel driver
 ***************
-*** 286,291 ****
---- 287,299 ----
+*** 288,293 ****
+--- 289,301 ----
   	M lkm c 112 0 640 _lkm
   	;;
   
@@ -630,22 +630,15 @@ diff -c -r1.106 MAKEDEV
   	M pf c 59 0 600
   	;;
 ***************
-*** 472,478 ****
-  	R fd0C fd0D fd0E fd0F fd0G fd0H xfs0 ss0 ss1 ch0 ses0 cuaa
-  	R cuab cuac cuad ttya ttyb ttyc ttyd wscons audio0 uk0 random
-  	R lkm pf systrace xd0 xd1 xd2 xd3 raid0 raid1 raid2 raid3 std
-! 	R st0 st1 fd
+*** 474,479 ****
+--- 482,488 ----
+  	R fd0F fd0G fd0H xfs0 ss0 ss1 ch0 ses0 cuaa cuab cuac cuad
+  	R ttya ttyb ttyc ttyd wscons audio0 uk0 random lkm pf systrace
+  	R xd0 xd1 xd2 xd3 raid0 raid1 raid2 raid3 std st0 st1 fd
++ 	R ipl
   	;;
   
-  presto*|xd*|xy*|sd*|raid*|ccd*)
---- 480,486 ----
-  	R fd0C fd0D fd0E fd0F fd0G fd0H xfs0 ss0 ss1 ch0 ses0 cuaa
-  	R cuab cuac cuad ttya ttyb ttyc ttyd wscons audio0 uk0 random
-  	R lkm pf systrace xd0 xd1 xd2 xd3 raid0 raid1 raid2 raid3 std
-! 	R st0 st1 fd ipl
-  	;;
-  
-  presto*|xd*|xy*|sd*|raid*|ccd*)
+  xd*|xy*|sd*|raid*|ccd*)
 Index: etc/etc.sparc/MAKEDEV.md
 ===================================================================
 RCS file: /cvs/src/etc/etc.sparc/MAKEDEV.md,v
@@ -674,8 +667,8 @@ diff -c -r1.78 MAKEDEV
 *** etc/etc.sparc64/MAKEDEV	6 Jan 2003 17:19:59 -0000	1.78
 --- etc/etc.sparc64/MAKEDEV	8 Jun 2003 07:40:35 -0000
 ***************
-*** 76,81 ****
---- 76,82 ----
+*** 84,89 ****
+--- 84,90 ----
   #	ss*	SCSI scanners
   #	uk*	SCSI Unknown device
   #	audio*	audio device
@@ -684,8 +677,8 @@ diff -c -r1.78 MAKEDEV
   #	bpf*	Berkeley Packet Filter
   #	tun*	network tunnel driver
 ***************
-*** 314,319 ****
---- 315,327 ----
+*** 317,322 ****
+--- 318,330 ----
   	M bpf$U c 105 $U 600
   	;;
   
@@ -700,19 +693,19 @@ diff -c -r1.78 MAKEDEV
   	M pf c 73 0 600
   	;;
 ***************
-*** 558,564 ****
-  	R ccd2 ccd3 wscons pci usbs audio0 uk0 random lpa0 lpa1 lpa2
-  	R lpt0 lpt1 lpt2 lkm tty00 tty01 tty02 tty03 ttyh0 ttyh1
-  	R crypto pf systrace wd0 wd1 wd2 wd3 raid0 raid1 raid2 raid3
-! 	R std st0 st1 fd
+*** 561,567 ****
+  	R ccd3 wscons pci usbs audio0 uk0 random lpa0 lpa1 lpa2 lpt0
+  	R lpt1 lpt2 lkm tty00 tty01 tty02 tty03 ttyh0 ttyh1 crypto pf
+  	R systrace wd0 wd1 wd2 wd3 raid0 raid1 raid2 raid3 std st0 st1
+! 	R fd
   	;;
   
   wd*|sd*|raid*|ccd*)
---- 566,572 ----
-  	R ccd2 ccd3 wscons pci usbs audio0 uk0 random lpa0 lpa1 lpa2
-  	R lpt0 lpt1 lpt2 lkm tty00 tty01 tty02 tty03 ttyh0 ttyh1
-  	R crypto pf systrace wd0 wd1 wd2 wd3 raid0 raid1 raid2 raid3
-! 	R std st0 st1 fd ipl
+--- 569,575 ----
+  	R ccd3 wscons pci usbs audio0 uk0 random lpa0 lpa1 lpa2 lpt0
+  	R lpt1 lpt2 lkm tty00 tty01 tty02 tty03 ttyh0 ttyh1 crypto pf
+  	R systrace wd0 wd1 wd2 wd3 raid0 raid1 raid2 raid3 std st0 st1
+! 	R ipl fd
   	;;
   
   wd*|sd*|raid*|ccd*)
