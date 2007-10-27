@@ -188,8 +188,8 @@ extern	int		pfil_delayed_copy;
 
 static	nat_t	*ipf_nat_clone __P((fr_info_t *, nat_t *));
 static	int	ipf_nat_flush_entry __P((void *));
-static	int	ipf_nat_getent __P((caddr_t));
-static	int	ipf_nat_getsz __P((caddr_t));
+static	int	ipf_nat_getent __P((caddr_t, int));
+static	int	ipf_nat_getsz __P((caddr_t, int));
 static	int	ipf_nat_putent __P((caddr_t, int));
 static	void	ipf_nat_addencap __P((ipnat_t *));
 static	void	ipf_nat_addnat __P((struct ipnat *));
@@ -977,20 +977,23 @@ ipf_nat_ioctl(data, cmd, mode, uid, ctx)
 	    {
 		natlookup_t nl;
 
-		if (getlock) {
-			READ_ENTER(&ipf_nat);
-		}
 		error = ipf_inobj(data, &nl, IPFOBJ_NATLOOKUP);
 		if (error == 0) {
-			if (ipf_nat_lookupredir(&nl) != NULL) {
+			void *ptr;
+
+			if (getlock) {
+				READ_ENTER(&ipf_nat);
+			}
+			ptr = ipf_nat_lookupredir(&nl);
+			if (getlock) {
+				RWLOCK_EXIT(&ipf_nat);
+			}
+			if (ptr != NULL) {
 				error = ipf_outobj(data, &nl, IPFOBJ_NATLOOKUP);
 			} else {
 				ipf_interror = 60011;
 				error = ESRCH;
 			}
-		}
-		if (getlock) {
-			RWLOCK_EXIT(&ipf_nat);
 		}
 		break;
 	    }
@@ -1068,13 +1071,7 @@ ipf_nat_ioctl(data, cmd, mode, uid, ctx)
 
 	case SIOCSTGSZ :
 		if (ipf_nat_lock) {
-			if (getlock) {
-				READ_ENTER(&ipf_nat);
-			}
-			error = ipf_nat_getsz(data);
-			if (getlock) {
-				RWLOCK_EXIT(&ipf_nat);
-			}
+			error = ipf_nat_getsz(data, getlock);
 		} else {
 			ipf_interror = 60017;
 			error = EACCES;
@@ -1083,13 +1080,7 @@ ipf_nat_ioctl(data, cmd, mode, uid, ctx)
 
 	case SIOCSTGET :
 		if (ipf_nat_lock) {
-			if (getlock) {
-				READ_ENTER(&ipf_nat);
-			}
-			error = ipf_nat_getent(data);
-			if (getlock) {
-				RWLOCK_EXIT(&ipf_nat);
-			}
+			error = ipf_nat_getent(data, getlock);
 		} else {
 			ipf_interror = 60018;
 			error = EACCES;
@@ -1386,8 +1377,10 @@ ipf_nat_siocdelnat(n, np, getlock)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_nat_getsz                                               */
 /* Returns:     int - 0 == success, != 0 is the error value.                */
-/* Parameters:  data(I) - pointer to natget structure with kernel pointer   */
-/*                        get the size of.                                  */
+/* Parameters:  data(I)    - pointer to natget structure with kernel        */
+/*                           pointer get the size of.                       */
+/*              getlock(I) - flag indicating whether or not the caller      */
+/*                           holds a lock on ipf_nat                        */
 /*                                                                          */
 /* Handle SIOCSTGSZ.                                                        */
 /* Return the size of the nat list entry to be copied back to user space.   */
@@ -1395,8 +1388,9 @@ ipf_nat_siocdelnat(n, np, getlock)
 /* structure is copied back to the user.                                    */
 /* ------------------------------------------------------------------------ */
 static int
-ipf_nat_getsz(data)
+ipf_nat_getsz(data, getlock)
 	caddr_t data;
+	int getlock;
 {
 	ap_session_t *aps;
 	nat_t *nat, *n;
@@ -1409,6 +1403,10 @@ ipf_nat_getsz(data)
 		return EFAULT;
 	}
 
+	if (getlock) {
+		READ_ENTER(&ipf_nat);
+	}
+
 	nat = ng.ng_ptr;
 	if (!nat) {
 		nat = ipf_nat_instances;
@@ -1417,6 +1415,9 @@ ipf_nat_getsz(data)
 		 * Empty list so the size returned is 0.  Simple.
 		 */
 		if (nat == NULL) {
+			if (getlock) {
+				RWLOCK_EXIT(&ipf_nat);
+			}
 			error = BCOPYOUT(&ng, data, sizeof(ng));
 			if (error != 0) {
 				ipf_interror = 60025;
@@ -1434,6 +1435,9 @@ ipf_nat_getsz(data)
 			if (n == nat)
 				break;
 		if (n == NULL) {
+			if (getlock) {
+				RWLOCK_EXIT(&ipf_nat);
+			}
 			ipf_interror = 60026;
 			return ESRCH;
 		}
@@ -1449,6 +1453,9 @@ ipf_nat_getsz(data)
 		if (aps->aps_data != 0)
 			ng.ng_sz += aps->aps_psiz;
 	}
+	if (getlock) {
+		RWLOCK_EXIT(&ipf_nat);
+	}
 
 	error = BCOPYOUT(&ng, data, sizeof(ng));
 	if (error != 0) {
@@ -1462,16 +1469,19 @@ ipf_nat_getsz(data)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_nat_getent                                              */
 /* Returns:     int - 0 == success, != 0 is the error value.                */
-/* Parameters:  data(I) - pointer to natget structure with kernel pointer   */
-/*                        to NAT structure to copy out.                     */
+/* Parameters:  data(I)    - pointer to natget structure with kernel pointer*/
+/*                           to NAT structure to copy out.                  */
+/*              getlock(I) - flag indicating whether or not the caller      */
+/*                           holds a lock on ipf_nat                        */
 /*                                                                          */
 /* Handle SIOCSTGET.                                                        */
 /* Copies out NAT entry to user space.  Any additional data held for a      */
 /* proxy is also copied, as to is the NAT rule which was responsible for it */
 /* ------------------------------------------------------------------------ */
 static int
-ipf_nat_getent(data)
+ipf_nat_getent(data, getlock)
 	caddr_t data;
+	int getlock;
 {
 	int error, outsize;
 	ap_session_t *aps;
@@ -1491,6 +1501,10 @@ ipf_nat_getent(data)
 	if (ipn == NULL) {
 		ipf_interror = 60029;
 		return ENOMEM;
+	}
+
+	if (getlock) {
+		READ_ENTER(&ipf_nat);
 	}
 
 	ipn->ipn_dsize = ipns.ipn_dsize;
@@ -1569,10 +1583,17 @@ ipf_nat_getent(data)
 		}
 	}
 	if (error == 0) {
+		if (getlock) {
+			READ_ENTER(&ipf_nat);
+			getlock = 0;
+		}
 		error = ipf_outobjsz(data, ipn, IPFOBJ_NATSAVE, ipns.ipn_dsize);
 	}
 
 finished:
+	if (getlock) {
+		READ_ENTER(&ipf_nat);
+	}
 	if (ipn != NULL) {
 		KFREES(ipn, ipns.ipn_dsize);
 	}

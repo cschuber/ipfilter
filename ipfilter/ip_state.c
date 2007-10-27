@@ -697,11 +697,13 @@ ipf_stgetent(data)
 	if (error)
 		return EFAULT;
 
+	READ_ENTER(&ipf_state);
 	isn = ips.ips_next;
 	if (isn == NULL) {
 		isn = ipf_state_list;
 		if (isn == NULL) {
 			if (ips.ips_next == NULL) {
+				RWLOCK_EXIT(&ipf_state);
 				ipf_interror = 100021;
 				return ENOENT;
 			}
@@ -717,6 +719,7 @@ ipf_stgetent(data)
 			if (is == isn)
 				break;
 		if (!is) {
+			RWLOCK_EXIT(&ipf_state);
 			ipf_interror = 100022;
 			return ESRCH;
 		}
@@ -727,6 +730,7 @@ ipf_stgetent(data)
 	if (isn->is_rule != NULL)
 		bcopy((char *)isn->is_rule, (char *)&ips.ips_fr,
 		      sizeof(ips.ips_fr));
+	RWLOCK_EXIT(&ipf_state);
 	error = ipf_outobj(data, &ips, IPFOBJ_STATESAVE);
 	return error;
 }

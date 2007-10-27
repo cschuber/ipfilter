@@ -7659,7 +7659,6 @@ ipf_ipf_ioctl(data, cmd, mode, uid, ctx)
 				break;
 			}
 
-			RWLOCK_EXIT(&ipf_global);
 			WRITE_ENTER(&ipf_global);
 			if (tmp) {
 				if (ipf_running > 0)
@@ -7675,6 +7674,7 @@ ipf_ipf_ioctl(data, cmd, mode, uid, ctx)
 				if (error == 0)
 					ipf_running = -1;
 			}
+			RWLOCK_EXIT(&ipf_global);
 		}
 		break;
 
@@ -7852,7 +7852,6 @@ ipf_ipf_ioctl(data, cmd, mode, uid, ctx)
 			ipf_interror = 114;
 			error = EPERM;
 		} else {
-			RWLOCK_EXIT(&ipf_global);
 			WRITE_ENTER(&ipf_global);
 #if defined(MENTAT) && defined(_KERNEL)
 			error = ipfsync();
@@ -7860,6 +7859,7 @@ ipf_ipf_ioctl(data, cmd, mode, uid, ctx)
 			ipf_sync(NULL);
 			error = 0;
 #endif
+			RWLOCK_EXIT(&ipf_global);
 
 		}
 		break;
