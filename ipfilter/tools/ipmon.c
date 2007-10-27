@@ -440,12 +440,12 @@ static void init_tabs()
 			    p->p_name != NULL && protocols[p->p_proto] == NULL)
 				protocols[p->p_proto] = strdup(p->p_name);
 		endprotoent();
-#if defined(_AIX51)
 		if (protocols[0])
 			free(protocols[0]);
+		protocols[0] = strdup("ip");
+#if defined(_AIX51)
 		if (protocols[252])
 			free(protocols[252]);
-		protocols[0] = "ip";
 		protocols[252] = NULL;
 #endif
 	}
@@ -780,6 +780,10 @@ static void print_natlog(conf, buf, blen)
 		strcpy(t, "NAT:EXPIRE");
 		break;
 
+	case NL_DESTROY :
+		strcpy(t, "NAT:DESTROY");
+		break;
+
 	default :
 		sprintf(t, "NAT:Action(%d)", nl->nl_action);
 		break;
@@ -863,6 +867,9 @@ static void print_natlog(conf, buf, blen)
 		sprintf(t, "%s,%s", HOSTNAME_V4(res, nl->nl_ndstip),
 			portname(res, proto, (u_int)nl->nl_ndstport));
 	}
+	t += strlen(t);
+
+	strcpy(t, getproto(nl->nl_p);
 	t += strlen(t);
 
 	if (nl->nl_action == NL_EXPIRE || nl->nl_action == NL_FLUSH) {

@@ -1022,13 +1022,16 @@ rn_freehead(rnh)
 {
 
 	RADIX_NODE_HEAD_LOCK(rnh);
+#  if defined(__NetBSD_Version__) && (__NetBSD_Version__ > 499002000)
+	rn_walktree(rnh, rn_freenode, rnh);
+#  else
 	(*rnh->rnh_walktree)(rnh, rn_freenode, rnh);
+#  endif
 
 	rnh->rnh_addaddr = NULL;
 	rnh->rnh_deladdr = NULL;
 	rnh->rnh_matchaddr = NULL;
 	rnh->rnh_lookup = NULL;
-	rnh->rnh_walktree = NULL;
 	RADIX_NODE_HEAD_UNLOCK(rnh);
 
 	Free(rnh);
