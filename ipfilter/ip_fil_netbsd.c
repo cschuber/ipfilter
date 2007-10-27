@@ -912,6 +912,10 @@ ipf_send_icmp_err(type, fin, dst)
 }
 
 
+/*  
+ * m0 - pointer to mbuf where the IP packet starts  
+ * mpp - pointer to the mbuf pointer that is the start of the mbuf chain  
+ */  
 int
 ipf_fastroute(m0, mpp, fin, fdp)
 	mb_t *m0, **mpp;
@@ -919,7 +923,7 @@ ipf_fastroute(m0, mpp, fin, fdp)
 	frdest_t *fdp;
 {
 	register struct ip *ip, *mhip;
-	register struct mbuf *m = m0;
+	register struct mbuf *m = *mpp;
 	register struct route *ro;
 	int len, off, error = 0, hlen, code;
 	struct ifnet *ifp, *sifp;
@@ -1052,7 +1056,7 @@ ipf_fastroute(m0, mpp, fin, fdp)
 			break;
 		case -1 :
 			error = -1;
-			goto done;
+			goto bad;
 			break;
 		}
 
@@ -1326,9 +1330,9 @@ ipf_fastroute6(m0, mpp, fin, fdp)
 		if ((error == 0) && (m0->m_pkthdr.len <= mtu)) {
 			*mpp = NULL;
 # if __NetBSD_Version__ >= 499001100
-			error = nd6_output(ifp, ifp, m0, satocsin6(dst), rt);
+			error = nd6_output(ifp, ifp, *mpp, satocsin6(dst), rt);
 # else
-			error = nd6_output(ifp, ifp, m0, dst6, rt);
+			error = nd6_output(ifp, ifp, *mpp, dst6, rt);
 # endif
 		} else {
 			error = EMSGSIZE;

@@ -648,6 +648,10 @@ mbufchainlen(m0)
 }
 
 
+/*  
+ * m0 - pointer to mbuf where the IP packet starts  
+ * mpp - pointer to the mbuf pointer that is the start of the mbuf chain  
+ */  
 int
 ipf_fastroute(m0, mpp, fin, fdp)
 	struct mbuf *m0, **mpp;
@@ -655,7 +659,7 @@ ipf_fastroute(m0, mpp, fin, fdp)
 	frdest_t *fdp;
 {
 	register struct ip *ip, *mhip;
-	register struct mbuf *m = m0;
+	register struct mbuf *m = *mpp;
 	register struct route *ro;
 	int len, off, error = 0, hlen, code;
 	struct ifnet *ifp, *sifp;
@@ -747,7 +751,7 @@ ipf_fastroute(m0, mpp, fin, fdp)
 			break;
 		case -1 :
 			error = -1;
-			goto done;
+			goto bad;
 			break;
 		}
 
