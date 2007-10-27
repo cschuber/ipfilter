@@ -23,10 +23,13 @@ char *name;
 #ifdef _AIX51
 	/*
 	 * For some bogus reason, "ip" is 252 in /etc/protocols on AIX 5
+	 * The IANA has doubled up on the definition of 0 - it is now also
+	 * used for IPv6 hop-opts, so we can no longer rely on /etc/protocols
+	 * providing the correct name->number mapping
 	 */
+#endif
 	if (!strcasecmp(name, "ip"))
 		return 0;
-#endif
 
 	p = getprotobyname(name);
 	if (p != NULL)

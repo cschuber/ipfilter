@@ -419,12 +419,12 @@ static void init_tabs()
 			    p->p_name != NULL && protocols[p->p_proto] == NULL)
 				protocols[p->p_proto] = strdup(p->p_name);
 		endprotoent();
-#if defined(_AIX51)
 		if (protocols[0])
 			free(protocols[0]);
+		protocols[0] = strdup("ip");
+#if defined(_AIX51)
 		if (protocols[252])
 			free(protocols[252]);
-		protocols[0] = "ip";
 		protocols[252] = NULL;
 #endif
 	}

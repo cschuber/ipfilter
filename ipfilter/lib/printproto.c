@@ -29,10 +29,13 @@ ipnat_t *np;
 #ifdef _AIX51
 		/*
 		 * To make up for "ip = 252" and "hopopt = 0" in /etc/protocols
+		 * The IANA has doubled up on the definition of 0 - it is now
+		 * also used for IPv6 hop-opts, so we can no longer rely on
+		 * /etc/protocols providing the correct name->number mapping
 		 */
+#endif
 		else if (np->in_p == 0)
 			printf("ip");
-#endif
 		else if (pr != NULL)
 			printf("%s", pr->p_name);
 		else
