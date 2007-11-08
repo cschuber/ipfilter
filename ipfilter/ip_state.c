@@ -2558,9 +2558,13 @@ ipf_state_lookup(fin, tcp, ifqp)
 	}
 #endif
 	if ((v == 4) &&
- 	    (fin->fin_flx & (FI_MULTICAST|FI_BROADCAST|FI_MBCAST))) {
- 		hv -= dst.in4.s_addr;
- 	}
+	    (fin->fin_flx & (FI_MULTICAST|FI_BROADCAST|FI_MBCAST))) {
+		if (fin->fin_out == 0) {
+			hv -= src.in4.s_addr;
+		} else {
+			hv -= dst.in4.s_addr;
+		}
+	}
 
 	/* TRACE fin_saddr, fin_daddr, hv */
 
@@ -2644,14 +2648,6 @@ icmp6again:
 			return is;
 		break;
 #endif
-	if ((v == 4) &&
-	    (fin->fin_flx & (FI_MULTICAST|FI_BROADCAST|FI_MBCAST))) {
-		if (fin->fin_out == 0) {
-			hv -= src.in4.s_addr;
-		} else {
-			hv -= dst.in4.s_addr;
-		}
-	}
 
 	case IPPROTO_ICMP :
 		if (v == 4) {
