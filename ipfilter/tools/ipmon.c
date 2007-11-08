@@ -869,7 +869,7 @@ static void print_natlog(conf, buf, blen)
 	}
 	t += strlen(t);
 
-	strcpy(t, getproto(nl->nl_p);
+	strcpy(t, getproto(nl->nl_p));
 	t += strlen(t);
 
 	if (nl->nl_action == NL_EXPIRE || nl->nl_action == NL_FLUSH) {
