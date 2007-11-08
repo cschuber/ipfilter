@@ -489,13 +489,13 @@ int iplopen(dev, flags
 #endif
 	int flags;
 {
-	u_int min = GET_MINOR(dev);
+	u_int unit = GET_MINOR(dev);
 
-	if (IPL_LOGMAX < min)
-		min = ENXIO;
+	if (IPL_LOGMAX < unit)
+		unit = ENXIO;
 	else
-		min = 0;
-	return min;
+		unit = 0;
+	return unit;
 }
 
 
@@ -518,13 +518,13 @@ int iplclose(dev, flags
 #endif
 	int flags;
 {
-	u_int	min = GET_MINOR(dev);
+	u_int	unit = GET_MINOR(dev);
 
-	if (IPL_LOGMAX < min)
-		min = ENXIO;
+	if (IPL_LOGMAX < unit)
+		unit = ENXIO;
 	else
-		min = 0;
-	return min;
+		unit = 0;
+	return unit;
 }
 
 /*
@@ -546,21 +546,21 @@ int iplread(dev, uio)
 #endif
 	register struct uio *uio;
 {
-	u_int	xmin = GET_MINOR(dev);
+	u_int	unit = GET_MINOR(dev);
 
-	if (xmin < 0)
+	if (unit < 0)
 		return ENXIO;
 
 	if (fr_running < 1)
 		return EIO;
 
 # ifdef	IPFILTER_SYNC
-	if (xmin == IPL_LOGSYNC)
+	if (unit == IPL_LOGSYNC)
 		return ipfsync_read(uio);
 # endif
 
 #ifdef IPFILTER_LOG
-	return ipflog_read(xmin, uio);
+	return ipflog_read(unit, uio);
 #else
 	return ENXIO;
 #endif

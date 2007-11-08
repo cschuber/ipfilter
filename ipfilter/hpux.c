@@ -550,13 +550,13 @@ int iplopen(dev, flag, dummy, mode)
 	intptr_t dummy;
 	int mode;
 {
-	minor_t min = getminor(dev);
+	minor_t unit = getminor(dev);
 
 #ifdef  IPFDEBUG
 	cmn_err(CE_CONT, "iplopen(%x,%x,%x,%x)\n", dev, flag, dummy, mode);
 #endif
-	min = (IPL_LOGMAX < min) ? ENXIO : 0;
-	return min;
+	unit = (IPL_LOGMAX < unit) ? ENXIO : 0;
+	return unit;
 }
 
 
@@ -565,7 +565,7 @@ int iplclose(dev, flag, mode)
 	int flag;
 	int mode;
 {
-	minor_t min = getminor(dev);
+	minor_t unit = getminor(dev);
 
 #ifdef  IPFDEBUG
 	cmn_err(CE_CONT, "iplclose(%x,%x,%x)\n", dev, flag, mode);
@@ -574,8 +574,8 @@ int iplclose(dev, flag, mode)
 	if (fr_running < 1)
 		return EIO;
 
-	min = (IPL_LOGMAX < min) ? ENXIO : 0;
-	return min;
+	unit = (IPL_LOGMAX < unit) ? ENXIO : 0;
+	return unit;
 }
 
 

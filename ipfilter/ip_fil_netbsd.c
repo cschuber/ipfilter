@@ -767,8 +767,7 @@ ipf_send_icmp_err(type, fin, dst)
 	ohlen = 0;
 	ifp = fin->fin_ifp;
 	if (fin->fin_v == 4) {
-		if ((fin->fin_p == IPPROTO_ICMP) &&
-		    !(fin->fin_flx & FI_SHORT))
+		if ((fin->fin_p == IPPROTO_ICMP) && !(fin->fin_flx & FI_SHORT))
 			switch (ntohs(fin->fin_data[0]) >> 8)
 			{
 			case ICMP_ECHO :
@@ -1686,16 +1685,16 @@ mbufchainlen(m0)
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    ipf_pullup                                                   */
+/* Function:    ipf_pullup                                                  */
 /* Returns:     NULL == pullup failed, else pointer to protocol header      */
-/* Parameters:  m(I)   - pointer to buffer where data packet starts         */
+/* Parameters:  xmin(I)- pointer to buffer where data packet starts         */
 /*              fin(I) - pointer to packet information                      */
 /*              len(I) - number of bytes to pullup                          */
 /*                                                                          */
 /* Attempt to move at least len bytes (from the start of the buffer) into a */
 /* single buffer for ease of access.  Operating system native functions are */
 /* used to manage buffers - if necessary.  If the entire packet ends up in  */
-/* a single buffer, set the FI_COALESCE flag even though ipf_coalesce() has  */
+/* a single buffer, set the FI_COALESCE flag even though ipf_coalesce() has */
 /* not been called.  Both fin_ip and fin_dp are updated before exiting _IF_ */
 /* and ONLY if the pullup succeeds.                                         */
 /*                                                                          */
@@ -1726,12 +1725,25 @@ ipf_pullup(xmin, fin, len)
 		dpoff = 0;
 
 	if (M_LEN(m) < len) {
-#ifdef MHLEN
+		mb_t *n = *fin->fin_mp;
 		/*
 		 * Assume that M_PKTHDR is set and just work with what is left
 		 * rather than check..
 		 * Should not make any real difference, anyway.
 		 */
+		if (m != n) {
+			/*
+			 * Record the mbuf that points to the mbuf that we're
+			 * about to go to work on so that we can update the
+			 * m_next appropriately later.
+			 */
+			for (; n->m_next != m; n = n->m_next)
+				;
+		} else {
+			n = NULL;
+		}
+
+#ifdef MHLEN
 		if (len > MHLEN)
 #else
 		if (len > MLEN)
@@ -1743,29 +1755,44 @@ ipf_pullup(xmin, fin, len)
 #else
 			FREE_MB_T(*fin->fin_mp);
 			m = NULL;
+			n = NULL;
 #endif
 		} else
 		{
 			m = m_pullup(m, len);
 		}
-		*fin->fin_mp = m;
+		if (n != NULL)
+			n->m_next = m;
 		if (m == NULL) {
+			/*
+			 * When n is non-NULL, it indicates that m pointed to
+			 * a sub-chain (tail) of the mbuf and that the head
+			 * of this chain has not yet been free'd.
+			 */
+			if (n != NULL) {
+				FREE_MB_T(*fin->fin_mp);
+			}
+
+			*fin->fin_mp = NULL;
 			fin->fin_m = NULL;
 			ATOMIC_INCL(ipf_stats[out].fr_pull[1]);
 			return NULL;
 		}
+
+		if (n == NULL)
+			*fin->fin_mp = m;
 
 		while (M_LEN(m) == 0) {
 			m = m->m_next;
 		}
 		fin->fin_m = m;
 		ip = MTOD(m, char *) + ipoff;
-	}
 
-	ATOMIC_INCL(ipf_stats[out].fr_pull[0]);
-	fin->fin_ip = (ip_t *)ip;
-	if (fin->fin_dp != NULL)
-		fin->fin_dp = (char *)fin->fin_ip + dpoff;
+		ATOMIC_INCL(ipf_stats[out].fr_pull[0]);
+		fin->fin_ip = (ip_t *)ip;
+		if (fin->fin_dp != NULL)
+			fin->fin_dp = (char *)fin->fin_ip + dpoff;
+	}
 
 	if (len == fin->fin_plen)
 		fin->fin_flx |= FI_COALESCE;

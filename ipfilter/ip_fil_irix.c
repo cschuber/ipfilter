@@ -211,13 +211,13 @@ iplopen(pdev, flags, devtype, cp)
 	int flags, devtype;
 	cred_t *cp;
 {
-	u_int min = geteminor(*pdev);
+	u_int unit = geteminor(*pdev);
 
-	if (IPL_LOGMAX < min)
-		min = ENXIO;
+	if (IPL_LOGMAX < unit)
+		unit = ENXIO;
 	else
-		min = 0;
-	return min;
+		unit = 0;
+	return unit;
 }
 
 
@@ -227,13 +227,13 @@ iplclose(dev, flags, devtype, cp)
 	int flags, devtype;
 	cred_t *cp;
 {
-	u_int	min = GET_MINOR(dev);
+	u_int	unit = GET_MINOR(dev);
 
-	if (IPL_LOGMAX < min)
-		min = ENXIO;
+	if (IPL_LOGMAX < unit)
+		unit = ENXIO;
 	else
-		min = 0;
-	return min;
+		unit = 0;
+	return unit;
 }
 
 /*
@@ -440,8 +440,7 @@ ipf_send_icmp_err(type, fin, dst)
 	avail = 0;
 	ifp = fin->fin_ifp;
 	if (fin->fin_v == 4) {
-		if ((fin->fin_p == IPPROTO_ICMP) &&
-		    !(fin->fin_flx & FI_SHORT))
+		if ((fin->fin_p == IPPROTO_ICMP) && !(fin->fin_flx & FI_SHORT))
 			switch (ntohs(fin->fin_data[0]) >> 8)
 			{
 			case ICMP_ECHO :
@@ -1117,7 +1116,7 @@ ipf_checkv6sum(fin)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_pullup                                                  */
 /* Returns:     NULL == pullup failed, else pointer to protocol header      */
-/* Parameters:  m(I)   - pointer to buffer where data packet starts         */
+/* Parameters:  xmin(I)- pointer to buffer where data packet starts         */
 /*              fin(I) - pointer to packet information                      */
 /*              len(I) - number of bytes to pullup                          */
 /*                                                                          */
@@ -1132,13 +1131,13 @@ ipf_checkv6sum(fin)
 /* of buffers that starts at *fin->fin_mp.                                  */
 /* ------------------------------------------------------------------------ */
 void *
-ipf_pullup(min, fin, len)
-	mb_t *min;
+ipf_pullup(xmin, fin, len)
+	mb_t *xmin;
 	fr_info_t *fin;
 	int len;
 {
 	int out = fin->fin_out, dpoff;
-	mb_t *m = min;
+	mb_t *m = xmin, *n;
 	char *ip;
 
 	if (m == NULL)

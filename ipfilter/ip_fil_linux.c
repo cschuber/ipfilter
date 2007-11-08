@@ -455,12 +455,12 @@ ipf_nextipid(fr_info_t *fin)
 
 
 /*  
- * min - pointer to mbuf where the IP packet starts  
+ * xmin - pointer to mbuf where the IP packet starts  
  * mpp - pointer to the mbuf pointer that is the start of the mbuf chain  
  */  
 /*ARGSUSED*/
 int
-ipf_fastroute(mb_t *min, mb_t **mp, fr_info_t *fin, frdest_t *fdp)
+ipf_fastroute(mb_t *xmin, mb_t **mp, fr_info_t *fin, frdest_t *fdp)
 {
 	struct net_device *ifp, *sifp;
 	struct in_addr dip;
@@ -471,7 +471,7 @@ ipf_fastroute(mb_t *min, mb_t **mp, fr_info_t *fin, frdest_t *fdp)
 
 	rt = NULL;
 	fr = fin->fin_fr;
-	ip = MTOD(min, ip_t *);
+	ip = MTOD(xmin, ip_t *);
 	dip = ip->ip_dst;
 
 	if (fdp != NULL)
@@ -543,14 +543,14 @@ ipf_fastroute(mb_t *min, mb_t **mp, fr_info_t *fin, frdest_t *fdp)
 	ip->ip_sum = 0;
 
 
-	if (min->dst != NULL) {
-		dst_release(min->dst);
-		min->dst = NULL;
+	if (xmin->dst != NULL) {
+		dst_release(xmin->dst);
+		xmin->dst = NULL;
 	}
 
-	min->dst = &rt->u.dst;
+	xmin->dst = &rt->u.dst;
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,21)
-	if (min->len > min->dst->pmtu) {
+	if (xmin->len > xmin->dst->pmtu) {
 		err = EMSGSIZE;
 		goto bad;
 	}
@@ -561,8 +561,8 @@ ipf_fastroute(mb_t *min, mb_t **mp, fr_info_t *fin, frdest_t *fdp)
 	case 4 :
 		ip->ip_sum = ip_fast_csum((u_char *)ip, ip->ip_hl);
 
-		/*dumpskbuff(min);*/
-		NF_HOOK(PF_INET, NF_IP_LOCAL_OUT, min, NULL,
+		/*dumpskbuff(xmin);*/
+		NF_HOOK(PF_INET, NF_IP_LOCAL_OUT, xmin, NULL,
 			ifp, ip_finish_output);
 		err = 0;
 		break;
@@ -575,8 +575,8 @@ ipf_fastroute(mb_t *min, mb_t **mp, fr_info_t *fin, frdest_t *fdp)
 	if (err == 0)
 		return 0;
 bad:
-	if (min != NULL)
-		kfree_skb(min);
+	if (xmin != NULL)
+		kfree_skb(xmin);
 	return err;
 }
 
@@ -894,7 +894,7 @@ m_pullup(mb_t *m, int len)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_pullup                                                  */
 /* Returns:     NULL == pullup failed, else pointer to protocol header      */
-/* Parameters:  m(I)   - pointer to buffer where data packet starts         */
+/* Parameters:  xmin(I)- pointer to buffer where data packet starts         */
 /*              fin(I) - pointer to packet information                      */
 /*              len(I) - number of bytes to pullup                          */
 /*                                                                          */
@@ -909,10 +909,10 @@ m_pullup(mb_t *m, int len)
 /* of buffers that starts at *fin->fin_mp.                                  */
 /* ------------------------------------------------------------------------ */
 void *
-ipf_pullup(mb_t *min, fr_info_t *fin, int len)
+ipf_pullup(mb_t *xmin, fr_info_t *fin, int len)
 {
 	int out = fin->fin_out, dpoff, ipoff;
-	mb_t *m = min;
+	mb_t *m = xmin;
 	char *ip;
 
 	if (m == NULL)

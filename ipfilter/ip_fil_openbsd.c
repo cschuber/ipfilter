@@ -203,99 +203,6 @@ iplioctl(dev, cmd, data, mode , p)
 
 
 /*
- * routines below for saving IP headers to buffer
- */
-int
-iplopen(dev, flags, devtype, p)
-	dev_t dev;
-	int flags;
-	int devtype;
-	struct proc *p;
-{
-	u_int min = GET_MINOR(dev);
-
-	if (IPL_LOGMAX < min)
-		min = ENXIO;
-	else
-		min = 0;
-	return min;
-}
-
-
-int
-iplclose(dev, flags, devtype, p)
-	dev_t dev;
-	int flags;
-	int devtype;
-	struct proc *p;
-{
-	u_int	min = GET_MINOR(dev);
-
-	if (IPL_LOGMAX < min)
-		min = ENXIO;
-	else
-		min = 0;
-	return min;
-}
-
-/*
- * iplread/ipllog
- * both of these must operate with at least splnet() lest they be
- * called during packet processing and cause an inconsistancy to appear in
- * the filter lists.
- */
-int
-iplread(dev, uio, ioflag)
-	dev_t dev;
-	register struct uio *uio;
-	int ioflag;
-{
-
-	if (ipf_running < 1)
-		return EIO;
-
-# ifdef	IPFILTER_SYNC
-	if (GET_MINOR(dev) == IPL_LOGSYNC)
-		return ipfsync_read(uio);
-# endif
-
-#ifdef IPFILTER_LOG
-	return ipflog_read(GET_MINOR(dev), uio);
-#else
-	return ENXIO;
-#endif
-}
-
-
-/*
- * iplwrite
- * both of these must operate with at least splnet() lest they be
- * called during packet processing and cause an inconsistancy to appear in
- * the filter lists.
- */
-int
-#if (BSD >= 199306)
-iplwrite(dev, uio, ioflag)
-	int ioflag;
-#else
-iplwrite(dev, uio)
-#endif
-	dev_t dev;
-	register struct uio *uio;
-{
-
-	if (ipf_running < 1)
-		return EIO;
-
-#ifdef	IPFILTER_SYNC
-	if (GET_MINOR(dev) == IPL_LOGSYNC)
-		return ipfsync_write(uio);
-#endif
-	return ENXIO;
-}
-
-
-/*
  * ipf_send_reset - this could conceivably be a call to tcp_respond(), but that
  * requires a large amount of setting up and isn't any more efficient.
  */
@@ -499,8 +406,7 @@ ipf_send_icmp_err(type, fin, dst)
 	ohlen = 0;
 	ifp = fin->fin_ifp;
 	if (fin->fin_v == 4) {
-		if ((fin->fin_p == IPPROTO_ICMP) &&
-		    !(fin->fin_flx & FI_SHORT))
+		if ((fin->fin_p == IPPROTO_ICMP) && !(fin->fin_flx & FI_SHORT))
 			switch (ntohs(fin->fin_data[0]) >> 8)
 			{
 			case ICMP_ECHO :
@@ -1227,7 +1133,7 @@ mbufchainlen(m0)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_pullup                                                  */
 /* Returns:     NULL == pullup failed, else pointer to protocol header      */
-/* Parameters:  m(I)   - pointer to buffer where data packet starts         */
+/* Parameters:  xmin(I)- pointer to buffer where data packet starts         */
 /*              fin(I) - pointer to packet information                      */
 /*              len(I) - number of bytes to pullup                          */
 /*                                                                          */
@@ -1242,13 +1148,13 @@ mbufchainlen(m0)
 /* of buffers that starts at *fin->fin_mp.                                  */
 /* ------------------------------------------------------------------------ */
 void *
-ipf_pullup(min, fin, len)
-	mb_t *min;
+ipf_pullup(xmin, fin, len)
+	mb_t *xmin;
 	fr_info_t *fin;
 	int len;
 {
 	int out = fin->fin_out, dpoff, ipoff;
-	mb_t *m = min;
+	mb_t *m = xmin;
 	char *ip;
 
 	if (m == NULL)
@@ -1265,12 +1171,25 @@ ipf_pullup(min, fin, len)
 		dpoff = 0;
 
 	if (M_LEN(m) < len) {
-#ifdef MHLEN
+		mb_t *n = *fin->fin_mp;
 		/*
 		 * Assume that M_PKTHDR is set and just work with what is left
 		 * rather than check..
 		 * Should not make any real difference, anyway.
 		 */
+		if (m != n) {
+			/*
+			 * Record the mbuf that points to the mbuf that we're
+			 * about to go to work on so that we can update the
+			 * m_next appropriately later.
+			 */
+			for (; n->m_next != m; n = n->m_next)
+				;
+		} else {
+			n = NULL;
+		}
+
+#ifdef MHLEN
 		if (len > MHLEN)
 #else
 		if (len > MLEN)
@@ -1287,24 +1206,38 @@ ipf_pullup(min, fin, len)
 		{
 			m = m_pullup(m, len);
 		}
-		*fin->fin_mp = m;
+		if (n != NULL)
+			n->m_next = m;
 		if (m == NULL) {
+			/*
+			 * When n is non-NULL, it indicates that m pointed to
+			 * a sub-chain (tail) of the mbuf and that the head
+			 * of this chain has not yet been free'd.
+			 */
+			if (n != NULL) {
+				FREE_MB_T(*fin->fin_mp);
+			}
+
+			*fin->fin_mp = NULL;
 			fin->fin_m = NULL;
 			ATOMIC_INCL(frstats[out].fr_pull[1]);
 			return NULL;
 		}
+
+		if (n == NULL)
+			*fin->fin_mp = m;
 
 		while (M_LEN(m) == 0) {
 			m = m->m_next;
 		}
 		fin->fin_m = m;
 		ip = MTOD(m, char *) + ipoff;
-	}
 
-	ATOMIC_INCL(frstats[out].fr_pull[0]);
-	fin->fin_ip = (ip_t *)ip;
-	if (fin->fin_dp != NULL)
-		fin->fin_dp = (char *)fin->fin_ip + dpoff;
+		ATOMIC_INCL(frstats[out].fr_pull[0]);
+		fin->fin_ip = (ip_t *)ip;
+		if (fin->fin_dp != NULL)
+			fin->fin_dp = (char *)fin->fin_ip + dpoff;
+	}
 
 	if (len == fin->fin_plen)
 		fin->fin_flx |= FI_COALESCE;

@@ -256,13 +256,13 @@ static int iplopen(dev, flags)
 	dev_t dev;
 	int flags;
 {
-	u_int min = GET_MINOR(dev);
+	u_int unit = GET_MINOR(dev);
 
-	if (IPL_LOGMAX < min)
-		min = ENXIO;
+	if (IPL_LOGMAX < unit)
+		unit = ENXIO;
 	else
-		min = 0;
-	return min;
+		unit = 0;
+	return unit;
 }
 
 
@@ -270,13 +270,13 @@ static int iplclose(dev, flags)
 	dev_t dev;
 	int flags;
 {
-	u_int	min = GET_MINOR(dev);
+	u_int	unit = GET_MINOR(dev);
 
-	if (IPL_LOGMAX < min)
-		min = ENXIO;
+	if (IPL_LOGMAX < unit)
+		unit = ENXIO;
 	else
-		min = 0;
-	return min;
+		unit = 0;
+	return unit;
 }
 
 

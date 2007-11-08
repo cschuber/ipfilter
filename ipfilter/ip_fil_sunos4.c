@@ -311,8 +311,7 @@ ipf_send_icmp_err(type, fin, dst)
 
 	ifp = fin->fin_ifp;
 	if (fin->fin_v == 4) {
-		if ((fin->fin_p == IPPROTO_ICMP) &&
-		    !(fin->fin_flx & FI_SHORT))
+		if ((fin->fin_p == IPPROTO_ICMP) && !(fin->fin_flx & FI_SHORT))
 			switch (ntohs(fin->fin_data[0]) >> 8)
 			{
 			case ICMP_ECHO :
@@ -767,7 +766,7 @@ ipf_checkv4sum(fin)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_pullup                                                  */
 /* Returns:     NULL == pullup failed, else pointer to protocol header      */
-/* Parameters:  m(I)   - pointer to buffer where data packet starts         */
+/* Parameters:  xmin(I)- pointer to buffer where data packet starts         */
 /*              fin(I) - pointer to packet information                      */
 /*              len(I) - number of bytes to pullup                          */
 /*                                                                          */
@@ -778,17 +777,17 @@ ipf_checkv4sum(fin)
 /* not been called.  Both fin_ip and fin_dp are updated before exiting _IF_ */
 /* and ONLY if the pullup succeeds.                                         */
 /*                                                                          */
-/* We assume that 'min' is a pointer to a buffer that is part of the chain  */
+/* We assume that 'xmin' is a pointer to a buffer that is part of the chain */
 /* of buffers that starts at *fin->fin_mp.                                  */
 /* ------------------------------------------------------------------------ */
 void *
-ipf_pullup(min, fin, len)
-	mb_t *min;
+ipf_pullup(xmin, fin, len)
+	mb_t *xmin;
 	fr_info_t *fin;
 	int len;
 {
 	int out = fin->fin_out, dpoff, ipoff;
-	mb_t *m = min;
+	mb_t *m = xmin;
 	char *ip;
 
 	if (m == NULL)
@@ -805,25 +804,51 @@ ipf_pullup(min, fin, len)
 		dpoff = 0;
 
 	if (M_LEN(m) < len) {
+		mb_t *n = *fin->fin_mp;
+
+		if (m != n) {
+			for (; n->m_next != m; n = n->m_next)
+				;
+		} else {
+			n = NULL;
+		}
+
 		if (len > MLEN) {
 			FREE_MB_T(*fin->fin_mp);
 			m = NULL;
+			n = NULL;
 		} else {
 			m = m_pullup(m, len);
 		}
-		*fin->fin_mp = m;
-		fin->fin_m = m;
+
+		if (n != NULL)
+			n->m_next = m;
+
 		if (m == NULL) {
+			if (n != NULL) {
+				FREE_MB_T(*fin->fin_mp);
+			}
 			ATOMIC_INCL(ipf_stats[out].fr_pull[1]);
+			*fin->fin_mp = NULL;
+			fin->fin_m = NULL;
 			return NULL;
 		}
-		ip = MTOD(m, char *) + ipoff;
-	}
 
-	ATOMIC_INCL(ipf_stats[out].fr_pull[0]);
-	fin->fin_ip = (ip_t *)ip;
-	if (fin->fin_dp != NULL)
-		fin->fin_dp = (char *)fin->fin_ip + dpoff;
+		if (n == NULL)
+			*fin->fin_mp = m;
+
+		while (M_LEN(m) == 0) {
+			m = m->m_next;
+		}
+
+		fin->fin_m = m;
+		ip = MTOD(m, char *) + ipoff;
+
+		ATOMIC_INCL(ipf_stats[out].fr_pull[0]);
+		fin->fin_ip = (ip_t *)ip;
+		if (fin->fin_dp != NULL)
+			fin->fin_dp = (char *)fin->fin_ip + dpoff;
+	}
 
 	if (len == fin->fin_plen)
 		fin->fin_flx |= FI_COALESCE;

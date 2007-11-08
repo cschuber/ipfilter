@@ -252,3 +252,97 @@ static int ipl_load()
 	}
 	return error;
 }
+
+
+/*    
+ * routines below for saving IP headers to buffer
+ */
+int
+iplopen(dev, flags, devtype, p)
+	dev_t dev;    
+	int flags;   
+	int devtype;  
+	struct proc *p;
+{
+	u_int min = GET_MINOR(dev);
+
+	if (IPL_LOGMAX < min)
+		min = ENXIO;
+	else       
+		min = 0;
+	return min;    
+}
+
+
+int
+iplclose(dev, flags, devtype, p)
+	dev_t dev;
+	int flags;
+	int devtype;    
+	struct proc *p;   
+{
+	u_int   min = GET_MINOR(dev);
+
+	if (IPL_LOGMAX < min)
+		min = ENXIO;
+	else
+		min = 0;   
+	return min;
+}
+
+
+/*
+ * iplread/ipllog
+ * both of these must operate with at least splnet() lest they be
+ * called during packet processing and cause an inconsistancy to appear in
+ * the filter lists.
+ */
+int
+iplread(dev, uio, ioflag)
+	dev_t dev;
+	register struct uio *uio;
+	int ioflag;
+{
+
+	if (ipf_running < 1)
+		return EIO;
+
+# ifdef IPFILTER_SYNC
+	if (GET_MINOR(dev) == IPL_LOGSYNC)
+		return ipfsync_read(uio);
+# endif
+
+#ifdef IPFILTER_LOG
+	return ipflog_read(GET_MINOR(dev), uio);
+#else
+	return ENXIO;
+#endif
+}
+
+
+/*
+ * iplwrite
+ * both of these must operate with at least splnet() lest they be
+ * called during packet processing and cause an inconsistancy to appear in
+ * the filter lists.
+ */
+int
+#if (BSD >= 199306)
+iplwrite(dev, uio, ioflag)
+	int ioflag;
+#else
+iplwrite(dev, uio)
+#endif
+	dev_t dev;
+	register struct uio *uio;
+{
+
+	if (ipf_running < 1)
+		return EIO;
+
+#ifdef  IPFILTER_SYNC
+	if (GET_MINOR(dev) == IPL_LOGSYNC)
+		return ipfsync_write(uio);
+#endif
+	return ENXIO;
+}

@@ -459,8 +459,7 @@ ipf_send_icmp_err(int type, fr_info_t *fin, int dst)
 	} else
 #endif
 	{
-		if ((fin->fin_p == IPPROTO_ICMP) &&
-		    !(fin->fin_flx & FI_SHORT))
+		if ((fin->fin_p == IPPROTO_ICMP) && !(fin->fin_flx & FI_SHORT))
 			switch (ntohs(fin->fin_data[0]) >> 8)
 			{
 			case ICMP_ECHO :
@@ -1008,7 +1007,7 @@ bad_fastroute:
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_pullup                                                  */
 /* Returns:     NULL == pullup failed, else pointer to protocol header      */
-/* Parameters:  m(I)   - pointer to buffer where data packet starts         */
+/* Parameters:  xmin(I)- pointer to buffer where data packet starts         */
 /*              fin(I) - pointer to packet information                      */
 /*              len(I) - number of bytes to pullup                          */
 /*                                                                          */
@@ -1019,15 +1018,15 @@ bad_fastroute:
 /* not been called.  Both fin_ip and fin_dp are updated before exiting _IF_ */
 /* and ONLY if the pullup succeeds.                                         */
 /*                                                                          */
-/* We assume that 'min' is a pointer to a buffer that is part of the chain  */
+/* We assume that 'xmin' is a pointer to a buffer that is part of the chain */
 /* of buffers that starts at *fin->fin_mp.                                  */
 /* ------------------------------------------------------------------------ */
 void *
-ipf_pullup(mb_t *min, fr_info_t *fin, int len)
+ipf_pullup(mb_t *xmin, fr_info_t *fin, int len)
 {
 	qpktinfo_t *qpi = fin->fin_qpi;
 	int out = fin->fin_out, dpoff, ipoff;
-	mb_t *m = min;
+	mb_t *m = xmin;
 	char *ip;
 
 	if (m == NULL)

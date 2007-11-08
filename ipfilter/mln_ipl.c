@@ -399,13 +399,13 @@ static int ipfopen(dev, flags
 	dev_t dev;
 	int flags;
 {
-	u_int xmin = GET_MINOR(dev);
+	u_int unit = GET_MINOR(dev);
 
-	if (IPL_LOGMAX < xmin)
-		xmin = ENXIO;
+	if (IPL_LOGMAX < unit)
+		unit = ENXIO;
 	else
-		xmin = 0;
-	return xmin;
+		unit = 0;
+	return unit;
 }
 
 
@@ -420,13 +420,13 @@ static int ipfclose(dev, flags
 	dev_t dev;
 	int flags;
 {
-	u_int	xmin = GET_MINOR(dev);
+	u_int	unit = GET_MINOR(dev);
 
-	if (IPL_LOGMAX < xmin)
-		xmin = ENXIO;
+	if (IPL_LOGMAX < unit)
+		unit = ENXIO;
 	else
-		xmin = 0;
-	return xmin;
+		unit = 0;
+	return unit;
 }
 
 /*
@@ -485,19 +485,19 @@ static int ipfpoll(dev, events, p)
 	int events;
 	PROC_T *p;
 {
-	u_int xmin = GET_MINOR(dev);
+	u_int unit = GET_MINOR(dev);
 	int revents = 0;
 
-	if (IPL_LOGMAX < xmin)
+	if (IPL_LOGMAX < unit)
 		return ENXIO;
 
-	switch (xmin)
+	switch (unit)
 	{
 	case IPL_LOGIPF :
 	case IPL_LOGNAT :
 	case IPL_LOGSTATE :
 #ifdef IPFILTER_LOG
-		if ((events & (POLLIN | POLLRDNORM)) && ipf_log_canread(xmin))
+		if ((events & (POLLIN | POLLRDNORM)) && ipf_log_canread(unit))
 			revents |= events & (POLLIN | POLLRDNORM);
 #endif
 		break;
@@ -520,6 +520,6 @@ static int ipfpoll(dev, events, p)
 	}
 
 	if ((revents == 0) && (((events & (POLLIN|POLLRDNORM)) != 0)))
-		selrecord(p, &ipfselwait[xmin]);
+		selrecord(p, &ipfselwait[unit]);
 	return revents;
 }

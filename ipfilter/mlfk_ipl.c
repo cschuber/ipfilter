@@ -334,21 +334,21 @@ ipfpoll(struct cdev *dev, int events, struct thread *td)
 ipfpoll(dev_t dev, int events, struct proc *td)
 #endif
 {
-	u_int xmin = GET_MINOR(dev);
+	u_int unit = GET_MINOR(dev);
 	int revents;
 
-	if (xmin < 0 || xmin > IPL_LOGMAX)
+	if (unit < 0 || unit > IPL_LOGMAX)
 		return 0;
 
 	revents = 0;
 
-	switch (xmin)
+	switch (unit)
 	{
 	case IPL_LOGIPF :
 	case IPL_LOGNAT :
 	case IPL_LOGSTATE :
 #ifdef IPFILTER_LOG
-		if ((events & (POLLIN | POLLRDNORM)) && ipf_log_canread(xmin))
+		if ((events & (POLLIN | POLLRDNORM)) && ipf_log_canread(unit))
 			revents |= events & (POLLIN | POLLRDNORM);
 #endif
 		break;
@@ -371,7 +371,7 @@ ipfpoll(dev_t dev, int events, struct proc *td)
 	}
 
 	if ((revents == 0) && ((events & (POLLIN|POLLRDNORM)) != 0))
-		selrecord(td, &ipfselwait[xmin]);
+		selrecord(td, &ipfselwait[unit]);
 
 	return revents;
 }
@@ -399,13 +399,13 @@ static int ipfopen(dev, flags
 #endif
 	int flags;
 {
-	u_int min = GET_MINOR(dev);
+	u_int unit = GET_MINOR(dev);
 
-	if (IPL_LOGMAX < min)
-		min = ENXIO;
+	if (IPL_LOGMAX < unit)
+		unit = ENXIO;
 	else
-		min = 0;
-	return min;
+		unit = 0;
+	return unit;
 }
 
 
@@ -428,13 +428,13 @@ static int ipfclose(dev, flags
 #endif
 	int flags;
 {
-	u_int	min = GET_MINOR(dev);
+	u_int	unit = GET_MINOR(dev);
 
-	if (IPL_LOGMAX < min)
-		min = ENXIO;
+	if (IPL_LOGMAX < unit)
+		unit = ENXIO;
 	else
-		min = 0;
-	return min;
+		unit = 0;
+	return unit;
 }
 
 /*
@@ -456,21 +456,21 @@ static int ipfread(dev, uio)
 #endif
 	struct uio *uio;
 {
-	u_int	xmin = GET_MINOR(dev);
+	u_int	unit = GET_MINOR(dev);
 
-	if (xmin < 0)
+	if (unit < 0)
 		return ENXIO;
 
 	if (ipf_running < 1)
 		return EIO;
 
 # ifdef	IPFILTER_SYNC
-	if (xmin == IPL_LOGSYNC)
+	if (unit == IPL_LOGSYNC)
 		return ipfsync_read(uio);
 # endif
 
 #ifdef IPFILTER_LOG
-	return ipf_log_read(xmin, uio);
+	return ipf_log_read(unit, uio);
 #else
 	return ENXIO;
 #endif
