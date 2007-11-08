@@ -200,13 +200,13 @@ int flag;
 intptr_t dummy;
 int mode;
 {
-	minor_t min = getminor(dev);
+	minor_t unit = getminor(dev);
 
 #ifdef  IPFDEBUG
 	cmn_err(CE_CONT, "iplopen(%x,%x,%x,%x)\n", dev, flag, dummy, mode);
 #endif
-	min = (IPL_LOGMAX < min) ? ENXIO : 0;
-	return min;
+	unit = (IPL_LOGMAX < unit) ? ENXIO : 0;
+	return unit;
 }
 
 
@@ -215,13 +215,13 @@ dev_t dev;
 int flag;
 int mode;
 {
-	minor_t min = getminor(dev);
+	minor_t unit = getminor(dev);
 
 #ifdef  IPFDEBUG
 	cmn_err(CE_CONT, "iplclose(%x,%x,%x)\n", dev, flag, mode);
 #endif
-	min = (IPL_LOGMAX < min) ? ENXIO : 0;
-	return min;
+	unit = (IPL_LOGMAX < unit) ? ENXIO : 0;
+	return unit;
 }
 
 
@@ -426,8 +426,7 @@ int dst;
 	} else
 #endif
 	{
-		if ((fin->fin_p == IPPROTO_ICMP) &&
-		    !(fin->fin_flx & FI_SHORT))
+		if ((fin->fin_p == IPPROTO_ICMP) && !(fin->fin_flx & FI_SHORT))
 			switch (ntohs(fin->fin_data[0]) >> 8)
 			{
 			case ICMP_ECHO :
@@ -707,17 +706,17 @@ fr_info_t *fin;
 /* not been called.  Both fin_ip and fin_dp are updated before exiting _IF_ */
 /* and ONLY if the pullup succeeds.                                         */
 /*                                                                          */
-/* We assume that 'min' is a pointer to a buffer that is part of the chain  */
+/* We assume that 'xmin' is a pointer to a buffer that is part of the chain */
 /* of buffers that starts at *fin->fin_mp.                                  */
 /* ------------------------------------------------------------------------ */
-void *fr_pullup(min, fin, len)
-mb_t *min;
+void *fr_pullup(xmin, fin, len)
+mb_t *xmin;
 fr_info_t *fin;
 int len;
 {
 	qpktinfo_t *qpi = fin->fin_qpi;
 	int out = fin->fin_out, dpoff, ipoff;
-	mb_t *m = min;
+	mb_t *m = xmin;
 	char *ip;
 
 	if (m == NULL)
@@ -745,7 +744,7 @@ int len;
 					inc = 0;
 			}
 		}
-		m = msgpullup(min, len + ipoff + inc);
+		m = msgpullup(xmin, len + ipoff + inc);
 		if (m == NULL) {
 			ATOMIC_INCL(frstats[out].fr_pull[1]);
 			FREE_MB_T(*fin->fin_mp);
@@ -758,14 +757,14 @@ int len;
 		 * Because msgpullup allocates a new mblk, we need to delink
 		 * (and free) the old one and link on the new one.
 		 */
-		if (min == *fin->fin_mp) {	/* easy case 1st */
+		if (xmin == *fin->fin_mp) {	/* easy case 1st */
 			FREE_MB_T(*fin->fin_mp);
 			*fin->fin_mp = m;
 		} else {
 			mb_t *m2;
 
 			for (m2 = *fin->fin_mp; m2 != NULL; m2 = m2->b_next)
-				if (m2->b_next == min)
+				if (m2->b_next == xmin)
 					break;
 			if (m2 == NULL) {
 				ATOMIC_INCL(frstats[out].fr_pull[1]);
@@ -773,7 +772,7 @@ int len;
 				FREE_MB_T(m);
 				return NULL;
 			}
-			FREE_MB_T(min);
+			FREE_MB_T(xmin);
 			m2->b_next = m;
 		}
 
@@ -781,12 +780,12 @@ int len;
 		m->b_rptr += inc;
 		ip = MTOD(m, char *) + ipoff;
 		qpi->qpi_data = ip;
-	}
 
-	ATOMIC_INCL(frstats[out].fr_pull[0]);
-	fin->fin_ip = (ip_t *)ip;
-	if (fin->fin_dp != NULL)
-		fin->fin_dp = (char *)fin->fin_ip + dpoff;
+		ATOMIC_INCL(frstats[out].fr_pull[0]);
+		fin->fin_ip = (ip_t *)ip;
+		if (fin->fin_dp != NULL)
+			fin->fin_dp = (char *)fin->fin_ip + dpoff;
+	}
 
 	if (len == fin->fin_plen)
 		fin->fin_flx |= FI_COALESCE;

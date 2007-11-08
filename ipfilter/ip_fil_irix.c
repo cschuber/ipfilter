@@ -242,13 +242,13 @@ dev_t *pdev;
 int flags, devtype;
 cred_t *cp;
 {
-	u_int min = geteminor(*pdev);
+	u_int unit = geteminor(*pdev);
 
-	if (IPL_LOGMAX < min)
-		min = ENXIO;
+	if (IPL_LOGMAX < unit)
+		unit = ENXIO;
 	else
-		min = 0;
-	return min;
+		unit = 0;
+	return unit;
 }
 
 
@@ -257,13 +257,13 @@ dev_t dev;
 int flags, devtype;
 cred_t *cp;
 {
-	u_int	min = GET_MINOR(dev);
+	u_int	unit = GET_MINOR(dev);
 
-	if (IPL_LOGMAX < min)
-		min = ENXIO;
+	if (IPL_LOGMAX < unit)
+		unit = ENXIO;
 	else
-		min = 0;
-	return min;
+		unit = 0;
+	return unit;
 }
 
 /*
@@ -465,8 +465,7 @@ int dst;
 	avail = 0;
 	ifp = fin->fin_ifp;
 	if (fin->fin_v == 4) {
-		if ((fin->fin_p == IPPROTO_ICMP) &&
-		    !(fin->fin_flx & FI_SHORT))
+		if ((fin->fin_p == IPPROTO_ICMP) && !(fin->fin_flx & FI_SHORT))
 			switch (ntohs(fin->fin_data[0]) >> 8)
 			{
 			case ICMP_ECHO :
@@ -1116,16 +1115,16 @@ fr_info_t *fin;
 /* not been called.  Both fin_ip and fin_dp are updated before exiting _IF_ */
 /* and ONLY if the pullup succeeds.                                         */
 /*                                                                          */
-/* We assume that 'min' is a pointer to a buffer that is part of the chain  */
+/* We assume that 'xmin' is a pointer to a buffer that is part of the chain */
 /* of buffers that starts at *fin->fin_mp.                                  */
 /* ------------------------------------------------------------------------ */
-void *fr_pullup(min, fin, len)
-mb_t *min;
+void *fr_pullup(xmin, fin, len)
+mb_t *xmin;
 fr_info_t *fin;
 int len;
 {
 	int out = fin->fin_out, dpoff;
-	mb_t *m = min;
+	mb_t *m = xmin;
 	char *ip;
 
 	if (m == NULL)

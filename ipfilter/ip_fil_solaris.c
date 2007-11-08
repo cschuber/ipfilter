@@ -293,7 +293,7 @@ dev_t *devp;
 int flags, otype;
 cred_t *cred;
 {
-	minor_t min = getminor(*devp);
+	minor_t unit = getminor(*devp);
 
 #ifdef	IPFDEBUG
 	cmn_err(CE_CONT, "iplopen(%x,%x,%x,%x)\n", devp, flags, otype, cred);
@@ -301,8 +301,8 @@ cred_t *cred;
 	if (!(otype & OTYP_CHR))
 		return ENXIO;
 
-	min = (IPL_LOGMAX < min) ? ENXIO : 0;
-	return min;
+	unit = (IPL_LOGMAX < unit) ? ENXIO : 0;
+	return unit;
 }
 
 
@@ -312,14 +312,14 @@ dev_t dev;
 int flags, otype;
 cred_t *cred;
 {
-	minor_t	min = getminor(dev);
+	minor_t	unit = getminor(dev);
 
 #ifdef	IPFDEBUG
 	cmn_err(CE_CONT, "iplclose(%x,%x,%x,%x)\n", dev, flags, otype, cred);
 #endif
 
-	min = (IPL_LOGMAX < min) ? ENXIO : 0;
-	return min;
+	unit = (IPL_LOGMAX < unit) ? ENXIO : 0;
+	return unit;
 }
 
 #ifdef	IPFILTER_LOG
@@ -586,8 +586,7 @@ int dst;
 	} else
 #endif
 	{
-		if ((fin->fin_p == IPPROTO_ICMP) &&
-		    !(fin->fin_flx & FI_SHORT))
+		if ((fin->fin_p == IPPROTO_ICMP) && !(fin->fin_flx & FI_SHORT))
 			switch (ntohs(fin->fin_data[0]) >> 8)
 			{
 			case ICMP_ECHO :
@@ -1170,17 +1169,17 @@ bad_fastroute:
 /* not been called.  Both fin_ip and fin_dp are updated before exiting _IF_ */
 /* and ONLY if the pullup succeeds.                                         */
 /*                                                                          */
-/* We assume that 'min' is a pointer to a buffer that is part of the chain  */
+/* We assume that 'xmin' is a pointer to a buffer that is part of the chain */
 /* of buffers that starts at *fin->fin_mp.                                  */
 /* ------------------------------------------------------------------------ */
-void *fr_pullup(min, fin, len)
-mb_t *min;
+void *fr_pullup(xmin, fin, len)
+mb_t *xmin;
 fr_info_t *fin;
 int len;
 {
 	qpktinfo_t *qpi = fin->fin_qpi;
 	int out = fin->fin_out, dpoff, ipoff;
-	mb_t *m = min;
+	mb_t *m = xmin;
 	char *ip;
 
 	if (m == NULL)
@@ -1217,12 +1216,12 @@ int len;
 		fin->fin_m = m;
 		ip = MTOD(m, char *) + ipoff;
 		qpi->qpi_data = ip;
-	}
 
-	ATOMIC_INCL(frstats[out].fr_pull[0]);
-	fin->fin_ip = (ip_t *)ip;
-	if (fin->fin_dp != NULL)
-		fin->fin_dp = (char *)fin->fin_ip + dpoff;
+		ATOMIC_INCL(frstats[out].fr_pull[0]);
+		fin->fin_ip = (ip_t *)ip;
+		if (fin->fin_dp != NULL)
+			fin->fin_dp = (char *)fin->fin_ip + dpoff;
+	}
 
 	if (len == fin->fin_plen)
 		fin->fin_flx |= FI_COALESCE;
@@ -1356,8 +1355,8 @@ static int pfil_sendbuf(void *ifp, mblk_t *mb, ip_t *ip, void *dstp)
 }
 
 
-void mb_copydata(min, off, len, buf)
-mblk_t *min;
+void mb_copydata(xmin, off, len, buf)
+mblk_t *xmin;
 size_t off, len;
 char *buf;
 {
@@ -1365,7 +1364,7 @@ char *buf;
 	size_t mlen, olen, clen;
 	mblk_t *m;
 
-	for (m = min; (m != NULL) && (len > 0); m = m->b_cont) {
+	for (m = xmin; (m != NULL) && (len > 0); m = m->b_cont) {
 		if (MTYPE(m) != M_DATA)
 			continue;
 		s = m->b_rptr;
@@ -1387,8 +1386,8 @@ char *buf;
 }
 
 
-void mb_copyback(min, off, len, buf)
-mblk_t *min;
+void mb_copyback(xmin, off, len, buf)
+mblk_t *xmin;
 size_t off, len;
 char *buf;
 {
@@ -1396,7 +1395,7 @@ char *buf;
 	size_t mlen, olen, clen;
 	mblk_t *m, *mp;
 
-	for (m = min, mp = NULL; (m != NULL) && (len > 0); m = m->b_cont) {
+	for (m = xmin, mp = NULL; (m != NULL) && (len > 0); m = m->b_cont) {
 		mp = m;
 		if (MTYPE(m) != M_DATA)
 			continue;

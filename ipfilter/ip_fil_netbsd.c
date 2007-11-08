@@ -95,6 +95,11 @@ MALLOC_DEFINE(M_IPFILTER, "IP Filter", "IP Filter packet filter data structures"
 #if __NetBSD_Version__ < 200000000
 extern	struct	protosw	inetsw[];
 #endif
+#if (__NetBSD_Version__ < 399001400)
+extern int ip6_getpmtu __P((struct route_in6 *, struct route_in6 *,
+			    struct ifnet *, struct in6_addr *, u_long *,
+			    int *));
+#endif
 
 static	int	(*fr_savep) __P((ip_t *, int, void *, int, struct mbuf **));
 static	int	fr_send_ip __P((fr_info_t *, mb_t *, mb_t **));
@@ -636,13 +641,13 @@ struct proc *p;
 dev_t dev;
 int flags;
 {
-	u_int xmin = GET_MINOR(dev);
+	u_int unit = GET_MINOR(dev);
 
-	if (IPL_LOGMAX < xmin)
-		xmin = ENXIO;
+	if (IPL_LOGMAX < unit)
+		unit = ENXIO;
 	else
-		xmin = 0;
-	return xmin;
+		unit = 0;
+	return unit;
 }
 
 
@@ -661,13 +666,13 @@ struct proc *p;
 dev_t dev;
 int flags;
 {
-	u_int	xmin = GET_MINOR(dev);
+	u_int	unit = GET_MINOR(dev);
 
-	if (IPL_LOGMAX < xmin)
-		xmin = ENXIO;
+	if (IPL_LOGMAX < unit)
+		unit = ENXIO;
 	else
-		xmin = 0;
-	return xmin;
+		unit = 0;
+	return unit;
 }
 
 /*
@@ -939,8 +944,7 @@ int dst;
 	ohlen = 0;
 	ifp = fin->fin_ifp;
 	if (fin->fin_v == 4) {
-		if ((fin->fin_p == IPPROTO_ICMP) &&
-		    !(fin->fin_flx & FI_SHORT))
+		if ((fin->fin_p == IPPROTO_ICMP) && !(fin->fin_flx & FI_SHORT))
 			switch (ntohs(fin->fin_data[0]) >> 8)
 			{
 			case ICMP_ECHO :
@@ -1888,12 +1892,25 @@ int len;
 		dpoff = 0;
 
 	if (M_LEN(m) < len) {
-#ifdef MHLEN
+		mb_t *n = *fin->fin_mp;
 		/*
 		 * Assume that M_PKTHDR is set and just work with what is left
 		 * rather than check..
 		 * Should not make any real difference, anyway.
 		 */
+		if (m != n) {
+			/*
+			 * Record the mbuf that points to the mbuf that we're
+			 * about to go to work on so that we can update the
+			 * m_next appropriately later.
+			 */
+			for (; n->m_next != m; n = n->m_next)
+				;
+		} else {
+			n = NULL;
+		}
+
+#ifdef MHLEN
 		if (len > MHLEN)
 #else
 		if (len > MLEN)
@@ -1905,29 +1922,44 @@ int len;
 #else
 			FREE_MB_T(*fin->fin_mp);
 			m = NULL;
+			n = NULL;
 #endif
 		} else
 		{
 			m = m_pullup(m, len);
 		}
-		*fin->fin_mp = m;
+		if (n != NULL)
+			n->m_next = m;
 		if (m == NULL) {
+			/*
+			 * When n is non-NULL, it indicates that m pointed to
+			 * a sub-chain (tail) of the mbuf and that the head
+			 * of this chain has not yet been free'd.
+			 */
+			if (n != NULL) {
+				FREE_MB_T(*fin->fin_mp);
+			}
+
+			*fin->fin_mp = NULL;
 			fin->fin_m = NULL;
 			ATOMIC_INCL(frstats[out].fr_pull[1]);
 			return NULL;
 		}
+
+		if (n == NULL)
+			*fin->fin_mp = m;
 
 		while (M_LEN(m) == 0) {
 			m = m->m_next;
 		}
 		fin->fin_m = m;
 		ip = MTOD(m, char *) + ipoff;
-	}
 
-	ATOMIC_INCL(frstats[out].fr_pull[0]);
-	fin->fin_ip = (ip_t *)ip;
-	if (fin->fin_dp != NULL)
-		fin->fin_dp = (char *)fin->fin_ip + dpoff;
+		ATOMIC_INCL(frstats[out].fr_pull[0]);
+		fin->fin_ip = (ip_t *)ip;
+		if (fin->fin_dp != NULL)
+			fin->fin_dp = (char *)fin->fin_ip + dpoff;
+	}
 
 	if (len == fin->fin_plen)
 		fin->fin_flx |= FI_COALESCE;
@@ -1944,19 +1976,19 @@ struct lwp *p;
 struct proc *p;
 #endif
 {
-	u_int xmin = GET_MINOR(dev);
+	u_int unit = GET_MINOR(dev);
 	int revents = 0;
 
-	if (IPL_LOGMAX < xmin)
+	if (IPL_LOGMAX < unit)
 		return ENXIO;
 
-	switch (xmin)
+	switch (unit)
 	{
 	case IPL_LOGIPF :
 	case IPL_LOGNAT :
 	case IPL_LOGSTATE :
 #ifdef IPFILTER_LOG
-		if ((events & (POLLIN | POLLRDNORM)) && ipflog_canread(xmin))
+		if ((events & (POLLIN | POLLRDNORM)) && ipflog_canread(unit))
 			revents |= events & (POLLIN | POLLRDNORM);
 #endif
 		break;
@@ -1979,7 +2011,7 @@ struct proc *p;
 	}
 
 	if ((revents == 0) && ((events & (POLLIN|POLLRDNORM)) != 0))
-		selrecord(p, &ipfselwait[xmin]);
+		selrecord(p, &ipfselwait[unit]);
 	return revents;
 }
 
