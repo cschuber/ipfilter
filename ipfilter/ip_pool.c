@@ -96,23 +96,6 @@ static void *ip_pool_exists __P((int, char *));
 ip_pool_stat_t ipoolstat;
 ipfrwlock_t ip_poolrw;
 
-/*
- * Binary tree routines from Sedgewick and enhanced to do ranges of addresses.
- * NOTE: Insertion *MUST* be from greatest range to least for it to work!
- * These should be replaced, eventually, by something else - most notably a
- * interval searching method.  The important feature is to be able to find
- * the best match.
- *
- * So why not use a radix tree for this?  As the first line implies, it
- * has been written to work with a _range_ of addresses.  A range is not
- * necessarily a match with any given netmask so what we end up dealing
- * with is an interval tree.  Implementations of these are hard to find
- * and the one herein is far from bug free.
- *
- * Sigh, in the end I became convinced that the bugs the code contained did
- * not make it worthwhile not using radix trees.  For now the radix tree from
- * 4.4 BSD is used, but this is not viewed as a long term solution.
- */
 ip_pool_t *ip_pool_list[IPL_LOGSIZE] = { NULL, NULL, NULL, NULL,
 					 NULL, NULL, NULL, NULL };
 
