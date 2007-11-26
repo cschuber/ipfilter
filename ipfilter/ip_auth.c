@@ -935,16 +935,6 @@ ipf_auth_ioctlloop:
 	}
 	RWLOCK_EXIT(&ipf_authlk);
 
-	/*
-	 * We exit ipf_global here because a program that enters in
-	 * here will have a lock on it and goto sleep having this lock.
-	 * If someone were to do an 'ipf -D' the system would then
-	 * deadlock.  The catch with releasing it here is that the
-	 * caller of this function expects it to be held when we
-	 * return so we have to reacquire it in here.
-	 */
-	RWLOCK_EXIT(&ipf_global);
-
 	MUTEX_ENTER(&ipf_auth_mx);
 #ifdef	_KERNEL
 # if	SOLARIS
@@ -973,7 +963,6 @@ ipf_auth_ioctlloop:
 # endif /* SOLARIS */
 #endif
 	MUTEX_EXIT(&ipf_auth_mx);
-	READ_ENTER(&ipf_global);
 	if (error == 0)
 		goto ipf_auth_ioctlloop;
 	return error;
