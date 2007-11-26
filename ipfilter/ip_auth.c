@@ -306,7 +306,7 @@ ipf_auth_check(fin, passp)
 
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_auth_new                                                */
-/* Returns:     int - 0 == success, else error                              */
+/* Returns:     int - 1 == success, 0 = did not put packet on auth queue    */
 /* Parameters:  m(I)   - pointer to mb_t with packet in it                  */
 /*              fin(I) - pointer to packet information                      */
 /*                                                                          */
@@ -343,10 +343,10 @@ ipf_auth_new(m, fin)
 	i = ipf_auth_end++;
 	if (ipf_auth_end == ipf_auth_size)
 		ipf_auth_end = 0;
-	RWLOCK_EXIT(&ipf_authlk);
-
 	fra = ipf_auth + i;
 	fra->fra_index = i;
+	RWLOCK_EXIT(&ipf_authlk);
+
 	if (fin->fin_fr != NULL)
 		fra->fra_pass = fin->fin_fr->fr_flags;
 	else
@@ -1071,6 +1071,7 @@ ipf_auth_reply(data)
 	 * not being processed, make sure we advance to the next one.
 	 */
 	if (error == ENOBUFS) {
+		WRITE_ENTER(&ipf_authlk);
 		ipf_auth_used--;
 		fra->fra_index = -1;
 		fra->fra_pass = 0;
@@ -1088,6 +1089,7 @@ ipf_auth_reply(data)
 				ipf_auth_start = ipf_auth_end = 0;
 			}
 		}
+		RWLOCK_EXIT(&ipf_authlk);
 	}
 #endif /* _KERNEL */
 	SPL_X(s);

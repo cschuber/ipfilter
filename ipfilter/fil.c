@@ -2604,8 +2604,7 @@ ipf_firewall(fin, passp)
 	if (FR_ISAUTH(pass)) {
 		if (ipf_auth_new(fin->fin_m, fin) != 0) {
 #ifdef	_KERNEL
-			if ((pass & FR_RETMASK) == 0)
-				fin->fin_m = *fin->fin_mp = NULL;
+			fin->fin_m = *fin->fin_mp = NULL;
 #else
 			;
 #endif
@@ -2898,7 +2897,8 @@ ipf_check(ip, hlen, ifp, out
 	 * Here rather than ipf_firewall because ipf_checkauth may decide
 	 * to return a packet for "keep state"
 	 */
-	if ((pass & FR_KEEPSTATE) && !(fin->fin_flx & FI_STATE)) {
+	if ((pass & FR_KEEPSTATE) && (fin->fin_m != NULL) &&
+	    !(fin->fin_flx & FI_STATE)) {
 		if (ipf_state_add(fin, NULL, 0) != NULL) {
 			ATOMIC_INCL(ipf_stats[out].fr_ads);
 		} else {
