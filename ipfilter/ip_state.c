@@ -942,6 +942,176 @@ ipf_state_insert(is, rev)
 	ipf_state_setqueue(is, rev);
 }
 
+/* ------------------------------------------------------------------------ */
+/* Function:	fr_matchipv4addrs					    */
+/* Returns:	int - 2 addresses match (strong match), 1 reverse match,    */
+/*			0 no match					    */
+/*									    */
+/* Function matches IPv4 addresses it returns strong match for ICMP proto   */
+/* even there is only reverse match					    */
+/* ------------------------------------------------------------------------ */
+static int ipf_matchipv4addrs(ipstate_t *is1, ipstate_t *is2)
+{
+	int	rv;
+
+	if (is1->is_saddr == is2->is_saddr && is1->is_daddr == is2->is_daddr)
+		rv = 2;
+	else if (is1->is_saddr == is2->is_daddr && 
+	    is1->is_daddr == is2->is_saddr) {
+		/* force strong match for ICMP protocol */
+		rv = (is1->is_p == IPPROTO_ICMP) ? 2 : 1;
+	}
+	else
+		rv = 0;
+	
+	return (rv);
+}
+
+/* ------------------------------------------------------------------------ */
+/* Function:	fr_matchipv6addrs					    */
+/* Returns:	int - 2 addresses match (strong match), 1 reverse match,    */
+/*			0 no match					    */
+/*									    */
+/* Function matches IPv6 addresses it returns strong match for ICMP proto   */
+/* even there is only reverse match					    */
+/* ------------------------------------------------------------------------ */
+static int ipf_matchipv6addrs(ipstate_t *is1, ipstate_t *is2)
+{
+	int	rv;
+
+	if (IP6_EQ(&is1->is_src, &is2->is_src) && 
+	    IP6_EQ(&is1->is_dst, &is2->is_dst))  
+		rv = 2;
+	else if (IP6_EQ(&is1->is_src, &is2->is_dst) &&
+	    IP6_EQ(&is1->is_dst, &is2->is_src)) {
+		/* force strong match for ICMPv6 protocol */
+		rv = (is1->is_p == IPPROTO_ICMPV6) ? 2 : 1;
+	}
+	else
+		rv = 0;
+
+	return (rv);
+}
+/* ------------------------------------------------------------------------ */
+/* Function:	fr_matchaddresses					    */
+/* Returns:	int - 2 addresses match, 1 reverse match, zero no match	    */
+/* Parameters:	is1, is2 pointers to states we are checking		    */
+/*									    */
+/* function retruns true if two pairs of addresses belong to single 	    */
+/* connection. suppose there are two endpoints:				    */
+/* 	endpoint1 1.1.1.1						    */
+/*	endpoint2 1.1.1.2						    */
+/*									    */
+/* the state is established by packet flying from .1 to .2 so we see:	    */
+/* 	is1->src = 1.1.1.1						    */
+/*	is1->dst = 1.1.1.2						    */
+/* now endpoint 1.1.1.2 sends answer					    */
+/* retreives is1 record created by first packat and compares it with is2    */
+/* temporal record, is2 is initialized as follows:			    */
+/*	is2->src = 1.1.1.2						    */
+/*	is2->dst = 1.1.1.1						    */
+/* in this case 1 will be returned					    */
+/*									    */
+/* the ipf_matchaddresses() assumes those two records to be same. of course  */
+/* the ipf_matchaddresses() also assume records are same in case you pass    */
+/* identical arguments (i.e. ipf_matchaddress(is1, is1) would return 2	    */
+/* ------------------------------------------------------------------------ */
+static int ipf_matchaddresses(ipstate_t *is1, ipstate_t *is2)
+{
+	int	rv;
+
+	if (is1->is_v == 4) {
+		rv = ipf_matchipv4addrs(is1, is2);
+	}
+	else {
+		rv = ipf_matchipv6addrs(is1, is2);
+	}
+	
+	return (rv);
+}
+
+/* ------------------------------------------------------------------------ */
+/* Function:	fr_matchports						    */
+/* Returns:	int - 2 match, 1 rverse match, 0 no match		    */
+/* Parameters	ppairs1, ppairs - src, dst ports we want to match	    */
+/*									    */
+/* performs the same match for isps members as for addresses		    */
+/* ------------------------------------------------------------------------ */
+static unsigned int ipf_matchports(udpinfo_t *ppairs1, udpinfo_t *ppairs2)
+{
+	int	rv;
+
+	if (ppairs1->us_sport == ppairs2->us_sport && 
+	    ppairs1->us_dport == ppairs2->us_dport)
+		rv = 2;
+	else if (ppairs1->us_sport == ppairs2->us_dport && 
+		    ppairs1->us_dport == ppairs2->us_sport)
+		rv = 1;
+	else
+		rv = 0;
+
+	return (rv);
+}
+
+/* ------------------------------------------------------------------------ */
+/* Function:	fr_matchisps						    */
+/* Returns:	int - nonzero if isps members match, 0 nomatch		    */
+/* Parameters	is1, is2 - states we want to match			    */
+/*									    */
+/* performs the same match for isps members as for addresses		    */
+/* ------------------------------------------------------------------------ */
+static int ipf_matchisps(ipstate_t *is1, ipstate_t *is2)
+{
+	int	rv;
+
+	if (is1->is_p == is2->is_p) switch (is1->is_p) {
+		case	IPPROTO_TCP:
+		case	IPPROTO_UDP:	
+		case	IPPROTO_GRE:
+			/* greinfo_t can be also interprted as port pair */
+			rv = ipf_matchports(&is1->is_ps.is_us, &is2->is_ps.is_us);
+			break;
+		case	IPPROTO_ICMP:
+		case	IPPROTO_ICMPV6:
+			/* force strong match for ICMP datagram. */
+			if (bcmp(&is1->is_ps, &is2->is_ps, sizeof(icmpinfo_t)) == 0) 
+				rv = 2;
+			else
+				rv = 0;
+		default:
+			rv = 0;
+	}
+	else
+		rv = 0;
+
+	return (rv);
+}
+
+/* ------------------------------------------------------------------------ */
+/* Function:	fr_matchstates						    */
+/* Returns:	int - nonzero match, zero no match			    */
+/* Parameters	is1, is2 - states we want to match			    */
+/*									    */
+/* ------------------------------------------------------------------------ */
+static int ipf_matchstates(ipstate_t *is1, ipstate_t *is2)
+{
+	int	rv;
+	int	amatch;
+	int	pmatch;
+
+	if (bcmp(&is1->is_pass, &is2->is_pass,
+		 offsetof(struct ipstate, is_authmsk) -
+		 offsetof(struct ipstate, is_pass)) == 0) {
+		
+		pmatch = ipf_matchisps(is1, is2);
+		amatch = ipf_matchaddresses(is1, is2);
+		rv = (amatch != 0) && (amatch == pmatch);
+	}
+	else
+		rv = 0;
+
+	return (rv);
+}
 
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_state_add                                               */
@@ -1013,7 +1183,13 @@ ipf_state_add(fin, stsave, flags)
 		}
 	}
 
-	pass = (fr == NULL) ? 0 : fr->fr_flags;
+	if (fr == NULL) {
+		pass = ifs->ifs_fr_flags;
+		is->is_tag = FR_NOLOGTAG;
+	}
+	else {
+		pass = fr->fr_flags;
+	}
 
 	ic = NULL;
 	tcp = NULL;
@@ -1021,6 +1197,25 @@ ipf_state_add(fin, stsave, flags)
 	is = &ips;
 	bzero((char *)is, sizeof(*is));
 	is->is_die = 1 + ipf_ticks;
+	/*
+	 * We want to check everything that is a property of this packet,
+	 * but we don't (automatically) care about it's fragment status as
+	 * this may change.
+	 */
+	is->is_pass = pass;
+	is->is_v = fin->fin_v;
+	is->is_opt[0] = fin->fin_optmsk;
+	is->is_optmsk[0] = 0xffffffff;
+	is->is_optmsk[1] = 0xffffffff;
+	if (is->is_v == 6) {
+		is->is_opt[0] &= ~0x8;
+		is->is_optmsk[0] &= ~0x8;
+		is->is_optmsk[1] &= ~0x8;
+	}
+	is->is_sec = fin->fin_secmsk;
+	is->is_secmsk = 0xffff;
+	is->is_auth = fin->fin_auth;
+	is->is_authmsk = 0xffff;
 
 	/*
 	 * Copy and calculate...
@@ -1228,9 +1423,7 @@ ipf_state_add(fin, stsave, flags)
 	 */
 	for (is = ipf_state_table[is->is_hv % ipf_state_size]; is != NULL;
 	     is = is->is_hnext) {
-		if (bcmp(&ips.is_src, &is->is_src,
-			 offsetof(struct ipstate, is_ps) -
-			 offsetof(struct ipstate, is_src)) == 0)
+		if (fr_matchstates(&ips, is) == 1)
 			break;
 	}
 	if (is != NULL) {
@@ -1294,9 +1487,6 @@ ipf_state_add(fin, stsave, flags)
 		strncpy(is->is_ifname[((1 - out) << 1) + 1], fr->fr_ifnames[3],
 			sizeof(fr->fr_ifnames[3]));
 	} else {
-		pass = ipf_flags;
-		is->is_tag = FR_NOLOGTAG;
-
 		if (fin->fin_ifp != NULL) {
 			is->is_ifp[out << 1] = fin->fin_ifp;
 			COPYIFNAME(fin->fin_ifp, is->is_ifname[out << 1]);
@@ -1309,7 +1499,6 @@ ipf_state_add(fin, stsave, flags)
 	 * have it exist at the end of ipf_check() with is_ref == 1.
 	 */
 	is->is_ref = 2;
-	is->is_pass = pass;
 	is->is_pkts[0] = 0, is->is_bytes[0] = 0;
 	is->is_pkts[1] = 0, is->is_bytes[1] = 0;
 	is->is_pkts[2] = 0, is->is_bytes[2] = 0;
@@ -1327,25 +1516,6 @@ ipf_state_add(fin, stsave, flags)
 	if (pass & FR_STATESYNC)
 		is->is_flags |= IS_STATESYNC;
 
-	/*
-	 * We want to check everything that is a property of this packet,
-	 * but we don't (automatically) care about it's fragment status as
-	 * this may change.
-	 */
-	is->is_v = fin->fin_v;
-	is->is_opt[0] = fin->fin_optmsk;
-	is->is_optmsk[0] = 0xffffffff;
-	is->is_optmsk[1] = 0xffffffff;
-	if (is->is_v == 6) {
-		is->is_opt[0] &= ~0x8;
-		is->is_optmsk[0] &= ~0x8;
-		is->is_optmsk[1] &= ~0x8;
-	}
-	is->is_me = stsave;
-	is->is_sec = fin->fin_secmsk;
-	is->is_secmsk = 0xffff;
-	is->is_auth = fin->fin_auth;
-	is->is_authmsk = 0xffff;
 	if (flags & (SI_WILDP|SI_WILDA)) {
 		ATOMIC_INCL(ipf_state_stats.iss_wild);
 	}
