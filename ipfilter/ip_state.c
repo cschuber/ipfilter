@@ -130,6 +130,12 @@ static int ipf_state_flush_entry __P((void *));
 static ips_stat_t *ipf_statetstats __P((void));
 static int ipf_state_del __P((ipstate_t *, int));
 static int ipf_state_remove __P((caddr_t));
+static int ipf_state_match __P((ipstate_t *is1, ipstate_t *is2));
+static int ipf_state_matchaddresses __P((ipstate_t *is1, ipstate_t *is2));
+static int ipf_state_matchipv4addrs __P((ipstate_t *is1, ipstate_t *is2));
+static int ipf_state_matchipv6addrs __P((ipstate_t *is1, ipstate_t *is2));
+static int ipf_state_matchisps __P((ipstate_t *is1, ipstate_t *is2));
+static int ipf_state_matchports __P((udpinfo_t *is1, udpinfo_t *is2));
 static int ipf_state_matcharray __P((ipstate_t *, int *));
 static void ipf_ipsmove __P((ipstate_t *, u_int));
 static int ipf_state_tcp __P((fr_info_t *, tcphdr_t *, ipstate_t *));
@@ -942,15 +948,19 @@ ipf_state_insert(is, rev)
 	ipf_state_setqueue(is, rev);
 }
 
+
 /* ------------------------------------------------------------------------ */
-/* Function:	fr_matchipv4addrs					    */
-/* Returns:	int - 2 addresses match (strong match), 1 reverse match,    */
-/*			0 no match					    */
-/*									    */
+/* Function:    ipf_state_matchipv4addrs                                          */
+/* Returns:     int - 2 addresses match (strong match), 1 reverse match,    */
+/*                    0 no match                                            */
+/* Parameters:  is1, is2 pointers to states we are checking                 */
+/*                                                                          */
 /* Function matches IPv4 addresses it returns strong match for ICMP proto   */
-/* even there is only reverse match					    */
+/* even there is only reverse match                                         */
 /* ------------------------------------------------------------------------ */
-static int ipf_matchipv4addrs(ipstate_t *is1, ipstate_t *is2)
+static int
+ipf_state_matchipv4addrs(is1, is2)
+	ipstate_t *is1, *is2;
 {
 	int	rv;
 
@@ -963,19 +973,23 @@ static int ipf_matchipv4addrs(ipstate_t *is1, ipstate_t *is2)
 	}
 	else
 		rv = 0;
-	
+
 	return (rv);
 }
 
+
 /* ------------------------------------------------------------------------ */
-/* Function:	fr_matchipv6addrs					    */
-/* Returns:	int - 2 addresses match (strong match), 1 reverse match,    */
-/*			0 no match					    */
-/*									    */
+/* Function:    ipf_state_matchipv6addrs                                          */
+/* Returns:     int - 2 addresses match (strong match), 1 reverse match,    */
+/*                    0 no match                                            */
+/* Parameters:  is1, is2 pointers to states we are checking                 */
+/*                                                                          */
 /* Function matches IPv6 addresses it returns strong match for ICMP proto   */
-/* even there is only reverse match					    */
+/* even there is only reverse match                                         */
 /* ------------------------------------------------------------------------ */
-static int ipf_matchipv6addrs(ipstate_t *is1, ipstate_t *is2)
+static int
+ipf_state_matchipv6addrs(is1, is2)
+	ipstate_t *is1, *is2;
 {
 	int	rv;
 
@@ -992,52 +1006,59 @@ static int ipf_matchipv6addrs(ipstate_t *is1, ipstate_t *is2)
 
 	return (rv);
 }
+
+
 /* ------------------------------------------------------------------------ */
-/* Function:	fr_matchaddresses					    */
-/* Returns:	int - 2 addresses match, 1 reverse match, zero no match	    */
-/* Parameters:	is1, is2 pointers to states we are checking		    */
-/*									    */
-/* function retruns true if two pairs of addresses belong to single 	    */
-/* connection. suppose there are two endpoints:				    */
-/* 	endpoint1 1.1.1.1						    */
-/*	endpoint2 1.1.1.2						    */
-/*									    */
-/* the state is established by packet flying from .1 to .2 so we see:	    */
-/* 	is1->src = 1.1.1.1						    */
-/*	is1->dst = 1.1.1.2						    */
-/* now endpoint 1.1.1.2 sends answer					    */
+/* Function:    ipf_state_matchaddresses                                          */
+/* Returns:     int - 2 addresses match, 1 reverse match, zero no match     */
+/* Parameters:  is1, is2 pointers to states we are checking                 */
+/*                                                                          */
+/* function retruns true if two pairs of addresses belong to single         */
+/* connection. suppose there are two endpoints:                             */
+/*      endpoint1 1.1.1.1                                                   */
+/*      endpoint2 1.1.1.2                                                   */
+/*                                                                          */
+/* the state is established by packet flying from .1 to .2 so we see:       */
+/*      is1->src = 1.1.1.1                                                  */
+/*      is1->dst = 1.1.1.2                                                  */
+/* now endpoint 1.1.1.2 sends answer                                        */
 /* retreives is1 record created by first packat and compares it with is2    */
-/* temporal record, is2 is initialized as follows:			    */
-/*	is2->src = 1.1.1.2						    */
-/*	is2->dst = 1.1.1.1						    */
-/* in this case 1 will be returned					    */
-/*									    */
-/* the ipf_matchaddresses() assumes those two records to be same. of course  */
-/* the ipf_matchaddresses() also assume records are same in case you pass    */
-/* identical arguments (i.e. ipf_matchaddress(is1, is1) would return 2	    */
+/* temporal record, is2 is initialized as follows:                          */
+/*      is2->src = 1.1.1.2                                                  */
+/*      is2->dst = 1.1.1.1                                                  */
+/* in this case 1 will be returned                                          */
+/*                                                                          */
+/* the ipf_matchaddresses() assumes those two records to be same. of course */
+/* the ipf_matchaddresses() also assume records are same in case you pass   */
+/* identical arguments (i.e. ipf_matchaddress(is1, is1) would return 2      */
 /* ------------------------------------------------------------------------ */
-static int ipf_matchaddresses(ipstate_t *is1, ipstate_t *is2)
+static int
+ipf_state_matchaddresses(is1, is2)
+	ipstate_t *is1, *is2;
 {
 	int	rv;
 
 	if (is1->is_v == 4) {
-		rv = ipf_matchipv4addrs(is1, is2);
+		rv = ipf_state_matchipv4addrs(is1, is2);
 	}
 	else {
-		rv = ipf_matchipv6addrs(is1, is2);
+		rv = ipf_state_matchipv6addrs(is1, is2);
 	}
-	
+
 	return (rv);
 }
 
+
 /* ------------------------------------------------------------------------ */
-/* Function:	fr_matchports						    */
-/* Returns:	int - 2 match, 1 rverse match, 0 no match		    */
-/* Parameters	ppairs1, ppairs - src, dst ports we want to match	    */
-/*									    */
-/* performs the same match for isps members as for addresses		    */
+/* Function:    ipf_matchports                                              */
+/* Returns:     int - 2 match, 1 rverse match, 0 no match                   */
+/* Parameters:  ppairs1, ppairs - src, dst ports we want to match           */
+/*                                                                          */
+/* performs the same match for isps members as for addresses                */
 /* ------------------------------------------------------------------------ */
-static unsigned int ipf_matchports(udpinfo_t *ppairs1, udpinfo_t *ppairs2)
+static int
+ipf_state_matchports(ppairs1, ppairs2)
+	udpinfo_t *ppairs1, *ppairs2;
 {
 	int	rv;
 
@@ -1053,47 +1074,62 @@ static unsigned int ipf_matchports(udpinfo_t *ppairs1, udpinfo_t *ppairs2)
 	return (rv);
 }
 
+
 /* ------------------------------------------------------------------------ */
-/* Function:	fr_matchisps						    */
-/* Returns:	int - nonzero if isps members match, 0 nomatch		    */
-/* Parameters	is1, is2 - states we want to match			    */
-/*									    */
-/* performs the same match for isps members as for addresses		    */
+/* Function:    ipf_matchisps                                               */
+/* Returns:     int - nonzero if isps members match, 0 nomatch              */
+/* Parameters:  is1, is2 - states we want to match                          */
+/*                                                                          */
+/* performs the same match for isps members as for addresses                */
 /* ------------------------------------------------------------------------ */
-static int ipf_matchisps(ipstate_t *is1, ipstate_t *is2)
+static int
+ipf_state_matchisps(is1, is2)
+	ipstate_t *is1, *is2;
 {
 	int	rv;
 
-	if (is1->is_p == is2->is_p) switch (is1->is_p) {
-		case	IPPROTO_TCP:
-		case	IPPROTO_UDP:	
-		case	IPPROTO_GRE:
+	if (is1->is_p == is2->is_p) {
+		switch (is1->is_p)
+		{
+		case IPPROTO_TCP :
+		case IPPROTO_UDP :
+		case IPPROTO_GRE :
 			/* greinfo_t can be also interprted as port pair */
-			rv = ipf_matchports(&is1->is_ps.is_us, &is2->is_ps.is_us);
+			rv = ipf_state_matchports(&is1->is_ps.is_us,
+						  &is2->is_ps.is_us);
 			break;
-		case	IPPROTO_ICMP:
-		case	IPPROTO_ICMPV6:
+
+		case IPPROTO_ICMP :
+		case IPPROTO_ICMPV6 :
 			/* force strong match for ICMP datagram. */
-			if (bcmp(&is1->is_ps, &is2->is_ps, sizeof(icmpinfo_t)) == 0) 
+			if (bcmp(&is1->is_ps, &is2->is_ps,
+				 sizeof(icmpinfo_t)) == 0)  {
 				rv = 2;
-			else
+			} else {
 				rv = 0;
+			}
+			break;
+
 		default:
 			rv = 0;
-	}
-	else
+		}
+	} else {
 		rv = 0;
+	}
 
 	return (rv);
 }
 
+
 /* ------------------------------------------------------------------------ */
-/* Function:	fr_matchstates						    */
-/* Returns:	int - nonzero match, zero no match			    */
-/* Parameters	is1, is2 - states we want to match			    */
-/*									    */
+/* Function:    ipf_state_match                                             */
+/* Returns:     int - nonzero match, zero no match                          */
+/* Parameters:  is1, is2 - states we want to match                          */
+/*                                                                          */
 /* ------------------------------------------------------------------------ */
-static int ipf_matchstates(ipstate_t *is1, ipstate_t *is2)
+static int
+ipf_state_match(is1, is2)
+	ipstate_t *is1, *is2;
 {
 	int	rv;
 	int	amatch;
@@ -1102,13 +1138,13 @@ static int ipf_matchstates(ipstate_t *is1, ipstate_t *is2)
 	if (bcmp(&is1->is_pass, &is2->is_pass,
 		 offsetof(struct ipstate, is_authmsk) -
 		 offsetof(struct ipstate, is_pass)) == 0) {
-		
-		pmatch = ipf_matchisps(is1, is2);
-		amatch = ipf_matchaddresses(is1, is2);
+
+		pmatch = ipf_state_matchisps(is1, is2);
+		amatch = ipf_state_matchaddresses(is1, is2);
 		rv = (amatch != 0) && (amatch == pmatch);
-	}
-	else
+	} else {
 		rv = 0;
+	}
 
 	return (rv);
 }
@@ -1183,18 +1219,17 @@ ipf_state_add(fin, stsave, flags)
 		}
 	}
 
+	is = &ips;
 	if (fr == NULL) {
-		pass = ifs->ifs_fr_flags;
+		pass = ipf_flags;
 		is->is_tag = FR_NOLOGTAG;
-	}
-	else {
+	} else {
 		pass = fr->fr_flags;
 	}
 
 	ic = NULL;
 	tcp = NULL;
 	out = fin->fin_out;
-	is = &ips;
 	bzero((char *)is, sizeof(*is));
 	is->is_die = 1 + ipf_ticks;
 	/*
@@ -1423,7 +1458,7 @@ ipf_state_add(fin, stsave, flags)
 	 */
 	for (is = ipf_state_table[is->is_hv % ipf_state_size]; is != NULL;
 	     is = is->is_hnext) {
-		if (fr_matchstates(&ips, is) == 1)
+		if (ipf_state_match(&ips, is) == 1)
 			break;
 	}
 	if (is != NULL) {
