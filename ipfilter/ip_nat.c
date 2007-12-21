@@ -1821,7 +1821,6 @@ static int nat_flushtable()
 		j++;
 	}
 
-	nat_stats.ns_inuse = 0;
 	return j;
 }
 
