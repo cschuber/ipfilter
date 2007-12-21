@@ -132,6 +132,7 @@ wait_queue_head_t     ipf_auth_next_linux;
 
 int	ipf_auth_size = FR_NUMAUTH;
 int	ipf_auth_used = 0;
+int	ipf_auth_replies = 0;
 int	ipf_auth_defaultage = 600;
 int	ipf_auth_lock = 0;
 int	ipf_auth_inited = 0;
@@ -270,6 +271,7 @@ ipf_auth_check(fin, passp)
 			ipf_auth_stats.fas_hits++;
 			fra->fra_index = -1;
 			ipf_auth_used--;
+			ipf_auth_replies--;
 			if (i == ipf_auth_start) {
 				while (fra->fra_index == -1) {
 					i++;
@@ -284,7 +286,8 @@ ipf_auth_check(fin, passp)
 				}
 				if (ipf_auth_start == ipf_auth_end) {
 					ipf_auth_next = 0;
-					ipf_auth_start = ipf_auth_end = 0;
+					ipf_auth_start = 0;
+					ipf_auth_end = 0;
 				}
 			}
 			RWLOCK_EXIT(&ipf_authlk);
@@ -343,10 +346,9 @@ ipf_auth_new(m, fin)
 	i = ipf_auth_end++;
 	if (ipf_auth_end == ipf_auth_size)
 		ipf_auth_end = 0;
+
 	fra = ipf_auth + i;
 	fra->fra_index = i;
-	RWLOCK_EXIT(&ipf_authlk);
-
 	if (fin->fin_fr != NULL)
 		fra->fra_pass = fin->fin_fr->fr_flags;
 	else
@@ -374,14 +376,16 @@ ipf_auth_new(m, fin)
 #if SOLARIS && defined(_KERNEL)
 	COPYIFNAME(fin->fin_ifp, fra->fra_info.fin_ifname);
 	m->b_rptr -= qpi->qpi_off;
-	ipf_auth_pkts[i] = *(mblk_t **)fin->fin_mp;
 	fra->fra_q = qpi->qpi_q;	/* The queue can disappear! */
 	fra->fra_m = *fin->fin_mp;
 	fra->fra_info.fin_mp = &fra->fra_m;
+	ipf_auth_pkts[i] = *(mblk_t **)fin->fin_mp;
+	RWLOCK_EXIT(&ipf_authlk);
 	cv_signal(&ipf_auth_wait);
 	pollwakeup(&ipf_poll_head[IPL_LOGAUTH], POLLIN|POLLRDNORM);
 #else
 	ipf_auth_pkts[i] = m;
+	RWLOCK_EXIT(&ipf_authlk);
 	WAKEUP(&ipf_auth_next,0);
 #endif
 	return 1;
@@ -499,10 +503,10 @@ ipf_auth_ioctl(data, cmd, mode, uid, ctx)
 void
 ipf_auth_unload()
 {
-	register int i;
-	register frauthent_t *fae, **faep;
+	frauthent_t *fae, **faep;
 	frentry_t *fr, **frp;
 	mb_t *m;
+	int i;
 
 	if (ipf_auth != NULL) {
 		KFREES(ipf_auth, ipf_auth_size * sizeof(*ipf_authlk));
@@ -575,9 +579,13 @@ ipf_auth_expire()
 	WRITE_ENTER(&ipf_authlk);
 	for (i = 0, fra = ipf_auth; i < ipf_auth_size; i++, fra++) {
 		fra->fra_age--;
-		if ((fra->fra_age == 0) && (m = ipf_auth_pkts[i])) {
-			FREE_MB_T(m);
-			ipf_auth_pkts[i] = NULL;
+		if ((fra->fra_age == 0) && (ipf_auth[i].fra_index != -1)) {
+			if ((m = ipf_auth_pkts[i]) != NULL) {
+				FREE_MB_T(m);
+				ipf_auth_pkts[i] = NULL;
+			} else if (ipf_auth[i].fra_index == -2) {
+				ipf_auth_replies--;
+			}
 			ipf_auth[i].fra_index = -1;
 			ipf_auth_stats.fas_expire++;
 			ipf_auth_used--;
@@ -706,7 +714,7 @@ ipf_auth_precmd(cmd, fr, frptr)
 int
 ipf_auth_flush()
 {
-	register int i, num_flushed;
+	int i, num_flushed;
 	mb_t *m;
 
 	if (ipf_auth_lock)
@@ -715,14 +723,16 @@ ipf_auth_flush()
 	num_flushed = 0;
 
 	for (i = 0 ; i < ipf_auth_size; i++) {
-		m = ipf_auth_pkts[i];
-		if (m != NULL) {
-			FREE_MB_T(m);
-			ipf_auth_pkts[i] = NULL;
+		if (ipf_auth[i].fra_index != -1) {
+			m = ipf_auth_pkts[i];
+			if (m != NULL) {
+				FREE_MB_T(m);
+				ipf_auth_pkts[i] = NULL;
+			}
+
 			ipf_auth[i].fra_index = -1;
 			/* perhaps add & use a flush counter inst.*/
 			ipf_auth_stats.fas_expire++;
-			ipf_auth_used--;
 			num_flushed++;
 		}
 	}
@@ -730,6 +740,8 @@ ipf_auth_flush()
 	ipf_auth_start = 0;
 	ipf_auth_end = 0;
 	ipf_auth_next = 0;
+	ipf_auth_used = 0;
+	ipf_auth_replies = 0;
 
 	return num_flushed;
 }
@@ -897,8 +909,10 @@ ipf_auth_ioctlloop:
 
 		error = ipf_outobj(data, &ipf_auth[ipf_auth_next],
 				   IPFOBJ_FRAUTH);
-		if (error != 0)
+		if (error != 0) {
+			RWLOCK_EXIT(&ipf_authlk);
 			return error;
+		}
 
 		if (auth.fra_len != 0 && auth.fra_buf != NULL) {
 			/*
@@ -916,8 +930,10 @@ ipf_auth_ioctlloop:
 				error = copyoutptr(MTOD(m, char *), &t, i);
 				len -= i;
 				t += i;
-				if (error != 0)
+				if (error != 0) {
+					RWLOCK_EXIT(&ipf_authlk);
 					return error;
+				}
 				m = m->m_next;
 			}
 		}
@@ -984,6 +1000,7 @@ ipf_auth_reply(data)
 	char *data;
 {
 	frauth_t auth, *au = &auth, *fra;
+	fr_info_t fin;
 	int error, i;
 	mb_t *m;
 	SPL_INT(s);
@@ -1021,6 +1038,8 @@ ipf_auth_reply(data)
 	fra->fra_index = -2;
 	fra->fra_pass = au->fra_pass;
 	ipf_auth_pkts[i] = NULL;
+	ipf_auth_replies++;
+	bcopy(&fra->fra_info, &fin, sizeof(fin));
 
 	RWLOCK_EXIT(&ipf_authlk);
 
@@ -1033,7 +1052,7 @@ ipf_auth_reply(data)
 	 */
 #ifdef	_KERNEL
 	if ((m != NULL) && (au->fra_info.fin_out != 0)) {
-		error = ipf_inject(&fra->fra_info, m);
+		error = ipf_inject(&fin, m);
 		if (error != 0) {
 			ipf_interror = 10016;
 			error = ENOBUFS;
@@ -1042,7 +1061,7 @@ ipf_auth_reply(data)
 			ipf_auth_stats.fas_sendok++;
 		}
 	} else if (m) {
-		error = ipf_inject(&fra->fra_info, m);
+		error = ipf_inject(&fin, m);
 		if (error != 0) {
 			ipf_interror = 10017;
 			error = ENOBUFS;

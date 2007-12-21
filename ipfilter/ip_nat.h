@@ -252,6 +252,9 @@ typedef	struct	ipnat	{
 	char		in_plabel[APR_LABELLEN];	/* proxy label. */
 	char		in_pconfig[APR_LABELLEN];	/* proxy label. */
 	ipftag_t	in_tag;
+	int		in_limit;
+	U_QUAD_T	in_pkts[2];
+	U_QUAD_T	in_bytes[2];
 } ipnat_t;
 
 /*

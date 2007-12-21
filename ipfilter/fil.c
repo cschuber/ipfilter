@@ -2459,7 +2459,7 @@ ipf_scanlist(fin, pass)
 			 * the rule to "not match" and keep on processing
 			 * filter rules.
 			 */
-			if ((pass & FR_KEEPSTATE) &&
+			if ((pass & FR_KEEPSTATE) && !FR_ISAUTH(pass) &&
 			    !(fin->fin_flx & FI_STATE)) {
 				int out = fin->fin_out;
 
@@ -2780,6 +2780,18 @@ ipf_check(ip, hlen, ifp, out
 
 	bzero((char *)fin, sizeof(*fin));
 	m = *mp;
+# if defined(M_MCAST)
+	if ((m->m_flags & M_MCAST) != 0)
+		fin->fin_flx |= FI_MBCAST|FI_MULTICAST;
+# endif
+# if defined(M_MLOOP)
+	if ((m->m_flags & M_MLOOP) != 0)
+		fin->fin_flx |= FI_MBCAST|FI_MULTICAST;
+# endif
+# if defined(M_BCAST)
+	if ((m->m_flags & M_BCAST) != 0)
+		fin->fin_flx |= FI_MBCAST|FI_BROADCAST;
+# endif
 #endif /* _KERNEL */
 
 	fin->fin_v = v;
@@ -2854,24 +2866,25 @@ ipf_check(ip, hlen, ifp, out
 
 	READ_ENTER(&ipf_mutex);
 
-	/*
-	 * Check auth now.  This, combined with the check below to see if apass
-	 * is 0 is to ensure that we don't count the packet twice, which can
-	 * otherwise occur when we reprocess it.  As it is, we only count it
-	 * after it has no auth. table matchup.  This also stops NAT from
-	 * occuring until after the packet has been auth'd.
-	 *
-	 * If a packet is found in the auth table, then skip checking
-	 * the access lists for permission but we do need to consider
-	 * the result as if it were from the ACL's.
-	 */
-	fr = ipf_auth_check(fin, &pass);
 	if (!out && (ipf_specfuncref[1][ipf_active] == 0)) {
 		if (ipf_nat_checkin(fin, &pass) == -1) {
 			goto filterdone;
 		}
 	}
-	if (!out)
+	/*
+	 * Check auth now.  This, combined with the check below to see if apass
+	 * is 0 is to ensure that we don't count the packet twice, which can
+	 * otherwise occur when we reprocess it.  As it is, we only count it
+	 * after it has no auth. table matchup.
+	 *
+	 * If a packet is found in the auth table, then skip checking
+	 * the access lists for permission but we do need to consider
+	 * the result as if it were from the ACL's.  In addition, being
+	 * found in the auth table means it has been seen before, so do
+	 * not pass it through accounting (again), lest it be counted twice.
+	 */
+	fr = ipf_auth_check(fin, &pass);
+	if (!out && (fr == NULL))
 		(void) ipf_acctpkt(fin, NULL);
 
 	if (fr == NULL) {
@@ -3025,7 +3038,7 @@ filterdone:
 	 * the 'current' rule fr is not NULL), then we may have some extra
 	 * instructions about what to do with a packet.
 	 * Once we're finished return to our caller, freeing the packet if
-	 * we are dropping it (* BSD ONLY *).
+	 * we are dropping it.
 	 */
 	if (fr != NULL) {
 		frdest_t *fdp;

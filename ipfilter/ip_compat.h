@@ -820,22 +820,24 @@ typedef	u_int32_t	u_32_t;
 # if (__FreeBSD_version >= 700000)
 #  include <sys/selinfo.h>
 # endif
-# if (__FreeBSD_version >= 500043) && defined(_KERNEL)
+# if (__FreeBSD_version >= 500043)
 #  include <sys/mutex.h>
 #  if (__FreeBSD_version >= 700014)
 #   include <sys/rwlock.h>
 #   define	KRWLOCK_T		struct rwlock
-#   define	READ_ENTER(x)		rw_rlock(&(x)->ipf_lk)
-#   define	WRITE_ENTER(x)		rw_wlock(&(x)->ipf_lk)
-#   define	MUTEX_DOWNGRADE(x)	rw_downgrade(&(x)->ipf_lk)
-#   define	RWLOCK_INIT(x,y)	rw_init(&(x)->ipf_lk, (y))
-#   define	RW_DESTROY(x)		rw_destroy(&(x)->ipf_lk)
-#   define	RWLOCK_EXIT(x)		do { \
+#   ifdef _KERNEL
+#    define	READ_ENTER(x)		rw_rlock(&(x)->ipf_lk)
+#    define	WRITE_ENTER(x)		rw_wlock(&(x)->ipf_lk)
+#    define	MUTEX_DOWNGRADE(x)	rw_downgrade(&(x)->ipf_lk)
+#    define	RWLOCK_INIT(x,y)	rw_init(&(x)->ipf_lk, (y))
+#    define	RW_DESTROY(x)		rw_destroy(&(x)->ipf_lk)
+#    define	RWLOCK_EXIT(x)		do { \
 					    if (rw_wowned(&(x)->ipf_lk)) \
 					    	rw_wunlock(&(x)->ipf_lk); \
 					    else \
 						rw_runlock(&(x)->ipf_lk); \
 					} while (0)
+#   endif
 #  else
 #   include <sys/sx.h>
 /*
@@ -845,29 +847,33 @@ typedef	u_int32_t	u_32_t;
  */
 #   if (__FreeBSD_version < 700000)
 #    define	KRWLOCK_T		struct mtx
-#    define	READ_ENTER(x)		mtx_lock(&(x)->ipf_lk)
-#    define	WRITE_ENTER(x)		mtx_lock(&(x)->ipf_lk)
-#    define	RWLOCK_EXIT(x)		mtx_unlock(&(x)->ipf_lk)
-#    define	MUTEX_DOWNGRADE(x)	;
-#    define	RWLOCK_INIT(x,y)	mtx_init(&(x)->ipf_lk, (y), NULL,\
+#    ifdef _KERNEL
+#     define	READ_ENTER(x)		mtx_lock(&(x)->ipf_lk)
+#     define	WRITE_ENTER(x)		mtx_lock(&(x)->ipf_lk)
+#     define	RWLOCK_EXIT(x)		mtx_unlock(&(x)->ipf_lk)
+#     define	MUTEX_DOWNGRADE(x)	;
+#     define	RWLOCK_INIT(x,y)	mtx_init(&(x)->ipf_lk, (y), NULL,\
 						 MTX_DEF)
-#    define	RW_DESTROY(x)		mtx_destroy(&(x)->ipf_lk)
+#     define	RW_DESTROY(x)		mtx_destroy(&(x)->ipf_lk)
+#    endif
 #   else
 #    define	KRWLOCK_T		struct sx
-#    define	READ_ENTER(x)		sx_slock(&(x)->ipf_lk)
-#    define	WRITE_ENTER(x)		sx_xlock(&(x)->ipf_lk)
-#    define	MUTEX_DOWNGRADE(x)	sx_downgrade(&(x)->ipf_lk)
-#    define	RWLOCK_INIT(x, y)	sx_init(&(x)->ipf_lk, (y))
-#    define	RW_DESTROY(x)		sx_destroy(&(x)->ipf_lk)
-#    ifdef sx_unlock
-#     define	RWLOCK_EXIT(x)		sx_unlock(&(x)->ipf_lk)
-#    else
-#     define	RWLOCK_EXIT(x)		do { \
+#    ifdef _KERNEL
+#     define	READ_ENTER(x)		sx_slock(&(x)->ipf_lk)
+#     define	WRITE_ENTER(x)		sx_xlock(&(x)->ipf_lk)
+#     define	MUTEX_DOWNGRADE(x)	sx_downgrade(&(x)->ipf_lk)
+#     define	RWLOCK_INIT(x, y)	sx_init(&(x)->ipf_lk, (y))
+#     define	RW_DESTROY(x)		sx_destroy(&(x)->ipf_lk)
+#     ifdef sx_unlock
+#      define	RWLOCK_EXIT(x)		sx_unlock(&(x)->ipf_lk)
+#     else
+#      define	RWLOCK_EXIT(x)		do { \
 					    if ((x)->ipf_lk.sx_cnt < 0) \
 						sx_xunlock(&(x)->ipf_lk); \
 					    else \
 						sx_sunlock(&(x)->ipf_lk); \
 					} while (0)
+#     endif
 #    endif
 #   endif
 #  endif
@@ -1473,6 +1479,12 @@ typedef	struct	mb_s	{
 # define	m_flags		mb_flags
 # undef		m_data
 # define	m_data		mb_data
+# undef		M_MCAST
+# define	M_MCAST		0x01
+# undef		M_BCAST
+# define	M_BCAST		0x02
+# undef		M_MBCAST
+# define	M_MBCAST	0x04
 # define	MSGDSIZE(x)	msgdsize(x)
 # define	M_LEN(x)	(x)->mb_len
 # define	M_DUPLICATE(x)	dupmbt(x)

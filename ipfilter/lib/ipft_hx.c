@@ -107,6 +107,23 @@ static	int	hex_readip(mb, ifn, dir)
 				} else if (ifn)
 					*ifn = t;
 			}
+
+			while (*s++ == '+') {
+				if (!strncasecmp(s, "mcast", 5)) {
+					mb->mb_flags |= M_MCAST;
+					s += 5;
+				}
+				if (!strncasecmp(s, "bcast", 5)) {
+					mb->mb_flags |= M_BCAST;
+					s += 5;
+				}
+				if (!strncasecmp(s, "mbcast", 6)) {
+					mb->mb_flags |= M_MBCAST;
+					s += 6;
+				}
+			}
+			while (ISSPACE(*s))
+				s++;
 		} else
 			s = line;
 		t = (char *)ip;

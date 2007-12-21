@@ -1599,7 +1599,7 @@ extern	int		ipf_getnextrule __P((ipftoken_t *, void *));
 extern	void		ipf_expiretokens __P((void));
 extern	void		ipf_freetoken __P((ipftoken_t *));
 extern	int		ipf_deltoken __P((int,int, void *));
-#ifdef MENTAT
+#if defined(MENTAT) && defined(_KERNEL)
 extern	int		ipf_sync __P((void));
 #else
 extern	int		ipf_sync __P((void *));
