@@ -2080,7 +2080,6 @@ ipf_nat_flushtable()
 		j++;
 	}
 
-	ipf_nat_stats.ns_active = 0;
 	return j;
 }
 
