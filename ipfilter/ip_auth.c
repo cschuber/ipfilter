@@ -132,6 +132,7 @@ wait_queue_head_t     fr_authnext_linux;
 
 int	fr_authsize = FR_NUMAUTH;
 int	fr_authused = 0;
+int	fr_authreplies = 0;
 int	fr_defaultauthage = 600;
 int	fr_auth_lock = 0;
 int	fr_auth_init = 0;
@@ -264,6 +265,7 @@ u_32_t *passp;
 			fr_authstats.fas_hits++;
 			fra->fra_index = -1;
 			fr_authused--;
+			fr_authreplies--;
 			if (i == fr_authstart) {
 				while (fra->fra_index == -1) {
 					i++;
@@ -278,7 +280,8 @@ u_32_t *passp;
 				}
 				if (fr_authstart == fr_authend) {
 					fr_authnext = 0;
-					fr_authstart = fr_authend = 0;
+					fr_authstart = 0;
+					fr_authend = 0;
 				}
 			}
 			RWLOCK_EXIT(&ipf_auth);
@@ -300,7 +303,7 @@ u_32_t *passp;
 
 /* ------------------------------------------------------------------------ */
 /* Function:    fr_newauth                                                  */
-/* Returns:     int - 1 == success, 0 = did not put packet on auth queue    */
+/* Returns:     int - 0 == success, else error                              */
 /* Parameters:  m(I)   - pointer to mb_t with packet in it                  */
 /*              fin(I) - pointer to packet information                      */
 /*                                                                          */
@@ -336,10 +339,9 @@ fr_info_t *fin;
 	i = fr_authend++;
 	if (fr_authend == fr_authsize)
 		fr_authend = 0;
+
 	fra = fr_auth + i;
 	fra->fra_index = i;
-	RWLOCK_EXIT(&ipf_auth);
-
 	if (fin->fin_fr != NULL)
 		fra->fra_pass = fin->fin_fr->fr_flags;
 	else
@@ -367,16 +369,18 @@ fr_info_t *fin;
 #if SOLARIS && defined(_KERNEL)
 	COPYIFNAME(fin->fin_v, fin->fin_ifp, fra->fra_info.fin_ifname);
 	m->b_rptr -= qpi->qpi_off;
-	fr_authpkts[i] = *(mblk_t **)fin->fin_mp;
 # if !defined(_INET_IP_STACK_H)
 	fra->fra_q = qpi->qpi_q;	/* The queue can disappear! */
 # endif
 	fra->fra_m = *fin->fin_mp;
 	fra->fra_info.fin_mp = &fra->fra_m;
+	fr_authpkts[i] = fra->fra_m;
+	RWLOCK_EXIT(&ipf_auth);
 	cv_signal(&ipfauthwait);
 	pollwakeup(&iplpollhead[IPL_LOGAUTH], POLLIN|POLLRDNORM);
 #else
 	fr_authpkts[i] = m;
+	RWLOCK_EXIT(&ipf_auth);
 	WAKEUP(&fr_authnext,0);
 #endif
 	return 1;
@@ -560,9 +564,14 @@ void fr_authexpire()
 	WRITE_ENTER(&ipf_auth);
 	for (i = 0, fra = fr_auth; i < fr_authsize; i++, fra++) {
 		fra->fra_age--;
-		if ((fra->fra_age == 0) && (m = fr_authpkts[i])) {
-			FREE_MB_T(m);
-			fr_authpkts[i] = NULL;
+		if ((fra->fra_age == 0) && (fr_auth[i].fra_index != -1)) {
+			if ((m = fr_authpkts[i]) != NULL) {
+				FREE_MB_T(m);
+				fr_authpkts[i] = NULL;
+			} else if (fr_auth[i].fra_index == -2) {
+				fr_authreplies--;
+			}
+
 			fr_auth[i].fra_index = -1;
 			fr_authstats.fas_expire++;
 			fr_authused--;
@@ -687,14 +696,16 @@ int fr_authflush()
 	num_flushed = 0;
 
 	for (i = 0 ; i < fr_authsize; i++) {
-		m = fr_authpkts[i];
-		if (m != NULL) {
-			FREE_MB_T(m);
-			fr_authpkts[i] = NULL;
+		if (fr_auth[i].fra_index != -1) {
+			m = fr_authpkts[i];
+			if (m != NULL) {
+				FREE_MB_T(m);
+				fr_authpkts[i] = NULL;
+			}
+
 			fr_auth[i].fra_index = -1;
 			/* perhaps add & use a flush counter inst.*/
 			fr_authstats.fas_expire++;
-			fr_authused--;
 			num_flushed++;
 		}
 	}
@@ -702,6 +713,8 @@ int fr_authflush()
 	fr_authstart = 0;
 	fr_authend = 0;
 	fr_authnext = 0;
+	fr_authused = 0;
+	fr_authreplies = 0;
 
 	return num_flushed;
 }
@@ -854,7 +867,7 @@ fr_authioctlloop:
 	 * is a packet waiting to be delt with in the fr_authpkts array.  We
 	 * copy as much of that out to user space as requested.
 	 */
-	if (fr_authused > 0) {
+	if (fr_authused > fr_authreplies) {
 		while (fr_authpkts[fr_authnext] == NULL) {
 			fr_authnext++;
 			if (fr_authnext == fr_authsize)
@@ -862,8 +875,10 @@ fr_authioctlloop:
 		}
 
 		error = fr_outobj(data, &fr_auth[fr_authnext], IPFOBJ_FRAUTH);
-		if (error != 0)
+		if (error != 0) {
+			RWLOCK_EXIT(&ipf_auth);
 			return error;
+		}
 
 		if (auth.fra_len != 0 && auth.fra_buf != NULL) {
 			/*
@@ -881,8 +896,10 @@ fr_authioctlloop:
 				error = copyoutptr(MTOD(m, char *), &t, i);
 				len -= i;
 				t += i;
-				if (error != 0)
+				if (error != 0) {
+					RWLOCK_EXIT(&ipf_auth);
 					return error;
+				}
 				m = m->m_next;
 			}
 		}
@@ -899,6 +916,16 @@ fr_authioctlloop:
 		return 0;
 	}
 	RWLOCK_EXIT(&ipf_auth);
+
+	/*
+	 * We exit ipf_global here because a program that enters in
+	 * here will have a lock on it and goto sleep having this lock.
+	 * If someone were to do an 'ipf -D' the system would then
+	 * deadlock.  The catch with releasing it here is that the
+	 * caller of this function expects it to be held when we
+	 * return so we have to reacquire it in here.
+	 */
+	RWLOCK_EXIT(&ipf_global);
 
 	MUTEX_ENTER(&ipf_authmx);
 #ifdef	_KERNEL
@@ -926,6 +953,7 @@ fr_authioctlloop:
 # endif /* SOLARIS */
 #endif
 	MUTEX_EXIT(&ipf_authmx);
+	READ_ENTER(&ipf_global);
 	if (error == 0)
 		goto fr_authioctlloop;
 	return error;
@@ -946,6 +974,7 @@ int fr_authreply(data)
 char *data;
 {
 	frauth_t auth, *au = &auth, *fra;
+	fr_info_t fin;
 	int error, i;
 	mb_t *m;
 	SPL_INT(s);
@@ -977,6 +1006,8 @@ char *data;
 	fra->fra_index = -2;
 	fra->fra_pass = au->fra_pass;
 	fr_authpkts[i] = NULL;
+	fr_authreplies++;
+	bcopy(&fra->fra_info, &fin, sizeof(fin));
 
 	RWLOCK_EXIT(&ipf_auth);
 
@@ -989,7 +1020,7 @@ char *data;
 	 */
 #ifdef	_KERNEL
 	if ((m != NULL) && (au->fra_info.fin_out != 0)) {
-		error = ipf_inject(&fra->fra_info, m);
+		error = ipf_inject(&fin, m);
 		if (error != 0) {
 			error = ENOBUFS;
 			fr_authstats.fas_sendfail++;
@@ -997,7 +1028,7 @@ char *data;
 			fr_authstats.fas_sendok++;
 		}
 	} else if (m) {
-		error = ipf_inject(&fra->fra_info, m);
+		error = ipf_inject(&fin, m);
 		if (error != 0) {
 			error = ENOBUFS;
 			fr_authstats.fas_quefail++;
@@ -1014,21 +1045,33 @@ char *data;
 	 */
 	if (error == ENOBUFS) {
 		WRITE_ENTER(&ipf_auth);
-		fr_authused--;
-		fra->fra_index = -1;
-		fra->fra_pass = 0;
-		if (i == fr_authstart) {
-			while (fra->fra_index == -1) {
-				i++;
-				if (i == fr_authsize)
-					i = 0;
-				fr_authstart = i;
-				if (i == fr_authend)
-					break;
-			}
-			if (fr_authstart == fr_authend) {
-				fr_authnext = 0;
-				fr_authstart = fr_authend = 0;
+		/*
+		 * Check that the queue item has not been flushed
+		 * (and possible reused) yet.
+		 */
+		if ((fra->fra_index == -2) &&
+		    !bcmp((char *)&fin, (char *)&fra->fra_info, sizeof(fin))) {
+			fr_authused--;
+			fr_authreplies--;
+			fra->fra_index = -1;
+			fra->fra_pass = 0;
+			if (i == fr_authstart) {
+				while (fra->fra_index == -1) {
+					i++;
+					fra++;
+					if (i == fr_authsize) {
+						i = 0;
+						fra = fr_auth;
+					}
+					fr_authstart = i;
+					if (i == fr_authend)
+						break;
+				}
+				if (fr_authstart == fr_authend) {
+					fr_authnext = 0;
+					fr_authstart = 0;
+					fr_authend = 0;
+				}
 			}
 		}
 		RWLOCK_EXIT(&ipf_auth);

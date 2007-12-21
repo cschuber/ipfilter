@@ -2150,7 +2150,7 @@ u_32_t pass;
 			 * the rule to "not match" and keep on processing
 			 * filter rules.
 			 */
-			if ((pass & FR_KEEPSTATE) &&
+			if ((pass & FR_KEEPSTATE) && !FR_ISAUTH(pass) &&
 			    !(fin->fin_flx & FI_STATE)) {
 				int out = fin->fin_out;
 
@@ -2555,20 +2555,26 @@ int out;
 
 	READ_ENTER(&ipf_mutex);
 
-	/*
-	 * Check auth now.  This, combined with the check below to see if apass
-	 * is 0 is to ensure that we don't count the packet twice, which can
-	 * otherwise occur when we reprocess it.  As it is, we only count it
-	 * after it has no auth. table matchup.  This also stops NAT from
-	 * occuring until after the packet has been auth'd.
-	 */
-	fr = fr_checkauth(fin, &pass);
 	if (!out) {
 		if (fr_checknatin(fin, &pass) == -1) {
 			goto filterdone;
 		}
 	}
-	if (!out)
+
+	/*
+	 * Check auth now.  This, combined with the check below to see if apass
+	 * is 0 is to ensure that we don't count the packet twice, which can
+	 * otherwise occur when we reprocess it.  As it is, we only count it
+	 * after it has no auth. table matchup.
+	 *
+	 * If a packet is found in the auth table, then skip checking
+	 * the access lists for permission but we do need to consider
+	 * the result as if it were from the ACL's.  In addition, being
+	 * found in the auth table means it has been seen before, so do
+	 * not pass it through accounting (again), lest it be counted twice.
+	 */
+	fr = fr_checkauth(fin, &pass);
+	if (!out && (fr == NULL))
 		(void) fr_acctpkt(fin, NULL);
 
 	if (fr == NULL) {
