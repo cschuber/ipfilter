@@ -212,7 +212,7 @@ typedef	union	i6addr	{
 		  } \
 		}
 #define	IP6_AND(a,b,d)	{ i6addr_t *_s1 = (i6addr_t *)(a); \
-			  i6addr_t *_s2 = (i6addr_t *)(d); \
+			  i6addr_t *_s2 = (i6addr_t *)(b); \
 			  i6addr_t *_d = (i6addr_t *)(d); \
 			  _d->i6[0] = _s1->i6[0] & _s2->i6[0]; \
 			  _d->i6[1] = _s1->i6[1] & _s2->i6[1]; \
@@ -220,10 +220,10 @@ typedef	union	i6addr	{
 			  _d->i6[3] = _s1->i6[3] & _s2->i6[3]; \
 			}
 #define	IP6_MASKEQ(a,m,b) \
-			(((I60(a) & I60(m)) == I60(b)) && \
-			 ((I61(a) & I61(m)) == I61(b)) && \
+			(((I63(a) & I63(m)) == I63(b)) && \
 			 ((I62(a) & I62(m)) == I62(b)) && \
-			 ((I63(a) & I63(m)) == I63(b)))
+			 ((I61(a) & I61(m)) == I61(b)) && \
+			 ((I60(a) & I60(m)) == I60(b)))
 #define	IP6_MERGE(a,b,c) \
 			{ i6addr_t *_d, *_s1, *_s2; \
 			  _d = (i6addr_t *)(a); \
@@ -378,15 +378,17 @@ typedef	struct	fr_info	{
 #define	fin_secmsk	fin_fi.fi_secmsk
 #define	fin_auth	fin_fi.fi_auth
 #define	fin_src		fin_fi.fi_src.in4
-#define	fin_src6	fin_fi.fi_src.in6
 #define	fin_saddr	fin_fi.fi_saddr
 #define	fin_dst		fin_fi.fi_dst.in4
-#define	fin_dst6	fin_fi.fi_dst.in6
 #define	fin_daddr	fin_fi.fi_daddr
 #define	fin_data	fin_fi.fi_ports
 #define	fin_sport	fin_fi.fi_ports[0]
 #define	fin_dport	fin_fi.fi_ports[1]
 #define	fin_tcpf	fin_fi.fi_tcpf
+#ifdef USE_INET6
+# define	fin_src6	fin_fi.fi_src.in6
+# define	fin_dst6	fin_fi.fi_dst.in6
+#endif
 
 #define	IPF_IN		0
 #define	IPF_OUT		1
@@ -1389,6 +1391,9 @@ typedef struct ipfexp {
 #define	IPF_EXP_IP_ADDR		0x00000002
 #define	IPF_EXP_IP_SRCADDR	0x00000003
 #define	IPF_EXP_IP_DSTADDR	0x00000004
+#define	IPF_EXP_IP6_ADDR	0x00000005
+#define	IPF_EXP_IP6_SRCADDR	0x00000006
+#define	IPF_EXP_IP6_DSTADDR	0x00000007
 #define	IPF_EXP_TCP_FLAGS	0x00060001
 #define	IPF_EXP_TCP_PORT	0x00060002
 #define	IPF_EXP_TCP_SPORT	0x00060003

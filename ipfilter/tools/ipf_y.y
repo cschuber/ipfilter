@@ -1987,7 +1987,7 @@ static frentry_t *addrule()
 static u_32_t lookuphost(name)
 char *name;
 {
-	u_32_t addr;
+	i6addr_t addr;
 	int i;
 
 	hashed = 0;
@@ -2003,11 +2003,11 @@ char *name;
 		}
 	}
 
-	if (gethost(name, &addr) == -1) {
+	if (gethost(4, name, &addr) == -1) {
 		fprintf(stderr, "unknown name \"%s\"\n", name);
 		return 0;
 	}
-	return addr;
+	return addr.in4.s_addr;
 }
 
 

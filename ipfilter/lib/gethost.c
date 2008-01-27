@@ -8,35 +8,66 @@
 
 #include "ipf.h"
 
-int gethost(name, hostp)
+int gethost(v, name, hostp)
+	int v;
 	char *name;
-	u_32_t *hostp;
+	i6addr_t *hostp;
 {
 	struct hostent *h;
 	struct netent *n;
 	u_32_t addr;
 
 	if (!strcmp(name, "test.host.dots")) {
-		*hostp = htonl(0xfedcba98);
+		if (v == 4) {
+			hostp->in4.s_addr = htonl(0xfedcba98);
+		}
+#ifdef USE_INET6
+		if (v == 6) {
+			hostp->i6[0] = 0xfe80aa55;
+			hostp->i6[1] = 0x12345678;
+			hostp->i6[2] = 0x5a5aa5a5;
+			hostp->i6[3] = 0xfedcba98;
+		}
+#endif
 		return 0;
 	}
 
 	if (!strcmp(name, "<thishost>"))
 		name = thishost;
 
-	h = gethostbyname(name);
-	if (h != NULL) {
-		if ((h->h_addr != NULL) && (h->h_length == sizeof(addr))) {
-			bcopy(h->h_addr, (char *)&addr, sizeof(addr));
-			*hostp = addr;
+	if (v == 4) {
+		h = gethostbyname(name);
+		if (h != NULL) {
+			if ((h->h_addr != NULL) &&
+			    (h->h_length == sizeof(addr))) {
+				bcopy(h->h_addr, (char *)&addr, sizeof(addr));
+				hostp->in4.s_addr = addr;
+				return 0;
+			}
+		}
+
+		n = getnetbyname(name);
+		if (n != NULL) {
+			hostp->in4.s_addr = htonl(n->n_net & 0xffffffff);
 			return 0;
 		}
 	}
+#ifdef USE_INET6
+	if (v == 6) {
+		struct addrinfo hints, *res;
+		struct sockaddr_in6 *sin6;
 
-	n = getnetbyname(name);
-	if (n != NULL) {
-		*hostp = (u_32_t)htonl(n->n_net & 0xffffffff);
-		return 0;
+		bzero((char *)&hints, sizeof(hints));
+		hints.ai_family = PF_INET6;
+
+		getaddrinfo(name, NULL, &hints, &res);
+		if (res != NULL) {
+			sin6 = (struct sockaddr_in6 *)res->ai_addr;
+			hostp->in6 = sin6->sin6_addr;
+			freeaddrinfo(res);
+			return 0;
+		}
 	}
+#endif
 	return -1;
 }

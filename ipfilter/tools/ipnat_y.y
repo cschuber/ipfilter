@@ -937,10 +937,12 @@ hexnumber:
 	;
 
 hostname:
-	YY_STR				{ if (gethost($1, &$$.s_addr) == -1)
+	YY_STR				{ i6addr_t addr;
+					  if (gethost(4, $1, &addr) == -1)
 						fprintf(stderr,
 							"Unknown host '%s'\n",
 							$1);
+					  $$ = addr.in4;
 					  free($1);
 					}
 	| YY_NUMBER			{ $$.s_addr = htonl($1); }

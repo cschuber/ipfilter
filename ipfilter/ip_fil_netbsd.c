@@ -826,7 +826,7 @@ ipf_send_icmp_err(type, fin, dst)
 				return -1;
 			}
 		} else
-			dst6 = fin->fin_dst6;
+			dst6.in6 = fin->fin_dst6;
 	}
 #endif
 	else {
@@ -884,7 +884,7 @@ ipf_send_icmp_err(type, fin, dst)
 		ip6->ip6_plen = htons(iclen - hlen);
 		ip6->ip6_nxt = IPPROTO_ICMPV6;
 		ip6->ip6_hlim = 0;
-		ip6->ip6_src = dst6;
+		ip6->ip6_src = dst6.in6;
 		ip6->ip6_dst = fin->fin_src6;
 		if (xtra > 0)
 			bcopy((char *)fin->fin_ip + ohlen,
@@ -1299,12 +1299,7 @@ ipf_fastroute6(m0, mpp, fin, fdp)
 
 	{
 # if (__NetBSD_Version__ >= 106010000)
-#  if (__NetBSD_Version__ >= 399001400)
 		struct in6_ifextra *ife;
-#  else
-		struct in6_addr finaldst = fin->fin_dst6;
-		int frag;
-#  endif
 # endif
 # if __NetBSD_Version__ >= 499001100
 		if (ro->ro_rt->rt_flags & RTF_GATEWAY)
@@ -1319,12 +1314,8 @@ ipf_fastroute6(m0, mpp, fin, fdp)
 # if (__NetBSD_Version__ <= 106009999)
 		mtu = nd_ifinfo[ifp->if_index].linkmtu;
 # else
-#  if (__NetBSD_Version__ >= 399001400)
 		ife = (struct in6_ifextra *)(ifp)->if_afdata[AF_INET6];
 		mtu = ife->nd_ifinfo[ifp->if_index].linkmtu;
-#  else
-		error = ip6_getpmtu(ro, ro, ifp, &finaldst, &mtu, &frag);
-#  endif
 # endif
 		if ((error == 0) && (m0->m_pkthdr.len <= mtu)) {
 			*mpp = NULL;

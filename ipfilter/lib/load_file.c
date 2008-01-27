@@ -35,7 +35,8 @@ load_file(char *filename)
 		 */
 		s = strchr(line, '\n');
 		if (s == NULL) {
-			fprintf(stderr, "%d:%s: line too long\n", linenum, filename);
+			fprintf(stderr, "%d:%s: line too long\n",
+				linenum, filename);
 			fclose(fp);
 			alist_free(rtop);
 			return NULL;
@@ -71,12 +72,14 @@ load_file(char *filename)
 
 		if (isdigit(*t)) {
 			a = alist_new(4, t);
-			a->al_not = not;
-			if (rbot != NULL)
-				rbot->al_next = a;
-			else
-				rtop = a;
-			rbot = a;
+			if (a != NULL) {
+				a->al_not = not;
+				if (rbot != NULL)
+					rbot->al_next = a;
+				else
+					rtop = a;
+				rbot = a;
+			}
 		} else {
 			fprintf(stderr, "%s: unrecognised content line %d\n",
 				filename, linenum);

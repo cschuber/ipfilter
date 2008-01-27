@@ -8321,6 +8321,8 @@ ipf_fr_matcharray(fin, array)
 			break;
 
 		case IPF_EXP_IP_SRCADDR :
+			if (fin->fin_v != 4)
+				break;
 			for (i = 0; !e && i < x[3]; i++) {
 				e |= ((fin->fin_saddr & x[i + 4]) ==
 				      x[i + 3]);
@@ -8328,6 +8330,8 @@ ipf_fr_matcharray(fin, array)
 			break;
 
 		case IPF_EXP_IP_DSTADDR :
+			if (fin->fin_v != 4)
+				break;
 			for (i = 0; !e && i < x[3]; i++) {
 				e |= ((fin->fin_daddr & x[i + 4]) ==
 				      x[i + 3]);
@@ -8335,6 +8339,8 @@ ipf_fr_matcharray(fin, array)
 			break;
 
 		case IPF_EXP_IP_ADDR :
+			if (fin->fin_v != 4)
+				break;
 			for (i = 0; !e && i < x[3]; i++) {
 				e |= ((fin->fin_saddr & x[i + 4]) ==
 				      x[i + 3]) ||
@@ -8342,6 +8348,37 @@ ipf_fr_matcharray(fin, array)
 				      x[i + 3]);
 			}
 			break;
+
+#ifdef USE_INET6
+		case IPF_EXP_IP6_SRCADDR :
+			if (fin->fin_v != 6)
+				break;
+			for (i = 0; !e && i < x[3]; i++) {
+				e |= IP6_MASKEQ(&fin->fin_src6, x + i + 7,
+						x + i + 3);
+			}
+			break;
+
+		case IPF_EXP_IP6_DSTADDR :
+			if (fin->fin_v != 6)
+				break;
+			for (i = 0; !e && i < x[3]; i++) {
+				e |= IP6_MASKEQ(&fin->fin_dst6, x + i + 7,
+						x + i + 3);
+			}
+			break;
+
+		case IPF_EXP_IP6_ADDR :
+			if (fin->fin_v != 6)
+				break;
+			for (i = 0; !e && i < x[3]; i++) {
+				e |= IP6_MASKEQ(&fin->fin_src6, x + i + 7,
+						x + i + 3) ||
+				     IP6_MASKEQ(&fin->fin_dst6, x + i + 7,
+						x + i + 3);
+			}
+			break;
+#endif
 
 		case IPF_EXP_UDP_PORT :
 		case IPF_EXP_TCP_PORT :

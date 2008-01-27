@@ -8,11 +8,14 @@ typedef struct ipfopentry {
 	char	*ipoe_word;
 } ipfopentry_t;
 
-static ipfopentry_t opwords[14] = {
+static ipfopentry_t opwords[17] = {
 	{ IPF_EXP_IP_ADDR, 2, 0, "ip.addr" },
+	{ IPF_EXP_IP6_ADDR, 2, 0, "ip6.addr" },
 	{ IPF_EXP_IP_PR, 1, 0, "ip.p" },
 	{ IPF_EXP_IP_SRCADDR, 2, 0, "ip.src" },
 	{ IPF_EXP_IP_DSTADDR, 2, 0, "ip.dst" },
+	{ IPF_EXP_IP6_SRCADDR, 2, 0, "ip6.src" },
+	{ IPF_EXP_IP6_DSTADDR, 2, 0, "ip6.dst" },
 	{ IPF_EXP_TCP_PORT, 1, 0, "tcp.port" },
 	{ IPF_EXP_TCP_DPORT, 1, 0, "tcp.dport" },
 	{ IPF_EXP_TCP_SPORT, 1, 0, "tcp.sport" },
@@ -143,7 +146,7 @@ int *parseipfexpr(line, errorptr)
 			if (!strcasecmp(ops, "ip.addr") ||
 			    !strcasecmp(ops, "ip.src") ||
 			    !strcasecmp(ops, "ip.dst")) {
-				u_32_t mask, addr;
+				i6addr_t mask, addr;
 				char *delim;
 
 				delim = strchr(s, '/');
@@ -155,15 +158,51 @@ int *parseipfexpr(line, errorptr)
 						goto parseerror;
 					}
 				} else {
-					mask = 0xffffffff;
+					mask.in4.s_addr = 0xffffffff;
 				}
-				if (gethost(s, &addr) == -1) {
+				if (gethost(4, s, &addr) == -1) {
 					error = "gethost failed";
 					goto parseerror;
 				}
 
-				oplist[osize++] = addr;
-				oplist[osize++] = mask;
+				oplist[osize++] = addr.in4.s_addr;
+				oplist[osize++] = mask.in4.s_addr;
+
+#ifdef USE_INET6
+			} else if (!strcasecmp(ops, "ip6.addr") ||
+			    !strcasecmp(ops, "ip6.src") ||
+			    !strcasecmp(ops, "ip6.dst")) {
+				i6addr_t mask, addr;
+				char *delim;
+
+				delim = strchr(s, '/');
+				if (delim != NULL) {
+					*delim++ = '\0';
+					if (genmask(AF_INET6, delim,
+						    &mask) == -1) {
+						error = "genmask failed";
+						goto parseerror;
+					}
+				} else {
+					mask.i6[0] = 0xffffffff;
+					mask.i6[1] = 0xffffffff;
+					mask.i6[2] = 0xffffffff;
+					mask.i6[3] = 0xffffffff;
+				}
+				if (gethost(6, s, &addr) == -1) {
+					error = "gethost failed";
+					goto parseerror;
+				}
+
+				oplist[osize++] = addr.i6[0];
+				oplist[osize++] = addr.i6[1];
+				oplist[osize++] = addr.i6[2];
+				oplist[osize++] = addr.i6[3];
+				oplist[osize++] = mask.i6[0];
+				oplist[osize++] = mask.i6[1];
+				oplist[osize++] = mask.i6[2];
+				oplist[osize++] = mask.i6[3];
+#endif
 
 			} else if (!strcasecmp(ops, "ip.p")) {
 				int p;

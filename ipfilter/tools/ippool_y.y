@@ -501,8 +501,9 @@ char *url;
 		if (hlist == NULL)
 			return NULL;
 
-		if (gethost(url, &hlist->al_addr) == -1)
+		if (gethost(hlist->al_v, url, &hlist->al_i6addr) == -1) {
 			yyerror("Unknown hostname");
+		}
 	}
 
 	hbot = NULL;
@@ -553,8 +554,9 @@ char *url;
 		if (hlist == NULL)
 			return NULL;
 
-		if (gethost(url, &hlist->al_addr) == -1)
+		if (gethost(hlist->al_v, url, &hlist->al_i6addr) == -1) {
 			yyerror("Unknown hostname");
+		}
 	}
 
 	pbot = NULL;

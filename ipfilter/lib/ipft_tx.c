@@ -49,7 +49,7 @@ static	u_32_t	tx_hostnum(host, resolved)
 	char	*host;
 	int	*resolved;
 {
-	u_32_t	ipa;
+	i6addr_t	ipa;
 
 	*resolved = 0;
 	if (!strcasecmp("any", host))
@@ -57,12 +57,12 @@ static	u_32_t	tx_hostnum(host, resolved)
 	if (ISDIGIT(*host))
 		return inet_addr(host);
 
-	if (gethost(host, &ipa) == -1) {
+	if (gethost(4, host, &ipa) == -1) {
 		*resolved = -1;
 		fprintf(stderr, "can't resolve hostname: %s\n", host);
 		return 0;
 	}
-	return ipa;
+	return ipa.in4.s_addr;
 }
 
 

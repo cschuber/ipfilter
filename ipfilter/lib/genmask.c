@@ -12,9 +12,10 @@
 int genmask(family, msk, mskp)
 	int family;
 	char *msk;
-	u_32_t *mskp;
+	i6addr_t *mskp;
 {
 	char *endptr = 0L;
+	u_32_t addr;
 	int bits;
 
 	if (strchr(msk, '.') || strchr(msk, 'x') || strchr(msk, ':')) {
@@ -24,12 +25,12 @@ int genmask(family, msk, mskp)
 		{
 #ifdef USE_INET6
 		case AF_INET6 :
-			if (inet_pton(AF_INET6, msk, mskp) != 1)
+			if (inet_pton(AF_INET6, msk, &mskp->in4) != 1)
 				return -1;
 			break;
 #endif
 		case AF_INET :
-			if (inet_aton(msk, (struct in_addr *)mskp) == 0)
+			if (inet_aton(msk, &mskp->in4) == 0)
 				return -1;
 			break;
 		default :
@@ -47,15 +48,16 @@ int genmask(family, msk, mskp)
 		case AF_INET6 :
 			if ((*endptr != '\0') || (bits < 0) || (bits > 128))
 				return -1;
-			fill6bits(bits, mskp);
+			fill6bits(bits, mskp->i6);
 			break;
 		case AF_INET :
 			if (*endptr != '\0' || bits > 32 || bits < 0)
 				return -1;
 			if (bits == 0)
-				*mskp = 0;
+				addr = 0;
 			else
-				*mskp = htonl(0xffffffff << (32 - bits));
+				addr = htonl(0xffffffff << (32 - bits));
+			mskp->in4.s_addr = addr;
 			break;
 		default :
 			return -1;
