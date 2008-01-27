@@ -208,7 +208,7 @@ typedef	union	i6addr	{
 		  } \
 		}
 #define	IP6_AND(a,b,d)	{ i6addr_t *_s1 = (i6addr_t *)(a); \
-			  i6addr_t *_s2 = (i6addr_t *)(d); \
+			  i6addr_t *_s2 = (i6addr_t *)(b); \
 			  i6addr_t *_d = (i6addr_t *)(d); \
 			  _d->i6[0] = _s1->i6[0] & _s2->i6[0]; \
 			  _d->i6[1] = _s1->i6[1] & _s2->i6[1]; \
