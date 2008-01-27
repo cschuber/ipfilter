@@ -756,7 +756,11 @@ typedef unsigned int    u_32_t;
 /* ----------------------------------------------------------------------- */
 #ifdef __NetBSD__
 # if (NetBSD >= 199905) && !defined(IPFILTER_LKM) && defined(_KERNEL)
-#  include "opt_ipfilter.h"
+#  if (__NetBSD_Version__ < 399001400)
+#   include "opt_ipfilter_log.h"
+#  else
+#   include "opt_ipfilter.h"
+#  endif
 # endif
 # if defined(_KERNEL)
 #  include <sys/systm.h>
@@ -791,6 +795,9 @@ typedef	char *	caddr_t;
 #  define	IPF_PANIC(x,y)	if (x) { printf y; panic("ipf_panic"); }
 #  define	COPYIN(a,b,c)	copyin((caddr_t)(a), (caddr_t)(b), (c))
 #  define	COPYOUT(a,b,c)	copyout((caddr_t)(a), (caddr_t)(b), (c))
+#  if (defined(__NetBSD_Version__) && (__NetBSD_Version__ >= 499004900))
+#   define	POLLWAKEUP(x)	selnotify(ipfselwait+x, 0, 0)
+#  endif
 typedef struct mbuf mb_t;
 # endif /* _KERNEL */
 # if (NetBSD <= 1991011) && (NetBSD >= 199606)
@@ -1656,7 +1663,9 @@ MALLOC_DECLARE(M_IPFILTER);
 #  define	UIOMOVE(a,b,c,d)	uiomove((caddr_t)a,b,d)
 #  define	SLEEP(id, n)	tsleep((id), PPAUSE|PCATCH, n, 0)
 #  define	WAKEUP(id,x)	wakeup(id+x)
-#  define	POLLWAKEUP(x)	selwakeup(ipfselwait+x)
+#  if !defined(POLLWAKEUP)
+#   define	POLLWAKEUP(x)	selwakeup(ipfselwait+x)
+#  endif
 #  define	GETIFP(n, v)	ifunit(n)
 # endif /* (Free)BSD */
 
