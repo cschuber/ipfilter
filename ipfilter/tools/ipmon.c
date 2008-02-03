@@ -1471,10 +1471,15 @@ char *argv[];
 	int	fd[3], doread, n, i;
 	int	tr, nr, regular[3], c;
 	int	fdt[3], devices = 0, make_daemon = 0;
-	char	buf[DEFAULT_IPFLOGSIZE], *iplfile[3], *s;
+	char	buf[DEFAULT_IPFLOGSIZE], *iplfile[3], *prog;
 	extern	int	optind;
 	extern	char	*optarg;
 
+	prog = strrchr(argv[0], '/');
+	if (prog == NULL)
+		prog = argv[0];
+	else
+		prog++;
 	fd[0] = fd[1] = fd[2] = -1;
 	fdt[0] = fdt[1] = fdt[2] = -1;
 	iplfile[0] = IPL_NAME;
@@ -1548,13 +1553,6 @@ char *argv[];
 			pidfile = optarg;
 			break;
 		case 's' :
-			s = strrchr(argv[0], '/');
-			if (s == NULL)
-				s = argv[0];
-			else
-				s++;
-			openlog(s, LOG_NDELAY|LOG_PID, logfac);
-			s = NULL;
 			opts |= OPT_SYSLOG;
 			log = NULL;
 			break;
@@ -1580,6 +1578,9 @@ char *argv[];
 		case '?' :
 			usage(argv[0]);
 		}
+
+	if (opts & OPT_SYSLOG)
+		openlog(prog, LOG_NDELAY|LOG_PID, logfac);
 
 	init_tabs();
 	if (conf_file)
