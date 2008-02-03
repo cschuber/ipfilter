@@ -229,7 +229,7 @@ ipfr_t *table[];
 	frentry_t *fr;
 	ip_t *ip;
 
-	if (ipfr_inuse >= IPFT_SIZE)
+	if (ipfr_inuse >= ipfr_size)
 		return NULL;
 
 	if ((fin->fin_flx & (FI_FRAG|FI_BAD)) != FI_FRAG)
@@ -252,7 +252,7 @@ ipfr_t *table[];
 	idx += ip->ip_dst.s_addr;
 	frag.ipfr_ifp = fin->fin_ifp;
 	idx *= 127;
-	idx %= IPFT_SIZE;
+	idx %= ipfr_size;
 
 	frag.ipfr_optmsk = fin->fin_fi.fi_optmsk & IPF_OPTCOPY;
 	frag.ipfr_secmsk = fin->fin_fi.fi_secmsk;
@@ -450,7 +450,7 @@ ipfr_t *table[];
 	idx += ip->ip_dst.s_addr;
 	frag.ipfr_ifp = fin->fin_ifp;
 	idx *= 127;
-	idx %= IPFT_SIZE;
+	idx %= ipfr_size;
 
 	frag.ipfr_optmsk = fin->fin_fi.fi_optmsk & IPF_OPTCOPY;
 	frag.ipfr_secmsk = fin->fin_fi.fi_secmsk;
