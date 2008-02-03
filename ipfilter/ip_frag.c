@@ -255,7 +255,7 @@ ipfr_frag_new(fin, pass, table
 	u_int idx, off;
 	frentry_t *fr;
 
-	if (ipfr_inuse >= IPFT_SIZE)
+	if (ipfr_inuse >= ipfr_size)
 		return NULL;
 
 	if ((fin->fin_flx & (FI_FRAG|FI_BAD)) != FI_FRAG)
@@ -275,7 +275,7 @@ ipfr_frag_new(fin, pass, table
 	idx += frag.ipfr_dst.s_addr;
 	frag.ipfr_ifp = fin->fin_ifp;
 	idx *= 127;
-	idx %= IPFT_SIZE;
+	idx %= ipfr_size;
 
 	frag.ipfr_optmsk = fin->fin_fi.fi_optmsk & IPF_OPTCOPY;
 	frag.ipfr_secmsk = fin->fin_fi.fi_secmsk;
@@ -525,7 +525,7 @@ ipf_frag_lookup(fin, table
 	idx += frag.ipfr_dst.s_addr;
 	frag.ipfr_ifp = fin->fin_ifp;
 	idx *= 127;
-	idx %= IPFT_SIZE;
+	idx %= ipfr_size;
 
 	frag.ipfr_optmsk = fin->fin_fi.fi_optmsk & IPF_OPTCOPY;
 	frag.ipfr_secmsk = fin->fin_fi.fi_secmsk;
