@@ -1600,8 +1600,14 @@ int main(argc, argv)
 	char *argv[];
 {
 	int	doread, c, make_daemon = 0;
-	char	*s;
+	char	*prog;
 	config_t	config;
+
+	prog = strrchr(argv[0], '/');
+	if (prog == NULL)
+		prog = argv[0];
+	else
+		prog++;
 
 	initconfig(&config);
 
@@ -1671,12 +1677,6 @@ int main(argc, argv)
 			pidfile = optarg;
 			break;
 		case 's' :
-			s = strrchr(argv[0], '/');
-			if (s == NULL)
-				s = argv[0];
-			else
-				s++;
-			openlog(s, LOG_NDELAY|LOG_PID, logfac);
 			opts |= OPT_SYSLOG;
 			config.log = NULL;
 			break;
@@ -1702,6 +1702,9 @@ int main(argc, argv)
 		case '?' :
 			usage(argv[0]);
 		}
+
+	if (opts & OPT_SYSLOG)
+		openlog(prog, LOG_NDELAY|LOG_PID, logfac);
 
 	init_tabs();
 	if (config.cfile)
