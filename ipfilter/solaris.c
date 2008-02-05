@@ -53,7 +53,7 @@
 #include "netinet/ip_auth.h"
 #include "netinet/ip_state.h"
 
-struct pollhead iplpollhead[IPL_LOGSIZE];
+struct pollhead ipf_poll_head[IPL_LOGSIZE];
 
 extern	int	fr_running;
 extern	int	fr_flags;
@@ -620,7 +620,7 @@ static int iplpoll(dev, events, anyyet, reventsp, phpp)
 	} else {
 		*reventsp = 0;
 		if (!anyyet)
-			*phpp = &iplpollhead[xmin];
+			*phpp = &ipf_poll_head[xmin];
 	}
 	return 0;
 }

@@ -156,7 +156,7 @@ wait_queue_head_t	iplh_linux[IPL_LOGSIZE];
 # endif
 # if SOLARIS && defined(_KERNEL)
 extern	kcondvar_t	iplwait;
-extern	struct pollhead	iplpollhead[IPL_LOGSIZE];
+extern	struct pollhead	ipf_poll_head[IPL_LOGSIZE];
 # endif
 
 iplog_t	**iplh[IPL_LOGSIZE], *iplt[IPL_LOGSIZE], *ipll[IPL_LOGSIZE];
@@ -523,7 +523,7 @@ ipf_log_items(dev, fin, items, itemsz, types, cnt)
 # if SOLARIS && defined(_KERNEL)
 	cv_signal(&iplwait);
 	MUTEX_EXIT(&ipl_mutex);
-	pollwakeup(&iplpollhead[dev], POLLRDNORM);
+	pollwakeup(&ipf_poll_head[dev], POLLRDNORM);
 # else
 	MUTEX_EXIT(&ipl_mutex);
 	WAKEUP(iplh, dev);
