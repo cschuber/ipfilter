@@ -49,6 +49,9 @@
 #include "ip_compat.h"
 #include "ip_fil.h"
 #include "ip_auth.h"
+#include "ip_state.h"
+#include "ip_nat.h"
+#include "ip_sync.h"
 
 #if !defined(__NetBSD_Version__) || __NetBSD_Version__ < 103050000
 #define vn_lock(v,f) VOP_LOCK(v)
@@ -468,7 +471,7 @@ static int ipfread(dev, uio, ioflag)
 
 # ifdef	IPFILTER_SYNC
 	if (GET_MINOR(dev) == IPL_LOGSYNC)
-		return ipfsync_read(uio);
+		return ipf_sync_read(uio);
 # endif
 
 #ifdef IPFILTER_LOG
@@ -496,7 +499,7 @@ static int ipfwrite(dev, uio, ioflag)
 
 #ifdef	IPFILTER_SYNC
 	if (GET_MINOR(dev) == IPL_LOGSYNC)
-		return ipfsync_write(uio);
+		return ipf_sync_write(uio);
 #endif
 	return ENXIO;
 }
@@ -529,10 +532,10 @@ static int ipfpoll(dev, events, p)
 		break;
 	case IPL_LOGSYNC :
 #ifdef IPFILTER_SYNC
-		if ((events & (POLLIN | POLLRDNORM)) && ipfsync_canread())
+		if ((events & (POLLIN | POLLRDNORM)) && ipf_sync_canread())
 			revents |= events & (POLLIN | POLLRDNORM);
-		if ((events & (POLLOUT | POLLWRNORM)) && ipfsync_canwrite())
-			revents |= events & (POLLOUT | POLLOUTNORM);
+		if ((events & (POLLOUT | POLLWRNORM)) && ipf_sync_canwrite())
+			revents |= events & (POLLOUT | POLLWRNORM);
 #endif
 		break;
 	case IPL_LOGSCAN :

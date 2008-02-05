@@ -598,7 +598,7 @@ ipf_sync_state(sp, data)
 		 * the master to create this state entry.
 		 */
 		READ_ENTER(&ipf_mutex);
-		fr = fr_getrulen(IPL_LOGIPF, sn.is_group, sn.is_rulen);
+		fr = ipf_getrulen(IPL_LOGIPF, sn.is_group, sn.is_rulen);
 		if (fr != NULL) {
 			MUTEX_ENTER(&fr->fr_lock);
 			fr->fr_ref++;
@@ -626,7 +626,7 @@ ipf_sync_state(sp, data)
 			syncstatetab[hv]->sl_pnext = &sl->sl_next;
 		syncstatetab[hv] = sl;
 		MUTEX_DOWNGRADE(&ipf_syncstate);
-		fr_stinsert(is, sp->sm_rev);
+		ipf_state_insert(is, sp->sm_rev);
 		/*
 		 * Do not initialise the interface pointers for the state
 		 * entry as the full complement of interface names may not
@@ -690,7 +690,7 @@ ipf_sync_state(sp, data)
 		if (ipf_sync_debug > 6)
 			printf("[%d] Setting timers for state\n", sp->sm_num);
 
-		fr_setstatequeue(is, sp->sm_rev);
+		ipf_state_setqueue(is, sp->sm_rev);
 
 		MUTEX_EXIT(&is->is_lock);
 		break;
@@ -1097,6 +1097,7 @@ ipf_sync_ioctl(data, cmd, mode, uid, ctx)
 	void *ctx;
 {
 	int error, i;
+	SPL_INT(s);
 
 	switch (cmd)
 	{
