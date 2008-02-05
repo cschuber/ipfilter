@@ -120,6 +120,7 @@ u_int		sl_idx = 0,	/* next available sync log entry */
 		su_tail = 0;	/* next sync update entry to read */
 int		ipf_sync_debug = 0;
 
+static int ipf_sync_flush_table __P((int, synclist_t **));
 
 # if !defined(sparc) && !defined(__hppa)
 void ipf_sync_tcporder __P((int, struct tcpdata *));
@@ -149,6 +150,29 @@ ipf_sync_init()
 
 	bzero((char *)syncnattab, sizeof(syncnattab));
 	bzero((char *)syncstatetab, sizeof(syncstatetab));
+
+	return 0;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_sync_unload                                             */
+/* Returns:     int - 0 == success, -1 == failure                           */
+/* Parameters:  Nil                                                         */
+/*                                                                          */
+/* Destroy the locks created when initialising and free any memory in use   */
+/* with the synchronisation tables.                                         */
+/* ------------------------------------------------------------------------ */
+int
+ipf_sync_unload()
+{
+	(void) ipf_sync_flush_table(SYNC_STATETABSZ, syncstatetab);
+	(void) ipf_sync_flush_table(SYNC_NATTABSZ, syncnattab);
+
+	MUTEX_DESTROY(&ipsl_mutex);
+	MUTEX_DESTROY(&ipf_syncadd);
+	RW_DESTROY(&ipf_syncnat);
+	RW_DESTROY(&ipf_syncstate);
 
 	return 0;
 }
@@ -487,33 +511,33 @@ ipf_sync_read(uio)
 #   endif /* __hpux */
 #  endif /* SOLARIS */
 	}
-	MUTEX_EXIT(&ipsl_mutex);
 
-	READ_ENTER(&ipf_syncstate);
 	while ((sl_tail < sl_idx)  && (uio->uio_resid > sizeof(*sl))) {
 		sl = synclog + sl_tail++;
+		MUTEX_EXIT(&ipsl_mutex);
 		err = UIOMOVE(sl, sizeof(*sl), UIO_READ, uio);
 		if (err != 0)
-			break;
+			goto goterror;
+		MUTEX_ENTER(&ipsl_mutex);
 	}
 
 	while ((su_tail < su_idx)  && (uio->uio_resid > sizeof(*su))) {
 		su = syncupd + su_tail;
 		su_tail++;
+		MUTEX_EXIT(&ipsl_mutex);
 		err = UIOMOVE(su, sizeof(*su), UIO_READ, uio);
 		if (err != 0)
-			break;
+			goto goterror;
+		MUTEX_ENTER(&ipsl_mutex);
 		if (su->sup_hdr.sm_sl != NULL)
 			su->sup_hdr.sm_sl->sl_idx = -1;
 	}
-
-	MUTEX_ENTER(&ipf_syncadd);
-	if (su_tail == su_idx)
-		su_tail = su_idx = 0;
 	if (sl_tail == sl_idx)
 		sl_tail = sl_idx = 0;
-	MUTEX_EXIT(&ipf_syncadd);
-	RWLOCK_EXIT(&ipf_syncstate);
+	if (su_tail == su_idx)
+		su_tail = su_idx = 0;
+	MUTEX_EXIT(&ipsl_mutex);
+goterror:
 	return err;
 }
 
@@ -1020,6 +1044,42 @@ ipf_sync_update(tab, fin, sl)
 
 
 /* ------------------------------------------------------------------------ */
+/* Function:    ipf_sync_flush_table                                        */
+/* Returns:     int - number of entries freed by flushing table             */
+/* Parameters:  tabsize(I) - size of the array pointed to by table          */
+/*              table(I)   - pointer to sync table to empty                 */
+/*                                                                          */
+/* Walk through a table of sync entries and free each one.  It is assumed   */
+/* that some lock is held so that nobody else tries to access the table     */
+/* during this cleanup.                                                     */
+/* ------------------------------------------------------------------------ */
+static int
+ipf_sync_flush_table(tabsize, table)
+	int tabsize;
+	synclist_t **table;
+{
+	synclist_t *sl;
+	int i, items;
+
+	items = 0;
+
+	for (i = 0; i < tabsize; i++) {
+		while ((sl = table[i]) != NULL) {
+			if (sl->sl_next != NULL)
+				sl->sl_next->sl_pnext = sl->sl_pnext;
+			table[i] = sl->sl_next;
+			if (sl->sl_idx != -1)
+				syncupd[sl->sl_idx].sup_hdr.sm_sl = NULL;
+			KFREE(sl);
+			items++;
+		}
+	}
+
+	return items;
+}
+
+
+/* ------------------------------------------------------------------------ */
 /* Function:    ipf_sync_ioctl                                              */
 /* Returns:     int - 0 == success, != 0 == failure                         */
 /* Parameters:  data(I) - pointer to ioctl data                             */
@@ -1036,11 +1096,74 @@ ipf_sync_ioctl(data, cmd, mode, uid, ctx)
 	int mode, uid;
 	void *ctx;
 {
-	ipf_interror = 110021;
-	return EINVAL;
+	int error, i;
+
+	switch (cmd)
+	{
+        case SIOCIPFFL:
+		error = BCOPYIN(data, &i, sizeof(i));
+		if (error != 0) {
+			ipf_interror = 110023;
+			error = EFAULT;
+			break;
+		}
+
+		switch (i)
+		{
+		case SMC_RLOG :
+			SPL_NET(s);
+			MUTEX_ENTER(&ipsl_mutex);
+			i = (sl_tail - sl_idx) + (su_tail - su_idx);
+			sl_idx = 0;
+			su_idx = 0;
+			sl_tail = 0;
+			su_tail = 0;
+			MUTEX_EXIT(&ipsl_mutex);
+			SPL_X(s);
+			break;
+
+		case SMC_NAT :
+			SPL_NET(s);
+			WRITE_ENTER(&ipf_syncnat);
+			i = ipf_sync_flush_table(SYNC_NATTABSZ, syncnattab);
+			RWLOCK_EXIT(&ipf_syncnat);
+			SPL_X(s);
+			break;
+
+		case SMC_STATE :
+			SPL_NET(s);
+			WRITE_ENTER(&ipf_syncstate);
+			i = ipf_sync_flush_table(SYNC_STATETABSZ, syncstatetab);
+			RWLOCK_EXIT(&ipf_syncstate);
+			SPL_X(s);
+			break;
+		}
+
+		error = BCOPYOUT(&i, data, sizeof(i));
+		if (error != 0) {
+			ipf_interror = 110022;
+			error = EFAULT;
+		}
+		break;
+
+	default :
+		ipf_interror = 110021;
+		error = EINVAL;
+		break;
+	}
+
+	return error;
 }
 
 
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_sync_canread                                            */
+/* Returns:     int - 0 == success, != 0 == failure                         */
+/* Parameters:  Nil                                                         */
+/*                                                                          */
+/* This function provides input to the poll handler about whether or not    */
+/* there is data waiting to be read from the /dev/ipsync device.            */
+/* ------------------------------------------------------------------------ */
 int
 ipf_sync_canread()
 {
@@ -1048,6 +1171,15 @@ ipf_sync_canread()
 }
 
 
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_sync_canwrite                                           */
+/* Returns:     int - 1 == can always write                                 */
+/* Parameters:  Nil                                                         */
+/*                                                                          */
+/* This function lets the poll handler know that it is always ready willing */
+/* to accept write events.                                                  */
+/* XXX Maybe this should return false if the sync table is full?            */
+/* ------------------------------------------------------------------------ */
 int
 ipf_sync_canwrite()
 {

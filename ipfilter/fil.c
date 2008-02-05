@@ -7049,6 +7049,9 @@ ipf_initialise()
 void
 ipf_deinitialise()
 {
+#ifdef IPFILTER_SYNC
+	ipf_sync_unload();
+#endif
 	ipf_frag_unload();
 	ipf_auth_unload();
 	ipf_nat_unload();

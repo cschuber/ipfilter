@@ -36,6 +36,7 @@ typedef	struct	synchdr	{
 /*
  * Tables
  */
+#define	SMC_RLOG	-2	/* Only used with SIOCIPFFL */
 #define	SMC_NAT		0
 #define	SMC_STATE	1
 #define	SMC_MAXTBL	1
@@ -112,6 +113,7 @@ extern	synclist_t *ipf_sync_new __P((int, fr_info_t *, void *));
 extern	int ipf_sync_read __P((struct uio *uio));
 extern	int ipf_sync_state __P((synchdr_t *sp, void *data));
 extern	int ipf_sync_write __P((struct uio *uio));
+extern	int ipf_sync_unload __P((void));
 extern	void ipf_sync_update __P((int, fr_info_t *, synclist_t *));
 
 #endif /* IP_SYNC */
