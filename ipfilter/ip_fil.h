@@ -1301,10 +1301,10 @@ typedef	struct	ipftune	{
 # define	FR_VERBOSE(verb_pr)
 # define	FR_DEBUG(verb_pr)
 #else
-extern	void	debug __P((char *, ...));
-extern	void	verbose __P((char *, ...));
-# define	FR_VERBOSE(verb_pr)	verbose verb_pr
-# define	FR_DEBUG(verb_pr)	debug verb_pr
+extern	void	ipfkdebug __P((char *, ...));
+extern	void	ipfkverbose __P((char *, ...));
+# define	FR_VERBOSE(verb_pr)	ipfkverbose verb_pr
+# define	FR_DEBUG(verb_pr)	ipfkdebug verb_pr
 #endif
 
 /*

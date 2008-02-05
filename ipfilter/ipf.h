@@ -214,6 +214,7 @@ extern	char	*icmpcodes[MAX_ICMPCODE + 1];
 extern	char	*icmptypes[MAX_ICMPTYPE + 1];
 extern	int	use_inet6;
 extern	int	lineNum;
+extern	int	debuglevel;
 extern	struct ipopt_names v6ionames[];
 extern	icmptype_t icmptypelist[];
 extern	wordtab_t statefields[];
@@ -347,8 +348,10 @@ extern void set_variable __P((char *, char *));
 extern char *get_variable __P((char *, char **, int));
 extern void resetlexer __P((void));
 
-extern void debug __P((char *, ...));
-extern void verbose __P((char *, ...));
+extern void debug __P((int, char *, ...));
+extern void verbose __P((int, char *, ...));
+extern void ipfkdebug __P((char *, ...));
+extern void ipfkverbose __P((char *, ...));
 
 #if SOLARIS
 extern int gethostname __P((char *, int ));

@@ -564,7 +564,7 @@ int
 ipf_send_reset(fin)
 	fr_info_t *fin;
 {
-	verbose("- TCP RST sent\n");
+	ipfkverbose("- TCP RST sent\n");
 	return 0;
 }
 
@@ -575,7 +575,7 @@ ipf_send_icmp_err(type, fin, dst)
 	fr_info_t *fin;
 	int dst;
 {
-	verbose("- ICMP unreachable sent\n");
+	ipfkverbose("- ICMP unreachable sent\n");
 	return 0;
 }
 

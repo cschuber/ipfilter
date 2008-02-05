@@ -16,11 +16,32 @@
 #include "ipf.h"
 #include "opts.h"
 
+int	debuglevel = 0;
+
 
 #ifdef	__STDC__
-void	debug(char *fmt, ...)
+void	debug(int level, char *fmt, ...)
 #else
-void	debug(fmt, va_alist)
+void	debug(level, fmt, va_alist)
+	int level;
+	char *fmt;
+	va_dcl
+#endif
+{
+	va_list pvar;
+
+	va_start(pvar, fmt);
+
+	if ((debuglevel > 0) && (level <= debuglevel))
+		vfprintf(stderr, fmt, pvar);
+	va_end(pvar);
+}
+
+
+#ifdef	__STDC__
+void	ipfkdebug(char *fmt, ...)
+#else
+void	ipfkdebug(fmt, va_alist)
 	char *fmt;
 	va_dcl
 #endif
@@ -30,6 +51,6 @@ void	debug(fmt, va_alist)
 	va_start(pvar, fmt);
 
 	if (opts & OPT_DEBUG)
-		vprintf(fmt, pvar);
+		debug(0x1fffffff, fmt, pvar);
 	va_end(pvar);
 }
