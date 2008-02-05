@@ -642,12 +642,34 @@ dev_t dev;
 int flags;
 {
 	u_int unit = GET_MINOR(dev);
+	int error;
 
 	if (IPL_LOGMAX < unit)
-		unit = ENXIO;
-	else
-		unit = 0;
-	return unit;
+		error = ENXIO;
+	else {
+		switch (unit)
+		{
+		case IPL_LOGIPF :
+		case IPL_LOGNAT :
+		case IPL_LOGSTATE :
+		case IPL_LOGAUTH :
+#ifdef IPFILTER_LOOKUP
+		case IPL_LOGLOOKUP :
+#endif
+#ifdef IPFILTER_SYNC
+		case IPL_LOGSYNC :
+#endif
+#ifdef IPFILTER_SCAN
+		case IPL_LOGSCAN :
+#endif
+			error = 0;
+			break;
+		default :
+			error = ENXIO;
+			break;
+		}
+	}
+	return error;
 }
 
 

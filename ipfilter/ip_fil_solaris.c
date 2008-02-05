@@ -294,6 +294,7 @@ int flags, otype;
 cred_t *cred;
 {
 	minor_t unit = getminor(*devp);
+	int error;
 
 #ifdef	IPFDEBUG
 	cmn_err(CE_CONT, "iplopen(%x,%x,%x,%x)\n", devp, flags, otype, cred);
@@ -301,8 +302,32 @@ cred_t *cred;
 	if (!(otype & OTYP_CHR))
 		return ENXIO;
 
-	unit = (IPL_LOGMAX < unit) ? ENXIO : 0;
-	return unit;
+	if (IPL_LOGMAX < unit) {
+		error = ENXIO;
+	} else {
+		switch (unit)
+		{
+		case IPL_LOGIPF :
+		case IPL_LOGNAT :
+		case IPL_LOGSTATE :
+		case IPL_LOGAUTH :
+#ifdef IPFILTER_LOOKUP
+		case IPL_LOGLOOKUP :
+#endif 
+#ifdef IPFILTER_SYNC
+		case IPL_LOGSYNC :
+#endif
+#ifdef IPFILTER_SCAN
+		case IPL_LOGSCAN :
+#endif
+			error = 0;
+			break;
+		default :
+			error = ENXIO;
+			break;
+		}
+	}
+	return error;
 }
 
 

@@ -90,11 +90,33 @@ static int ipf_open(struct inode *in, struct file *fp)
 {
 	int unit, err;
 
-	err = 0;
 	unit = MINOR(in->i_rdev);
 
-	if (unit < 0 || unit > IPL_LOGMAX)
+	if (unit < 0 || unit > IPL_LOGMAX) {
 		err = -ENXIO;
+	} else {
+		switch (unit)
+		{
+		case IPL_LOGIPF :
+		case IPL_LOGNAT :
+		case IPL_LOGSTATE :
+		case IPL_LOGAUTH :
+#ifdef IPFILTER_LOOKUP
+		case IPL_LOGLOOKUP :
+#endif
+#ifdef IPFILTER_SYNC  
+		case IPL_LOGSYNC :
+#endif
+#ifdef IPFILTER_SCAN
+		case IPL_LOGSCAN :
+#endif
+			err = 0;
+			break;
+		default :  
+			err = -ENXIO;
+			break;
+		}
+	}
 	return err;
 }
 

@@ -201,12 +201,37 @@ intptr_t dummy;
 int mode;
 {
 	minor_t unit = getminor(dev);
+	int error;
 
 #ifdef  IPFDEBUG
 	cmn_err(CE_CONT, "iplopen(%x,%x,%x,%x)\n", dev, flag, dummy, mode);
 #endif
-	unit = (IPL_LOGMAX < unit) ? ENXIO : 0;
-	return unit;
+	if (IPL_LOGMAX < unit) {
+		error = ENXIO;
+	} else {
+		switch (unit)
+		{
+		case IPL_LOGIPF :
+		case IPL_LOGNAT :
+		case IPL_LOGSTATE :
+		case IPL_LOGAUTH :
+#ifdef IPFILTER_LOOKUP
+		case IPL_LOGLOOKUP :
+#endif
+#ifdef IPFILTER_SYNC  
+		case IPL_LOGSYNC :
+#endif
+#ifdef IPFILTER_SCAN
+		case IPL_LOGSCAN :
+#endif
+			error = 0;
+			break;
+		default :  
+			error = ENXIO;
+			break;
+		}
+	}
+	return error;
 }
 
 

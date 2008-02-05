@@ -1041,15 +1041,37 @@ ipfilter_postconfig_callback(int point, int order, ulong argument, ulong event_a
 int ipfilteropen(dev_t dev, int flag, int format)
 {
 	int unit;
+	int error;
 
 	unit = minor(dev);
 
-	if ((IPL_LOGMAX < unit) || (unit < 0))
-		unit = ENXIO;
-	else
-		unit = ESUCCESS;
+	if ((IPL_LOGMAX < unit) || (unit < 0)) {
+		error = ENXIO;
+	} else {
+		switch (unit)
+		{
+		case IPL_LOGIPF :
+		case IPL_LOGNAT :
+		case IPL_LOGSTATE :
+		case IPL_LOGAUTH :
+#ifdef IPFILTER_LOOKUP
+		case IPL_LOGLOOKUP :
+#endif
+#ifdef IPFILTER_SYNC  
+		case IPL_LOGSYNC :
+#endif
+#ifdef IPFILTER_SCAN
+		case IPL_LOGSCAN :
+#endif
+			error = ESUCCESS;
+			break;
+		default :  
+			error = ENXIO;
+			break;
+		}
+	}
 
-	return unit;
+	return error;
 }
 
 /*---------------------------------------------------------
