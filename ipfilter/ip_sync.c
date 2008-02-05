@@ -30,6 +30,10 @@ struct file;
 # if !defined(__SVR4) && !defined(__svr4__)
 #  include <sys/mbuf.h>
 # endif
+# include <sys/select.h>
+# if __FreeBSD_version >= 500000
+#  include <sys/selinfo.h>
+# endif
 #endif
 #if defined(__NetBSD__) && (__NetBSD_Version__ >= 104000000)
 # include <sys/proc.h>
@@ -103,6 +107,10 @@ static const char rcsid[] = "@(#)$Id$";
 #define	SYNC_NATTABSZ	256
 
 #ifdef	IPFILTER_SYNC
+# if SOLARIS && defined(_KERNEL)
+extern	struct pollhead	ipf_poll_head[IPL_LOGSIZE];
+# endif 
+
 ipfmutex_t	ipf_syncadd, ipsl_mutex;
 ipfrwlock_t	ipf_syncstate, ipf_syncnat;
 #if SOLARIS && defined(_KERNEL)
@@ -943,12 +951,14 @@ ipf_sync_new(tab, fin, ptr)
 # if SOLARIS
 #  ifdef _KERNEL
 	cv_signal(&ipslwait);
+	pollwakeup(&ipf_poll_head[IPL_LOGSYNC], POLLIN|POLLRDNORM);
 #  endif
 	MUTEX_EXIT(&ipsl_mutex);
 # else
 	MUTEX_EXIT(&ipsl_mutex);
 #  ifdef _KERNEL
 	wakeup(&sl_tail);
+	POLLWAKEUP(IPL_LOGSYNC);
 #  endif
 # endif
 	return sl;
@@ -1032,12 +1042,14 @@ ipf_sync_update(tab, fin, sl)
 # if SOLARIS
 #  ifdef _KERNEL
 	cv_signal(&ipslwait);
+	pollwakeup(&ipf_poll_head[IPL_LOGSYNC], POLLIN|POLLRDNORM);
 #  endif
 	MUTEX_EXIT(&ipsl_mutex);
 # else
 	MUTEX_EXIT(&ipsl_mutex);
 #  ifdef _KERNEL
 	wakeup(&sl_tail);
+	POLLWAKEUP(IPL_LOGSYNC);
 #  endif
 # endif
 }
