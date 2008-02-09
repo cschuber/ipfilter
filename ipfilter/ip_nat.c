@@ -3804,6 +3804,10 @@ u_32_t *passp;
 		 * If there is no current entry in the nat table for this IP#,
 		 * create one for it (if there is a matching rule).
 		 */
+		if ((fin->fin_off != 0) && (fin->fin_flx & FI_TCPUDP)) {
+			natfailed = -1;
+			goto nonatfrag;
+		}
 		RWLOCK_EXIT(&ipf_nat);
 		msk = 0xffffffff;
 		nmsk = nat_masks;
@@ -3861,6 +3865,7 @@ maskloop:
 		MUTEX_DOWNGRADE(&ipf_nat);
 	}
 
+nonatfrag:
 	if (nat != NULL) {
 		rval = fr_natout(fin, nat, natadd, nflags);
 		if (rval == 1) {
@@ -4095,6 +4100,10 @@ u_32_t *passp;
 	} else {
 		u_32_t hv, msk, rmsk;
 
+		if ((fin->fin_off != 0) && (fin->fin_flx & FI_TCPUDP)) {
+			natfailed = -1;
+			goto nonatfrag;
+		}
 		RWLOCK_EXIT(&ipf_nat);
 		rmsk = rdr_masks;
 		msk = 0xffffffff;
@@ -4155,6 +4164,8 @@ maskloop:
 		}
 		MUTEX_DOWNGRADE(&ipf_nat);
 	}
+
+nonatfrag:
 	if (nat != NULL) {
 		rval = fr_natin(fin, nat, natadd, nflags);
 		if (rval == 1) {
