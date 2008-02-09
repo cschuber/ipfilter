@@ -4405,6 +4405,17 @@ ipf_nat_checkout(fin, passp)
 		u_32_t hv, msk, nmsk;
 
 		/*
+		 * If we have a fragment of a TCP or UDP packet, do not try
+		 * to add the packet to the NAT table if it is not the first
+		 * fragment (offset=0) as it trips up various assumptions
+		 * about the header and port numbers being present.
+		 */
+		if ((fin->fin_off != 0) && (fin->fin_flx & FI_TCPUDP)) {
+			rval = -1;
+			goto outmatchfail;
+		}
+
+		/*
 		 * If there is no current entry in the nat table for this IP#,
 		 * create one for it (if there is a matching rule).
 		 */
@@ -4971,6 +4982,16 @@ ipf_nat_checkin(fin, passp)
 	} else {
 		u_32_t hv, msk, rmsk;
 
+		/*
+		 * If we have a fragment of a TCP or UDP packet, do not try
+		 * to add the packet to the NAT table if it is not the first
+		 * fragment (offset=0) as it trips up various assumptions
+		 * about the header and port numbers being present.
+		 */
+		if ((fin->fin_off != 0) && (fin->fin_flx & FI_TCPUDP)) {
+			rval = -1;
+			goto inmatchfail;
+		}
 		RWLOCK_EXIT(&ipf_nat);
 		rmsk = ipf_nat_rdr_masks;
 		msk = 0xffffffff;
