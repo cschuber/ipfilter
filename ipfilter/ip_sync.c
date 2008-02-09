@@ -716,7 +716,7 @@ void *data;
 	u_int hv = 0;
 	int err;
 
-	READ_ENTER(&ipf_syncstate);
+	READ_ENTER(&ipf_syncnat);
 
 	switch (sp->sm_cmd)
 	{
@@ -746,11 +746,11 @@ void *data;
 		sl->sl_num = ntohl(sp->sm_num);
 
 		WRITE_ENTER(&ipf_nat);
-		sl->sl_pnext = syncstatetab + hv;
-		sl->sl_next = syncstatetab[hv];
-		if (syncstatetab[hv] != NULL)
-			syncstatetab[hv]->sl_pnext = &sl->sl_next;
-		syncstatetab[hv] = sl;
+		sl->sl_pnext = syncnattab + hv;
+		sl->sl_next = syncnattab[hv];
+		if (syncnattab[hv] != NULL)
+			syncnattab[hv]->sl_pnext = &sl->sl_next;
+		syncnattab[hv] = sl;
 		nat_insert(n, sl->sl_rev);
 		RWLOCK_EXIT(&ipf_nat);
 		break;
@@ -758,8 +758,8 @@ void *data;
 	case SMC_UPDATE :
 		bcopy(data, &su, sizeof(su));
 
-		READ_ENTER(&ipf_syncstate);
-		for (sl = syncstatetab[hv]; (sl != NULL); sl = sl->sl_next)
+		READ_ENTER(&ipf_syncnat);
+		for (sl = syncnattab[hv]; (sl != NULL); sl = sl->sl_next)
 			if (sl->sl_hdr.sm_num == sp->sm_num)
 				break;
 		if (sl == NULL) {
@@ -784,7 +784,7 @@ void *data;
 		break;
 	}
 
-	RWLOCK_EXIT(&ipf_syncstate);
+	RWLOCK_EXIT(&ipf_syncnat);
 	return 0;
 }
 
@@ -827,16 +827,6 @@ void *ptr;
 		ipf_syncwrap = 1;
 	}
 
-	hv = ipf_syncnum & (SYNC_STATETABSZ - 1);
-	while (ipf_syncwrap != 0) {
-		for (ss = syncstatetab[hv]; ss; ss = ss->sl_next)
-			if (ss->sl_hdr.sm_num == ipf_syncnum)
-				break;
-		if (ss == NULL)
-			break;
-		ipf_syncnum++;
-		hv = ipf_syncnum & (SYNC_STATETABSZ - 1);
-	}
 	/*
 	 * Use the synch number of the object as the hash key.  Should end up
 	 * with relatively even distribution over time.
@@ -845,9 +835,35 @@ void *ptr;
 	 * nth connection they make, where n is a value in the interval
 	 * [0, SYNC_STATETABSZ-1].
 	 */
-	sl->sl_pnext = syncstatetab + hv;
-	sl->sl_next = syncstatetab[hv];
-	syncstatetab[hv] = sl;
+	 if (tab == SMC_STATE) {
+		hv = ipf_syncnum & (SYNC_STATETABSZ - 1);
+		while (ipf_syncwrap != 0) {
+			for (ss = syncstatetab[hv]; ss; ss = ss->sl_next)
+				if (ss->sl_hdr.sm_num == ipf_syncnum)
+					break;
+			if (ss == NULL)
+				break;
+			ipf_syncnum++;
+			hv = ipf_syncnum & (SYNC_STATETABSZ - 1);
+		}
+		sl->sl_pnext = syncstatetab + hv;
+		sl->sl_next = syncstatetab[hv];
+		syncstatetab[hv] = sl;
+	} else {
+		hv = ipf_syncnum & (SYNC_NATTABSZ - 1);
+		while (ipf_syncwrap != 0) {
+			for (ss = syncnattab[hv]; ss; ss = ss->sl_next)
+				if (ss->sl_hdr.sm_num == ipf_syncnum)
+					break;
+			if (ss == NULL)
+				break;
+			ipf_syncnum++;
+			hv = ipf_syncnum & (SYNC_STATETABSZ - 1);
+		}
+		sl->sl_pnext = syncnattab + hv;
+		sl->sl_next = syncnattab[hv];
+		syncnattab[hv] = sl;
+	}
 	sl->sl_num = ipf_syncnum;
 	MUTEX_EXIT(&ipf_syncadd);
 
@@ -861,12 +877,9 @@ void *ptr;
 	if (tab == SMC_STATE) {
 		sl->sl_ips = ptr;
 		sz = sizeof(*sl->sl_ips);
-	} else if (tab == SMC_NAT) {
+	} else {
 		sl->sl_ipn = ptr;
 		sz = sizeof(*sl->sl_ipn);
-	} else {
-		ptr = NULL;
-		sz = 0;
 	}
 	sl->sl_len = sz;
 
