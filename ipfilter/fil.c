@@ -6594,6 +6594,22 @@ ipftuneable_t ipf_tuneables[] = {
 	{ { &ipl_logsize },	"log_size",		0,	0x80000,
 		sizeof(ipl_logsize),		0,			NULL },
 #endif
+#ifdef IPFILTER_SYNC
+	{ { &ipf_sync_log_sz },		"sync_log_sz",
+	  0,	0x7fffffff,	sizeof(ipf_sync_log_sz),	0,	NULL },
+	{ { &ipf_sync_nat_tab_sz },	"sync_nat_tab_sz",
+	  1,	0x7fffffff,	sizeof(ipf_sync_nat_tab_sz),	0,	NULL },
+	{ { &ipf_sync_state_tab_sz },	"sync_state_tab_sz",
+	  1,	0x7fffffff,	sizeof(ipf_sync_state_tab_sz),	0,	NULL },
+	{ { &ipf_sync_debug },		"sync_debug",
+	  0,	0x7fffffff,	sizeof(ipf_sync_debug),		0,	NULL },
+	{ { &ipf_sync_wake_interval },	"sync_wake_interval",
+	  0,	0x7fffffff,	sizeof(ipf_sync_wake_interval),	0,	NULL },
+	{ { &ipf_sync_event_high_wm },	"sync_event_high_wm",
+	  1,	0x7fffffff,	sizeof(ipf_sync_event_high_wm),	0,	NULL },
+	{ { &ipf_sync_queue_high_wm },	"sync_queue_high_wm",
+	  1,	0x7fffffff,	sizeof(ipf_sync_queue_high_wm),	0,	NULL },
+#endif
 	{ { NULL },		NULL,			0,	0,
 		0,				0,	NULL }
 };
@@ -7049,9 +7065,6 @@ ipf_initialise()
 void
 ipf_deinitialise()
 {
-#ifdef IPFILTER_SYNC
-	ipf_sync_unload();
-#endif
 	ipf_frag_unload();
 	ipf_auth_unload();
 	ipf_nat_unload();
@@ -7060,6 +7073,9 @@ ipf_deinitialise()
 	ipf_scan_unload();
 #endif
 	appr_unload();
+#ifdef IPFILTER_SYNC
+	ipf_sync_unload();
+#endif
 
 #ifdef IPFILTER_COMPILED
 	ipfrule_remove();

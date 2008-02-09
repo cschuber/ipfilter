@@ -2006,7 +2006,7 @@ ipf_nat_delete(nat, logtype)
 
 #ifdef	IPFILTER_SYNC
 	if (nat->nat_sync)
-		ipf_sync_del(nat->nat_sync);
+		ipf_sync_del_nat(nat->nat_sync);
 #endif
 
 	if (nat->nat_fr != NULL) {

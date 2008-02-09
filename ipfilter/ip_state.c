@@ -3393,7 +3393,7 @@ ipf_state_del(is, why)
 
 #ifdef	IPFILTER_SYNC
 	if (is->is_sync)
-		ipf_sync_del(is->is_sync);
+		ipf_sync_del_state(is->is_sync);
 #endif
 #ifdef	IPFILTER_SCAN
 	(void) ipf_scan_detachis(is);

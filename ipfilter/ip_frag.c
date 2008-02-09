@@ -78,6 +78,7 @@ struct file;
 #include "netinet/ip_state.h"
 #include "netinet/ip_auth.h"
 #include "netinet/ip_proxy.h"
+#include "netinet/ip_sync.h"
 #if (__FreeBSD_version >= 300000)
 # include <sys/malloc.h>
 # if defined(_KERNEL)
@@ -965,6 +966,9 @@ ipf_slowtimer()
 	ipf_state_timeout();
 	ipf_nat_expire();
 	ipf_auth_expire();
+#ifdef IPFILTER_SYNC
+	ipf_sync_expire();
+#endif
 	ipf_ticks++;
 	if (ipf_running <= 0)
 		goto done;

@@ -116,19 +116,32 @@ ipfrwlock_t	ipf_syncstate, ipf_syncnat;
 #if SOLARIS && defined(_KERNEL)
 kcondvar_t	ipslwait;
 #endif
-synclist_t	*syncstatetab[SYNC_STATETABSZ];
-synclist_t	*syncnattab[SYNC_NATTABSZ];
-synclogent_t	synclog[SYNCLOG_SZ];
-syncupdent_t	syncupd[SYNCLOG_SZ];
-u_int		ipf_syncnum = 1;
-u_int		ipf_syncwrap = 0;
-u_int		sl_idx = 0,	/* next available sync log entry */
-		su_idx = 0,	/* next available sync update entry */
-		sl_tail = 0,	/* next sync log entry to read */
-		su_tail = 0;	/* next sync update entry to read */
+synclist_t	**syncstatetab;
+synclist_t	**syncnattab;
+synclogent_t	*synclog;
+syncupdent_t	*syncupd;
+u_int		ipf_sync_num;
+u_int		ipf_sync_wrap;
+u_int		sl_idx;			/* next available sync log entry */
+u_int		su_idx;			/* next available sync update entry */
+u_int		sl_tail;		/* next sync log entry to read */
+u_int		su_tail;		/* next sync update entry to read */
+int		ipf_sync_log_sz = SYNCLOG_SZ;
+int		ipf_sync_nat_tab_sz = SYNC_STATETABSZ;
+int		ipf_sync_state_tab_sz = SYNC_STATETABSZ;
 int		ipf_sync_debug = 0;
+int		ipf_sync_events;
+u_32_t		ipf_sync_lastwakeup;
+int		ipf_sync_wake_interval = 0;
+int		ipf_sync_event_high_wm = SYNCLOG_SZ * 100 / 90;	/* 90% */
+int		ipf_sync_queue_high_wm = SYNCLOG_SZ * 100 / 90;	/* 90% */
+int		ipf_sync_inited = 0;
+
 
 static int ipf_sync_flush_table __P((int, synclist_t **));
+static void ipf_sync_wakeup __P((void));
+static void ipf_sync_del __P((synclist_t *));
+static void ipf_sync_poll_wakeup __P((void));
 
 # if !defined(sparc) && !defined(__hppa)
 void ipf_sync_tcporder __P((int, struct tcpdata *));
@@ -148,16 +161,47 @@ void ipf_sync_storder __P((int, struct ipstate *));
 int
 ipf_sync_init()
 {
-	RWLOCK_INIT(&ipf_syncstate, "add things to state sync table");
-	RWLOCK_INIT(&ipf_syncnat, "add things to nat sync table");
-	MUTEX_INIT(&ipf_syncadd, "add things to sync table");
-	MUTEX_INIT(&ipsl_mutex, "add things to sync table");
+
 # if SOLARIS && defined(_KERNEL)
 	cv_init(&ipslwait, "ipsl condvar", CV_DRIVER, NULL);
 # endif
 
-	bzero((char *)syncnattab, sizeof(syncnattab));
-	bzero((char *)syncstatetab, sizeof(syncstatetab));
+	KMALLOCS(synclog, synclogent_t *, ipf_sync_log_sz * sizeof(*synclog));
+	if (synclog == NULL)
+		return -1;
+
+	KMALLOCS(syncupd, syncupdent_t *, ipf_sync_log_sz * sizeof(*syncupd));
+	if (syncupd == NULL)
+		return -2;
+
+	KMALLOCS(syncstatetab, synclist_t **,
+		 ipf_sync_state_tab_sz * sizeof(*syncstatetab));
+	if (syncstatetab == NULL)
+		return -3;
+	bzero((char *)syncstatetab, 
+	      ipf_sync_state_tab_sz * sizeof(*syncstatetab));
+
+	KMALLOCS(syncnattab, synclist_t **,
+		 ipf_sync_nat_tab_sz * sizeof(*syncnattab));
+	if (syncnattab == NULL)
+		return -3;
+	bzero((char *)syncnattab, ipf_sync_nat_tab_sz * sizeof(*syncnattab));
+
+	ipf_sync_num = 1;
+	ipf_sync_wrap = 0;
+	sl_idx = 0;
+	su_idx = 0;
+	sl_tail = 0;
+	su_tail = 0;
+	ipf_sync_events = 0;
+	ipf_sync_lastwakeup = 0;
+
+	RWLOCK_INIT(&ipf_syncstate, "add things to state sync table");
+	RWLOCK_INIT(&ipf_syncnat, "add things to nat sync table");
+	MUTEX_INIT(&ipf_syncadd, "add things to sync table");
+	MUTEX_INIT(&ipsl_mutex, "read ring lock");
+
+	ipf_sync_inited = 1;
 
 	return 0;
 }
@@ -174,13 +218,37 @@ ipf_sync_init()
 int
 ipf_sync_unload()
 {
-	(void) ipf_sync_flush_table(SYNC_STATETABSZ, syncstatetab);
-	(void) ipf_sync_flush_table(SYNC_NATTABSZ, syncnattab);
 
-	MUTEX_DESTROY(&ipsl_mutex);
-	MUTEX_DESTROY(&ipf_syncadd);
-	RW_DESTROY(&ipf_syncnat);
-	RW_DESTROY(&ipf_syncstate);
+	if (syncupd != NULL) {
+		KFREES(syncupd, ipf_sync_log_sz * sizeof(*syncupd));
+		syncupd = NULL;
+	}
+
+	if (synclog != NULL) {
+		KFREES(synclog, ipf_sync_log_sz * sizeof(*synclog));
+		synclog = NULL;
+	}
+
+	if (syncnattab != NULL) {
+		ipf_sync_flush_table(ipf_sync_nat_tab_sz, syncnattab);
+		KFREES(syncnattab, ipf_sync_nat_tab_sz * sizeof(*syncnattab));
+		syncnattab = NULL;
+	}
+
+	if (syncstatetab != NULL) {
+		ipf_sync_flush_table(ipf_sync_state_tab_sz, syncstatetab);
+		KFREES(syncstatetab,
+		       ipf_sync_state_tab_sz * sizeof(*syncstatetab));
+		syncstatetab = NULL;
+	}
+
+	if (ipf_sync_inited == 1) {
+		MUTEX_DESTROY(&ipsl_mutex);
+		MUTEX_DESTROY(&ipf_syncadd);
+		RW_DESTROY(&ipf_syncnat);
+		RW_DESTROY(&ipf_syncstate);
+		ipf_sync_inited = 0;
+	}
 
 	return 0;
 }
@@ -301,8 +369,6 @@ ipf_sync_storder(way, ips)
 #  define	ipf_sync_natorder(x,y)
 #  define	ipf_sync_storder(x,y)
 # endif /* !defined(sparc) && !defined(__hppa) */
-
-/* enable this for debugging */
 
 # ifdef _KERNEL
 /* ------------------------------------------------------------------------ */
@@ -574,7 +640,7 @@ ipf_sync_state(sp, data)
 	u_int hv;
 	int err = 0;
 
-	hv = sp->sm_num & (SYNC_STATETABSZ - 1);
+	hv = sp->sm_num & (ipf_sync_state_tab_sz - 1);
 
 	switch (sp->sm_cmd)
 	{
@@ -728,19 +794,52 @@ ipf_sync_state(sp, data)
 /* Returns:     Nil                                                         */
 /* Parameters:  sl(I) - pointer to synclist object to delete                */
 /*                                                                          */
-/* Deletes an object from the synclist table and free's its memory.         */
+/* Deletes an object from the synclist.                                     */
 /* ------------------------------------------------------------------------ */
-void
+static void
 ipf_sync_del(sl)
 	synclist_t *sl;
 {
-	WRITE_ENTER(&ipf_syncstate);
 	*sl->sl_pnext = sl->sl_next;
 	if (sl->sl_next != NULL)
 		sl->sl_next->sl_pnext = sl->sl_pnext;
 	if (sl->sl_idx != -1)
 		syncupd[sl->sl_idx].sup_hdr.sm_sl = NULL;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_sync_del_state                                          */
+/* Returns:     Nil                                                         */
+/* Parameters:  sl(I) - pointer to synclist object to delete                */
+/*                                                                          */
+/* Deletes an object from the synclist state table and free's its memory.   */
+/* ------------------------------------------------------------------------ */
+void
+ipf_sync_del_state(sl)
+	synclist_t *sl;
+{
+	WRITE_ENTER(&ipf_syncstate);
+	ipf_sync_del(sl);
 	RWLOCK_EXIT(&ipf_syncstate);
+	KFREE(sl);
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_sync_del_nat                                            */
+/* Returns:     Nil                                                         */
+/* Parameters:  sl(I) - pointer to synclist object to delete                */
+/*                                                                          */
+/* Deletes an object from the synclist nat table and free's its memory.     */
+/* ------------------------------------------------------------------------ */
+void
+ipf_sync_del_nat(sl)
+	synclist_t *sl;
+{
+	WRITE_ENTER(&ipf_syncnat);
+	ipf_sync_del(sl);
+	RWLOCK_EXIT(&ipf_syncnat);
 	KFREE(sl);
 }
 
@@ -768,7 +867,7 @@ ipf_sync_nat(sp, data)
 	u_int hv = 0;
 	int err;
 
-	READ_ENTER(&ipf_syncstate);
+	READ_ENTER(&ipf_syncnat);
 
 	switch (sp->sm_cmd)
 	{
@@ -800,11 +899,11 @@ ipf_sync_nat(sp, data)
 		sl->sl_num = ntohl(sp->sm_num);
 
 		WRITE_ENTER(&ipf_nat);
-		sl->sl_pnext = syncstatetab + hv;
-		sl->sl_next = syncstatetab[hv];
-		if (syncstatetab[hv] != NULL)
-			syncstatetab[hv]->sl_pnext = &sl->sl_next;
-		syncstatetab[hv] = sl;
+		sl->sl_pnext = syncnattab + hv;
+		sl->sl_next = syncnattab[hv];
+		if (syncnattab[hv] != NULL)
+			syncnattab[hv]->sl_pnext = &sl->sl_next;
+		syncnattab[hv] = sl;
 		ipf_nat_insert(n, sl->sl_rev);
 		RWLOCK_EXIT(&ipf_nat);
 		break;
@@ -812,8 +911,8 @@ ipf_sync_nat(sp, data)
 	case SMC_UPDATE :
 		bcopy(data, &su, sizeof(su));
 
-		READ_ENTER(&ipf_syncstate);
-		for (sl = syncstatetab[hv]; (sl != NULL); sl = sl->sl_next)
+		READ_ENTER(&ipf_syncnat);
+		for (sl = syncnattab[hv]; (sl != NULL); sl = sl->sl_next)
 			if (sl->sl_hdr.sm_num == sp->sm_num)
 				break;
 		if (sl == NULL) {
@@ -840,7 +939,7 @@ ipf_sync_nat(sp, data)
 		break;
 	}
 
-	RWLOCK_EXIT(&ipf_syncstate);
+	RWLOCK_EXIT(&ipf_syncnat);
 	return 0;
 }
 
@@ -866,7 +965,7 @@ ipf_sync_new(tab, fin, ptr)
 	synclogent_t *sle;
 	u_int hv, sz;
 
-	if (sl_idx == SYNCLOG_SZ)
+	if (sl_idx == ipf_sync_log_sz)
 		return NULL;
 	KMALLOC(sl, synclist_t *);
 	if (sl == NULL)
@@ -878,22 +977,12 @@ ipf_sync_new(tab, fin, ptr)
 	 * to be unique for the lifetime of the structure and may be reused
 	 * later.
 	 */
-	ipf_syncnum++;
-	if (ipf_syncnum == 0) {
-		ipf_syncnum = 1;
-		ipf_syncwrap = 1;
+	ipf_sync_num++;
+	if (ipf_sync_num == 0) {
+		ipf_sync_num = 1;
+		ipf_sync_wrap++;
 	}
 
-	hv = ipf_syncnum & (SYNC_STATETABSZ - 1);
-	while (ipf_syncwrap != 0) {
-		for (ss = syncstatetab[hv]; ss; ss = ss->sl_next)
-			if (ss->sl_hdr.sm_num == ipf_syncnum)
-				break;
-		if (ss == NULL)
-			break;
-		ipf_syncnum++;
-		hv = ipf_syncnum & (SYNC_STATETABSZ - 1);
-	}
 	/*
 	 * Use the synch number of the object as the hash key.  Should end up
 	 * with relatively even distribution over time.
@@ -902,10 +991,45 @@ ipf_sync_new(tab, fin, ptr)
 	 * nth connection they make, where n is a value in the interval
 	 * [0, SYNC_STATETABSZ-1].
 	 */
-	sl->sl_pnext = syncstatetab + hv;
-	sl->sl_next = syncstatetab[hv];
-	syncstatetab[hv] = sl;
-	sl->sl_num = ipf_syncnum;
+	switch (tab)
+	{
+	case SMC_STATE :
+		hv = ipf_sync_num & (ipf_sync_state_tab_sz - 1);
+		while (ipf_sync_wrap != 0) {
+			for (ss = syncstatetab[hv]; ss; ss = ss->sl_next)
+				if (ss->sl_hdr.sm_num == ipf_sync_num)
+					break;
+			if (ss == NULL)
+				break;
+			ipf_sync_num++;
+			hv = ipf_sync_num & (ipf_sync_state_tab_sz - 1);
+		}
+		sl->sl_pnext = syncstatetab + hv;
+		sl->sl_next = syncstatetab[hv];
+		syncstatetab[hv] = sl;
+		break;
+
+	case SMC_NAT :
+		hv = ipf_sync_num & (ipf_sync_nat_tab_sz - 1);
+		while (ipf_sync_wrap != 0) {
+			for (ss = syncnattab[hv]; ss; ss = ss->sl_next)
+				if (ss->sl_hdr.sm_num == ipf_sync_num)
+					break;
+			if (ss == NULL)
+				break;
+			ipf_sync_num++;
+			hv = ipf_sync_num & (ipf_sync_nat_tab_sz - 1);
+		}
+		sl->sl_pnext = syncnattab + hv;
+		sl->sl_next = syncnattab[hv];
+		syncnattab[hv] = sl;
+		break;
+
+	default :
+		break;
+	}
+
+	sl->sl_num = ipf_sync_num;
 	MUTEX_EXIT(&ipf_syncadd);
 
 	sl->sl_magic = htonl(SYNHDRMAGIC);
@@ -947,20 +1071,7 @@ ipf_sync_new(tab, fin, ptr)
 	}
 	MUTEX_EXIT(&ipf_syncadd);
 
-	MUTEX_ENTER(&ipsl_mutex);
-# if SOLARIS
-#  ifdef _KERNEL
-	cv_signal(&ipslwait);
-	pollwakeup(&ipf_poll_head[IPL_LOGSYNC], POLLIN|POLLRDNORM);
-#  endif
-	MUTEX_EXIT(&ipsl_mutex);
-# else
-	MUTEX_EXIT(&ipsl_mutex);
-#  ifdef _KERNEL
-	wakeup(&sl_tail);
-	POLLWAKEUP(IPL_LOGSYNC);
-#  endif
-# endif
+	ipf_sync_wakeup();
 	return sl;
 }
 
@@ -985,15 +1096,24 @@ ipf_sync_update(tab, fin, sl)
 	syncupdent_t *slu;
 	ipstate_t *ips;
 	nat_t *nat;
+	ipfrwlock_t *lock;
 
 	if (fin->fin_out == 0 || sl == NULL)
 		return;
 
-	WRITE_ENTER(&ipf_syncstate);
-	MUTEX_ENTER(&ipf_syncadd);
+	if (tab == SMC_STATE) {
+		lock = &ipf_syncstate;
+	} else {
+		lock = &ipf_syncnat;
+	}
+
+	READ_ENTER(lock);
 	if (sl->sl_idx == -1) {
+		MUTEX_ENTER(&ipf_syncadd);
 		slu = syncupd + su_idx;
 		sl->sl_idx = su_idx++;
+		MUTEX_EXIT(&ipf_syncadd);
+
 		bcopy((char *)&sl->sl_hdr, (char *)&slu->sup_hdr,
 		      sizeof(slu->sup_hdr));
 		slu->sup_hdr.sm_magic = htonl(SYNHDRMAGIC);
@@ -1011,8 +1131,6 @@ ipf_sync_update(tab, fin, sl)
 # endif
 	} else
 		slu = syncupd + sl->sl_idx;
-	MUTEX_EXIT(&ipf_syncadd);
-	MUTEX_DOWNGRADE(&ipf_syncstate);
 
 	/*
 	 * Only TCP has complex timeouts, others just use default timeouts.
@@ -1036,22 +1154,9 @@ ipf_sync_update(tab, fin, sl)
 			st->stu_age = htonl(nat->nat_age);
 		}
 	}
-	RWLOCK_EXIT(&ipf_syncstate);
+	RWLOCK_EXIT(lock);
 
-	MUTEX_ENTER(&ipsl_mutex);
-# if SOLARIS
-#  ifdef _KERNEL
-	cv_signal(&ipslwait);
-	pollwakeup(&ipf_poll_head[IPL_LOGSYNC], POLLIN|POLLRDNORM);
-#  endif
-	MUTEX_EXIT(&ipsl_mutex);
-# else
-	MUTEX_EXIT(&ipsl_mutex);
-#  ifdef _KERNEL
-	wakeup(&sl_tail);
-	POLLWAKEUP(IPL_LOGSYNC);
-#  endif
-# endif
+	ipf_sync_wakeup();
 }
 
 
@@ -1197,5 +1302,83 @@ int
 ipf_sync_canwrite()
 {
 	return 1;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_sync_wakeup                                             */
+/* Parameters:  Nil                                                         */
+/* Returns:     Nil                                                         */
+/*                                                                          */
+/* This function implements the heuristics that decide how often to         */
+/* generate a poll wakeup for programs that are waiting for information     */
+/* about when they can do a read on /dev/ipsync.                            */
+/*                                                                          */
+/* There are three different considerations here:                           */
+/* - do not keep a program waiting too long: ipf_sync_wake_interval is the  */
+/*   maximum number of ipf ticks to let pass by;                            */
+/* - do not let the queue of ouststanding things to generate notifies for   */
+/*   get too full (ipf_sync_queue_high_wm is the high water mark);          */
+/* - do not let too many events get collapsed in before deciding that the   */
+/*   other host(s) need an update (ipf_sync_event_high_wm is the high water */
+/*   mark for this counter.)                                                */
+/* ------------------------------------------------------------------------ */
+static void
+ipf_sync_wakeup()
+{
+	ipf_sync_events++;
+	if ((ipf_ticks > ipf_sync_lastwakeup + ipf_sync_wake_interval) ||
+	    (ipf_sync_events > ipf_sync_event_high_wm) ||
+	    ((sl_tail - sl_idx) > ipf_sync_queue_high_wm) ||
+	    ((su_tail - su_idx) > ipf_sync_queue_high_wm)) {
+
+		ipf_sync_poll_wakeup();
+	}
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_sync_poll_wakeup                                        */
+/* Parameters:  Nil                                                         */
+/* Returns:     Nil                                                         */
+/*                                                                          */
+/* Deliver a poll wakeup and reset counters for two of the three heuristics */
+/* ------------------------------------------------------------------------ */
+static void
+ipf_sync_poll_wakeup()
+{
+
+	ipf_sync_events = 0;
+	ipf_sync_lastwakeup = ipf_ticks;
+
+# ifdef _KERNEL
+#  if SOLARIS
+	MUTEX_ENTER(&ipsl_mutex);
+	cv_signal(&ipslwait);
+	MUTEX_EXIT(&ipsl_mutex);
+	pollwakeup(&ipf_poll_head[IPL_LOGSYNC], POLLIN|POLLRDNORM);
+#  else
+	wakeup(&sl_tail);
+	POLLWAKEUP(IPL_LOGSYNC);
+#  endif
+# endif
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_sync_expire                                             */
+/* Parameters:  Nil                                                         */
+/* Returns:     Nil                                                         */
+/*                                                                          */
+/* This is the function called even ipf_tick.  It implements one of the     */
+/* three heuristics above *IF* there are events waiting.                    */
+/* ------------------------------------------------------------------------ */
+void
+ipf_sync_expire()
+{
+	if ((ipf_sync_events > 0) &&
+	    (ipf_ticks > ipf_sync_lastwakeup + ipf_sync_wake_interval)) {
+		ipf_sync_poll_wakeup();
+	}
 }
 #endif /* IPFILTER_SYNC */
