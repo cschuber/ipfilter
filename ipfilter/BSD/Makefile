@@ -43,11 +43,11 @@ INSTALL=install
 #
 MODOBJS=ip_fil.o fil.o ml_ipl.o ip_nat.o ip_frag.o ip_state.o ip_proxy.o \
 	ip_auth.o ip_log.o ip_pool.o ip_htable.o ip_lookup.o ip_rules.o \
-	ip_scan.o ip_sync.o
+	ip_scan.o ip_sync.o ip_nat6.o
 #	ip_trafcon.o
 DFLAGS=$(IPFLKM) $(IPFLOG) $(LOOKUP) $(SYNC) $(DEF) $(DLKM) $(IPFBPF)
 IPF=ipf.o ipfcomp.o ipf_y.o ipf_l.o bpf_filter_u.o
-IPT=ipftest.o fil_u.o ip_frag_u.o ip_state_u.o ip_nat_u.o \
+IPT=ipftest.o fil_u.o ip_frag_u.o ip_state_u.o ip_nat_u.o ip_nat6_u.o \
     ip_proxy_u.o ip_auth_u.o ip_htable_u.o ip_lookup_u.o ip_pool_u.o \
     ip_scan_u.o ip_sync_u.o ip_rules_u.o ip_fil_u.o ip_log_u.o \
     ippool_y.o ippool_l.o ipf_y.o ipf_l.o ipnat_y.o ipnat_l.o \
@@ -182,6 +182,9 @@ ipnat_l.h: $(TOOL)/lexer.h
 ip_nat_u.o: $(TOP)/ip_nat.c $(TOP)/ip_nat.h $(TOP)/ip_compat.h $(TOP)/ip_fil.h
 	$(CC) $(CCARGS) $(EXTRA) -c $(TOP)/ip_nat.c -o $@
 
+ip_nat6_u.o: $(TOP)/ip_nat6.c $(TOP)/ip_nat.h $(TOP)/ip_compat.h $(TOP)/ip_fil.h
+	$(CC) $(CCARGS) $(EXTRA) -c $(TOP)/ip_nat6.c -o $@
+
 ip_proxy_u.o: $(TOP)/ip_proxy.c $(TOP)/ip_proxy.h $(TOP)/ip_compat.h \
 	$(TOP)/ip_fil.h $(PROXYLIST) $(TOP)/ip_nat.h
 	$(CC) $(CCARGS) $(EXTRA) -c $(TOP)/ip_proxy.c -o $@
@@ -267,6 +270,9 @@ ipf.ko ipl.ko: $(MODOBJS)
 
 ip_nat.o: $(TOP)/ip_nat.c $(TOP)/ip_nat.h $(TOP)/ip_compat.h $(TOP)/ip_fil.h
 	$(CC) $(KCARGS) $(DFLAGS) -c $(TOP)/ip_nat.c -o $@
+
+ip_nat6.o: $(TOP)/ip_nat6.c $(TOP)/ip_nat.h $(TOP)/ip_compat.h $(TOP)/ip_fil.h
+	$(CC) $(KCARGS) $(DFLAGS) -c $(TOP)/ip_nat6.c -o $@
 
 ip_frag.o: $(TOP)/ip_frag.c $(TOP)/ip_frag.h $(TOP)/ip_compat.h $(TOP)/ip_fil.h
 	$(CC) $(KCARGS) $(DFLAGS) -c $(TOP)/ip_frag.c -o $@

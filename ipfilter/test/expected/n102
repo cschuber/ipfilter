@@ -7,7 +7,7 @@
 > ip #0 40(20) 6 1.1.1.1,101 > 2.3.2.3,203
 > ip #0 40(20) 6 4.4.4.4,1000 > 6.6.0.1,203
 List of active MAP/Redirect filters:
-rewrite out on zx0 proto tcp from any to 2.2.0.0/16 -> src 4.4.4.4/32,1000-2000 dst 6.6.0.0/16;
+rewrite out on zx0 proto tcp from 0/0 to 2.2.0.0/16 -> src 4.4.4.4/32,1000-2000 dst 6.6.0.0/16;
 
 List of active sessions:
 RWR-MAP 1.1.1.1         101   2.2.2.3         203  <- -> 4.4.4.4         1000  6.6.0.1         203  

@@ -3,7 +3,7 @@
 4500 0028 0001 0000 ff06 b5c9 0202 0202 0101 0101 0050 0065 0000 0001 1000 0001 5010 2000 7918 0000 
 
 List of active MAP/Redirect filters:
-rewrite out on zx0 proto tcp from any to 2.2.0.0/16 port = 80 -> src 4.4.4.4/32,1000-1001 dst 6.6.0.0/16,port = 3128;
+rewrite out on zx0 proto tcp from 0/0 to 2.2.0.0/16 port = 80 -> src 4.4.4.4/32,1000-1001 dst 6.6.0.0/16,port = 3128;
 
 List of active sessions:
 RWR-MAP 1.1.1.1         101   2.2.2.2         80   <- -> 4.4.4.4         1000  6.6.0.1         3128 

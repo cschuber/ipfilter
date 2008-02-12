@@ -14,6 +14,7 @@
 static const char rcsid[] = "@(#)$Id$";
 #endif
 
+
 /*
  * Print out a NAT rule
  */
@@ -22,7 +23,7 @@ void printnat(np, opts)
 	int opts;
 {
 	struct protoent *pr;
-	int bits, proto;
+	int proto;
 
 	if (np->in_flags & IPN_NO)
 		printf("no ");
@@ -103,33 +104,25 @@ void printnat(np, opts)
 		if (np->in_flags & IPN_NOTSRC)
 			printf("! ");
 		printf("from ");
-		printaddr(AF_INET, np->in_osrcatype, np->in_ifnames[0],
-			  (u_32_t *)&np->in_osrcaddr,
-			  (u_32_t *)&np->in_osrcmsk);
+		printnataddr(np->in_v, &np->in_osrc, np->in_ifnames[0]);
 		if (np->in_scmp)
 			printportcmp(proto, &np->in_tuc.ftu_src);
 
 		if (np->in_flags & IPN_NOTDST)
 			printf(" !");
 		printf(" to ");
-		printaddr(AF_INET, np->in_odstatype, np->in_ifnames[0],
-			  (u_32_t *)&np->in_odstaddr,
-			  (u_32_t *)&np->in_odstmsk);
+		printnataddr(np->in_v, &np->in_odst, np->in_ifnames[0]);
 		if (np->in_dcmp)
 			printportcmp(proto, &np->in_tuc.ftu_dst);
 	}
 
 	if (np->in_redir & (NAT_ENCAP|NAT_DIVERTUDP)) {
 		printf(" -> src ");
-		printaddr(AF_INET, np->in_nsrcatype, np->in_ifnames[0],
-			  (u_32_t *)&np->in_nsrcaddr,
-			  (u_32_t *)&np->in_nsrcmsk);
+		printnataddr(np->in_v, &np->in_nsrc, np->in_ifnames[0]);
 		if ((np->in_redir & NAT_DIVERTUDP) != 0)
 			printf(",%u", np->in_spmin);
 		printf(" dst ");
-		printaddr(AF_INET, np->in_ndstatype, np->in_ifnames[0],
-			  (u_32_t *)&np->in_ndstaddr,
-			  (u_32_t *)&np->in_ndstmsk);
+		printnataddr(np->in_v, &np->in_ndst, np->in_ifnames[0]);
 		if ((np->in_redir & NAT_DIVERTUDP) != 0)
 			printf(",%u udp", np->in_dpmin);
 		printf(";\n");
@@ -141,9 +134,7 @@ void printnat(np, opts)
 		} else if (np->in_nsrcafunc == NA_HASHMD5) {
 			printf("hash-md5(");
 		}
-		printaddr(AF_INET, np->in_nsrcatype, np->in_ifnames[0],
-			  (u_32_t *)&np->in_nsrcaddr,
-			  (u_32_t *)&np->in_nsrcmsk);
+		printnataddr(np->in_v, &np->in_nsrc, np->in_ifnames[0]);
 		if (np->in_nsrcafunc != NA_NORMAL) {
 			printf(")");
 		}
@@ -163,9 +154,7 @@ void printnat(np, opts)
 		} else if (np->in_ndstafunc == NA_HASHMD5) {
 			printf("hash-md5(");
 		}
-		printaddr(AF_INET, np->in_ndstatype, np->in_ifnames[0],
-			  (u_32_t *)&np->in_ndstaddr,
-			  (u_32_t *)&np->in_ndstmsk);
+		printnataddr(np->in_v, &np->in_ndst, np->in_ifnames[0]);
 		if (np->in_ndstafunc != NA_NORMAL) {
 			printf(")");
 		}
@@ -183,9 +172,7 @@ void printnat(np, opts)
 
 	} else if (np->in_redir == NAT_REDIRECT) {
 		if (!(np->in_flags & IPN_FILTER)) {
-			printaddr(AF_INET, np->in_odstatype, np->in_ifnames[0],
-				  (u_32_t *)&np->in_odstaddr,
-				  (u_32_t *)&np->in_odstmsk);
+			printnataddr(np->in_v, &np->in_odst, np->in_ifnames[0]);
 			if (np->in_flags & IPN_TCPUDP) {
 				printf(" port %d", np->in_odport);
 				if (np->in_odport != np->in_dtop)
@@ -198,11 +185,8 @@ void printnat(np, opts)
 			printf(";\n");
 			return;
 		}
-		printf(" -> %s", inet_ntoa(np->in_ndstip));
-		if (np->in_flags & IPN_SPLIT)
-			printf(",%s", inet_ntoa(np->in_ndst.na_addr[1].in4));
-		else if (np->in_ndstmsk == 0 && np->in_ndstaddr == 0)
-			printf("/0");
+		printf(" -> ");
+		printnataddr(np->in_v, &np->in_ndst, np->in_ifnames[0]);
 		if (np->in_flags & IPN_TCPUDP) {
 			if ((np->in_flags & IPN_FIXEDDPORT) != 0)
 				printf(" port = %d", np->in_dpmin);
@@ -238,9 +222,7 @@ void printnat(np, opts)
 		int protoprinted = 0;
 
 		if (!(np->in_flags & IPN_FILTER)) {
-			printaddr(AF_INET, np->in_osrcatype, np->in_ifnames[0],
-				  (u_32_t *)&np->in_osrcaddr,
-				  (u_32_t *)&np->in_osrcmsk);
+			printnataddr(np->in_v, &np->in_osrc, np->in_ifnames[0]);
 		}
 		if (np->in_flags & IPN_NO) {
 			putchar(' ');
@@ -250,15 +232,10 @@ void printnat(np, opts)
 		}
 		printf(" -> ");
 		if (np->in_flags & IPN_SIPRANGE) {
-			printf("range %s-", inet_ntoa(np->in_nsrcip));
-			printf("%s", inet_ntoa(np->in_nsrc.na_addr[1].in4));
+			printf("range ");
+			printnataddr(np->in_v, &np->in_nsrc, np->in_ifnames[0]);
 		} else {
-			printf("%s/", inet_ntoa(np->in_nsrcip));
-			bits = count4bits(np->in_nsrcmsk);
-			if (bits != -1)
-				printf("%d", bits);
-			else
-				printf("%s", inet_ntoa(np->in_nsrcip));
+			printnataddr(np->in_v, &np->in_nsrc, np->in_ifnames[0]);
 		}
 		if (*np->in_plabel != '\0') {
 			printf(" proxy port ");

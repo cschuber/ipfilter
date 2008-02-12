@@ -2,7 +2,7 @@
 < ip #0 28(20) 17 2.2.2.2,4500 > 3.3.3.1,6700
 > ip #0 28(20) 17 1.1.2.3,4500 > 3.3.3.1,6700
 List of active MAP/Redirect filters:
-rdr le0,bge0 1.1.0.0/16 -> 2.2.2.2 ip
+rdr le0,bge0 1.1.0.0/16 -> 2.2.2.2/32 ip
 map hme0,ppp0 3.3.3.0/24 -> 4.4.4.4/32
 
 List of active sessions:
@@ -10,7 +10,7 @@ MAP 3.3.3.1         6700  <- -> 4.4.4.4         6700  [2.2.2.2 4500]
 RDR 2.2.2.2         4500  <- -> 1.1.2.3         4500  [3.3.3.1 6700]
 
 Hostmap table:
-3.3.3.1,2.2.2.2 -> 4.4.4.4,0.0.0.0 (use = 1 hv = 1758)
+3.3.3.1,2.2.2.2 -> 4.4.4.4,0.0.0.0 (use = 1)
 List of active state sessions:
 4:udp src:3.3.3.1,6700 dst:2.2.2.2,4500 24
 	FWD: IN pkts 1 bytes 28 OUT pkts 1 bytes 28

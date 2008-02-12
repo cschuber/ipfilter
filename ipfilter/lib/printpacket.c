@@ -24,7 +24,12 @@ void printpacket(dir, m)
 	ip = MTOD(m, ip_t *);
 
 	if (IP_V(ip) == 6) {
-		len = ntohs(((u_short *)ip)[2]) + 40;
+#ifdef USE_INET6
+		len = ntohs(((ip6_t *)ip)->ip6_plen);
+#else
+		len = ntohs(((u_short *)ip)[2]);
+#endif
+		len += 40;
 	} else {
 		len = ntohs(ip->ip_len);
 	}

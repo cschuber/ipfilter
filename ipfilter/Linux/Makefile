@@ -60,7 +60,7 @@ RANLIB=ranlib
 AROPTS=crs
 #
 MODOBJS=$(OBJ)/linux.o $(OBJ)/ip_fil.o $(OBJ)/fil.o $(OBJ)/ip_nat.o \
-	$(OBJ)/ip_frag.o $(OBJ)/ip_scan.o $(OBJ)/ip_sync.o \
+	$(OBJ)/ip_frag.o $(OBJ)/ip_scan.o $(OBJ)/ip_sync.o $(OBJ)/ip_nat6.o \
 	$(OBJ)/ip_state.o $(OBJ)/ip_proxy.o $(OBJ)/ip_auth.o \
 	$(OBJ)/ip_lookup.o $(OBJ)/ip_pool.o $(OBJ)/ip_htable.o \
 	$(OBJ)/ip_log.o $(OBJ)/radix.o
@@ -68,7 +68,7 @@ KCCARGS=$(KCFLAGS) -D_BSD_SOURCE=1 $(IPFLKM) $(DEF) $(DLKM) -march=$(ARCH) \
 	$(INC) -iwithprefix include -I. $(LOOKUP) $(IPFLOG)
 IPF=$(OBJ)/ipf.o $(OBJ)/ipfcomp.o $(OBJ)/ipf_y.o $(OBJ)/ipf_l.o
 IPT=$(OBJ)/ipftest.o $(OBJ)/ip_fil_u.o $(OBJ)/ip_state_u.o \
-    $(OBJ)/ip_frag_u.o $(OBJ)/ip_nat_u.o $(OBJ)/fil_u.o \
+    $(OBJ)/ip_frag_u.o $(OBJ)/ip_nat_u.o $(OBJ)/fil_u.o $(OBJ)/ip_nat6_u.o \
     $(OBJ)/ip_pool_u.o $(OBJ)/ip_htable_u.o $(OBJ)/ip_lookup_u.o \
     $(OBJ)/ip_proxy_u.o $(OBJ)/ip_auth_u.o $(OBJ)/ip_log_u.o \
     $(OBJ)/ippool_y.o $(OBJ)/ippool_l.o $(OBJ)/ipnat_y.o $(OBJ)/ipnat_l.o \
@@ -250,6 +250,10 @@ $(OBJ)/ip_nat_u.o: $(TOP)/ip_nat.c $(TOP)/ip_nat.h $(TOP)/ip_compat.h \
 	    $(TOP)/ip_fil.h
 	$(CC) $(CCARGS) -c $(TOP)/ip_nat.c -o $@
 
+$(OBJ)/ip_nat6_u.o: $(TOP)/ip_nat6.c $(TOP)/ip_nat.h $(TOP)/ip_compat.h \
+	    $(TOP)/ip_fil.h
+	$(CC) $(CCARGS) -c $(TOP)/ip_nat6.c -o $@
+
 $(OBJ)/ip_proxy_u.o: $(TOP)/ip_proxy.c $(TOP)/ip_proxy.h $(TOP)/ip_compat.h \
 	$(TOP)/ip_fil.h
 	$(CC) $(CCARGS) -c $(TOP)/ip_proxy.c -o $@
@@ -299,6 +303,10 @@ $(OBJ)/ipfilter.o: $(MODOBJS)
 $(OBJ)/ip_nat.o: ip_nat.c $(TOP)/ip_nat.h $(TOP)/ip_compat.h \
 	$(TOP)/ip_fil.h ipf-linux.h
 	$(CC) $(KCCARGS) -c ip_nat.c -o $@
+
+$(OBJ)/ip_nat6.o: ip_nat6.c $(TOP)/ip_nat.h $(TOP)/ip_compat.h \
+	$(TOP)/ip_fil.h ipf-linux.h
+	$(CC) $(KCCARGS) -c ip_nat6.c -o $@
 
 ip_nat.c: $(TOP)/ip_nat.c Makefile
 	sed -e '/^#/,$$d' $< > $@

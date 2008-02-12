@@ -806,15 +806,29 @@ void fixv4sums(m, ip)
 	mb_t *m;
 	ip_t *ip;
 {
-	u_char *csump, *hdr;
+	u_char *csump, *hdr, p;
+	int len;
 
-	ip->ip_sum = 0;
-	ip->ip_sum = ipf_cksum((u_short *)ip, IP_HL(ip) << 2);
-
+	p = 0;
+	len = 0;
 	csump = (u_char *)ip;
-	csump += IP_HL(ip) << 2;
+	if (IP_V(ip) == 4) {
+		ip->ip_sum = 0;
+		ip->ip_sum = ipf_cksum((u_short *)ip, IP_HL(ip) << 2);
+		csump += IP_HL(ip) << 2;
+		p = ip->ip_p;
+		len = ntohs(ip->ip_len);
+#ifdef USE_INET6
+	} else if (IP_V(ip) == 6) {
+		csump += sizeof(ip6_t);
+		p = ((ip6_t *)ip)->ip6_nxt;
+		len = ntohs(((ip6_t *)ip)->ip6_plen);
+		len += sizeof(ip6_t);
+#endif
+	}
 
-	switch (ip->ip_p)
+
+	switch (p)
 	{
 	case IPPROTO_TCP :
 		hdr = csump;
@@ -835,7 +849,6 @@ void fixv4sums(m, ip)
 	}
 	if (hdr != NULL) {
 		*csump = 0;
-		*(u_short *)csump = fr_cksum(m, ip, ip->ip_p, hdr,
-					     ntohs(ip->ip_len));
+		*(u_short *)csump = fr_cksum(m, ip, p, hdr, len);
 	}
 }

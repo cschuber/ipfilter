@@ -19,7 +19,7 @@ void	printhostmask(family, addr, mask)
 	struct in_addr ipa;
 #endif
 
-	if ((family == -1) || (!*addr && !*mask))
+	if ((family == -1) || ((!addr || !*addr) && (!mask || !*mask)))
 		printf("any");
 	else {
 		void *ptr = addr;
@@ -30,6 +30,7 @@ void	printhostmask(family, addr, mask)
 		ipa.s_addr = *addr;
 		printf("%s", inet_ntoa(ipa));
 #endif
-		printmask(family, mask);
+		if (mask != NULL)
+			printmask(family, mask);
 	}
 }

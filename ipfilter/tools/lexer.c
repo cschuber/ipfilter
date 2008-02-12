@@ -174,8 +174,11 @@ static char *yytexttostr(offset, max)
 
 int yylex()
 {
+	static int prior = 0;
+	static int priornum = 0;
 	int c, n, isbuilding, rval, lnext, nokey = 0;
 	char *name;
+	int triedv6 = 0;
 
 	isbuilding = 0;
 	lnext = 0;
@@ -231,6 +234,7 @@ nextchar:
 	if (lnext == 1) {
 		lnext = 0;
 		if ((isbuilding == 0) && !ISALNUM(c)) {
+			prior = c;
 			return c;
 		}
 		goto nextchar;
@@ -321,6 +325,7 @@ nextchar:
 		yytokentype = 0;
 		if (yydebug)
 			fprintf(stderr, "reset at EOF\n");
+		prior = 0;
 		return 0;
 	}
 
@@ -345,16 +350,21 @@ nextchar:
 	switch (c)
 	{
 	case '-' :
-		if (yyexpectaddr)
-			break;
-		if (isbuilding == 1)
-			break;
 		n = yygetc(0);
 		if (n == '>') {
 			isbuilding = 1;
 			goto done;
 		}
 		yyunputc(n);
+		if (yyexpectaddr) {
+			if (isbuilding == 1)
+				yyunputc(c);
+			else
+				rval = '-';
+			goto done;
+		}
+		if (isbuilding == 1)
+			break;
 		rval = '-';
 		goto done;
 
@@ -421,13 +431,19 @@ nextchar:
 	 * 0000:0000:0000:0000:0000:0000:0000:0000
 	 */
 #ifdef	USE_INET6
-	if (yyexpectaddr == 1 && isbuilding == 0 && (ishex(c) || c == ':')) {
+	if (yyexpectaddr == 1 && isbuilding == 0 && (ishex(c) || isdigit(c) || c == ':')) {
 		char ipv6buf[45 + 1], *s, oc;
 		int start;
 
+buildipv6:
 		start = yypos;
 		s = ipv6buf;
 		oc = c;
+
+		if (prior == YY_NUMBER && c == ':') {
+			sprintf(s, "%d", priornum);
+			s += strlen(s);
+		}
 
 		/*
 		 * Perhaps we should implement stricter controls on what we
@@ -452,7 +468,25 @@ nextchar:
 	}
 #endif
 
-	if (c == ':') {
+	if ((c == ':') && (rval != YY_IPV6) && (triedv6 == 0)) {
+#ifdef	USE_INET6
+		yystr = yytexttostr(0, yypos - 1);
+		if (yystr != NULL) {
+			char *s;
+
+			for (s = yystr; *s && ishex(*s); s++)
+				;
+			if (!*s && *yystr) {
+				isbuilding = 0;
+				free(yystr);
+				triedv6 = 1;
+				c = *yystr;
+				yypos = 1;
+				goto buildipv6;
+			}
+			free(yystr);
+		}
+#endif
 		if (isbuilding == 1) {
 			yyunputc(c);
 			goto done;
@@ -493,8 +527,8 @@ done:
 	yystr = yytexttostr(0, yypos);
 
 	if (yydebug)
-		printf("isbuilding %d yyvarnext %d nokey %d fixed %d\n",
-		       isbuilding, yyvarnext, nokey, yydictfixed);
+		printf("isbuilding %d yyvarnext %d nokey %d fixed %d addr %d\n",
+		       isbuilding, yyvarnext, nokey, yydictfixed, yyexpectaddr);
 	if (isbuilding == 1) {
 		wordtab_t *w;
 
@@ -515,8 +549,12 @@ done:
 			rval = YY_STR;
 	}
 
-	if (rval == YY_STR && yysavedepth > 0 && !yydictfixed)
-		yyresetdict();
+	if (rval == YY_STR) {
+		if (yysavedepth > 0 && !yydictfixed)
+			yyresetdict();
+		if (yyexpectaddr == 1)
+			yyexpectaddr = 0;
+	}
 
 	yytokentype = rval;
 
@@ -549,6 +587,9 @@ done:
 		yypos = 0;
 	}
 
+	if (rval == YY_NUMBER)
+		priornum = yylval.num;
+	prior = rval;
 	return rval;
 }
 

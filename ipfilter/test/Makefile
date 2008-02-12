@@ -30,7 +30,9 @@ ftests: f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f
 ptests: i1 i2 i3 i4 i5 i6 i7 i8 i9 i10 i11 i12 i13 i14 i15 i16 i17 i18 i19 \
 	i20 i21 i22
 
-ntests: n1 n2 n3 n4 n5 n6 n7 n8 n9 n10 n11 n12 n15 n16 n100 n101 n102 n103 n104 n105 n106 n200 n201 n202
+ntests: n1 n2 n3 n4 n5 n6 n7 n8 n9 n10 n11 n12 n15 n16 n17 n100 n101 n102 n103 n104 n105 n106 n200 n201 n202
+
+ntests6: n1_6 n2_6 n4_6 n5_6 n6_6 n7_6 n11_6 n12_6 n15_6
 
 nitests: ni1 ni2 ni3 ni4 ni5 ni6 ni7 ni8 ni9 ni10 ni11 ni12 ni13 ni14 ni15 \
 	 ni16 ni17 ni18 ni19 ni20 ni21 ni23
@@ -225,7 +227,10 @@ n12: expected/n12 regress/n12 input/n12
 n15: expected/n15 regress/n15 input/n15
 	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
 
-n16: expected/n15 regress/n16 input/n16
+n16: expected/n16 regress/n16 input/n16
+	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+
+n17: expected/n17 regress/n17 input/n17
 	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
 
 n100: expected/n100 regress/n100 input/n100
@@ -256,6 +261,33 @@ n201: expected/n201 regress/n201 input/n201
 	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
 
 n202: expected/n202 regress/n202 input/n202
+	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+
+n1_6: expected/n1_6 regress/n1_6 input/n1_6
+	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+
+n2_6: expected/n2_6 regress/n2_6 input/n2_6
+	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+
+n4_6: expected/n4_6 regress/n4_6 input/n4_6
+	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+
+n5_6: expected/n5_6 regress/n5_6 input/n5_6
+	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+
+n6_6: expected/n6_6 regress/n6_6 input/n6_6
+	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+
+n7_6: expected/n7_6 regress/n7_6 input/n7_6
+	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+
+n11_6: expected/n11_6 regress/n11_6 input/n11_6
+	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+
+n12_6: expected/n12_6 regress/n12_6 input/n12_6
+	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+
+n15_6: expected/n15_6 regress/n15_6 input/n15_6
 	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
 
 ni2: expected/ni2 input/ni2 regress/ni2.nat regress/ni2.ipf
@@ -398,7 +430,8 @@ clean:
 	/bin/rm -f f18 f19 f20 f21 f22 f24 f25
 	/bin/rm -f i1 i2 i3 i4 i5 i6 i7 i8 i9 i10 i11 i12 i13 i14 i15 i16 i17
 	/bin/rm -f i18 i19 i20 i21 i22
-	/bin/rm -f n1 n2 n3 n4 n5 n6 n7 n8 n9 n10 n11 n12 n15 n16 n100 n101 n102 n103 n104 n105 n106 n200 n201 n202
+	/bin/rm -f n1 n2 n3 n4 n5 n6 n7 n8 n9 n10 n11 n12 n15 n16 n17 n100 n101 n102 n103 n104 n105 n106 n200 n201 n202
+	/bin/rm -f n1_6 n2_6 n4_6 n5_6 n6_6 n7_6 n11_6 n12_6 n15_6
 	/bin/rm -f ni1 ni2 ni3 ni4 ni5 ni6 ni7 ni8 ni9
 	/bin/rm -f ni10 ni11 ni12 ni13 ni14 ni15 ni16 ni17 ni18 ni19 ni20 ni21 ni23
 	/bin/rm -f in1 in2 in3 in4 in5 in6 in100 in101
@@ -411,3 +444,14 @@ clean:
 
 diffs:
 	-cd expected; for i in *; do if [ -f $$i -a ! -f ../$$i -a -f ../results/$$i ] ; then  diff -c $$i ../results/$$i >> ../diff.out; fi done
+
+n6s:
+	for i in 1 2 4 5 6 7 11 15; do \
+		sh i4to6 < input/n$${i} > input/n$${i}_6; \
+		sh e4to6 < regress/n$${i} > regress/n$${i}_6; \
+		sh e4to6 < expected/n$${i} > expected/n$${i}_6; \
+	done
+	for i in 12; do \
+		sh e4to6 < regress/n$${i} > regress/n$${i}_6; \
+		perl h4to6 < input/n$${i} > input/n$${i}_6; \
+	done

@@ -31,6 +31,7 @@ int ntomask(v, nbits, ap)
 		*ap = htonl(mask);
 		break;
 
+	case 0 :
 	case 6 :
 		if ((nbits > 128) || (use_inet6 == -1))
 			return -1;

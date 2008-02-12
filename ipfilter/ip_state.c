@@ -13,14 +13,6 @@
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/file.h>
-#if defined(__NetBSD__) && (NetBSD >= 199905) && !defined(IPFILTER_LKM) && \
-    defined(_KERNEL)
-# if (__NetBSD_Version__ < 399001400)
-#  include "opt_ipfilter_log.h"
-# else
-#  include "opt_ipfilter.h"
-# endif
-#endif
 #if defined(_KERNEL) && defined(__FreeBSD_version) && \
     (__FreeBSD_version >= 400000) && !defined(KLD_MODULE)
 #include "opt_inet6.h"
@@ -39,9 +31,6 @@ struct file;
 #if defined(_KERNEL) && (__FreeBSD_version >= 220000)
 # include <sys/filio.h>
 # include <sys/fcntl.h>
-# if (__FreeBSD_version >= 300000) && !defined(IPFILTER_LKM)
-#  include "opt_ipfilter.h"
-# endif
 #else
 # include <sys/ioctl.h>
 #endif

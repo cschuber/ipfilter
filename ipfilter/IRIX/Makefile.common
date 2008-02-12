@@ -1,10 +1,10 @@
 MODOBJS=ip_fil.o fil.o ml_ipl.o ip_nat.o ip_frag.o ip_state.o ip_proxy.o \
-        ip_auth.o ip_log.o ip_scan.o ip_sync.o md5.o radix.o \
+        ip_auth.o ip_log.o ip_scan.o ip_sync.o md5.o radix.o ip_nat6.o \
 	ip_lookup.o ip_htable.o ip_pool.o
 IPF=ipf.o ipfcomp.o ipf_y.o ipf_l.o
 IPFTEST=ipftest.o fil_u.o ip_frag_u.o ip_state_u.o ip_nat_u.o ip_proxy_u.o \
         ip_auth_u.o ip_fil_u.o ip_log_u.o ip_scan_u.o ip_sync_u.o \
-	ip_lookup_u.o ip_htable_u.o ip_pool_u.o ip_rules_u.o \
+	ip_lookup_u.o ip_htable_u.o ip_pool_u.o ip_rules_u.o ip_nat6_u.o \
 	ipf_y.o ipf_l.o ipnat_y.o ipnat_l.o ippool_y.o ippool_l.o \
 	bpf_filter_u.o md5_u.o radix_u.o
 IPNAT=ipnat.o ipnat_y.o ipnat_l.o
@@ -78,6 +78,9 @@ ipftest.o: $(TOOL)/ipftest.c $(TOP)/ip_fil.h $(TOP)/ipt.h $(TOP)/ipf.h
 
 ip_nat_u.o: $(TOP)/ip_nat.c $(TOP)/ip_nat.h $(TOP)/ip_compat.h $(TOP)/ip_fil.h
 	$(CC) $(CCARGS) $(EXTRA) -c $(TOP)/ip_nat.c -o $@
+
+ip_nat6_u.o: $(TOP)/ip_nat6.c $(TOP)/ip_nat.h $(TOP)/ip_compat.h $(TOP)/ip_fil.h
+	$(CC) $(CCARGS) $(EXTRA) -c $(TOP)/ip_nat6.c -o $@
 
 ip_proxy_u.o: $(TOP)/ip_proxy.c $(TOP)/ip_proxy.h $(TOP)/ip_compat.h \
 	$(TOP)/ip_ftp_pxy.c $(TOP)/ip_rcmd_pxy.c $(TOP)/ip_raudio_pxy.c \
@@ -170,6 +173,9 @@ $(LKM): $(MODOBJS)
 
 ip_nat.o: $(TOP)/ip_nat.c $(TOP)/ip_nat.h $(TOP)/ip_compat.h $(TOP)/ip_fil.h
 	$(CC) $(CCARGS) $(DFLAGS) -c $(TOP)/ip_nat.c -o $@
+
+ip_nat6.o: $(TOP)/ip_nat6.c $(TOP)/ip_nat.h $(TOP)/ip_compat.h $(TOP)/ip_fil.h
+	$(CC) $(CCARGS) $(DFLAGS) -c $(TOP)/ip_nat6.c -o $@
 
 ip_frag.o: $(TOP)/ip_frag.c $(TOP)/ip_frag.h $(TOP)/ip_compat.h $(TOP)/ip_fil.h
 	$(CC) $(CCARGS) $(DFLAGS) -c $(TOP)/ip_frag.c -o $@

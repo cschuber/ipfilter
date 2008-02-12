@@ -338,9 +338,21 @@ ipf_setifpaddr(ifp, addr)
 #else
 		sin = (struct sockaddr_in *)&ifa->ifa_addr;
 #endif
-		sin->sin_addr.s_addr = inet_addr(addr);
-		if (sin->sin_addr.s_addr == 0)
-			abort();
+#ifdef USE_INET6
+		if (index(addr, ':') != NULL) {
+			struct sockaddr_in6 *sin6;
+
+			sin6 = (struct sockaddr_in6 *)&ifa->ifa_addr;
+			sin6->sin6_family = AF_INET6;
+			inet_pton(AF_INET6, addr, &sin6->sin6_addr);
+		} else
+#endif
+		{
+			sin->sin_family = AF_INET;
+			sin->sin_addr.s_addr = inet_addr(addr);
+			if (sin->sin_addr.s_addr == 0)
+				abort();
+		}
 	}
 }
 

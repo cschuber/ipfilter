@@ -296,11 +296,13 @@ extern void printhashdata __P((iphtable_t *, int));
 extern struct iphtent_s *printhashnode __P((struct iphtable_s *,
 					    struct iphtent_s *,
 					    copyfunc_t, int));
+extern void printhost __P((int, u_32_t *));
 extern void printhostmask __P((int, u_32_t *, u_32_t *));
 extern void printip __P((int, u_32_t *));
 extern void printlog __P((struct frentry *));
 extern void printlookup __P((i6addr_t *addr, i6addr_t *mask));
 extern void printmask __P((int, u_32_t *));
+extern void printnataddr __P((int, nat_addr_t *, char *));           
 extern void printnatfield __P((nat_t *, int));
 extern void printnatside __P((char *, natstat_t *, nat_stat_side_t *));
 extern void printpacket __P((int, mb_t *));
@@ -337,6 +339,7 @@ extern char *hostname __P((int, void *));
 extern struct ipstate *printstate __P((struct ipstate *, int, u_long));
 extern void printsbuf __P((char *));
 extern void printnat __P((struct ipnat *, int));
+extern void printactiveaddress __P((int, char *, i6addr_t *, char *));
 extern void printactivenat __P((struct nat *, int, int, u_long));
 extern void printhostmap __P((struct hostmap *, u_int));
 extern void printtcpflags __P((u_32_t, u_32_t));

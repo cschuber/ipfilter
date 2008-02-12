@@ -91,7 +91,7 @@ ALLOPTS=-DIPFILTER_LOG -DIPFILTER_LOOKUP \
 #
 # Uncomment this when building IPv6 capability.
 #
-#INET6=-DUSE_INET6
+INET6=-DUSE_INET6
 #
 # For packets which don't match any pass rules or any block rules, set either
 # FR_PASS or FR_BLOCK (respectively).  It defaults to FR_PASS if left

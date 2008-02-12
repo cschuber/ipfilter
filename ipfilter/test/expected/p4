@@ -11,15 +11,15 @@
 > ip #0 20(20) 0 2.2.0.1 > 1.2.1.3
 > ip #0 20(20) 0 4.4.1.1 > 1.2.1.1
 List of active MAP/Redirect filters:
-map * from pool/100 to any -> 1.2.3.4/32
+map * from pool/100 to 0/0 -> 1.2.3.4/32
 
 List of active sessions:
 MAP 2.2.2.1         <- -> 1.2.3.4         [1.2.1.2]
 MAP 1.1.1.1         <- -> 1.2.3.4         [1.2.1.1]
 
 Hostmap table:
-2.2.2.1,1.2.1.2 -> 1.2.3.4,0.0.0.0 (use = 1 hv = 1246)
-1.1.1.1,1.2.1.1 -> 1.2.3.4,0.0.0.0 (use = 1 hv = 1610)
+2.2.2.1,1.2.1.2 -> 1.2.3.4,0.0.0.0 (use = 1)
+1.1.1.1,1.2.1.1 -> 1.2.3.4,0.0.0.0 (use = 1)
 List of active state sessions:
 List of configured pools
 table role = nat type = tree number = 100

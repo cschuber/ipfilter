@@ -25,51 +25,73 @@ void printactivenat(nat, opts, alive, now)
 	if (nat->nat_flags & SI_CLONE)
 		printf(" CLONE");
 
+	putchar(' ');
 	if (nat->nat_redir & NAT_REWRITE) {
-		printf(" %-15s", inet_ntoa(nat->nat_osrcip));
+		printactiveaddress(nat->nat_v, "%-15s", &nat->nat_osrc6,
+				   nat->nat_ifnames[0]);
+
 		if ((nat->nat_flags & IPN_TCPUDP) != 0)
 			printf(" %-5hu", ntohs(nat->nat_osport));
 
-		printf(" %-15s", inet_ntoa(nat->nat_odstip));
+		putchar(' ');
+		printactiveaddress(nat->nat_v, "%-15s", &nat->nat_odst6,
+				   nat->nat_ifnames[0]);
+
 		if ((nat->nat_flags & IPN_TCPUDP) != 0)
 			printf(" %-5hu", ntohs(nat->nat_odport));
 
-		printf("<- ->");
-		printf(" %-15s", inet_ntoa(nat->nat_nsrcip));
+		printf("<- -> ");
+		printactiveaddress(nat->nat_v, "%-15s", &nat->nat_nsrc6,
+				   nat->nat_ifnames[0]);
+
 		if ((nat->nat_flags & IPN_TCPUDP) != 0)
 			printf(" %-5hu", ntohs(nat->nat_nsport));
 
-		printf(" %-15s", inet_ntoa(nat->nat_ndstip));
+		putchar(' ');
+		printactiveaddress(nat->nat_v, "%-15s", &nat->nat_ndst6,
+				   nat->nat_ifnames[0]);
 		if ((nat->nat_flags & IPN_TCPUDP) != 0)
 			printf(" %-5hu", ntohs(nat->nat_ndport));
 
 	} else if (nat->nat_dir == NAT_OUTBOUND) {
-		printf(" %-15s", inet_ntoa(nat->nat_osrcip));
+		printactiveaddress(nat->nat_v, "%-15s", &nat->nat_osrc6,
+				   nat->nat_ifnames[0]);
 
 		if ((nat->nat_flags & IPN_TCPUDP) != 0)
 			printf(" %-5hu", ntohs(nat->nat_osport));
 
-		printf(" <- -> %-15s",inet_ntoa(nat->nat_nsrcip));
+		printf(" <- -> ");
+		printactiveaddress(nat->nat_v, "%-15s", &nat->nat_nsrc6,
+				   nat->nat_ifnames[0]);
 
 		if ((nat->nat_flags & IPN_TCPUDP) != 0)
 			printf(" %-5hu", ntohs(nat->nat_nsport));
 
-		printf(" [%s", inet_ntoa(nat->nat_odstip));
+		printf(" [");
+		printactiveaddress(nat->nat_v, "%s", &nat->nat_odst6,
+				   nat->nat_ifnames[0]);
+
 		if ((nat->nat_flags & IPN_TCPUDP) != 0)
 			printf(" %hu", ntohs(nat->nat_odport));
 		printf("]");
 	} else {
-		printf(" %-15s", inet_ntoa(nat->nat_ndstip));
+		printactiveaddress(nat->nat_v, "%-15s", &nat->nat_ndst6,
+				   nat->nat_ifnames[0]);
 
 		if ((nat->nat_flags & IPN_TCPUDP) != 0)
 			printf(" %-5hu", ntohs(nat->nat_ndport));
 
-		printf(" <- -> %-15s",inet_ntoa(nat->nat_odstip));
+		printf(" <- -> ");
+		printactiveaddress(nat->nat_v, "%-15s", &nat->nat_odst6,
+				   nat->nat_ifnames[0]);
 
 		if ((nat->nat_flags & IPN_TCPUDP) != 0)
 			printf(" %-5hu", ntohs(nat->nat_odport));
 
-		printf(" [%s", inet_ntoa(nat->nat_osrcip));
+		printf(" [");
+		printactiveaddress(nat->nat_v, "%s", &nat->nat_osrc6,
+				   nat->nat_ifnames[0]);
+
 		if ((nat->nat_flags & IPN_TCPUDP) != 0)
 			printf(" %hu", ntohs(nat->nat_osport));
 		printf("]");
@@ -105,7 +127,8 @@ void printactivenat(nat, opts, alive, now)
 			nat->nat_hnext[0], nat->nat_hnext[1],
 			nat->nat_phnext[0], nat->nat_phnext[1]);
 		printf("\t_data %p _me %p _state %p _aps %p\n",
-			nat->nat_data, nat->nat_me, nat->nat_state, nat->nat_aps);
+			nat->nat_data, nat->nat_me, nat->nat_state,
+			nat->nat_aps);
 		printf("\tfr %p ptr %p ifps %p/%p sync %p\n",
 			nat->nat_fr, nat->nat_ptr, nat->nat_ifps[0],
 			nat->nat_ifps[1], nat->nat_sync);

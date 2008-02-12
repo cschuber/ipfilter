@@ -41,9 +41,6 @@ struct file;
 #if defined(_KERNEL) && (__FreeBSD_version >= 220000)
 # include <sys/filio.h>
 # include <sys/fcntl.h>
-# if (__FreeBSD_version >= 300000) && !defined(IPFILTER_LKM)
-#  include "opt_ipfilter.h"
-# endif
 #else
 # include <sys/ioctl.h>
 #endif
@@ -219,16 +216,6 @@ int
 ipf_sync_unload()
 {
 
-	if (syncupd != NULL) {
-		KFREES(syncupd, ipf_sync_log_sz * sizeof(*syncupd));
-		syncupd = NULL;
-	}
-
-	if (synclog != NULL) {
-		KFREES(synclog, ipf_sync_log_sz * sizeof(*synclog));
-		synclog = NULL;
-	}
-
 	if (syncnattab != NULL) {
 		ipf_sync_flush_table(ipf_sync_nat_tab_sz, syncnattab);
 		KFREES(syncnattab, ipf_sync_nat_tab_sz * sizeof(*syncnattab));
@@ -240,6 +227,16 @@ ipf_sync_unload()
 		KFREES(syncstatetab,
 		       ipf_sync_state_tab_sz * sizeof(*syncstatetab));
 		syncstatetab = NULL;
+	}
+
+	if (syncupd != NULL) {
+		KFREES(syncupd, ipf_sync_log_sz * sizeof(*syncupd));
+		syncupd = NULL;
+	}
+
+	if (synclog != NULL) {
+		KFREES(synclog, ipf_sync_log_sz * sizeof(*synclog));
+		synclog = NULL;
 	}
 
 	if (ipf_sync_inited == 1) {

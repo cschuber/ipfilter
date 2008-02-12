@@ -13,7 +13,7 @@ List of active sessions:
 MAP 2.2.2.2         <- -> 10.10.10.1      [4.4.4.4]
 
 Hostmap table:
-2.2.2.2,4.4.4.4 -> 10.10.10.1,0.0.0.0 (use = 1 hv = 1469)
+2.2.2.2,4.4.4.4 -> 10.10.10.1,0.0.0.0 (use = 1)
 List of active state sessions:
 List of configured pools
 List of configured hash tables

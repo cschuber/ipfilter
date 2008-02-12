@@ -81,7 +81,8 @@ DFLAGS=$(IPFLKM) $(DEF) $(SOLARIS2) $(IPFLOG) $(LOOKUP) $(SYNC)
 MODOBJS=$(OBJ)/ip_fil.o $(OBJ)/fil.o $(OBJ)/solaris.o $(OBJ)/ip_state.o \
     $(OBJ)/ip_frag.o $(OBJ)/ip_nat.o $(OBJ)/ip_proxy.o $(OBJ)/ip_auth.o \
     $(OBJ)/ip_pool.o $(OBJ)/ip_htable.o $(OBJ)/ip_lookup.o $(OBJ)/ip_log.o \
-    $(OBJ)/ip_scan.o $(OBJ)/ip_sync.o $(OBJ)/radix.o $(OBJ)/md5.o $(BPFILTER)
+    $(OBJ)/ip_scan.o $(OBJ)/ip_sync.o $(OBJ)/radix.o $(OBJ)/md5.o \
+    $(OBJ)/ip_nat6.o $(BPFILTER)
 #	$(OBJ)/ip_trafcon.o
 IPF=$(OBJ)/ipf.o $(OBJ)/ipfcomp.o $(OBJ)/ipf_y.o $(OBJ)/ipf_l.o
 IPT=$(OBJ)/ipftest.o $(OBJ)/ip_fil_u.o $(OBJ)/ip_state_u.o \
@@ -91,7 +92,7 @@ IPT=$(OBJ)/ipftest.o $(OBJ)/ip_fil_u.o $(OBJ)/ip_state_u.o \
     $(OBJ)/ip_auth_u.o $(OBJ)/ip_log_u.o $(OBJ)/ip_rules_u.o\
     $(OBJ)/ippool_y.o $(OBJ)/ippool_l.o $(OBJ)/ipnat_y.o $(OBJ)/ipnat_l.o \
     $(OBJ)/ipf_y.o $(OBJ)/ipf_l.o $(OBJ)/radix_u.o $(OBJ)/md5_u.o \
-    $(OBJ)/bpf_filter_u.o
+    $(OBJ)/ip_nat6_u.o $(OBJ)/bpf_filter_u.o
 #	$(OBJ)/ip_trafcon_u.o
 IPNAT=$(OBJ)/ipnat.o $(OBJ)/ipnat_y.o $(OBJ)/ipnat_l.o
 IPMON=$(OBJ)/ipmon.o $(OBJ)/ipmon_y.o $(OBJ)/ipmon_l.o
@@ -239,6 +240,9 @@ $(OBJ)/radix.o: $(TOP)/md5.c $(TOP)/radix_ipf.h
 $(OBJ)/ip_nat.o: $(TOP)/ip_nat.c $(TOP)/ip_nat.h $(TOP)/ip_compat.h
 	$(CC) -I$(TOP) $(DFLAGS) -c $(TOP)/ip_nat.c -o $@
 
+$(OBJ)/ip_nat6.o: $(TOP)/ip_nat6.c $(TOP)/ip_nat.h $(TOP)/ip_compat.h
+	$(CC) -I$(TOP) $(DFLAGS) -c $(TOP)/ip_nat6.c -o $@
+
 $(OBJ)/ip_state.o: $(TOP)/ip_state.c $(TOP)/ip_state.h $(TOP)/ip_compat.h
 	$(CC) -I$(TOP) $(DFLAGS) -c $(TOP)/ip_state.c -o $@
 
@@ -290,6 +294,9 @@ $(OBJ)/radix_u.o: $(TOP)/radix.c $(TOP)/radix_ipf.h
 
 $(OBJ)/ip_nat_u.o: $(TOP)/ip_nat.c $(TOP)/ip_nat.h $(TOP)/ip_compat.h
 	$(CC) $(CCARGS) $(EXTRA) -c $(TOP)/ip_nat.c -o $@
+
+$(OBJ)/ip_nat6_u.o: $(TOP)/ip_nat6.c $(TOP)/ip_nat.h $(TOP)/ip_compat.h
+	$(CC) $(CCARGS) $(EXTRA) -c $(TOP)/ip_nat6.c -o $@
 
 $(OBJ)/ip_frag_u.o: $(TOP)/ip_frag.c $(TOP)/ip_frag.h $(TOP)/ip_compat.h
 	$(CC) $(CCARGS) $(EXTRA) -c $(TOP)/ip_frag.c -o $@

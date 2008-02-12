@@ -636,7 +636,7 @@ ipf_frag_natknown(fin)
 	nat_t	*nat;
 	ipfr_t	*ipf;
 
-	if ((fin->fin_v != 4) || (ipf_frag_lock) || !ipfr_natlist)
+	if ((ipf_frag_lock) || !ipfr_natlist)
 		return NULL;
 #ifdef USE_MUTEXES
 	ipf = ipf_frag_lookup(fin, ipfr_nattab, &ipf_natfrag);

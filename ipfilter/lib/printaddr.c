@@ -49,6 +49,18 @@ void printaddr(family, type, ifname, addr, mask)
 		printhostmask(family, addr, mask);
 		suffix = NULL;
 		break;
+	case FRI_RANGE :
+		printhost(family, addr);
+		putchar('-');
+		printhost(family, mask);
+		suffix = NULL;
+		break;
+	case FRI_SPLIT :
+		printhost(family, addr);
+		putchar(',');
+		printhost(family, mask);
+		suffix = NULL;
+		break;
 	default :
 		printf("<%d>", type);
 		printmask(family, mask);

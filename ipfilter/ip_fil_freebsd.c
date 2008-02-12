@@ -67,9 +67,6 @@ static const char rcsid[] = "@(#)$Id$";
 # if __FreeBSD_version >= 500043
 #  include <net/netisr.h>
 # endif
-# if !defined(IPFILTER_LKM)
-#  include "opt_ipfilter.h"
-# endif
 #endif
 #include <net/route.h>
 #include <netinet/in.h>

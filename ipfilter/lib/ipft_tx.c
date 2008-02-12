@@ -40,6 +40,9 @@ static	int	tfd = -1;
 static	u_32_t	tx_hostnum __P((char *, int *));
 static	u_short	tx_portnum __P((char *));
 
+#ifdef USE_INET6
+int parseipv6 __P((char **, ip6_t *, char **, int *));
+#endif
 
 /*
  * returns an ip address as a long var as a result of either a DNS lookup or
@@ -151,6 +154,12 @@ static	int	text_readip(mb, ifn, dir)
 		*dir = 0;
 		if (!parseline(line, (ip_t *)buf, ifn, dir)) {
 			ip = (ip_t *)buf;
+#ifdef USE_INET6
+			if (IP_V(ip) == 6) {
+				return ntohs(((ip6_t *)ip)->ip6_plen) +
+				       sizeof(ip6_t);
+			}
+#endif
 			return ntohs(ip->ip_len);
 		}
 	}
@@ -190,6 +199,13 @@ static	int	parseline(line, ip, ifn, out)
 		fprintf(stderr, "bad direction \"%s\"\n", *cpp);
 		return 1;
 	}
+
+#ifdef USE_INET6
+	if (!strcasecmp(*cpp, "out6") || !strcasecmp(*cpp, "in6")) {
+		return parseipv6(cpp, (ip6_t *)ip, ifn, out);
+	}
+#endif
+
 	*out = (TOLOWER(c) == 'o') ? 1 : 0;
 	cpp++;
 	if (!*cpp)
@@ -329,3 +345,169 @@ static	int	parseline(line, ip, ifn, out)
 	ip->ip_len = htons(ip->ip_len);
 	return 0;
 }
+
+
+#ifdef USE_INET6
+int parseipv6(cpp, ip6, ifn, out)
+	char **cpp;
+	ip6_t *ip6;
+	char **ifn;
+	int *out;
+{
+	tcphdr_t th, *tcp = &th;
+	struct icmp6_hdr icmp, *ic6 = &icmp;
+
+	bzero((char *)ip6, MAX(sizeof(*tcp), sizeof(*ic6)) + sizeof(*ip6));
+	bzero((char *)tcp, sizeof(*tcp));
+	bzero((char *)ic6, sizeof(*ic6));
+	ip6->ip6_vfc = 0x60;
+
+	*out = (**cpp == 'o') ? 1 : 0;
+	cpp++;
+	if (!*cpp)
+		return 1;
+
+	if (!strcasecmp(*cpp, "on")) {
+		cpp++;
+		if (!*cpp)
+			return 1;
+		*ifn = strdup(*cpp++);
+		if (!*cpp)
+			return 1;
+	}
+
+	if (!strcasecmp(*cpp, "tcp")) {
+		ip6->ip6_nxt = IPPROTO_TCP;
+		tx_proto = "tcp";
+		cpp++;
+	} else if (!strcasecmp(*cpp, "udp")) {
+		ip6->ip6_nxt = IPPROTO_UDP;
+		tx_proto = "udp";
+		cpp++;
+	} else if (!strcasecmp(*cpp, "icmpv6")) {
+		ip6->ip6_nxt = IPPROTO_ICMPV6;
+		tx_proto = "icmpv6";
+		cpp++;
+	} else if (ISDIGIT(**cpp) && !index(*cpp, ':')) {
+		ip6->ip6_nxt = atoi(*cpp);
+		cpp++;
+	} else
+		ip6->ip6_nxt = IPPROTO_IPV6;
+
+	if (!*cpp)
+		return 1;
+
+	switch (ip6->ip6_nxt)
+	{
+	case IPPROTO_TCP :
+		ip6->ip6_plen = sizeof(struct tcphdr);
+		break;
+	case IPPROTO_UDP :
+		ip6->ip6_plen = sizeof(struct udphdr);
+		break;
+	case IPPROTO_ICMPV6 :
+		ip6->ip6_plen = ICMP6ERR_IPICMPHLEN;
+		break;
+	default :
+		break;
+	}
+
+	if (ip6->ip6_nxt == IPPROTO_TCP || ip6->ip6_nxt == IPPROTO_UDP) {
+		char *last;
+
+		last = strchr(*cpp, ',');
+		if (!last) {
+			fprintf(stderr, "tcp/udp with no source port\n");
+			return 1;
+		}
+		*last++ = '\0';
+		tcp->th_sport = htons(tx_portnum(last));
+		if (ip6->ip6_nxt == IPPROTO_TCP) {
+			tcp->th_win = htons(4096);
+			TCP_OFF_A(tcp, sizeof(*tcp) >> 2);
+		}
+	}
+
+	if (inet_pton(AF_INET6, *cpp, &ip6->ip6_src) != 1) {
+		fprintf(stderr, "cannot parse source address '%s'\n", *cpp);
+		return 1;
+	}
+
+	cpp++;
+	if (!*cpp)
+		return 1;
+
+	if (ip6->ip6_nxt == IPPROTO_TCP || ip6->ip6_nxt == IPPROTO_UDP) {
+		char *last;
+
+		last = strchr(*cpp, ',');
+		if (!last) {
+			fprintf(stderr, "tcp/udp with no destination port\n");
+			return 1;
+		}
+		*last++ = '\0';
+		tcp->th_dport = htons(tx_portnum(last));
+	}
+
+	if (inet_pton(AF_INET6, *cpp, &ip6->ip6_dst) != 1) {
+		fprintf(stderr, "cannot parse destination address '%s'\n",
+			*cpp);
+		return 1;
+	}
+
+	cpp++;
+	if (ip6->ip6_nxt == IPPROTO_TCP) {
+		if (*cpp != NULL) {
+			char *s, *t;
+
+			tcp->th_flags = 0;
+			for (s = *cpp; *s; s++)
+				if ((t  = strchr(myflagset, *s)))
+					tcp->th_flags |= myflags[t-myflagset];
+			if (tcp->th_flags)
+				cpp++;
+		}
+
+		if (tcp->th_flags & TH_URG)
+			tcp->th_urp = htons(1);
+
+		if (*cpp && !strncasecmp(*cpp, "seq=", 4)) {
+			tcp->th_seq = htonl(atoi(*cpp + 4));
+			cpp++;
+		}
+
+		if (*cpp && !strncasecmp(*cpp, "ack=", 4)) {
+			tcp->th_ack = htonl(atoi(*cpp + 4));
+			cpp++;
+		}
+	} else if (*cpp && ip6->ip6_nxt == IPPROTO_ICMPV6) {
+		char *t;
+
+		t = strchr(*cpp, ',');
+		if (t != NULL)
+			*t = '\0';
+
+		ic6->icmp6_type = geticmptype(6, *cpp);
+
+		if (t != NULL)
+			*t = ',';
+	}
+
+	if (ip6->ip6_nxt == IPPROTO_TCP || ip6->ip6_nxt == IPPROTO_UDP) {
+		bcopy((char *)tcp, (char *)ip6 + sizeof(*ip6),
+			sizeof(*tcp));
+	} else if (ip6->ip6_nxt == IPPROTO_ICMPV6) {
+		bcopy((char *)ic6, (char *)ip6 + sizeof(*ip6),
+			sizeof(*ic6));
+	}
+
+	/*
+	 * Because a length of 0 == jumbo gram...
+	 */
+	if (ip6->ip6_plen == 0) {
+		ip6->ip6_plen++;
+	}
+	ip6->ip6_plen = htons(ip6->ip6_plen);
+	return 0;
+}
+#endif

@@ -115,3 +115,12 @@ n16 hex hex -D
 f24 hex text
 ipv6.6 hex text
 f25 hex text -D
+n1_6 text text -6
+n2_6 text text -6
+n4_6 text text -6
+n5_6 text text -6
+n6_6 text text -6
+n7_6 text text -6
+n11_6 text text -6
+n12_6 hex hex -D6
+n15_6 text text -6

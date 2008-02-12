@@ -75,33 +75,36 @@ LIBOBJS=$(DEST)/addicmp.o \
      $(DEST)/parseipfexpr.o \
      $(DEST)/portname.o \
      $(DEST)/print_toif.o \
+     $(DEST)/printactiveaddr.o \
      $(DEST)/printactivenat.o \
      $(DEST)/printaddr.o \
      $(DEST)/printaps.o \
      $(DEST)/printbuf.o \
+     $(DEST)/printfieldhdr.o \
+     $(DEST)/printfr.o \
+     $(DEST)/printfraginfo.o \
      $(DEST)/printhash.o \
      $(DEST)/printhashdata.o \
      $(DEST)/printhashnode.o \
      $(DEST)/printhash_live.o \
+     $(DEST)/printhost.o \
+     $(DEST)/printhostmap.o \
+     $(DEST)/printhostmask.o \
+     $(DEST)/printifname.o \
      $(DEST)/printip.o \
      $(DEST)/printipfexpr.o \
+     $(DEST)/printlog.o \
      $(DEST)/printlookup.o \
+     $(DEST)/printmask.o \
+     $(DEST)/printnat.o \
+     $(DEST)/printnataddr.o \
+     $(DEST)/printnatfield.o \
      $(DEST)/printnatside.o \
      $(DEST)/printpool.o \
      $(DEST)/printpooldata.o \
      $(DEST)/printpoolnode.o \
      $(DEST)/printpool_live.o \
      $(DEST)/printproto.o \
-     $(DEST)/printfieldhdr.o \
-     $(DEST)/printfr.o \
-     $(DEST)/printfraginfo.o \
-     $(DEST)/printhostmap.o \
-     $(DEST)/printifname.o \
-     $(DEST)/printhostmask.o \
-     $(DEST)/printlog.o \
-     $(DEST)/printmask.o \
-     $(DEST)/printnat.o \
-     $(DEST)/printnatfield.o \
      $(DEST)/printportcmp.o \
      $(DEST)/printpacket.o \
      $(DEST)/printpacket6.o \
@@ -266,6 +269,8 @@ $(DEST)/portname.o: $(LIBSRC)/portname.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/portname.c -o $@
 $(DEST)/print_toif.o: $(LIBSRC)/print_toif.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/print_toif.c -o $@
+$(DEST)/printactiveaddr.o: $(LIBSRC)/printactiveaddr.c $(INCDEP) $(TOP)/ip_nat.h
+	$(CC) $(CCARGS) -c $(LIBSRC)/printactiveaddr.c -o $@
 $(DEST)/printactivenat.o: $(LIBSRC)/printactivenat.c $(INCDEP) $(TOP)/ip_nat.h
 	$(CC) $(CCARGS) -c $(LIBSRC)/printactivenat.c -o $@
 $(DEST)/printaddr.o: $(LIBSRC)/printaddr.c $(INCDEP)
@@ -297,6 +302,8 @@ $(DEST)/printipfexpr.o: $(LIBSRC)/printipfexpr.c $(TOP)/ip_fil.h
 	$(CC) $(CCARGS) -c $(LIBSRC)/printipfexpr.c -o $@
 $(DEST)/printlookup.o: $(LIBSRC)/printlookup.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/printlookup.c -o $@
+$(DEST)/printnataddr.o: $(LIBSRC)/printnataddr.c $(INCDEP) $(TOP)/ip_nat.h
+	$(CC) $(CCARGS) -c $(LIBSRC)/printnataddr.c -o $@
 $(DEST)/printnatside.o: $(LIBSRC)/printnatside.c $(INCDEP) $(TOP)/ip_nat.h
 	$(CC) $(CCARGS) -c $(LIBSRC)/printnatside.c -o $@
 $(DEST)/printpool.o: $(LIBSRC)/printpool.c $(TOP)/ip_fil.h $(TOP)/ip_pool.h
@@ -312,6 +319,8 @@ $(DEST)/printpool_live.o: $(LIBSRC)/printpool_live.c $(TOP)/ip_fil.h \
 	$(CC) $(CCARGS) -c $(LIBSRC)/printpool_live.c -o $@
 $(DEST)/printproto.o: $(LIBSRC)/printproto.c $(TOP)/ip_fil.h
 	$(CC) $(CCARGS) -c $(LIBSRC)/printproto.c -o $@
+$(DEST)/printhost.o: $(LIBSRC)/printhost.c $(TOP)/ip_fil.h
+	$(CC) $(CCARGS) -c $(LIBSRC)/printhost.c -o $@
 $(DEST)/printhostmap.o: $(LIBSRC)/printhostmap.c $(TOP)/ip_fil.h
 	$(CC) $(CCARGS) -c $(LIBSRC)/printhostmap.c -o $@
 $(DEST)/printifname.o: $(LIBSRC)/printifname.c $(INCDEP)

@@ -47,9 +47,6 @@ struct file;
 #if defined(_KERNEL) && (__FreeBSD_version >= 220000)
 # include <sys/filio.h>
 # include <sys/fcntl.h>
-# if (__FreeBSD_version >= 300000) && !defined(IPFILTER_LKM)
-#  include "opt_ipfilter.h"
-# endif
 #else
 # include <sys/ioctl.h>
 #endif

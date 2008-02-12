@@ -175,14 +175,22 @@ typedef	union	i6addr	{
 			 (I61(a) != I61(b)) || (I60(a) != I60(b)))
 #define IP6_ISZERO(a)   ((I60(a) | I61(a) | I62(a) | I63(a)) == 0)
 #define IP6_NOTZERO(a)  ((I60(a) | I61(a) | I62(a) | I63(a)) != 0)
-#define	IP6_GT(a,b)	(HI60(a) > HI60(b) || (HI60(a) == HI60(b) && \
-			  (HI61(a) > HI61(b) || (HI61(a) == HI61(b) && \
-			    (HI62(a) > HI62(b) || (HI62(a) == HI62(b) && \
-			      HI63(a) > HI63(b)))))))
-#define	IP6_LT(a,b)	(HI60(a) < HI60(b) || (HI60(a) == HI60(b) && \
-			  (HI61(a) < HI61(b) || (HI61(a) == HI61(b) && \
-			    (HI62(a) < HI62(b) || (HI62(a) == HI62(b) && \
-			      HI63(a) < HI63(b)))))))
+#define	IP6_ISONES(a)	((I63(a) == 0xffffffff) && (I62(a) == 0xffffffff) && \
+			 (I61(a) == 0xffffffff) && (I60(a) == 0xffffffff))
+#define	IP6_GT(a,b)	(ntohl(HI60(a)) > ntohl(HI60(b)) || \
+			 (HI60(a) == HI60(b) && \
+			  (ntohl(HI61(a)) > ntohl(HI61(b)) || \
+			   (HI61(a) == HI61(b) && \
+			    (ntohl(HI62(a)) > ntohl(HI62(b)) || \
+			     (HI62(a) == HI62(b) && \
+			      ntohl(HI63(a)) > ntohl(HI63(b))))))))
+#define	IP6_LT(a,b)	(ntohl(HI60(a)) < ntohl(HI60(b)) || \
+			 (HI60(a) == HI60(b) && \
+			  (ntohl(HI61(a)) < ntohl(HI61(b)) || \
+			   (HI61(a) == HI61(b) && \
+			    (ntohl(HI62(a)) < ntohl(HI62(b)) || \
+			     (HI62(a) == HI62(b) && \
+			      ntohl(HI63(a)) < ntohl(HI63(b))))))))
 #define	NLADD(n,x)	htonl(ntohl(n) + (x))
 #define	IP6_INC(a)	\
 		{ u_32_t *_i6 = (u_32_t *)(a); \
@@ -219,11 +227,24 @@ typedef	union	i6addr	{
 			  _d->i6[2] = _s1->i6[2] & _s2->i6[2]; \
 			  _d->i6[3] = _s1->i6[3] & _s2->i6[3]; \
 			}
+#define	IP6_ANDASSIGN(a,m) \
+			{ i6addr_t *_d = (i6addr_t *)(a); \
+			  i6addr_t *_m = (i6addr_t *)(m); \
+			  _d->i6[0] &= _m->i6[0]; \
+			  _d->i6[1] &= _m->i6[1]; \
+			  _d->i6[2] &= _m->i6[2]; \
+			  _d->i6[3] &= _m->i6[3]; \
+			}
 #define	IP6_MASKEQ(a,m,b) \
-			(((I63(a) & I63(m)) == I63(b)) && \
-			 ((I62(a) & I62(m)) == I62(b)) && \
+			(((I60(a) & I60(m)) == I60(b)) && \
 			 ((I61(a) & I61(m)) == I61(b)) && \
-			 ((I60(a) & I60(m)) == I60(b)))
+			 ((I62(a) & I62(m)) == I62(b)) && \
+			 ((I63(a) & I63(m)) == I63(b)))
+#define	IP6_MASKNEQ(a,m,b) \
+			(((I60(a) & I60(m)) != I60(b)) || \
+			 ((I61(a) & I61(m)) != I61(b)) || \
+			 ((I62(a) & I62(m)) != I62(b)) || \
+			 ((I63(a) & I63(m)) != I63(b)))
 #define	IP6_MERGE(a,b,c) \
 			{ i6addr_t *_d, *_s1, *_s2; \
 			  _d = (i6addr_t *)(a); \
@@ -232,9 +253,18 @@ typedef	union	i6addr	{
 			  _d->i6[0] |= _s1->i6[0] & ~_s2->i6[0]; \
 			  _d->i6[1] |= _s1->i6[1] & ~_s2->i6[1]; \
 			  _d->i6[2] |= _s1->i6[2] & ~_s2->i6[2]; \
-			  _d->i6[2] |= _s1->i6[3] & ~_s2->i6[3]; \
+			  _d->i6[3] |= _s1->i6[3] & ~_s2->i6[3]; \
 			}
-
+#define	IP6_MASK(a,b,c) \
+			{ i6addr_t *_d, *_s1, *_s2; \
+			  _d = (i6addr_t *)(a); \
+			  _s1 = (i6addr_t *)(b); \
+			  _s2 = (i6addr_t *)(c); \
+			  _d->i6[0] = _s1->i6[0] & ~_s2->i6[0]; \
+			  _d->i6[1] = _s1->i6[1] & ~_s2->i6[1]; \
+			  _d->i6[2] = _s1->i6[2] & ~_s2->i6[2]; \
+			  _d->i6[3] = _s1->i6[3] & ~_s2->i6[3]; \
+			}
 typedef	union	{
 	u_short	ipsou_ripso[2];
 	u_32_t	ipsou_doi;
@@ -357,7 +387,12 @@ typedef	struct	fr_info	{
 	void	*fin_nat;
 	void	*fin_state;
 	void	*fin_nattag;
-	ip_t	*fin_ip;
+	union {
+		ip_t	*fip_ip;
+#ifdef USE_INET6
+		ip6_t	*fip_ip6;
+#endif
+	} fin_ipu;
 	mb_t	**fin_mp;		/* pointer to pointer to mbuf */
 	mb_t	*fin_m;			/* pointer to mbuf */
 #ifdef	MENTAT
@@ -371,6 +406,8 @@ typedef	struct	fr_info	{
 	void	*fin_fraghdr;		/* pointer to start of ipv6 frag hdr */
 } fr_info_t;
 
+#define	fin_ip		fin_ipu.fip_ip
+#define	fin_ip6		fin_ipu.fip_ip6
 #define	fin_v		fin_fi.fi_v
 #define	fin_p		fin_fi.fi_p
 #define	fin_flx		fin_fi.fi_flx
@@ -386,8 +423,10 @@ typedef	struct	fr_info	{
 #define	fin_dport	fin_fi.fi_ports[1]
 #define	fin_tcpf	fin_fi.fi_tcpf
 #ifdef USE_INET6
-# define	fin_src6	fin_fi.fi_src.in6
-# define	fin_dst6	fin_fi.fi_dst.in6
+# define	fin_src6	fin_fi.fi_src
+# define	fin_dst6	fin_fi.fi_dst
+# define	fin_srcip6	fin_fi.fi_src.in6
+# define	fin_dstip6	fin_fi.fi_dst.in6
 #endif
 
 #define	IPF_IN		0

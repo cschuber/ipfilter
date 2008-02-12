@@ -21,7 +21,7 @@ List of active sessions:
 BIMAP 10.1.1.1        <- -> 1.6.7.8         [10.1.1.2]
 
 Hostmap table:
-10.1.1.1,10.1.1.2 -> 1.6.7.8,0.0.0.0 (use = 1 hv = 620)
+10.1.1.1,10.1.1.2 -> 1.6.7.8,0.0.0.0 (use = 1)
 List of active state sessions:
 List of configured pools
 List of configured hash tables
@@ -61,8 +61,8 @@ BIMAP 10.1.1.2        <- -> 10.2.2.2        [10.1.1.1]
 BIMAP 10.1.1.0        <- -> 10.2.2.2        [10.1.1.2]
 
 Hostmap table:
-10.1.1.2,10.1.1.1 -> 10.2.2.2,0.0.0.0 (use = 1 hv = 620)
-10.1.1.0,10.1.1.2 -> 10.2.2.2,0.0.0.0 (use = 1 hv = 612)
+10.1.1.2,10.1.1.1 -> 10.2.2.2,0.0.0.0 (use = 1)
+10.1.1.0,10.1.1.2 -> 10.2.2.2,0.0.0.0 (use = 1)
 List of active state sessions:
 List of configured pools
 List of configured hash tables
@@ -105,9 +105,9 @@ BIMAP 10.1.1.1        <- -> 10.3.4.1        [10.1.1.2]
 BIMAP 10.1.1.0        <- -> 10.3.4.0        [10.1.1.2]
 
 Hostmap table:
-10.1.1.2,10.1.1.1 -> 10.3.4.1,0.0.0.0 (use = 1 hv = 620)
-10.1.1.1,10.1.1.2 -> 10.3.4.1,0.0.0.0 (use = 1 hv = 620)
-10.1.1.0,10.1.1.2 -> 10.3.4.1,0.0.0.0 (use = 1 hv = 612)
+10.1.1.2,10.1.1.1 -> 10.3.4.1,0.0.0.0 (use = 1)
+10.1.1.1,10.1.1.2 -> 10.3.4.1,0.0.0.0 (use = 1)
+10.1.1.0,10.1.1.2 -> 10.3.4.1,0.0.0.0 (use = 1)
 List of active state sessions:
 List of configured pools
 List of configured hash tables

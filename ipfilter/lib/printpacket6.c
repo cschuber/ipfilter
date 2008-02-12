@@ -35,7 +35,7 @@ void printpacket6(dir, m)
 		printf("< ");
 
 	printf("ip6/%d %d %#x %d", buf[0] & 0xf, plen, flow, p);
-	printf(" %02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x",
+	printf(" %x:%x:%x:%x:%x:%x:%x:%x",
 		ntohs(addrs[0]), ntohs(addrs[1]), ntohs(addrs[2]),
 		ntohs(addrs[3]), ntohs(addrs[4]), ntohs(addrs[5]),
 		ntohs(addrs[6]), ntohs(addrs[7]));
@@ -44,7 +44,7 @@ void printpacket6(dir, m)
 			(void)printf(",%d", ntohs(tcp->th_sport));
 	printf(" >");
 	addrs += 8;
-	printf(" %02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x",
+	printf(" %x:%x:%x:%x:%x:%x:%x:%x",
 		ntohs(addrs[0]), ntohs(addrs[1]), ntohs(addrs[2]),
 		ntohs(addrs[3]), ntohs(addrs[4]), ntohs(addrs[5]),
 		ntohs(addrs[6]), ntohs(addrs[7]));

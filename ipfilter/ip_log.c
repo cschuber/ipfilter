@@ -12,22 +12,8 @@
 # define        KERNEL	1
 # define        _KERNEL	1
 #endif
-#if defined(__NetBSD__) && (NetBSD >= 199905) && !defined(IPFILTER_LKM) && \
-    defined(_KERNEL)
-# if (__NetBSD_Version__ < 399001400)
-#  include "opt_ipfilter_log.h"
-# else
-#  include "opt_ipfilter.h"
-# endif
-#endif
-#if defined(__FreeBSD__) && !defined(IPFILTER_LKM)
-# if defined(_KERNEL)
-#  if defined(__FreeBSD_version) && (__FreeBSD_version >= 300000)
-#   include "opt_ipfilter.h"
-#  endif
-# else
-#  include <osreldate.h>
-# endif
+#if defined(__FreeBSD__) && !defined(_KERNEL)
+# include <osreldate.h>
 #endif
 #ifndef SOLARIS
 # define SOLARIS (defined(sun) && (defined(__svr4__) || defined(__SVR4)))

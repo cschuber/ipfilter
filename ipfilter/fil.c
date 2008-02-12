@@ -13,15 +13,6 @@
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/time.h>
-#if defined(__NetBSD__)
-# if (NetBSD >= 199905) && !defined(IPFILTER_LKM) && defined(_KERNEL)
-#  if (__NetBSD_Version__ < 399001400)
-#   include "opt_ipfilter_log.h"
-#  else
-#   include "opt_ipfilter.h"
-#  endif
-# endif
-#endif
 #if defined(_KERNEL) && defined(__FreeBSD_version) && \
     (__FreeBSD_version >= 220000)
 # if (__FreeBSD_version >= 400000)
@@ -142,9 +133,6 @@ struct file;
 #endif
 #if defined(__FreeBSD_version) && (__FreeBSD_version >= 300000)
 # include <sys/malloc.h>
-# if defined(_KERNEL) && !defined(IPFILTER_LKM)
-#  include "opt_ipfilter.h"
-# endif
 #endif
 #include "netinet/ipl.h"
 /* END OF INCLUDES */
@@ -2867,8 +2855,22 @@ ipf_check(ip, hlen, ifp, out
 	READ_ENTER(&ipf_mutex);
 
 	if (!out && (ipf_specfuncref[1][ipf_active] == 0)) {
-		if (ipf_nat_checkin(fin, &pass) == -1) {
-			goto filterdone;
+		switch (fin->fin_v)
+		{
+		case 4 :
+			if (ipf_nat_checkin(fin, &pass) == -1) {
+				goto filterdone;
+			}
+			break;
+#ifdef USE_INET6
+		case 6 :
+			if (ipf_nat6_checkin(fin, &pass) == -1) {
+				goto filterdone;
+			}
+			break;
+#endif
+		default :
+			break;
 		}
 	}
 	/*
@@ -2933,18 +2935,31 @@ ipf_check(ip, hlen, ifp, out
 	if (out && FR_ISPASS(pass)) {
 		(void) ipf_acctpkt(fin, NULL);
 
-		if ((ipf_specfuncref[2][ipf_active] == 0) &&
-		    (ipf_nat_checkout(fin, &pass) == -1)) {
-			;
-		} else if ((ipf_update_ipid != 0) && (v == 4)) {
-			if (ipf_updateipid(fin) == -1) {
-				ATOMIC_INCL(ipf_stats[1].fr_ipud);
-				pass &= ~FR_CMDMASK;
-				pass |= FR_BLOCK;
-				fin->fin_reason = 6;
-			} else {
-				ATOMIC_INCL(ipf_stats[0].fr_ipud);
+		switch (fin->fin_v)
+		{
+		case 4 :
+			if ((ipf_specfuncref[2][ipf_active] == 0) &&
+			    (ipf_nat_checkout(fin, &pass) == -1)) {
+				;
+			} else if ((ipf_update_ipid != 0) && (v == 4)) {
+				if (ipf_updateipid(fin) == -1) {
+					ATOMIC_INCL(ipf_stats[1].fr_ipud);
+					pass &= ~FR_CMDMASK;
+					pass |= FR_BLOCK;
+					fin->fin_reason = 6;
+				} else {
+					ATOMIC_INCL(ipf_stats[0].fr_ipud);
+				}
 			}
+			break;
+#ifdef USE_INET6
+		case 6 :
+			if (ipf_specfuncref[2][ipf_active] == 0)
+				(void) ipf_nat6_checkout(fin, &pass);
+			break;
+#endif
+		default :
+			break;
 		}
 	}
 
