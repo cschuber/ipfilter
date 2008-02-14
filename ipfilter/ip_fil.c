@@ -799,18 +799,33 @@ ipf_ifpaddr(v, atype, ifptr, inp, inpmask)
 # endif
 #endif
 	if (ifa != NULL) {
-		struct sockaddr_in *sin, mask;
+		if (v == 4) {
+			struct sockaddr_in *sin, mask;
 
-		mask.sin_addr.s_addr = 0xffffffff;
+			mask.sin_addr.s_addr = 0xffffffff;
 
 #ifdef __sgi
-		sin = (struct sockaddr_in *)&ifa->ia_addr;
+			sin = (struct sockaddr_in *)&ifa->ia_addr;
 #else
-		sin = (struct sockaddr_in *)&ifa->ifa_addr;
+			sin = (struct sockaddr_in *)&ifa->ifa_addr;
 #endif
 
-		return ipf_ifpfillv4addr(atype, sin, &mask,
-					&inp->in4, &inpmask->in4);
+			return ipf_ifpfillv4addr(atype, sin, &mask,
+						 &inp->in4, &inpmask->in4);
+		}
+#ifdef USE_INET6
+		if (v == 6) {
+			struct sockaddr_in6 *sin6, mask;
+
+			sin6 = (struct sockaddr_in6 *)&ifa->ifa_addr;
+			((i6addr_t *)&mask.sin6_addr)->i6[0] = 0xffffffff;
+			((i6addr_t *)&mask.sin6_addr)->i6[1] = 0xffffffff;
+			((i6addr_t *)&mask.sin6_addr)->i6[2] = 0xffffffff;
+			((i6addr_t *)&mask.sin6_addr)->i6[3] = 0xffffffff;
+			return ipf_ifpfillv6addr(atype, sin6, &mask,
+						 inp, inpmask);
+		}
+#endif
 	}
 	return 0;
 }
