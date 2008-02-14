@@ -823,6 +823,8 @@ ipf_pr_icmp6(fin)
 		{
 		case ICMP6_ECHO_REPLY :
 		case ICMP6_ECHO_REQUEST :
+			if (fin->fin_dlen >= 6)
+				fin->fin_data[1] = icmp6->icmp6_id;
 			minicmpsz = ICMP6ERR_MINPKTLEN - sizeof(ip6_t);
 			break;
 
