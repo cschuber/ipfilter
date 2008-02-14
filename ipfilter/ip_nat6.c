@@ -1166,7 +1166,8 @@ ipf_nat6_finalise(fin, nat, ni, natsave, direction)
 
 	nat->nat_ptr = np;
 	nat->nat_mssclamp = np->in_mssclamp;
-	nat->nat_v = 6;
+	nat->nat_v[0] = 6;
+	nat->nat_v[1] = 6;
 
 #ifdef IPF_V6_PROXIES
 	if ((np->in_apr != NULL) && ((ni->nai_flags & NAT_SLAVE) == 0))
@@ -1277,12 +1278,12 @@ ipf_nat6_insert(nat, rev)
 	nat->nat_pkts[1] = 0;
 
 	nat->nat_ifnames[0][LIFNAMSIZ - 1] = '\0';
-	nat->nat_ifps[0] = ipf_resolvenic(nat->nat_ifnames[0], nat->nat_v);
+	nat->nat_ifps[0] = ipf_resolvenic(nat->nat_ifnames[0], nat->nat_v[0]);
 
 	if (nat->nat_ifnames[1][0] != '\0') {
 		nat->nat_ifnames[1][LIFNAMSIZ - 1] = '\0';
 		nat->nat_ifps[1] = ipf_resolvenic(nat->nat_ifnames[1],
-						 nat->nat_v);
+						  nat->nat_v[1]);
 	} else {
 		ipnat_t *in = nat->nat_ptr;
 
@@ -1924,8 +1925,6 @@ ipf_nat6_inlookup(fin, flags, p, src, mapdst)
 	/* TRACE dst, dport, src, sport, hv, nat */
 
 	for (; nat; nat = nat->nat_hnext[1]) {
-		if (nat->nat_v != 6)
-			continue;
 		if (nat->nat_ifps[0] != NULL) {
 			if ((ifp != NULL) && (ifp != nat->nat_ifps[0]))
 				continue;
@@ -1937,6 +1936,8 @@ ipf_nat6_inlookup(fin, flags, p, src, mapdst)
 		switch (nat->nat_dir)
 		{
 		case NAT_INBOUND :
+			if (nat->nat_v[0] != 6)
+				continue;
 			if (IP6_NEQ(&nat->nat_osrc6, src) ||
 			    IP6_NEQ(&nat->nat_odst6, &dst))
 				continue;
@@ -1953,8 +1954,10 @@ ipf_nat6_inlookup(fin, flags, p, src, mapdst)
 			}
 			break;
 		case NAT_OUTBOUND :
-			if (IP6_NEQ(&nat->nat_ndstaddr, src) ||
-			    IP6_NEQ(&nat->nat_nsrcaddr, &dst))
+			if (nat->nat_v[1] != 6)
+				continue;
+			if (IP6_NEQ(&nat->nat_ndst6, src) ||
+			    IP6_NEQ(&nat->nat_nsrc6, &dst))
 				continue;
 			if ((nat->nat_flags & IPN_TCPUDP) != 0) {
 				if (nat->nat_ndport != sport)
@@ -2012,8 +2015,6 @@ find_in_wild_ports:
 	nat = ipf_nat_table[1][hv];
 	/* TRACE dst, src, hv, nat */
 	for (; nat; nat = nat->nat_hnext[1]) {
-		if (nat->nat_v != 6)
-			continue;
 		if (nat->nat_ifps[0] != NULL) {
 			if ((ifp != NULL) && (ifp != nat->nat_ifps[0]))
 				continue;
@@ -2025,11 +2026,15 @@ find_in_wild_ports:
 		switch (nat->nat_dir)
 		{
 		case NAT_INBOUND :
+			if (nat->nat_v[0] != 6)
+				continue;
 			if (IP6_NEQ(&nat->nat_osrc6, src) ||
 			    IP6_NEQ(&nat->nat_odst6, &dst))
 				continue;
 			break;
 		case NAT_OUTBOUND :
+			if (nat->nat_v[1] != 6)
+				continue;
 			if (IP6_NEQ(&nat->nat_ndst6, src) ||
 			    IP6_NEQ(&nat->nat_nsrc6, &dst))
 				continue;
@@ -2235,8 +2240,6 @@ ipf_nat6_outlookup(fin, flags, p, src, dst)
 	/* TRACE src, sport, dst, dport, hv, nat */
 
 	for (; nat; nat = nat->nat_hnext[0]) {
-		if (nat->nat_v != 6)
-			continue;
 		if (nat->nat_ifps[1] != NULL) {
 			if ((ifp != NULL) && (ifp != nat->nat_ifps[1]))
 				continue;
@@ -2248,6 +2251,8 @@ ipf_nat6_outlookup(fin, flags, p, src, dst)
 		switch (nat->nat_dir)
 		{
 		case NAT_INBOUND :
+			if (nat->nat_v[1] != 6)
+				continue;
 			if (IP6_NEQ(&nat->nat_ndst6, src) ||
 			    IP6_NEQ(&nat->nat_nsrc6, dst))
 				continue;
@@ -2265,6 +2270,8 @@ ipf_nat6_outlookup(fin, flags, p, src, dst)
 			}
 			break;
 		case NAT_OUTBOUND :
+			if (nat->nat_v[0] != 6)
+				continue;
 			if (IP6_NEQ(&nat->nat_osrc6, src) ||
 			    IP6_NEQ(&nat->nat_odst6, dst))
 				continue;
@@ -2323,8 +2330,6 @@ find_out_wild_ports:
 
 	nat = ipf_nat_table[0][hv];
 	for (; nat; nat = nat->nat_hnext[0]) {
-		if (nat->nat_v != 6)
-			continue;
 		if (nat->nat_ifps[1] != NULL) {
 			if ((ifp != NULL) && (ifp != nat->nat_ifps[1]))
 				continue;
@@ -2336,11 +2341,15 @@ find_out_wild_ports:
 		switch (nat->nat_dir)
 		{
 		case NAT_INBOUND :
+			if (nat->nat_v[1] != 6)
+				continue;
 			if (IP6_NEQ(&nat->nat_ndst6, src) ||
 			    IP6_NEQ(&nat->nat_nsrc6, dst))
 				continue;
 			break;
 		case NAT_OUTBOUND :
+			if (nat->nat_v[0] != 6)
+			continue;
 			if (IP6_NEQ(&nat->nat_osrc6, src) ||
 			    IP6_NEQ(&nat->nat_odst6, dst))
 				continue;
@@ -2709,7 +2718,7 @@ maskloop:
 		for (np = ipf_nat_map_rules[hv]; np; np = np->in_mnext) {
 			if ((np->in_ifps[1] && (np->in_ifps[1] != ifp)))
 				continue;
-			if (np->in_v != 6)
+			if (np->in_v[0] != 6)
 				continue;
 			if (np->in_pr[1] && (np->in_pr[1] != fin->fin_p))
 				continue;
@@ -3202,7 +3211,7 @@ maskloop:
 		for (np = ipf_nat_rdr_rules[hv]; np; np = np->in_rnext) {
 			if (np->in_ifps[0] && (np->in_ifps[0] != ifp))
 				continue;
-			if (np->in_v != 6)
+			if (np->in_v[0] != 6)
 				continue;
 			if (np->in_pr[0] && (np->in_pr[0] != fin->fin_p))
 				continue;
@@ -4087,7 +4096,7 @@ ipf_nat6_matchencap(fin, np)
 		break;
 #ifdef IPFILTER_LOOKUP
 	case FRI_LOOKUP :
-		match = (*np->in_nsrcfunc)(np->in_osrcptr, np->in_v,
+		match = (*np->in_osrcfunc)(np->in_osrcptr, np->in_v[0],
 					   &ip6->ip6_dst);
 		break;
 #endif
@@ -4103,7 +4112,7 @@ ipf_nat6_matchencap(fin, np)
 		break;
 #ifdef IPFILTER_LOOKUP
 	case FRI_LOOKUP :
-		match = (*np->in_nsrcfunc)(np->in_odstptr, np->in_v,
+		match = (*np->in_odstfunc)(np->in_odstptr, np->in_v[0],
 					   &ip6->ip6_src);
 		break;
 #endif

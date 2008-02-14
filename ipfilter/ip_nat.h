@@ -126,7 +126,7 @@ typedef	struct	nat	{
 	u_int		nat_hv[2];
 	char		nat_ifnames[2][LIFNAMSIZ];
 	int		nat_rev;		/* 0 = forward, 1 = reverse */
-	int		nat_v;
+	int		nat_v[2];		/* 0 = old, 1 = new */
 	u_int		nat_redir;		/* copy of in_redir */
 } nat_t;
 
@@ -233,8 +233,7 @@ typedef	struct	ipnat	{
 	u_short		in_dpnext;
 	u_short		in_spnext;
 	/* From here to the end is covered by IPN_CMPSIZ */
-	u_char		in_v;
-	u_char		in_xxx;
+	u_char		in_v[2];		/* 0 = old, 1 = new */
 	u_32_t		in_flags;
 	u_32_t		in_mssclamp;		/* if != 0 clamp MSS to this */
 	u_int		in_age[2];

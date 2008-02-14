@@ -222,7 +222,7 @@ static	void	ipf_nat_tabmove __P((nat_t *));
 
 
 
-#define	NATFSUM(n,f)	((n)->nat_v == 4 ? (n)->f.in4.s_addr : (n)->f.i6[0] + \
+#define	NATFSUM(n,v,f)	((v) == 4 ? (n)->f.in4.s_addr : (n)->f.i6[0] + \
 			 (n)->f.i6[1] + (n)->f.i6[2] + (n)->f.i6[3])
 
 /* ------------------------------------------------------------------------ */
@@ -1202,7 +1202,7 @@ ipf_nat_siocaddnat(n, np, getlock)
 
 	n->in_stepnext = 0;
 
-	switch (n->in_v)
+	switch (n->in_v[0])
 	{
 	case 4 :
 		error = ipf_nat_ruleaddrinit(n);
@@ -1228,7 +1228,7 @@ ipf_nat_siocaddnat(n, np, getlock)
 
 	if (n->in_redir & NAT_REDIRECT) {
 		n->in_flags &= ~IPN_NOTDST;
-		switch (n->in_v)
+		switch (n->in_v[0])
 		{
 		case 4 :
 			ipf_nat_addrdr(n);
@@ -1249,7 +1249,7 @@ ipf_nat_siocaddnat(n, np, getlock)
 
 	if (n->in_redir & (NAT_MAP|NAT_MAPBLK)) {
 		n->in_flags &= ~IPN_NOTSRC;
-		switch (n->in_v)
+		switch (n->in_v[0])
 		{
 		case 4 :
 			ipf_nat_addnat(n);
@@ -1349,14 +1349,14 @@ ipf_nat_resolverule(n)
 	ipnat_t *n;
 {
 	n->in_ifnames[0][LIFNAMSIZ - 1] = '\0';
-	n->in_ifps[0] = ipf_resolvenic(n->in_ifnames[0], n->in_v);
+	n->in_ifps[0] = ipf_resolvenic(n->in_ifnames[0], n->in_v[0]);
 
 	n->in_ifnames[1][LIFNAMSIZ - 1] = '\0';
 	if (n->in_ifnames[1][0] == '\0') {
 		(void) strncpy(n->in_ifnames[1], n->in_ifnames[0], LIFNAMSIZ);
 		n->in_ifps[1] = n->in_ifps[0];
 	} else {
-		n->in_ifps[1] = ipf_resolvenic(n->in_ifnames[1], n->in_v);
+		n->in_ifps[1] = ipf_resolvenic(n->in_ifnames[1], n->in_v[1]);
 	}
 
 	if (n->in_plabel[0] != '\0') {
@@ -1784,7 +1784,6 @@ ipf_nat_putent(data, getlock)
 	 *
 	 */
 	bzero((char *)&fin, sizeof(fin));
-	fin.fin_v = nat->nat_v;
 	fin.fin_p = nat->nat_pr[0];
 	fin.fin_ifp = nat->nat_ifps[0];
 	fin.fin_data[0] = ntohs(nat->nat_ndport);
@@ -1795,9 +1794,10 @@ ipf_nat_putent(data, getlock)
 			READ_ENTER(&ipf_nat);
 		}
 
-		switch (fin.fin_v)
+		switch (nat->nat_v[1])
 		{
 		case 4 :
+			fin.fin_v = nat->nat_v[1];
 			n = ipf_nat_inlookup(&fin, nat->nat_flags, fin.fin_p,
 					 nat->nat_ndstip, nat->nat_nsrcip);
 			break;
@@ -3002,7 +3002,8 @@ ipf_nat_finalise(fin, nat, ni, natsave, direction)
 
 	nat->nat_ptr = np;
 	nat->nat_mssclamp = np->in_mssclamp;
-	nat->nat_v = 4;
+	nat->nat_v[0] = 4;
+	nat->nat_v[1] = 4;
 
 	if ((np->in_apr != NULL) && ((ni->nai_flags & NAT_SLAVE) == 0))
 		if (appr_new(fin, nat) == -1)
@@ -3112,12 +3113,11 @@ ipf_nat_insert(nat, rev)
 	nat->nat_pkts[1] = 0;
 
 	nat->nat_ifnames[0][LIFNAMSIZ - 1] = '\0';
-	nat->nat_ifps[0] = ipf_resolvenic(nat->nat_ifnames[0], nat->nat_v);
+	nat->nat_ifps[0] = ipf_resolvenic(nat->nat_ifnames[0], 4);
 
 	if (nat->nat_ifnames[1][0] != '\0') {
 		nat->nat_ifnames[1][LIFNAMSIZ - 1] = '\0';
-		nat->nat_ifps[1] = ipf_resolvenic(nat->nat_ifnames[1],
-						 nat->nat_v);
+		nat->nat_ifps[1] = ipf_resolvenic(nat->nat_ifnames[1], 4);
 	} else {
 		ipnat_t *in = nat->nat_ptr;
 
@@ -3714,8 +3714,6 @@ ipf_nat_inlookup(fin, flags, p, src, mapdst)
 	/* TRACE dst, dport, src, sport, hv, nat */
 
 	for (; nat; nat = nat->nat_hnext[1]) {
-		if (nat->nat_v != 4)
-			continue;
 		if (nat->nat_ifps[0] != NULL) {
 			if ((ifp != NULL) && (ifp != nat->nat_ifps[0]))
 				continue;
@@ -3727,6 +3725,8 @@ ipf_nat_inlookup(fin, flags, p, src, mapdst)
 		switch (nat->nat_dir)
 		{
 		case NAT_INBOUND :
+			if (nat->nat_v[0] != 4)
+				continue;
 			if (nat->nat_osrcaddr != src.s_addr ||
 			    nat->nat_odstaddr != dst)
 				continue;
@@ -3743,6 +3743,8 @@ ipf_nat_inlookup(fin, flags, p, src, mapdst)
 			}
 			break;
 		case NAT_OUTBOUND :
+			if (nat->nat_v[1] != 4)
+				continue;
 			if (nat->nat_ndstaddr != src.s_addr ||
 			    nat->nat_nsrcaddr != dst)
 				continue;
@@ -3800,8 +3802,6 @@ find_in_wild_ports:
 	nat = ipf_nat_table[1][hv];
 	/* TRACE dst, src, hv, nat */
 	for (; nat; nat = nat->nat_hnext[1]) {
-		if (nat->nat_v != 4)
-			continue;
 		if (nat->nat_ifps[0] != NULL) {
 			if ((ifp != NULL) && (ifp != nat->nat_ifps[0]))
 				continue;
@@ -3813,11 +3813,15 @@ find_in_wild_ports:
 		switch (nat->nat_dir)
 		{
 		case NAT_INBOUND :
+			if (nat->nat_v[0] != 4)
+				continue;
 			if (nat->nat_osrcaddr != src.s_addr ||
 			    nat->nat_odstaddr != dst)
 				continue;
 			break;
 		case NAT_OUTBOUND :
+			if (nat->nat_v[1] != 4)
+				continue;
 			if (nat->nat_ndstaddr != src.s_addr ||
 			    nat->nat_nsrcaddr != dst)
 				continue;
@@ -4023,8 +4027,6 @@ ipf_nat_outlookup(fin, flags, p, src, dst)
 	/* TRACE src, sport, dst, dport, hv, nat */
 
 	for (; nat; nat = nat->nat_hnext[0]) {
-		if (nat->nat_v != 4)
-			continue;
 		if (nat->nat_ifps[1] != NULL) {
 			if ((ifp != NULL) && (ifp != nat->nat_ifps[1]))
 				continue;
@@ -4036,6 +4038,8 @@ ipf_nat_outlookup(fin, flags, p, src, dst)
 		switch (nat->nat_dir)
 		{
 		case NAT_INBOUND :
+			if (nat->nat_v[1] != 4)
+				continue;
 			if (nat->nat_ndstaddr != src.s_addr ||
 			    nat->nat_nsrcaddr != dst.s_addr)
 				continue;
@@ -4053,6 +4057,8 @@ ipf_nat_outlookup(fin, flags, p, src, dst)
 			}
 			break;
 		case NAT_OUTBOUND :
+			if (nat->nat_v[0] != 4)
+				continue;
 			if (nat->nat_osrcaddr != src.s_addr ||
 			    nat->nat_odstaddr != dst.s_addr)
 				continue;
@@ -4109,8 +4115,6 @@ find_out_wild_ports:
 
 	nat = ipf_nat_table[0][hv];
 	for (; nat; nat = nat->nat_hnext[0]) {
-		if (nat->nat_v != 4)
-			continue;
 		if (nat->nat_ifps[1] != NULL) {
 			if ((ifp != NULL) && (ifp != nat->nat_ifps[1]))
 				continue;
@@ -4122,11 +4126,15 @@ find_out_wild_ports:
 		switch (nat->nat_dir)
 		{
 		case NAT_INBOUND :
+			if (nat->nat_v[1] != 4)
+				continue;
 			if (nat->nat_ndstaddr != src.s_addr ||
 			    nat->nat_nsrcaddr != dst.s_addr)
 				continue;
 			break;
 		case NAT_OUTBOUND :
+			if (nat->nat_v[0] != 4)
+				continue;
 			if (nat->nat_osrcaddr != src.s_addr ||
 			    nat->nat_odstaddr != dst.s_addr)
 				continue;
@@ -4561,7 +4569,7 @@ maskloop:
 		{
 			if ((np->in_ifps[1] && (np->in_ifps[1] != ifp)))
 				continue;
-			if (np->in_v != 4)
+			if (np->in_v[0] != 4)
 				continue;
 			if (np->in_pr[1] && (np->in_pr[1] != fin->fin_p))
 				continue;
@@ -5144,7 +5152,7 @@ maskloop:
 		for (np = ipf_nat_rdr_rules[hv]; np; np = np->in_rnext) {
 			if (np->in_ifps[0] && (np->in_ifps[0] != ifp))
 				continue;
-			if (np->in_v != 4)
+			if (np->in_v[0] != 4)
 				continue;
 			if (np->in_pr[0] && (np->in_pr[0] != fin->fin_p))
 				continue;
@@ -5785,8 +5793,7 @@ ipf_nat_sync(ifp)
 
 		n = nat->nat_ptr;
 		if (n != NULL) {
-			switch (n->in_v) {
-			case 4 :
+			if (n->in_v[1] == 4) {
 				if (n->in_redir & NAT_MAP) {
 					if ((n->in_nsrcaddr != 0) ||
 					    (n->in_nsrcmsk != 0xffffffff))
@@ -5796,9 +5803,9 @@ ipf_nat_sync(ifp)
 					    (n->in_ndstmsk != 0xffffffff))
 						continue;
 				}
-				break;
+			}
 #ifdef USE_INET6
-			case 6 :
+			if (n->in_v[1] == 4) {
 				if (n->in_redir & NAT_MAP) {
 					if (!IP6_ISZERO(n->in_nsrcaddr) ||
 					    !IP6_ISONES(n->in_nsrcmsk))
@@ -5808,24 +5815,21 @@ ipf_nat_sync(ifp)
 					    !IP6_ISONES(n->in_ndstmsk))
 						continue;
 				}
-				break;
-#endif
-			default :
-				break;
 			}
+#endif
 		}
 
 		if (((ifp == NULL) || (ifp == nat->nat_ifps[0]) ||
 		     (ifp == nat->nat_ifps[1]))) {
 			nat->nat_ifps[0] = GETIFP(nat->nat_ifnames[0],
-						  nat->nat_v);
+						  nat->nat_v[0]);
 			if ((nat->nat_ifps[0] != NULL) &&
 			    (nat->nat_ifps[0] != (void *)-1)) {
 				nat->nat_mtu[0] = GETIFMTU(nat->nat_ifps[0]);
 			}
 			if (nat->nat_ifnames[1][0] != '\0') {
 				nat->nat_ifps[1] = GETIFP(nat->nat_ifnames[1],
-							  nat->nat_v);
+							  nat->nat_v[1]);
 			} else {
 				nat->nat_ifps[1] = nat->nat_ifps[0];
 			}
@@ -5841,13 +5845,13 @@ ipf_nat_sync(ifp)
 			 * Change the map-to address to be the same as the
 			 * new one.
 			 */
-			sum1 = NATFSUM(nat, nat_nsrc6);
-			if (ipf_ifpaddr(nat->nat_v, FRI_NORMAL, ifp2,
+			sum1 = NATFSUM(nat, nat->nat_v[1], nat_nsrc6);
+			if (ipf_ifpaddr(nat->nat_v[0], FRI_NORMAL, ifp2,
 				       &in, NULL) != -1) {
-				if (nat->nat_v == 4)
+				if (nat->nat_v[0] == 4)
 					nat->nat_nsrcip = in.in4;
 			}
-			sum2 = NATFSUM(nat, nat_nsrc6);
+			sum2 = NATFSUM(nat, nat->nat_v[1], nat_nsrc6);
 
 			if (sum1 == sum2)
 				continue;
@@ -5868,10 +5872,10 @@ ipf_nat_sync(ifp)
 	for (n = ipf_nat_list; (n != NULL); n = n->in_next) {
 		if ((ifp == NULL) || (n->in_ifps[0] == ifp))
 			n->in_ifps[0] = ipf_resolvenic(n->in_ifnames[0],
-						      n->in_v);
+						       n->in_v[0]);
 		if ((ifp == NULL) || (n->in_ifps[1] == ifp))
 			n->in_ifps[1] = ipf_resolvenic(n->in_ifnames[1],
-						      n->in_v);
+						       n->in_v[1]);
 
 		if (n->in_redir & NAT_REDIRECT)
 			idx = 1;
@@ -5977,7 +5981,7 @@ ipf_nat_log(nat, action)
 	natl.nl_nsrcport = nat->nat_nsport;
 	natl.nl_ndstport = nat->nat_ndport;
 	natl.nl_p = nat->nat_pr[0];
-	natl.nl_v = nat->nat_v;
+	natl.nl_v = nat->nat_v[0];
 	natl.nl_type = nat->nat_redir;
 	natl.nl_action = action;
 	natl.nl_rule = -1;
@@ -7370,7 +7374,7 @@ ipf_nat_matchencap(fin, np)
 		break;
 #ifdef IPFILTER_LOOKUP
 	case FRI_LOOKUP :
-		match = (*np->in_nsrcfunc)(np->in_osrcptr, np->in_v,
+		match = (*np->in_nsrcfunc)(np->in_osrcptr, np->in_v[0],
 					   &ip->ip_dst.s_addr);
 		break;
 #endif
@@ -7386,7 +7390,7 @@ ipf_nat_matchencap(fin, np)
 		break;
 #ifdef IPFILTER_LOOKUP
 	case FRI_LOOKUP :
-		match = (*np->in_nsrcfunc)(np->in_odstptr, np->in_v,
+		match = (*np->in_nsrcfunc)(np->in_odstptr, np->in_v[0],
 					   &ip->ip_src.s_addr);
 		break;
 #endif
@@ -7895,61 +7899,111 @@ ipf_nat_matcharray(nat, array)
 			break;
 
 		case IPF_EXP_IP_SRCADDR :
-			if (nat->nat_v != 4)
-				break;
-			for (i = 0; !e && i < x[2]; i++) {
-				e |= ((nat->nat_nsrcaddr & x[i + 4]) ==
-				      x[i + 3]);
+			if (nat->nat_v[0] == 4) {
+				for (i = 0; !e && i < x[2]; i++) {
+					e |= ((nat->nat_osrcaddr & x[i + 4]) ==
+					      x[i + 3]);
+				}
+			}
+			if (nat->nat_v[1] == 4) {
+				for (i = 0; !e && i < x[2]; i++) {
+					e |= ((nat->nat_nsrcaddr & x[i + 4]) ==
+					      x[i + 3]);
+				}
 			}
 			break;
 
 		case IPF_EXP_IP_DSTADDR :
-			if (nat->nat_v != 4)
-				break;
-			for (i = 0; !e && i < x[2]; i++) {
-				e |= ((nat->nat_ndstaddr & x[i + 4]) ==
-				      x[i + 3]);
+			if (nat->nat_v[0] == 4) {
+				for (i = 0; !e && i < x[2]; i++) {
+					e |= ((nat->nat_odstaddr & x[i + 4]) ==
+					      x[i + 3]);
+				}
+			}
+			if (nat->nat_v[1] == 4) {
+				for (i = 0; !e && i < x[2]; i++) {
+					e |= ((nat->nat_ndstaddr & x[i + 4]) ==
+					      x[i + 3]);
+				}
 			}
 			break;
 
 		case IPF_EXP_IP_ADDR :
-			if (nat->nat_v != 4)
-				break;
 			for (i = 0; !e && i < x[2]; i++) {
-				e |= ((nat->nat_nsrcaddr & x[i + 4]) ==
-				      x[i + 3]) ||
-				     ((nat->nat_ndstaddr & x[i + 4]) ==
-				      x[i + 3]);
+				if (nat->nat_v[0] == 4) {
+					e |= ((nat->nat_osrcaddr & x[i + 4]) ==
+					      x[i + 3]);
+				}
+				if (nat->nat_v[1] == 4) {
+					e |= ((nat->nat_nsrcaddr & x[i + 4]) ==
+					      x[i + 3]);
+				}
+				if (nat->nat_v[0] == 4) {
+					e |= ((nat->nat_odstaddr & x[i + 4]) ==
+					      x[i + 3]);
+				}
+				if (nat->nat_v[1] == 4) {
+					e |= ((nat->nat_ndstaddr & x[i + 4]) ==
+					      x[i + 3]);
+				}
 			}
 			break;
 
 #ifdef USE_INET6
 		case IPF_EXP_IP6_SRCADDR :
-			if (nat->nat_v != 6)
-				break;
-			for (i = 0; !e && i < x[3]; i++) {
-				e |= IP6_MASKEQ(&nat->nat_nsrc6, x + i + 7,
-						x + i + 3);
+			if (nat->nat_v[0] == 6) {
+				for (i = 0; !e && i < x[3]; i++) {
+					e |= IP6_MASKEQ(&nat->nat_osrc6,
+							x + i + 7, x + i + 3);
+				}
+			}
+			if (nat->nat_v[1] == 6) {
+				for (i = 0; !e && i < x[3]; i++) {
+					e |= IP6_MASKEQ(&nat->nat_nsrc6,
+							x + i + 7, x + i + 3);
+				}
 			}
 			break;
 
 		case IPF_EXP_IP6_DSTADDR :
-			if (nat->nat_v != 6)
-				break;
-			for (i = 0; !e && i < x[3]; i++) {
-				e |= IP6_MASKEQ(&nat->nat_ndst6, x + i + 7,
-						x + i + 3);
+			if (nat->nat_v[0] == 6) {
+				for (i = 0; !e && i < x[3]; i++) {
+					e |= IP6_MASKEQ(&nat->nat_odst6,
+							x + i + 7,
+							x + i + 3);
+				}
+			}
+			if (nat->nat_v[1] == 6) {
+				for (i = 0; !e && i < x[3]; i++) {
+					e |= IP6_MASKEQ(&nat->nat_ndst6,
+							x + i + 7,
+							x + i + 3);
+				}
 			}
 			break;
 
 		case IPF_EXP_IP6_ADDR :
-			if (nat->nat_v != 6)
-				break;
 			for (i = 0; !e && i < x[3]; i++) {
-				e |= IP6_MASKEQ(&nat->nat_nsrc6, x + i + 7,
-						x + i + 3) ||
-				     IP6_MASKEQ(&nat->nat_ndst6, x + i + 7,
-						x + i + 3);
+				if (nat->nat_v[0] == 6) {
+					e |= IP6_MASKEQ(&nat->nat_osrc6,
+							x + i + 7,
+							x + i + 3);
+				}
+				if (nat->nat_v[0] == 6) {
+					e |= IP6_MASKEQ(&nat->nat_odst6,
+							x + i + 7,
+							x + i + 3);
+				}
+				if (nat->nat_v[1] == 6) {
+					e |= IP6_MASKEQ(&nat->nat_nsrc6,
+							x + i + 7,
+							x + i + 3);
+				}
+				if (nat->nat_v[1] == 6) {
+					e |= IP6_MASKEQ(&nat->nat_ndst6,
+							x + i + 7,
+							x + i + 3);
+				}
 			}
 			break;
 #endif

@@ -28,7 +28,7 @@ wordtab_t natfields[] = {
 	{ "hash1",	16 },
 	{ "ref",	17 },
 	{ "rev",	18 },
-	{ "v",		19 },
+	{ "v0",		19 },
 	{ "redir",	20 },
 	{ "use",	21 },
 	{ "ipsumd",	22 },
@@ -42,6 +42,7 @@ wordtab_t natfields[] = {
 	{ "newdport",	30 },
 	{ "newsport",	31 },
 	{ "age",	32 },
+	{ "v1",		33 },
 	{ NULL, 0 }
 };
 
@@ -153,7 +154,11 @@ void printnatfield(n, fieldnum)
 		break;
 
 	case 19:
-		printf("%d", n->nat_v);
+		printf("%d", n->nat_v[0]);
+		break;
+
+	case 33:
+		printf("%d", n->nat_v[0]);
 		break;
 
 	case 20:
@@ -173,19 +178,19 @@ void printnatfield(n, fieldnum)
 		break;
 
 	case 24:
-		printf("%s", hostname(n->nat_v, &n->nat_odstip));
+		printf("%s", hostname(n->nat_v[0], &n->nat_odstip));
 		break;
 
 	case 25:
-		printf("%s", hostname(n->nat_v, &n->nat_osrcip));
+		printf("%s", hostname(n->nat_v[0], &n->nat_osrcip));
 		break;
 
 	case 26:
-		printf("%s", hostname(n->nat_v, &n->nat_ndstip));
+		printf("%s", hostname(n->nat_v[1], &n->nat_ndstip));
 		break;
 
 	case 27:
-		printf("%s", hostname(n->nat_v, &n->nat_nsrcip));
+		printf("%s", hostname(n->nat_v[1], &n->nat_nsrcip));
 		break;
 
 	case 28:
