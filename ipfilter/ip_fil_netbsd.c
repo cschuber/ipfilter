@@ -305,6 +305,9 @@ int count;
 int ipfattach()
 {
 	int s;
+#if (__NetBSD_Version__ >= 499005500)
+	int i;
+#endif
 #if defined(NETBSD_PF) && (__NetBSD_Version__ >= 104200000)
 	int error = 0;
 # if defined(__NetBSD_Version__) && (__NetBSD_Version__ >= 105110000)
@@ -398,7 +401,12 @@ int ipfattach()
 # endif
 #endif
 
+#if (__NetBSD_Version__ >= 499005500)
+	for (i = 0; i < IPL_LOGSIZE; i++)
+		selinit(&ipfselwait[i]);
+#else
 	bzero((char *)ipfselwait, sizeof(ipfselwait));
+#endif
 	bzero((char *)frcache, sizeof(frcache));
 	fr_savep = fr_checkp;
 	fr_checkp = fr_check;
@@ -439,6 +447,9 @@ pfil_error:
 int ipfdetach()
 {
 	int s;
+#if (__NetBSD_Version__ >= 499005500)
+	int i;
+#endif
 #if defined(NETBSD_PF) && (__NetBSD_Version__ >= 104200000)
 	int error = 0;
 # if __NetBSD_Version__ >= 105150000
@@ -509,6 +520,11 @@ int ipfdetach()
 	fr_deinitialise();
 
 	SPL_X(s);
+
+#if (__NetBSD_Version__ >= 499005500)
+	for (i = 0; i < IPL_LOGSIZE; i++)
+		seldestroy(&ipfselwait[i]);
+#endif
 	return 0;
 }
 
