@@ -1262,7 +1262,7 @@ ipf_fastroute6(m0, mpp, fin, fdp)
 	fr = fin->fin_fr;
 
 	if (fdp != NULL)
-		ifp = fdp->fd_ifp;
+		ifp = fdp->fd_ptr;
 	else
 		ifp = fin->fin_ifp;
 	bzero(ro, sizeof(*ro));

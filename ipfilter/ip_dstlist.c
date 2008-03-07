@@ -209,9 +209,9 @@ ipf_dstlist_iter_next(token, iter)
 	ipftoken_t *token;
 	ipflookupiter_t *iter;
 {
-	ipf_dstnode_t zn, *nextnode, *node;
-	ippool_dst_t zero, *next, *list;
-	int err;
+	ipf_dstnode_t zn, *nextnode = NULL, *node = NULL;
+	ippool_dst_t zero, *next = NULL, *list = NULL;
+	int err = 0;
 
 	switch (iter->ili_otype)
 	{

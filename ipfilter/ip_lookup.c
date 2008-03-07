@@ -714,7 +714,7 @@ ipf_lookup_res_name(type, unit, name, funcptr)
 	char *name;
 	lookupfunc_t *funcptr;
 {
-	void *ptr;
+	void *ptr = NULL;
 	int i;
 
 	READ_ENTER(&ipf_poolrw);
