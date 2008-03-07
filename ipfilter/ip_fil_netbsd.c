@@ -264,6 +264,9 @@ int
 ipfattach()
 {
 	int s;
+#if (__NetBSD_Version__ >= 499005500)
+	int i;
+#endif
 #if defined(NETBSD_PF) && (__NetBSD_Version__ >= 104200000)
 	int error = 0;
 # if defined(__NetBSD_Version__) && (__NetBSD_Version__ >= 105110000)
@@ -357,7 +360,12 @@ ipfattach()
 # endif
 #endif
 
+#if (__NetBSD_Version__ >= 499005500)
+	for (i = 0; i < IPL_LOGSIZE; i++)
+		selinit(&ipfselwait[i]);
+#else
 	bzero((char *)ipfselwait, sizeof(ipfselwait));
+#endif
 	bzero((char *)ipf_cache, sizeof(ipf_cache));
 	ipf_savep = ipf_checkp;
 	ipf_checkp = ipf_check;
@@ -399,6 +407,9 @@ int
 ipfdetach()
 {
 	int s;
+#if (__NetBSD_Version__ >= 499005500)
+	int i;
+#endif
 #if defined(NETBSD_PF) && (__NetBSD_Version__ >= 104200000)
 	int error = 0;
 # if __NetBSD_Version__ >= 105150000
@@ -469,6 +480,11 @@ ipfdetach()
 	ipf_deinitialise();
 
 	SPL_X(s);
+
+#if (__NetBSD_Version__ >= 499005500)
+	for (i = 0; i < IPL_LOGSIZE; i++)
+		seldestroy(&ipfselwait[i]);
+#endif
 	return 0;
 }
 
@@ -967,7 +983,7 @@ ipf_fastroute(m0, mpp, fin, fdp)
 	bzero(ro, sizeof (*ro));
 
 	if (fdp != NULL)
-		ifp = fdp->fd_ifp;
+		ifp = fdp->fd_ptr;
 	else
 		ifp = fin->fin_ifp;
 	fr = fin->fin_fr;
