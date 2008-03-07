@@ -52,6 +52,14 @@ typedef	struct	ipfrstat {
 	u_long	ifs_inuse;
 	u_long	ifs_retrans0;
 	u_long	ifs_short;
+	u_long	ifs_bad;
+	u_long	ifs_overlap;
+	u_long	ifs_unordered;
+	u_long	ifs_strict;
+	u_long	ifs_miss;
+	u_long	ifs_maximum;
+	u_long	ifs_newbad;
+	u_long	ifs_newrestrictnot0;
 	struct	ipfr	**ifs_table;
 	struct	ipfr	**ifs_nattab;
 } ipfrstat_t;

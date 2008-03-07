@@ -256,15 +256,22 @@ ipfr_frag_new(fin, pass, table
 	u_int idx, off;
 	frentry_t *fr;
 
-	if (ipfr_inuse >= ipfr_size)
+	if (ipfr_inuse >= ipfr_size) {
+		ATOMIC_INCL(ipfr_stats.ifs_maximum);
 		return NULL;
+	}
 
-	if ((fin->fin_flx & (FI_FRAG|FI_BAD)) != FI_FRAG)
+	if ((fin->fin_flx & (FI_FRAG|FI_BAD)) != FI_FRAG) {
+		ATOMIC_INCL(ipfr_stats.ifs_newbad);
 		return NULL;
+	}
 
-	if (pass & FR_FRSTRICT)
-		if (fin->fin_off != 0)
+	if (pass & FR_FRSTRICT) {
+		if (fin->fin_off != 0) {
+			ATOMIC_INCL(ipfr_stats.ifs_newrestrictnot0);
 			return NULL;
+		}
+	}
 
 	frag.ipfr_p = fin->fin_p;
 	idx = fin->fin_p;
@@ -314,7 +321,7 @@ ipfr_frag_new(fin, pass, table
 		if (!bcmp((char *)&frag.ipfr_ifp, (char *)&fra->ipfr_ifp,
 			  IPFR_CMPSZ)) {
 			RWLOCK_EXIT(lock);
-			ipfr_stats.ifs_exists++;
+			ATOMIC_INCL(ipfr_stats.ifs_exists);
 			KFREE(fra);
 			return NULL;
 		}
@@ -507,8 +514,10 @@ ipf_frag_lookup(fin, table
 		return NULL;
 	}
 
-	if ((fin->fin_flx & (FI_FRAG|FI_BAD)) != FI_FRAG)
+	if ((fin->fin_flx & FI_BAD) != 0) {
+		ATOMIC_INCL(ipfr_stats.ifs_bad);
 		return NULL;
+	}
 
 	/*
 	 * For fragments, we record protocol, packet id, TOS and both IP#'s
@@ -560,6 +569,7 @@ ipf_frag_lookup(fin, table
 				 */
 				if ((f->ipfr_firstend != 0) &&
 				    (off < f->ipfr_firstend)) {
+					ATOMIC_INCL(ipfr_stats.ifs_overlap);
 					fin->fin_flx |= FI_BAD;
 					break;
 				}
@@ -608,8 +618,11 @@ ipf_frag_lookup(fin, table
 
 			} else {
 				f->ipfr_badorder++;
-				if (f->ipfr_pass & FR_FRSTRICT)
+				ATOMIC_INCL(ipfr_stats.ifs_unordered);
+				if (f->ipfr_pass & FR_FRSTRICT) {
+					ATOMIC_INCL(ipfr_stats.ifs_strict);
 					continue;
+				}
 			}
 			ATOMIC_INCL(ipfr_stats.ifs_hits);
 			return f;
@@ -617,6 +630,7 @@ ipf_frag_lookup(fin, table
 	}
 
 	RWLOCK_EXIT(lock);
+	ATOMIC_INCL(ipfr_stats.ifs_miss);
 	return NULL;
 }
 
