@@ -21,14 +21,14 @@
 #include <netinet/in.h>
 
 
-#include <netinet/ipl.h>
-#include <netinet/ip_compat.h>
-#include <netinet/ip_fil.h>
-#include <netinet/ip_state.h>
-#include <netinet/ip_nat.h>
-#include <netinet/ip_auth.h>
-#include <netinet/ip_frag.h>
-#include <netinet/ip_sync.h>
+#include "netinet/ipl.h"
+#include "netinet/ip_compat.h"
+#include "netinet/ip_fil.h"
+#include "netinet/ip_state.h"
+#include "netinet/ip_nat.h"
+#include "netinet/ip_auth.h"
+#include "netinet/ip_frag.h"
+#include "netinet/ip_sync.h"
 
 extern	struct	selinfo	ipfselwait[IPL_LOGSIZE];
 
@@ -358,9 +358,9 @@ ipfpoll(dev_t dev, int events, struct proc *td)
 		break;
 	case IPL_LOGSYNC :
 #ifdef IPFILTER_SYNC
-		if ((events & (POLLIN | POLLRDNORM)) && ipfsync_canread())
+		if ((events & (POLLIN | POLLRDNORM)) && ipf_sync_canread())
 			revents |= events & (POLLIN | POLLRDNORM);
-		if ((events & (POLLOUT | POLLWRNORM)) && ipfsync_canwrite())
+		if ((events & (POLLOUT | POLLWRNORM)) && ipf_sync_canwrite())
 			revents |= events & (POLLOUT | POLLWRNORM);
 #endif
 		break;
@@ -411,9 +411,7 @@ static int ipfopen(dev, flags
 		case IPL_LOGNAT :
 		case IPL_LOGSTATE :
 		case IPL_LOGAUTH :
-#ifdef IPFILTER_LOOKUP
 		case IPL_LOGLOOKUP :
-#endif
 #ifdef IPFILTER_SYNC
 		case IPL_LOGSYNC :
 #endif
@@ -488,7 +486,7 @@ static int ipfread(dev, uio)
 
 # ifdef	IPFILTER_SYNC
 	if (unit == IPL_LOGSYNC)
-		return ipfsync_read(uio);
+		return ipf_sync_read(uio);
 # endif
 
 #ifdef IPFILTER_LOG
@@ -524,7 +522,7 @@ static int ipfwrite(dev, uio)
 
 #ifdef	IPFILTER_SYNC
 	if (GET_MINOR(dev) == IPL_LOGSYNC)
-		return ipfsync_write(uio);
+		return ipf_sync_write(uio);
 #endif
 	return ENXIO;
 }

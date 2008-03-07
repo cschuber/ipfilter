@@ -298,7 +298,7 @@ extern	void	ipf_state_setpending __P((ipstate_t *));
 extern	void	ipf_state_sync __P((void *));
 extern	void	ipf_state_timeout __P((void));
 extern	void	ipf_state_unload __P((void));
-extern	void	ipf_state_update __P((fr_info_t *, ipstate_t *, ipftq_t *));
+extern	void	ipf_state_update __P((fr_info_t *, ipstate_t *));
 
 extern	void	ipf_sttab_init __P((struct ipftq *));
 extern	void	ipf_sttab_destroy __P((struct ipftq *));

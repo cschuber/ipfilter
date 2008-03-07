@@ -61,25 +61,8 @@ typedef	struct	iphtstat_s	{
 
 
 extern iphtable_t *ipf_htables[IPL_LOGSIZE];
-
-extern int ipf_htable_create __P((iplookupop_t *));
-extern int ipf_htable_clear __P((iphtable_t *));
-extern void ipf_htable_del __P((iphtable_t *));
-extern int ipf_htable_deref __P((iphtable_t *));
-extern int ipf_htable_destroy __P((int, char *));
-extern iphtable_t *ipf_htable_exists __P((int, char *));
-extern iphtable_t *ipf_htable_find __P((int, char *));
-extern size_t ipf_htable_flush __P((iplookupflush_t *));
-extern int ipf_htable_getnext __P((ipftoken_t *, ipflookupiter_t *));
-extern int ipf_htable_getstats __P((iplookupop_t *));
-extern void ipf_htable_iterderef __P((u_int, int, void *));
-extern int ipf_htable_remove __P((iphtable_t *));
-extern int ipf_htable_stats __P((iplookupop_t *));
-extern void ipf_htable_unload __P((void));
-extern int ipf_htent_deref __P((iphtent_t *));
-extern int ipf_htent_insert __P((iphtable_t *, iphtent_t *));
-extern int ipf_htent_remove __P((iphtable_t *, iphtent_t *));
 extern void *ipf_iphmfindgroup __P((void *, void *));
-extern int ipf_iphmfindip __P((void *, int, void *));
+extern iphtable_t *ipf_htable_find __P((int, char *));
+extern ipf_lookup_t ipf_htable_backend;
 
 #endif /* __IP_HTABLE_H__ */

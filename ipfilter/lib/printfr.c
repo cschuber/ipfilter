@@ -94,11 +94,11 @@ void	printfr(fp, iocfunc)
 		putchar(' ');
 	}
 
-	if (*fp->fr_dif.fd_ifname || (fp->fr_flags & FR_DUP))
+	if (*fp->fr_dif.fd_name || (fp->fr_flags & FR_DUP))
 		print_toif("dup-to", &fp->fr_dif);
-	if (*fp->fr_tif.fd_ifname)
+	if (*fp->fr_tif.fd_name)
 		print_toif("to", &fp->fr_tif);
-	if (*fp->fr_rif.fd_ifname)
+	if (*fp->fr_rif.fd_name)
 		print_toif("reply-to", &fp->fr_rif);
 	if (fp->fr_flags & FR_FASTROUTE)
 		printf("fastroute ");
@@ -121,12 +121,14 @@ void	printfr(fp, iocfunc)
 		}
 	}
 
-	if (fp->fr_v == 4) {
+	if (fp->fr_family == AF_INET) {
 		printf("inet ");
 		af = AF_INET;
-	} else if (fp->fr_v == 6) {
+#ifdef USE_INET6
+	} else if (fp->fr_family == AF_INET6) {
 		printf("inet6 ");
 		af = AF_INET6;
+#endif
 	} else {
 		af = -1;
 	}
@@ -175,7 +177,7 @@ void	printfr(fp, iocfunc)
 			type = ntohs(fp->fr_icmp);
 			code = type & 0xff;
 			type /= 256;
-			name = icmptypename(fp->fr_v, type);
+			name = icmptypename(fp->fr_family, type);
 			if (name == NULL)
 				printf(" icmp-type %d", type);
 			else
@@ -195,7 +197,7 @@ void	printfr(fp, iocfunc)
 		fakebpf_t *fb;
 		int i;
 
-		printf("bpf-v%d { \"", fp->fr_v);
+		printf("bpf-v%d { \"", fp->fr_family);
 		i = fp->fr_dsize / sizeof(*fb);
 
 		for (fb = fp->fr_data, s = ""; i; i--, fb++, s = " ")
@@ -235,7 +237,7 @@ void	printfr(fp, iocfunc)
 		    fp->fr_secbits || fp->fr_secmask) {
 			sec[0] = fp->fr_secmask;
 			sec[1] = fp->fr_secbits;
-			if (fp->fr_v == 4)
+			if (fp->fr_family == AF_INET)
 				optprint(sec, fp->fr_optmask, fp->fr_optbits);
 #ifdef	USE_INET6
 			else

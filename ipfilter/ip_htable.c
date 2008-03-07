@@ -54,31 +54,90 @@ struct file;
 static const char rcsid[] = "@(#)$Id$";
 #endif
 
-#ifdef	IPFILTER_LOOKUP
-static iphtent_t *ipf_iphmfind __P((iphtable_t *, struct in_addr *));
 # ifdef USE_INET6
 static iphtent_t *ipf_iphmfind6 __P((iphtable_t *, i6addr_t *));
 # endif
-static	u_long	ipht_nomem[IPL_LOGSIZE] = { 0, 0, 0, 0, 0, 0, 0, 0 };
-static	u_long	ipf_nhtables[IPL_LOGSIZE] = { 0, 0, 0, 0, 0, 0, 0, 0 };
-static	u_long	ipf_nhtnodes[IPL_LOGSIZE] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+static iphtent_t *ipf_iphmfind __P((iphtable_t *, struct in_addr *));
+static int ipf_iphmfindip __P((void *, int, void *));
+static int ipf_htable_clear __P((iphtable_t *));
+static int ipf_htable_create __P((iplookupop_t *));
+static int ipf_htable_deref __P((void *));
+static int ipf_htable_destroy __P((int, char *));
+static void *ipf_htable_exists __P((int, char *));
+static void ipf_htable_fini __P((void));
+static size_t ipf_htable_flush __P((iplookupflush_t *));
+static void ipf_htable_free(iphtable_t *);
+static int ipf_htable_init __P((void));
+static int ipf_htable_iter_deref __P((int, int, void *));
+static int ipf_htable_iter_next __P((ipftoken_t *, ipflookupiter_t *));
+static int ipf_htable_remove __P((iphtable_t *));
+static int ipf_htable_node_add __P((iplookupop_t *));
+static int ipf_htable_node_del __P((iplookupop_t *));
+static int ipf_htable_stats_get __P((iplookupop_t *));
+static int ipf_htable_table_add __P((iplookupop_t *));
+static int ipf_htable_table_del __P((iplookupop_t *));
+static int ipf_htent_deref __P((iphtent_t *));
+static int ipf_htent_insert __P((iphtable_t *, iphtent_t *));
+static int ipf_htent_remove __P((iphtable_t *, iphtent_t *));
+static void *ipf_htable_select_add_ref __P((int, char *));
 
-iphtable_t *ipf_htables[IPL_LOGSIZE] = { NULL, NULL, NULL, NULL,
-					 NULL, NULL, NULL, NULL };
+static	u_long	ipht_nomem[IPL_LOGSIZE];
+static	u_long	ipf_nhtables[IPL_LOGSIZE];
+static	u_long	ipf_nhtnodes[IPL_LOGSIZE];
+
+iphtable_t *ipf_htables[IPL_LOGSIZE];
+
+ipf_lookup_t ipf_htable_backend = {
+	IPLT_HASH,
+	ipf_htable_init,
+	ipf_htable_fini,
+	ipf_iphmfindip,
+	ipf_htable_flush,
+	ipf_htable_iter_deref,
+	ipf_htable_iter_next,
+	ipf_htable_node_add,
+	ipf_htable_node_del,
+	ipf_htable_stats_get,
+	ipf_htable_table_add,
+	ipf_htable_table_del,
+	ipf_htable_deref,
+	ipf_htable_exists,
+	ipf_htable_select_add_ref
+};
 
 
-void
-ipf_htable_unload()
+static int
+ipf_htable_init()
+{
+	int i;
+
+	for (i = 0; i < IPL_LOGSIZE; i++) {
+		ipht_nomem[i] = 0;
+		ipf_nhtables[i] = 0;
+		ipf_nhtnodes[i] = 0;
+		ipf_htables[i] = NULL;
+	}
+
+	return 0;
+}
+
+
+static void
+ipf_htable_fini()
 {
 	iplookupflush_t fop;
 
+	fop.iplf_type = IPLT_HASH;
 	fop.iplf_unit = IPL_LOGALL;
+	fop.iplf_arg = 0;
+	fop.iplf_count = 0;
+	*fop.iplf_name = '\0';
 	ipf_htable_flush(&fop);
 }
 
 
-int
-ipf_htable_getstats(op)
+static int
+ipf_htable_stats_get(op)
 	iplookupop_t *op;
 {
 	iphtstat_t stats;
@@ -105,7 +164,7 @@ ipf_htable_getstats(op)
 /*
  * Create a new hash table using the template passed.
  */
-int
+static int
 ipf_htable_create(op)
 	iplookupop_t *op;
 {
@@ -194,9 +253,17 @@ ipf_htable_create(op)
 }
 
 
+static int
+ipf_htable_table_del(op)
+	iplookupop_t *op;
+{
+	return ipf_htable_destroy(op->iplo_unit, op->iplo_name);
+}
+
+
 /*
  */
-int
+static int
 ipf_htable_destroy(unit, name)
 	int unit;
 	char *name;
@@ -226,7 +293,7 @@ ipf_htable_destroy(unit, name)
 }
 
 
-int
+static int
 ipf_htable_clear(iph)
 	iphtable_t *iph;
 {
@@ -239,14 +306,10 @@ ipf_htable_clear(iph)
 }
 
 
-int
-ipf_htable_remove(iph)
+static void
+ipf_htable_free(iph)
 	iphtable_t *iph;
 {
-
-	if (ipf_htable_clear(iph) != 0)
-		return 1;
-
 	if (iph->iph_pnext != NULL)
 		*iph->iph_pnext = iph->iph_next;
 	if (iph->iph_next != NULL)
@@ -254,14 +317,74 @@ ipf_htable_remove(iph)
 
 	ipf_nhtables[iph->iph_unit]--;
 
+	KFREES(iph->iph_table, iph->iph_size * sizeof(*iph->iph_table));
+	KFREE(iph);
+}
+
+
+static int
+ipf_htable_remove(iph)
+	iphtable_t *iph;
+{
+
+	if (ipf_htable_clear(iph) != 0)
+		return 1;
+
 	return ipf_htable_deref(iph);
+}
+
+
+static int
+ipf_htable_node_del(op)
+	iplookupop_t *op;
+{
+        iphtable_t *iph;
+        iphtent_t hte;
+	int err;
+
+	if (op->iplo_size != sizeof(hte)) {
+		ipf_interror = 30014;
+		return EINVAL;
+	}
+
+	err = COPYIN(op->iplo_struct, &hte, sizeof(hte));
+	if (err != 0) {
+		ipf_interror = 30015;
+		return EFAULT;
+	}
+
+	iph = ipf_htable_find(op->iplo_unit, op->iplo_name);
+	if (iph == NULL) {
+		ipf_interror = 30016;
+		return ESRCH;
+	}
+	err = ipf_htent_remove(iph, &hte);
+
+	return err;
+}
+
+
+static int
+ipf_htable_table_add(op)
+        iplookupop_t *op;
+{
+	int err;
+
+	if (ipf_htable_find(op->iplo_unit, op->iplo_name) != NULL) {
+		ipf_interror = 30017;
+		err = EEXIST;
+	} else {
+		err = ipf_htable_create(op);
+	}
+
+	return err;
 }
 
 
 /*
  * Delete an entry from a hash table.
  */
-int
+static int
 ipf_htent_remove(iph, ipe)
 	iphtable_t *iph;
 	iphtent_t *ipe;
@@ -294,25 +417,25 @@ ipf_htent_remove(iph, ipe)
 }
 
 
-int
-ipf_htable_deref(iph)
-	iphtable_t *iph;
+static int
+ipf_htable_deref(arg)
+	void *arg;
 {
+	iphtable_t *iph = arg;
 	int refs;
 
 	iph->iph_ref--;
 	refs = iph->iph_ref;
 
 	if (iph->iph_ref == 0) {
-		KFREES(iph->iph_table, iph->iph_size * sizeof(*iph->iph_table));
-		KFREE(iph);
+		ipf_htable_free(iph);
 	}
 
 	return refs;
 }
 
 
-int
+static int
 ipf_htent_deref(ipe)
 	iphtent_t *ipe;
 {
@@ -330,7 +453,7 @@ ipf_htent_deref(ipe)
 }
 
 
-iphtable_t *
+static void *
 ipf_htable_exists(unit, name)
 	int unit;
 	char *name;
@@ -344,6 +467,24 @@ ipf_htable_exists(unit, name)
 }
 
 
+static void *
+ipf_htable_select_add_ref(unit, name)
+	int unit;
+	char *name;
+{
+	iphtable_t *iph;
+
+	iph = ipf_htable_exists(unit, name);
+	if (iph != NULL) {
+		ATOMIC_INC32(iph->iph_ref);
+	}
+	return iph;
+}
+
+
+/*
+ * This function is exposed becaues it is used in the group-map feature.
+ */
 iphtable_t *
 ipf_htable_find(unit, name)
 	int unit;
@@ -358,8 +499,9 @@ ipf_htable_find(unit, name)
 	return NULL;
 }
 
+extern iphtable_t *printhash(iphtable_t *, void *, char *, int);
 
-size_t
+static size_t
 ipf_htable_flush(op)
 	iplookupflush_t *op;
 {
@@ -385,10 +527,41 @@ ipf_htable_flush(op)
 }
 
 
+static int
+ipf_htable_node_add(op)
+	iplookupop_t *op;
+
+{
+	iphtable_t *iph;
+	iphtent_t hte;
+	int err;
+
+	if (op->iplo_size != sizeof(hte)) {
+		ipf_interror = 30018;
+		return EINVAL;
+	}       
+
+	err = COPYIN(op->iplo_struct, &hte, sizeof(hte));
+	if (err != 0) {
+		ipf_interror = 30019;
+		return EFAULT;
+	}
+
+	iph = ipf_htable_find(op->iplo_unit, op->iplo_name);
+	if (iph == NULL) {
+		ipf_interror = 30020;
+		return ESRCH;
+	}
+	err = ipf_htent_insert(iph, &hte);
+
+	return err;
+}
+
+
 /*
  * Add an entry to a hash table.
  */
-int
+static int
 ipf_htent_insert(iph, ipeo)
 	iphtable_t *iph;
 	iphtent_t *ipeo;
@@ -484,8 +657,12 @@ ipf_htent_insert(iph, ipeo)
 }
 
 
-/* search a hash table for a matching entry and return the pointer stored in */
-/* it for use as the next group of rules to search.                          */
+/*
+ * Search a hash table for a matching entry and return the pointer stored in
+ * it for use as the next group of rules to search.
+ *
+ * This function is exposed becaues it is used in the group-map feature.
+ */
 void *
 ipf_iphmfindgroup(tptr, aptr)
 	void *tptr, *aptr;
@@ -518,7 +695,7 @@ ipf_iphmfindgroup(tptr, aptr)
 /*                                                                          */
 /* Search the hash table for a given address and return a search result.    */
 /* ------------------------------------------------------------------------ */
-int
+static int
 ipf_iphmfindip(tptr, ipversion, aptr)
 	void *tptr, *aptr;
 	int ipversion;
@@ -594,8 +771,8 @@ maskloop:
 }
 
 
-int
-ipf_htable_getnext(token, ilp)
+static int
+ipf_htable_iter_next(token, ilp)
 	ipftoken_t *token;
 	ipflookupiter_t *ilp;
 {
@@ -699,39 +876,37 @@ ipf_htable_getnext(token, ilp)
 }
 
 
-void
-ipf_htable_iterderef(otype, unit, data)
-	u_int otype;
+static int
+ipf_htable_iter_deref(otype, unit, data)
+	int otype;
 	int unit;
 	void *data;
 {
 
 	if (data == NULL)
-		return;
+		return EFAULT;
 
 	if (unit < 0 || unit > IPL_LOGMAX)
-		return;
+		return EINVAL;
 
 	switch (otype)
 	{
 	case IPFLOOKUPITER_LIST :
-		WRITE_ENTER(&ipf_poolrw);
 		ipf_htable_deref((iphtable_t *)data);
-		RWLOCK_EXIT(&ipf_poolrw);
 		break;
 
 	case IPFLOOKUPITER_NODE :
-		WRITE_ENTER(&ipf_poolrw);
 		ipf_htent_deref((iphtent_t *)data);
-		RWLOCK_EXIT(&ipf_poolrw);
 		break;
 	default :
 		break;
 	}
+
+	return 0;
 }
 
 
-# ifdef USE_INET6
+#ifdef USE_INET6
 /* Locks:  ipf_poolrw */
 static iphtent_t *
 ipf_iphmfind6(iph, addr)
@@ -791,5 +966,4 @@ nextmask:
 	}
 	return ipe;
 }
-# endif
-#endif /* IPFILTER_LOOKUP */
+#endif

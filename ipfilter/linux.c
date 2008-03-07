@@ -101,9 +101,7 @@ static int ipf_open(struct inode *in, struct file *fp)
 		case IPL_LOGNAT :
 		case IPL_LOGSTATE :
 		case IPL_LOGAUTH :
-#ifdef IPFILTER_LOOKUP
 		case IPL_LOGLOOKUP :
-#endif
 #ifdef IPFILTER_SYNC  
 		case IPL_LOGSYNC :
 #endif
@@ -143,7 +141,7 @@ static ssize_t ipf_write(struct file *fp, const char *buf, size_t count,
         uio.uio_offset = *posp;
         uio.uio_resid = count;
 
-	err = ipfsync_write(&uio);
+	err = ipf_sync_write(&uio);
 	if (err > 0)
 		err = -err;
 	return err;
@@ -174,7 +172,7 @@ static ssize_t ipf_read(struct file *fp, char *buf, size_t count, loff_t *posp)
 	{
 #ifdef IPFILTER_SYNC
 	case IPL_LOGSYNC :
-		err = ipfsync_read(&uio);
+		err = ipf_sync_read(&uio);
 		break;
 #endif
 	default :
@@ -221,7 +219,7 @@ static u_int ipf_poll(struct file *fp, poll_table *wait)
 		break;
 	case IPL_LOGSYNC :
 # ifdef IPFILTER_SYNC
-		if (ipfsync_canread())
+		if (ipf_sync_canread())
 			revents = (POLLIN | POLLRDNORM);
 # endif
 		break;

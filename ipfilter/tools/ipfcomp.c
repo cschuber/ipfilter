@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2001-2005 by Darren Reed.
+ * Copyright (C) 2001-2007 by Darren Reed.
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  */
@@ -69,7 +69,7 @@ void printc(fr)
 	FILE *fp;
 	int i;
 
-	if (fr->fr_v == 6)
+	if (fr->fr_family == 6)
 		return;
 	if ((fr->fr_type != FR_T_IPF) && (fr->fr_type != FR_T_NONE))
 		return;
@@ -1031,7 +1031,7 @@ static void printCgroup(dir, top, m, group)
 			} else
 				n &= ~0x0001;
 
-			if ((n & 0x0002) && (fr1->fr_v == fr->fr_v)) {
+			if ((n & 0x0002) && (fr1->fr_family == fr->fr_family)) {
 				m[FRC_V].e++;
 				m[FRC_V].n++;
 			} else
@@ -1312,6 +1312,7 @@ int ipfrule_add_%s_%s()\n", instr, group);
 
 	fprintf(fp, "\
 	fp->fr_v = 4;\n\
+	fp->fr_family = AF_INET;\n\
 	fp->fr_func = (ipfunc_t)ipfrule_match_%s_%s;\n\
 	err = frrequest(IPL_LOGIPF, SIOCADDFR, (caddr_t)fp, ipf_active, 0);\n",
 			instr, group);

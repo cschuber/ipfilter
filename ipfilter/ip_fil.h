@@ -369,6 +369,7 @@ typedef	struct	fr_info	{
 	int	fin_mtu;		/* MTU input for ICMP need-frag */
 	int	fin_out;		/* in or out ? 1 == out, 0 == in */
 	int	fin_rev;		/* state only: 1 = reverse */
+	int	fin_family;		/* AF_INET, etc. */
 	u_short	fin_hlen;		/* length of IP header in bytes */
 	u_32_t	fin_rule;		/* rule # last matched */
 	char	fin_group[FR_GROUPLEN];	/* group number, -1 for none */
@@ -469,39 +470,47 @@ typedef	struct	{
 #define	ipt_num	ipt_un.iptu_num
 
 
+typedef enum fr_dtypes_e {
+	FRD_NORMAL = 0,
+	FRD_POOL
+} fr_dtypes_t;
 /*
  * This structure is used to hold information about the next hop for where
  * to forward a packet.
  */
 typedef	struct	frdest	{
-	void		*fd_ifp;
+	void		*fd_ptr;
 	i6addr_t	fd_ip6;
+	fr_dtypes_t	fd_type;
 	int		fd_local;
-	char		fd_ifname[LIFNAMSIZ];
+	char		fd_name[LIFNAMSIZ];
 } frdest_t;
 
 #define	fd_ip	fd_ip6.in4
 
 
+typedef enum fr_ctypes_e {
+	FR_NONE = 0,
+	FR_EQUAL,
+	FR_NEQUAL,
+	FR_LESST,
+	FR_GREATERT,
+	FR_LESSTE,
+	FR_GREATERTE,
+	FR_OUTRANGE,
+	FR_INRANGE,
+	FR_INCRANGE
+} fr_ctypes_t;
+
 /*
  * This structure holds information about a port comparison.
  */
 typedef	struct	frpcmp	{
-	int	frp_cmp;	/* data for port comparisons */
-	u_32_t	frp_port;	/* top port for <> and >< */
-	u_32_t	frp_top;	/* top port for <> and >< */
+	fr_ctypes_t	frp_cmp;	/* data for port comparisons */
+	u_32_t		frp_port;	/* top port for <> and >< */
+	u_32_t		frp_top;	/* top port for <> and >< */
 } frpcmp_t;
 
-#define FR_NONE 0
-#define FR_EQUAL 1
-#define FR_NEQUAL 2
-#define FR_LESST 3
-#define FR_GREATERT 4
-#define FR_LESSTE 5
-#define FR_GREATERTE 6
-#define FR_OUTRANGE 7
-#define FR_INRANGE 8
-#define FR_INCRANGE 9
 
 /*
  * Structure containing all the relevant TCP things that can be checked in
@@ -523,23 +532,36 @@ typedef	struct	frtuc	{
 
 #define	FR_TCPFMAX	0x3f
 
+typedef enum fr_atypes_e {
+	FRI_NONE = -1,	/* For LHS of NAT */
+	FRI_NORMAL = 0,	/* Normal address */
+	FRI_DYNAMIC,	/* dynamic address */
+	FRI_LOOKUP,	/* address is a pool # */
+	FRI_RANGE,	/* address/mask is a range */
+	FRI_NETWORK,	/* network address from if */
+	FRI_BROADCAST,	/* broadcast address from if */
+	FRI_PEERADDR,	/* Peer address for P-to-P */
+	FRI_NETMASKED,	/* network address with netmask from if */
+	FRI_SPLIT	/* For NAT compatibility */
+} fr_atypes_t;
+
 /*
  * This structure makes up what is considered to be the IPFilter specific
  * matching components of a filter rule, as opposed to the data structures
  * used to define the result which are in frentry_t and not here.
  */
 typedef	struct	fripf	{
-	fr_ip_t	fri_ip;
-	fr_ip_t	fri_mip;	/* mask structure */
+	fr_ip_t		fri_ip;
+	fr_ip_t		fri_mip;	/* mask structure */
 
-	u_short	fri_icmpm;		/* data for ICMP packets (mask) */
-	u_short	fri_icmp;
+	u_short		fri_icmpm;	/* data for ICMP packets (mask) */
+	u_short		fri_icmp;
 
-	frtuc_t	fri_tuc;
-	int	fri_satype;		/* addres type */
-	int	fri_datype;		/* addres type */
-	int	fri_sifpidx;		/* doing dynamic addressing */
-	int	fri_difpidx;		/* index into fr_ifps[] to use when */
+	frtuc_t		fri_tuc;
+	fr_atypes_t	fri_satype;	/* addres type */
+	fr_atypes_t	fri_datype;	/* addres type */
+	int		fri_sifpidx;	/* doing dynamic addressing */
+	int		fri_difpidx;	/* index into fr_ifps[] to use when */
 } fripf_t;
 
 #define	fri_dlookup	fri_mip.fi_dst
@@ -551,17 +573,16 @@ typedef	struct	fripf	{
 #define	fri_dstptr	fri_mip.fi_dstptr
 #define	fri_srcptr	fri_mip.fi_srcptr
 
-#define	FRI_NONE	-1	/* For LHS of NAT */
-#define	FRI_NORMAL	0	/* Normal address */
-#define	FRI_DYNAMIC	1	/* dynamic address */
-#define	FRI_LOOKUP	2	/* address is a pool # */
-#define	FRI_RANGE	3	/* address/mask is a range */
-#define	FRI_NETWORK	4	/* network address from if */
-#define	FRI_BROADCAST	5	/* broadcast address from if */
-#define	FRI_PEERADDR	6	/* Peer address for P-to-P */
-#define	FRI_NETMASKED	7	/* network address with netmask from if */
-#define	FRI_SPLIT	8	/* For NAT compatibility */
 
+typedef enum fr_rtypes_e {
+	FR_T_NONE = 0,
+	FR_T_IPF,		/* IPF structures */
+	FR_T_BPFOPC,		/* BPF opcode */
+	FR_T_CALLFUNC,		/* callout to function in fr_func only */
+	FR_T_COMPIPF,			/* compiled C code */
+	FR_T_IPFEXPR,			/* IPF expression */
+	FR_T_BUILTIN = 0x80000000	/* rule is in kernel space */
+} fr_rtypes_t;
 
 typedef	struct	frentry	* (* frentfunc_t) __P((fr_info_t *));
 
@@ -610,7 +631,7 @@ typedef	struct	frentry {
 	int	fr_dsize;
 	int	fr_pps;
 	int	fr_statemax;	/* max reference count */
-	u_32_t	fr_type;
+	fr_rtypes_t	fr_type;
 	u_32_t	fr_flags;	/* per-rule flags && options (see below) */
 	u_32_t	fr_logtag;	/* user defined log tag # */
 	u_32_t	fr_collect;	/* collection number */
@@ -618,7 +639,7 @@ typedef	struct	frentry {
 	u_int	fr_loglevel;	/* syslog log facility + priority */
 	u_int	fr_age[2];	/* non-TCP state timeouts */
 	int	fr_nostatelog;
-	u_char	fr_v;
+	u_char	fr_family;
 	u_char	fr_icode;	/* return ICMP code */
 	char	fr_group[FR_GROUPLEN];	/* group to which this rule belongs */
 	char	fr_grhead[FR_GROUPLEN];	/* group # which this rule starts */
@@ -710,16 +731,6 @@ typedef	struct	frentry {
 #define	FR_CMPSIZ	(sizeof(struct frentry) - \
 			 offsetof(struct frentry, fr_func))
 
-/*
- * fr_type
- */
-#define	FR_T_NONE	0
-#define	FR_T_IPF	1	/* IPF structures */
-#define	FR_T_BPFOPC	2	/* BPF opcode */
-#define	FR_T_CALLFUNC	3	/* callout to function in fr_func only */
-#define	FR_T_COMPIPF	4	/* compiled C code */
-#define	FR_T_IPFEXPR	5	/* IPF expression */
-#define	FR_T_BUILTIN	0x80000000	/* rule is in kernel space */
 
 /*
  * fr_flags

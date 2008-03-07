@@ -91,6 +91,7 @@ extern struct ifnet vpnif;
 #include "netinet/ip_frag.h"
 #include "netinet/ip_state.h"
 #include "netinet/ip_proxy.h"
+#include "netinet/ip_lookup.h"
 #ifdef	IPFILTER_SYNC
 #include "netinet/ip_sync.h"
 #endif
@@ -2523,11 +2524,9 @@ ipf_nat6_match(fin, np)
 		match = IP6_MASKNEQ(&fin->fin_src6, &np->in_osrcmsk6,
 				    &np->in_osrcip6);
 		break;
-#ifdef IPFILTER_LOOKUP
 	case FRI_LOOKUP :
 		match = (*np->in_osrcfunc)(np->in_osrcptr, 6, &fin->fin_src6);
 		break;
-#endif
 	}
 	match ^= ((np->in_flags & IPN_NOTSRC) != 0);
 	if (match)
@@ -2540,11 +2539,9 @@ ipf_nat6_match(fin, np)
 		match = IP6_MASKNEQ(&fin->fin_dst6, &np->in_odstmsk6,
 				    &np->in_odstip6);
 		break;
-#ifdef IPFILTER_LOOKUP
 	case FRI_LOOKUP :
 		match = (*np->in_odstfunc)(np->in_odstptr, 6, &fin->fin_dst6);
 		break;
-#endif
 	}
 
 	match ^= ((np->in_flags & IPN_NOTDST) != 0);
@@ -2648,7 +2645,7 @@ ipf_nat6_checkout(fin, passp)
 	fr = fin->fin_fr;
 	sifp = fin->fin_ifp;
 	if (fr != NULL) {
-		ifp = fr->fr_tifs[fin->fin_rev].fd_ifp;
+		ifp = fr->fr_tifs[fin->fin_rev].fd_ptr;
 		if ((ifp != NULL) && (ifp != (void *)-1))
 			fin->fin_ifp = ifp;
 	}
@@ -4094,12 +4091,10 @@ ipf_nat6_matchencap(fin, np)
 		match = IP6_MASKNEQ(&ip6->ip6_dst, &np->in_osrcmsk6,
 				    &np->in_osrcip6);
 		break;
-#ifdef IPFILTER_LOOKUP
 	case FRI_LOOKUP :
 		match = (*np->in_osrcfunc)(np->in_osrcptr, np->in_v[0],
 					   &ip6->ip6_dst);
 		break;
-#endif
 	}
 	if (match)
 		return 0;
@@ -4110,12 +4105,10 @@ ipf_nat6_matchencap(fin, np)
 		match = IP6_MASKNEQ(&ip6->ip6_src, &np->in_odstmsk6,
 				    &np->in_odstip6);
 		break;
-#ifdef IPFILTER_LOOKUP
 	case FRI_LOOKUP :
 		match = (*np->in_odstfunc)(np->in_odstptr, np->in_v[0],
 					   &ip6->ip6_src);
 		break;
-#endif
 	}
 	if (match)
 		return 0;
@@ -4313,20 +4306,18 @@ ipf_nat6_nextaddrinit(na, initial, ifp)
 {
 	switch (na->na_atype)
 	{
-#ifdef	IPFILTER_LOOKUP
 	case FRI_LOOKUP :
 		if (na->na_ptr == NULL) {
-			na->na_ptr = ipf_resolvelookup(IPL_LOGNAT,
-						      na->na_type,
-						      na->na_num,
-						      &na->na_func);
+			na->na_ptr = ipf_lookup_res_num(na->na_type,
+							IPL_LOGNAT,
+						        na->na_num,
+						        &na->na_func);
 		}
 		if (na->na_ptr == NULL) {
 			ipf_interror = 160056;
 			return ESRCH;
 		}
 		break;
-#endif
 	case FRI_DYNAMIC :
 	case FRI_BROADCAST :
 	case FRI_NETWORK :

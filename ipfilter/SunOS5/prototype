@@ -71,6 +71,7 @@ f none /usr/include/ipfilter/ip_nat.h=root/usr/include/ipfilter/ip_nat.h
 f none /usr/include/ipfilter/ip_proxy.h=root/usr/include/ipfilter/ip_proxy.h
 f none /usr/include/ipfilter/ip_state.h=root/usr/include/ipfilter/ip_state.h
 f none /usr/include/ipfilter/ip_htable.h=root/usr/include/ipfilter/ip_htable.h
+f none /usr/include/ipfilter/ip_dstlist.h=root/usr/include/ipfilter/ip_dstlist.h
 f none /usr/include/ipfilter/ip_lookup.h=root/usr/include/ipfilter/ip_lookup.h
 f none /usr/include/ipfilter/ip_pool.h=root/usr/include/ipfilter/ip_pool.h
 f none /opt/ipf/examples/example.1=root/opt/ipf/examples/example.1

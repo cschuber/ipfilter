@@ -44,7 +44,8 @@ if [ ! -f ip_rules.c -o ! -f ip_rules.h ] ; then
 fi
 
 echo -n "Installing "
-for j in auth frag nat proxy scan state sync pool htable lookup rules; do
+for j in auth frag nat proxy scan state sync pool dstlist htable lookup rules \
+	 dstlist; do
 	for i in ip_$j.[ch]; do
 		if [ -f "$i" ] ; then
 			echo -n " $i"
@@ -95,7 +96,8 @@ for i in ip_fil.h fil.c ip_log.c ip_compat.h ipl.h ip_*_pxy.c; do
 done
 echo ""
 echo -n "Installing into /usr/include/netinet"
-for j in auth compat fil frag nat proxy scan state sync pool htable lookup; do
+for j in auth compat fil frag nat proxy scan state sync pool htable dstlist \
+	 lookup; do
 	i=ip_$j.h
 	if [ -f "$i" ] ; then
 		echo -n " $i"
@@ -157,7 +159,7 @@ if [ $os = FreeBSD -a -f /sys/conf/files ] ; then
 		mv files files.preipf4
 		cp -p files.preipf4 files
 	fi
-	for i in htable pool lookup; do
+	for i in dstlist htable pool lookup; do
 		grep ip_$i.c files >/dev/null 2>&1
 		if [ $? -ne 0 ] ; then
 			echo "contrib/ipfilter/netinet/ip_$i.c	optional ipfilter inet ipfilter_lookup" >> files
@@ -183,7 +185,7 @@ if [ $os = NetBSD -a -f /sys/conf/files ] ; then
 		cp -p files.preipf4 files
 	fi
 	if [ $fullrev -ge 010600 -a $fullrev -lt 020000 ] ; then
-		for i in htable pool lookup; do
+		for i in dstlist htable pool lookup; do
 			grep ip_$i.c files >/dev/null 2>&1
 			if [ $? -ne 0 ] ; then
 				echo "file	netinet/ip_$i.c	ipfilter & ipfilter_lookup" >> files
@@ -210,7 +212,7 @@ if [ $os = OpenBSD -a -f /sys/conf/files ] ; then
 		cp -p files.preipf4 files
 	fi
 	if [ $fullrev -ge 030400 ] ; then
-		for i in htable pool lookup; do
+		for i in dstlist htable pool lookup; do
 			grep ip_$i.c files >/dev/null 2>&1
 			if [ $? -ne 0 ] ; then
 				echo "file	netinet/ip_$i.c	ipfilter & ipfilter_lookup" >> files
@@ -250,7 +252,7 @@ cat | (cd /usr/src/sys/modules/ipfilter; patch) <<__EOF__
 --- 5,15 ----
   KMOD=	ipl
   SRCS=	mlfk_ipl.c ip_nat.c ip_frag.c ip_state.c ip_proxy.c ip_auth.c \\
-! 	ip_log.c ip_fil.c fil.c ip_lookup.c ip_pool.c ip_htable.c \\
+! 	ip_log.c ip_fil.c fil.c ip_lookup.c ip_pool.c ip_dstlist.c ip_htable.c \\
 ! 	ip_sync.c ip_scan.c ip_rules.c
 
   .if !defined(NOINET6)

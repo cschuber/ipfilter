@@ -51,9 +51,7 @@ static const char rcsid[] = "@(#)$Id$";
 #include "netinet/ip_state.h"
 #include "netinet/ip_auth.h"
 #include "netinet/ip_proxy.h"
-#ifdef	IPFILTER_LOOKUP
-# include "netinet/ip_lookup.h"
-#endif
+#include "netinet/ip_lookup.h"
 #include <inet/ip_ire.h>
 
 #include "md5.h"
@@ -251,15 +249,15 @@ iplioctl(dev, cmd, data, mode, cp, rp)
 
 
 void *
-get_unit(char *name, int v)
+get_unit(char *name, int family)
 {
 	void *ifp;
 	qif_t *qf;
 	int sap;
 
-	if (v == 4)
+	if (family == AF_INET)
 		sap = 0x0800;
-	else if (v == 6)
+	else if (family == AF_INET6)
 		sap = 0x86dd;
 	else
 		return NULL;
@@ -896,7 +894,7 @@ ipf_fastroute(mb, mpp, fin, fdp)
 		}
 		fdp = &fd;
 	} else {
-		ifp = fdp->fd_ifp;
+		ifp = fdp->fd_ptr;
 
 		if (ifp == NULL || ifp == (void *)-1)
 			goto bad_fastroute;

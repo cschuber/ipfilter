@@ -357,9 +357,9 @@ ipf_setifpaddr(ifp, addr)
 }
 
 struct ifnet *
-get_unit(name, v)
+get_unit(name, family)
 	char *name;
-	int v;
+	int family;
 {
 	struct ifnet *ifp, **ifpp, **old_ifneta;
 	char *addr;
@@ -518,7 +518,7 @@ ipf_fastroute(m, mpp, fin, fdp)
 	fr_info_t *fin;
 	frdest_t *fdp;
 {
-	struct ifnet *ifp = fdp->fd_ifp;
+	struct ifnet *ifp = fdp->fd_ptr;
 	ip_t *ip = fin->fin_ip;
 	int error = 0;
 	frentry_t *fr;

@@ -79,6 +79,7 @@ struct file;
 #include "netinet/ip_frag.h"
 #include "netinet/ip_state.h"
 #include "netinet/ip_proxy.h"
+#include "netinet/ip_lookup.h"
 #ifdef	IPFILTER_SYNC
 #include "netinet/ip_sync.h"
 #endif
@@ -801,7 +802,7 @@ ipf_stputent(data)
 		 */
 		for (i = 0; i < 4; i++) {
 			name = fr->fr_ifnames[i];
-			fr->fr_ifas[i] = ipf_resolvenic(name, fr->fr_v);
+			fr->fr_ifas[i] = ipf_resolvenic(name, fr->fr_family);
 			name = isn->is_ifname[i];
 			isn->is_ifp[i] = ipf_resolvenic(name, isn->is_v);
 		}
@@ -811,9 +812,9 @@ ipf_stputent(data)
 		fr->fr_data = NULL;
 		fr->fr_type = FR_T_NONE;
 
-		ipf_resolvedest(&fr->fr_tifs[0], fr->fr_v);
-		ipf_resolvedest(&fr->fr_tifs[1], fr->fr_v);
-		ipf_resolvedest(&fr->fr_dif, fr->fr_v);
+		ipf_resolvedest(&fr->fr_tifs[0], fr->fr_family);
+		ipf_resolvedest(&fr->fr_tifs[1], fr->fr_family);
+		ipf_resolvedest(&fr->fr_dif, fr->fr_family);
 
 		/*
 		 * send a copy back to userland of what we ended up
@@ -1167,6 +1168,7 @@ ipf_state_add(fin, stsave, flags)
 	u_int pass, hv;
 	frentry_t *fr;
 	tcphdr_t *tcp;
+	frdest_t *fdp;
 #if 0
 	grehdr_t *gre;
 #endif
@@ -1582,6 +1584,19 @@ ipf_state_add(fin, stsave, flags)
 	fin->fin_flx |= FI_STATE;
 	if (fin->fin_flx & FI_FRAG)
 		(void) ipf_frag_new(fin, pass);
+	fdp = &fr->fr_tifs[0];
+	if (fdp->fd_type == FRD_POOL)
+		fdp->fd_ptr = ipf_lookup_res_name(IPLT_DSTLIST, IPL_LOGIPF,
+						  fdp->fd_name, NULL);
+	fdp = &fr->fr_tifs[1];
+	if (fdp->fd_type == FRD_POOL)
+		fdp->fd_ptr = ipf_lookup_res_name(IPLT_DSTLIST, IPL_LOGIPF,
+						  fdp->fd_name, NULL);
+	fdp = &fr->fr_dif;
+	if (fdp->fd_type == FRD_POOL)
+		fdp->fd_ptr = ipf_lookup_res_name(IPLT_DSTLIST, IPL_LOGIPF,
+						  fdp->fd_name, NULL);
+
 	ATOMIC_INCL(ipf_state_stats.iss_proto[is->is_p]);
 	ATOMIC_INC(ipf_state_stats.iss_active_proto[is->is_p]);
 
@@ -2984,62 +2999,6 @@ retry_tcpudp:
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    ipf_state_update                                            */
-/* Returns:     Nil                                                         */
-/* Parameters:  fin(I) - pointer to packet information                      */
-/*              is(I)  - pointer to state table entry                       */
-/* Read Locks:  ipf_state                                                   */
-/*                                                                          */
-/* Updates packet and byte counters for a newly received packet.  Seeds the */
-/* fragment cache with a new entry as required.                             */
-/* ------------------------------------------------------------------------ */
-void
-ipf_state_update(fin, is, ifq)
-	fr_info_t *fin;
-	ipstate_t *is;
-	ipftq_t *ifq;
-{
-	ipftqent_t *tqe;
-	int i, pass;
-
-	i = (fin->fin_rev << 1) + fin->fin_out;
-
-	/*
-	 * For TCP packets, ifq == NULL.  For all others, check if this new
-	 * queue is different to the last one it was on and move it if so.
-	 */
-	tqe = &is->is_sti;
-	MUTEX_ENTER(&is->is_lock);
-	if ((tqe->tqe_flags & TQE_RULEBASED) != 0)
-		ifq = is->is_tqehead[fin->fin_rev];
-
-	if (ifq != NULL)
-		ipf_movequeue(tqe, tqe->tqe_ifq, ifq);
-
-	is->is_pkts[i]++;
-	is->is_bytes[i] += fin->fin_plen;
-	MUTEX_EXIT(&is->is_lock);
-
-#ifdef	IPFILTER_SYNC
-	if (is->is_flags & IS_STATESYNC)
-		ipf_sync_update(SMC_STATE, fin, is->is_sync);
-#endif
-
-	ATOMIC_INCL(ipf_state_stats.iss_hits);
-
-	fin->fin_fr = is->is_rule;
-
-	/*
-	 * If this packet is a fragment and the rule says to track fragments,
-	 * then create a new fragment cache entry.
-	 */
-	pass = is->is_pass;
-	if ((fin->fin_flx & FI_FRAG) && FR_ISPASS(pass))
-		(void) ipf_frag_new(fin, pass);
-}
-
-
-/* ------------------------------------------------------------------------ */
 /* Function:    ipf_state_check                                             */
 /* Returns:     frentry_t* - NULL == search failed,                         */
 /*                           else pointer to rule for matching state        */
@@ -3053,21 +3012,30 @@ ipf_state_check(fin, passp)
 	fr_info_t *fin;
 	u_32_t *passp;
 {
+	ipftqent_t *tqe;
 	ipstate_t *is;
 	frentry_t *fr;
 	tcphdr_t *tcp;
 	ipftq_t *ifq;
 	u_int pass;
+	int inout;
 
 	if (ipf_state_lock || (ipf_state_list == NULL))
 		return NULL;
 
-	if (fin->fin_flx & (FI_SHORT|FI_STATE|FI_FRAGBODY|FI_BAD)) {
+	if (fin->fin_flx & (FI_SHORT|FI_FRAGBODY|FI_BAD)) {
 		ATOMIC_INCL(ipf_state_stats.iss_check_bad);
 		return NULL;
 	}
 
-	is = NULL;
+	is = fin->fin_state;
+	if (is != NULL) {
+		READ_ENTER(&ipf_state);
+		fr = is->is_rule;
+		MUTEX_ENTER(&is->is_lock);
+		goto stateheld;
+	}
+
 	if ((fin->fin_flx & FI_TCPUDP) ||
 	    (fin->fin_fi.fi_p == IPPROTO_ICMP)
 #ifdef	USE_INET6
@@ -3078,13 +3046,12 @@ ipf_state_check(fin, passp)
 	else
 		tcp = NULL;
 
+	ifq = NULL;
 	/*
 	 * Search the hash table for matching packet header info.
 	 */
-	ifq = NULL;
-	is = fin->fin_state;
-	if (is == NULL)
-		is = ipf_state_lookup(fin, tcp, &ifq);
+	is = ipf_state_lookup(fin, tcp, &ifq);
+
 	switch (fin->fin_p)
 	{
 #ifdef	USE_INET6
@@ -3093,8 +3060,6 @@ ipf_state_check(fin, passp)
 			break;
 		if (fin->fin_v == 6) {
 			is = ipf_checkicmp6matchingstate(fin);
-			if (is != NULL)
-				goto matched;
 		}
 		break;
 #endif
@@ -3106,9 +3071,8 @@ ipf_state_check(fin, passp)
 		 * response to another state entry.
 		 */
 		is = ipf_checkicmpmatchingstate(fin);
-		if (is != NULL)
-			goto matched;
 		break;
+
 	case IPPROTO_TCP :
 		if (is == NULL)
 			break;
@@ -3132,15 +3096,16 @@ ipf_state_check(fin, passp)
 		return NULL;
 	}
 
-matched:
 	fr = is->is_rule;
 	if (fr != NULL) {
 		if ((fin->fin_out == 0) && (fr->fr_nattag.ipt_num[0] != 0)) {
 			if (fin->fin_nattag == NULL) {
+				RWLOCK_EXIT(&ipf_state);
 				ATOMIC_INCL(ipf_state_stats.iss_check_notag);
 				return NULL;
 			}
 			if (ipf_matchtag(&fr->fr_nattag, fin->fin_nattag)!=0) {
+				RWLOCK_EXIT(&ipf_state);
 				ATOMIC_INCL(ipf_state_stats.iss_check_nattag);
 				return NULL;
 			}
@@ -3150,15 +3115,49 @@ matched:
 	}
 
 	fin->fin_rule = is->is_rulen;
-	pass = is->is_pass;
-	ipf_state_update(fin, is, ifq);
-
+	fin->fin_fr = is->is_rule;
 	fin->fin_state = is;
 	is->is_touched = ipf_ticks;
+
+	/*
+	 * If this packet is a fragment and the rule says to track fragments,
+	 * then create a new fragment cache entry.
+	 */
+	if ((fin->fin_flx & FI_FRAG) && FR_ISPASS(is->is_pass))
+		(void) ipf_frag_new(fin, is->is_pass);
+
+	/*
+	 * For TCP packets, ifq == NULL.  For all others, check if this new
+	 * queue is different to the last one it was on and move it if so.
+	 */
+	tqe = &is->is_sti;
+	if ((tqe->tqe_flags & TQE_RULEBASED) != 0)
+		ifq = is->is_tqehead[fin->fin_rev];
+
 	MUTEX_ENTER(&is->is_lock);
 	is->is_ref++;
+
+	if (ifq != NULL)
+		ipf_movequeue(tqe, tqe->tqe_ifq, ifq);
+
+stateheld:
+	inout = (fin->fin_rev << 1) + fin->fin_out;
+	is->is_pkts[inout]++;
+	is->is_bytes[inout] += fin->fin_plen;
+
 	MUTEX_EXIT(&is->is_lock);
+
+	pass = is->is_pass;
+
+#ifdef	IPFILTER_SYNC
+	if (is->is_flags & IS_STATESYNC)
+		ipf_sync_update(SMC_STATE, fin, is->is_sync);
+#endif
+
 	RWLOCK_EXIT(&ipf_state);
+
+	ATOMIC_INCL(ipf_state_stats.iss_hits);
+
 	fin->fin_flx |= FI_STATE;
 	if ((pass & FR_LOGFIRST) != 0)
 		pass &= ~(FR_LOGFIRST|FR_LOG);
@@ -3305,6 +3304,8 @@ ipf_state_del(is, why)
 	int why;
 {
 	int orphan = 1;
+	frentry_t *fr;
+	frdest_t *fdp;
 
 	/*
 	 * Since we want to delete this, remove it from the state table,
@@ -3368,6 +3369,19 @@ ipf_state_del(is, why)
 		return is->is_ref;
 	}
 	MUTEX_EXIT(&is->is_lock);
+
+	fr = is->is_rule;
+	if (fr != NULL) {
+		fdp = &fr->fr_tifs[0];
+		if (fdp->fd_type == FRD_POOL)
+			ipf_lookup_deref(IPLT_DSTLIST, fdp->fd_ptr);
+		fdp = &fr->fr_tifs[1];
+		if (fdp->fd_type == FRD_POOL)
+			ipf_lookup_deref(IPLT_DSTLIST, fdp->fd_ptr);
+		fdp = &fr->fr_dif;
+		if (fdp->fd_type == FRD_POOL)
+			ipf_lookup_deref(IPLT_DSTLIST, fdp->fd_ptr);
+	}
 
 	is->is_ref = 0;
 

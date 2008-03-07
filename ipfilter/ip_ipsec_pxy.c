@@ -146,6 +146,7 @@ ippr_ipsec_new(fin, aps, nat)
 	      sizeof(ipn->in_ifnames[0]));
 	ipn->in_pr[0] = IPPROTO_ESP;
 	ipn->in_pr[1] = IPPROTO_ESP;
+	MUTEX_INIT(&ipn->in_lock, "IPSec proxy NAT rule");
 
 	bcopy((char *)fin, (char *)&fi, sizeof(fi));
 	fi.fin_state = NULL;

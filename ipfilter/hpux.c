@@ -565,9 +565,7 @@ int iplopen(dev, flag, dummy, mode)
 		case IPL_LOGNAT :
 		case IPL_LOGSTATE :
 		case IPL_LOGAUTH :
-#ifdef IPFILTER_LOOKUP
 		case IPL_LOGLOOKUP :
-#endif
 #ifdef IPFILTER_SYNC  
 		case IPL_LOGSYNC :
 #endif

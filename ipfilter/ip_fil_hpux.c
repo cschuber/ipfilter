@@ -177,17 +177,17 @@ iplioctl(dev, cmd, data, flags)
 
 
 void *
-get_unit(name, v)
+get_unit(name, family)
 	char *name;
-	int v;
+	int family;
 {
 	size_t len = strlen(name) + 1;	/* includes \0 */
 	qif_t *qf;
 	int sap;
 
-	if (v == 4)
+	if (family == AF_INET)
 		sap = 0x0800;
-	else if (v == 6)
+	else if (family == AF_INET6)
 		return NULL;
 	spinlock(&pfil_rw);
 	qf = qif_iflookup(name, sap);
@@ -778,7 +778,7 @@ ipf_fastroute(mb, mpp, fin, fdp)
 		*mpp = mp;
 	}
 
-	ifp = (ifinfo_t *)fdp->fd_ifp;
+	ifp = (ifinfo_t *)fdp->fd_ptr;
 	if (fdp && fdp->fd_ip.s_addr)
 		dst = fdp->fd_ip;
 	else

@@ -136,6 +136,7 @@ ippr_pptp_new(fin, aps, nat)
 	ipn->in_nsrcmsk = 0xffffffff;
 	ipn->in_odstmsk = 0xffffffff;
 	ipn->in_ndstmsk = 0xffffffff;
+	MUTEX_INIT(&ipn->in_lock, "pptp proxy NAT rule");
 
 	bcopy(np->in_ifnames[0], ipn->in_ifnames[0],
 	      sizeof(ipn->in_ifnames[0]));

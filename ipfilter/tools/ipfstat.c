@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2002-2006 by Darren Reed.
+ * Copyright (C) 2002-2007 by Darren Reed.
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  */
@@ -803,10 +803,10 @@ static void printlivelist(out, set, fp, group, comment)
 		if (bcmp(fp, &zero, sizeof(zero)) == 0)
 			break;
 		if (use_inet6 != 0) {
-			if (fp->fr_v != 0 && fp->fr_v != 6)
+			if (fp->fr_family != 0 && fp->fr_family != 6)
 				continue;
 		} else {
-			if (fp->fr_v != 0 && fp->fr_v != 4)
+			if (fp->fr_family != 0 && fp->fr_family != 4)
 				continue;
 		}
 		if (fp->fr_data != NULL)
@@ -901,10 +901,10 @@ static void printdeadlist(out, set, fp, group, comment)
 		}
 		fp = &fb;
 		if (use_inet6 != 0) {
-			if (fp->fr_v != 0 && fp->fr_v != 6)
+			if (fp->fr_family != 0 && fp->fr_family != 6)
 				continue;
 		} else {
-			if (fp->fr_v != 0 && fp->fr_v != 4)
+			if (fp->fr_family != 0 && fp->fr_family != 4)
 				continue;
 		}
 

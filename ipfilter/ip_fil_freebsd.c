@@ -451,8 +451,8 @@ ipf_send_reset(fin)
 		ip6->ip6_plen = htons(sizeof(struct tcphdr));
 		ip6->ip6_nxt = IPPROTO_TCP;
 		ip6->ip6_hlim = 0;
-		ip6->ip6_src = fin->fin_dst6;
-		ip6->ip6_dst = fin->fin_src6;
+		ip6->ip6_src = fin->fin_dst6.in6;
+		ip6->ip6_dst = fin->fin_src6.in6;
 		tcp2->th_sum = in6_cksum(m, IPPROTO_TCP,
 					 sizeof(*ip6), sizeof(*tcp2));
 		return ipf_send_ip(fin, m, &m);
@@ -574,6 +574,7 @@ ipf_send_icmp_err(type, fin, dst)
 	xtra = 0;
 	hlen = 0;
 	ohlen = 0;
+	dst4.s_addr = 0;
 	ifp = fin->fin_ifp;
 	if (fin->fin_v == 4) {
 		if ((fin->fin_p == IPPROTO_ICMP) && !(fin->fin_flx & FI_SHORT))
@@ -684,8 +685,8 @@ ipf_send_icmp_err(type, fin, dst)
 		ip6->ip6_plen = htons(iclen - hlen);
 		ip6->ip6_nxt = IPPROTO_ICMPV6;
 		ip6->ip6_hlim = 0;
-		ip6->ip6_src = dst6;
-		ip6->ip6_dst = fin->fin_src6;
+		ip6->ip6_src = dst6.in6;
+		ip6->ip6_dst = fin->fin_src6.in6;
 		if (xtra > 0)
 			bcopy((char *)fin->fin_ip + ohlen,
 			      (char *)&icmp->icmp_ip + ohlen, xtra);
@@ -806,7 +807,7 @@ ipf_fastroute(m0, mpp, fin, fdp)
 
 	fr = fin->fin_fr;
 	if (fdp != NULL)
-		ifp = fdp->fd_ifp;
+		ifp = fdp->fd_ptr;
 	else
 		ifp = fin->fin_ifp;
 

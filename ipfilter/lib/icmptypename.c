@@ -7,8 +7,8 @@
  */
 #include "ipf.h"
 
-char *icmptypename(v, type)
-	int v, type;
+char *icmptypename(family, type)
+	int family, type;
 {
 	icmptype_t *i;
 
@@ -16,10 +16,12 @@ char *icmptypename(v, type)
 		return NULL;
 
 	for (i = icmptypelist; i->it_name != NULL; i++) {
-		if ((v == 4) && (i->it_v4 == type))
+		if ((family == AF_INET) && (i->it_v4 == type))
 			return i->it_name;
-		if ((v == 6) && (i->it_v6 == type))
+#ifdef USE_INET6
+		if ((family == AF_INET6) && (i->it_v6 == type))
 			return i->it_name;
+#endif
 	}
 
 	return NULL;

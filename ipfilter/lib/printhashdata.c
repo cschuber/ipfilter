@@ -17,7 +17,7 @@ void printhashdata(hp, opts)
 
 	if ((opts & OPT_DEBUG) == 0) {
 		if ((hp->iph_type & IPHASH_ANON) == IPHASH_ANON)
-			PRINTF("# 'anonymous' table\n");
+			PRINTF("# 'anonymous' table refs %d\n", hp->iph_ref);
 		if ((hp->iph_flags & IPHASH_DELETE) == IPHASH_DELETE)
 			PRINTF("# ");
 		switch (hp->iph_type & ~IPHASH_ANON)

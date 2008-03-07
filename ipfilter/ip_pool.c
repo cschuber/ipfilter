@@ -65,7 +65,7 @@ struct file;
 #include "netinet/ip_fil.h"
 #include "netinet/ip_pool.h"
 
-#if defined(IPFILTER_LOOKUP) && defined(_KERNEL) && \
+#if defined(_KERNEL) && \
       ((BSD >= 198911) && !defined(__osf__) && \
       !defined(__hpux) && !defined(__sgi))
 static int rn_freenode __P((struct radix_node *, void *));
@@ -78,40 +78,59 @@ static const char sccsid[] = "@(#)ip_fil.c	2.41 6/5/96 (C) 1993-2000 Darren Reed
 static const char rcsid[] = "@(#)$Id$";
 #endif
 
-#ifdef IPFILTER_LOOKUP
-# if !defined(RADIX_NODE_HEAD_LOCK) || !defined(RADIX_NODE_HEAD_UNLOCK) || \
+#if !defined(RADIX_NODE_HEAD_LOCK) || !defined(RADIX_NODE_HEAD_UNLOCK) || \
      !defined(_KERNEL)
-#  undef RADIX_NODE_HEAD_LOCK
-#  undef RADIX_NODE_HEAD_UNLOCK
-#  define RADIX_NODE_HEAD_LOCK(x)	;
-#  define RADIX_NODE_HEAD_UNLOCK(x)	;
-# endif
+# undef RADIX_NODE_HEAD_LOCK
+# undef RADIX_NODE_HEAD_UNLOCK
+# define RADIX_NODE_HEAD_LOCK(x)	;
+# define RADIX_NODE_HEAD_UNLOCK(x)	;
+#endif
 
 static void ipf_pool_clearnodes __P((ip_pool_t *));
+static int ipf_pool_create __P((iplookupop_t *));
+static int ipf_pool_deref __P((void *));
+static int ipf_pool_destroy __P((int, char *));
 static void *ipf_pool_exists __P((int, char *));
+static void *ipf_pool_find __P((int, char *));
+static ip_pool_node_t *ipf_pool_findeq __P((ip_pool_t *, addrfamily_t *, addrfamily_t *));
+static void ipf_pool_fini __P((void));
+static void ipf_pool_free __P((ip_pool_t *));
+static int ipf_pool_init __P((void));
+static int ipf_pool_insert __P((ip_pool_t *, struct ip_pool_node *));
+static int ipf_pool_iter_next __P(( ipftoken_t *, ipflookupiter_t *));
+static size_t ipf_pool_flush __P((iplookupflush_t *));
+static int ipf_pool_node_add __P((iplookupop_t *));
+static int ipf_pool_node_del __P((iplookupop_t *));
+static void ipf_pool_node_deref __P((ip_pool_node_t *));
+static int ipf_pool_remove __P((ip_pool_t *, ip_pool_node_t *));
+static int ipf_pool_search __P((void *, int, void *));
+static int ipf_pool_stats_get __P((iplookupop_t *));
+static int ipf_pool_table_add __P((iplookupop_t *));
+static int ipf_pool_table_del __P((iplookupop_t *));
+static int ipf_pool_iter_deref __P((int, int, void *));
+static void *ipf_pool_select_add_ref __P((int, char *));
 
 ipf_pool_stat_t ipf_pool_stats;
 ipfrwlock_t ipf_poolrw;
+ip_pool_t *ipf_pool_list[IPL_LOGSIZE];
 
-/*
- * Binary tree routines from Sedgewick and enhanced to do ranges of addresses.
- * NOTE: Insertion *MUST* be from greatest range to least for it to work!
- * These should be replaced, eventually, by something else - most notably a
- * interval searching method.  The important feature is to be able to find
- * the best match.
- *
- * So why not use a radix tree for this?  As the first line implies, it
- * has been written to work with a _range_ of addresses.  A range is not
- * necessarily a match with any given netmask so what we end up dealing
- * with is an interval tree.  Implementations of these are hard to find
- * and the one herein is far from bug free.
- *
- * Sigh, in the end I became convinced that the bugs the code contained did
- * not make it worthwhile not using radix trees.  For now the radix tree from
- * 4.4 BSD is used, but this is not viewed as a long term solution.
- */
-ip_pool_t *ipf_pool_list[IPL_LOGSIZE] = { NULL, NULL, NULL, NULL,
-					 NULL, NULL, NULL, NULL };
+ipf_lookup_t ipf_pool_backend = {
+	IPLT_POOL,
+	ipf_pool_init,
+	ipf_pool_fini,
+	ipf_pool_search,
+	ipf_pool_flush,
+	ipf_pool_iter_deref,
+	ipf_pool_iter_next,
+	ipf_pool_node_add,
+	ipf_pool_node_del,
+	ipf_pool_stats_get,
+	ipf_pool_table_add,
+	ipf_pool_table_del,
+	ipf_pool_deref,
+	ipf_pool_find,
+	ipf_pool_select_add_ref
+};
 
 
 #ifdef TEST_POOL
@@ -241,9 +260,13 @@ treeprint(ipo)
 /*                                                                          */
 /* Initialise the routing table data structures where required.             */
 /* ------------------------------------------------------------------------ */
-int
+static int
 ipf_pool_init()
 {
+	int i;
+
+	for (i = 0; i < IPL_LOGSIZE; i++)
+		ipf_pool_list[i] = NULL;
 
 	bzero((char *)&ipf_pool_stats, sizeof(ipf_pool_stats));
 
@@ -263,7 +286,7 @@ ipf_pool_init()
 /* function for the radix tree that supports the pools. ipf_pool_destroy() is*/
 /* used to delete the pools one by one to ensure they're properly freed up. */
 /* ------------------------------------------------------------------------ */
-void
+static void
 ipf_pool_fini()
 {
 	ip_pool_t *p, *q;
@@ -283,6 +306,138 @@ ipf_pool_fini()
 
 
 /* ------------------------------------------------------------------------ */
+/* Function:   ipf_pool_node_add                                            */
+/* Returns:    int - 0 = success, else error                                */
+/* Parameters: op(I) - pointer to lookup operatin data                      */
+/*                                                                          */
+/* ------------------------------------------------------------------------ */
+static int
+ipf_pool_node_add(op)
+	iplookupop_t *op;
+{
+	ip_pool_node_t node, *m;
+	ip_pool_t *p;
+	int err;
+
+	if (op->iplo_size != sizeof(node)) {
+		ipf_interror = 70014;
+		return EINVAL;       
+	}
+	      
+	err = COPYIN(op->iplo_struct, &node, sizeof(node));
+	if (err != 0) { 
+		ipf_interror = 70015;
+		return EFAULT;
+	}     
+
+	if (node.ipn_addr.adf_family != node.ipn_mask.adf_family) {
+		ipf_interror = 70016;
+		return EINVAL;
+	}      
+
+	p = ipf_pool_find(op->iplo_unit, op->iplo_name);
+	if (p == NULL) {
+		ipf_interror = 70017;
+		return ESRCH;
+	}  
+
+	/*
+	 * add an entry to a pool - return an error if it already
+	 * exists remove an entry from a pool - if it exists
+	 * - in both cases, the pool *must* exist!
+	 */
+	m = ipf_pool_findeq(p, &node.ipn_addr, &node.ipn_mask);       
+	if (m != NULL) {
+		ipf_interror = 70018;
+		return EEXIST;
+	}
+	err = ipf_pool_insert(p, &node);
+
+	return err;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:   ipf_pool_node_add                                            */
+/* Returns:    int - 0 = success, else error                                */
+/* Parameters: op(I) - pointer to lookup operatin data                      */
+/*                                                                          */
+/* ------------------------------------------------------------------------ */
+static int
+ipf_pool_node_del(op)
+	iplookupop_t *op;
+{
+	ip_pool_node_t node, *m;
+	ip_pool_t *p;
+	int err;
+
+
+	if (op->iplo_size != sizeof(node)) {
+		ipf_interror = 70019;
+		return EINVAL;
+	}
+
+	err = COPYIN(op->iplo_struct, &node, sizeof(node));
+	if (err != 0) {
+		ipf_interror = 70020;
+		return EFAULT;
+	}
+
+	p = ipf_pool_find(op->iplo_unit, op->iplo_name);
+	if (p == NULL) {
+		ipf_interror = 70021;
+		return ESRCH;
+	}
+
+	m = ipf_pool_findeq(p, &node.ipn_addr, &node.ipn_mask);
+	if (m == NULL) {
+		ipf_interror = 70022;
+		return ENOENT;
+	}
+	err = ipf_pool_remove(p, m);
+
+	return err;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:   ipf_pool_table_add                                           */
+/* Returns:    int - 0 = success, else error                                */
+/* Parameters: op(I) - pointer to lookup operatin data                      */
+/*                                                                          */
+/* ------------------------------------------------------------------------ */
+static int
+ipf_pool_table_add(op)
+	iplookupop_t *op;
+{
+	int err;
+
+	if (ipf_pool_find(op->iplo_unit, op->iplo_name) != NULL) {
+		ipf_interror = 70023;
+		err = EEXIST;
+	} else {
+		err = ipf_pool_create(op);
+	}
+
+	return err;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:   ipf_pool_table_del                                           */
+/* Returns:    int - 0 = success, else error                                */
+/* Parameters: op(I) - pointer to lookup operatin data                      */
+/*                                                                          */
+/* ------------------------------------------------------------------------ */
+static int
+ipf_pool_table_del(op)
+	iplookupop_t *op;
+{
+	return ipf_pool_destroy(op->iplo_unit, op->iplo_name);
+}
+
+
+/* ------------------------------------------------------------------------ */
 /* Function:    ipf_pool_statistics                                         */
 /* Returns:     int     - 0 = success, else error                           */
 /* Parameters:  op(I)   - pointer to lookup operation arguments             */
@@ -290,8 +445,8 @@ ipf_pool_fini()
 /* Copy the current statistics out into user space, collecting pool list    */
 /* pointers as appropriate for later use.                                   */
 /* ------------------------------------------------------------------------ */
-int
-ipf_pool_getstats(op)
+static int
+ipf_pool_stats_get(op)
 	iplookupop_t *op;
 {
 	ipf_pool_stat_t stats;
@@ -353,7 +508,7 @@ ipf_pool_exists(unit, name)
 /* device, indicated by the unit number.  If it is marked for deletion then */
 /* pretend it does not exist.                                               */
 /* ------------------------------------------------------------------------ */
-void *
+static void *
 ipf_pool_find(unit, name)
 	int unit;
 	char *name;
@@ -368,6 +523,21 @@ ipf_pool_find(unit, name)
 }
 
 
+static void *
+ipf_pool_select_add_ref(unit, name)
+	int unit;
+	char *name;
+{
+	ip_pool_t *p;
+
+	p = ipf_pool_find(unit, name);
+	if (p != NULL) {
+		ATOMIC_INC32(p->ipo_ref);
+	}
+	return p;
+}
+
+
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_pool_findeq                                             */
 /* Returns:     int     - 0 = success, else error                           */
@@ -377,19 +547,16 @@ ipf_pool_find(unit, name)
 /*                                                                          */
 /* Searches for an exact match of an entry in the pool.                     */
 /* ------------------------------------------------------------------------ */
-ip_pool_node_t *
+static ip_pool_node_t *
 ipf_pool_findeq(ipo, addr, mask)
 	ip_pool_t *ipo;
 	addrfamily_t *addr, *mask;
 {
 	struct radix_node *n;
-	SPL_INT(s);
 
-	SPL_NET(s);
 	RADIX_NODE_HEAD_LOCK(ipo->ipo_head);
 	n = ipo->ipo_head->rnh_lookup(addr, mask, ipo->ipo_head);
 	RADIX_NODE_HEAD_UNLOCK(ipo->ipo_head);
-	SPL_X(s);
 	return (ip_pool_node_t *)n;
 }
 
@@ -403,7 +570,7 @@ ipf_pool_findeq(ipo, addr, mask)
 /*                                                                          */
 /* Search the pool for a given address and return a search result.          */
 /* ------------------------------------------------------------------------ */
-int
+static int
 ipf_pool_search(tptr, ipversion, dptr)
 	void *tptr;
 	int ipversion;
@@ -468,7 +635,7 @@ ipf_pool_search(tptr, ipversion, dptr)
 /* Add another node to the pool given by ipo.  The three parameters passed  */
 /* in (addr, mask, info) shold all be stored in the node.                   */
 /* ------------------------------------------------------------------------ */
-int
+static int
 ipf_pool_insert(ipo, node)
 	ip_pool_t *ipo;
 	struct ip_pool_node *node;
@@ -543,7 +710,7 @@ ipf_pool_insert(ipo, node)
 /* as this likely means we've tried to free a pool that is in use (flush)   */
 /* and now want to repopulate it with "new" data.                           */
 /* ------------------------------------------------------------------------ */
-int
+static int
 ipf_pool_create(op)
 	iplookupop_t *op;
 {
@@ -635,7 +802,7 @@ ipf_pool_create(op)
 /*                                                                          */
 /* Remove a node from the pool given by ipo.                                */
 /* ------------------------------------------------------------------------ */
-int
+static int
 ipf_pool_remove(ipo, ipe)
 	ip_pool_t *ipo;
 	ip_pool_node_t *ipe;
@@ -671,7 +838,7 @@ ipf_pool_remove(ipo, ipe)
 /* may not be initialised, we can't use an ASSERT to enforce the locking    */
 /* assertion that one of the two (ipf_poolrw,ipf_global) is held.           */
 /* ------------------------------------------------------------------------ */
-int
+static int
 ipf_pool_destroy(unit, name)
 	int unit;
 	char *name;
@@ -708,7 +875,7 @@ ipf_pool_destroy(unit, name)
 /* may not be initialised, we can't use an ASSERT to enforce the locking    */
 /* assertion that one of the two (ipf_poolrw,ipf_global) is held.           */
 /* ------------------------------------------------------------------------ */
-int
+static size_t
 ipf_pool_flush(fp)
 	iplookupflush_t *fp;
 {
@@ -751,7 +918,7 @@ ipf_pool_flush(fp)
 /* may not be initialised, we can't use an ASSERT to enforce the locking    */
 /* assertion that one of the two (ipf_poolrw,ipf_global) is held.           */
 /* ------------------------------------------------------------------------ */
-void
+static void
 ipf_pool_free(ipo)
 	ip_pool_t *ipo;
 {
@@ -810,10 +977,11 @@ ipf_pool_clearnodes(ipo)
 /* Drop the number of known references to this pool structure by one and if */
 /* we arrive at zero known references, free it.                             */
 /* ------------------------------------------------------------------------ */
-void
-ipf_pool_deref(ipo)
-	ip_pool_t *ipo;
+static int
+ipf_pool_deref(arg)
+	void *arg;
 {
+	ip_pool_t *ipo = arg;
 
 	ipo->ipo_ref--;
 
@@ -822,6 +990,8 @@ ipf_pool_deref(ipo)
 
 	else if ((ipo->ipo_ref == 1) && (ipo->ipo_flags & IPOOL_DELETE))
 		ipf_pool_destroy(ipo->ipo_unit, ipo->ipo_name);
+
+	return 0;
 }
 
 
@@ -834,7 +1004,7 @@ ipf_pool_deref(ipo)
 /* Drop a reference to the pool node passed in and if we're the last, free  */
 /* it all up and adjust the stats accordingly.                              */
 /* ------------------------------------------------------------------------ */
-void
+static void
 ipf_pool_node_deref(ipn)
 	ip_pool_node_t *ipn;
 {
@@ -849,14 +1019,14 @@ ipf_pool_node_deref(ipn)
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    ipf_pool_getnext                                            */
+/* Function:    ipf_pool_iter_next                                          */
 /* Returns:     void                                                        */
 /* Parameters:  token(I) - pointer to pool structure                        */
 /* Parameters:  ilp(IO)   - pointer to pool iterating structure             */
 /*                                                                          */
 /* ------------------------------------------------------------------------ */
-int
-ipf_pool_getnext(token, ilp)
+static int
+ipf_pool_iter_next(token, ilp)
 	ipftoken_t *token;
 	ipflookupiter_t *ilp;
 {
@@ -968,39 +1138,37 @@ ipf_pool_getnext(token, ilp)
 /* Locks:       WRITE(ipf_poolrw)                                           */
 /*                                                                          */
 /* ------------------------------------------------------------------------ */
-void
-ipf_pool_iterderef(otype, unit, data)
-	u_int otype;
+static int
+ipf_pool_iter_deref(otype, unit, data)
+	int otype;
 	int unit;
 	void *data;
 {
 
 	if (data == NULL)
-		return;
+		return EINVAL;
 
 	if (unit < 0 || unit > IPL_LOGMAX)
-		return;
+		return EINVAL;
 
 	switch (otype)
 	{
 	case IPFLOOKUPITER_LIST :
-		WRITE_ENTER(&ipf_poolrw);
 		ipf_pool_deref((ip_pool_t *)data);
-		RWLOCK_EXIT(&ipf_poolrw);
 		break;
 
 	case IPFLOOKUPITER_NODE :
-		WRITE_ENTER(&ipf_poolrw);
 		ipf_pool_node_deref((ip_pool_node_t *)data);
-		RWLOCK_EXIT(&ipf_poolrw);
 		break;
 	default :
 		break;
 	}
+
+	return 0;
 }
 
 
-# if defined(_KERNEL) && ((BSD >= 198911) && !defined(__osf__) && \
+#if defined(_KERNEL) && ((BSD >= 198911) && !defined(__osf__) && \
       !defined(__hpux) && !defined(__sgi))
 static int
 rn_freenode(struct radix_node *n, void *p)
@@ -1036,5 +1204,4 @@ rn_freehead(rnh)
 
 	Free(rnh);
 }
-# endif
-#endif /* IPFILTER_LOOKUP */
+#endif

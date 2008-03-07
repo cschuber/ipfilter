@@ -24,6 +24,7 @@
 # include <sys/ioctl.h>
 #endif
 #if !defined(_KERNEL)
+# include <stdio.h>
 # include <string.h>
 # define _KERNEL
 # ifdef __OpenBSD__
@@ -52,9 +53,10 @@ struct file;
 
 #include "netinet/ip_compat.h"
 #include "netinet/ip_fil.h"
+#include "netinet/ip_lookup.h"
 #include "netinet/ip_pool.h"
 #include "netinet/ip_htable.h"
-#include "netinet/ip_lookup.h"
+#include "netinet/ip_dstlist.h"
 /* END OF INCLUDES */
 
 #if !defined(lint)
@@ -73,6 +75,13 @@ static int ipf_lookup_flush __P((caddr_t));
 static int ipf_lookup_iterate __P((void *, int, void *));
 static int ipf_lookup_deltok __P((void *, int, void *));
 
+static ipf_lookup_t *backends[] = {
+	&ipf_pool_backend,
+	&ipf_htable_backend,
+	&ipf_dstlist_backend
+};
+
+#define	MAX_BACKENDS	(sizeof(backends)/sizeof(backends[0]))
 
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_lookup_init                                             */
@@ -85,12 +94,17 @@ int
 ipf_lookup_init()
 {
 
-	if (ipf_pool_init() == -1)
-		return -1;
+	int i;
 
 	RWLOCK_INIT(&ipf_poolrw, "ip pool rwlock");
-
 	ipf_lookup_inited = 1;
+
+	for (i = 0; i < MAX_BACKENDS; i++) {
+		if (backends[i]->ipfl_init != NULL) {
+			if ((*backends[i]->ipfl_init)() == -1)
+				return -1;
+		}
+	}
 
 	return 0;
 }
@@ -108,12 +122,14 @@ ipf_lookup_init()
 void
 ipf_lookup_unload()
 {
-	ipf_pool_fini();
-	ipf_htable_unload();
+	int i;
+
+	for (i = 0; i < MAX_BACKENDS; i++) {
+		(*backends[i]->ipfl_fini)();
+	}
 
 	if (ipf_lookup_inited == 1) {
 		RW_DESTROY(&ipf_poolrw);
-		ipf_lookup_inited = 0;
 	}
 }
 
@@ -216,12 +232,9 @@ static int
 ipf_lookup_addnode(data)
 	caddr_t data;
 {
-	ip_pool_node_t node, *m;
 	iplookupop_t op;
-	iphtable_t *iph;
-	iphtent_t hte;
-	ip_pool_t *p;
 	int err;
+	int i;
 
 	err = BCOPYIN(data, &op, sizeof(op));
 	if (err != 0) {
@@ -236,69 +249,18 @@ ipf_lookup_addnode(data)
 
 	op.iplo_name[sizeof(op.iplo_name) - 1] = '\0';
 
-	switch (op.iplo_type)
-	{
-	case IPLT_POOL :
-		if (op.iplo_size != sizeof(node)) {
-			ipf_interror = 50004;
-			return EINVAL;
+	for (i = 0; i < MAX_BACKENDS; i++) {
+		if (op.iplo_type == backends[i]->ipfl_type) {
+			err = (*backends[i]->ipfl_node_add)(&op);
+			break;
 		}
+	}
 
-		err = COPYIN(op.iplo_struct, &node, sizeof(node));
-		if (err != 0) {
-			ipf_interror = 50005;
-			return EFAULT;
-		}
-
-		if (node.ipn_addr.adf_family != node.ipn_mask.adf_family) {
-			ipf_interror = 50006;
-			return EINVAL;
-		}
-
-		p = ipf_pool_find(op.iplo_unit, op.iplo_name);
-		if (p == NULL) {
-			ipf_interror = 50007;
-			return ESRCH;
-		}
-
-		/*
-		 * add an entry to a pool - return an error if it already
-		 * exists remove an entry from a pool - if it exists
-		 * - in both cases, the pool *must* exist!
-		 */
-		m = ipf_pool_findeq(p, &node.ipn_addr, &node.ipn_mask);
-		if (m) {
-			ipf_interror = 50008;
-			return EEXIST;
-		}
-		err = ipf_pool_insert(p, &node);
-		break;
-
-	case IPLT_HASH :
-		if (op.iplo_size != sizeof(hte)) {
-			ipf_interror = 50009;
-			return EINVAL;
-		}
-
-		err = COPYIN(op.iplo_struct, &hte, sizeof(hte));
-		if (err != 0) {
-			ipf_interror = 50010;
-			return EFAULT;
-		}
-
-		iph = ipf_htable_find(op.iplo_unit, op.iplo_name);
-		if (iph == NULL) {
-			ipf_interror = 50011;
-			return ESRCH;
-		}
-		err = ipf_htent_insert(iph, &hte);
-		break;
-
-	default :
+	if (i == MAX_BACKENDS) {
 		ipf_interror = 50012;
 		err = EINVAL;
-		break;
 	}
+
 	return err;
 }
 
@@ -315,12 +277,9 @@ static int
 ipf_lookup_delnode(data)
 	caddr_t data;
 {
-	ip_pool_node_t node, *m;
 	iplookupop_t op;
-	iphtable_t *iph;
-	iphtent_t hte;
-	ip_pool_t *p;
 	int err;
+	int i;
 
 	err = BCOPYIN(data, &op, sizeof(op));
 	if (err != 0) {
@@ -335,58 +294,16 @@ ipf_lookup_delnode(data)
 
 	op.iplo_name[sizeof(op.iplo_name) - 1] = '\0';
 
-	switch (op.iplo_type)
-	{
-	case IPLT_POOL :
-		if (op.iplo_size != sizeof(node)) {
-			ipf_interror = 50014;
-			return EINVAL;
+	for (i = 0; i < MAX_BACKENDS; i++) {
+		if (op.iplo_type == backends[i]->ipfl_type) {
+			err = (*backends[i]->ipfl_node_del)(&op);
+			break;
 		}
+	}
 
-		err = COPYIN(op.iplo_struct, &node, sizeof(node));
-		if (err != 0) {
-			ipf_interror = 50015;
-			return EFAULT;
-		}
-
-		p = ipf_pool_find(op.iplo_unit, op.iplo_name);
-		if (p == NULL) {
-			ipf_interror = 50016;
-			return ESRCH;
-		}
-
-		m = ipf_pool_findeq(p, &node.ipn_addr, &node.ipn_mask);
-		if (m == NULL) {
-			ipf_interror = 50017;
-			return ENOENT;
-		}
-		err = ipf_pool_remove(p, m);
-		break;
-
-	case IPLT_HASH :
-		if (op.iplo_size != sizeof(hte)) {
-			ipf_interror = 50018;
-			return EINVAL;
-		}
-
-		err = COPYIN(op.iplo_struct, &hte, sizeof(hte));
-		if (err != 0) {
-			ipf_interror = 50019;
-			return EFAULT;
-		}
-
-		iph = ipf_htable_find(op.iplo_unit, op.iplo_name);
-		if (iph == NULL) {
-			ipf_interror = 50020;
-			return ESRCH;
-		}
-		err = ipf_htent_remove(iph, &hte);
-		break;
-
-	default :
+	if (i == MAX_BACKENDS) {
 		ipf_interror = 50021;
 		err = EINVAL;
-		break;
 	}
 	return err;
 }
@@ -405,7 +322,7 @@ ipf_lookup_addtable(data)
 	caddr_t data;
 {
 	iplookupop_t op;
-	int err;
+	int err, i;
 
 	err = BCOPYIN(data, &op, sizeof(op));
 	if (err != 0) {
@@ -420,30 +337,16 @@ ipf_lookup_addtable(data)
 
 	op.iplo_name[sizeof(op.iplo_name) - 1] = '\0';
 
-	switch (op.iplo_type)
-	{
-	case IPLT_POOL :
-		if (ipf_pool_find(op.iplo_unit, op.iplo_name) != NULL) {
-			ipf_interror = 50024;
-			err = EEXIST;
-		} else {
-			err = ipf_pool_create(&op);
+	for (i = 0; i < MAX_BACKENDS; i++) {
+		if (op.iplo_type == backends[i]->ipfl_type) {
+			err = (*backends[i]->ipfl_table_add)(&op);
+			break;
 		}
-		break;
+	}
 
-	case IPLT_HASH :
-		if (ipf_htable_find(op.iplo_unit, op.iplo_name) != NULL) {
-			ipf_interror = 50025;
-			err = EEXIST;
-		} else {
-			err = ipf_htable_create(&op);
-		}
-		break;
-
-	default :
+	if (i == MAX_BACKENDS) {
 		ipf_interror = 50026;
 		err = EINVAL;
-		break;
 	}
 
 	/*
@@ -475,7 +378,7 @@ ipf_lookup_deltable(data)
 	caddr_t data;
 {
 	iplookupop_t op;
-	int err;
+	int err, i;
 
 	err = BCOPYIN(data, &op, sizeof(op));
 	if (err != 0) {
@@ -490,24 +393,16 @@ ipf_lookup_deltable(data)
 
 	op.iplo_name[sizeof(op.iplo_name) - 1] = '\0';
 
-	/*
-	 * create a new pool - fail if one already exists with
-	 * the same #
-	 */
-	switch (op.iplo_type)
-	{
-	case IPLT_POOL :
-		err = ipf_pool_destroy(op.iplo_unit, op.iplo_name);
-		break;
+	for (i = 0; i < MAX_BACKENDS; i++) {
+		if (op.iplo_type == backends[i]->ipfl_type) {
+			err = (*backends[i]->ipfl_table_del)(&op);
+			break;
+		}
+	}
 
-	case IPLT_HASH :
-		err = ipf_htable_destroy(op.iplo_unit, op.iplo_name);
-		break;
-
-	default :
+	if (i == MAX_BACKENDS) {
 		ipf_interror = 50030;
 		err = EINVAL;
-		break;
 	}
 	return err;
 }
@@ -526,6 +421,7 @@ ipf_lookup_stats(data)
 {
 	iplookupop_t op;
 	int err;
+	int i;
 
 	err = BCOPYIN(data, &op, sizeof(op));
 	if (err != 0) {
@@ -538,21 +434,18 @@ ipf_lookup_stats(data)
 		return EINVAL;
 	}
 
-	switch (op.iplo_type)
-	{
-	case IPLT_POOL :
-		err = ipf_pool_getstats(&op);
-		break;
+	for (i = 0; i < MAX_BACKENDS; i++) {
+		if (op.iplo_type == backends[i]->ipfl_type) {
+			err = (*backends[i]->ipfl_stats_get)(&op);
+			break;
+		}
+	}
 
-	case IPLT_HASH :
-		err = ipf_htable_getstats(&op);
-		break;
-
-	default :
+	if (i == MAX_BACKENDS) {
 		ipf_interror = 50033;
 		err = EINVAL;
-		break;
 	}
+
 	return err;
 }
 
@@ -569,7 +462,7 @@ static int
 ipf_lookup_flush(data)
 	caddr_t data;
 {
-	int err, unit, num, type;
+	int err, unit, num, type, i;
 	iplookupflush_t flush;
 
 	err = BCOPYIN(data, &flush, sizeof(flush));
@@ -591,14 +484,11 @@ ipf_lookup_flush(data)
 	err = EINVAL;
 	num = 0;
 
-	if (type == IPLT_POOL || type == IPLT_ALL) {
-		err = 0;
-		num = ipf_pool_flush(&flush);
-	}
-
-	if (type == IPLT_HASH  || type == IPLT_ALL) {
-		err = 0;
-		num += ipf_htable_flush(&flush);
+	for (i = 0; i < MAX_BACKENDS; i++) {
+		if (type == backends[i]->ipfl_type || type == IPLT_ALL) {
+			err = 0;
+			num += (*backends[i]->ipfl_flush)(&flush);
+		}
 	}
 
 	if (err == 0) {
@@ -627,21 +517,19 @@ ipf_lookup_deref(type, ptr)
 	int type;
 	void *ptr;
 {
+	int i;
+
 	if (ptr == NULL)
 		return;
 
-	WRITE_ENTER(&ipf_poolrw);
-	switch (type)
-	{
-	case IPLT_POOL :
-		ipf_pool_deref(ptr);
-		break;
-
-	case IPLT_HASH :
-		ipf_htable_deref(ptr);
-		break;
+	for (i = 0; i < MAX_BACKENDS; i++) {
+		if (type == backends[i]->ipfl_type) {
+			WRITE_ENTER(&ipf_poolrw);
+			(*backends[i]->ipfl_table_deref)(ptr);
+			RWLOCK_EXIT(&ipf_poolrw);
+			break;
+		}
 	}
-	RWLOCK_EXIT(&ipf_poolrw);
 }
 
 
@@ -662,7 +550,7 @@ ipf_lookup_iterate(data, uid, ctx)
 {
 	ipflookupiter_t iter;
 	ipftoken_t *token;
-	int err;
+	int err, i;
 	SPL_INT(s);
 
 	err = ipf_inobj(data, &iter, IPFOBJ_LOOKUPITER);
@@ -688,21 +576,19 @@ ipf_lookup_iterate(data, uid, ctx)
 		return ESRCH;
 	}
 
-	switch (iter.ili_type)
-	{
-	case IPLT_POOL :
-		err = ipf_pool_getnext(token, &iter);
-		break;
-	case IPLT_HASH :
-		err = ipf_htable_getnext(token, &iter);
-		break;
-	default :
-		ipf_interror = 50041;
-		err = EINVAL;
-		break;
+	for (i = 0; i < MAX_BACKENDS; i++) {
+		if (iter.ili_type == backends[i]->ipfl_type) {
+			err = (*backends[i]->ipfl_iter_next)(token, &iter);
+			break;
+		}
 	}
 	RWLOCK_EXIT(&ipf_tokens);
 	SPL_X(s);
+
+	if (i == MAX_BACKENDS) {
+		ipf_interror = 50041;
+		err = EINVAL;
+	}
 
 	return err;
 }
@@ -721,24 +607,27 @@ ipf_lookup_iterderef(type, data)
 	u_32_t type;
 	void *data;
 {
-	iplookupiterkey_t	key;
+	struct iplookupiterkey *lkey;
+	iplookupiterkey_t key;
+	int i;
 
 	key.ilik_key = type;
+	lkey = &key.ilik_unstr;
 
-	if (key.ilik_unstr.ilik_ival != IPFGENITER_LOOKUP)
+	if (lkey->ilik_ival != IPFGENITER_LOOKUP)
 		return;
 
-	switch (key.ilik_unstr.ilik_type)
-	{
-	case IPLT_POOL :
-		ipf_pool_iterderef((u_int)key.ilik_unstr.ilik_otype,
-				  (int)key.ilik_unstr.ilik_unit, data);
-		break;
-	case IPLT_HASH :
-		ipf_htable_iterderef((u_int)key.ilik_unstr.ilik_otype,
-				    (int)key.ilik_unstr.ilik_unit, data);
-		break;
+	WRITE_ENTER(&ipf_poolrw);
+
+	for (i = 0; i < MAX_BACKENDS; i++) {
+		if (type == backends[i]->ipfl_type) {
+			(*backends[i]->ipfl_iter_deref)(lkey->ilik_otype,
+							lkey->ilik_unit,
+							data);
+			break;
+		}
 	}
+	RWLOCK_EXIT(&ipf_poolrw);
 }
 
 
@@ -771,16 +660,82 @@ ipf_lookup_deltok(data, uid, ctx)
 }
 
 
-#else /* IPFILTER_LOOKUP */
-
-/*ARGSUSED*/
-int
-ipf_lookup_ioctl(data, cmd, mode, uid, ctx)
-	caddr_t data;
-	ioctlcmd_t cmd;
-	int mode, uid;
-	void *ctx;
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_lookup_res_num                                          */
+/* Returns:     void * - NULL = failure, else success.                      */
+/* Parameters:  unit(I)     - device for which this is for                  */
+/*              type(I)     - type of lookup these parameters are for.      */
+/*              number(I)   - table number to use when searching            */
+/*              funcptr(IO) - pointer to pointer for storing IP address     */
+/*                            searching function.                           */
+/*                                                                          */
+/* Search for the "table" number passed in amongst those configured for     */
+/* that particular type.  If the type is recognised then the function to    */
+/* call to do the IP address search will be change, regardless of whether   */
+/* or not the "table" number exists.                                        */
+/* ------------------------------------------------------------------------ */
+void *
+ipf_lookup_res_num(type, unit, number, funcptr)
+	u_int type;
+	int unit;
+	u_int number;
+	lookupfunc_t *funcptr;
 {
-	return EIO;
+	char name[FR_GROUPLEN];
+
+#if defined(SNPRINTF) && defined(_KERNEL)
+	SNPRINTF(name, sizeof(name), "%u", number);
+#else
+	(void) sprintf(name, "%u", number);
+#endif
+
+	return ipf_lookup_res_name(type, unit, name, funcptr);
 }
-#endif /* IPFILTER_LOOKUP */
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_lookup_res_name                                         */
+/* Returns:     void * - NULL = failure, else success.                      */
+/* Parameters:  unit(I)     - device for which this is for                  */
+/*              type(I)     - type of lookup these parameters are for.      */
+/*              name(I)     - table name to use when searching              */
+/*              funcptr(IO) - pointer to pointer for storing IP address     */
+/*                            searching function.                           */
+/*                                                                          */
+/* Search for the "table" number passed in amongst those configured for     */
+/* that particular type.  If the type is recognised then the function to    */
+/* call to do the IP address search will be change, regardless of whether   */
+/* or not the "table" number exists.                                        */
+/* ------------------------------------------------------------------------ */
+void *
+ipf_lookup_res_name(type, unit, name, funcptr)
+	u_int type;
+	int unit;
+	char *name;
+	lookupfunc_t *funcptr;
+{
+	void *ptr;
+	int i;
+
+	READ_ENTER(&ipf_poolrw);
+
+	for (i = 0; i < MAX_BACKENDS; i++) {
+		if (type == backends[i]->ipfl_type) {
+			ptr = (*backends[i]->ipfl_select_add_ref)(unit, name);
+			if (ptr != NULL && funcptr != NULL) {
+				*funcptr = backends[i]->ipfl_addr_find;
+			}
+			break;
+		}
+	}
+
+	if (i == MAX_BACKENDS) {
+		ptr = NULL;
+		if (funcptr != NULL)
+			*funcptr = NULL;
+	}
+
+	RWLOCK_EXIT(&ipf_poolrw);
+
+	return ptr;
+}

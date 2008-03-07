@@ -113,6 +113,7 @@ ippr_rcmd_new(fin, aps, nat)
 	ipn->in_ndstmsk = 0xffffffff;
 	ipn->in_pr[0] = IPPROTO_TCP;
 	ipn->in_pr[1] = IPPROTO_TCP;
+	MUTEX_INIT(&ipn->in_lock, "rcmd proxy NAT rule");
 
 	bcopy(nat->nat_ptr->in_ifnames[0], ipn->in_ifnames[0],
 	      sizeof(ipn->in_ifnames[0]));

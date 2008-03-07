@@ -606,7 +606,7 @@ ipf_fastroute(m0, mpp, fin, fdp)
 
 	fr = fin->fin_fr;
 	if (fdp != NULL)
-		ifp = fdp->fd_ifp;
+		ifp = fdp->fd_ptr;
 	else
 		ifp = fin->fin_ifp;
 

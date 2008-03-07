@@ -43,7 +43,7 @@ INSTALL=install
 #
 MODOBJS=ip_fil.o fil.o ml_ipl.o ip_nat.o ip_frag.o ip_state.o ip_proxy.o \
 	ip_auth.o ip_log.o ip_pool.o ip_htable.o ip_lookup.o ip_rules.o \
-	ip_scan.o ip_sync.o ip_nat6.o
+	ip_scan.o ip_sync.o ip_nat6.o ip_dstlist.o
 #	ip_trafcon.o
 DFLAGS=$(IPFLKM) $(IPFLOG) $(LOOKUP) $(SYNC) $(DEF) $(DLKM) $(IPFBPF)
 IPF=ipf.o ipfcomp.o ipf_y.o ipf_l.o bpf_filter_u.o
@@ -51,7 +51,7 @@ IPT=ipftest.o fil_u.o ip_frag_u.o ip_state_u.o ip_nat_u.o ip_nat6_u.o \
     ip_proxy_u.o ip_auth_u.o ip_htable_u.o ip_lookup_u.o ip_pool_u.o \
     ip_scan_u.o ip_sync_u.o ip_rules_u.o ip_fil_u.o ip_log_u.o \
     ippool_y.o ippool_l.o ipf_y.o ipf_l.o ipnat_y.o ipnat_l.o \
-    md5_u.o radix_u.o bpf_filter_u.o
+    md5_u.o radix_u.o bpf_filter_u.o ip_dstlist_u.o
 #   ip_syn_u.o
 #ip_trafcon_u.o
 TOOL=$(TOP)/tools
@@ -224,8 +224,13 @@ ip_htable_u.o: $(TOP)/ip_htable.c $(TOP)/ip_compat.h $(TOP)/ip_fil.h \
 	$(TOP)/ip_htable.h
 	$(CC) $(CCARGS) $(EXTRA) -c $(TOP)/ip_htable.c -o $@
 
+ip_dstlist_u.o: $(TOP)/ip_dstlist.c $(TOP)/ip_compat.h $(TOP)/ip_fil.h \
+	$(TOP)/ip_dstlist.h
+	$(CC) $(CCARGS) $(EXTRA) -c $(TOP)/ip_dstlist.c -o $@
+
 ip_lookup_u.o: $(TOP)/ip_lookup.c $(TOP)/ip_compat.h $(TOP)/ip_fil.h \
-	$(TOP)/ip_lookup.h $(TOP)/ip_pool.h $(TOP)/ip_htable.h
+	$(TOP)/ip_lookup.h $(TOP)/ip_pool.h $(TOP)/ip_htable.h \
+	$(TOP)/ip_dstlist.h
 	$(CC) $(CCARGS) $(EXTRA) -c $(TOP)/ip_lookup.c -o $@
 
 ip_trafcon_u.o: $(TOP)/ip_trafcon.c $(TOP)/ip_compat.h $(TOP)/ip_fil.h \
@@ -313,8 +318,13 @@ ip_htable.o: $(TOP)/ip_htable.c $(TOP)/ip_compat.h $(TOP)/ip_fil.h \
 	$(TOP)/ip_lookup.h $(TOP)/ip_htable.h
 	$(CC) $(KCARGS) $(DFLAGS) -c $(TOP)/ip_htable.c -o $@
 
+ip_dstlist.o: $(TOP)/ip_dstlist.c $(TOP)/ip_compat.h $(TOP)/ip_fil.h \
+	$(TOP)/ip_lookup.h $(TOP)/ip_dstlist.h
+	$(CC) $(KCARGS) $(DFLAGS) -c $(TOP)/ip_dstlist.c -o $@
+
 ip_lookup.o: $(TOP)/ip_lookup.c $(TOP)/ip_compat.h $(TOP)/ip_fil.h \
-	$(TOP)/ip_pool.h $(TOP)/ip_htable.h $(TOP)/ip_lookup.h
+	$(TOP)/ip_pool.h $(TOP)/ip_htable.h $(TOP)/ip_lookup.h \
+	$(TOP)/ip_dstlist.h
 	$(CC) $(KCARGS) $(DFLAGS) -c $(TOP)/ip_lookup.c -o $@
 
 ip_trafcon.o: $(TOP)/ip_trafcon.c $(TOP)/ip_compat.h $(TOP)/ip_fil.h \

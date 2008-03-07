@@ -189,9 +189,7 @@ int	ipf_features = 0
 #ifdef	IPFILTER_LOG
 		| IPF_FEAT_LOG
 #endif
-#ifdef	IPFILTER_LOOKUP
 		| IPF_FEAT_LOOKUP
-#endif
 #ifdef	IPFILTER_BPF
 		| IPF_FEAT_BPF
 #endif
@@ -226,9 +224,7 @@ static	int		ipf_fr_matcharray __P((fr_info_t *, int *));
 static	int		ipf_frruleiter __P((void *, int, void *));
 static	int		ipf_funcinit __P((frentry_t *fr));
 static	int		ipf_geniter __P((ipftoken_t *, ipfgeniter_t *));
-#ifdef	IPFILTER_LOOKUP
 static	int		ipf_grpmapinit __P((frentry_t *fr));
-#endif
 static	int		ipf_portcheck __P((frpcmp_t *, u_32_t));
 static	INLINE int	ipf_pr_ah __P((fr_info_t *));
 static	INLINE void	ipf_pr_esp __P((fr_info_t *));
@@ -310,10 +306,8 @@ static const	struct	optlist	secopt[8] = {
  * Table of functions available for use with call rules.
  */
 static ipfunc_resolve_t ipf_availfuncs[] = {
-#ifdef	IPFILTER_LOOKUP
 	{ "srcgrpmap", ipf_srcgrpmap, ipf_grpmapinit, NULL },
 	{ "dstgrpmap", ipf_dstgrpmap, ipf_grpmapinit, NULL },
-#endif
 	{ "checkstate", ipf_state_check, NULL, ipf_specfuncref[0] },
 	{ "natin", ipf_nat_ipfin, NULL, ipf_specfuncref[1] },
 	{ "natout", ipf_nat_ipfout, NULL, ipf_specfuncref[2] },
@@ -2095,7 +2089,6 @@ ipf_check_ipf(fin, fr, portcmp)
 	/*
 	 * Check the source address.
 	 */
-#ifdef	IPFILTER_LOOKUP
 	if (fr->fr_satype == FRI_LOOKUP) {
 		i = (*fr->fr_srcfunc)(fr->fr_srcptr, fi->fi_v, lip);
 		if (i == -1)
@@ -2104,7 +2097,6 @@ ipf_check_ipf(fin, fr, portcmp)
 		lm += 3;
 		ld += 3;
 	} else {
-#endif
 		i = ((*lip & *lm) != *ld);
 		FR_DEBUG(("2a. %#08x & %#08x != %#08x\n",
 			   ntohl(*lip), ntohl(*lm), ntohl(*ld)));
@@ -2126,9 +2118,7 @@ ipf_check_ipf(fin, fr, portcmp)
 			lm += 3;
 			ld += 3;
 		}
-#ifdef	IPFILTER_LOOKUP
 	}
-#endif
 	i ^= (fr->fr_flags & FR_NOTSRCIP) >> 6;
 	if (i != 0)
 		return 1;
@@ -2137,7 +2127,6 @@ ipf_check_ipf(fin, fr, portcmp)
 	 * Check the destination address.
 	 */
 	lip++, lm++, ld++;
-#ifdef	IPFILTER_LOOKUP
 	if (fr->fr_datype == FRI_LOOKUP) {
 		i = (*fr->fr_dstfunc)(fr->fr_dstptr, fi->fi_v, lip);
 		if (i == -1)
@@ -2146,7 +2135,6 @@ ipf_check_ipf(fin, fr, portcmp)
 		lm += 3;
 		ld += 3;
 	} else {
-#endif
 		i = ((*lip & *lm) != *ld);
 		FR_DEBUG(("3a. %#08x & %#08x != %#08x\n",
 			   ntohl(*lip), ntohl(*lm), ntohl(*ld)));
@@ -2168,9 +2156,7 @@ ipf_check_ipf(fin, fr, portcmp)
 			lm += 3;
 			ld += 3;
 		}
-#ifdef	IPFILTER_LOOKUP
 	}
-#endif
 	i ^= (fr->fr_flags & FR_NOTDSTIP) >> 7;
 	if (i != 0)
 		return 1;
@@ -2314,7 +2300,7 @@ ipf_scanlist(fin, pass)
 
 			if (*fin->fin_mp == NULL)
 				continue;
-			if (fin->fin_v != fr->fr_v)
+			if (fin->fin_family != fr->fr_family)
 				continue;
 			mc = (u_char *)fin->fin_m;
 			wlen = fin->fin_dlen + fin->fin_hlen;
@@ -2337,7 +2323,7 @@ ipf_scanlist(fin, pass)
 
 		case FR_T_IPFEXPR :
 		case FR_T_IPFEXPR|FR_T_BUILTIN :
-			if (fin->fin_v != fr->fr_v)
+			if (fin->fin_family != fr->fr_family)
 				continue;
 			if (ipf_fr_matcharray(fin, fr->fr_data) == 0)
 				continue;
@@ -2892,7 +2878,7 @@ ipf_check(ip, hlen, ifp, out
 		(void) ipf_acctpkt(fin, NULL);
 
 	if (fr == NULL) {
-		if ((fin->fin_flx & (FI_FRAG|FI_BAD)) == FI_FRAG) {
+		if ((fin->fin_flx & FI_FRAG) != 0) {
 			fr = ipf_frag_known(fin, &pass);
 			/*
 			 * Reset the keep state flag here so that we don't
@@ -3069,8 +3055,8 @@ filterdone:
 			 */
 			(void) ipf_fastroute(fin->fin_m, mp, fin, NULL);
 			m = *mp = NULL;
-		} else if ((fdp->fd_ifp != NULL) &&
-			   (fdp->fd_ifp != (struct ifnet *)-1)) {
+		} else if ((fdp->fd_ptr != NULL) &&
+			   (fdp->fd_ptr != (struct ifnet *)-1)) {
 			/* this is for to rules: */
 			(void) ipf_fastroute(fin->fin_m, mp, fin, fdp);
 			m = *mp = NULL;
@@ -4078,7 +4064,7 @@ ipf_synclist(fr, ifp)
 	int v, i;
 
 	for (; fr; fr = fr->fr_next) {
-		v = fr->fr_v;
+		v = fr->fr_family;
 
 		/*
 		 * Lookup all the interface names that are part of the rule.
@@ -4105,39 +4091,37 @@ ipf_synclist(fr, ifp)
 		}
 
 		fdp = &fr->fr_tifs[0];
-		if ((ifp == NULL) || (fdp->fd_ifp == ifp))
+		if ((ifp == NULL) || (fdp->fd_ptr == ifp))
 			ipf_resolvedest(fdp, v);
 
 		fdp = &fr->fr_tifs[1];
-		if ((ifp == NULL) || (fdp->fd_ifp == ifp))
+		if ((ifp == NULL) || (fdp->fd_ptr == ifp))
 			ipf_resolvedest(fdp, v);
 
 		fdp = &fr->fr_dif;
-		if ((ifp == NULL) || (fdp->fd_ifp == ifp)) {
+		if ((ifp == NULL) || (fdp->fd_ptr == ifp)) {
 			ipf_resolvedest(fdp, v);
 
 			fr->fr_flags &= ~FR_DUP;
-			if ((fdp->fd_ifp != (void *)-1) &&
-			    (fdp->fd_ifp != NULL))
+			if ((fdp->fd_ptr != (void *)-1) &&
+			    (fdp->fd_ptr != NULL))
 				fr->fr_flags |= FR_DUP;
 		}
 
-#ifdef	IPFILTER_LOOKUP
 		if (fr->fr_type == FR_T_IPF && fr->fr_satype == FRI_LOOKUP &&
 		    fr->fr_srcptr == NULL) {
-			fr->fr_srcptr = ipf_resolvelookup(IPL_LOGIPF,
-							 fr->fr_srctype,
-							 fr->fr_srcnum,
-							 &fr->fr_srcfunc);
+			fr->fr_srcptr = ipf_lookup_res_num(fr->fr_srctype,
+							   IPL_LOGIPF,
+							   fr->fr_srcnum,
+							   &fr->fr_srcfunc);
 		}
 		if (fr->fr_type == FR_T_IPF && fr->fr_datype == FRI_LOOKUP &&
 		    fr->fr_dstptr == NULL) {
-			fr->fr_dstptr = ipf_resolvelookup(IPL_LOGIPF,
-							 fr->fr_dsttype,
-							 fr->fr_dstnum,
-							 &fr->fr_dstfunc);
+			fr->fr_dstptr = ipf_lookup_res_num(fr->fr_dsttype,
+							   IPL_LOGIPF,
+							   fr->fr_dstnum,
+							   &fr->fr_dstfunc);
 		}
-#endif
 	}
 }
 
@@ -4430,75 +4414,6 @@ ipf_matchicmpqueryreply(v, ic, icmp, rev)
 }
 
 
-#ifdef	IPFILTER_LOOKUP
-/* ------------------------------------------------------------------------ */
-/* Function:    ipf_resolvelookup                                           */
-/* Returns:     void * - NULL = failure, else success.                      */
-/* Parameters:  unit(I)     - device for which this is for                  */
-/*              type(I)     - type of lookup these parameters are for.      */
-/*              number(I)   - table number to use when searching            */
-/*              funcptr(IO) - pointer to pointer for storing IP address     */
-/*                            searching function.                           */
-/*                                                                          */
-/* Search for the "table" number passed in amongst those configured for     */
-/* that particular type.  If the type is recognised then the function to    */
-/* call to do the IP address search will be change, regardless of whether   */
-/* or not the "table" number exists.                                        */
-/* ------------------------------------------------------------------------ */
-void *
-ipf_resolvelookup(unit, type, number, funcptr)
-	int unit;
-	u_int type, number;
-	lookupfunc_t *funcptr;
-{
-	char name[FR_GROUPLEN];
-	iphtable_t *iph;
-	ip_pool_t *ipo;
-	void *ptr;
-
-#if defined(SNPRINTF) && defined(_KERNEL)
-	SNPRINTF(name, sizeof(name), "%u", number);
-#else
-	(void) sprintf(name, "%u", number);
-#endif
-
-	READ_ENTER(&ipf_poolrw);
-
-	switch (type)
-	{
-	case IPLT_POOL :
-# if (defined(__osf__) && defined(_KERNEL))
-		ptr = NULL;
-		*funcptr = NULL;
-# else
-		ipo = ipf_pool_find(unit, name);
-		ptr = ipo;
-		if (ipo != NULL) {
-			ATOMIC_INC32(ipo->ipo_ref);
-		}
-		*funcptr = ipf_pool_search;
-# endif
-		break;
-	case IPLT_HASH :
-		iph = ipf_htable_find(unit, name);
-		ptr = iph;
-		if (iph != NULL) {
-			ATOMIC_INC32(iph->iph_ref);
-		}
-		*funcptr = ipf_iphmfindip;
-		break;
-	default:
-		ptr = NULL;
-		*funcptr = NULL;
-		break;
-	}
-	RWLOCK_EXIT(&ipf_poolrw);
-
-	return ptr;
-}
-#endif
-
-
 /* ------------------------------------------------------------------------ */
 /* Function:    frrequest                                                   */
 /* Returns:     int - 0 == success, > 0 == errno value                      */
@@ -4524,7 +4439,7 @@ frrequest(unit, req, data, set, makecopy)
 	caddr_t data;
 {
 	frentry_t frd, *fp, *f, **fprev, **ftail;
-	int error = 0, in, v, addrem;
+	int error = 0, in, family, addrem;
 	void *ptr, *uptr;
 	u_int *p, *pp;
 	frgroup_t *fg;
@@ -4558,7 +4473,7 @@ frrequest(unit, req, data, set, makecopy)
 		return EINVAL;
 	}
 
-	v = fp->fr_v;
+	family = fp->fr_family;
 	uptr = fp->fr_data;
 
 	if (req == (ioctlcmd_t)SIOCINAFR || req == (ioctlcmd_t)SIOCINIFR ||
@@ -4576,13 +4491,13 @@ frrequest(unit, req, data, set, makecopy)
 	/*
 	 * Only filter rules for IPv4 or IPv6 are accepted.
 	 */
-	if (v == 4) {
+	if (family == AF_INET) {
 		/*EMPTY*/;
 #ifdef	USE_INET6
-	} else if (v == 6) {
+	} else if (family == AF_INET6) {
 		/*EMPTY*/;
 #endif
-	} else if (v != 0) {
+	} else if (family != 0) {
 		ipf_interror = 10;
 		return EINVAL;
 	}
@@ -4742,14 +4657,16 @@ frrequest(unit, req, data, set, makecopy)
 				return EINVAL;
 			}
 			break;
-#ifdef	IPFILTER_LOOKUP
 		case FRI_LOOKUP :
-			fp->fr_srcptr = ipf_resolvelookup(IPL_LOGIPF,
-							 fp->fr_srctype,
-							 fp->fr_srcnum,
-							 &fp->fr_srcfunc);
+			fp->fr_srcptr = ipf_lookup_res_num(fp->fr_srctype,
+							   IPL_LOGIPF,
+							   fp->fr_srcnum,
+							   &fp->fr_srcfunc);
+			if (fp->fr_srcfunc == NULL) {
+				ipf_interror = 2222;
+				return ESRCH;
+			}
 			break;
-#endif
 		default :
 			break;
 		}
@@ -4769,14 +4686,16 @@ frrequest(unit, req, data, set, makecopy)
 				return EINVAL;
 			}
 			break;
-#ifdef	IPFILTER_LOOKUP
 		case FRI_LOOKUP :
-			fp->fr_dstptr = ipf_resolvelookup(IPL_LOGIPF,
-							 fp->fr_dsttype,
-							 fp->fr_dstnum,
-							 &fp->fr_dstfunc);
+			fp->fr_dstptr = ipf_lookup_res_num(fp->fr_dsttype,
+							   IPL_LOGIPF,
+							   fp->fr_dstnum,
+							   &fp->fr_dstfunc);
+			if (fp->fr_dstfunc == NULL) {
+				ipf_interror = 3333;
+				return ESRCH;
+			}
 			break;
-#endif
 		default :
 			break;
 		}
@@ -5246,12 +5165,10 @@ ipf_derefrule(frp)
 		MUTEX_EXIT(&fr->fr_lock);
 		MUTEX_DESTROY(&fr->fr_lock);
 
-#ifdef IPFILTER_LOOKUP
 		if (fr->fr_type == FR_T_IPF && fr->fr_satype == FRI_LOOKUP)
 			ipf_lookup_deref(fr->fr_srctype, fr->fr_srcptr);
 		if (fr->fr_type == FR_T_IPF && fr->fr_datype == FRI_LOOKUP)
 			ipf_lookup_deref(fr->fr_dsttype, fr->fr_dstptr);
-#endif
 
 		if (fr->fr_dsize) {
 			KFREES(fr->fr_data, fr->fr_dsize);
@@ -5268,7 +5185,6 @@ ipf_derefrule(frp)
 }
 
 
-#ifdef	IPFILTER_LOOKUP
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_grpmapinit                                              */
 /* Returns:     int - 0 == success, else ESRCH because table entry not found*/
@@ -5359,7 +5275,6 @@ ipf_dstgrpmap(fin, passp)
 	(void) ipf_scanlist(fin, *passp);
 	return fin->fin_fr;
 }
-#endif /* IPFILTER_LOOKUP */
 
 /*
  * Queue functions
@@ -5887,12 +5802,9 @@ ipf_ioctlswitch(unit, data, cmd, mode, uid, ctx)
 		}
 		break;
 	case IPL_LOGLOOKUP :
-#ifdef IPFILTER_LOOKUP
 		if (ipf_running > 0)
 			error = ipf_lookup_ioctl(data, cmd, mode, uid, ctx);
-		else
-#endif
-		{
+		else {
 			error = EIO;
 			ipf_interror = 47;
 		}
@@ -7057,11 +6969,9 @@ ipf_initialise()
 	if (i < 0)
 		return -80 + i;
 #endif
-#ifdef IPFILTER_LOOKUP
 	i = ipf_lookup_init();
 	if (i < 0)
 		return -90 + i;
-#endif
 #ifdef IPFILTER_COMPILED
 	ipfrule_add();
 #endif
@@ -7103,9 +7013,7 @@ ipf_deinitialise()
 	(void) ipf_flush(IPL_LOGCOUNT, FR_INQUE|FR_OUTQUE|FR_INACTIVE);
 	(void) ipf_flush(IPL_LOGCOUNT, FR_INQUE|FR_OUTQUE);
 
-#ifdef IPFILTER_LOOKUP
 	ipf_lookup_unload();
-#endif
 
 #ifdef IPFILTER_LOG
 	ipf_log_unload();
@@ -7163,12 +7071,12 @@ ipf_resolvedest(fdp, v)
 
 	ifp = NULL;
 
-	if (*fdp->fd_ifname != '\0') {
-		ifp = GETIFP(fdp->fd_ifname, v);
+	if (*fdp->fd_name != '\0') {
+		ifp = GETIFP(fdp->fd_name, v);
 		if (ifp == NULL)
 			ifp = (void *)-1;
 	}
-	fdp->fd_ifp = ifp;
+	fdp->fd_ptr = ifp;
 
 	if ((ifp != NULL) && (ifp != (void *)-1)) {
 		fdp->fd_local = ipf_deliverlocal(v, ifp, &fdp->fd_ip);
@@ -7432,9 +7340,7 @@ ipf_freetoken(token)
 			RWLOCK_EXIT(&ipf_nat);
 			break;
 		default :
-#ifdef IPFILTER_LOOKUP
 			ipf_lookup_iterderef(token->ipt_type, data);
-#endif
 			break;
 		}
 	}

@@ -1041,9 +1041,7 @@ int ipfilteropen(dev_t dev, int flag, int format)
 		case IPL_LOGNAT :
 		case IPL_LOGSTATE :
 		case IPL_LOGAUTH :
-#ifdef IPFILTER_LOOKUP
 		case IPL_LOGLOOKUP :
-#endif
 #ifdef IPFILTER_SYNC  
 		case IPL_LOGSYNC :
 #endif

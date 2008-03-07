@@ -38,10 +38,6 @@ IPFLOG=-DIPFILTER_LOG
 #
 #SYNC=-DIPFILTER_SYNC
 #
-# To enable extended IPFilter functionality
-#
-LOOKUP=-DIPFILTER_LOOKUP -DIPFILTER_SCAN
-#
 # The facility you wish to log messages from ipmon to syslogd with.
 #
 LOGFAC=-DLOGFAC=LOG_LOCAL0
@@ -187,7 +183,7 @@ freebsd22: include
 	fi
 	make freebsd20
 
-freebsd5 freebsd6 freebsd7: include
+freebsd5 freebsd6 freebsd7 freebsd8: include
 	if [ x$(INET6) = x ] ; then \
 		echo "#undef INET6" > opt_inet6.h; \
 	else \

@@ -193,6 +193,7 @@ ippr_h323_in(fin, aps, nat)
 		ipn->in_odstip = nat->nat_odstip;
 		ipn->in_odstmsk = 0xffffffff;
 		ipn->in_odport = htons(port);
+		MUTEX_INIT(&ipn->in_lock, "h323 proxy NAT rule");
 		/*
 		 * we got a problem here. we need to call fr_nat_ioctl() to add
 		 * the h245 proxy rule, but since we already hold (READ locked)

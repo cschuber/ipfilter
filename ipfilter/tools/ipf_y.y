@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2001-2006 by Darren Reed.
+ * Copyright (C) 2001-2008 by Darren Reed.
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  */
@@ -56,7 +56,7 @@ static	int		ipffd = -1;
 static	int		*yycont = NULL;
 static	ioctlfunc_t	ipfioctls[IPL_LOGSIZE];
 static	addfunc_t	ipfaddfunc = NULL;
-static	struct	wordtab ipfwords[99];
+static	struct	wordtab ipfwords[100];
 static	struct	wordtab	addrwords[4];
 static	struct	wordtab	maskwords[5];
 static	struct	wordtab icmpcodewords[17];
@@ -123,7 +123,7 @@ static	struct	wordtab logwords[33];
 %token	IPFY_LOG IPFY_BODY IPFY_FIRST IPFY_LEVEL IPFY_ORBLOCK IPFY_L5AS
 %token	IPFY_LOGTAG IPFY_MATCHTAG IPFY_SETTAG IPFY_SKIP IPFY_DECAPS
 %token	IPFY_FROM IPFY_ALL IPFY_ANY IPFY_BPFV4 IPFY_BPFV6 IPFY_POOL IPFY_HASH
-%token	IPFY_IPFEXPR IPFY_PPS
+%token	IPFY_IPFEXPR IPFY_PPS IPFY_FAMILY
 %token	IPFY_ESP IPFY_AH
 %token	IPFY_WITH IPFY_AND IPFY_NOT IPFY_NO IPFY_OPT
 %token	IPFY_TCPUDP IPFY_TCP IPFY_UDP
@@ -260,18 +260,18 @@ ipfrule:
 	family tos ttl proto ip
 	;
 
-family:	| IPFY_INET			{ if (use_inet6 == 1) {
+family:	| IPFY_FAMILY IPFY_INET		{ if (use_inet6 == 1) {
 						YYERROR;
 					  } else {
 						setipftype();
-						frc->fr_v = 4;
+						frc->fr_family = AF_INET;
 					  }
 					}
-	| IPFY_INET6			{ if (use_inet6 == -1) {
+	| IPFY_FAMILY IPFY_INET6	{ if (use_inet6 == -1) {
 						YYERROR;
 					  } else {
 						setipftype();
-						frc->fr_v = 6;
+						frc->fr_family = AF_INET6;
 					  }
 					}
 	;
@@ -585,21 +585,26 @@ vianame:
 	;
 
 dup:	IPFY_DUPTO name
-	{ strncpy(fr->fr_dif.fd_ifname, $2, sizeof(fr->fr_dif.fd_ifname));
+	{ strncpy(fr->fr_dif.fd_name, $2, sizeof(fr->fr_dif.fd_name));
 	  free($2);
 	}
+	| IPFY_DUPTO IPFY_POOL '/' name
+	{ strncpy(fr->fr_dif.fd_name, $4, sizeof(fr->fr_dif.fd_name));
+	  fr->fr_dif.fd_type = FRD_POOL;
+	  free($4);
+	}
 	| IPFY_DUPTO name duptoseparator hostname
-	{ strncpy(fr->fr_dif.fd_ifname, $2, sizeof(fr->fr_dif.fd_ifname));
+	{ strncpy(fr->fr_dif.fd_name, $2, sizeof(fr->fr_dif.fd_name));
 	  fr->fr_dif.fd_ip = $4;
 	  yyexpectaddr = 0;
-	  fr->fr_v = 4;
+	  fr->fr_family = AF_INET;
 	  free($2);
 	}
 	| IPFY_DUPTO name duptoseparator YY_IPV6
-	{ strncpy(fr->fr_dif.fd_ifname, $2, sizeof(fr->fr_dif.fd_ifname));
+	{ strncpy(fr->fr_dif.fd_name, $2, sizeof(fr->fr_dif.fd_name));
 	  bcopy(&$4, &fr->fr_dif.fd_ip6, sizeof(fr->fr_dif.fd_ip6));
 	  yyexpectaddr = 0;
-	  fr->fr_v = 6;
+	  fr->fr_family = AF_INET6;
 	  free($2);
 	}
 	;
@@ -612,21 +617,26 @@ froute:	IPFY_FROUTE			{ fr->fr_flags |= FR_FASTROUTE; }
 	;
 
 proute:	routeto name
-	{ strncpy(fr->fr_tif.fd_ifname, $2, sizeof(fr->fr_tif.fd_ifname));
+	{ strncpy(fr->fr_tif.fd_name, $2, sizeof(fr->fr_tif.fd_name));
 	  free($2);
 	}
+	| routeto IPFY_POOL '/' name
+	{ strncpy(fr->fr_tif.fd_name, $4, sizeof(fr->fr_tif.fd_name));
+	  fr->fr_tif.fd_type = FRD_POOL;
+	  free($4);
+	}
 	| routeto name duptoseparator hostname
-	{ strncpy(fr->fr_tif.fd_ifname, $2, sizeof(fr->fr_tif.fd_ifname));
+	{ strncpy(fr->fr_tif.fd_name, $2, sizeof(fr->fr_tif.fd_name));
 	  fr->fr_tif.fd_ip = $4;
 	  yyexpectaddr = 0;
-	  fr->fr_v = 4;
+	  fr->fr_family = AF_INET;
 	  free($2);
 	}
 	| routeto name duptoseparator YY_IPV6
-	{ strncpy(fr->fr_tif.fd_ifname, $2, sizeof(fr->fr_tif.fd_ifname));
+	{ strncpy(fr->fr_tif.fd_name, $2, sizeof(fr->fr_tif.fd_name));
 	  bcopy(&$4, &fr->fr_tif.fd_ip6, sizeof(fr->fr_tif.fd_ip6));
 	  yyexpectaddr = 0;
-	  fr->fr_v = 6;
+	  fr->fr_family = AF_INET6;
 	  free($2);
 	}
 	;
@@ -638,20 +648,25 @@ routeto:
 
 replyto:
 	IPFY_REPLY_TO name
-	{ strncpy(fr->fr_rif.fd_ifname, $2, sizeof(fr->fr_rif.fd_ifname));
+	{ strncpy(fr->fr_rif.fd_name, $2, sizeof(fr->fr_rif.fd_name));
 	  free($2);
 	}
+	| IPFY_REPLY_TO IPFY_POOL '/' name
+	{ strncpy(fr->fr_rif.fd_name, $4, sizeof(fr->fr_rif.fd_name));
+	  fr->fr_rif.fd_type = FRD_POOL;
+	  free($4);
+	}
 	| IPFY_REPLY_TO name duptoseparator hostname
-	{ strncpy(fr->fr_rif.fd_ifname, $2, sizeof(fr->fr_rif.fd_ifname));
+	{ strncpy(fr->fr_rif.fd_name, $2, sizeof(fr->fr_rif.fd_name));
 	  fr->fr_rif.fd_ip = $4;
-	  fr->fr_v = 4;
+	  fr->fr_family = AF_INET;
 	  free($2);
 	}
 	| IPFY_REPLY_TO name duptoseparator YY_IPV6
-	{ strncpy(fr->fr_rif.fd_ifname, $2, sizeof(fr->fr_rif.fd_ifname));
+	{ strncpy(fr->fr_rif.fd_name, $2, sizeof(fr->fr_rif.fd_name));
 	  bcopy(&$4, &fr->fr_rif.fd_ip6, sizeof(fr->fr_rif.fd_ip6));
 	  yyexpectaddr = 0;
-	  fr->fr_v = 6;
+	  fr->fr_family = AF_INET6;
 	  free($2);
 	}
 	;
@@ -689,7 +704,7 @@ protocol:
 					 * packets so that type keyword
 					 * lookup functions properly.
 					 */
-					DOALL(fr->fr_v = 4;)
+					DOALL(fr->fr_family = AF_INET;)
 				  }
 				}
 	| YY_STR		{ if (!strcmp($1, "tcp-udp")) {
@@ -705,7 +720,7 @@ protocol:
 						 * packets so that type keyword
 						 * lookup functions properly.
 						 */
-						DOALL(fr->fr_v = 4;)
+						DOALL(fr->fr_family = AF_INET;)
 					}
 					DOALL(fr->fr_proto = p; \
 						fr->fr_mproto = 0xff;)
@@ -805,7 +820,7 @@ srcaddr:
 	addr	{ DOREM(bcopy(&($1.a), &fr->fr_ip.fi_src, sizeof($1.a)); \
 			bcopy(&($1.m), &fr->fr_mip.fi_src, sizeof($1.m)); \
 			if ($1.v != 0) { \
-				fr->fr_v = $1.v; \
+				fr->fr_family = ($1.v == 6)?AF_INET6:AF_INET;\
 				fr->fr_ip.fi_v = $1.v; \
 				fr->fr_mip.fi_v = 0xf; \
 			} \
@@ -822,7 +837,7 @@ srcaddrlist:
 	addr	{ DOREM(bcopy(&($1.a), &fr->fr_ip.fi_src, sizeof($1.a)); \
 			bcopy(&($1.m), &fr->fr_mip.fi_src, sizeof($1.m)); \
 			if ($1.v != 0) { \
-				fr->fr_v = $1.v; \
+				fr->fr_family = ($1.v == 6)?AF_INET6:AF_INET;\
 				fr->fr_ip.fi_v = $1.v; \
 				fr->fr_mip.fi_v = 0xf; \
 			} \
@@ -836,7 +851,7 @@ srcaddrlist:
 		{ DOREM(bcopy(&($3.a), &fr->fr_ip.fi_src, sizeof($3.a)); \
 			bcopy(&($3.m), &fr->fr_mip.fi_src, sizeof($3.m)); \
 			if ($3.v != 0) { \
-				fr->fr_v = $3.v; \
+				fr->fr_family = ($3.v == 6)?AF_INET6:AF_INET;\
 				fr->fr_ip.fi_v = $3.v; \
 				fr->fr_mip.fi_v = 0xf; \
 			} \
@@ -897,7 +912,7 @@ dstaddr:
 	addr	{ DOREM(bcopy(&($1.a), &fr->fr_ip.fi_dst, sizeof($1.a)); \
 			bcopy(&($1.m), &fr->fr_mip.fi_dst, sizeof($1.m)); \
 			if ($1.v != 0) { \
-				fr->fr_v = $1.v; \
+				fr->fr_family = ($1.v == 6)?AF_INET6:AF_INET;\
 				fr->fr_ip.fi_v = $1.v; \
 				fr->fr_mip.fi_v = 0xf; \
 			} \
@@ -914,7 +929,7 @@ dstaddrlist:
 	addr	{ DOREM(bcopy(&($1.a), &fr->fr_ip.fi_dst, sizeof($1.a)); \
 			bcopy(&($1.m), &fr->fr_mip.fi_dst, sizeof($1.m)); \
 			if ($1.v != 0) { \
-				fr->fr_v = $1.v; \
+				fr->fr_family = ($1.v == 6)?AF_INET6:AF_INET;\
 				fr->fr_ip.fi_v = $1.v; \
 				fr->fr_mip.fi_v = 0xf; \
 			} \
@@ -928,7 +943,7 @@ dstaddrlist:
 		{ DOREM(bcopy(&($3.a), &fr->fr_ip.fi_dst, sizeof($3.a)); \
 			bcopy(&($3.m), &fr->fr_mip.fi_dst, sizeof($3.m)); \
 			if ($3.v != 0) { \
-				fr->fr_v = $3.v; \
+				fr->fr_family = ($3.v == 6)?AF_INET6:AF_INET;\
 				fr->fr_ip.fi_v = $3.v; \
 				fr->fr_mip.fi_v = 0xf; \
 			} \
@@ -1210,7 +1225,8 @@ itype:	seticmptype icmptype
 
 seticmptype:
 	IPFY_ICMPTYPE				{ setipftype();
-						  yysetdict(NULL); }
+						  yysetdict(NULL);
+						}
 	;
 
 icode:	| seticmpcode icmpcode
@@ -1343,7 +1359,7 @@ ipopt:	IPFY_OPT			{ yysetdict(ipv4optwords); }
 	;
 
 startv6hdrs:
-	IPF6_V6HDRS	{ if (frc->fr_v != 6)
+	IPF6_V6HDRS	{ if (frc->fr_family != AF_INET6)
 				yyerror("only available with IPv6");
 			  yysetdict(ipv6optwords);
 			}
@@ -1374,9 +1390,9 @@ opttype:
 	;
 
 ipopts:	optlist		{ DOALL(fr->fr_mip.fi_optmsk |= $1; \
-				if (fr->fr_v == 0) { \
-					fr->fr_v = 4; \
-				} else if (fr->fr_v != 4) { \
+				if (fr->fr_family == 0) { \
+					fr->fr_family = AF_INET; \
+				} else if (fr->fr_family != AF_INET) { \
 					YYERROR; \
 				} \
 				if (!nowith) \
@@ -1419,7 +1435,7 @@ seclevel:
 
 icmptype:
 	YY_NUMBER		{ $$ = $1; }
-	| YY_STR		{ $$ = geticmptype(frc->fr_v, $1);
+	| YY_STR		{ $$ = geticmptype(frc->fr_family, $1);
 				  if ($$ == -1)
 					yyerror("unrecognised icmp type");
 				}
@@ -1472,9 +1488,9 @@ opt:
 	| IPFY_IPOPT_UMP		{ $$ = getoptbyvalue(IPOPT_UMP); }
 	| setsecclass secname
 			{ DOALL(fr->fr_mip.fi_secmsk |= $2; \
-				if (fr->fr_v == 0) { \
-					fr->fr_v = 4; \
-				} else if (fr->fr_v != 4) { \
+				if (fr->fr_family == 0) { \
+					fr->fr_family = AF_INET; \
+				} else if (fr->fr_family != AF_INET) { \
 					YYERROR; \
 				} \
 				if (!nowith) \
@@ -1611,7 +1627,7 @@ ipv4:	ipv4_24 '.' YY_NUMBER
 %%
 
 
-static	struct	wordtab ipfwords[99] = {
+static	struct	wordtab ipfwords[100] = {
 	{ "age",			IPFY_AGE },
 	{ "ah",				IPFY_AH },
 	{ "all",			IPFY_ALL },
@@ -1636,6 +1652,7 @@ static	struct	wordtab ipfwords[99] = {
 	{ "eq",				YY_CMP_EQ },
 	{ "esp",			IPFY_ESP },
 	{ "exp",			IPFY_IPFEXPR },
+	{ "family",			IPFY_FAMILY },
 	{ "fastroute",			IPFY_FROUTE },
 	{ "first",			IPFY_FIRST },
 	{ "flags",			IPFY_FLAGS },
@@ -1931,9 +1948,9 @@ static void newrule()
 	fr->fr_type = FR_T_NONE;
 
 	if (use_inet6 == 1)
-		fr->fr_v = 6;
+		fr->fr_family = AF_INET6;
 	else if (use_inet6 == -1)
-		fr->fr_v = 4;
+		fr->fr_family = AF_INET;
 
 	nrules = 1;
 }
@@ -1946,7 +1963,8 @@ static void setipftype()
 			fr->fr_type = FR_T_IPF;
 			fr->fr_data = (void *)calloc(sizeof(fripf_t), 1);
 			fr->fr_dsize = sizeof(fripf_t);
-			fr->fr_ip.fi_v = frc->fr_v;
+			fr->fr_family = frc->fr_family;
+			fr->fr_ip.fi_v = frc->fr_ip.fi_v;
 			fr->fr_mip.fi_v = 0xf;
 			fr->fr_ipf->fri_sifpidx = -1;
 			fr->fr_ipf->fri_difpidx = -1;
@@ -2029,7 +2047,7 @@ char *phrase;
 			fprintf(stderr, "cannot mix IPF and BPF matching\n");
 			return;
 		}
-		fr->fr_v = v;
+		fr->fr_family = (v == 4) ? AF_INET : AF_INET6;
 		fr->fr_type = FR_T_BPFOPC;
 
 		if (!strncmp(phrase, "0x", 2)) {
@@ -2345,8 +2363,8 @@ frentry_t *fr;
 	if (f->fr_type != fr->fr_type || f->fr_type != FR_T_IPF)
 		return;
 
-	if (fr->fr_v == 0 && f->fr_v != 0)
-		fr->fr_v = f->fr_v;
+	if (fr->fr_family == 0 && f->fr_family != 0)
+		fr->fr_family = f->fr_family;
 
 	if (fr->fr_mproto == 0 && f->fr_mproto != 0)
 		fr->fr_mproto = f->fr_mproto;

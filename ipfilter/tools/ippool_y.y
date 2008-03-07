@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2001-2006 by Darren Reed.
+ * Copyright (C) 2001-2008 by Darren Reed.
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  */
@@ -77,6 +77,8 @@ static ip_pool_node_t *add_poolhosts __P((char *));
 %token	IPT_TABLE IPT_GROUPMAP IPT_HASH
 %token	IPT_ROLE IPT_TYPE IPT_TREE
 %token	IPT_GROUP IPT_SIZE IPT_SEED IPT_NUM IPT_NAME
+%token	IPT_POOL IPT_DSTLIST IPT_ROUNDROBIN
+%token	IPT_WEIGHTED IPT_RANDOM IPT_CONNECTION IPT_BYTES
 %type	<num> role table inout
 %type	<ipp> ipftree range addrlist
 %type	<adrmsk> addrmask
@@ -115,6 +117,7 @@ line:	table role ipftree eol		{ iplo.ipo_unit = $2;
 					  use_inet6 = 0;
 					}
 	| YY_COMMENT
+	| poolline
 	;
 
 eol:	';'
@@ -377,26 +380,78 @@ start:	'{'				{ yyexpectaddr = 1; }
 end:	'}'				{ yyexpectaddr = 0; }
 	;
 
+poolline:
+	IPT_POOL IPT_IPF '/' inout pooltype
+	| IPT_POOL IPT_NAT '/' inout pooltype
+	| IPT_POOL IPT_AUTH '/' inout pooltype
+	| IPT_POOL IPT_COUNT '/' inout pooltype
+	;
+
+pooltype:
+	IPT_DSTLIST '(' IPT_NAME YY_STR ';' dstopts ')' '{' dstlist '}'
+	| IPT_TREE '(' IPT_NAME YY_STR ';' ')' '{' addrlist '}'
+	| IPT_HASH '(' IPT_NAME YY_STR ';' hashoptlist ')' '{' hashlist '}'
+	| IPT_GROUPMAP '(' IPT_NAME YY_STR ';' ')' '{' setgrouplist '}'
+	;
+
+hashoptlist:
+	| hashopt
+	| hashoptlist ';' hashopt
+	;
+hashopt:
+	IPT_SIZE YY_NUMBER
+	| IPT_SEED YY_NUMBER
+	;
+
+dstlist:
+	dstentries ';'
+	;
+dstentries:
+	dstentry
+	| dstentries ';' dstentry
+	;
+
+dstentry:
+	YY_STR ':' ipaddr
+	| ipaddr
+	;
+
+dstopts:
+	| IPT_ROUNDROBIN ';'
+	| IPT_WEIGHTED weighting ';'
+	| IPT_RANDOM ';'
+	;
+
+weighting:
+	IPT_CONNECTION
+	| IPT_BYTES
+	;
 %%
 static	wordtab_t	yywords[] = {
-	{ "auth",	IPT_AUTH },
-	{ "count",	IPT_COUNT },
-	{ "group",	IPT_GROUP },
-	{ "group-map",	IPT_GROUPMAP },
-	{ "hash",	IPT_HASH },
-	{ "in",		IPT_IN },
-	{ "ipf",	IPT_IPF },
-	{ "name",	IPT_NAME },
-	{ "nat",	IPT_NAT },
-	{ "number",	IPT_NUM },
-	{ "out",	IPT_OUT },
-	{ "role",	IPT_ROLE },
-	{ "seed",	IPT_SEED },
-	{ "size",	IPT_SIZE },
-	{ "table",	IPT_TABLE },
-	{ "tree",	IPT_TREE },
-	{ "type",	IPT_TYPE },
-	{ NULL,		0 }
+	{ "auth",		IPT_AUTH },
+	{ "bytes",		IPT_BYTES },
+	{ "connection",		IPT_CONNECTION },
+	{ "count",		IPT_COUNT },
+	{ "dst-list",		IPT_DSTLIST },
+	{ "group",		IPT_GROUP },
+	{ "group-map",		IPT_GROUPMAP },
+	{ "hash",		IPT_HASH },
+	{ "in",			IPT_IN },
+	{ "ipf",		IPT_IPF },
+	{ "name",		IPT_NAME },
+	{ "nat",		IPT_NAT },
+	{ "number",		IPT_NUM },
+	{ "out",		IPT_OUT },
+	{ "random",		IPT_RANDOM },
+	{ "round-robin",	IPT_ROUNDROBIN },
+	{ "role",		IPT_ROLE },
+	{ "seed",		IPT_SEED },
+	{ "size",		IPT_SIZE },
+	{ "table",		IPT_TABLE },
+	{ "tree",		IPT_TREE },
+	{ "type",		IPT_TYPE },
+	{ "weighted",		IPT_WEIGHTED },
+	{ NULL,			0 }
 };
 
 

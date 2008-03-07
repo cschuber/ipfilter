@@ -443,9 +443,7 @@ ipfopen(dev_t dev, u_long flags, chan_t chan, int ext)
 		case IPL_LOGNAT :
 		case IPL_LOGSTATE :
 		case IPL_LOGAUTH :
-#ifdef IPFILTER_LOOKUP
 		case IPL_LOGLOOKUP :
-#endif
 #ifdef IPFILTER_SYNC
 		case IPL_LOGSYNC :
 #endif
@@ -931,7 +929,7 @@ ipf_fastroute(m0, mpp, fin, fdp)
 
 	fr = fin->fin_fr;
 	if (fdp != NULL)
-		ifp = fdp->fd_ifp;
+		ifp = fdp->fd_ptr;
 	else
 		ifp = fin->fin_ifp;
 
