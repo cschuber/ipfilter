@@ -4632,6 +4632,8 @@ maskloop:
 		if (rval == 1) {
 			MUTEX_ENTER(&nat->nat_lock);
 			nat->nat_ref++;
+			nat->nat_bytes[1] += fin->fin_plen;
+			nat->nat_pkts[1]++;
 			MUTEX_EXIT(&nat->nat_lock);
 			nat->nat_touched = ipf_ticks;
 			fin->fin_nat = nat;
@@ -4695,11 +4697,6 @@ ipf_nat_out(fin, nat, natadd, nflags)
 
 	if ((natadd != 0) && (fin->fin_flx & FI_FRAG) && (np != NULL))
 		(void) ipf_frag_natnew(fin, 0, nat);
-
-	MUTEX_ENTER(&nat->nat_lock);
-	nat->nat_bytes[1] += fin->fin_plen;
-	nat->nat_pkts[1]++;
-	MUTEX_EXIT(&nat->nat_lock);
 
 	/*
 	 * Fix up checksums, not by recalculating them, but
@@ -5215,6 +5212,8 @@ maskloop:
 		if (rval == 1) {
 			MUTEX_ENTER(&nat->nat_lock);
 			nat->nat_ref++;
+			nat->nat_bytes[0] += fin->fin_plen;
+			nat->nat_pkts[0]++;
 			MUTEX_EXIT(&nat->nat_lock);
 			nat->nat_touched = ipf_ticks;
 			fin->fin_nat = nat;
@@ -5305,11 +5304,6 @@ ipf_nat_in(fin, nat, natadd, nflags)
 #ifdef	IPFILTER_SYNC
 	ipf_sync_update(SMC_NAT, fin, nat->nat_sync);
 #endif
-
-	MUTEX_ENTER(&nat->nat_lock);
-	nat->nat_bytes[0] += fin->fin_plen;
-	nat->nat_pkts[0]++;
-	MUTEX_EXIT(&nat->nat_lock);
 
 	ipsumd = nat->nat_ipsumd;
 	/*
