@@ -3734,11 +3734,11 @@ int fr_checknatout(fin, passp)
 fr_info_t *fin;
 u_32_t *passp;
 {
+	ipnat_t *np = NULL, *npnext;
 	struct ifnet *ifp, *sifp;
 	icmphdr_t *icmp = NULL;
 	tcphdr_t *tcp = NULL;
 	int rval, natfailed;
-	ipnat_t *np = NULL;
 	u_int nflags = 0;
 	u_32_t ipa, iph;
 	int natadd = 1;
@@ -3808,15 +3808,13 @@ u_32_t *passp;
 			natfailed = -1;
 			goto nonatfrag;
 		}
-		RWLOCK_EXIT(&ipf_nat);
 		msk = 0xffffffff;
 		nmsk = nat_masks;
-		WRITE_ENTER(&ipf_nat);
 maskloop:
 		iph = ipa & htonl(msk);
 		hv = NAT_HASH_FN(iph, 0, ipf_natrules_sz);
-		for (np = nat_rules[hv]; np; np = np->in_mnext)
-		{
+		for (np = nat_rules[hv]; np; np = npnext) {
+			npnext = np->in_mnext);
 			if ((np->in_ifps[1] && (np->in_ifps[1] != ifp)))
 				continue;
 			if (np->in_v != fin->fin_v)
@@ -3843,12 +3841,19 @@ maskloop:
 					continue;
 			}
 
-			if ((nat = nat_new(fin, np, NULL, nflags,
-					   NAT_OUTBOUND))) {
+			ATOMIC_INC32(np->in_use);
+			RWLOCK_EXIT(&ipf_nat);
+			WRITE_ENTER(&ipf_nat);
+			nat = nat_new(fin, np, NULL, nflags, NAT_OUTBOUND);
+			if (nat != NULL) {
 				np->in_hits++;
+				np->in_use--;
+				MUTEX_DOWNGRADE(&ipf_nat);
 				break;
-			} else
-				natfailed = -1;
+			}
+			natfailed = -1;
+			fr_ipnatderef(&np);
+			MUTEX_DOWNGRADE(&ipf_nat);
 		}
 		if ((np == NULL) && (nmsk != 0)) {
 			while (nmsk) {
@@ -3862,7 +3867,6 @@ maskloop:
 				goto maskloop;
 			}
 		}
-		MUTEX_DOWNGRADE(&ipf_nat);
 	}
 
 nonatfrag:
@@ -3871,6 +3875,8 @@ nonatfrag:
 		if (rval == 1) {
 			MUTEX_ENTER(&nat->nat_lock);
 			nat->nat_ref++;
+			nat->nat_bytes[1] += fin->fin_plen;
+			nat->nat_pkts[1]++;
 			MUTEX_EXIT(&nat->nat_lock);
 			nat->nat_touched = fr_ticks;
 			fin->fin_nat = nat;
@@ -3918,11 +3924,6 @@ u_32_t nflags;
 
 	if ((natadd != 0) && (fin->fin_flx & FI_FRAG) && (np != NULL))
 		(void) fr_nat_newfrag(fin, 0, nat);
-
-	MUTEX_ENTER(&nat->nat_lock);
-	nat->nat_bytes[1] += fin->fin_plen;
-	nat->nat_pkts[1]++;
-	MUTEX_EXIT(&nat->nat_lock);
 
 	/*
 	 * Fix up checksums, not by recalculating them, but
@@ -4033,6 +4034,7 @@ int fr_checknatin(fin, passp)
 fr_info_t *fin;
 u_32_t *passp;
 {
+	ipnat_t *np, *npnext;
 	u_int nflags, natadd;
 	int rval, natfailed;
 	struct ifnet *ifp;
@@ -4040,7 +4042,6 @@ u_32_t *passp;
 	icmphdr_t *icmp;
 	tcphdr_t *tcp;
 	u_short dport;
-	ipnat_t *np;
 	nat_t *nat;
 	u_32_t iph;
 
@@ -4104,10 +4105,8 @@ u_32_t *passp;
 			natfailed = -1;
 			goto nonatfrag;
 		}
-		RWLOCK_EXIT(&ipf_nat);
 		rmsk = rdr_masks;
 		msk = 0xffffffff;
-		WRITE_ENTER(&ipf_nat);
 		/*
 		 * If there is no current entry in the nat table for this IP#,
 		 * create one for it (if there is a matching rule).
@@ -4115,7 +4114,8 @@ u_32_t *passp;
 maskloop:
 		iph = in.s_addr & htonl(msk);
 		hv = NAT_HASH_FN(iph, 0, ipf_rdrrules_sz);
-		for (np = rdr_rules[hv]; np; np = np->in_rnext) {
+		for (np = rdr_rules[hv]; np; np = npnext) {
+			npnext = np->in_rnext;
 			if (np->in_ifps[0] && (np->in_ifps[0] != ifp))
 				continue;
 			if (np->in_v != fin->fin_v)
@@ -4142,12 +4142,19 @@ maskloop:
 				}
 			}
 
+			ATOMIC_INC32(np->in_use);
+			RWLOCK_EXIT(&ipf_nat);
+			WRITE_ENTER(&ipf_nat);
 			nat = nat_new(fin, np, NULL, nflags, NAT_INBOUND);
 			if (nat != NULL) {
 				np->in_hits++;
+				np->in_use--;
+				MUTEX_DOWNGRADE(&ipf_nat);
 				break;
-			} else
-				natfailed = -1;
+			}
+			natfailed = -1;
+			fr_ipnatderef(&np);
+			MUTEX_DOWNGRADE(&ipf_nat);
 		}
 
 		if ((np == NULL) && (rmsk != 0)) {
@@ -4162,7 +4169,6 @@ maskloop:
 				goto maskloop;
 			}
 		}
-		MUTEX_DOWNGRADE(&ipf_nat);
 	}
 
 nonatfrag:
@@ -4171,6 +4177,8 @@ nonatfrag:
 		if (rval == 1) {
 			MUTEX_ENTER(&nat->nat_lock);
 			nat->nat_ref++;
+			nat->nat_bytes[0] += fin->fin_plen;
+			nat->nat_pkts[0]++;
 			MUTEX_EXIT(&nat->nat_lock);
 			nat->nat_touched = fr_ticks;
 			fin->fin_nat = nat;
@@ -4242,11 +4250,6 @@ u_32_t nflags;
 #ifdef	IPFILTER_SYNC
 	ipfsync_update(SMC_NAT, fin, nat->nat_sync);
 #endif
-
-	MUTEX_ENTER(&nat->nat_lock);
-	nat->nat_bytes[0] += fin->fin_plen;
-	nat->nat_pkts[0]++;
-	MUTEX_EXIT(&nat->nat_lock);
 
 	fin->fin_ip->ip_dst = nat->nat_inip;
 	fin->fin_fi.fi_daddr = nat->nat_inip.s_addr;
