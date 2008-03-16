@@ -257,6 +257,7 @@ ipf_auth_check(fin, passp)
 			} else
 				fr = fra->fra_info.fin_fr;
 			fin->fin_fr = fr;
+			fin->fin_flx |= fra->fra_flx;
 			RWLOCK_EXIT(&ipf_authlk);
 
 			WRITE_ENTER(&ipf_authlk);
@@ -355,6 +356,8 @@ ipf_auth_new(m, fin)
 		fra->fra_pass = 0;
 	fra->fra_age = ipf_auth_defaultage;
 	bcopy((char *)fin, (char *)&fra->fra_info, sizeof(*fin));
+	fra->fra_flx = fra->fra_info.fin_flx & (FI_STATE|FI_NATED);
+	fra->fra_info.fin_flx &= ~(FI_STATE|FI_NATED);
 #if !defined(sparc) && !defined(m68k)
 	/*
 	 * No need to copyback here as we want to undo the changes, not keep
@@ -386,7 +389,7 @@ ipf_auth_new(m, fin)
 #else
 	ipf_auth_pkts[i] = m;
 	RWLOCK_EXIT(&ipf_authlk);
-	WAKEUP(&ipf_auth_next,0);
+	WAKEUP(&ipf_auth_next, 0);
 #endif
 	return 1;
 }
@@ -911,6 +914,7 @@ ipf_auth_ioctlloop:
 				   IPFOBJ_FRAUTH);
 		if (error != 0) {
 			RWLOCK_EXIT(&ipf_authlk);
+			SPL_X(s);
 			return error;
 		}
 
@@ -932,6 +936,7 @@ ipf_auth_ioctlloop:
 				t += i;
 				if (error != 0) {
 					RWLOCK_EXIT(&ipf_authlk);
+					SPL_X(s);
 					return error;
 				}
 				m = m->m_next;
