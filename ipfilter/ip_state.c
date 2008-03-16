@@ -3190,12 +3190,10 @@ int why;
 	is->is_ref = 0;
 
 	if (is->is_tqehead[0] != NULL) {
-		if (fr_deletetimeoutqueue(is->is_tqehead[0]) == 0)
-			fr_freetimeoutqueue(is->is_tqehead[0]);
+		(void) fr_deletetimeoutqueue(is->is_tqehead[0]);
 	}
 	if (is->is_tqehead[1] != NULL) {
-		if (fr_deletetimeoutqueue(is->is_tqehead[1]) == 0)
-			fr_freetimeoutqueue(is->is_tqehead[1]);
+		(void) fr_deletetimeoutqueue(is->is_tqehead[1]);
 	}
 
 #ifdef	IPFILTER_SYNC
@@ -3268,9 +3266,7 @@ void fr_timeoutstate()
 			fr_delstate(is, ISL_EXPIRE);
 		}
 
-	for (ifq = ips_utqe; ifq != NULL; ifq = ifqnext) {
-		ifqnext = ifq->ifq_next;
-
+	for (ifq = ips_utqe; ifq != NULL; ifq = ifq->ifq_next) {
 		for (tqn = ifq->ifq_head; ((tqe = tqn) != NULL); ) {
 			if (tqe->tqe_die > fr_ticks)
 				break;
