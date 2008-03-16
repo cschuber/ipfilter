@@ -188,7 +188,7 @@ freebsd22: include
 	fi
 	make freebsd20
 
-freebsd5 freebsd6 freebsd7: include
+freebsd5 freebsd6 freebsd7 freebsd8: include
 	if [ x$(INET6) = x ] ; then \
 		echo "#undef INET6" > opt_inet6.h; \
 	else \
