@@ -2423,10 +2423,7 @@ int out;
 	SPL_INT(s);
 # endif
 
-	READ_ENTER(&ipf_global);
-
 	if (fr_running <= 0) {
-		RWLOCK_EXIT(&ipf_global);
 		return 0;
 	}
 
@@ -2473,8 +2470,6 @@ int out;
 #  endif /* CSUM_DELAY_DATA */
 # endif /* MENTAT */
 #else
-	READ_ENTER(&ipf_global);
-
 	bzero((char *)fin, sizeof(*fin));
 	m = *mp;
 #endif /* _KERNEL */
@@ -2775,7 +2770,6 @@ finished:
 	}
 
 	SPL_X(s);
-	RWLOCK_EXIT(&ipf_global);
 
 #ifdef _KERNEL
 # if (defined(OpenBSD) && (OpenBSD >= 200311))
