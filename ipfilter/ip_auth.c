@@ -251,6 +251,7 @@ u_32_t *passp;
 			} else
 				fr = fra->fra_info.fin_fr;
 			fin->fin_fr = fr;
+			fin->fin_flx |= fra->fra_flx;
 			RWLOCK_EXIT(&ipf_auth);
 
 			WRITE_ENTER(&ipf_auth);
@@ -381,7 +382,7 @@ fr_info_t *fin;
 #else
 	fr_authpkts[i] = m;
 	RWLOCK_EXIT(&ipf_auth);
-	WAKEUP(&fr_authnext,0);
+	WAKEUP(&fr_authnext, 0);
 #endif
 	return 1;
 }
@@ -877,6 +878,7 @@ fr_authioctlloop:
 		error = fr_outobj(data, &fr_auth[fr_authnext], IPFOBJ_FRAUTH);
 		if (error != 0) {
 			RWLOCK_EXIT(&ipf_auth);
+			SPL_X(s);
 			return error;
 		}
 
@@ -898,6 +900,7 @@ fr_authioctlloop:
 				t += i;
 				if (error != 0) {
 					RWLOCK_EXIT(&ipf_auth);
+					SPL_X(s);
 					return error;
 				}
 				m = m->m_next;
@@ -916,6 +919,7 @@ fr_authioctlloop:
 		return 0;
 	}
 	RWLOCK_EXIT(&ipf_auth);
+	SPL_X(s);
 
 	MUTEX_ENTER(&ipf_authmx);
 #ifdef	_KERNEL
