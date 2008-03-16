@@ -3386,12 +3386,10 @@ ipf_state_del(is, why)
 	is->is_ref = 0;
 
 	if (is->is_tqehead[0] != NULL) {
-		if (ipf_deletetimeoutqueue(is->is_tqehead[0]) == 0)
-			ipf_freetimeoutqueue(is->is_tqehead[0]);
+		(void) ipf_deletetimeoutqueue(is->is_tqehead[0]);
 	}
 	if (is->is_tqehead[1] != NULL) {
-		if (ipf_deletetimeoutqueue(is->is_tqehead[1]) == 0)
-			ipf_freetimeoutqueue(is->is_tqehead[1]);
+		(void) ipf_deletetimeoutqueue(is->is_tqehead[1]);
 	}
 
 #ifdef	IPFILTER_SYNC
@@ -3522,9 +3520,9 @@ static int
 ipf_state_flush(which, proto)
 	int which, proto;
 {
-	ipftq_t *ifq, *ifqnext;
 	ipftqent_t *tqe, *tqn;
 	ipstate_t *is, **isp;
+	ipftq_t *ifq;
 	int removed;
 	SPL_INT(s);
 
@@ -3573,8 +3571,7 @@ ipf_state_flush(which, proto)
 		/*
 		 * Also need to look through the user defined queues.
 		 */
-		for (ifq = ips_utqe; ifq != NULL; ifq = ifqnext) {
-			ifqnext = ifq->ifq_next;
+		for (ifq = ips_utqe; ifq != NULL; ifq = ifq->ifq_next) {
 			for (tqn = ifq->ifq_head; ((tqe = tqn) != NULL); ) {
 				tqn = tqe->tqe_next;
 				is = tqe->tqe_parent;
@@ -3672,8 +3669,8 @@ ipf_state_flush(which, proto)
 /* Write Locks: ipf_state                                                   */
 /*                                                                          */
 /* This function is a stepping stone between ipf_queueflush() and           */
-/* fr_delstate().  It is used so we can provide a uniform interface via the */
-/* ipf_queueflush() function.                                               */
+/* ipf_state_del().  It is used so we can provide a uniform interface via   */
+/* the ipf_queueflush() function.                                           */
 /* ------------------------------------------------------------------------ */
 static int
 ipf_state_flush_entry(entry)
