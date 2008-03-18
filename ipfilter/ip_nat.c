@@ -191,8 +191,7 @@ static	int	ipf_nat_clearlist __P((void));
 static	int	ipf_nat_decap __P((fr_info_t *, nat_t *));
 static	int	ipf_nat_encapok __P((fr_info_t *, nat_t *));
 static	int	ipf_nat_extraflush __P((int));
-static	int	ipf_nat_finalise __P((fr_info_t *, nat_t *, natinfo_t *,
-				      nat_t **, int));
+static	int	ipf_nat_finalise __P((fr_info_t *, nat_t *));
 static	int	ipf_nat_flushtable __P((void));
 static	int	ipf_nat_getnext __P((ipftoken_t *, ipfgeniter_t *));
 static	int	ipf_nat_gettable __P((char *));
@@ -1703,6 +1702,7 @@ ipf_nat_putent(data, getlock)
 	/*
 	 * Initialise early because of code at junkput label.
 	 */
+	n = NULL;
 	in = NULL;
 	aps = NULL;
 	nat = NULL;
@@ -1741,6 +1741,21 @@ ipf_nat_putent(data, getlock)
 	}
 
 	bcopy((char *)&ipnn->ipn_nat, (char *)nat, sizeof(*nat));
+
+	switch (nat->nat_v[0])
+	{
+	case 4:
+#ifdef USE_IENT6
+	case 6 :
+#endif
+		break;
+	default :
+		ipf_interror = 60061;
+		error = EPROTONOSUPPORT;
+		goto junkput;
+		/*NOTREACHED*/
+	}
+
 	/*
 	 * Initialize all these so that ipf_nat_delete() doesn't cause a crash.
 	 */
@@ -1785,7 +1800,9 @@ ipf_nat_putent(data, getlock)
 	 *
 	 */
 	bzero((char *)&fin, sizeof(fin));
+	fin.fin_v = nat->nat_v[0];
 	fin.fin_p = nat->nat_pr[0];
+	fin.fin_rev = nat->nat_rev;
 	fin.fin_ifp = nat->nat_ifps[0];
 	fin.fin_data[0] = ntohs(nat->nat_ndport);
 	fin.fin_data[1] = ntohs(nat->nat_nsport);
@@ -1795,23 +1812,16 @@ ipf_nat_putent(data, getlock)
 			READ_ENTER(&ipf_nat);
 		}
 
-		switch (nat->nat_v[1])
-		{
-		case 4 :
-			fin.fin_v = nat->nat_v[1];
+		fin.fin_v = nat->nat_v[1];
+		if (nat->nat_v[1] == 4) {
 			n = ipf_nat_inlookup(&fin, nat->nat_flags, fin.fin_p,
 					 nat->nat_ndstip, nat->nat_nsrcip);
-			break;
 #ifdef USE_INET6
-		case 6 :
+		} else if (nat->nat_v[1] == 6) {
 			n = ipf_nat6_inlookup(&fin, nat->nat_flags, fin.fin_p,
 					      &nat->nat_ndst6.in6,
 					      &nat->nat_nsrc6.in6);
-			break;
 #endif
-		default :
-			n = NULL;
-			break;
 		}
 
 		if (getlock) {
@@ -1827,23 +1837,16 @@ ipf_nat_putent(data, getlock)
 			READ_ENTER(&ipf_nat);
 		}
 
-		switch (fin.fin_v)
-		{
-		case 4 :
+		if (fin.fin_v == 4) {
 			n = ipf_nat_outlookup(&fin, nat->nat_flags, fin.fin_p,
 					      nat->nat_ndstip,
 					      nat->nat_nsrcip);
-			break;
 #ifdef USE_INET6
-		case 6 :
+		} else if (fin.fin_v == 6) {
 			n = ipf_nat6_outlookup(&fin, nat->nat_flags, fin.fin_p,
 					       &nat->nat_ndst6.in6,
 					       &nat->nat_nsrc6.in6);
-			break;
 #endif
-		default :
-			n = NULL;
-			break;
 		}
 
 		if (getlock) {
@@ -1957,7 +1960,14 @@ ipf_nat_putent(data, getlock)
 	if (getlock) {
 		WRITE_ENTER(&ipf_nat);
 	}
-	error = ipf_nat_insert(nat, nat->nat_rev);
+
+	if (fin.fin_v == 4)
+		error = ipf_nat_finalise(&fin, nat);
+#ifdef USE_INET6
+	else
+		error = ipf_nat6_finalise(&fin, nat);
+#endif
+
 	if ((error == 0) && (aps != NULL)) {
 		aps->aps_next = ap_sess_list;
 		ap_sess_list = aps;
@@ -2069,8 +2079,13 @@ ipf_nat_delete(nat, logtype)
 		nat->nat_me = NULL;
 	}
 
-	if (nat->nat_tqe.tqe_ifq != NULL)
-		ipf_deletequeueentry(&nat->nat_tqe);
+	if (nat->nat_tqe.tqe_ifq != NULL) {
+		/*
+		 * No call to ipf_freetimeoutqueue() is made here, they are
+		 * garbage collected in ipf_nat_expire().
+		 */
+		(void) ipf_deletequeueentry(&nat->nat_tqe);
+	}
 
 	if (logtype == NL_EXPIRE)
 		ipf_nat_stats.ns_expire++;
@@ -2299,7 +2314,7 @@ ipf_nat_newmap(fin, nat, ni)
 	np = ni->nai_np;
 	st_ip = np->in_snip;
 	st_port = np->in_spnext;
-	flags = ni->nai_flags;
+	flags = nat->nat_flags;
 
 	if (flags & IPN_ICMPQUERY) {
 		sport = fin->fin_data[1];
@@ -2549,7 +2564,7 @@ ipf_nat_newrdr(fin, nat, ni)
 	hm = NULL;
 	in.s_addr = 0;
 	np = ni->nai_np;
-	flags = ni->nai_flags;
+	flags = nat->nat_flags;
 
 	if (flags & IPN_ICMPQUERY) {
 		dport = fin->fin_data[1];
@@ -2767,8 +2782,6 @@ ipf_nat_add(fin, np, natsave, flags, direction)
 	nflags &= NAT_FROMRULE;
 
 	ni.nai_np = np;
-	ni.nai_nflags = nflags;
-	ni.nai_flags = flags;
 	ni.nai_dport = 0;
 	ni.nai_sport = 0;
 
@@ -2864,6 +2877,32 @@ ipf_nat_add(fin, np, natsave, flags, direction)
 
 	np = ni.nai_np;
 
+	nat->nat_mssclamp = np->in_mssclamp;
+	nat->nat_me = natsave;
+	nat->nat_fr = fin->fin_fr;
+	nat->nat_rev = fin->fin_rev;
+	nat->nat_ptr = np;
+
+	if ((np->in_apr != NULL) && ((nat->nat_flags & NAT_SLAVE) == 0))
+		if (appr_new(fin, nat) == -1)
+			goto badnat;
+
+	nat->nat_ifps[0] = np->in_ifps[0];
+	if (np->in_ifps[0] != NULL) {
+		COPYIFNAME(np->in_ifps[0], nat->nat_ifnames[0]);
+	}
+
+	nat->nat_ifps[1] = np->in_ifps[1];
+	if (np->in_ifps[1] != NULL) {
+		COPYIFNAME(np->in_ifps[1], nat->nat_ifnames[1]);
+	}
+
+	if (ipf_nat_finalise(fin, nat) == -1) {
+		goto badnat;
+	}
+
+	np->in_use++;
+
 	if ((move == 1) && (np->in_flags & IPN_ROUNDR)) {
 		if ((np->in_redir & (NAT_REDIRECT|NAT_MAP)) == NAT_REDIRECT) {
 			ipf_nat_delrdr(np);
@@ -2872,10 +2911,6 @@ ipf_nat_add(fin, np, natsave, flags, direction)
 			ipf_nat_delnat(np);
 			ipf_nat_addnat(np);
 		}
-	}
-
-	if (ipf_nat_finalise(fin, nat, &ni, natsave, direction) == -1) {
-		goto badnat;
 	}
 
 	if (flags & SI_WILDP)
@@ -2902,31 +2937,24 @@ done:
 /* Returns:     int - 0 == sucess, -1 == failure                            */
 /* Parameters:  fin(I) - pointer to packet information                      */
 /*              nat(I) - pointer to NAT entry                               */
-/*              ni(I)  - pointer to structure with misc. information needed */
-/*                       to create new NAT entry.                           */
-/* Write Lock:                                                       */
+/* Write Lock:  ipf_nat                                                     */
 /*                                                                          */
 /* This is the tail end of constructing a new NAT entry and is the same     */
 /* for both IPv4 and IPv6.                                                  */
 /* ------------------------------------------------------------------------ */
 /*ARGSUSED*/
 static int
-ipf_nat_finalise(fin, nat, ni, natsave, direction)
+ipf_nat_finalise(fin, nat)
 	fr_info_t *fin;
 	nat_t *nat;
-	natinfo_t *ni;
-	nat_t **natsave;
-	int direction;
 {
 	u_32_t sum1, sum2, sumd;
 	frentry_t *fr;
-	ipnat_t *np;
 	u_32_t flags;
 
-	np = ni->nai_np;
-	flags = ni->nai_flags;
+	flags = nat->nat_flags;
 
-	switch (fin->fin_p)
+	switch (nat->nat_pr[0])
 	{
 	case IPPROTO_ICMP :
 		sum1 = LONG_SUM(ntohs(nat->nat_osport));
@@ -2956,14 +2984,14 @@ ipf_nat_finalise(fin, nat, ni, natsave, direction)
 #if SOLARIS && defined(_KERNEL) && (SOLARIS2 >= 6) && defined(ICK_M_CTL_MAGIC)
 	if ((flags & IPN_TCP) && dohwcksum &&
 	    (((ill_t *)qpi->qpi_ill)->ill_ick.ick_magic == ICK_M_CTL_MAGIC)) {
-		if (direction == NAT_OUTBOUND)
-			ni.nai_sum1 = LONG_SUM(in.s_addr);
+		if (nat->nat_dir == NAT_OUTBOUND)
+			sum1 = LONG_SUM(in.s_addr);
 		else
-			ni.nai_sum1 = LONG_SUM(ntohl(fin->fin_saddr));
-		ni.nai_sum1 += LONG_SUM(ntohl(fin->fin_daddr));
-		ni.nai_sum1 += 30;
-		ni.nai_sum1 = (ni.nai_sum1 & 0xffff) + (ni.nai_sum1 >> 16);
-		nat->nat_sumd[1] = NAT_HW_CKSUM|(ni.nai_sum1 & 0xffff);
+			sum1 = LONG_SUM(ntohl(nat->nat_osrcaddr));
+		sum1 += LONG_SUM(ntohl(nat->nat_odstaddr));
+		sum1 += 30;
+		sum1 = (sum1 & 0xffff) + (sum1 >> 16);
+		nat->nat_sumd[1] = NAT_HW_CKSUM|(sum1 & 0xffff);
 	} else
 #endif
 		nat->nat_sumd[1] = nat->nat_sumd[0];
@@ -2978,44 +3006,26 @@ ipf_nat_finalise(fin, nat, ni, natsave, direction)
 	CALC_SUMD(sum1, sum2, sumd);
 	nat->nat_ipsumd += (sumd & 0xffff) + (sumd >> 16);
 
-	if (np->in_ifps[0] != NULL) {
-		COPYIFNAME(np->in_ifps[0], nat->nat_ifnames[0]);
-	}
-	if (np->in_ifps[1] != NULL) {
-		COPYIFNAME(np->in_ifps[1], nat->nat_ifnames[1]);
-	}
-#ifdef	IPFILTER_SYNC
-	if ((nat->nat_flags & SI_CLONE) == 0)
-		nat->nat_sync = ipf_sync_new(SMC_NAT, fin, nat);
-#endif
-
-	nat->nat_me = natsave;
-	nat->nat_ifps[0] = np->in_ifps[0];
+	nat->nat_v[0] = 4;
+	nat->nat_v[1] = 4;
 
 	if ((nat->nat_ifps[0] != NULL) && (nat->nat_ifps[0] != (void *)-1)) {
 		nat->nat_mtu[0] = GETIFMTU(nat->nat_ifps[0]);
 	}
 
-	nat->nat_ifps[1] = np->in_ifps[1];
 	if ((nat->nat_ifps[1] != NULL) && (nat->nat_ifps[1] != (void *)-1)) {
 		nat->nat_mtu[1] = GETIFMTU(nat->nat_ifps[1]);
 	}
 
-	nat->nat_ptr = np;
-	nat->nat_mssclamp = np->in_mssclamp;
-	nat->nat_v[0] = 4;
-	nat->nat_v[1] = 4;
+#ifdef	IPFILTER_SYNC
+	if ((nat->nat_flags & SI_CLONE) == 0)
+		nat->nat_sync = ipf_sync_new(SMC_NAT, fin, nat);
+#endif
 
-	if ((np->in_apr != NULL) && ((ni->nai_flags & NAT_SLAVE) == 0))
-		if (appr_new(fin, nat) == -1)
-			return -1;
-
-	if (ipf_nat_insert(nat, fin->fin_rev) == 0) {
+	if (ipf_nat_insert(nat) == 0) {
 		if (ipf_nat_logging)
 			ipf_nat_log(nat, NL_NEW);
-		np->in_use++;
-		fr = fin->fin_fr;
-		nat->nat_fr = fr;
+		fr = nat->nat_fr;
 		if (fr != NULL) {
 			MUTEX_ENTER(&fr->fr_lock);
 			fr->fr_ref++;
@@ -3043,9 +3053,8 @@ ipf_nat_finalise(fin, nat, ni, natsave, direction)
 /* list of active NAT entries.  Adjust global counters when complete.       */
 /* ------------------------------------------------------------------------ */
 int
-ipf_nat_insert(nat, rev)
+ipf_nat_insert(nat)
 	nat_t *nat;
-	int rev;
 {
 	u_int hv1, hv2;
 	nat_t **natp;
@@ -3106,7 +3115,6 @@ ipf_nat_insert(nat, rev)
 
 	MUTEX_INIT(&nat->nat_lock, "nat entry lock");
 
-	nat->nat_rev = rev;
 	nat->nat_ref = 1;
 	nat->nat_bytes[0] = 0;
 	nat->nat_pkts[0] = 0;
@@ -3164,7 +3172,7 @@ ipf_nat_insert(nat, rev)
 	*natp = nat;
 	ipf_nat_stats.ns_side[1].ns_bucketlen[hv2]++;
 
-	ipf_nat_setqueue(nat, rev);
+	ipf_nat_setqueue(nat);
 
 	ipf_nat_stats.ns_added++;
 	ipf_nat_stats.ns_active++;
@@ -5711,9 +5719,7 @@ ipf_nat_expire()
 		}
 	}
 
-	for (ifq = ipf_nat_utqe; ifq != NULL; ifq = ifqnext) {
-		ifqnext = ifq->ifq_next;
-
+	for (ifq = ipf_nat_utqe; ifq != NULL; ifq = ifq->ifq_next) {
 		for (tqn = ifq->ifq_head; ((tqe = tqn) != NULL); i++) {
 			if (tqe->tqe_die > ipf_ticks)
 				break;
@@ -6120,7 +6126,8 @@ ipf_nat_clone(fin, nat)
 
 	MUTEX_NUKE(&clone->nat_lock);
 
-        clone->nat_aps = NULL;
+	clone->nat_rev = fin->fin_rev;
+	clone->nat_aps = NULL;
 	/*
 	 * Initialize all these so that ipf_nat_delete() doesn't cause a crash.
 	 */
@@ -6135,7 +6142,7 @@ ipf_nat_clone(fin, nat)
 	if (clone->nat_hm)
 		clone->nat_hm->hm_ref++;
 
-	if (ipf_nat_insert(clone, fin->fin_rev) == -1) {
+	if (ipf_nat_insert(clone) == -1) {
 		KFREE(clone);
 		ipf_nat_stats.ns_side[fin->fin_out].ns_insert_fail++;
 		return NULL;
@@ -6314,11 +6321,11 @@ ipf_nat_mssclamp(tcp, maxmss, fin, csump)
 /* determining which queue it should be placed on.                          */
 /* ------------------------------------------------------------------------ */
 void
-ipf_nat_setqueue(nat, rev)
+ipf_nat_setqueue(nat)
 	nat_t *nat;
-	int rev;
 {
 	ipftq_t *oifq, *nifq;
+	int rev = nat->nat_rev;
 
 	if (nat->nat_ptr != NULL)
 		nifq = nat->nat_ptr->in_tqehead[rev];
@@ -6565,9 +6572,9 @@ static int
 ipf_nat_extraflush(which)
 	int which;
 {
-	ipftq_t *ifq, *ifqnext;
 	nat_t *nat, **natp;
 	ipftqent_t *tqn;
+	ipftq_t *ifq;
 	int removed;
 	SPL_INT(s);
 
@@ -6610,8 +6617,7 @@ ipf_nat_extraflush(which)
 		/*
 		 * Also need to look through the user defined queues.
 		 */
-		for (ifq = ipf_nat_utqe; ifq != NULL; ifq = ifqnext) {
-			ifqnext = ifq->ifq_next;
+		for (ifq = ipf_nat_utqe; ifq != NULL; ifq = ifq->ifq_next) {
 			for (tqn = ifq->ifq_head; tqn != NULL; ) {
 				nat = tqn->tqe_parent;
 				tqn = tqn->tqe_next;
@@ -6839,7 +6845,7 @@ ipf_nat_newrewrite(fin, nat, nai)
 	natl = NULL;
 	changed = -1;
 	np = nai->nai_np;
-	flags = nai->nai_flags;
+	flags = nat->nat_flags;
 	bcopy((char *)fin, (char *)&frnat, sizeof(*fin));
 	frnat.fin_state = NULL;
 

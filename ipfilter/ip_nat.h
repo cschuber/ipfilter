@@ -454,8 +454,6 @@ typedef struct	natinfo	{
 	ipnat_t		*nai_np;
 	u_32_t		nai_sum1;
 	u_32_t		nai_sum2;
-	u_32_t		nai_nflags;
-	u_32_t		nai_flags;
 	struct	in_addr	nai_ip;		/* In host byte order */
 	u_short		nai_port;
 	u_short		nai_nport;
@@ -649,7 +647,7 @@ extern	int	ipf_nat_init __P((void));
 extern	nat_t	*ipf_nat_inlookup __P((fr_info_t *, u_int, u_int,
 				      struct in_addr, struct in_addr));
 extern	int	ipf_nat_in __P((fr_info_t *, nat_t *, int, u_32_t));
-extern	int	ipf_nat_insert __P((nat_t *, int));
+extern	int	ipf_nat_insert __P((nat_t *));
 extern	int	ipf_nat_ioctl __P((caddr_t, ioctlcmd_t, int, int, void *));
 extern	frentry_t *ipf_nat_ipfin __P((fr_info_t *, u_32_t *));
 extern	frentry_t *ipf_nat_ipfout __P((fr_info_t *, u_32_t *));
@@ -664,7 +662,7 @@ extern	nat_t	*ipf_nat_outlookup __P((fr_info_t *, u_int, u_int,
 				       struct in_addr, struct in_addr));
 extern	u_short	*ipf_nat_proto __P((fr_info_t *, nat_t *, u_int));
 extern	void	ipf_nat_rulederef __P((ipnat_t **));
-extern	void	ipf_nat_setqueue __P((nat_t *, int));
+extern	void	ipf_nat_setqueue __P((nat_t *));
 extern	void	ipf_nat_setpending __P((nat_t *));
 extern	nat_t	*ipf_nat_tnlookup __P((fr_info_t *, int));
 extern	void	ipf_nat_unload __P((void));
@@ -691,11 +689,12 @@ extern	void	ipf_nat6_addencap __P((ipnat_t *));
 extern	int	ipf_nat6_builddivertmp __P((ipnat_t *));
 extern	int	ipf_nat6_checkout __P((fr_info_t *, u_32_t *));
 extern	int	ipf_nat6_checkin __P((fr_info_t *, u_32_t *));
+extern	int	ipf_nat6_finalise __P((fr_info_t *, nat_t *));
 extern	nat_t	*ipf_nat6_icmperror __P((fr_info_t *, u_int *, int));
 extern	nat_t	*ipf_nat6_icmperrorlookup __P((fr_info_t *, int));
 extern	nat_t	*ipf_nat6_inlookup __P((fr_info_t *, u_int, u_int,
 					struct in6_addr *, struct in6_addr *));
-extern	int	ipf_nat6_insert __P((nat_t *, int));
+extern	int	ipf_nat6_insert __P((nat_t *));
 extern	u_32_t	ipf_nat6_ip6subtract __P((i6addr_t *, i6addr_t *));
 extern	frentry_t *ipf_nat6_ipfin __P((fr_info_t *, u_32_t *));
 extern	frentry_t *ipf_nat6_ipfout __P((fr_info_t *, u_32_t *));

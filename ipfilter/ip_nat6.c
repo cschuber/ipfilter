@@ -114,8 +114,6 @@ static	u_32_t	ipf_nat6_rdr_masks[4] = {0, 0, 0, 0};
 
 static struct hostmap *ipf_nat6_hostmap __P((ipnat_t *, i6addr_t *, i6addr_t *,
 					     i6addr_t *, u_32_t));
-static int ipf_nat6_finalise __P((fr_info_t *, nat_t *, natinfo_t *,
-				  nat_t **, int));
 static int ipf_nat6_match __P((fr_info_t *, ipnat_t *));
 static void ipf_nat6_tabmove __P((nat_t *));
 static int ipf_nat6_decap __P((fr_info_t *, nat_t *));
@@ -456,7 +454,7 @@ ipf_nat6_newmap(fin, nat, ni)
 	np = ni->nai_np;
 	st_ip = np->in_snip6;
 	st_port = np->in_spnext;
-	flags = ni->nai_flags;
+	flags = nat->nat_flags;
 
 	if (flags & IPN_ICMPQUERY) {
 		sport = fin->fin_data[1];
@@ -729,7 +727,7 @@ ipf_nat6_newrdr(fin, nat, ni)
 	in.i6[2] = 0;
 	in.i6[3] = 0;
 	np = ni->nai_np;
-	flags = ni->nai_flags;
+	flags = nat->nat_flags;
 
 	if (flags & IPN_ICMPQUERY) {
 		dport = fin->fin_data[1];
@@ -952,8 +950,6 @@ ipf_nat6_add(fin, np, natsave, flags, direction)
 	nflags &= NAT_FROMRULE;
 
 	ni.nai_np = np;
-	ni.nai_nflags = nflags;
-	ni.nai_flags = flags;
 	ni.nai_dport = 0;
 	ni.nai_sport = 0;
 
@@ -1051,6 +1047,34 @@ ipf_nat6_add(fin, np, natsave, flags, direction)
 
 	np = ni.nai_np;
 
+	nat->nat_mssclamp = np->in_mssclamp;
+	nat->nat_me = natsave;
+	nat->nat_fr = fin->fin_fr;
+	nat->nat_rev = fin->fin_rev;
+	nat->nat_ptr = np;
+
+#ifdef IPF_V6_PROXIES
+	if ((np->in_apr != NULL) && ((nat->nat_flags & NAT_SLAVE) == 0))
+		if (appr_new(fin, nat) == -1)
+			goto badnat;
+#endif
+
+	nat->nat_ifps[0] = np->in_ifps[0];
+	if (np->in_ifps[0] != NULL) {
+		COPYIFNAME(np->in_ifps[0], nat->nat_ifnames[0]);
+	}
+
+	nat->nat_ifps[1] = np->in_ifps[1];
+	if (np->in_ifps[1] != NULL) {
+		COPYIFNAME(np->in_ifps[1], nat->nat_ifnames[1]);
+	}
+
+	if (ipf_nat6_finalise(fin, nat) == -1) {
+		goto badnat;
+	}
+
+	np->in_use++;
+
 	if ((move == 1) && (np->in_flags & IPN_ROUNDR)) {
 		if ((np->in_redir & (NAT_REDIRECT|NAT_MAP)) == NAT_REDIRECT) {
 			ipf_nat_delrdr(np);
@@ -1059,10 +1083,6 @@ ipf_nat6_add(fin, np, natsave, flags, direction)
 			ipf_nat_delnat(np);
 			ipf_nat6_addnat(np);
 		}
-	}
-
-	if (ipf_nat6_finalise(fin, nat, &ni, natsave, direction) == -1) {
-		goto badnat;
 	}
 
 	if (flags & SI_WILDP)
@@ -1089,29 +1109,22 @@ done:
 /* Returns:     int - 0 == sucess, -1 == failure                            */
 /* Parameters:  fin(I) - pointer to packet information                      */
 /*              nat(I) - pointer to NAT entry                               */
-/*              ni(I)  - pointer to structure with misc. information needed */
-/*                       to create new NAT entry.                           */
-/* Write Lock:                                                       */
+/* Write Lock:  ipf_nat                                                     */
 /*                                                                          */
 /* This is the tail end of constructing a new NAT entry and is the same     */
 /* for both IPv4 and IPv6.                                                  */
 /* ------------------------------------------------------------------------ */
 /*ARGSUSED*/
-static int
-ipf_nat6_finalise(fin, nat, ni, natsave, direction)
+int
+ipf_nat6_finalise(fin, nat)
 	fr_info_t *fin;
 	nat_t *nat;
-	natinfo_t *ni;
-	nat_t **natsave;
-	int direction;
 {
 	u_32_t sum1, sum2, sumd;
 	frentry_t *fr;
-	ipnat_t *np;
 	u_32_t flags;
 
-	np = ni->nai_np;
-	flags = ni->nai_flags;
+	flags = nat->nat_flags;
 
 	switch (fin->fin_p)
 	{
@@ -1142,46 +1155,26 @@ ipf_nat6_finalise(fin, nat, ni, natsave, direction)
 
 	nat->nat_sumd[1] = nat->nat_sumd[0];
 
-	if (np->in_ifps[0] != NULL) {
-		COPYIFNAME(np->in_ifps[0], nat->nat_ifnames[0]);
-	}
-	if (np->in_ifps[1] != NULL) {
-		COPYIFNAME(np->in_ifps[1], nat->nat_ifnames[1]);
-	}
 #ifdef	IPFILTER_SYNC
 	if ((nat->nat_flags & SI_CLONE) == 0)
 		nat->nat_sync = ipf_sync_new(SMC_NAT, fin, nat);
 #endif
 
-	nat->nat_me = natsave;
-	nat->nat_ifps[0] = np->in_ifps[0];
-
 	if ((nat->nat_ifps[0] != NULL) && (nat->nat_ifps[0] != (void *)-1)) {
 		nat->nat_mtu[0] = GETIFMTU(nat->nat_ifps[0]);
 	}
 
-	nat->nat_ifps[1] = np->in_ifps[1];
 	if ((nat->nat_ifps[1] != NULL) && (nat->nat_ifps[1] != (void *)-1)) {
 		nat->nat_mtu[1] = GETIFMTU(nat->nat_ifps[1]);
 	}
 
-	nat->nat_ptr = np;
-	nat->nat_mssclamp = np->in_mssclamp;
 	nat->nat_v[0] = 6;
 	nat->nat_v[1] = 6;
 
-#ifdef IPF_V6_PROXIES
-	if ((np->in_apr != NULL) && ((ni->nai_flags & NAT_SLAVE) == 0))
-		if (appr_new(fin, nat) == -1)
-			return -1;
-#endif
-
-	if (ipf_nat6_insert(nat, fin->fin_rev) == 0) {
+	if (ipf_nat6_insert(nat) == 0) {
 		if (ipf_nat_logging)
 			ipf_nat_log(nat, NL_NEW);
-		np->in_use++;
-		fr = fin->fin_fr;
-		nat->nat_fr = fr;
+		fr = nat->nat_fr;
 		if (fr != NULL) {
 			MUTEX_ENTER(&fr->fr_lock);
 			fr->fr_ref++;
@@ -1209,9 +1202,8 @@ ipf_nat6_finalise(fin, nat, ni, natsave, direction)
 /* list of active NAT entries.  Adjust global counters when complete.       */
 /* ------------------------------------------------------------------------ */
 int
-ipf_nat6_insert(nat, rev)
+ipf_nat6_insert(nat)
 	nat_t *nat;
-	int rev;
 {
 	u_int hv1, hv2;
 	nat_t **natp;
@@ -1271,7 +1263,6 @@ ipf_nat6_insert(nat, rev)
 
 	MUTEX_INIT(&nat->nat_lock, "nat entry lock");
 
-	nat->nat_rev = rev;
 	nat->nat_ref = 1;
 	nat->nat_bytes[0] = 0;
 	nat->nat_pkts[0] = 0;
@@ -1330,7 +1321,7 @@ ipf_nat6_insert(nat, rev)
 	*natp = nat;
 	ipf_nat_stats.ns_side[1].ns_bucketlen[hv2]++;
 
-	ipf_nat_setqueue(nat, rev);
+	ipf_nat_setqueue(nat);
 
 	ipf_nat_stats.ns_added++;
 	ipf_nat_stats.ns_active++;
@@ -3600,7 +3591,7 @@ ipf_nat6_newrewrite(fin, nat, nai)
 	natl = NULL;
 	changed = -1;
 	np = nai->nai_np;
-	flags = nai->nai_flags;
+	flags = nat->nat_flags;
 	bcopy((char *)fin, (char *)&frnat, sizeof(*fin));
 	frnat.fin_state = NULL;
 
