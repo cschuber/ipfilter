@@ -304,7 +304,7 @@ u_32_t *passp;
 
 /* ------------------------------------------------------------------------ */
 /* Function:    fr_newauth                                                  */
-/* Returns:     int - 0 == success, else error                              */
+/* Returns:     int - 0 == success, 0 = did not put packet on auth queue    */
 /* Parameters:  m(I)   - pointer to mb_t with packet in it                  */
 /*              fin(I) - pointer to packet information                      */
 /*                                                                          */
@@ -349,6 +349,8 @@ fr_info_t *fin;
 		fra->fra_pass = 0;
 	fra->fra_age = fr_defaultauthage;
 	bcopy((char *)fin, (char *)&fra->fra_info, sizeof(*fin));
+	fra->fra_flx = fra->fra_info.fin_flx & (FI_STATE|FI_NATED);
+	fra->fra_info.fin_flx &= ~(FI_STATE|FI_NATED);
 #if !defined(sparc) && !defined(m68k)
 	/*
 	 * No need to copyback here as we want to undo the changes, not keep
