@@ -1506,7 +1506,7 @@ int getlock;
 		}
 	} else if (nat->nat_dir == NAT_INBOUND) {
 		fin.fin_ifp = nat->nat_ifps[0];
-		fin.fin_data[0] = ntohs(nat->nat_outport);
+		fin.fin_data[0] = ntohs(nat->nat_inport);
 		fin.fin_data[1] = ntohs(nat->nat_oport);
 		if (getlock) {
 			READ_ENTER(&ipf_nat);
