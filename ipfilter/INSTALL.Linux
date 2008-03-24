@@ -1,1 +1,18 @@
-Linux is no longer supported.
+
+David Stes notes on Ipfilter for Linux
+--------------------------------------
+
+Darren Reed ported ipfilter to Linux RedHat 9 and SuSE 9.x.
+
+I had relatively good results on Linux Slackware (which is what I use)
+with version 4.1.27 of ipfilter, on Slackware 10.0.
+
+I also ported 4.1.27 to Slackware 12.0 and 4.1.27 worked on Linux 2.6.21-5.
+
+Darren Reed didn't mind adding my fixes to the ipfilter 5.x branch, so
+we are working now on making ipfilter 5.x support Slackware 12.0 with its
+2.6.21-5 kernel.
+
+David Stes
+Email: stes@pandora.be
+
