@@ -1097,83 +1097,79 @@ ipf_pr_icmp(fin)
 		return;
 	}
 
-	if (fin->fin_dlen > 1) {
-		icmp = fin->fin_dp;
+	icmp = fin->fin_dp;
 
-		fin->fin_data[0] = *(u_short *)icmp;
+	fin->fin_data[0] = *(u_short *)icmp;
+	fin->fin_data[1] = icmp->icmp_id;
 
-		if (fin->fin_dlen >= 6)				/* ID field */
-			fin->fin_data[1] = icmp->icmp_id;
-
-		switch (icmp->icmp_type)
-		{
-		case ICMP_ECHOREPLY :
-		case ICMP_ECHO :
-		/* Router discovery messaes - RFC 1256 */
-		case ICMP_ROUTERADVERT :
-		case ICMP_ROUTERSOLICIT :
-			fin->fin_flx |= FI_ICMPQUERY;
-			minicmpsz = ICMP_MINLEN;
-			break;
-		/*
-		 * type(1) + code(1) + cksum(2) + id(2) seq(2) +
-		 * 3 * timestamp(3 * 4)
-		 */
-		case ICMP_TSTAMP :
-		case ICMP_TSTAMPREPLY :
-			fin->fin_flx |= FI_ICMPQUERY;
-			minicmpsz = 20;
-			break;
-		/*
-		 * type(1) + code(1) + cksum(2) + id(2) seq(2) +
-		 * mask(4)
-		 */
-		case ICMP_MASKREQ :
-		case ICMP_MASKREPLY :
-			fin->fin_flx |= FI_ICMPQUERY;
-			minicmpsz = 12;
-			break;
-		/*
-		 * type(1) + code(1) + cksum(2) + id(2) seq(2) + ip(20+)
-		 */
-		case ICMP_UNREACH :
+	switch (icmp->icmp_type)
+	{
+	case ICMP_ECHOREPLY :
+	case ICMP_ECHO :
+	/* Router discovery messaes - RFC 1256 */
+	case ICMP_ROUTERADVERT :
+	case ICMP_ROUTERSOLICIT :
+		fin->fin_flx |= FI_ICMPQUERY;
+		minicmpsz = ICMP_MINLEN;
+		break;
+	/*
+	 * type(1) + code(1) + cksum(2) + id(2) seq(2) +
+	 * 3 * timestamp(3 * 4)
+	 */
+	case ICMP_TSTAMP :
+	case ICMP_TSTAMPREPLY :
+		fin->fin_flx |= FI_ICMPQUERY;
+		minicmpsz = 20;
+		break;
+	/*
+	 * type(1) + code(1) + cksum(2) + id(2) seq(2) +
+	 * mask(4)
+	 */
+	case ICMP_MASKREQ :
+	case ICMP_MASKREPLY :
+		fin->fin_flx |= FI_ICMPQUERY;
+		minicmpsz = 12;
+		break;
+	/*
+	 * type(1) + code(1) + cksum(2) + id(2) seq(2) + ip(20+)
+	 */
+	case ICMP_UNREACH :
 #ifdef icmp_nextmtu
-			if (icmp->icmp_code == ICMP_UNREACH_NEEDFRAG) {
-				if (icmp->icmp_nextmtu < ipf_icmpminfragmtu)
-					fin->fin_flx |= FI_BAD;
-			}
-#endif
-		case ICMP_SOURCEQUENCH :
-		case ICMP_REDIRECT :
-		case ICMP_TIMXCEED :
-		case ICMP_PARAMPROB :
-			fin->fin_flx |= FI_ICMPERR;
-			if (ipf_coalesce(fin) != 1) {
-				ATOMIC_INCL(ipf_stats[fin->fin_out].
-					    fr_icmp_coalesce);
-				return;
-			}
-
-			/*
-			 * ICMP error packets should not be generated for IP
-			 * packets that are a fragment that isn't the first
-			 * fragment.
-			 */
-			oip = (ip_t *)((char *)fin->fin_dp + ICMPERR_ICMPHLEN);
-			if ((ntohs(oip->ip_off) & IP_OFFMASK) != 0)
+		if (icmp->icmp_code == ICMP_UNREACH_NEEDFRAG) {
+			if (icmp->icmp_nextmtu < ipf_icmpminfragmtu)
 				fin->fin_flx |= FI_BAD;
-
-			/*
-			 * If the destination of this packet doesn't match the
-			 * source of the original packet then this packet is
-			 * not correct.
-			 */
-			if (oip->ip_src.s_addr != fin->fin_daddr)
-				fin->fin_flx |= FI_BAD;
-			break;
-		default :
-			break;
 		}
+#endif
+	case ICMP_SOURCEQUENCH :
+	case ICMP_REDIRECT :
+	case ICMP_TIMXCEED :
+	case ICMP_PARAMPROB :
+		fin->fin_flx |= FI_ICMPERR;
+		if (ipf_coalesce(fin) != 1) {
+			ATOMIC_INCL(ipf_stats[fin->fin_out].
+				    fr_icmp_coalesce);
+			return;
+		}
+
+		/*
+		 * ICMP error packets should not be generated for IP
+		 * packets that are a fragment that isn't the first
+		 * fragment.
+		 */
+		oip = (ip_t *)((char *)fin->fin_dp + ICMPERR_ICMPHLEN);
+		if ((ntohs(oip->ip_off) & IP_OFFMASK) != 0)
+			fin->fin_flx |= FI_BAD;
+
+		/*
+		 * If the destination of this packet doesn't match the
+		 * source of the original packet then this packet is
+		 * not correct.
+		 */
+		if (oip->ip_src.s_addr != fin->fin_daddr)
+			fin->fin_flx |= FI_BAD;
+		break;
+	default :
+		break;
 	}
 
 	ipf_pr_short(fin, minicmpsz);
@@ -2702,10 +2698,7 @@ ipf_check(ip, hlen, ifp, out
 	SPL_INT(s);
 # endif
 
-	READ_ENTER(&ipf_global);
-
 	if (ipf_running <= 0) {
-		RWLOCK_EXIT(&ipf_global);
 		return 0;
 	}
 
@@ -2752,8 +2745,6 @@ ipf_check(ip, hlen, ifp, out
 #  endif /* CSUM_DELAY_DATA */
 # endif /* MENTAT */
 #else
-	READ_ENTER(&ipf_global);
-
 	bzero((char *)fin, sizeof(*fin));
 	m = *mp;
 # if defined(M_MCAST)
@@ -3093,7 +3084,6 @@ finished:
 	}
 
 	SPL_X(s);
-	RWLOCK_EXIT(&ipf_global);
 
 #ifdef _KERNEL
 	return (FR_ISPASS(pass)) ? 0 : fin->fin_error;
@@ -5574,44 +5564,54 @@ ipf_movequeue(tqe, oifq, nifq)
 	 * Is the operation here going to be a no-op ?
 	 */
 	MUTEX_ENTER(&oifq->ifq_lock);
-	if ((oifq != nifq) || (*oifq->ifq_tail != tqe)) {
-		/*
-		 * Remove from the old queue
-		 */
-		*tqe->tqe_pnext = tqe->tqe_next;
-		if (tqe->tqe_next)
-			tqe->tqe_next->tqe_pnext = tqe->tqe_pnext;
-		else
-			oifq->ifq_tail = tqe->tqe_pnext;
-		tqe->tqe_next = NULL;
-
-		/*
-		 * If we're moving from one queue to another, release the
-		 * lock on the old queue and get a lock on the new queue.
-		 * For user defined queues, if we're moving off it, call
-		 * delete in case it can now be freed.
-		 */
-		if (oifq != nifq) {
-			tqe->tqe_ifq = NULL;
-
-			(void) ipf_deletetimeoutqueue(oifq);
-
-			MUTEX_EXIT(&oifq->ifq_lock);
-
-			MUTEX_ENTER(&nifq->ifq_lock);
-
-			tqe->tqe_ifq = nifq;
-			nifq->ifq_ref++;
+	tqe->tqe_die = ipf_ticks + nifq->ifq_ttl;
+	/*
+	 * Is the operation here going to be a no-op ?
+	 */
+	if (oifq == nifq) {
+		if ((tqe->tqe_next == NULL) ||
+		    (tqe->tqe_next->tqe_die == tqe->tqe_die)) {
+			MUTEX_EXIT(&nifq->ifq_lock);
+			return;
 		}
-
-		/*
-		 * Add to the bottom of the new queue
-		 */
-		tqe->tqe_die = ipf_ticks + nifq->ifq_ttl;
-		tqe->tqe_pnext = nifq->ifq_tail;
-		*nifq->ifq_tail = tqe;
-		nifq->ifq_tail = &tqe->tqe_next;
 	}
+
+	/*
+	 * Remove from the old queue
+	 */
+	*tqe->tqe_pnext = tqe->tqe_next;
+	if (tqe->tqe_next)
+		tqe->tqe_next->tqe_pnext = tqe->tqe_pnext;
+	else
+		oifq->ifq_tail = tqe->tqe_pnext;
+	tqe->tqe_next = NULL;
+
+	/*
+	 * If we're moving from one queue to another, release the
+	 * lock on the old queue and get a lock on the new queue.
+	 * For user defined queues, if we're moving off it, call
+	 * delete in case it can now be freed.
+	 */
+	if (oifq != nifq) {
+		tqe->tqe_ifq = NULL;
+
+		(void) ipf_deletetimeoutqueue(oifq);
+
+		MUTEX_EXIT(&oifq->ifq_lock);
+
+		MUTEX_ENTER(&nifq->ifq_lock);
+
+		tqe->tqe_ifq = nifq;
+		nifq->ifq_ref++;
+	}
+
+	/*
+	 * Add to the bottom of the new queue
+	 */
+	tqe->tqe_die = ipf_ticks + nifq->ifq_ttl;
+	tqe->tqe_pnext = nifq->ifq_tail;
+	*nifq->ifq_tail = tqe;
+	nifq->ifq_tail = &tqe->tqe_next;
 	MUTEX_EXIT(&nifq->ifq_lock);
 }
 
