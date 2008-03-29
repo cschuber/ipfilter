@@ -1001,84 +1001,80 @@ fr_info_t *fin;
 	if (frpr_pullup(fin, ICMPERR_ICMPHLEN) == -1)
 		return;
 
-	if (fin->fin_dlen > 1) {
-		icmp = fin->fin_dp;
+	icmp = fin->fin_dp;
 
-		fin->fin_data[0] = *(u_short *)icmp;
+	fin->fin_data[0] = *(u_short *)icmp;
+	fin->fin_data[1] = icmp->icmp_id;
 
-		if (fin->fin_dlen >= 6)				/* ID field */
-			fin->fin_data[1] = icmp->icmp_id;
-
-		switch (icmp->icmp_type)
-		{
-		case ICMP_ECHOREPLY :
-		case ICMP_ECHO :
-		/* Router discovery messaes - RFC 1256 */
-		case ICMP_ROUTERADVERT :
-		case ICMP_ROUTERSOLICIT :
-			minicmpsz = ICMP_MINLEN;
-			break;
-		/*
-		 * type(1) + code(1) + cksum(2) + id(2) seq(2) +
-		 * 3 * timestamp(3 * 4)
-		 */
-		case ICMP_TSTAMP :
-		case ICMP_TSTAMPREPLY :
-			minicmpsz = 20;
-			break;
-		/*
-		 * type(1) + code(1) + cksum(2) + id(2) seq(2) +
-		 * mask(4)
-		 */
-		case ICMP_MASKREQ :
-		case ICMP_MASKREPLY :
-			minicmpsz = 12;
-			break;
-		/*
-		 * type(1) + code(1) + cksum(2) + id(2) seq(2) + ip(20+)
-		 */
-		case ICMP_UNREACH :
+	switch (icmp->icmp_type)
+	{
+	case ICMP_ECHOREPLY :
+	case ICMP_ECHO :
+	/* Router discovery messaes - RFC 1256 */
+	case ICMP_ROUTERADVERT :
+	case ICMP_ROUTERSOLICIT :
+		minicmpsz = ICMP_MINLEN;
+		break;
+	/*
+	 * type(1) + code(1) + cksum(2) + id(2) seq(2) +
+	 * 3 * timestamp(3 * 4)
+	 */
+	case ICMP_TSTAMP :
+	case ICMP_TSTAMPREPLY :
+		minicmpsz = 20;
+		break;
+	/*
+	 * type(1) + code(1) + cksum(2) + id(2) seq(2) +
+	 * mask(4)
+	 */
+	case ICMP_MASKREQ :
+	case ICMP_MASKREPLY :
+		minicmpsz = 12;
+		break;
+	/*
+	 * type(1) + code(1) + cksum(2) + id(2) seq(2) + ip(20+)
+	 */
+	case ICMP_UNREACH :
 #ifdef icmp_nextmtu
-			if (icmp->icmp_code == ICMP_UNREACH_NEEDFRAG) {
-				if (icmp->icmp_nextmtu < fr_icmpminfragmtu)
-					fin->fin_flx |= FI_BAD;
-			}
-#endif
-		case ICMP_SOURCEQUENCH :
-		case ICMP_REDIRECT :
-		case ICMP_TIMXCEED :
-		case ICMP_PARAMPROB :
-			fin->fin_flx |= FI_ICMPERR;
-			if (fr_coalesce(fin) != 1)
-				return;
-			/*
-			 * ICMP error packets should not be generated for IP
-			 * packets that are a fragment that isn't the first
-			 * fragment.
-			 */
-			oip = (ip_t *)((char *)fin->fin_dp + ICMPERR_ICMPHLEN);
-			if ((ntohs(oip->ip_off) & IP_OFFMASK) != 0)
+		if (icmp->icmp_code == ICMP_UNREACH_NEEDFRAG) {
+			if (icmp->icmp_nextmtu < fr_icmpminfragmtu)
 				fin->fin_flx |= FI_BAD;
-
-			/*
-			 * If the destination of this packet doesn't match the
-			 * source of the original packet then this packet is
-			 * not correct.
-			 */
-			if (oip->ip_src.s_addr != fin->fin_daddr)
-				fin->fin_flx |= FI_BAD;
-
-			/*
-			 * If the destination of this packet doesn't match the
-			 * source of the original packet then this packet is
-			 * not correct.
-			 */
-			if (oip->ip_src.s_addr != fin->fin_daddr)
-				fin->fin_flx |= FI_BAD;
-			break;
-		default :
-			break;
 		}
+#endif
+	case ICMP_SOURCEQUENCH :
+	case ICMP_REDIRECT :
+	case ICMP_TIMXCEED :
+	case ICMP_PARAMPROB :
+		fin->fin_flx |= FI_ICMPERR;
+		if (fr_coalesce(fin) != 1)
+			return;
+		/*
+		 * ICMP error packets should not be generated for IP
+		 * packets that are a fragment that isn't the first
+		 * fragment.
+		 */
+		oip = (ip_t *)((char *)fin->fin_dp + ICMPERR_ICMPHLEN);
+		if ((ntohs(oip->ip_off) & IP_OFFMASK) != 0)
+			fin->fin_flx |= FI_BAD;
+
+		/*
+		 * If the destination of this packet doesn't match the
+		 * source of the original packet then this packet is
+		 * not correct.
+		 */
+		if (oip->ip_src.s_addr != fin->fin_daddr)
+			fin->fin_flx |= FI_BAD;
+
+		/*
+		 * If the destination of this packet doesn't match the
+		 * source of the original packet then this packet is
+		 * not correct.
+		 */
+		if (oip->ip_src.s_addr != fin->fin_daddr)
+			fin->fin_flx |= FI_BAD;
+		break;
+	default :
+		break;
 	}
 
 	frpr_short(fin, minicmpsz);
