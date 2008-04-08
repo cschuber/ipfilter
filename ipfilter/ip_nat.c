@@ -3844,6 +3844,18 @@ maskloop:
 			ATOMIC_INC32(np->in_use);
 			RWLOCK_EXIT(&ipf_nat);
 			WRITE_ENTER(&ipf_nat);
+			/*
+			 * If we've matched a round-robin rule but it has
+			 * moved in the list since we got it, start over as
+			 * this is now no longer correct.
+			 */
+			if (npnext != np->in_mnext) {
+				if (np->in_flags & IPN_ROUNDR) {
+					MUTEX_DOWNGRADE(&ipf_nat);
+					goto maskloop;
+				}
+				npnext = np->in_mnext;
+			}
 			nat = nat_new(fin, np, NULL, nflags, NAT_OUTBOUND);
 			if (nat != NULL) {
 				np->in_hits++;
@@ -4145,6 +4157,16 @@ maskloop:
 			ATOMIC_INC32(np->in_use);
 			RWLOCK_EXIT(&ipf_nat);
 			WRITE_ENTER(&ipf_nat);
+			/*
+			 * If we've matched a round-robin rule but it has
+			 * moved in the list since we got it, start over as
+			 * this is now no longer correct.
+			 */
+			if ((npnext != np->in_rnext) &&
+			    (np->in_flags & IPN_ROUNDR)) {
+				MUTEX_DOWNGRADE(&ipf_nat);
+				goto maskloop;
+			}
 			nat = nat_new(fin, np, NULL, nflags, NAT_INBOUND);
 			if (nat != NULL) {
 				np->in_hits++;
