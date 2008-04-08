@@ -4473,11 +4473,11 @@ ipf_nat_checkout(fin, passp)
 	fr_info_t *fin;
 	u_32_t *passp;
 {
+	ipnat_t *np = NULL, *npnext;
 	struct ifnet *ifp, *sifp;
 	icmphdr_t *icmp = NULL;
 	tcphdr_t *tcp = NULL;
 	int rval, natfailed;
-	ipnat_t *np = NULL;
 	u_int nflags = 0;
 	u_32_t ipa, iph;
 	int natadd = 1;
@@ -4563,15 +4563,14 @@ ipf_nat_checkout(fin, passp)
 		 * If there is no current entry in the nat table for this IP#,
 		 * create one for it (if there is a matching rule).
 		 */
-		RWLOCK_EXIT(&ipf_nat);
 		msk = 0xffffffff;
 		nmsk = ipf_nat_map_masks;
-		WRITE_ENTER(&ipf_nat);
 maskloop:
 		iph = ipa & htonl(msk);
 		hv = NAT_HASH_FN(iph, 0, ipf_nat_maprules_sz);
-		for (np = ipf_nat_map_rules[hv]; np; np = np->in_mnext)
-		{
+retry_roundrobin:
+		for (np = ipf_nat_map_rules[hv]; np; np = npnext) {
+			npnext = np->in_mnext;
 			if ((np->in_ifps[1] && (np->in_ifps[1] != ifp)))
 				continue;
 			if (np->in_v[0] != 4)
@@ -4612,13 +4611,32 @@ maskloop:
 				np->in_hits++;
 				break;
 			}
+			ATOMIC_INC32(np->in_use);
+			RWLOCK_EXIT(&ipf_nat);
+
+			WRITE_ENTER(&ipf_nat);
+			/*
+			 * If we've matched a round-robin rule but it has
+			 * moved in the list since we got it, start over as
+			 * this is now no longer correct.
+			 */
+			if (npnext != np->in_mnext) {
+				if ((np->in_flags & IPN_ROUNDR) != 0) {
+					MUTEX_DOWNGRADE(&ipf_nat);
+					goto retry_roundrobin;
+				}
+				npnext = np->in_mnext;
+			}
 
 			if ((nat = ipf_nat_add(fin, np, NULL, nflags,
 					   NAT_OUTBOUND))) {
 				np->in_hits++;
+				np->in_use--;
 				break;
-			} else
-				natfailed = -1;
+			}
+			natfailed = -1;
+			ipf_nat_rulederef(&np);
+			MUTEX_DOWNGRADE(&ipf_nat);
 		}
 		if ((np == NULL) && (nmsk != 0)) {
 			while (nmsk) {
@@ -5062,13 +5080,13 @@ ipf_nat_checkin(fin, passp)
 	u_32_t *passp;
 {
 	u_int nflags, natadd;
+	ipnat_t *np, *npnext;
 	int rval, natfailed;
 	struct ifnet *ifp;
 	struct in_addr in;
 	icmphdr_t *icmp;
 	tcphdr_t *tcp;
 	u_short dport;
-	ipnat_t *np;
 	nat_t *nat;
 	u_32_t iph;
 
@@ -5139,10 +5157,8 @@ ipf_nat_checkin(fin, passp)
 			rval = -1;
 			goto inmatchfail;
 		}
-		RWLOCK_EXIT(&ipf_nat);
 		rmsk = ipf_nat_rdr_masks;
 		msk = 0xffffffff;
-		WRITE_ENTER(&ipf_nat);
 		/*
 		 * If there is no current entry in the nat table for this IP#,
 		 * create one for it (if there is a matching rule).
@@ -5150,8 +5166,10 @@ ipf_nat_checkin(fin, passp)
 maskloop:
 		iph = in.s_addr & htonl(msk);
 		hv = NAT_HASH_FN(iph, 0, ipf_nat_rdrrules_sz);
+retry_roundrobin:
 		/* TRACE (iph,msk,rmsk,hv,ipf_nat_rdrrules_sz) */
-		for (np = ipf_nat_rdr_rules[hv]; np; np = np->in_rnext) {
+		for (np = ipf_nat_rdr_rules[hv]; np; np = npnext) {
+			npnext = np->in_rnext;
 			if (np->in_ifps[0] && (np->in_ifps[0] != ifp))
 				continue;
 			if (np->in_v[0] != 4)
@@ -5192,13 +5210,32 @@ maskloop:
 				np->in_hits++;
 				break;
 			}
+			ATOMIC_INC32(np->in_use);
+			RWLOCK_EXIT(&ipf_nat);
+
+			WRITE_ENTER(&ipf_nat);
+			/*
+			 * If we've matched a round-robin rule but it has
+			 * moved in the list since we got it, start over as
+			 * this is now no longer correct.
+			 */
+			if (npnext != np->in_rnext) {
+				if ((np->in_flags & IPN_ROUNDR) != 0) {
+					MUTEX_DOWNGRADE(&ipf_nat);
+					goto retry_roundrobin;
+				}
+				npnext = np->in_rnext;
+			}
 
 			nat = ipf_nat_add(fin, np, NULL, nflags, NAT_INBOUND);
 			if (nat != NULL) {
 				np->in_hits++;
+				np->in_use--;
 				break;
-			} else
-				natfailed = -1;
+			}
+			natfailed = -1;
+			ipf_nat_rulederef(&np);
+			MUTEX_DOWNGRADE(&ipf_nat);
 		}
 
 		if ((np == NULL) && (rmsk != 0)) {
