@@ -161,7 +161,8 @@ struct radix_node_head {
 #define FreeS(p, z)		KFREES(p, z)
 #define Free(p)			KFREE(p)
 
-#if (defined(__osf__) || defined(AIX) || (IRIX >= 60516) || defined(sun)) && defined(_KERNEL)
+#if (defined(__osf__) || defined(AIX) || \
+    (defined(IRIX) && (IRIX >= 60516)) || defined(sun)) && defined(_KERNEL)
 # define	rn_init		ipf_rn_init
 # define	rn_fini		ipf_rn_fini
 # define	rn_inithead	ipf_rn_inithead
