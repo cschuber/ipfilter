@@ -6014,8 +6014,10 @@ ipf_nat_log(nat, action)
 	natl.nl_osrcport = nat->nat_osport;
 	natl.nl_nsrcport = nat->nat_nsport;
 	natl.nl_ndstport = nat->nat_ndport;
-	natl.nl_p = nat->nat_pr[0];
-	natl.nl_v = nat->nat_v[0];
+	natl.nl_p[0] = nat->nat_pr[0];
+	natl.nl_p[1] = nat->nat_pr[1];
+	natl.nl_v[0] = nat->nat_v[0];
+	natl.nl_v[1] = nat->nat_v[1];
 	natl.nl_type = nat->nat_redir;
 	natl.nl_action = action;
 	natl.nl_rule = -1;

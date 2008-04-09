@@ -556,8 +556,8 @@ typedef	struct	natlog {
 	int		nl_rule;
 	U_QUAD_T	nl_pkts[2];
 	U_QUAD_T	nl_bytes[2];
-	u_char		nl_p;
-	u_char		nl_v;
+	u_char		nl_p[2];
+	u_char		nl_v[2];
 	u_char		nl_ifnames[2][LIFNAMSIZ];
 } natlog_t;
 

@@ -843,33 +843,40 @@ static void print_natlog(conf, buf, blen)
 	}
 	t += strlen(t);
 
-	proto = getproto(nl->nl_p);
+	proto = getproto(nl->nl_p[0]);
 
 	if (simple == 1) {
-		sprintf(t, "%s,%s <- -> ", HOSTNAME_V4(res, nl->nl_osrcip),
+		sprintf(t, "%s,%s <- -> ",
+			hostname(res, nl->nl_v[0], nl->nl_osrcip.i6),
 			portname(res, proto, (u_int)nl->nl_osrcport));
 		t += strlen(t);
-		sprintf(t, "%s,%s ", HOSTNAME_V4(res, nl->nl_nsrcip),
+		sprintf(t, "%s,%s ",
+			hostname(res, nl->nl_v[0], nl->nl_nsrcip.i6),
 			portname(res, proto, (u_int)nl->nl_nsrcport));
 		t += strlen(t);
-		sprintf(t, "[%s,%s]", HOSTNAME_V4(res, nl->nl_odstip),
+		sprintf(t, "[%s,%s]",
+			hostname(res, nl->nl_v[0], nl->nl_odstip.i6),
 			portname(res, proto, (u_int)nl->nl_odstport));
 	} else {
-		sprintf(t, "%s,%s ", HOSTNAME_V4(res, nl->nl_osrcip),
+		sprintf(t, "%s,%s ",
+			hostname(res, nl->nl_v[0], nl->nl_osrcip.i6),
 			portname(res, proto, (u_int)nl->nl_osrcport));
 		t += strlen(t);
-		sprintf(t, "%s,%s <- -> ", HOSTNAME_V4(res, nl->nl_odstip),
+		sprintf(t, "%s,%s <- -> ",
+			hostname(res, nl->nl_v[0], nl->nl_odstip.i6),
 			portname(res, proto, (u_int)nl->nl_odstport));
 		t += strlen(t);
-		sprintf(t, "%s,%s ", HOSTNAME_V4(res, nl->nl_nsrcip),
+		sprintf(t, "%s,%s ",
+			hostname(res, nl->nl_v[0], nl->nl_nsrcip.i6),
 			portname(res, proto, (u_int)nl->nl_nsrcport));
 		t += strlen(t);
-		sprintf(t, "%s,%s", HOSTNAME_V4(res, nl->nl_ndstip),
+		sprintf(t, "%s,%s",
+			hostname(res, nl->nl_v[0], nl->nl_ndstip.i6),
 			portname(res, proto, (u_int)nl->nl_ndstport));
 	}
 	t += strlen(t);
 
-	strcpy(t, getproto(nl->nl_p));
+	strcpy(t, getproto(nl->nl_p[0]));
 	t += strlen(t);
 
 	if (nl->nl_action == NL_EXPIRE || nl->nl_action == NL_FLUSH) {
