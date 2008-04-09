@@ -87,8 +87,8 @@ extern	void	fr_forgetnat __P((void *));
 extern	void	fr_fragclear __P((void));
 extern	void	fr_fragexpire __P((void));
 
-#if     defined(_KERNEL) && ((BSD >= 199306) || SOLARIS || defined(__sgi) \
-	        || defined(__osf__) || (defined(__sgi) && (IRIX >= 60500)))
+#if defined(_KERNEL) && ((defined(BSD) && (BSD >= 199306)) || SOLARIS || \
+    defined(__sgi) || defined(__osf__) || (defined(__sgi) && (IRIX >= 60500)))
 # if defined(SOLARIS2) && (SOLARIS2 < 7)
 extern	void	fr_slowtimer __P((void));
 # else

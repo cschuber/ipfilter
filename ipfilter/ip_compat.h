@@ -1128,8 +1128,12 @@ typedef	unsigned int	u_32_t;
 /*                            L I N U X                                    */
 /* ----------------------------------------------------------------------- */
 #if defined(linux) && !defined(OS_RECOGNISED)
-#include <linux/config.h>
 #include <linux/version.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,23)
+# include <linux/autoconf.h>
+#else
+# include <linux/config.h>
+#endif
 # if (LINUX >= 20600) && defined(_KERNEL)
 #  define	 HDR_T_PRIVATE	1
 # endif
@@ -1583,7 +1587,7 @@ extern void eMrwlock_downgrade __P((eMrwlock_t *, char *, int));
  * On BSD's use quad_t as a guarantee for getting at least a 64bit sized
  * object.
  */
-#if	BSD > 199306
+#if defined(BSD) && (BSD > 199306)
 # define	USE_QUAD_T
 # define	U_QUAD_T	u_quad_t
 # define	QUAD_T		quad_t
@@ -1619,7 +1623,7 @@ typedef	struct ip6_hdr	ip6_t;
 #  define	COPYDATA	m_copydata
 #  define	COPYBACK	m_copyback
 # endif
-# if (BSD >= 199306) || defined(__FreeBSD__)
+# if (defined(BSD) && (BSD >= 199306)) || defined(__FreeBSD__)
 #  if (defined(__NetBSD_Version__) && (__NetBSD_Version__ < 105180000)) || \
        defined(__FreeBSD__) || (defined(OpenBSD) && (OpenBSD < 200206)) || \
        defined(_BSDI_VERSION)
@@ -1855,7 +1859,7 @@ typedef	struct	tcpiphdr	tcpiphdr_t;
 #define	TCPF_ALL	(TH_FIN|TH_SYN|TH_RST|TH_PUSH|TH_ACK|TH_URG|\
 			 TH_ECN|TH_CWR)
 
-#if (BSD >= 199306) && !defined(m_act)
+#if (defined(BSD) && (BSD >= 199306)) && !defined(m_act)
 # define	m_act	m_nextpkt
 #endif
 

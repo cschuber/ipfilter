@@ -1339,10 +1339,11 @@ extern	void	ipfilter_sgi_intfsync __P((void));
 #   ifdef	IPFILTER_LKM
 extern	int	iplidentify __P((char *));
 #   endif
-#   if (_BSDI_VERSION >= 199510) || (__FreeBSD_version >= 220000) || \
-      (NetBSD >= 199511) || defined(__OpenBSD__)
+#   if (defined(_BSDI_VERSION) && (_BSDI_VERSION >= 199510)) || \
+       (defined(__FreeBSD_version) && (__FreeBSD_version >= 220000)) || \
+       (defined(NetBSD) && (NetBSD >= 199511)) || defined(__OpenBSD__)
 #    if defined(__NetBSD__) || (_BSDI_VERSION >= 199701) || \
-       defined(__OpenBSD__) || (__FreeBSD_version >= 300000)
+        defined(__OpenBSD__) || (__FreeBSD_version >= 300000)
 #     if (__FreeBSD_version >= 500024)
 #      if (__FreeBSD_version >= 502116)
 extern	int	iplioctl __P((struct cdev*, u_long, caddr_t, int, struct thread *));
@@ -1389,7 +1390,7 @@ extern	int	iplclose __P((dev_t, int));
 extern	int	iplioctl __P((dev_t, int, caddr_t, int));
 #    endif
 #   endif /* (_BSDI_VERSION >= 199510) */
-#   if	BSD >= 199306
+#   if defined(BSD) && (BSD >= 199306)
 #      if (__FreeBSD_version >= 502116)
 extern	int	iplread __P((struct cdev*, struct uio *, int));
 extern	int	iplwrite __P((struct cdev*, struct uio *, int));
@@ -1444,7 +1445,8 @@ extern	int	fr_resolvefunc __P((void *));
 extern	void	*fr_resolvenic __P((char *, int));
 extern	int	fr_send_icmp_err __P((int, fr_info_t *, int));
 extern	int	fr_send_reset __P((fr_info_t *));
-#if  (__FreeBSD_version < 501000) || !defined(_KERNEL)
+#if  (defined(__FreeBSD_version) && (__FreeBSD_version < 501000)) || \
+    !defined(_KERNEL)
 extern	int	ppsratecheck __P((struct timeval *, int *, int));
 #endif
 extern	ipftq_t	*fr_addtimeoutqueue __P((ipftq_t **, u_int));
