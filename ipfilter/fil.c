@@ -6000,6 +6000,8 @@ ipftuneable_t ipf_tuneables[] = {
 		sizeof(fr_tcpclosed),		IPFT_WRDISABLED,	NULL },
 	{ { &fr_tcphalfclosed }, "fr_tcphalfclosed",	1,	0x7fffffff,
 		sizeof(fr_tcphalfclosed),	IPFT_WRDISABLED,	NULL },
+	{ { &fr_tcptimewait }, "fr_tcptimewait",	1,	0x7fffffff,
+		sizeof(fr_tcptimewait),		IPFT_WRDISABLED,	NULL },
 	{ { &fr_udptimeout },	"fr_udptimeout",	1,	0x7fffffff,
 		sizeof(fr_udptimeout),		IPFT_WRDISABLED,	NULL },
 	{ { &fr_udpacktimeout }, "fr_udpacktimeout",	1,	0x7fffffff,
