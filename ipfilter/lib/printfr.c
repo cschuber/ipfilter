@@ -171,7 +171,7 @@ ioctlfunc_t	iocfunc;
 		putchar(' ');
 	}
 
-	if (*fp->fr_dif.fd_ifname || (fp->fr_flags & FR_DUP))
+	if (*fp->fr_dif.fd_ifname && (fp->fr_flags & FR_DUP))
 		print_toif("dup-to", &fp->fr_dif);
 	if (*fp->fr_tif.fd_ifname)
 		print_toif("to", &fp->fr_tif);

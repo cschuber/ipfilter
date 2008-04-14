@@ -531,10 +531,12 @@ vianame:
 
 dup:	IPFY_DUPTO name
 	{ strncpy(fr->fr_dif.fd_ifname, $2, sizeof(fr->fr_dif.fd_ifname));
+	  fr->fr_flags |= FR_DUP;
 	  free($2);
 	}
 	| IPFY_DUPTO name duptoseparator hostname
 	{ strncpy(fr->fr_dif.fd_ifname, $2, sizeof(fr->fr_dif.fd_ifname));
+	  fr->fr_flags |= FR_DUP;
 	  fr->fr_dif.fd_ip = $4;
 	  yyexpectaddr = 0;
 	  free($2);
@@ -542,6 +544,7 @@ dup:	IPFY_DUPTO name
 	| IPFY_DUPTO name duptoseparator YY_IPV6
 	{ strncpy(fr->fr_dif.fd_ifname, $2, sizeof(fr->fr_dif.fd_ifname));
 	  bcopy(&$4, &fr->fr_dif.fd_ip6, sizeof(fr->fr_dif.fd_ip6));
+	  fr->fr_flags |= FR_DUP;
 	  yyexpectaddr = 0;
 	  free($2);
 	}
