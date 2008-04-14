@@ -6896,7 +6896,6 @@ int ipf_getnextrule(ipftoken_t *t, void *ptr)
 	if (fr != NULL) {
 		(void) fr_derefrule(&fr);
 	}
-
 	return error;
 }
 
