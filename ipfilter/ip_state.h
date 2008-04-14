@@ -220,6 +220,7 @@ extern	u_long	fr_tcpclosewait;
 extern	u_long	fr_tcplastack;
 extern	u_long	fr_tcptimeout;
 extern	u_long	fr_tcpclosed;
+extern	u_long	fr_tcptimewait;
 extern	u_long	fr_tcphalfclosed;
 extern	u_long	fr_udptimeout;
 extern	u_long	fr_udpacktimeout;
