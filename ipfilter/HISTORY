@@ -10,6 +10,78 @@
 # and especially those who have found the time to port IP Filter to new
 # platforms.
 #
+4.1.29 - Release 14 April 2008
+
+* #ifdef warning fixes from Victor M Blood (FreeBSD) - #1821249
+
+* An error in NAT'ing a packet that is being fed through the fastroute
+  code (i.e return-icmp/return-rst/to/dup-to) can lead to a memory leak
+  with mbufs
+
+* NetBSD has removed rnh_walktree
+
+* Remove exit/enter of ipf_global lock as they are now no longer held by
+  what calls fr_auth_ioctl()
+
+* add in checks to see that a symbol is defined before using it in a test
+  case with C preprocessor #if statements
+
+* add setting TCP TIME_WAIT timer to list of tuneables
+
+* call of _pullup() high up in _icmp() means later checks for fin_dlen
+  that are less than 8 are not required.
+
+* cleanup some errors in merging patches
+
+* merge changes from netbsd for updated poll apis
+
+* merge white space cleanup
+
+* preserve and restore the fin_flx bits from the packet before it is
+  authorised to after it is.
+
+* remove old comment that is no longer accurate
+
+* sunos5x86 Makefile target has been removed from the Makefile
+
+* try and optimise fr_movequeue and short cut some cases where there
+  is no requirement to change the position of the object on the list.
+
+* update ip_compat.h for NetBSD changes with POLLWAKEUP
+
+* use defined() in #if statements to make sure something has a value
+  before its use
+
+1785476 more state entries might be created for single connection
+
+1821247 holding ipf_global lock over call to fr_ioctlswitch() causes
+        a panic for FreeBSD with INVARIANTS - move holding locks in ioctl
+        processing to only where they are necessary.
+
+1821358 errors can lead to mbufs not being freed
+
+1825877 variables called min should be renamed to xmin
+
+1835705 It is impossible to delete a state using SIOCDELST ioctl
+
+1839009 Auth rules with both "quick" and "keep state" don't work
+
+1839023 OS freeze: race condition in the auth code.
+
+1839028 Potential problems in auth code
+
+1855763 Fixed bug (#1838530) is reintoduced in the recent CVS commit
+
+1872740 the ipfr_size tunable is ignored
+
+1886836 open on devices not compiled in always succeed
+
+1886965 sync code does not wakeup sleeping polls
+
+1890025 sync code uses state table for nat objects
+
+1915176 Use of "age X/Y" can lead to panic
+
 4.1.28 - Release 16 October 2007
 
 backout changes (B1) & (B2) as they've caused NAT entries to persist for
