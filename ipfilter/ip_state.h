@@ -258,6 +258,7 @@ typedef	struct	ips_stat {
 
 extern	u_int	ipf_tcpidletimeout;
 extern	u_int	ipf_tcpclosewait;
+extern	u_int	ipf_tcptimewait;
 extern	u_int	ipf_tcplastack;
 extern	u_int	ipf_tcptimeout;
 extern	u_int	ipf_tcpclosed;
