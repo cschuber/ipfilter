@@ -25,6 +25,7 @@
 #include <linux/skbuff.h>
 #include <linux/in.h>
 #include <linux/ip.h>
+#include <net/ip.h> /* IP_DF */
 #include <linux/icmp.h>
 #include <linux/rtnetlink.h>
 #include <linux/netfilter.h>

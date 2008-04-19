@@ -2,6 +2,9 @@
  * Copyright (C) 1993-2003 by Darren Reed.
  *
  * See the IPFILTER.LICENCE file for details on licencing.
+ *
+ * $Id$
+ *
  */
 #if defined(KERNEL) || defined(_KERNEL)
 # undef KERNEL
@@ -117,6 +120,7 @@ struct file;
 #include "netinet/ip_state.h"
 #include "netinet/ip_proxy.h"
 #include "netinet/ip_auth.h"
+#include "netinet/ip_lookup.h"
 #ifdef IPFILTER_SCAN
 # include "netinet/ip_scan.h"
 #endif

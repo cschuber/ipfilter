@@ -2,6 +2,8 @@
  * Copyright (C) 1995-2003 by Darren Reed.
  *
  * See the IPFILTER.LICENCE file for details on licencing.
+ *
+ * $Id$
  */
 #if defined(KERNEL) || defined(_KERNEL)
 # undef KERNEL

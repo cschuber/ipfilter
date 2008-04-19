@@ -15,12 +15,14 @@ MODULE_DESCRIPTION("IP-Filter Firewall");
 MODULE_LICENSE("(C)Copyright 2003-2004 Darren Reed");
 
 MODULE_PARM(ipf_flags, "i");
-MODULE_PARM(fr_control_forwarding, "i");
-MODULE_PARM(fr_update_ipid, "i");
-MODULE_PARM(fr_chksrc, "i");
-MODULE_PARM(fr_pass, "i");
+MODULE_PARM(ipf_control_forwarding, "i");
+MODULE_PARM(ipf_update_ipid, "i");
+MODULE_PARM(ipf_chksrc, "i");
+MODULE_PARM(ipf_pass, "i");
+#ifdef STES
 MODULE_PARM(ipstate_logging, "i");
 MODULE_PARM(nat_logging, "i");
+#endif
 MODULE_PARM(ipl_suppress, "i");
 MODULE_PARM(ipl_logall, "i");
 #endif
@@ -176,7 +178,7 @@ static ssize_t ipf_read(struct file *fp, char *buf, size_t count, loff_t *posp)
 		break;
 #endif
 	default :
-		err = ipflog_read(unit, &uio);
+		err = ipf_log_read(unit, &uio);
 		if (err == 0)
 			return count - uio.uio_resid;
 		break;
@@ -209,12 +211,12 @@ static u_int ipf_poll(struct file *fp, poll_table *wait)
 	case IPL_LOGNAT :
 	case IPL_LOGSTATE :
 # ifdef IPFILTER_LOG
-		if (ipflog_canread(unit))
+		if (ipf_log_canread(unit))
 			revents = (POLLIN | POLLRDNORM);
 # endif
 		break;
 	case IPL_LOGAUTH :
-		if (fr_auth_waiting())
+		if (ipf_auth_waiting())
 			revents = (POLLIN | POLLRDNORM);
 		break;
 	case IPL_LOGSYNC :
@@ -287,9 +289,9 @@ static int ipfilter_init(void)
 		if (ipfproc != NULL)
 			ipfproc->owner = THIS_MODULE;
 # endif
-		if (FR_ISPASS(fr_pass))
+		if (FR_ISPASS(ipf_pass))
 			defpass = "pass";
-		else if (FR_ISBLOCK(fr_pass))
+		else if (FR_ISBLOCK(ipf_pass))
 			defpass = "block";
 		else
 			defpass = "no-match -> block";
@@ -309,7 +311,7 @@ static int ipfilter_init(void)
 # endif
 			);
 
-		fr_running = 1;
+		ipf_running = 1;
 	}
 #else
 	printf("IPFilter: device major number: %d\n", ipfmajor);
@@ -336,7 +338,7 @@ static int ipfilter_fini(void)
 	if (ipf_refcnt)
 		return EBUSY;
 
-	if (fr_running >= 0) {
+	if (ipf_running >= 0) {
 		result = ipfdetach();
 		if (result != 0) {
 			if (result > 0)
@@ -349,7 +351,7 @@ static int ipfilter_fini(void)
 	RW_DESTROY(&ipf_mutex);
 	RW_DESTROY(&ipf_frcache);
 
-	fr_running = -2;
+	ipf_running = -2;
 #ifdef CONFIG_PROC_FS
 	proc_net_remove("ipfilter");
 #endif

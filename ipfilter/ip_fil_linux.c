@@ -1,3 +1,12 @@
+
+/*                                                                              
+ * Copyright (C) 1993-2001 by Darren Reed.                                      
+ *                                                                              
+ * See the IPFILTER.LICENCE file for details on licencing.                      
+ *                      
+ * $Id$
+ */
+
 #include <linux/version.h>
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 # define __irq_h        1       /* stop it being included! */
@@ -14,15 +23,19 @@
 #include <linux/random.h>
 #include <asm/ioctls.h>
 
+#ifdef STES
+/* in kernel 2.6.21 no longer exported / static to net/ipv4/ip_output.c */
+#endif
 extern int sysctl_ip_default_ttl;
 
-static	int	frzerostats __P((caddr_t));
+static	int	ipf_zerostats __P((caddr_t));
 static	int	ipf_send_ip __P((fr_info_t *, struct sk_buff *, struct sk_buff **));
 
 ipfmutex_t	ipl_mutex, ipf_auth_mx, ipf_rw, ipf_stinsert;
 ipfmutex_t	ipf_nat_new, ipf_natio, ipf_timeoutlock;
-ipfrwlock_t	ipf_mutex, ipf_global, ipf_ipidfrag, ipf_frcache;
+ipfrwlock_t	ipf_mutex, ipf_global, ipf_ipidfrag, ipf_frcache, ipf_tokens;
 ipfrwlock_t	ipf_frag, ipf_state, ipf_nat, ipf_natfrag, ipf_authlk;
+struct timer_list       ipf_timer;
 
 static u_int ipf_linux_inout __P((u_int, struct sk_buff **, const struct net_device *, const struct net_device *, int (*okfn)(struct sk_buff *)));
 
@@ -212,7 +225,7 @@ ipf_send_reset(fr_info_t *fin)
 		ip->ip_dst.s_addr = fin->fin_saddr;
 		ip->ip_p = IPPROTO_TCP;
 		ip->ip_len = htons(sizeof(*ip) + sizeof(*tcp));
-		tcp2->th_sum = ipf_cksum(m, ip, IPPROTO_TCP, tcp2,
+		tcp2->th_sum = fr_cksum(m, ip, IPPROTO_TCP, tcp2,
 					 ntohs(ip->ip_len));
 	}
 	return ipf_send_ip(fin, m, &m);
@@ -474,9 +487,11 @@ ipf_fastroute(mb_t *xmin, mb_t **mp, fr_info_t *fin, frdest_t *fdp)
 	ip = MTOD(xmin, ip_t *);
 	dip = ip->ip_dst;
 
+/*
 	if (fdp != NULL)
 		ifp = fdp->fd_ifp;
 	else
+*/
 		ifp = fin->fin_ifp;
 
 	if ((ifp == NULL) && ((fr == NULL) || !(fr->fr_flags & FR_FASTROUTE))) {
@@ -645,14 +660,13 @@ ipf_zerostats(caddr_t data)
 	if (error)
 		return EFAULT;
 
-	bzero((char *)frstats, sizeof(*frstats) * 2);
+	bzero((char *)ipf_stats, sizeof(*ipf_stats) * 2);
 
 	return 0;
 }
 
 
-int
-iplattach()
+int ipfattach()
 {
 	int err, i;
 
@@ -667,6 +681,7 @@ iplattach()
 	MUTEX_INIT(&ipl_mutex, "ipf log mutex");
 	MUTEX_INIT(&ipf_timeoutlock, "ipf timeout lock mutex");
 	RWLOCK_INIT(&ipf_ipidfrag, "ipf IP NAT-Frag rwlock");
+        RWLOCK_INIT(&ipf_tokens, "ipf token rwlock");
 
 	for (i = 0; i < sizeof(ipf_hooks)/sizeof(ipf_hooks[0]); i++) {
 		err = nf_register_hook(&ipf_hooks[i]);
@@ -687,21 +702,31 @@ iplattach()
 #endif
 
 	SPL_X(s);
-	/* timeout(ipf_slowtimer, NULL, (hz / IPF_HZ_DIVIDE) * IPF_HZ_MULT); */
+
+#ifdef STES
+	/* timeout(fr_slowtimer, NULL, (hz / IPF_HZ_DIVIDE) * IPF_HZ_MULT); */
+        init_timer(&ipf_timer);
+        ipf_timer.function = fr_slowtimer;
+        ipf_timer.data = NULL;
+        ipf_timer.expires = (HZ / IPF_HZ_DIVIDE) * IPF_HZ_MULT;
+        add_timer(&ipf_timer);
+        mod_timer(&ipf_timer, HZ/2 + jiffies);
+#endif
+
 	return 0;
 }
 
-
-int
-ipldetach()
+int ipfdetach()
 {
-	int i;
+        int i;
 
-	SPL_NET(s);
+        del_timer(&ipf_timer);
 
-	for (i = 0; i < sizeof(ipf_hooks)/sizeof(ipf_hooks[0]); i++)
-		nf_unregister_hook(&ipf_hooks[i]);
-	/* untimeout(ipf_slowtimer, NULL); */
+        SPL_NET(s);
+
+        for (i = 0; i < sizeof(ipf_hooks)/sizeof(ipf_hooks[0]); i++)
+                nf_unregister_hook(&ipf_hooks[i]);
+        /* untimeout(fr_slowtimer, NULL); */
 
 #ifdef notyet
 	if (ipf_control_forwarding & 2)
@@ -710,12 +735,13 @@ ipldetach()
 
 	ipf_deinitialise();
 
-	(void) frflush(IPL_LOGIPF, FR_INQUE|FR_OUTQUE|FR_INACTIVE);
-	(void) frflush(IPL_LOGIPF, FR_INQUE|FR_OUTQUE);
+	(void) ipf_flush(IPL_LOGIPF, FR_INQUE|FR_OUTQUE|FR_INACTIVE);
+	(void) ipf_flush(IPL_LOGIPF, FR_INQUE|FR_OUTQUE);
 
 	MUTEX_DESTROY(&ipf_timeoutlock);
 	MUTEX_DESTROY(&ipl_mutex);
 	MUTEX_DESTROY(&ipf_rw);
+        RW_DESTROY(&ipf_tokens);
 	RW_DESTROY(&ipf_ipidfrag);
 
 	SPL_X(s);
@@ -838,6 +864,14 @@ ipf_rw_downgrade(ipfrwlock_t *rwlk)
 	ipf_read_enter(rwlk);
 }
 
+void ipf_rw_init(rwlck, name)
+ipfrwlock_t *rwlck;
+char *name;
+{
+        memset(rwlck, 0, sizeof(*rwlck));
+        rwlck->ipf_lname = name;
+        rwlock_init(&rwlck->ipf_lk);
+}
 
 #if 0
 void dumpskbuff(sk)
@@ -933,13 +967,13 @@ ipf_pullup(mb_t *xmin, fr_info_t *fin, int len)
 		*fin->fin_mp = m;
 		fin->fin_m = m;
 		if (m == NULL) {
-			ATOMIC_INCL(frstats[out].fr_pull[1]);
+			ATOMIC_INCL(ipf_stats[out].fr_pull[1]);
 			return NULL;
 		}
 		ip = MTOD(m, char *) + ipoff;
 	}
 
-	ATOMIC_INCL(frstats[out].fr_pull[0]);
+	ATOMIC_INCL(ipf_stats[out].fr_pull[0]);
 	fin->fin_ip = (ip_t *)ip;
 	if (fin->fin_dp != NULL)
 		fin->fin_dp = (char *)fin->fin_ip + dpoff;
@@ -969,3 +1003,44 @@ ipf_random(int range)
 	number %= range;
 	return number;
 }
+
+#ifdef STES
+/* ------------------------------------------------------------------------ */
+/* Function:    fr_slowtimer                                                */
+/* Returns:     Nil                                                         */
+/* Parameters:  Nil                                                         */
+/*                                                                          */
+/* Slowly expire held state for fragments.  Timeouts are set * in           */
+/* expectation of this being called twice per second.                       */
+/* ------------------------------------------------------------------------ */
+void fr_slowtimer(long value)
+{
+        READ_ENTER(&ipf_global);
+
+        ipf_expiretokens();
+        fr_fragexpire();
+        fr_timeoutstate();
+        fr_natexpire();
+        fr_authexpire();
+        fr_ticks++;
+        if (fr_running <= 0)
+                goto done;
+        mod_timer(&ipf_timer, HZ/2 + jiffies);
+
+done:
+        RWLOCK_EXIT(&ipf_global);
+}
+#endif
+
+int ipf_inject(fin, m)
+fr_info_t *fin;
+mb_t *m;
+{
+        FREE_MB_T(m);
+
+        fin->fin_m = NULL;
+        fin->fin_ip = NULL;
+
+        return EINVAL;
+}
+

@@ -29,6 +29,11 @@ IPFLKM=-DIPFILTER_LKM
 # To enable logging of blocked/passed packets...
 #
 IPFLOG=-DIPFILTER_LOG
+
+# To enable lookup
+
+LOOKUP=-DIPFILTER_LOOKUP
+
 #
 # To enable loading filter rules compiled to C code...
 #
@@ -72,7 +77,7 @@ ALLOPTS=-DIPFILTER_LOG -DIPFILTER_LOOKUP \
 #
 # Uncomment the next 3 lines if you want to view the state table a la top(1)
 # (requires that you have installed ncurses).
-#STATETOP_CFLAGS=-DSTATETOP
+STATETOP_CFLAGS=-DSTATETOP
 #
 # Where to find the ncurses include files (if not in default path),
 #
@@ -81,13 +86,13 @@ ALLOPTS=-DIPFILTER_LOG -DIPFILTER_LOOKUP \
 #
 # How to link the ncurses library
 #
-#STATETOP_LIB=-lncurses
+STATETOP_LIB=-lncurses
 #STATETOP_LIB=-L/usr/local/lib -lncurses
 
 #
 # Uncomment this when building IPv6 capability.
 #
-INET6=-DUSE_INET6
+#INET6=-DUSE_INET6
 #
 # For packets which don't match any pass rules or any block rules, set either
 # FR_PASS or FR_BLOCK (respectively).  It defaults to FR_PASS if left

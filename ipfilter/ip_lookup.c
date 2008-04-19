@@ -78,7 +78,9 @@ static int ipf_lookup_deltok __P((void *, int, void *));
 static ipf_lookup_t *backends[] = {
 	&ipf_pool_backend,
 	&ipf_htable_backend,
+#ifdef STES
 	&ipf_dstlist_backend
+#endif
 };
 
 #define	MAX_BACKENDS	(sizeof(backends)/sizeof(backends[0]))
@@ -739,3 +741,7 @@ ipf_lookup_res_name(type, unit, name, funcptr)
 
 	return ptr;
 }
+
+
+#endif /* IPFILTER_LOOKUP */
+

@@ -338,7 +338,7 @@ ipf_send_reset(fr_info_t *fin)
 		ip->ip_p = IPPROTO_TCP;
 		ip->ip_len = htons(sizeof(*ip) + sizeof(*tcp));
 		ip->ip_tos = fin->fin_ip->ip_tos;
-		tcp2->th_sum = ipf_cksum(m, ip, IPPROTO_TCP, tcp2,
+		tcp2->th_sum = fr_cksum(m, ip, IPPROTO_TCP, tcp2,
 					 ntohs(ip->ip_len));
 	}
 	return ipf_send_ip(fin, m, &m);
@@ -1123,7 +1123,7 @@ ipf_fixl4sum(fr_info_t *fin)
 
 	if (csump != NULL) {
 		*csump = 0;
-		*csump = ipf_cksum(fin->fin_m, fin->fin_ip, fin->fin_p,
+		*csump = fr_cksum(fin->fin_m, fin->fin_ip, fin->fin_p,
 				   fin->fin_dp, fin->fin_plen);
 	}
 }
