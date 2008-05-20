@@ -30,9 +30,9 @@ ftests: f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f
 ptests: i1 i2 i3 i4 i5 i6 i7 i8 i9 i10 i11 i12 i13 i14 i15 i16 i17 i18 i19 \
 	i20 i21 i22
 
-ntests: n1 n2 n3 n4 n5 n6 n7 n8 n9 n10 n11 n12 n15 n16 n17 n100 n101 n102 n103 n104 n105 n106 n200 n201 n202
+ntests: n1 n2 n3 n4 n5 n6 n7 n8 n9 n10 n11 n12 n13 n14 n15 n16 n17 n100 n101 n102 n103 n104 n105 n106 n200 n201 n202
 
-ntests6: n1_6 n2_6 n4_6 n5_6 n6_6 n7_6 n11_6 n12_6 n15_6
+ntests6: n1_6 n2_6 n4_6 n5_6 n6_6 n7_6 n8_6 n9_6 n11_6 n12_6 n15_6
 
 nitests: ni1 ni2 ni3 ni4 ni5 ni6 ni7 ni8 ni9 ni10 ni11 ni12 ni13 ni14 ni15 \
 	 ni16 ni17 ni18 ni19 ni20 ni21 ni23
@@ -43,7 +43,7 @@ logtests: l1
 
 pools: p1 p2 p3 p4 ip1 ip2
 
-ipv6: ipv6.1 ipv6.2 ipv6.3 ipv6.4 ipv6.5 ipv6.6
+ipv6: ipv6.1 ipv6.2 ipv6.3 ipv6.4 ipv6.5 ipv6.6 ntests6
 
 bpf: bpf1 bpf-f1
 
@@ -224,6 +224,12 @@ n11: expected/n11 regress/n11 input/n11
 n12: expected/n12 regress/n12 input/n12
 	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
 
+n13: expected/n13 regress/n13 input/n13
+	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+
+n14: expected/n14 regress/n14 input/n14
+	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+
 n15: expected/n15 regress/n15 input/n15
 	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
 
@@ -279,6 +285,12 @@ n6_6: expected/n6_6 regress/n6_6 input/n6_6
 	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
 
 n7_6: expected/n7_6 regress/n7_6 input/n7_6
+	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+
+n8_6: expected/n8_6 regress/n8_6 input/n8_6
+	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+
+n9_6: expected/n9_6 regress/n9_6 input/n9_6
 	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
 
 n11_6: expected/n11_6 regress/n11_6 input/n11_6
@@ -430,8 +442,8 @@ clean:
 	/bin/rm -f f18 f19 f20 f21 f22 f24 f25
 	/bin/rm -f i1 i2 i3 i4 i5 i6 i7 i8 i9 i10 i11 i12 i13 i14 i15 i16 i17
 	/bin/rm -f i18 i19 i20 i21 i22
-	/bin/rm -f n1 n2 n3 n4 n5 n6 n7 n8 n9 n10 n11 n12 n15 n16 n17 n100 n101 n102 n103 n104 n105 n106 n200 n201 n202
-	/bin/rm -f n1_6 n2_6 n4_6 n5_6 n6_6 n7_6 n11_6 n12_6 n15_6
+	/bin/rm -f n1 n2 n3 n4 n5 n6 n7 n8 n9 n10 n11 n12 n13 n14 n15 n16 n17 n100 n101 n102 n103 n104 n105 n106 n200 n201 n202
+	/bin/rm -f n1_6 n2_6 n4_6 n5_6 n6_6 n7_6 n8_6 n9_6 n11_6 n12_6 n15_6
 	/bin/rm -f ni1 ni2 ni3 ni4 ni5 ni6 ni7 ni8 ni9
 	/bin/rm -f ni10 ni11 ni12 ni13 ni14 ni15 ni16 ni17 ni18 ni19 ni20 ni21 ni23
 	/bin/rm -f in1 in2 in3 in4 in5 in6 in100 in101
@@ -446,12 +458,12 @@ diffs:
 	-cd expected; for i in *; do if [ -f $$i -a ! -f ../$$i -a -f ../results/$$i ] ; then  diff -c $$i ../results/$$i >> ../diff.out; fi done
 
 n6s:
-	for i in 1 2 4 5 6 7 11 15; do \
+	for i in 1 2 4 5 6 7 11 13 14 15; do \
 		sh i4to6 < input/n$${i} > input/n$${i}_6; \
 		sh e4to6 < regress/n$${i} > regress/n$${i}_6; \
 		sh e4to6 < expected/n$${i} > expected/n$${i}_6; \
 	done
-	for i in 12; do \
+	for i in 8 9 10 12 17; do \
 		sh e4to6 < regress/n$${i} > regress/n$${i}_6; \
 		perl h4to6 < input/n$${i} > input/n$${i}_6; \
 	done

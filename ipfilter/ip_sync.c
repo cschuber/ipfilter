@@ -890,6 +890,7 @@ ipf_sync_nat(sp, data)
 		      sizeof(*n) - offsetof(nat_t, nat_age));
 		ipf_sync_natorder(0, n);
 		n->nat_sync = sl;
+		n->nat_rev = sl->sl_rev;
 
 		sl->sl_idx = -1;
 		sl->sl_ipn = n;
@@ -901,7 +902,7 @@ ipf_sync_nat(sp, data)
 		if (syncnattab[hv] != NULL)
 			syncnattab[hv]->sl_pnext = &sl->sl_next;
 		syncnattab[hv] = sl;
-		ipf_nat_insert(n, sl->sl_rev);
+		(void) ipf_nat_insert(n);
 		RWLOCK_EXIT(&ipf_nat);
 		break;
 
@@ -923,7 +924,7 @@ ipf_sync_nat(sp, data)
 		nat = sl->sl_ipn;
 
 		MUTEX_ENTER(&nat->nat_lock);
-		ipf_nat_setqueue(nat, sl->sl_rev);
+		ipf_nat_setqueue(nat);
 		MUTEX_EXIT(&nat->nat_lock);
 
 		RWLOCK_EXIT(&ipf_nat);

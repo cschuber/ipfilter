@@ -129,8 +129,10 @@ file:	line
 	;
 
 line:	xx rule		{ while ((nat = nattop) != NULL) {
-				if (nat->in_v == 0)
-					nat->in_v = 4;
+				if (nat->in_v[0] == 0)
+					nat->in_v[0] = 4;
+				if (nat->in_v[1] == 0)
+					nat->in_v[1] = nat->in_v[0];
 				nattop = nat->in_next;
 				(*nataddfunc)(natfd, natioctlfunc, nat);
 				free(nat);
@@ -174,11 +176,13 @@ eol:	| ';'
 	;
 
 map:	mapit ifnames addr tlate rhsaddr proxy mapoptions
-				{ nat->in_v = $3.v;
+				{ nat->in_v[0] = $3.v;
 				  if ($3.v != 0 && $3.v != $5.v && $5.v != 0)
 					yyerror("3.address family mismatch");
-				  if (nat->in_v == 0 && $5.v != 0)
-					nat->in_v = $5.v;
+				  if (nat->in_v[0] == 0 && $5.v != 0)
+					nat->in_v[0] = $5.v;
+				  if (nat->in_v[1] == 0 && $5.v != 0)
+					nat->in_v[1] = $5.v;
 				  nat->in_osrcatype = $3.t;
 				  bcopy(&$3.a, &nat->in_osrc.na_addr[0],
 					sizeof($3.a));
@@ -196,9 +200,11 @@ map:	mapit ifnames addr tlate rhsaddr proxy mapoptions
 	| mapit ifnames addr tlate rhsaddr mapport mapoptions
 				{ if ($3.v != $5.v && $3.v != 0 && $5.v != 0)
 					yyerror("4.address family mismatch");
-				  if (nat->in_v == 0 && $5.v != 0)
-					nat->in_v = $5.v;
-				  nat->in_v = $3.v;
+				  if (nat->in_v[1] == 0 && $5.v != 0)
+					nat->in_v[1] = $5.v;
+				  nat->in_v[0] = $3.v;
+				  if (nat->in_v[0] == 0 && $5.v != 0)
+					nat->in_v[0] = $5.v;
 				  nat->in_osrcatype = $3.t;
 				  bcopy(&$3.a, &nat->in_osrc.na_addr[0],
 					sizeof($3.a));
@@ -214,7 +220,7 @@ map:	mapit ifnames addr tlate rhsaddr proxy mapoptions
 				  setmapifnames();
 				}
 	| no mapit ifnames addr setproto ';'
-				{ nat->in_v = $4.v;
+				{ nat->in_v[0] = $4.v;
 				  nat->in_osrcatype = $4.t;
 				  bcopy(&$4.a, &nat->in_osrc.na_addr[0],
 					sizeof($4.a));
@@ -224,11 +230,13 @@ map:	mapit ifnames addr tlate rhsaddr proxy mapoptions
 				  setmapifnames();
 				}
 	| mapit ifnames mapfrom tlate rhsaddr proxy mapoptions
-				{ nat->in_v = $3;
+				{ nat->in_v[0] = $3;
 				  if ($3 != 0 && $5.v != 0 && $3 != $5.v)
 					yyerror("5.address family mismatch");
-				  if (nat->in_v == 0 && $5.v != 0)
-					nat->in_v = $5.v;
+				  if (nat->in_v[0] == 0 && $5.v != 0)
+					nat->in_v[0] = $5.v;
+				  if (nat->in_v[1] == 0 && $5.v != 0)
+					nat->in_v[1] = $5.v;
 				  nat->in_nsrcatype = $5.t;
 				  nat->in_nsrcafunc = $5.f;
 				  bcopy(&$5.a, &nat->in_nsrc.na_addr[0],
@@ -239,15 +247,17 @@ map:	mapit ifnames addr tlate rhsaddr proxy mapoptions
 				  setmapifnames();
 				}
 	| no mapit ifnames mapfrom setproto ';'
-				{ nat->in_v = $4;
+				{ nat->in_v[0] = $4;
 				  setmapifnames();
 				}
 	| mapit ifnames mapfrom tlate rhsaddr mapport mapoptions
-				{ nat->in_v = $3;
+				{ nat->in_v[0] = $3;
 				  if ($3 != 0 && $5.v != 0 && $3 != $5.v)
 					yyerror("6.address family mismatch");
-				  if (nat->in_v == 0 && $5.v != 0)
-					nat->in_v = $5.v;
+				  if (nat->in_v[0] == 0 && $5.v != 0)
+					nat->in_v[0] = $5.v;
+				  if (nat->in_v[1] == 0 && $5.v != 0)
+					nat->in_v[1] = $5.v;
 				  nat->in_nsrcatype = $5.t;
 				  nat->in_nsrcafunc = $5.f;
 				  bcopy(&$5.a, &nat->in_nsrc.na_addr[0],
@@ -261,11 +271,13 @@ map:	mapit ifnames addr tlate rhsaddr proxy mapoptions
 
 mapblock:
 	mapblockit ifnames addr tlate addr ports mapoptions
-				{ nat->in_v = $3.v;
+				{ nat->in_v[0] = $3.v;
 				  if ($3.v != 0 && $5.v != 0 && $3.v != $5.v)
 					yyerror("7.address family mismatch");
-				  if (nat->in_v == 0 && $5.v != 0)
-					nat->in_v = $5.v;
+				  if (nat->in_v[0] == 0 && $5.v != 0)
+					nat->in_v[0] = $5.v;
+				  if (nat->in_v[1] == 0 && $5.v != 0)
+					nat->in_v[1] = $5.v;
 				  nat->in_osrcatype = $3.t;
 				  bcopy(&$3.a, &nat->in_osrc.na_addr[0],
 					sizeof($3.a));
@@ -281,7 +293,7 @@ mapblock:
 				  setmapifnames();
 				}
 	| no mapblockit ifnames { yyexpectaddr = 1; } addr setproto ';'
-				{ nat->in_v = $5.v;
+				{ nat->in_v[0] = $5.v;
 				  nat->in_osrcatype = $5.t;
 				  bcopy(&$5.a, &nat->in_osrc.na_addr[0],
 					sizeof($5.a));
@@ -296,9 +308,9 @@ redir:	rdrit ifnames addr dport tlate dip nport setproto rdroptions
 				{ if ($6 != 0 && $3.v != 0 && $6 != $3.v)
 					yyerror("21.address family mismatch");
 				  if ($3.v != 0)
-					nat->in_v = $3.v;
+					nat->in_v[0] = $3.v;
 				  else
-					nat->in_v = $6;
+					nat->in_v[0] = $6;
 				  nat->in_odstatype = $3.t;
 				  bcopy(&$3.a, &nat->in_odst.na_addr[0],
 					sizeof($3.a));
@@ -308,7 +320,7 @@ redir:	rdrit ifnames addr dport tlate dip nport setproto rdroptions
 				  setrdrifnames();
 				}
 	| no rdrit ifnames addr dport setproto ';'
-				{ nat->in_v = $4.v;
+				{ nat->in_v[0] = $4.v;
 				  nat->in_odstatype = $4.t;
 				  bcopy(&$4.a, &nat->in_odst.na_addr[0],
 					sizeof($4.a));
@@ -321,13 +333,13 @@ redir:	rdrit ifnames addr dport tlate dip nport setproto rdroptions
 				{ if ($5 != 0 && $3 != 0 && $5 != $3)
 					yyerror("20.address family mismatch");
 				  if ($3 != 0)
-					nat->in_v = $3;
+					nat->in_v[0] = $3;
 				  else
-					nat->in_v = $5;
+					nat->in_v[0] = $5;
 				  setrdrifnames();
 				}
 	| no rdrit ifnames rdrfrom setproto ';'
-				{ nat->in_v = $4;
+				{ nat->in_v[0] = $4;
 
 				  setrdrifnames();
 				}
@@ -392,7 +404,7 @@ dnsline:
 	;
 
 oninout:
-	inout IPNY_ON ifnames	{ nat->in_v = 4; }
+	inout IPNY_ON ifnames	{ nat->in_v[0] = 4; }
 	;
 
 inout:	IPNY_IN			{ nat->in_redir = NAT_REDIRECT; }

@@ -109,6 +109,13 @@ ipfdetach()
 #endif
 	}
 
+	ipf_pfil_hooks_remove();
+
+	if (fr_timer_id != 0) {
+		(void) untimeout(fr_timer_id0;
+		fr_timer_id = 0;
+	}
+
 #ifdef	IPFDEBUG
 	cmn_err(CE_CONT, "ipfdetach()\n");
 #endif
@@ -196,6 +203,10 @@ ipfattach __P((void))
 			*ip6_forwarding = 1;
 #endif
 	}
+
+	fr_timer_id = timeout(fr_slowtimer, NULL, drv_usectohz(500000));
+
+	ipf_set_pfil_hooks();
 
 	return 0;
 }
@@ -338,7 +349,7 @@ ipf_send_reset(fr_info_t *fin)
 		ip->ip_p = IPPROTO_TCP;
 		ip->ip_len = htons(sizeof(*ip) + sizeof(*tcp));
 		ip->ip_tos = fin->fin_ip->ip_tos;
-		tcp2->th_sum = fr_cksum(m, ip, IPPROTO_TCP, tcp2,
+		tcp2->th_sum = ipf_cksum(m, ip, IPPROTO_TCP, tcp2,
 					 ntohs(ip->ip_len));
 	}
 	return ipf_send_ip(fin, m, &m);
@@ -778,18 +789,11 @@ ipf_slowtimer __P((void *ptr))
 #endif
 {
 
-	WRITE_ENTER(&ipf_global);
+	READ_ENTER(&ipf_global);
 	if (ipf_running <= 0) {
-		if (ipf_running >= -1) {
-			ipf_timer_id = timeout(ipf_slowtimer, NULL,
-					       drv_usectohz(500000));
-		} else {
-			ipf_timer_id = NULL;
-		}
 		RWLOCK_EXIT(&ipf_global);
 		return;
 	}
-	MUTEX_DOWNGRADE(&ipf_global);
 
 	ipf_expiretokens();
 	ipf_fragexpire();
@@ -1123,7 +1127,7 @@ ipf_fixl4sum(fr_info_t *fin)
 
 	if (csump != NULL) {
 		*csump = 0;
-		*csump = fr_cksum(fin->fin_m, fin->fin_ip, fin->fin_p,
+		*csump = ipf_cksum(fin->fin_m, fin->fin_ip, fin->fin_p,
 				   fin->fin_dp, fin->fin_plen);
 	}
 }

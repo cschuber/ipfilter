@@ -56,7 +56,6 @@ struct file;
 #include "netinet/ip_lookup.h"
 #include "netinet/ip_pool.h"
 #include "netinet/ip_htable.h"
-#include "netinet/ip_dstlist.h"
 /* END OF INCLUDES */
 
 #if !defined(lint)

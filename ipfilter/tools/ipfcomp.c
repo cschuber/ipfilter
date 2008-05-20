@@ -1311,7 +1311,6 @@ int ipfrule_add_%s_%s()\n", instr, group);
 		instr, group);
 
 	fprintf(fp, "\
-	fp->fr_v = 4;\n\
 	fp->fr_family = AF_INET;\n\
 	fp->fr_func = (ipfunc_t)ipfrule_match_%s_%s;\n\
 	err = frrequest(IPL_LOGIPF, SIOCADDFR, (caddr_t)fp, ipf_active, 0);\n",

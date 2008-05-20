@@ -4650,7 +4650,6 @@ retry_roundrobin:
 				goto maskloop;
 			}
 		}
-		MUTEX_DOWNGRADE(&ipf_nat);
 	}
 
 	if (nat != NULL) {
@@ -4824,12 +4823,10 @@ ipf_nat_out(fin, nat, natadd, nflags)
 		m->m_data += skip;
 		m->m_len -= skip;
 
-#ifdef STES
-#ifdef M_PKTHDR
+# ifdef M_PKTHDR
 		if (m->m_flags & M_PKTHDR)
 			m->m_pkthdr.len -= skip;
-#endif
-#endif
+# endif
 #endif
 
 		ipf_nat_update(fin, nat, np);
@@ -4878,9 +4875,7 @@ ipf_nat_out(fin, nat, natadd, nflags)
 #endif
 		/* TRACE (ip) */
 
-#ifdef STES
 		PREP_MB_T(fin, m);
-#endif
 
 		fin->fin_ip = ip;
 		fin->fin_plen += sizeof(ip_t);	/* UDP + new IPv4 hdr */
@@ -4924,9 +4919,7 @@ ipf_nat_out(fin, nat, natadd, nflags)
 		ipf_fix_incksum(fin, &ip->ip_sum, sumd);
 #endif
 
-#ifdef STES
 		PREP_MB_T(fin, m);
-#endif
 
 		fin->fin_ip = ip;
 		fin->fin_plen += sizeof(ip_t) + 8;	/* UDP + new IPv4 hdr */
@@ -5256,7 +5249,6 @@ retry_roundrobin:
 				goto maskloop;
 			}
 		}
-		MUTEX_DOWNGRADE(&ipf_nat);
 	}
 	if (nat != NULL) {
 		rval = ipf_nat_in(fin, nat, natadd, nflags);
@@ -5441,9 +5433,7 @@ ipf_nat_in(fin, nat, natadd, nflags)
 		ipf_fix_outcksum(fin, &ip->ip_sum, sumd);
 #endif
 
-#ifdef STES
 		PREP_MB_T(fin, m);
-#endif
 
 		fin->fin_ip = ip;
 		fin->fin_plen += sizeof(ip_t);	/* UDP + new IPv4 hdr */
@@ -5486,10 +5476,7 @@ ipf_nat_in(fin, nat, natadd, nflags)
      defined(__osf__) || defined(linux)
 		ipf_fix_outcksum(fin, &ip->ip_sum, sumd);
 #endif
-
-#ifdef STES
 		PREP_MB_T(fin, m);
-#endif
 
 		fin->fin_ip = ip;
 		fin->fin_plen += sizeof(ip_t) + 8;	/* UDP + new IPv4 hdr */
@@ -5520,12 +5507,10 @@ ipf_nat_in(fin, nat, natadd, nflags)
 		m->m_data += skip;
 		m->m_len -= skip;
 
-#ifdef STES
-#ifdef M_PKTHDR
+# ifdef M_PKTHDR
 		if (m->m_flags & M_PKTHDR)
 			m->m_pkthdr.len -= skip;
-#endif
-#endif
+# endif
 #endif
 
 		ipf_nat_update(fin, nat, np);
@@ -7196,9 +7181,7 @@ ipf_nat_builddivertmp(np)
 	else
 		len = sizeof(ip_t);
 
-#ifdef STES
 	ALLOC_MB_T(np->in_divmp, len);
-#endif
 	if (np->in_divmp == NULL) {
 		ATOMIC_INCL(ipf_nat_stats.ns_divert_build);
 		return -1;
@@ -7207,7 +7190,6 @@ ipf_nat_builddivertmp(np)
 	/*
 	 * First, the header to get the packet diverted to the new destination
 	 */
-
 	ip = MTOD(np->in_divmp, ip_t *);
 	IP_V_A(ip, 4);
 	IP_HL_A(ip, 5);
@@ -7570,7 +7552,6 @@ ipf_nat_nextaddr(fin, na, old, dst)
 		}
 		break;
 
-#ifdef STES
 	case NA_HASHMD5 :
 	    {
 		u_char hash[16];
@@ -7596,7 +7577,6 @@ ipf_nat_nextaddr(fin, na, old, dst)
 		new = htonl(new);
 		break;
 	    }
-#endif
 
 	default :
 		ipf_nat_stats.ns_side[fin->fin_out].ns_badnextaddr++;

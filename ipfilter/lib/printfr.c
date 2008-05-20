@@ -94,7 +94,7 @@ void	printfr(fp, iocfunc)
 		putchar(' ');
 	}
 
-	if (*fp->fr_dif.fd_name || (fp->fr_flags & FR_DUP))
+	if (*fp->fr_dif.fd_name && (fp->fr_flags & FR_DUP))
 		print_toif("dup-to", &fp->fr_dif);
 	if (*fp->fr_tif.fd_name)
 		print_toif("to", &fp->fr_tif);

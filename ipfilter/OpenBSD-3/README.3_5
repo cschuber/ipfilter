@@ -26,12 +26,12 @@ options for IPFilter.
 cd /usr/src
 gunzip -c sys.tar.gz | tar xpf -
 
-2. Unpack IPFilter and apply the patches to the kernel source
+2. Unpack IPFilter and apply the patches to the kernel source 
 
 cd ~
 gunzip -c ip_fil4next.tar.gz | tar xpf -
 cd /usr/src
-patch < ~/ip_fil4next/OpenBSD-3/3.5-sys-diffs
+patch < ~/ip_fil4.1.14/OpenBSD-3/3.5-sys-diffs
 
 3. Add IPFilter to the source code tree:
 
@@ -60,7 +60,7 @@ OpenBSD-3/makedevs-3.5
 6. Patch rc scripts in /etc
 
 cd /etc
-patch < ~/ip_fil4next/OpenBSD-3/3.5-rc-diffs
+patch < ~/ip_fil4.1.14/OpenBSD-3/3.5-rc-diffs
 
 7. Reboot
 
@@ -79,8 +79,8 @@ patches.
 Building a Release
 ==================
 cd /usr/src
-patch < ~/ip_fil4next/OpenBSD-3/3.5-rc-diffs
-patch < ~/ip_fil4next/OpenBSD-3/3.5-MAKEDEV-diffs
+patch < ~/ip_fil4.1.14/OpenBSD-3/3.5-rc-diffs
+patch < ~/ip_fil4.1.14/OpenBSD-3/3.5-MAKEDEV-diffs
 cd ~/ip_fil4next
 ./OpenBSD-3/fixdist-3.5
 

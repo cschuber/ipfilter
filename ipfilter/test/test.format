@@ -72,7 +72,7 @@ n8 hex hex update_ipid=0
 n9 hex hex update_ipid=0
 n10 hex hex update_ipid=0
 n11 text text
-n12 hex hex update_ipid=0
+n12 hex hex update_ipid=0 -v
 n15 text text update_ipid=0
 n100 text text
 n101 text text
@@ -112,6 +112,7 @@ p3 text text
 p4 text text
 p5 text text
 n16 hex hex -D
+n17 hex hex -D
 f24 hex text
 ipv6.6 hex text
 f25 hex text -D
@@ -121,6 +122,11 @@ n4_6 text text -6
 n5_6 text text -6
 n6_6 text text -6
 n7_6 text text -6
+n8_6 hex hex -6D
+n9_6 hex hex -6D
 n11_6 text text -6
 n12_6 hex hex -D6
 n15_6 text text -6
+n17_6 hex hex -6
+n13 text text
+n14 text text

@@ -586,25 +586,29 @@ vianame:
 
 dup:	IPFY_DUPTO name
 	{ strncpy(fr->fr_dif.fd_name, $2, sizeof(fr->fr_dif.fd_name));
+	  fr->fr_flags |= FR_DUP;
 	  free($2);
 	}
 	| IPFY_DUPTO IPFY_POOL '/' name
 	{ strncpy(fr->fr_dif.fd_name, $4, sizeof(fr->fr_dif.fd_name));
 	  fr->fr_dif.fd_type = FRD_POOL;
+	  fr->fr_flags |= FR_DUP;
 	  free($4);
 	}
 	| IPFY_DUPTO name duptoseparator hostname
 	{ strncpy(fr->fr_dif.fd_name, $2, sizeof(fr->fr_dif.fd_name));
+	  fr->fr_family = AF_INET;
+	  fr->fr_flags |= FR_DUP;
 	  fr->fr_dif.fd_ip = $4;
 	  yyexpectaddr = 0;
-	  fr->fr_family = AF_INET;
 	  free($2);
 	}
 	| IPFY_DUPTO name duptoseparator YY_IPV6
 	{ strncpy(fr->fr_dif.fd_name, $2, sizeof(fr->fr_dif.fd_name));
 	  bcopy(&$4, &fr->fr_dif.fd_ip6, sizeof(fr->fr_dif.fd_ip6));
-	  yyexpectaddr = 0;
 	  fr->fr_family = AF_INET6;
+	  fr->fr_flags |= FR_DUP;
+	  yyexpectaddr = 0;
 	  free($2);
 	}
 	;

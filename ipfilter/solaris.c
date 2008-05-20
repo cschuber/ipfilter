@@ -56,7 +56,6 @@
 struct pollhead ipf_poll_head[IPL_LOGSIZE];
 
 extern	int	fr_running;
-extern	int	fr_flags;
 extern	int	iplwrite __P((dev_t, struct uio *, cred_t *));
 
 extern ipnat_t *nat_list;
@@ -195,7 +194,8 @@ static	size_t	hdrsizes[57][2] = {
 static dev_info_t *ipf_dev_info = NULL;
 
 
-int _init()
+int
+_init()
 {
 	int ipfinst;
 
@@ -207,7 +207,8 @@ int _init()
 }
 
 
-int _fini(void)
+int
+_fini(void)
 {
 	int ipfinst;
 
@@ -219,7 +220,8 @@ int _fini(void)
 }
 
 
-int _info(modinfop)
+int
+_info(modinfop)
 	struct modinfo *modinfop;
 {
 	int ipfinst;
@@ -233,7 +235,8 @@ int _info(modinfop)
 
 
 #if SOLARIS2 < 10
-static int ipf_identify(dip)
+static int
+ipf_identify(dip)
 	dev_info_t *dip;
 {
 # ifdef	IPFDEBUG
@@ -246,7 +249,8 @@ static int ipf_identify(dip)
 #endif
 
 
-static int ipf_attach(dip, cmd)
+static int
+ipf_attach(dip, cmd)
 	dev_info_t *dip;
 	ddi_attach_cmd_t cmd;
 {
@@ -298,35 +302,7 @@ static int ipf_attach(dip, cmd)
 		RWLOCK_INIT(&ipf_mutex, "ipf filter rwlock");
 		RWLOCK_INIT(&ipf_frcache, "ipf cache rwlock");
 
-		/*
-		 * Lock people out while we set things up.
-		 */
-		WRITE_ENTER(&ipf_global);
-		if ((fr_running != 0) || (ipfattach() == -1)) {
-			RWLOCK_EXIT(&ipf_global);
-			goto attach_failed;
-		}
-
-		if (pfil_add_hook(fr_check, PFIL_IN|PFIL_OUT, &pfh_inet4))
-			cmn_err(CE_WARN, "IP Filter: %s(pfh_inet4) failed",
-				"pfil_add_hook");
-#ifdef USE_INET6
-		if (pfil_add_hook(fr_check, PFIL_IN|PFIL_OUT, &pfh_inet6))
-			cmn_err(CE_WARN, "IP Filter: %s(pfh_inet6) failed",
-				"pfil_add_hook");
-#endif
-		if (pfil_add_hook(fr_qifsync, PFIL_IN|PFIL_OUT, &pfh_sync))
-			cmn_err(CE_WARN, "IP Filter: %s(pfh_sync) failed",
-				"pfil_add_hook");
-
-		fr_timer_id = timeout(fr_slowtimer, NULL,
-				      drv_usectohz(500000));
-
-		fr_running = 1;
-
-		RWLOCK_EXIT(&ipf_global);
-
-		cmn_err(CE_CONT, "!%s, running.\n", ipfilter_version);
+		cmn_err(CE_CONT, "!%s, loaded.\n", ipfilter_version);
 
 		return DDI_SUCCESS;
 		/* NOTREACHED */
@@ -345,7 +321,8 @@ attach_failed:
 }
 
 
-static int ipf_detach(dip, cmd)
+static int
+ipf_detach(dip, cmd)
 	dev_info_t *dip;
 	ddi_detach_cmd_t cmd;
 {
@@ -371,18 +348,6 @@ static int ipf_detach(dip, cmd)
 			return DDI_FAILURE;
 		}
 		fr_running = -2;
-
-		if (pfil_remove_hook(fr_check, PFIL_IN|PFIL_OUT, &pfh_inet4))
-			cmn_err(CE_WARN, "IP Filter: %s(pfh_inet4) failed",
-				"pfil_remove_hook");
-#ifdef USE_INET6
-		if (pfil_remove_hook(fr_check, PFIL_IN|PFIL_OUT, &pfh_inet6))
-			cmn_err(CE_WARN, "IP Filter: %s(pfh_inet6) failed",
-				"pfil_add_hook");
-#endif
-		if (pfil_remove_hook(fr_qifsync, PFIL_IN|PFIL_OUT, &pfh_sync))
-			cmn_err(CE_WARN, "IP Filter: %s(pfh_sync) failed",
-				"pfil_remove_hook");
 
 		RWLOCK_EXIT(&ipf_global);
 
@@ -425,7 +390,8 @@ static int ipf_detach(dip, cmd)
 
 
 /*ARGSUSED*/
-static int ipf_getinfo(dip, infocmd, arg, result)
+static int
+ipf_getinfo(dip, infocmd, arg, result)
 	dev_info_t *dip;
 	ddi_info_cmd_t infocmd;
 	void *arg, **result;
@@ -459,7 +425,8 @@ static int ipf_getinfo(dip, infocmd, arg, result)
  * about and those which are currently configured.
  */
 /*ARGSUSED*/
-static int fr_qifsync(ip, hlen, il, out, qif, mp)
+static int
+fr_qifsync(ip, hlen, il, out, qif, mp)
 	ip_t *ip;
 	int hlen;
 	void *il;
@@ -482,7 +449,8 @@ static int fr_qifsync(ip, hlen, il, out, qif, mp)
  * look for bad consistancies between the list of interfaces the filter knows
  * about and those which are currently configured.
  */
-int ipfsync()
+int
+ipfsync()
 {
 	frsync(NULL);
 	return 0;
@@ -493,7 +461,8 @@ int ipfsync()
  * Fetch configuration file values that have been entered into the ipf.conf
  * driver file.
  */
-static int ipf_property_update(dip)
+static int
+ipf_property_update(dip)
 	dev_info_t *dip;
 {
 	ipftuneable_t *ipft;
@@ -574,7 +543,8 @@ static int ipf_property_update(dip)
 }
 
 
-static int iplpoll(dev, events, anyyet, reventsp, phpp)
+static int
+iplpoll(dev, events, anyyet, reventsp, phpp)
 	dev_t dev;
 	short events;
 	int anyyet;
@@ -630,7 +600,8 @@ static int iplpoll(dev, events, anyyet, reventsp, phpp)
  * routines below for saving IP headers to buffer
  */
 /*ARGSUSED*/
-static int iplopen(devp, flags, otype, cred)
+static int
+iplopen(devp, flags, otype, cred)
 	dev_t *devp;
 	int flags, otype;
 	cred_t *cred;
@@ -672,7 +643,8 @@ static int iplopen(devp, flags, otype, cred)
 
 
 /*ARGSUSED*/
-static int iplclose(dev, flags, otype, cred)
+static int
+iplclose(dev, flags, otype, cred)
 	dev_t dev;
 	int flags, otype;
 	cred_t *cred;
@@ -695,7 +667,8 @@ static int iplclose(dev, flags, otype, cred)
  * the filter lists.
  */
 /*ARGSUSED*/
-static int iplread(dev, uio, cp)
+static int
+iplread(dev, uio, cp)
 	dev_t dev;
 	register struct uio *uio;
 	cred_t *cp;
@@ -726,7 +699,8 @@ static int iplread(dev, uio, cp)
  * called during packet processing and cause an inconsistancy to appear in
  * the filter lists.
  */
-static int iplwrite(dev, uio, cp)
+static int
+iplwrite(dev, uio, cp)
 	dev_t dev;
 	register struct uio *uio;
 	cred_t *cp;
@@ -743,4 +717,37 @@ static int iplwrite(dev, uio, cp)
 		return ipf_sync_write(uio);
 #endif /* IPFILTER_SYNC */
 	return ENXIO;
+}
+
+void
+ipf_pfil_hooks_add()
+{
+	if (pfil_add_hook(fr_check, PFIL_IN|PFIL_OUT, &pfh_inet4))
+		cmn_err(CE_WARN, "IP Filter: %s(pfh_inet4) failed",
+			"pfil_add_hook");
+#ifdef USE_INET6
+	if (pfil_add_hook(fr_check, PFIL_IN|PFIL_OUT, &pfh_inet6))
+		cmn_err(CE_WARN, "IP Filter: %s(pfh_inet6) failed",
+			"pfil_add_hook");
+#endif
+	if (pfil_add_hook(fr_qifsync, PFIL_IN|PFIL_OUT, &pfh_sync))
+		cmn_err(CE_WARN, "IP Filter: %s(pfh_sync) failed",
+			"pfil_add_hook");
+}
+
+void
+ipf_pfil_hooks_remove()
+{
+	if (pfil_remove_hook(fr_check, PFIL_IN|PFIL_OUT, &pfh_inet4))
+		cmn_err(CE_WARN, "IP Filter: %s(pfh_inet4) failed",
+			"pfil_remove_hook");
+#ifdef USE_INET6
+	if (pfil_remove_hook(fr_check, PFIL_IN|PFIL_OUT, &pfh_inet6))
+		cmn_err(CE_WARN, "IP Filter: %s(pfh_inet6) failed",
+			"pfil_add_hook");
+#endif
+	if (pfil_remove_hook(fr_qifsync, PFIL_IN|PFIL_OUT, &pfh_sync))
+		cmn_err(CE_WARN, "IP Filter: %s(pfh_sync) failed",
+			"pfil_remove_hook");
+
 }
