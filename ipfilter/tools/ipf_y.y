@@ -41,6 +41,7 @@ static	frentry_t *addrule __P((void));
 static	void	setsyslog __P((void));
 static	void	unsetsyslog __P((void));
 static	void	fillgroup __P((frentry_t *));
+static	void	do_tuneint __P((char *, int));
 
 frentry_t	*fr = NULL, *frc = NULL, *frtop = NULL, *frold = NULL;
 
@@ -188,8 +189,8 @@ rules:	line
 	;
 
 setting:
-	IPFY_SET YY_STR YY_STR ';'
-	| IPFY_SET YY_STR YY_NUMBER ';'
+	IPFY_SET YY_STR YY_NUMBER ';'	{ do_tuneint($2, $3); }
+	| IPFY_SET YY_STR YY_HEX ';'	{ do_tuneint($2, $3); }
 	;
 
 line:	rule		{ while ((fr = frtop) != NULL) {
@@ -2397,4 +2398,18 @@ char *line;
 	fr->fr_type = FR_T_IPFEXPR;
 	fr->fr_data = array;
 	fr->fr_dsize = array[0] * sizeof(*array);
+}
+
+
+static void do_tuneint(varname, value)
+char *varname;
+int value;
+{
+	char buffer[80];
+
+	strncpy(buffer, varname, 60);
+	buffer[59] = '\0';
+	strcat(buffer, "=");
+	sprintf(buffer, "%u", value);
+	ipf_dotuning(ipffd, buffer, ioctl);
 }

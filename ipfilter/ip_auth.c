@@ -896,6 +896,7 @@ ipf_auth_ioctlloop:
 	 * we are trying to guard against here is an error in the copyout
 	 * steps should not cause the packet to "disappear" from the queue.
 	 */
+	SPL_NET(s);
 	READ_ENTER(&ipf_authlk);
 
 	/*
@@ -955,6 +956,7 @@ ipf_auth_ioctlloop:
 		return 0;
 	}
 	RWLOCK_EXIT(&ipf_authlk);
+	SPL_X(s);
 
 	MUTEX_ENTER(&ipf_auth_mx);
 #ifdef	_KERNEL

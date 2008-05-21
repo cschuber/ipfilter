@@ -149,7 +149,6 @@ iplog_t	**iplh[IPL_LOGSIZE], *iplt[IPL_LOGSIZE], *ipll[IPL_LOGSIZE];
 int	iplused[IPL_LOGSIZE];
 static fr_info_t	iplcrc[IPL_LOGSIZE];
 int	ipl_suppress = 1;
-int	ipl_logmax = IPL_LOGMAX;
 int	ipl_logall = 0;
 int	ipl_log_init = 0;
 int	ipl_logsize = IPFILTER_LOGSIZE;

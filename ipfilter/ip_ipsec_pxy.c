@@ -42,7 +42,8 @@ ippr_ipsec_init()
 	ipsecnattqe = ipf_addtimeoutqueue(&ipf_nat_utqe, ipsec_proxy_ttl);
 	if (ipsecnattqe == NULL)
 		return -1;
-	ipsecstatetqe = ipf_addtimeoutqueue(&ips_utqe, ipsec_proxy_ttl);
+	ipsecstatetqe = ipf_addtimeoutqueue(&ipf_state_usertq,
+					    ipsec_proxy_ttl);
 	if (ipsecstatetqe == NULL) {
 		if (ipf_deletetimeoutqueue(ipsecnattqe) == 0)
 			ipf_freetimeoutqueue(ipsecnattqe);

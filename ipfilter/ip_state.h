@@ -256,13 +256,15 @@ typedef	struct	ips_stat {
 } ips_stat_t;
 
 
-extern	u_int	ipf_tcpidletimeout;
-extern	u_int	ipf_tcpclosewait;
-extern	u_int	ipf_tcptimewait;
-extern	u_int	ipf_tcplastack;
-extern	u_int	ipf_tcptimeout;
 extern	u_int	ipf_tcpclosed;
+extern	u_int	ipf_tcpclosewait;
 extern	u_int	ipf_tcphalfclosed;
+extern	u_int	ipf_tcpidletimeout;
+extern	u_int	ipf_tcplastack;
+extern	u_int	ipf_tcpsynsent;
+extern	u_int	ipf_tcpsynrecv;
+extern	u_int	ipf_tcptimeout;
+extern	u_int	ipf_tcptimewait;
 extern	u_int	ipf_udptimeout;
 extern	u_int	ipf_udpacktimeout;
 extern	u_int	ipf_icmptimeout;
@@ -277,8 +279,13 @@ extern	int	ipf_state_maxbucket_reset;
 extern	u_int	ipf_state_wm_high;
 extern	u_int	ipf_state_wm_low;
 extern	ipstate_t	*ipf_state_list;
-extern	ipftq_t	*ips_utqe;
-extern	ipftq_t	ips_tqtqb[IPF_TCP_NSTATES];
+extern	ipftq_t	*ipf_state_usertq;
+extern	ipftq_t	ipf_state_iptq;
+extern	ipftq_t	ipf_state_udptq;
+extern	ipftq_t	ipf_state_udpacktq;
+extern	ipftq_t	ipf_state_icmptq;
+extern	ipftq_t	ipf_state_icmpacktq;
+extern	ipftq_t	ipf_state_tcptq[IPF_TCP_NSTATES];
 
 extern	int	ipf_tcp_age __P((struct ipftqent *, struct fr_info *,
 				struct ipftq *, int, int));
@@ -294,8 +301,10 @@ extern	void	ipf_state_insert __P((struct ipstate *, int));
 extern	int	ipf_state_ioctl __P((caddr_t, ioctlcmd_t, int, int, void *));
 extern	void	ipf_state_log __P((struct ipstate *, u_int));
 extern	int	ipf_state_matchflush __P((caddr_t));
+extern	int	ipf_state_rehash __P((ipftuneable_t *, ipftuneval_t *));
 extern	void	ipf_state_setqueue __P((ipstate_t *, int));
 extern	void	ipf_state_setpending __P((ipstate_t *));
+extern	int	ipf_state_settimeout __P((ipftuneable_t *, ipftuneval_t *));
 extern	void	ipf_state_sync __P((void *));
 extern	void	ipf_state_timeout __P((void));
 extern	void	ipf_state_unload __P((void));

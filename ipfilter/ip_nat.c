@@ -140,8 +140,7 @@ u_int	ipf_nat_table_sz = NAT_TABLE_SZ;
 u_int	ipf_nat_maprules_sz = NAT_SIZE;
 u_int	ipf_nat_rdrrules_sz = RDR_SIZE;
 u_int	ipf_nat_hostmap_sz = HOSTMAP_SIZE;
-u_int	ipf_nat_maxbucket = 0,
-	ipf_nat_maxbucket_reset = 1;
+u_int	ipf_nat_maxbucket = 0;
 u_32_t	ipf_nat_map_masks = 0;
 u_32_t	ipf_nat_rdr_masks = 0;
 u_int	ipf_nat_last_force_flush = 0;
@@ -149,9 +148,11 @@ ipnat_t	**ipf_nat_map_rules = NULL;
 ipnat_t	**ipf_nat_rdr_rules = NULL;
 hostmap_t	**ipf_hm_maptable  = NULL;
 hostmap_t	*ipf_hm_maplist  = NULL;
-ipftq_t	ipf_nat_tqb[IPF_TCP_NSTATES];
+ipftq_t	ipf_nat_tcptq[IPF_TCP_NSTATES];
 ipftq_t	ipf_nat_udptq;
+ipftq_t	ipf_nat_udpacktq;
 ipftq_t	ipf_nat_icmptq;
+ipftq_t	ipf_nat_icmpacktq;
 ipftq_t	ipf_nat_iptq;
 ipftq_t	ipf_nat_pending;
 ipftq_t	*ipf_nat_utqe = NULL;
@@ -184,7 +185,7 @@ static	int	ipf_nat_getent __P((caddr_t, int));
 static	int	ipf_nat_getsz __P((caddr_t, int));
 static	int	ipf_nat_putent __P((caddr_t, int));
 static	void	ipf_nat_addencap __P((ipnat_t *));
-static	void	ipf_nat_addnat __P((struct ipnat *));
+static	void	ipf_nat_addmap __P((struct ipnat *));
 static	void	ipf_nat_addrdr __P((struct ipnat *));
 static	int	ipf_nat_builddivertmp __P((ipnat_t *));
 static	int	ipf_nat_clearlist __P((void));
@@ -313,19 +314,25 @@ ipf_nat_init()
 		ipf_nat_maxbucket *= 2;
 	}
 
-	ipf_sttab_init(ipf_nat_tqb);
+	ipf_sttab_init(ipf_nat_tcptq);
 	/*
 	 * Increase this because we may have "keep state" following this too
 	 * and packet storms can occur if this is removed too quickly.
 	 */
-	ipf_nat_tqb[IPF_TCPS_CLOSED].ifq_ttl = ipf_tcplastack;
-	ipf_nat_tqb[IPF_TCP_NSTATES - 1].ifq_next = &ipf_nat_udptq;
+	ipf_nat_tcptq[IPF_TCPS_CLOSED].ifq_ttl = ipf_tcplastack;
+	ipf_nat_tcptq[IPF_TCP_NSTATES - 1].ifq_next = &ipf_nat_udptq;
 
 	IPFTQ_INIT(&ipf_nat_udptq, ipf_nat_defage, "nat ipftq udp tab");
-	ipf_nat_udptq.ifq_next = &ipf_nat_icmptq;
+	ipf_nat_udptq.ifq_next = &ipf_nat_udpacktq;
+
+	IPFTQ_INIT(&ipf_nat_udpacktq, ipf_nat_defage, "nat ipftq udpack tab");
+	ipf_nat_udpacktq.ifq_next = &ipf_nat_icmptq;
 
 	IPFTQ_INIT(&ipf_nat_icmptq, ipf_nat_deficmpage, "nat icmp ipftq tab");
-	ipf_nat_icmptq.ifq_next = &ipf_nat_iptq;
+	ipf_nat_icmptq.ifq_next = &ipf_nat_icmpacktq;
+
+	IPFTQ_INIT(&ipf_nat_icmpacktq, ipf_nat_defage, "nat icmpack ipftq tab");
+	ipf_nat_icmpacktq.ifq_next = &ipf_nat_iptq;
 
 	IPFTQ_INIT(&ipf_nat_iptq, ipf_nat_defipage, "nat ip ipftq tab");
 	ipf_nat_iptq.ifq_next = &ipf_nat_pending;
@@ -334,11 +341,11 @@ ipf_nat_init()
 	ipf_nat_pending.ifq_next = NULL;
 
 	for (i = 0; i < IPF_TCP_NSTATES; i++) {
-		if (ipf_nat_tqb[i].ifq_ttl < ipf_nat_deficmpage)
-			ipf_nat_tqb[i].ifq_ttl = ipf_nat_deficmpage;
+		if (ipf_nat_tcptq[i].ifq_ttl < ipf_nat_deficmpage)
+			ipf_nat_tcptq[i].ifq_ttl = ipf_nat_deficmpage;
 #ifdef LARGE_NAT
-		else if (ipf_nat_tqb[i].ifq_ttl > ipf_nat_defage)
-			ipf_nat_tqb[i].ifq_ttl = ipf_nat_defage;
+		else if (ipf_nat_tcptq[i].ifq_ttl > ipf_nat_defage)
+			ipf_nat_tcptq[i].ifq_ttl = ipf_nat_defage;
 #endif
 	}
 
@@ -347,7 +354,7 @@ ipf_nat_init()
 	 * this too and packet storms can occur if this is removed
 	 * too quickly.
 	 */
-	ipf_nat_tqb[IPF_TCPS_CLOSED].ifq_ttl = ipf_nat_tqb[IPF_TCPS_LAST_ACK].ifq_ttl;
+	ipf_nat_tcptq[IPF_TCPS_CLOSED].ifq_ttl = ipf_tcplastack;
 
 	RWLOCK_INIT(&ipf_nat, "ipf IP NAT rwlock");
 	RWLOCK_INIT(&ipf_natfrag, "ipf IP NAT-Frag rwlock");
@@ -380,6 +387,7 @@ ipf_nat_addrdr(n)
 	ipnat_t **np;
 	u_32_t j;
 	u_int hv;
+	u_int rhv;
 	int k;
 
 	if (n->in_odstatype == FRI_NORMAL) {
@@ -387,12 +395,13 @@ ipf_nat_addrdr(n)
 		if ((k >= 0) && (k != 32))
 			ipf_nat_rdr_masks |= 1 << k;
 		j = (n->in_odstaddr & n->in_odstmsk);
-		hv = NAT_HASH_FN(j, 0, ipf_nat_rdrrules_sz);
+		rhv = NAT_HASH_FN(j, 0, 0xffffffff);
 	} else {
 		ipf_nat_rdr_masks |= 1;
 		j = 0;
-		hv = 0;
+		rhv = 0;
 	}
+	hv = rhv % ipf_nat_rdrrules_sz;
 	np = ipf_nat_rdr_rules + hv;
 	while (*np != NULL)
 		np = &(*np)->in_rnext;
@@ -404,7 +413,7 @@ ipf_nat_addrdr(n)
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    ipf_nat_addnat                                              */
+/* Function:    ipf_nat_addmap                                              */
 /* Returns:     Nil                                                         */
 /* Parameters:  n(I) - pointer to NAT rule to add                           */
 /*                                                                          */
@@ -413,12 +422,13 @@ ipf_nat_addrdr(n)
 /* redirect rules.                                                          */
 /* ------------------------------------------------------------------------ */
 static void
-ipf_nat_addnat(n)
+ipf_nat_addmap(n)
 	ipnat_t *n;
 {
 	ipnat_t **np;
 	u_32_t j;
 	u_int hv;
+	u_int rhv;
 	int k;
 
 	if (n->in_osrcatype == FRI_NORMAL) {
@@ -426,18 +436,19 @@ ipf_nat_addnat(n)
 		if ((k >= 0) && (k != 32))
 			ipf_nat_map_masks |= 1 << k;
 		j = (n->in_osrcaddr & n->in_osrcmsk);
-		hv = NAT_HASH_FN(j, 0, ipf_nat_maprules_sz);
+		rhv = NAT_HASH_FN(j, 0, 0xffffffff);
 	} else {
 		ipf_nat_map_masks |= 1;
 		j = 0;
-		hv = 0;
+		rhv = 0;
 	}
+	hv = rhv % ipf_nat_maprules_sz;
 	np = ipf_nat_map_rules + hv;
 	while (*np != NULL)
 		np = &(*np)->in_mnext;
 	n->in_mnext = NULL;
 	n->in_pmnext = np;
-	n->in_hv[1] = hv;
+	n->in_hv[1] = rhv;
 	*np = n;
 }
 
@@ -460,7 +471,7 @@ ipf_nat_addencap(n)
 {
 	ipnat_t **np;
 	u_32_t j;
-	u_int hv;
+	u_int hv, rhv;
 	int k;
 
 	k = -1;
@@ -471,39 +482,43 @@ ipf_nat_addencap(n)
 	if (n->in_nsrcatype == FRI_NORMAL) {
 		k = count4bits(n->in_nsrcmsk);
 		j = (n->in_nsrcaddr & n->in_nsrcmsk);
-		hv = NAT_HASH_FN(j, 0, ipf_nat_maprules_sz);
+		rhv = NAT_HASH_FN(j, 0, 0xffffffff);
 	} else {
 		j = 0;
-		hv = 0;
+		rhv = 0;
 	}
 
 	/*
 	 * And place the rules table entry in the reverse spot, so for out
-	 * we use the rdr-links and for rdr, we use the map-links/
+	 * we use the rdr-links and for rdr, we use the map-links.  This is
+	 * the reverse of how it is used elsewhere...
 	 */
 	if (n->in_redir & NAT_MAP) {
 		if ((k >= 0) && (k != 32))
 			ipf_nat_rdr_masks |= 1 << k;
 		else
 			ipf_nat_rdr_masks |= 1;
+		hv = rhv % ipf_nat_maprules_sz;
 		np = ipf_nat_rdr_rules + hv;
 		while (*np != NULL)
 			np = &(*np)->in_rnext;
 		n->in_rnext = NULL;
 		n->in_prnext = np;
-		n->in_hv[0] = hv;
+		n->in_hv[0] = rhv;
 		*np = n;
-	} else if (n->in_redir & NAT_REDIRECT) {
+	}
+	if (n->in_redir & NAT_REDIRECT) {
 		if ((k >= 0) && (k != 32))
 			ipf_nat_map_masks |= 1 << k;
 		else
 			ipf_nat_map_masks |= 1;
+		hv = rhv % ipf_nat_rdrrules_sz;
 		np = ipf_nat_map_rules + hv;
 		while (*np != NULL)
 			np = &(*np)->in_mnext;
 		n->in_mnext = NULL;
 		n->in_pmnext = np;
-		n->in_hv[1] = hv;
+		n->in_hv[1] = rhv;
 		*np = n;
 	}
 
@@ -529,14 +544,14 @@ ipf_nat_delrdr(n)
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    ipf_nat_delnat                                              */
+/* Function:    ipf_nat_delmap                                              */
 /* Returns:     Nil                                                         */
 /* Parameters:  n(I) - pointer to NAT rule to delete                        */
 /*                                                                          */
 /* Removes a NAT map rule from the hash table of NAT map rules.             */
 /* ------------------------------------------------------------------------ */
 void
-ipf_nat_delnat(n)
+ipf_nat_delmap(n)
 	ipnat_t *n;
 {
 	if (n->in_mnext != NULL)
@@ -568,13 +583,14 @@ ipf_nat_hostmap(np, src, dst, map, port)
 	u_32_t port;
 {
 	hostmap_t *hm;
-	u_int hv;
+	u_int hv, rhv;
 
 	hv = (src.s_addr ^ dst.s_addr);
 	hv += src.s_addr;
 	hv += dst.s_addr;
-	hv %= HOSTMAP_SIZE;
-	for (hm = ipf_hm_maptable[hv]; hm; hm = hm->hm_next)
+	rhv = hv;
+	hv %= ipf_nat_hostmap_sz;
+	for (hm = ipf_hm_maptable[hv]; hm; hm = hm->hm_hnext)
 		if ((hm->hm_osrcip.s_addr == src.s_addr) &&
 		    (hm->hm_odstip.s_addr == dst.s_addr) &&
 		    ((np == NULL) || (np == hm->hm_ipnat)) &&
@@ -608,7 +624,7 @@ ipf_nat_hostmap(np, src, dst, map, port)
 		hm->hm_ndstip.s_addr = 0;
 		hm->hm_ref = 1;
 		hm->hm_port = port;
-		hm->hm_hv = hv;
+		hm->hm_hv = rhv;
 		hm->hm_v = 4;
 		ipf_nat_stats.ns_hm_new++;
 	} else {
@@ -1123,7 +1139,7 @@ ipf_nat_ioctl(data, cmd, mode, uid, ctx)
 		break;
 
 	case SIOCGTQTAB :
-		error = ipf_outobj(data, ipf_nat_tqb, IPFOBJ_STATETQTAB);
+		error = ipf_outobj(data, ipf_nat_tcptq, IPFOBJ_STATETQTAB);
 		break;
 
 	case SIOCGTABL :
@@ -1252,13 +1268,13 @@ ipf_nat_siocaddnat(n, np, getlock)
 		switch (n->in_v[0])
 		{
 		case 4 :
-			ipf_nat_addnat(n);
+			ipf_nat_addmap(n);
 			if (n->in_redir & NAT_ENCAP)
 				ipf_nat_addencap(n);
 			break;
 #ifdef USE_INET6
 		case 6 :
-			ipf_nat6_addnat(n);
+			ipf_nat6_addmap(n);
 			if (n->in_redir & NAT_ENCAP)
 				ipf_nat6_addencap(n);
 			break;
@@ -1398,7 +1414,7 @@ ipf_nat_siocdelnat(n, np, getlock)
 	if (n->in_redir & NAT_REDIRECT)
 		ipf_nat_delrdr(n);
 	if (n->in_redir & (NAT_MAPBLK|NAT_MAP))
-		ipf_nat_delnat(n);
+		ipf_nat_delmap(n);
 	if (ipf_nat_list == NULL) {
 		ipf_nat_map_masks = 0;
 		ipf_nat_rdr_masks = 0;
@@ -2036,12 +2052,13 @@ ipf_nat_delete(nat, logtype)
 	if (nat->nat_pnext != NULL) {
 		removed = 1;
 
-		bkt = nat->nat_hv[0];
+		bkt = nat->nat_hv[0] % ipf_nat_table_sz;
 		ipf_nat_stats.ns_side[0].ns_bucketlen[bkt]--;
 		if (ipf_nat_stats.ns_side[0].ns_bucketlen[bkt] == 0) {
 			ipf_nat_stats.ns_side[0].ns_inuse--;
 		}
-		bkt = nat->nat_hv[1];
+
+		bkt = nat->nat_hv[1] % ipf_nat_table_sz;
 		ipf_nat_stats.ns_side[1].ns_bucketlen[bkt]--;
 		if (ipf_nat_stats.ns_side[1].ns_bucketlen[bkt] == 0) {
 			ipf_nat_stats.ns_side[1].ns_inuse--;
@@ -2908,8 +2925,8 @@ ipf_nat_add(fin, np, natsave, flags, direction)
 			ipf_nat_delrdr(np);
 			ipf_nat_addrdr(np);
 		} else if ((np->in_redir & (NAT_REDIRECT|NAT_MAP)) == NAT_MAP) {
-			ipf_nat_delnat(np);
-			ipf_nat_addnat(np);
+			ipf_nat_delmap(np);
+			ipf_nat_addmap(np);
 		}
 	}
 
@@ -3056,7 +3073,7 @@ int
 ipf_nat_insert(nat)
 	nat_t *nat;
 {
-	u_int hv1, hv2;
+	u_int hv0, hv1, rhv0, rhv1;
 	nat_t **natp;
 
 	/*
@@ -3064,40 +3081,42 @@ ipf_nat_insert(nat)
 	 * entry numbers first and then proceed.
 	 */
 	if ((nat->nat_flags & (SI_W_SPORT|SI_W_DPORT)) == 0) {
-		hv1 = NAT_HASH_FN(nat->nat_osrcaddr, nat->nat_osport,
-				  0xffffffff);
-		hv1 = NAT_HASH_FN(nat->nat_odstaddr, hv1 + nat->nat_odport,
-				  ipf_nat_table_sz);
+		rhv0 = NAT_HASH_FN(nat->nat_osrcaddr, nat->nat_osport,
+				   0xffffffff);
+		rhv0 = NAT_HASH_FN(nat->nat_odstaddr, rhv0 + nat->nat_odport,
+				   0xffffffff);
 
 		/*
 		 * TRACE nat_osrcaddr, nat_osport, nat_odstaddr,
-		 * nat_odport, hv1
+		 * nat_odport, hv0
 		 */
 
-		hv2 = NAT_HASH_FN(nat->nat_nsrcaddr, nat->nat_nsport,
-				  0xffffffff);
-		hv2 = NAT_HASH_FN(nat->nat_ndstaddr, hv2 + nat->nat_ndport,
-				  ipf_nat_table_sz);
+		rhv1 = NAT_HASH_FN(nat->nat_nsrcaddr, nat->nat_nsport,
+				   0xffffffff);
+		rhv1 = NAT_HASH_FN(nat->nat_ndstaddr, rhv1 + nat->nat_ndport,
+				   0xffffffff);
 		/*
 		 * TRACE nat_nsrcaddr, nat_nsport, nat_ndstaddr,
 		 * nat_ndport, hv1
 		 */
 	} else {
-		hv1 = NAT_HASH_FN(nat->nat_osrcaddr, 0, 0xffffffff);
-		hv1 = NAT_HASH_FN(nat->nat_odstaddr, hv1, ipf_nat_table_sz);
-		/* TRACE nat_osrcaddr, nat_odstaddr, hv1 */
+		rhv0 = NAT_HASH_FN(nat->nat_osrcaddr, 0, 0xffffffff);
+		rhv0 = NAT_HASH_FN(nat->nat_odstaddr, rhv0, 0xffffffff);
+		/* TRACE nat_osrcaddr, nat_odstaddr, rhv0 */
 
-		hv2 = NAT_HASH_FN(nat->nat_nsrcaddr, 0, 0xffffffff);
-		hv2 = NAT_HASH_FN(nat->nat_ndstaddr, hv2, ipf_nat_table_sz);
-		/* TRACE nat_nsrcaddr, nat_ndstaddr, hv2 */
+		rhv1 = NAT_HASH_FN(nat->nat_nsrcaddr, 0, 0xffffffff);
+		rhv1 = NAT_HASH_FN(nat->nat_ndstaddr, rhv1, 0xffffffff);
+		/* TRACE nat_nsrcaddr, nat_ndstaddr, rhv1 */
 	}
+	hv0 = rhv0 % ipf_nat_table_sz;
+	hv1 = rhv1 % ipf_nat_table_sz;
 
-	if (ipf_nat_stats.ns_side[0].ns_bucketlen[hv1] >= ipf_nat_maxbucket) {
+	if (ipf_nat_stats.ns_side[0].ns_bucketlen[hv0] >= ipf_nat_maxbucket) {
 		ATOMIC_INCL(ipf_nat_stats.ns_side[0].ns_bucket_max);
 		return -1;
 	}
 
-	if (ipf_nat_stats.ns_side[1].ns_bucketlen[hv2] >= ipf_nat_maxbucket) {
+	if (ipf_nat_stats.ns_side[1].ns_bucketlen[hv1] >= ipf_nat_maxbucket) {
 		ATOMIC_INCL(ipf_nat_stats.ns_side[1].ns_bucket_max);
 		return -1;
 	}
@@ -3106,12 +3125,12 @@ ipf_nat_insert(nat)
 	    nat->nat_dir == NAT_DIVERTIN) {
 		u_int swap;
 
-		swap = hv2;
-		hv2 = hv1;
+		swap = hv0;
+		hv0 = hv1;
 		hv1 = swap;
 	}
-	nat->nat_hv[0] = hv1;
-	nat->nat_hv[1] = hv2;
+	nat->nat_hv[0] = rhv0;
+	nat->nat_hv[1] = rhv1;
 
 	MUTEX_INIT(&nat->nat_lock, "nat entry lock");
 
@@ -3152,7 +3171,7 @@ ipf_nat_insert(nat)
 		ipf_nat_instances->nat_pnext = &nat->nat_next;
 	ipf_nat_instances = nat;
 
-	natp = &ipf_nat_table[0][hv1];
+	natp = &ipf_nat_table[0][hv0];
 	if (*natp)
 		(*natp)->nat_phnext[0] = &nat->nat_hnext[0];
 	else
@@ -3160,9 +3179,9 @@ ipf_nat_insert(nat)
 	nat->nat_phnext[0] = natp;
 	nat->nat_hnext[0] = *natp;
 	*natp = nat;
-	ipf_nat_stats.ns_side[0].ns_bucketlen[hv1]++;
+	ipf_nat_stats.ns_side[0].ns_bucketlen[hv0]++;
 
-	natp = &ipf_nat_table[1][hv2];
+	natp = &ipf_nat_table[1][hv1];
 	if (*natp)
 		(*natp)->nat_phnext[1] = &nat->nat_hnext[1];
 	else
@@ -3170,7 +3189,7 @@ ipf_nat_insert(nat)
 	nat->nat_phnext[1] = natp;
 	nat->nat_hnext[1] = *natp;
 	*natp = nat;
-	ipf_nat_stats.ns_side[1].ns_bucketlen[hv2]++;
+	ipf_nat_stats.ns_side[1].ns_bucketlen[hv1]++;
 
 	ipf_nat_setqueue(nat);
 
@@ -3687,11 +3706,9 @@ ipf_nat_inlookup(fin, flags, p, src, mapdst)
 	int nflags;
 	u_32_t dst;
 	void *ifp;
-	u_int hv;
+	u_int hv, rhv;
 
 	ifp = fin->fin_ifp;
-	sport = 0;
-	dport = 0;
 	gre = NULL;
 	dst = mapdst.s_addr;
 	sflags = flags & NAT_TCPUDPICMP;
@@ -3704,12 +3721,17 @@ ipf_nat_inlookup(fin, flags, p, src, mapdst)
 		dport = htons(fin->fin_data[1]);
 		break;
 	case IPPROTO_ICMP :
-		if (flags & IPN_ICMPERR)
+		if (flags & IPN_ICMPERR) {
 			sport = fin->fin_data[1];
-		else
+			dport = 0;
+		} else {
 			dport = fin->fin_data[1];
+			sport = 0;
+		}
 		break;
 	default :
+		sport = 0;
+		dport = 0;
 		break;
 	}
 
@@ -3717,8 +3739,9 @@ ipf_nat_inlookup(fin, flags, p, src, mapdst)
 	if ((flags & SI_WILDP) != 0)
 		goto find_in_wild_ports;
 
-	hv = NAT_HASH_FN(dst, dport, 0xffffffff);
-	hv = NAT_HASH_FN(src.s_addr, hv + sport, ipf_nat_table_sz);
+	rhv = NAT_HASH_FN(dst, dport, 0xffffffff);
+	rhv = NAT_HASH_FN(src.s_addr, rhv + sport, 0xffffffff);
+	hv = rhv % ipf_nat_table_sz;
 	nat = ipf_nat_table[1][hv];
 	/* TRACE dst, dport, src, sport, hv, nat */
 
@@ -3908,7 +3931,7 @@ ipf_nat_tabmove(nat)
 	nat_t *nat;
 {
 	nat_t **natp;
-	u_int hv0, hv1;
+	u_int hv0, hv1, rhv0, rhv1;
 
 	if (nat->nat_flags & SI_CLONE)
 		return;
@@ -3919,22 +3942,23 @@ ipf_nat_tabmove(nat)
 	if (nat->nat_hnext[0])
 		nat->nat_hnext[0]->nat_phnext[0] = nat->nat_phnext[0];
 	*nat->nat_phnext[0] = nat->nat_hnext[0];
-	ipf_nat_stats.ns_side[0].ns_bucketlen[nat->nat_hv[0]]--;
+	ipf_nat_stats.ns_side[0].ns_bucketlen[nat->nat_hv[0] % ipf_nat_table_sz]--;
 
 	if (nat->nat_hnext[1])
 		nat->nat_hnext[1]->nat_phnext[1] = nat->nat_phnext[1];
 	*nat->nat_phnext[1] = nat->nat_hnext[1];
-	ipf_nat_stats.ns_side[1].ns_bucketlen[nat->nat_hv[1]]--;
+	ipf_nat_stats.ns_side[1].ns_bucketlen[nat->nat_hv[1] % ipf_nat_table_sz]--;
 
 	/*
 	 * Add into the NAT table in the new position
 	 */
-	hv0 = NAT_HASH_FN(nat->nat_osrcaddr, nat->nat_osport, 0xffffffff);
-	hv0 = NAT_HASH_FN(nat->nat_odstaddr, hv0 + nat->nat_odport,
-			  ipf_nat_table_sz);
-	hv1 = NAT_HASH_FN(nat->nat_nsrcaddr, nat->nat_nsport, 0xffffffff);
-	hv1 = NAT_HASH_FN(nat->nat_ndstaddr, hv1 + nat->nat_ndport,
-			  ipf_nat_table_sz);
+	rhv0 = NAT_HASH_FN(nat->nat_osrcaddr, nat->nat_osport, 0xffffffff);
+	rhv0 = NAT_HASH_FN(nat->nat_odstaddr, rhv0 + nat->nat_odport, 0xffffffff);
+	rhv1 = NAT_HASH_FN(nat->nat_nsrcaddr, nat->nat_nsport, 0xffffffff);
+	rhv1 = NAT_HASH_FN(nat->nat_ndstaddr, rhv1 + nat->nat_ndport, 0xffffffff);
+
+	hv0 = rhv0 % ipf_nat_table_sz;
+	hv1 = rhv1 % ipf_nat_table_sz;
 
 	if (nat->nat_dir == NAT_INBOUND || nat->nat_dir == NAT_ENCAPIN ||
 	    nat->nat_dir == NAT_DIVERTIN) {
@@ -3948,7 +3972,7 @@ ipf_nat_tabmove(nat)
 	/* TRACE nat_osrcaddr, nat_osport, nat_odstaddr, nat_odport, hv0 */
 	/* TRACE nat_nsrcaddr, nat_nsport, nat_ndstaddr, nat_ndport, hv1 */
 
-	nat->nat_hv[0] = hv0;
+	nat->nat_hv[0] = rhv0;
 	natp = &ipf_nat_table[0][hv0];
 	if (*natp)
 		(*natp)->nat_phnext[0] = &nat->nat_hnext[0];
@@ -3957,7 +3981,7 @@ ipf_nat_tabmove(nat)
 	*natp = nat;
 	ipf_nat_stats.ns_side[0].ns_bucketlen[hv0]++;
 
-	nat->nat_hv[1] = hv1;
+	nat->nat_hv[1] = rhv1;
 	natp = &ipf_nat_table[1][hv1];
 	if (*natp)
 		(*natp)->nat_phnext[1] = &nat->nat_hnext[1];
@@ -4381,7 +4405,7 @@ ipf_nat_update(fin, nat, np)
 		ifq2 = NULL;
 
 	if (nat->nat_pr[0] == IPPROTO_TCP && ifq2 == NULL) {
-		(void) ipf_tcp_age(&nat->nat_tqe, fin, ipf_nat_tqb, 0, 2);
+		(void) ipf_tcp_age(&nat->nat_tqe, fin, ipf_nat_tcptq, 0, 2);
 	} else {
 		if (ifq2 == NULL) {
 			if (nat->nat_pr[0] == IPPROTO_UDP)
@@ -5707,12 +5731,9 @@ ipf_nat_unload()
 		ipf_nat_stats.ns_side[1].ns_bucketlen = NULL;
 	}
 
-	if (ipf_nat_maxbucket_reset == 1)
-		ipf_nat_maxbucket = 0;
-
 	if (ipf_nat_inited == 1) {
 		ipf_nat_inited = 0;
-		ipf_sttab_destroy(ipf_nat_tqb);
+		ipf_sttab_destroy(ipf_nat_tcptq);
 
 		RW_DESTROY(&ipf_natfrag);
 		RW_DESTROY(&ipf_nat);
@@ -5745,7 +5766,7 @@ ipf_nat_expire()
 
 	SPL_NET(s);
 	WRITE_ENTER(&ipf_nat);
-	for (ifq = ipf_nat_tqb, i = 0; ifq != NULL; ifq = ifq->ifq_next) {
+	for (ifq = ipf_nat_tcptq, i = 0; ifq != NULL; ifq = ifq->ifq_next) {
 		for (tqn = ifq->ifq_head; ((tqe = tqn) != NULL); i++) {
 			if (tqe->tqe_die > ipf_ticks)
 				break;
@@ -6204,8 +6225,8 @@ ipf_nat_clone(fin, nat)
 	 * state of the new NAT from here.
 	 */
 	if (clone->nat_pr[0] == IPPROTO_TCP) {
-		(void) ipf_tcp_age(&clone->nat_tqe, fin, ipf_nat_tqb,
-				  clone->nat_flags, 2);
+		(void) ipf_tcp_age(&clone->nat_tqe, fin, ipf_nat_tcptq,
+				   clone->nat_flags, 2);
 	}
 #ifdef	IPFILTER_SYNC
 	clone->nat_sync = ipf_sync_new(SMC_NAT, fin, clone);
@@ -6379,7 +6400,7 @@ ipf_nat_setqueue(nat)
 			nifq = &ipf_nat_icmptq;
 			break;
 		case IPPROTO_TCP :
-			nifq = ipf_nat_tqb + nat->nat_tqe.tqe_state[rev];
+			nifq = ipf_nat_tcptq + nat->nat_tqe.tqe_state[rev];
 			break;
 		default :
 			nifq = &ipf_nat_iptq;
@@ -6637,7 +6658,7 @@ ipf_nat_extraflush(which)
 		 * Since we're only interested in things that are closing,
 		 * we can start with the appropriate timeout queue.
 		 */
-		for (ifq = ipf_nat_tqb + IPF_TCPS_CLOSE_WAIT; ifq != NULL;
+		for (ifq = ipf_nat_tcptq + IPF_TCPS_CLOSE_WAIT; ifq != NULL;
 		     ifq = ifq->ifq_next) {
 
 			for (tqn = ifq->ifq_head; tqn != NULL; ) {
@@ -6685,7 +6706,7 @@ ipf_nat_extraflush(which)
 	case IPF_TCPS_TIME_WAIT :
 	case IPF_TCPS_CLOSED :
 		ipf_nat_stats.ns_flush_state++;
-		tqn = ipf_nat_tqb[which].ifq_head;
+		tqn = ipf_nat_tcptq[which].ifq_head;
 		while (tqn != NULL) {
 			nat = tqn->tqe_parent;
 			tqn = tqn->tqe_next;
@@ -6732,7 +6753,7 @@ ipf_nat_extraflush(which)
 	if (ipf_ticks - ipf_nat_last_force_flush > IPF_TTLVAL(5)) {
 		ipf_nat_last_force_flush = ipf_ticks;
 
-		removed = ipf_queueflush(ipf_nat_flush_entry, ipf_nat_tqb,
+		removed = ipf_queueflush(ipf_nat_flush_entry, ipf_nat_tcptq,
 					 ipf_nat_utqe, &ipf_nat_stats.ns_active,
 					 ipf_nat_table_sz,
 					 ipf_nat_table_wm_low);
@@ -8127,4 +8148,347 @@ static int ipf_nat_gettable(data)
 		error = EFAULT;
 	}
 	return error;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_nat_settimeout                                          */
+/* Returns:     int  - 0 = success, else failure			    */
+/* Parameters:  t(I) - pointer to tunable                                   */
+/*              p(I) - pointer to new tuning data                           */
+/*                                                                          */
+/* Apply the timeout change to the NAT timeout queues.                      */
+/* ------------------------------------------------------------------------ */
+int
+ipf_nat_settimeout(t, p)
+	ipftuneable_t *t;
+	ipftuneval_t *p;
+{
+
+	if (!strncmp(t->ipft_name, "tcp_", 4))  
+		return ipf_settimeout_tcp(t, p, ipf_nat_tcptq);
+
+	if (!strcmp(t->ipft_name, "udp_timeout")) {
+		ipf_apply_timeout(&ipf_nat_udptq, p->ipftu_int);
+	} else if (!strcmp(t->ipft_name, "udp_ack_timeout")) {
+		ipf_apply_timeout(&ipf_nat_udpacktq, p->ipftu_int);
+	} else if (!strcmp(t->ipft_name, "icmp_timeout")) {
+		ipf_apply_timeout(&ipf_nat_icmptq, p->ipftu_int);
+	} else if (!strcmp(t->ipft_name, "icmp_ack_timeout")) {
+		ipf_apply_timeout(&ipf_nat_icmpacktq, p->ipftu_int);
+	} else if (!strcmp(t->ipft_name, "ip_timeout")) {
+		ipf_apply_timeout(&ipf_nat_iptq, p->ipftu_int);
+	} else {
+		ipf_interror = 60062;
+		return ESRCH;
+	}
+	return 0;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_nat_rehash                                              */
+/* Returns:     int  - 0 = success, else failure			    */
+/* Parameters:  t(I) - pointer to tunable                                   */
+/*              p(I) - pointer to new tuning data                           */
+/*                                                                          */
+/* To change the size of the basic NAT table, we need to first allocate the */
+/* new tables (lest it fails and we've got nowhere to store all of the NAT  */
+/* sessions currently active) and then walk through the entire list and     */
+/* insert them into the table.  There are two tables here: an inbound one   */
+/* and an outbound one.  Each NAT entry goes into each table once.          */
+/* ------------------------------------------------------------------------ */
+int
+ipf_nat_rehash(t, p)
+	ipftuneable_t *t;
+	ipftuneval_t *p;
+{
+	nat_t **newtab[2], *nat, **natp;
+	u_int *bucketlens[2];
+	u_int maxbucket;
+	u_int newsize;
+	u_int hv;
+	int i;
+
+	newsize = p->ipftu_int;
+	/*
+	 * In case there is nothing to do...
+	 */
+	if (newsize == ipf_state_size)
+		return 0;
+
+	/*
+	 * 4 tables depend on the NAT table size: the inbound looking table,
+	 * the outbound lookup table and the hash chain length for each.
+	 */
+	KMALLOCS(newtab[0], nat_t **, newsize * sizeof(nat_t *));
+	if (newtab == NULL) {
+		ipf_interror = 60063;
+		return ENOMEM;
+	}
+
+	KMALLOCS(newtab[1], nat_t **, newsize * sizeof(nat_t *));
+	if (newtab == NULL) {
+		KFREES(newtab[0], newsize * sizeof(nat_t *));
+		ipf_interror = 60064;
+		return ENOMEM;
+	}
+
+	KMALLOCS(bucketlens[0], u_int *, newsize * sizeof(u_int));
+	if (bucketlens[0] == NULL) {
+		KFREES(newtab[0], newsize * sizeof(nat_t *));
+		KFREES(newtab[1], newsize * sizeof(nat_t *));
+		ipf_interror = 60065;
+		return ENOMEM;
+	}
+
+	KMALLOCS(bucketlens[1], u_int *, newsize * sizeof(u_int));
+	if (bucketlens[1] == NULL) {
+		KFREES(bucketlens[0], newsize * sizeof(u_int));
+		KFREES(newtab[0], newsize * sizeof(nat_t *));
+		KFREES(newtab[1], newsize * sizeof(nat_t *));
+		ipf_interror = 60066;
+		return ENOMEM;
+	}
+
+	/*
+	 * Recalculate the maximum length based on the new size.
+	 */
+	for (maxbucket = 0, i = newsize; i > 0; i >>= 1)
+		maxbucket++;
+	maxbucket *= 2;
+
+	bzero((char *)newtab[0], newsize * sizeof(nat_t *));
+	bzero((char *)newtab[1], newsize * sizeof(nat_t *));
+	bzero((char *)bucketlens[0], newsize * sizeof(u_int));
+	bzero((char *)bucketlens[1], newsize * sizeof(u_int));
+
+	WRITE_ENTER(&ipf_nat);
+
+	if (ipf_nat_table[0] != NULL) {
+		KFREES(ipf_nat_table[0],
+		       ipf_nat_table_sz * sizeof(*ipf_nat_table[0]));
+	}
+	ipf_nat_table[0] = newtab[0];
+
+	if (ipf_nat_table[1] != NULL) {
+		KFREES(ipf_nat_table[1],
+		       ipf_nat_table_sz * sizeof(*ipf_nat_table[1]));
+	}
+	ipf_nat_table[1] = newtab[1];
+
+	if (ipf_nat_stats.ns_side[0].ns_bucketlen != NULL) {
+		KFREES(ipf_nat_stats.ns_side[0].ns_bucketlen,
+		       ipf_nat_table_sz * sizeof(u_int));
+	}
+	ipf_nat_stats.ns_side[0].ns_bucketlen = bucketlens[0];
+
+	if (ipf_nat_stats.ns_side[1].ns_bucketlen != NULL) {
+		KFREES(ipf_nat_stats.ns_side[1].ns_bucketlen,
+		       ipf_nat_table_sz * sizeof(u_int));
+	}
+	ipf_nat_stats.ns_side[1].ns_bucketlen = bucketlens[1];
+
+	ipf_nat_maxbucket = maxbucket;
+	ipf_nat_table_sz = newsize;
+	/*
+	 * Walk through the entire list of NAT table entries and put them
+	 * in the new NAT table, somewhere.  Because we have a new table,
+	 * we need to restart the counter of how many chains are in use.
+	 */
+	ipf_nat_stats.ns_side[0].ns_inuse = 0;
+	ipf_nat_stats.ns_side[1].ns_inuse = 0;
+
+	for (nat = ipf_nat_instances; nat != NULL; nat = nat->nat_next) {
+		nat->nat_hnext[0] = NULL;
+		nat->nat_phnext[0] = NULL;
+		hv = nat->nat_hv[0] % ipf_nat_table_sz;
+
+		natp = &ipf_nat_table[0][hv];
+		if (*natp)
+			(*natp)->nat_phnext[0] = &nat->nat_hnext[0];
+		else
+			ipf_nat_stats.ns_side[0].ns_inuse++;
+		nat->nat_phnext[0] = natp;
+		nat->nat_hnext[0] = *natp;
+		*natp = nat;
+		ipf_nat_stats.ns_side[0].ns_bucketlen[hv]++;
+
+		nat->nat_hnext[1] = NULL;
+		nat->nat_phnext[1] = NULL;
+		hv = nat->nat_hv[1] % ipf_nat_table_sz;
+
+		natp = &ipf_nat_table[1][hv];
+		if (*natp)
+			(*natp)->nat_phnext[1] = &nat->nat_hnext[1];
+		else
+			ipf_nat_stats.ns_side[1].ns_inuse++;
+		nat->nat_phnext[1] = natp;
+		nat->nat_hnext[1] = *natp;
+		*natp = nat;
+		ipf_nat_stats.ns_side[1].ns_bucketlen[hv]++;
+	}
+	RWLOCK_EXIT(&ipf_nat);
+
+	return 0;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_nat_rehash_rules                                        */
+/* Returns:     int  - 0 = success, else failure			    */
+/* Parameters:  t(I) - pointer to tunable                                   */
+/*              p(I) - pointer to new tuning data                           */
+/*                                                                          */
+/* All of the NAT rules hang off of a hash table that is searched with a    */
+/* hash on address after the netmask is applied.  There is a different table*/
+/* for both inbound rules (rdr) and outbound (map.)  The resizing will only */
+/* affect one of these two tables.                                          */
+/* ------------------------------------------------------------------------ */
+int
+ipf_nat_rehash_rules(t, p)
+	ipftuneable_t *t;
+	ipftuneval_t *p;
+{
+	ipnat_t **newtab, *np, ***old, **npp;
+	u_int newsize;
+	u_int mask;
+	u_int hv;
+
+	newsize = p->ipftu_int;
+	/*
+	 * In case there is nothing to do...
+	 */
+	if (newsize == *t->ipft_pint)
+		return 0;
+
+	/*
+	 * All inbound rules have the NAT_REDIRECT bit set in in_redir and
+	 * all outbound rules have either NAT_MAP or MAT_MAPBLK set.
+	 * This if statement allows for some more generic code to be below,
+	 * rather than two huge gobs of code that almost do the same thing.
+	 */
+	if (t->ipft_pint == &ipf_nat_rdrrules_sz) {
+		old = &ipf_nat_rdr_rules;
+		mask = NAT_REDIRECT;
+	} else {
+		old = &ipf_nat_map_rules;
+		mask = NAT_MAP|NAT_MAPBLK;
+	}
+
+	KMALLOCS(newtab, ipnat_t **, newsize * sizeof(ipnat_t *));
+	if (newtab == NULL) {
+		ipf_interror = 60067;
+		return ENOMEM;
+	}
+
+	bzero((char *)newtab, newsize * sizeof(ipnat_t *));
+
+	WRITE_ENTER(&ipf_nat);
+
+	if (*old != NULL) {
+		KFREES(*old, *t->ipft_pint * sizeof(ipnat_t **));
+	}
+	*old = newtab;
+	*t->ipft_pint = newsize;
+
+	for (np = ipf_nat_list; np != NULL; np = np->in_next) {
+		if ((np->in_redir & mask) == 0)
+			continue;
+
+		if ((np->in_redir & NAT_ENCAP) == 0) {
+			if (np->in_redir & NAT_REDIRECT) {
+				np->in_rnext = NULL;
+				hv = np->in_hv[0] % newsize;
+				for (npp = newtab + hv; *npp != NULL; )
+					npp = &(*npp)->in_rnext;
+				np->in_prnext = npp;
+				*npp = np;
+			}
+			if (np->in_redir & NAT_MAP) {
+				np->in_mnext = NULL;
+				hv = np->in_hv[1] % newsize;
+				for (npp = newtab + hv; *npp != NULL; )
+					npp = &(*npp)->in_mnext;
+				np->in_pmnext = npp;
+				*npp = np;
+			}
+		} else {
+			if (np->in_redir & NAT_MAP) {
+				np->in_rnext = NULL;
+				hv = np->in_hv[0] % newsize;
+				for (npp = newtab + hv; *npp != NULL; )
+					npp = &(*npp)->in_rnext;
+				np->in_prnext = npp;
+				*npp = np;
+			}
+			if (np->in_redir & NAT_REDIRECT) {
+				np->in_mnext = NULL;
+				hv = np->in_hv[1] % newsize;
+				for (npp = newtab + hv; *npp != NULL; )
+					npp = &(*npp)->in_mnext;
+				np->in_pmnext = npp;
+				*npp = np;
+			}
+		}
+
+	}
+	RWLOCK_EXIT(&ipf_nat);
+
+	return 0;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_nat_hostmap_rehash                                      */
+/* Returns:     int  - 0 = success, else failure			    */
+/* Parameters:  t(I) - pointer to tunable                                   */
+/*              p(I) - pointer to new tuning data                           */
+/*                                                                          */
+/* Allocate and populate a new hash table that will contain a reference to  */
+/* all of the active IP# translations currently in place.                   */
+/* ------------------------------------------------------------------------ */
+int
+ipf_nat_hostmap_rehash(t, p)
+	ipftuneable_t *t;
+	ipftuneval_t *p;
+{
+	hostmap_t *hm, **newtab;
+	u_int newsize;
+	u_int hv;
+
+	newsize = p->ipftu_int;
+	/*
+	 * In case there is nothing to do...
+	 */
+	if (newsize == *t->ipft_pint)
+		return 0;
+
+	KMALLOCS(newtab, hostmap_t **, newsize * sizeof(hostmap_t *));
+	if (newtab == NULL) {
+		ipf_interror = 60068;
+		return ENOMEM;
+	}
+
+	bzero((char *)newtab, newsize * sizeof(hostmap_t *));
+
+	WRITE_ENTER(&ipf_nat);
+	if (ipf_hm_maptable != NULL) {
+		KFREES(ipf_hm_maptable,
+		       ipf_nat_hostmap_sz * sizeof(hostmap_t *));
+	}
+	ipf_hm_maptable = newtab;
+	ipf_nat_hostmap_sz = newsize;
+
+	for (hm = ipf_hm_maplist; hm != NULL; hm = hm->hm_next) {
+		hv = hm->hm_hv % ipf_nat_hostmap_sz;
+		hm->hm_hnext = ipf_hm_maptable[hv];
+		hm->hm_phnext = ipf_hm_maptable + hv;
+		if (ipf_hm_maptable[hv] != NULL)
+			ipf_hm_maptable[hv]->hm_phnext = &hm->hm_hnext;
+		ipf_hm_maptable[hv] = hm;
+	}
+	RWLOCK_EXIT(&ipf_nat);
+
+	return 0;
 }

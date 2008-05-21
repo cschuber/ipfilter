@@ -1269,6 +1269,16 @@ typedef	union	ipftunevalptr	{
 	u_char		*ipftp_char;
 } ipftunevalptr_t;
 
+typedef	union	ipftuneval	{
+	u_long		ipftu_long;
+	u_int		ipftu_int;
+	u_short		ipftu_short;
+	u_char		ipftu_char;
+} ipftuneval_t;
+
+struct ipftuneable;
+typedef	int (* ipftunefunc_t) __P((struct ipftuneable *, ipftuneval_t *));
+
 typedef	struct	ipftuneable	{
 	ipftunevalptr_t	ipft_una;
 	const char	*ipft_name;
@@ -1277,6 +1287,7 @@ typedef	struct	ipftuneable	{
 	int		ipft_sz;
 	int		ipft_flags;
 	struct ipftuneable *ipft_next;
+	ipftunefunc_t	ipft_func;
 } ipftuneable_t;
 
 #define	ipft_addr	ipft_una.ipftp_void
@@ -1287,13 +1298,6 @@ typedef	struct	ipftuneable	{
 
 #define	IPFT_RDONLY	1	/* read-only */
 #define	IPFT_WRDISABLED	2	/* write when disabled only */
-
-typedef	union	ipftuneval	{
-	u_long		ipftu_long;
-	u_int		ipftu_int;
-	u_short		ipftu_short;
-	u_char		ipftu_char;
-} ipftuneval_t;
 
 typedef	struct	ipftune	{
 	void    	*ipft_cookie;
@@ -1581,6 +1585,7 @@ extern	int	ipf_send_reset __P((fr_info_t *));
 #if  (__FreeBSD_version < 501000) || !defined(_KERNEL)
 extern	int	ppsratecheck __P((struct timeval *, int *, int));
 #endif
+extern	void	ipf_apply_timeout __P((ipftq_t *, u_int));
 extern	ipftq_t	*ipf_addtimeoutqueue __P((ipftq_t **, u_int));
 extern	void	ipf_deletequeueentry __P((ipftqent_t *));
 extern	int	ipf_deletetimeoutqueue __P((ipftq_t *));
@@ -1591,6 +1596,8 @@ extern	void	ipf_queueback __P((ipftqent_t *));
 extern	int	ipf_queueflush __P((ipftq_delete_fn_t, ipftq_t *, ipftq_t *,
 				    u_int *, int, int));
 extern	void	ipf_queuefront __P((ipftqent_t *));
+extern	int	ipf_settimeout_tcp __P((ipftuneable_t *, ipftuneval_t *,
+					ipftq_t *));
 extern	void	ipf_checkv4sum __P((fr_info_t *));
 extern	int	ipf_checkl4sum __P((fr_info_t *));
 extern	int	ipf_ifpfillv4addr __P((int, struct sockaddr_in *,
@@ -1678,7 +1685,6 @@ extern	int	ipf_update_ipid;
 extern	int	ipf_nat_logging;
 extern	int	ipf_state_logging;
 extern	int	ipl_suppress;
-extern	int	ipl_logmax;
 extern	int	ipl_logall;
 extern	int	ipl_logsize;
 extern	u_32_t	ipf_ticks;
@@ -1703,3 +1709,4 @@ extern	int	ipf_interror;
 extern	ipf_statistics_t ipf_stats[2];
 
 #endif	/* __IP_FIL_H__ */
+

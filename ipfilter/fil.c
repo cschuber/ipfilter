@@ -245,6 +245,7 @@ static	ipftuneable_t	*ipf_tune_findbyname __P((const char *));
 static	ipftuneable_t	*ipf_tune_findbycookie __P((void *, void **));
 static	void		ipf_unlinktoken __P((ipftoken_t *));
 static	int		ipf_updateipid __P((fr_info_t *));
+static	int		ipf_settimeout __P((ipftuneable_t *, ipftuneval_t *));
 
 
 /*
@@ -6434,40 +6435,57 @@ ipftuneable_t ipf_tuneables[] = {
 	{ { &ipf_pass },	"default_pass",		0,	0xffffffff,
 		sizeof(ipf_pass),		0,			NULL },
 	/* state */
-	{ { &ipf_tcpidletimeout }, "tcp_idletimeout",	1,	0x7fffffff,
-		sizeof(ipf_tcpidletimeout),	IPFT_WRDISABLED,	NULL },
-	{ { &ipf_tcpclosewait },   "tcp_closewait",	1,	0x7fffffff,
-		sizeof(ipf_tcpclosewait),	IPFT_WRDISABLED,	NULL },
-	{ { &ipf_tcplastack },	"tcp_lastack",		1,	0x7fffffff,
-		sizeof(ipf_tcplastack),		IPFT_WRDISABLED,	NULL },
+	{ { &ipf_tcpidletimeout }, "tcp_idle_timeout",	1,	0x7fffffff,
+		sizeof(ipf_tcpidletimeout),	0,			NULL,
+		ipf_settimeout },
+	{ { &ipf_tcpclosewait },   "tcp_clos_ewait",	1,	0x7fffffff,
+		sizeof(ipf_tcpclosewait),	0,			NULL,
+		ipf_settimeout },
+	{ { &ipf_tcplastack },	"tcp_last_ack",		1,	0x7fffffff,
+		sizeof(ipf_tcplastack),		0,			NULL,
+		ipf_settimeout },
 	{ { &ipf_tcptimeout },	"tcp_timeout",		1,	0x7fffffff,
-		sizeof(ipf_tcptimeout),		IPFT_WRDISABLED,	NULL },
+		sizeof(ipf_tcptimeout),		0,			NULL,
+		ipf_settimeout },
+	{ { &ipf_tcpsynsent },	"tcp_syn_sent",		1,	0x7fffffff,
+		sizeof(ipf_tcpsynsent),		0,			NULL,
+		ipf_settimeout },
+	{ { &ipf_tcpsynrecv },	"tcp_syn_received",	1,	0x7fffffff,
+		sizeof(ipf_tcpsynrecv),		0,			NULL,
+		ipf_settimeout },
 	{ { &ipf_tcpclosed },	"tcp_closed",		1,	0x7fffffff,
-		sizeof(ipf_tcpclosed),		IPFT_WRDISABLED,	NULL },
+		sizeof(ipf_tcpclosed),		0,			NULL,
+		ipf_settimeout },
 	{ { &ipf_tcphalfclosed }, "tcp_half_closed",	1,	0x7fffffff,
-		sizeof(ipf_tcphalfclosed),	IPFT_WRDISABLED,	NULL },
+		sizeof(ipf_tcphalfclosed),	0,			NULL,
+		ipf_settimeout },
 	{ { &ipf_tcptimewait }, "tcp_time_wait",	1,	0x7fffffff,
-		sizeof(ipf_tcptimewait),	IPFT_WRDISABLED,	NULL },
+		sizeof(ipf_tcptimewait),	0,			NULL,
+		ipf_settimeout },
 	{ { &ipf_udptimeout },	"udp_timeout",		1,	0x7fffffff,
-		sizeof(ipf_udptimeout),		IPFT_WRDISABLED,	NULL },
+		sizeof(ipf_udptimeout),		0,			NULL,
+		ipf_settimeout },
 	{ { &ipf_udpacktimeout }, "udp_ack_timeout",	1,	0x7fffffff,
-		sizeof(ipf_udpacktimeout),	IPFT_WRDISABLED,	NULL },
+		sizeof(ipf_udpacktimeout),	0,			NULL,
+		ipf_settimeout },
 	{ { &ipf_icmptimeout },	"icmp_timeout",		1,	0x7fffffff,
-		sizeof(ipf_icmptimeout),	IPFT_WRDISABLED,	NULL },
+		sizeof(ipf_icmptimeout),	0,			NULL,
+		ipf_settimeout },
 	{ { &ipf_icmpacktimeout }, "icmp_ack_timeout",	1,	0x7fffffff,
-		sizeof(ipf_icmpacktimeout),	IPFT_WRDISABLED,	NULL },
+		sizeof(ipf_icmpacktimeout),	0,			NULL,
+		ipf_settimeout },
 	{ { &ipf_iptimeout },	"ip_timeout",		1,	0x7fffffff,
-		sizeof(ipf_iptimeout),		IPFT_WRDISABLED,	NULL },
+		sizeof(ipf_iptimeout),		0,			NULL,
+		ipf_settimeout },
 	{ { &ipf_state_max },	"state_max",		1,	0x7fffffff,
 		sizeof(ipf_state_max),		0,			NULL },
 	{ { &ipf_state_size },	"state_size",		1,	0x7fffffff,
-		sizeof(ipf_state_size),		IPFT_WRDISABLED,	NULL },
+		sizeof(ipf_state_size),		0,			NULL,
+		ipf_state_rehash },
 	{ { &ipf_state_lock },	"state_lock",		0,	1,
 		sizeof(ipf_state_lock),		IPFT_RDONLY,		NULL },
 	{ { &ipf_state_maxbucket }, "state_maxbucket",	1,	0x7fffffff,
-		sizeof(ipf_state_maxbucket),	IPFT_WRDISABLED,	NULL },
-	{ { &ipf_state_maxbucket_reset }, "state_maxbucket_reset",	0, 1,
-		sizeof(ipf_state_maxbucket_reset), IPFT_WRDISABLED,	NULL },
+		sizeof(ipf_state_maxbucket),	0,			NULL },
 	{ { &ipf_state_logging },	"state_logging",0,	1,
 		sizeof(ipf_state_logging),	0,			NULL },
 	{ { &ipf_state_wm_high },	"state_wm_high",2,	100,
@@ -6480,28 +6498,25 @@ ipftuneable_t ipf_tuneables[] = {
 	{ { &ipf_nat_lock },		"nat_lock",	0,	1,
 		sizeof(ipf_nat_lock),		IPFT_RDONLY,		NULL },
 	{ { &ipf_nat_table_sz },	"nat_table_size", 1,	0x7fffffff,
-		sizeof(ipf_nat_table_sz),	IPFT_WRDISABLED,	NULL },
+		sizeof(ipf_nat_table_sz),	0,			NULL,
+		ipf_nat_rehash },
 	{ { &ipf_nat_table_max },	"nat_table_max", 1,	0x7fffffff,
 		sizeof(ipf_nat_table_max),	0,			NULL },
 	{ { &ipf_nat_maprules_sz },	"nat_rules_size", 1,	0x7fffffff,
-		sizeof(ipf_nat_maprules_sz),	IPFT_WRDISABLED,	NULL },
+		sizeof(ipf_nat_maprules_sz),	0,			NULL,
+		ipf_nat_rehash_rules },
 	{ { &ipf_nat_rdrrules_sz },	"rdr_rules_size", 1,	0x7fffffff,
-		sizeof(ipf_nat_rdrrules_sz),	IPFT_WRDISABLED,	NULL },
+		sizeof(ipf_nat_rdrrules_sz),	0,			NULL,
+		ipf_nat_rehash_rules },
+
 	{ { &ipf_nat_hostmap_sz },	"hostmap_size",	1,	0x7fffffff,
-		sizeof(ipf_nat_hostmap_sz),	IPFT_WRDISABLED,	NULL },
-	{ { &ipf_nat_maxbucket }, "nat_maxbucket",	1,	0x7fffffff,
-		sizeof(ipf_nat_maxbucket),	IPFT_WRDISABLED,	NULL },
-	{ { &ipf_nat_maxbucket_reset },	"nat_maxbucket_reset",	0, 1,
-		sizeof(ipf_nat_maxbucket_reset), IPFT_WRDISABLED,	NULL },
-	{ { &ipf_nat_logging },		"nat_logging",		0,	1,
-		sizeof(ipf_nat_logging),		0,		NULL },
-	{ { &ipf_nat_defage },	"nat_defage",		1,	0x7fffffff,
-		sizeof(ipf_nat_defage),		IPFT_WRDISABLED,	NULL },
-	{ { &ipf_nat_defipage },	"nat_defipage",	1,	0x7fffffff,
-		sizeof(ipf_nat_defipage),	IPFT_WRDISABLED,	NULL },
-	{ { &ipf_nat_deficmpage }, "nat_deficmpage",	1,	0x7fffffff,
-		sizeof(ipf_nat_deficmpage),	IPFT_WRDISABLED,	NULL },
-	{ { &ipf_nat_doflush }, "nat_doflush",		0,	1,
+		sizeof(ipf_nat_hostmap_sz),	0,			NULL,
+		ipf_nat_hostmap_rehash },
+	{ { &ipf_nat_maxbucket },	"nat_maxbucket",1,	0x7fffffff,
+		sizeof(ipf_nat_maxbucket),	0,			NULL },
+	{ { &ipf_nat_logging },		"nat_logging",	0,	1,
+		sizeof(ipf_nat_logging),	0,			NULL },
+	{ { &ipf_nat_doflush },		"nat_doflush",	0,	1,
 		sizeof(ipf_nat_doflush),	0,			NULL },
 	{ { &ipf_nat_table_wm_low }, "nat_table_wm_low",	1,	99,
 		sizeof(ipf_nat_table_wm_low),	0,			NULL },
@@ -6510,20 +6525,15 @@ ipftuneable_t ipf_tuneables[] = {
 	/* proxy */
 	{ { &ipf_proxy_debug }, "ipf_proxy_debug",	0,	10,
 		sizeof(ipf_proxy_debug),	0,			NULL },
-  	/* frag */
-  	{ { &ipfr_size },	"ipfr_size",		1,	0x7fffffff,
-  		sizeof(ipfr_size),		IPFT_WRDISABLED,	NULL },
 	/* frag */
-	{ { &ipfr_size },	"ipfr_size",		1,	0x7fffffff,
+	{ { &ipfr_size },	"frag_size",		1,	0x7fffffff,
 		sizeof(ipfr_size),		IPFT_WRDISABLED,	NULL },
-	{ { &ipf_ipfrttl },	"ipfrttl",		1,	0x7fffffff,
-		sizeof(ipf_ipfrttl),		IPFT_WRDISABLED,	NULL },
+	{ { &ipf_ipfrttl },	"frag_ttl",		1,	0x7fffffff,
+		sizeof(ipf_ipfrttl),		0,			NULL },
 #ifdef IPFILTER_LOG
 	/* log */
 	{ { &ipl_suppress },	"log_suppress",		0,	1,
 		sizeof(ipl_suppress),		0,			NULL },
-	{ { &ipl_logmax },	"log_max",		0,	0x7fffffff,
-		sizeof(ipl_logmax),		IPFT_WRDISABLED,	NULL },
 	{ { &ipl_logall },	"log_all",		0,	1,
 		sizeof(ipl_logall),		0,			NULL },
 	{ { &ipl_logsize },	"log_size",		0,	0x80000,
@@ -6897,15 +6907,25 @@ ipf_ipftune(cmd, data)
 				break;
 			}
 
-			if (ta->ipft_sz == sizeof(u_long)) {
+			if (ta->ipft_func != NULL) {
+				SPL_INT(s);
+
+				SPL_NET(s);
+				error = (*ta->ipft_func)(ta, &tu.ipft_un);
+				SPL_X(s);
+
+			} else if (ta->ipft_sz == sizeof(u_long)) {
 				tu.ipft_vlong = *ta->ipft_plong;
 				*ta->ipft_plong = in;
+
 			} else if (ta->ipft_sz == sizeof(u_int)) {
 				tu.ipft_vint = *ta->ipft_pint;
 				*ta->ipft_pint = (u_int)(in & 0xffffffff);
+
 			} else if (ta->ipft_sz == sizeof(u_short)) {
 				tu.ipft_vshort = *ta->ipft_pshort;
 				*ta->ipft_pshort = (u_short)(in & 0xffff);
+
 			} else if (ta->ipft_sz == sizeof(u_char)) {
 				tu.ipft_vchar = *ta->ipft_pchar;
 				*ta->ipft_pchar = (u_char)(in & 0xff);
@@ -8557,4 +8577,114 @@ static int ipf_deliverlocal(ipversion, ifp, sinaddr)
 	}
 
 	return islocal;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_settimeout                                              */
+/* Returns:     int - 0 = success, -1 = failure                             */
+/* Parameters:  t(I) - pointer to tuneable array entry                      */
+/*              p(I) - pointer to values passed in to apply                 */
+/*                                                                          */
+/* This function is called to set the timeout values for each distinct      */
+/* queue timeout that is available.  When called, it calls into both the    */
+/* state and NAT code, telling them to update their timeout queues.         */
+/* ------------------------------------------------------------------------ */
+static int
+ipf_settimeout(t, p)
+	ipftuneable_t *t;
+	ipftuneval_t *p;
+{
+
+	/*
+	 * ipf_interror should be set by the functions called here, not
+	 * by this function - it's just a middle man.
+	 */
+	if (ipf_state_settimeout(t, p) == -1)
+		return -1;
+	if (ipf_nat_settimeout(t, p) == -1)
+		return -1;
+	return 0;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_apply_timeout                                           */
+/* Returns:     int - 0 = success, -1 = failure                             */
+/* Parameters:  head(I)    - pointer to tuneable array entry                */
+/*              seconds(I) - pointer to values passed in to apply           */
+/*                                                                          */
+/* This function applies a timeout of "seconds" to the timeout queue that   */
+/* is pointed to by "head".  All entries on this list have an expiration    */
+/* set to be the current tick value of ipf plus the ttl.  Given that this   */
+/* function should only be called when the delta is non-zero, the task is   */
+/* to walk the entire list and apply the change.  The sort order will not   */
+/* change.  The only catch is that this is O(n) across the list, so if the  */
+/* queue has lots of entries (10s of thousands or 100s of thousands), it    */
+/* could take a relatively long time to work through them all.              */
+/* ------------------------------------------------------------------------ */
+void
+ipf_apply_timeout(head, seconds)
+	ipftq_t *head;
+	u_int seconds;
+{
+	u_int oldtimeout, newtimeout;
+	ipftqent_t *tqe;
+	int delta;
+
+	MUTEX_ENTER(&head->ifq_lock);
+	oldtimeout = head->ifq_ttl;
+	newtimeout = IPF_TTLVAL(seconds);
+	delta = oldtimeout - newtimeout;
+
+	head->ifq_ttl = newtimeout;
+
+	for (tqe = head->ifq_head; tqe != NULL; tqe = tqe->tqe_next) {
+		tqe->tqe_die += delta;
+	}
+	MUTEX_EXIT(&head->ifq_lock);
+}
+
+
+int
+ipf_settimeout_tcp(t, p, tab)
+	ipftuneable_t *t;
+	ipftuneval_t *p;
+	ipftq_t *tab;
+{
+	if (!strcmp(t->ipft_name, "tcp_idle_timeout") ||
+	    !strcmp(t->ipft_name, "tcp_established")) {
+		ipf_apply_timeout(&tab[IPF_TCPS_ESTABLISHED], p->ipftu_int);
+	} else if (!strcmp(t->ipft_name, "tcp_close_wait")) {
+		ipf_apply_timeout(&tab[IPF_TCPS_CLOSE_WAIT], p->ipftu_int);
+	} else if (!strcmp(t->ipft_name, "tcp_last_ack")) {
+		ipf_apply_timeout(&tab[IPF_TCPS_LAST_ACK], p->ipftu_int);
+	} else if (!strcmp(t->ipft_name, "tcp_timeout")) {
+		ipf_apply_timeout(&tab[IPF_TCPS_LISTEN], p->ipftu_int);
+		ipf_apply_timeout(&tab[IPF_TCPS_HALF_ESTAB], p->ipftu_int);
+		ipf_apply_timeout(&tab[IPF_TCPS_CLOSING], p->ipftu_int);
+	} else if (!strcmp(t->ipft_name, "tcp_listen")) {
+		ipf_apply_timeout(&tab[IPF_TCPS_LISTEN], p->ipftu_int);
+	} else if (!strcmp(t->ipft_name, "tcp_half_established")) {
+		ipf_apply_timeout(&tab[IPF_TCPS_HALF_ESTAB], p->ipftu_int);
+	} else if (!strcmp(t->ipft_name, "tcp_closing")) {
+		ipf_apply_timeout(&tab[IPF_TCPS_CLOSING], p->ipftu_int);
+	} else if (!strcmp(t->ipft_name, "tcp_syn_received")) {
+		ipf_apply_timeout(&tab[IPF_TCPS_SYN_RECEIVED], p->ipftu_int);
+	} else if (!strcmp(t->ipft_name, "tcp_syn_sent")) {
+		ipf_apply_timeout(&tab[IPF_TCPS_SYN_SENT], p->ipftu_int);
+	} else if (!strcmp(t->ipft_name, "tcp_closed")) {
+		ipf_apply_timeout(&tab[IPF_TCPS_CLOSED], p->ipftu_int);
+	} else if (!strcmp(t->ipft_name, "tcp_half_closed")) {
+		ipf_apply_timeout(&tab[IPF_TCPS_CLOSED], p->ipftu_int);
+	} else if (!strcmp(t->ipft_name, "tcp_time_wait")) {
+		ipf_apply_timeout(&tab[IPF_TCPS_TIME_WAIT], p->ipftu_int);
+	} else {
+		/*
+		 * ipf_interror isn't set here because it should be set
+		 * by whatever called this function.
+		 */
+		return -1;
+	}
+	return 0;
 }

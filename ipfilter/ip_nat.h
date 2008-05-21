@@ -638,6 +638,7 @@ extern	void	ipf_nat_delete __P((struct nat *, int));
 extern	void	ipf_nat_deref __P((nat_t **));
 extern	void	ipf_nat_expire __P((void));
 extern	void	ipf_nat_hostmapdel __P((hostmap_t **));
+extern	int	ipf_nat_hostmap_rehash __P((ipftuneable_t *, ipftuneval_t *));
 extern	nat_t	*ipf_nat_icmperrorlookup __P((fr_info_t *, int));
 extern	nat_t	*ipf_nat_icmperror __P((fr_info_t *, u_int *, int));
 #if defined(__OpenBSD__)
@@ -671,11 +672,14 @@ extern	frentry_t *ipf_nat_ipfin __P((fr_info_t *, u_32_t *));
 extern	frentry_t *ipf_nat_ipfout __P((fr_info_t *, u_32_t *));
 extern	int	ipf_nat_in __P((fr_info_t *, nat_t *, int, u_32_t));
 extern	int	ipf_nat_out __P((fr_info_t *, nat_t *, int, u_32_t));
+extern	int	ipf_nat_rehash __P((ipftuneable_t *, ipftuneval_t *));
+extern	int	ipf_nat_rehash_rules __P((ipftuneable_t *, ipftuneval_t *));
+extern	int	ipf_nat_settimeout __P((ipftuneable_t *, ipftuneval_t *));
 extern	void	ipf_nat_sync __P((void *));
 extern	void	ipf_nat_rulederef __P((ipnat_t **));
 
 extern	nat_t	*ipf_nat_clone __P((fr_info_t *, nat_t *));
-extern	void	ipf_nat_delnat __P((struct ipnat *));
+extern	void	ipf_nat_delmap __P((struct ipnat *));
 extern	void	ipf_nat_delrdr __P((struct ipnat *));
 extern	void	ipf_nat_delrule __P((struct ipnat *));
 extern	int	ipf_nat_wildok __P((nat_t *, int, int, int, int));
@@ -684,7 +688,7 @@ extern	int	ipf_nat_wildok __P((nat_t *, int, int, int, int));
 extern	nat_t	*ipf_nat6_add __P((fr_info_t *, ipnat_t *, nat_t **,
 				   u_int, int));
 extern	void	ipf_nat6_addrdr __P((ipnat_t *));
-extern	void	ipf_nat6_addnat __P((ipnat_t *));
+extern	void	ipf_nat6_addmap __P((ipnat_t *));
 extern	void	ipf_nat6_addencap __P((ipnat_t *));
 extern	int	ipf_nat6_builddivertmp __P((ipnat_t *));
 extern	int	ipf_nat6_checkout __P((fr_info_t *, u_32_t *));

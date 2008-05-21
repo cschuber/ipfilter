@@ -15,7 +15,7 @@ typedef	struct	{
 	char	*iee_text;
 } ipf_error_entry_t;
 
-#define	IPF_NUM_ERRORS	350
+#define	IPF_NUM_ERRORS	361
 
 /*
  * NO REUSE OF NUMBERS!
@@ -299,6 +299,15 @@ log" },
 	{	60057,	"error copying out NAT log flush results" },
 	{	60058,	"bucket table type is incorrect" },
 	{	60059,	"error copying out NAT bucket table" },
+	{	60060,	"function not found for lookup" },
+	{	60061,	"address family not supported with SIOCSTPUT" },
+	{	60062,	"unknown timeout name" },
+	{	60063,	"cannot allocate new inbound NAT entry table" },
+	{	60064,	"cannot allocate new outbound NAT entry table" },
+	{	60065,	"cannot allocate new inbound NAT bucketlen table" },
+	{	60066,	"cannot allocate new outbound NAT bucketlen table" },
+	{	60067,	"cannot allocate new NAT rules table" },
+	{	60068,	"cannot allocate new NAT hostmap table" },
 /* -------------------------------------------------------------------------- */
 	{	70001,	"incorrect object size to get pool stats" },
 	{	70002,	"could not malloc memory for new pool node" },
@@ -364,6 +373,9 @@ log" },
 	{	100031,	"unrecognised table request" },
 	{	100032,	"error copying out bucket length data" },
 	{	100033,	"could not find existing filter rule for state entry" },
+	{	100034,	"could not find timeout name" },
+	{	100035, "could not allocate new state table" },
+	{	100036, "could not allocate new state bucket length table" },
 /* -------------------------------------------------------------------------- */
 	{	110001,	"sync write header magic number is incorrect" },
 	{	110002,	"sync write header protocol is incorrect" },

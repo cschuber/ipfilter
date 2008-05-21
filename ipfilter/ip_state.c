@@ -109,6 +109,8 @@ static const char rcsid[] = "@(#)$Id$";
 static	ipstate_t **ipf_state_table = NULL;
 static	u_long	*ipf_state_seed = NULL;
 ips_stat_t ipf_state_stats;
+static ipftq_t ipf_state_pending;
+static ipftq_t ipf_state_deletetq;
 
 #ifdef	USE_INET6
 static ipstate_t *ipf_checkicmp6matchingstate __P((fr_info_t *));
@@ -152,6 +154,8 @@ u_int	ipf_tcpidletimeout = FIVE_DAYS,
 	ipf_tcplastack = IPF_TTLVAL(30),
 	ipf_tcptimewait = IPF_TTLVAL(2 * TCP_MSL),
 	ipf_tcptimeout = IPF_TTLVAL(2 * TCP_MSL),
+	ipf_tcpsynsent = IPF_TTLVAL(2 * TCP_MSL),
+	ipf_tcpsynrecv = IPF_TTLVAL(2 * TCP_MSL),
 	ipf_tcpclosed = IPF_TTLVAL(30),
 	ipf_tcphalfclosed = IPF_TTLVAL(2 * 3600),	/* 2 hours */
 	ipf_udptimeout = IPF_TTLVAL(120),
@@ -168,17 +172,14 @@ u_int	ipf_tcpidletimeout = FIVE_DAYS,
 	ipf_state_wm_low = 90,
 	ipf_state_inited = 0;
 int	ipf_state_lock = 0,
-	ipf_state_maxbucket_reset = 1,
 	ipf_state_doflush = 0;
-ipftq_t	ips_tqtqb[IPF_TCP_NSTATES],
-	ips_udptq,
-	ips_udpacktq,
-	ips_iptq,
-	ips_icmptq,
-	ips_icmpacktq,
-	ips_pending,
-	ips_deletetq,
-	*ips_utqe = NULL;
+ipftq_t	ipf_state_tcptq[IPF_TCP_NSTATES],
+	ipf_state_udptq,
+	ipf_state_udpacktq,
+	ipf_state_iptq,
+	ipf_state_icmptq,
+	ipf_state_icmpacktq,
+	*ipf_state_usertq = NULL;
 #ifdef	IPFILTER_LOG
 int	ipf_state_logging = 1;
 #else
@@ -259,30 +260,31 @@ ipf_state_init()
 		ipf_state_maxbucket *= 2;
 	}
 
-	ipf_state_stats.iss_tcptab = ips_tqtqb;
-	ipf_sttab_init(ips_tqtqb);
-	ips_tqtqb[IPF_TCP_NSTATES - 1].ifq_next = &ips_udptq;
+	ipf_state_stats.iss_tcptab = ipf_state_tcptq;
+	ipf_sttab_init(ipf_state_tcptq);
+	ipf_state_tcptq[IPF_TCP_NSTATES - 1].ifq_next = &ipf_state_udptq;
 
-	IPFTQ_INIT(&ips_udptq, ipf_udptimeout, "ipftq udp tab");
-	ips_udptq.ifq_next = &ips_udpacktq;
+	IPFTQ_INIT(&ipf_state_udptq, ipf_udptimeout, "ipftq udp tab");
+	ipf_state_udptq.ifq_next = &ipf_state_udpacktq;
 
-	IPFTQ_INIT(&ips_udpacktq, ipf_udpacktimeout, "ipftq udpack tab");
-	ips_udpacktq.ifq_next = &ips_icmptq;
+	IPFTQ_INIT(&ipf_state_udpacktq, ipf_udpacktimeout, "ipftq udpack tab");
+	ipf_state_udpacktq.ifq_next = &ipf_state_icmptq;
 
-	IPFTQ_INIT(&ips_icmptq, ipf_icmptimeout, "ipftq icmp tab");
-	ips_icmptq.ifq_next = &ips_icmpacktq;
+	IPFTQ_INIT(&ipf_state_icmptq, ipf_icmptimeout, "ipftq icmp tab");
+	ipf_state_icmptq.ifq_next = &ipf_state_icmpacktq;
 
-	IPFTQ_INIT(&ips_icmpacktq, ipf_icmpacktimeout, "ipftq icmpack tab");
-	ips_icmpacktq.ifq_next = &ips_iptq;
+	IPFTQ_INIT(&ipf_state_icmpacktq, ipf_icmpacktimeout,
+		  "ipftq icmpack tab");
+	ipf_state_icmpacktq.ifq_next = &ipf_state_iptq;
 
-	IPFTQ_INIT(&ips_iptq, ipf_iptimeout, "ipftq iptimeout tab");
-	ips_iptq.ifq_next = &ips_pending;
+	IPFTQ_INIT(&ipf_state_iptq, ipf_iptimeout, "ipftq iptimeout tab");
+	ipf_state_iptq.ifq_next = &ipf_state_pending;
 
-	IPFTQ_INIT(&ips_pending, 1, "ipftq pending");
-	ips_pending.ifq_next = &ips_deletetq;
+	IPFTQ_INIT(&ipf_state_pending, 1, "ipftq pending");
+	ipf_state_pending.ifq_next = &ipf_state_deletetq;
 
-	IPFTQ_INIT(&ips_deletetq, 1, "ipftq delete");
-	ips_deletetq.ifq_next = NULL;
+	IPFTQ_INIT(&ipf_state_deletetq, 1, "ipftq delete");
+	ipf_state_deletetq.ifq_next = NULL;
 
 	RWLOCK_INIT(&ipf_state, "ipf IP state rwlock");
 	MUTEX_INIT(&ipf_stinsert, "ipf state insert mutex");
@@ -318,7 +320,7 @@ ipf_state_unload()
 	 * being created. Should the proxy timeouts have their own list?
 	 * There's no real justification as this is the only complication.
 	 */
-	for (ifq = ips_utqe; ifq != NULL; ifq = ifqnext) {
+	for (ifq = ipf_state_usertq; ifq != NULL; ifq = ifqnext) {
 		ifqnext = ifq->ifq_next;
 		if (((ifq->ifq_flags & IFQF_PROXY) == 0) &&
 		    (ipf_deletetimeoutqueue(ifq) == 0))
@@ -329,13 +331,13 @@ ipf_state_unload()
 	ipf_state_stats.iss_active = 0;
 
 	if (ipf_state_inited == 1) {
-		ipf_sttab_destroy(ips_tqtqb);
-		MUTEX_DESTROY(&ips_udptq.ifq_lock);
-		MUTEX_DESTROY(&ips_icmptq.ifq_lock);
-		MUTEX_DESTROY(&ips_udpacktq.ifq_lock);
-		MUTEX_DESTROY(&ips_icmpacktq.ifq_lock);
-		MUTEX_DESTROY(&ips_iptq.ifq_lock);
-		MUTEX_DESTROY(&ips_deletetq.ifq_lock);
+		ipf_sttab_destroy(ipf_state_tcptq);
+		MUTEX_DESTROY(&ipf_state_udptq.ifq_lock);
+		MUTEX_DESTROY(&ipf_state_icmptq.ifq_lock);
+		MUTEX_DESTROY(&ipf_state_udpacktq.ifq_lock);
+		MUTEX_DESTROY(&ipf_state_icmpacktq.ifq_lock);
+		MUTEX_DESTROY(&ipf_state_iptq.ifq_lock);
+		MUTEX_DESTROY(&ipf_state_deletetq.ifq_lock);
 	}
 
 	if (ipf_state_table != NULL) {
@@ -355,9 +357,6 @@ ipf_state_unload()
 		       ipf_state_size * sizeof(u_int));
 		ipf_state_stats.iss_bucketlen = NULL;
 	}
-
-	if (ipf_state_maxbucket_reset == 1)
-		ipf_state_maxbucket = 0;
 
 	if (ipf_state_inited == 1) {
 		ipf_state_inited = 0;
@@ -660,7 +659,7 @@ ipf_state_ioctl(data, cmd, mode, uid, ctx)
 		break;
 
 	case SIOCGTQTAB :
-		error = ipf_outobj(data, ips_tqtqb, IPFOBJ_STATETQTAB);
+		error = ipf_outobj(data, ipf_state_tcptq, IPFOBJ_STATETQTAB);
 		break;
 
 	default :
@@ -1473,15 +1472,19 @@ ipf_state_add(fin, stsave, flags)
 	 * Do not do the modulous here, it is done in ipf_state_insert().
 	 */
 	if (fr != NULL) {
+		ipftq_t *tq;
+
 		(void) strncpy(is->is_group, fr->fr_group, FR_GROUPLEN);
 		if (fr->fr_age[0] != 0) {
-			is->is_tqehead[0] = ipf_addtimeoutqueue(&ips_utqe,
-							       fr->fr_age[0]);
+			tq = ipf_addtimeoutqueue(&ipf_state_usertq,
+						 fr->fr_age[0]);
+			is->is_tqehead[0] = tq;
 			is->is_sti.tqe_flags |= TQE_RULEBASED;
 		}
 		if (fr->fr_age[1] != 0) {
-			is->is_tqehead[1] = ipf_addtimeoutqueue(&ips_utqe,
-							       fr->fr_age[1]);
+			tq = ipf_addtimeoutqueue(&ipf_state_usertq,
+						 fr->fr_age[1]);
+			is->is_tqehead[1] = tq;
 			is->is_sti.tqe_flags |= TQE_RULEBASED;
 		}
 
@@ -1563,7 +1566,7 @@ ipf_state_add(fin, stsave, flags)
 		* timer on it as we'll never see an error if it fails to
 		* connect.
 		*/
-		(void) ipf_tcp_age(&is->is_sti, fin, ips_tqtqb,
+		(void) ipf_tcp_age(&is->is_sti, fin, ipf_state_tcptq,
 				   is->is_flags, 2);
 		MUTEX_EXIT(&is->is_lock);
 #ifdef	IPFILTER_SCAN
@@ -1748,7 +1751,7 @@ ipf_state_tcp(fin, tcp, is)
 		    (is->is_state[1] > IPF_TCPS_ESTABLISHED)) {
 			is->is_state[!source] = IPF_TCPS_CLOSED;
 			ipf_movequeue(&is->is_sti, is->is_sti.tqe_ifq,
-				      &ips_deletetq);
+				      &ipf_state_deletetq);
 			MUTEX_EXIT(&is->is_lock);
 			ATOMIC_INCL(ipf_state_stats.iss_tcp_closing);
 			return 0;
@@ -1771,7 +1774,7 @@ ipf_state_tcp(fin, tcp, is)
 		/*
 		 * Nearing end of connection, start timeout.
 		 */
-		ret = ipf_tcp_age(&is->is_sti, fin, ips_tqtqb,
+		ret = ipf_tcp_age(&is->is_sti, fin, ipf_state_tcptq,
 				  is->is_flags, ret);
 		if (ret == 0) {
 			MUTEX_EXIT(&is->is_lock);
@@ -2105,7 +2108,7 @@ ipf_state_clone(fin, tcp, is)
 	ipf_state_insert(clone, fin->fin_rev);
 	clone->is_ref = 2;
 	if (clone->is_p == IPPROTO_TCP) {
-		(void) ipf_tcp_age(&clone->is_sti, fin, ips_tqtqb,
+		(void) ipf_tcp_age(&clone->is_sti, fin, ipf_state_tcptq,
 				  clone->is_flags, 2);
 	}
 	MUTEX_EXIT(&clone->is_lock);
@@ -2802,7 +2805,7 @@ icmp6again:
 			 * If a connection is about to be deleted, no packets
 			 * are allowed to match it.
 			 */
-			if (is->is_sti.tqe_ifq == &ips_deletetq)
+			if (is->is_sti.tqe_ifq == &ipf_state_deletetq)
 				continue;
 
 			if ((is->is_p != pr) || (is->is_v != v))
@@ -2812,9 +2815,9 @@ icmp6again:
 			    ipf_matchicmpqueryreply(v, &is->is_icmp,
 						   ic, fin->fin_rev)) {
 				if (fin->fin_rev)
-					ifq = &ips_icmpacktq;
+					ifq = &ipf_state_icmpacktq;
 				else
-					ifq = &ips_icmptq;
+					ifq = &ipf_state_icmptq;
 				break;
 			}
 		}
@@ -2876,9 +2879,9 @@ icmp6again:
 			    ipf_matchicmpqueryreply(v, &is->is_icmp,
 						   ic, fin->fin_rev)) {
 				if (fin->fin_rev)
-					ifq = &ips_icmpacktq;
+					ifq = &ipf_state_icmpacktq;
 				else
-					ifq = &ips_icmptq;
+					ifq = &ipf_state_icmptq;
 				break;
 			}
 		}
@@ -2977,7 +2980,7 @@ retry_tcpudp:
 				continue;
 			is = ipf_matchsrcdst(fin, is, &src, &dst, NULL, FI_CMP);
 			if (is != NULL) {
-				ifq = &ips_iptq;
+				ifq = &ipf_state_iptq;
 				break;
 			}
 		}
@@ -3088,9 +3091,9 @@ ipf_state_check(fin, passp)
 		break;
 	default :
 		if (fin->fin_rev)
-			ifq = &ips_udpacktq;
+			ifq = &ipf_state_udpacktq;
 		else
-			ifq = &ips_udptq;
+			ifq = &ipf_state_udptq;
 		break;
 	}
 	if (is == NULL) {
@@ -3460,7 +3463,7 @@ ipf_state_timeout()
 
 	SPL_NET(s);
 	WRITE_ENTER(&ipf_state);
-	for (ifq = ips_tqtqb; ifq != NULL; ifq = ifq->ifq_next)
+	for (ifq = ipf_state_tcptq; ifq != NULL; ifq = ifq->ifq_next)
 		for (tqn = ifq->ifq_head; ((tqe = tqn) != NULL); ) {
 			if (tqe->tqe_die > ipf_ticks)
 				break;
@@ -3469,7 +3472,7 @@ ipf_state_timeout()
 			ipf_state_del(is, ISL_EXPIRE);
 		}
 
-	for (ifq = ips_utqe; ifq != NULL; ifq = ifqnext) {
+	for (ifq = ipf_state_usertq; ifq != NULL; ifq = ifqnext) {
 		ifqnext = ifq->ifq_next;
 
 		for (tqn = ifq->ifq_head; ((tqe = tqn) != NULL); ) {
@@ -3481,7 +3484,7 @@ ipf_state_timeout()
 		}
 	}
 
-	for (ifq = ips_utqe; ifq != NULL; ifq = ifqnext) {
+	for (ifq = ipf_state_usertq; ifq != NULL; ifq = ifqnext) {
 		ifqnext = ifq->ifq_next;
 
 		if (((ifq->ifq_flags & IFQF_DELETE) != 0) &&
@@ -3557,7 +3560,7 @@ ipf_state_flush(which, proto)
 		 * Since we're only interested in things that are closing,
 		 * we can start with the appropriate timeout queue.
 		 */
-		for (ifq = ips_tqtqb + IPF_TCPS_CLOSE_WAIT; ifq != NULL;
+		for (ifq = ipf_state_tcptq + IPF_TCPS_CLOSE_WAIT; ifq != NULL;
 		     ifq = ifq->ifq_next) {
 
 			for (tqn = ifq->ifq_head; ((tqe = tqn) != NULL); ) {
@@ -3573,7 +3576,7 @@ ipf_state_flush(which, proto)
 		/*
 		 * Also need to look through the user defined queues.
 		 */
-		for (ifq = ips_utqe; ifq != NULL; ifq = ifq->ifq_next) {
+		for (ifq = ipf_state_usertq; ifq != NULL; ifq = ifq->ifq_next) {
 			for (tqn = ifq->ifq_head; ((tqe = tqn) != NULL); ) {
 				tqn = tqe->tqe_next;
 				is = tqe->tqe_parent;
@@ -3604,7 +3607,7 @@ ipf_state_flush(which, proto)
 	case IPF_TCPS_TIME_WAIT :
 	case IPF_TCPS_CLOSED :
 		ATOMIC_INCL(ipf_state_stats.iss_flush_queue);
-		tqn = ips_tqtqb[which].ifq_head;
+		tqn = ipf_state_tcptq[which].ifq_head;
 		while (tqn != NULL) {
 			tqe = tqn;
 			tqn = tqe->tqe_next;
@@ -3653,8 +3656,9 @@ ipf_state_flush(which, proto)
 	 * at random until N have been freed up.
 	 */
 	if (ipf_ticks - ipf_state_wm_last > ipf_state_wm_freq) {
-		removed = ipf_queueflush(ipf_state_flush_entry, ips_tqtqb,
-					 ips_utqe, &ipf_state_stats.iss_active,
+		removed = ipf_queueflush(ipf_state_flush_entry, ipf_state_tcptq,
+					 ipf_state_usertq,
+					 &ipf_state_stats.iss_active,
 					 ipf_state_size, ipf_state_wm_low);
 		ipf_state_wm_last = ipf_ticks;
 	}
@@ -4358,8 +4362,8 @@ ipf_sttab_init(tqp)
 	tqp[IPF_TCP_NSTATES - 1].ifq_next = NULL;
 	tqp[IPF_TCPS_CLOSED].ifq_ttl = ipf_tcpclosed;
 	tqp[IPF_TCPS_LISTEN].ifq_ttl = ipf_tcptimeout;
-	tqp[IPF_TCPS_SYN_SENT].ifq_ttl = ipf_tcptimeout;
-	tqp[IPF_TCPS_SYN_RECEIVED].ifq_ttl = ipf_tcptimeout;
+	tqp[IPF_TCPS_SYN_SENT].ifq_ttl = ipf_tcpsynsent;
+	tqp[IPF_TCPS_SYN_RECEIVED].ifq_ttl = ipf_tcpsynrecv;
 	tqp[IPF_TCPS_ESTABLISHED].ifq_ttl = ipf_tcpidletimeout;
 	tqp[IPF_TCPS_CLOSE_WAIT].ifq_ttl = ipf_tcphalfclosed;
 	tqp[IPF_TCPS_FIN_WAIT_1].ifq_ttl = ipf_tcphalfclosed;
@@ -4478,30 +4482,30 @@ ipf_state_setqueue(is, rev)
 #ifdef USE_INET6
 		case IPPROTO_ICMPV6 :
 			if (rev == 1)
-				nifq = &ips_icmpacktq;
+				nifq = &ipf_state_icmpacktq;
 			else
-				nifq = &ips_icmptq;
+				nifq = &ipf_state_icmptq;
 			break;
 #endif
 		case IPPROTO_ICMP :
 			if (rev == 1)
-				nifq = &ips_icmpacktq;
+				nifq = &ipf_state_icmpacktq;
 			else
-				nifq = &ips_icmptq;
+				nifq = &ipf_state_icmptq;
 			break;
 		case IPPROTO_TCP :
-			nifq = ips_tqtqb + is->is_state[rev];
+			nifq = ipf_state_tcptq + is->is_state[rev];
 			break;
 
 		case IPPROTO_UDP :
 			if (rev == 1)
-				nifq = &ips_udpacktq;
+				nifq = &ipf_state_udpacktq;
 			else
-				nifq = &ips_udptq;
+				nifq = &ipf_state_udptq;
 			break;
 
 		default :
-			nifq = &ips_iptq;
+			nifq = &ipf_state_iptq;
 			break;
 		}
 	}
@@ -4669,9 +4673,9 @@ ipf_state_setpending(is)
 
 	oifq = is->is_sti.tqe_ifq;
 	if (oifq != NULL)
-		ipf_movequeue(&is->is_sti, oifq, &ips_pending);
+		ipf_movequeue(&is->is_sti, oifq, &ipf_state_pending);
 	else
-		ipf_queueappend(&is->is_sti, &ips_pending, is);
+		ipf_queueappend(&is->is_sti, &ipf_state_pending, is);
 
 	if (is->is_me != NULL) {
 		*is->is_me = NULL;
@@ -4686,6 +4690,8 @@ ipf_state_setpending(is)
 /* Parameters:  is(I) - pointer to state structure                          */
 /* Locks:       ipf_state (read or write)                                   */
 /*                                                                          */
+/* Flush all entries from the list of state entries that match the          */
+/* properties in the array loaded.                                          */
 /* ------------------------------------------------------------------------ */
 int
 ipf_state_matchflush(data)
@@ -4720,10 +4726,12 @@ ipf_state_matchflush(data)
 
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_state_matcharray                                        */
-/* Returns:     Nil                                                         */
+/* Returns:     int   - 0 = no match, 1 = match                             */
 /* Parameters:  is(I) - pointer to state structure                          */
 /* Locks:       ipf_state (read or write)                                   */
 /*                                                                          */
+/* Compare a state entry with the match array passed in and return a value  */
+/* to indicate whether or not the matching was successful.                  */
 /* ------------------------------------------------------------------------ */
 static int
 ipf_state_matcharray(state, array)
@@ -4746,6 +4754,10 @@ ipf_state_matcharray(state, array)
 
 		e = 0;
 
+		/*
+		 * If we need to match the protocol and that doesn't match,
+		 * don't even both with the instruction array.
+		 */
 		p = (x[0] >> 16) & 0xff;
 		if (p != 0 && p != state->is_p)
 			break;
@@ -4851,6 +4863,10 @@ ipf_state_matcharray(state, array)
 			e |= (ipf_ticks - state->is_touched > x[3]);
 			break;
 		}
+
+		/*
+		 * Factor in doing a negative match.
+		 */
 		e ^= x[1];
 
 		if (!e)
@@ -4858,4 +4874,145 @@ ipf_state_matcharray(state, array)
 	}
 
 	return e;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_state_settimeout                                        */
+/* Returns:     int 0 = success, else failure                               */
+/* Parameters:  t(I) - pointer to tuneable being changed                    */
+/*              p(I) - pointer to the new value                             */
+/*                                                                          */
+/* Sets a timeout value for one of the many timeout queues.  We find the    */
+/* correct queue using a somewhat manual process of comparing the timeout   */
+/* names for each specific value available and calling ipf_apply_timeout on */
+/* that queue so that all of the items on it are updated accordingly.       */
+/* ------------------------------------------------------------------------ */
+int
+ipf_state_settimeout(t, p)
+	ipftuneable_t *t;
+	ipftuneval_t *p;
+{
+
+	/*
+	 * In case there is nothing to do...
+	 */
+	if (*t->ipft_pint == p->ipftu_int)
+		return 0;
+
+	if (!strncmp(t->ipft_name, "tcp_", 4))
+		return ipf_settimeout_tcp(t, p, ipf_state_tcptq);
+
+	if (!strcmp(t->ipft_name, "udp_timeout")) {
+		ipf_apply_timeout(&ipf_state_udptq, p->ipftu_int);
+	} else if (!strcmp(t->ipft_name, "udp_ack_timeout")) {
+		ipf_apply_timeout(&ipf_state_udpacktq, p->ipftu_int);
+	} else if (!strcmp(t->ipft_name, "icmp_timeout")) {
+		ipf_apply_timeout(&ipf_state_icmptq, p->ipftu_int);
+	} else if (!strcmp(t->ipft_name, "icmp_ack_timeout")) {
+		ipf_apply_timeout(&ipf_state_icmpacktq, p->ipftu_int);
+	} else if (!strcmp(t->ipft_name, "ip_timeout")) {
+		ipf_apply_timeout(&ipf_state_iptq, p->ipftu_int);
+	} else {
+		ipf_interror = 100034;
+		return ESRCH;
+	}
+
+	/*
+	 * Update the tuneable being set.
+	 */
+	*t->ipft_pint = p->ipftu_int;
+
+	return 0;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_state_rehash                                            */
+/* Returns:     int 0 = success, else failure                               */
+/* Parameters:  t(I) - pointer to tuneable being changed                    */
+/*              p(I) - pointer to the new value                             */
+/*                                                                          */
+/* To change the size of the state hash table at runtime, a new table has   */
+/* to be allocated and then all of the existing entries put in it, bumping  */
+/* up the bucketlength for it as we go along.                               */
+/* ------------------------------------------------------------------------ */
+int
+ipf_state_rehash(t, p)
+	ipftuneable_t *t;
+	ipftuneval_t *p;
+{
+	ipstate_t **newtab, *is;
+	u_int *bucketlens;
+	u_int maxbucket;
+	u_int newsize;
+	u_int hv;
+	int i;
+
+	newsize = p->ipftu_int;
+	/*
+	 * In case there is nothing to do...
+	 */
+	if (newsize == ipf_state_size)
+		return 0;
+
+	KMALLOCS(newtab, ipstate_t **, newsize * sizeof(ipstate_t *));
+	if (newtab == NULL) {
+		ipf_interror = 100035;
+		return ENOMEM;
+	}
+
+	KMALLOCS(bucketlens, u_int *, newsize * sizeof(u_int));
+	if (bucketlens == NULL) {
+		KFREES(newtab, newsize * sizeof(*ipf_state_table));
+		ipf_interror = 100036;
+		return ENOMEM;
+	}
+
+	for (maxbucket = 0, i = newsize; i > 0; i >>= 1)
+		maxbucket++;
+	maxbucket *= 2;
+
+	bzero((char *)newtab, newsize * sizeof(ipstate_t *));
+	bzero((char *)bucketlens, newsize * sizeof(u_int));
+
+	WRITE_ENTER(&ipf_state);
+
+	if (ipf_state_table != NULL) {
+		KFREES(ipf_state_table,
+		       ipf_state_size * sizeof(*ipf_state_table));
+	}
+	ipf_state_table = newtab;
+
+	if (ipf_state_stats.iss_bucketlen != NULL) {
+		KFREES(ipf_state_stats.iss_bucketlen,
+		       ipf_state_size * sizeof(u_int));
+	}
+	ipf_state_stats.iss_bucketlen = bucketlens;
+	ipf_state_maxbucket = maxbucket;
+	ipf_state_size = newsize;
+
+	/*
+	 * Walk through the entire list of state table entries and put them
+	 * in the new state table, somewhere.  Because we have a new table,
+	 * we need to restart the counter of how many chains are in use.
+	 */
+	ipf_state_stats.iss_inuse = 0;
+	for (is = ipf_state_list; is != NULL; is = is->is_next) {
+		is->is_hnext = NULL;
+		is->is_phnext = NULL;
+		hv = is->is_hv % ipf_state_size;
+
+		if (ipf_state_table[hv] != NULL)
+			ipf_state_table[hv]->is_phnext = &is->is_hnext;
+		else
+			ipf_state_stats.iss_inuse++;
+		is->is_phnext = ipf_state_table + hv;
+		is->is_hnext = ipf_state_table[hv];
+		ipf_state_table[hv] = is;
+		ipf_state_stats.iss_bucketlen[hv]++;
+	}
+	RWLOCK_EXIT(&ipf_state);
+
+	return 0;
 }
