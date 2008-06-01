@@ -1070,21 +1070,20 @@ ipf_state_matchisps(is1, is2)
 /* Parameters:  is1, is2 - states we want to match                          */
 /*                                                                          */
 /* ------------------------------------------------------------------------ */
-static int
-ipf_state_match(is1, is2)
-	ipstate_t *is1, *is2;
+static int ipf_state_match(is1, is2)
+ipstate_t *is1, *is2;
 {
 	int	rv;
-	int	amatch;
-	int	pmatch;
+	int	addrmatch;
+	int	portmatch;
 
 	if (bcmp(&is1->is_pass, &is2->is_pass,
 		 offsetof(struct ipstate, is_authmsk) -
 		 offsetof(struct ipstate, is_pass)) == 0) {
 
-		pmatch = ipf_state_matchisps(is1, is2);
-		amatch = ipf_state_matchaddresses(is1, is2);
-		rv = (amatch != 0) && (amatch == pmatch);
+		portmatch = ipf_state_matchisps(is1, is2);
+		addrmatch = ipf_state_matchaddresses(is1, is2);
+		rv = (addrmatch != 0) && (addrmatch == portmatch);
 	} else {
 		rv = 0;
 	}
