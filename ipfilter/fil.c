@@ -2441,7 +2441,7 @@ ipf_scanlist(fin, pass)
 				int out = fin->fin_out;
 
 				fin->fin_fr = fr;
-				if (ipf_state_add(fin, NULL, 0) != NULL) {
+				if (ipf_state_add(fin, NULL, 0) == 0) {
 					ATOMIC_INCL(ipf_stats[out].fr_ads);
 				} else {
 					ATOMIC_INCL(ipf_stats[out].fr_bads);
@@ -2898,7 +2898,7 @@ ipf_check(ip, hlen, ifp, out
 	 */
 	if ((pass & FR_KEEPSTATE) && (fin->fin_m != NULL) &&
 	    !(fin->fin_flx & FI_STATE)) {
-		if (ipf_state_add(fin, NULL, 0) != NULL) {
+		if (ipf_state_add(fin, NULL, 0) == 0) {
 			ATOMIC_INCL(ipf_stats[out].fr_ads);
 		} else {
 			ATOMIC_INCL(ipf_stats[out].fr_bads);

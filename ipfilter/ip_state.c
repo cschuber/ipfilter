@@ -1142,7 +1142,7 @@ ipf_state_match(is1, is2)
 
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_state_add                                               */
-/* Returns:     ipstate_t* - NULL == failure, else pointer to new state     */
+/* Returns:     ipstate_t - 0 = success                                     */
 /* Parameters:  fin(I)    - pointer to packet information                   */
 /*              stsave(O) - pointer to place to save pointer to created     */
 /*                          state structure.                                */
@@ -1158,7 +1158,7 @@ ipf_state_match(is1, is2)
 /*       either outlive this (not expired) or will deref the ip_state_t     */
 /*       when they are deleted.                                             */
 /* ------------------------------------------------------------------------ */
-ipstate_t *
+int
 ipf_state_add(fin, stsave, flags)
 	fr_info_t *fin;
 	ipstate_t **stsave;
@@ -1179,7 +1179,7 @@ ipf_state_add(fin, stsave, flags)
 	    (fin->fin_flx & (FI_SHORT|FI_STATE|FI_FRAGBODY|FI_BAD)) ||
 	    ((fin->fin_flx & FI_OOW) && !(fin->fin_tcpf & TH_SYN))) {
 		ATOMIC_INCL(ipf_state_stats.iss_add_bad);
-		return NULL;
+		return -1;
 	}
 
 	if ((ipf_state_stats.iss_active * 100 / ipf_state_max) >
@@ -1202,12 +1202,12 @@ ipf_state_add(fin, stsave, flags)
 		if ((ipf_state_stats.iss_active >= ipf_state_max) &&
 		    (fr->fr_statemax == 0)) {
 			ATOMIC_INCL(ipf_state_stats.iss_max);
-			return NULL;
+			return 1;
 		}
 		if ((fr->fr_statemax != 0) &&
 		    (fr->fr_statecnt >= fr->fr_statemax)) {
 			ATOMIC_INCL(ipf_state_stats.iss_max_ref);
-			return NULL;
+			return 2;
 		}
 	}
 
@@ -1306,7 +1306,7 @@ ipf_state_add(fin, stsave, flags)
 			break;
 		default :
 			ATOMIC_INCL(ipf_state_stats.iss_icmp6_notquery);
-			return NULL;
+			return -2;
 		}
 		break;
 #endif
@@ -1324,7 +1324,7 @@ ipf_state_add(fin, stsave, flags)
 			break;
 		default :
 			ATOMIC_INCL(ipf_state_stats.iss_icmp_notquery);
-			return NULL;
+			return -3;
 		}
 		break;
 
@@ -1356,7 +1356,7 @@ ipf_state_add(fin, stsave, flags)
 
 		if (tcp->th_flags & TH_RST) {
 			ATOMIC_INCL(ipf_state_stats.iss_tcp_rstadd);
-			return NULL;
+			return -4;
 		}
 
 		/* TRACE is, flags, hv */
@@ -1455,17 +1455,17 @@ ipf_state_add(fin, stsave, flags)
 	}
 	if (is != NULL) {
 		ATOMIC_INCL(ipf_state_stats.iss_add_dup);
-		return NULL;
+		return 3;
 	}
 
 	if (ipf_state_stats.iss_bucketlen[hv] >= ipf_state_maxbucket) {
 		ATOMIC_INCL(ipf_state_stats.iss_bucket_full);
-		return NULL;
+		return 4;
 	}
 	KMALLOC(is, ipstate_t *);
 	if (is == NULL) {
 		ATOMIC_INCL(ipf_state_stats.iss_nomem);
-		return NULL;
+		return 5;
 	}
 	bcopy((char *)&ips, (char *)is, sizeof(*is));
 	/*
@@ -1584,6 +1584,7 @@ ipf_state_add(fin, stsave, flags)
 		ipf_state_log(is, ISL_NEW);
 
 	RWLOCK_EXIT(&ipf_state);
+	*stsave = is;
 	fin->fin_state = is;
 	fin->fin_rev = IP6_NEQ(&is->is_dst, &fin->fin_daddr);
 	fin->fin_flx |= FI_STATE;
@@ -1605,7 +1606,7 @@ ipf_state_add(fin, stsave, flags)
 	ATOMIC_INCL(ipf_state_stats.iss_proto[is->is_p]);
 	ATOMIC_INC(ipf_state_stats.iss_active_proto[is->is_p]);
 
-	return is;
+	return 0;
 }
 
 

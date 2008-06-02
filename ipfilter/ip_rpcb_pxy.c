@@ -1268,8 +1268,7 @@ ippr_rpcb_getnat(fin, nat, proto, port)
 		nflags &= NAT_TCPUDP;
 		nflags |= SI_W_SPORT|SI_CLONE;
 
-		is = ipf_state_add(&fi, NULL, nflags);
-		if (is == NULL) {
+		if (ipf_state_add(&fi, NULL, nflags) != 0) {
 			/*
 			 * XXX nat_delete is private to ip_nat.c.  Should
 			 * check w/ Darren about this one.
@@ -1278,8 +1277,7 @@ ippr_rpcb_getnat(fin, nat, proto, port)
 			 */
 			return(-1);
 		}
-		if (fi.fin_state != NULL)
-			ipf_state_deref((ipstate_t **)&fi.fin_state);
+		ipf_state_deref((ipstate_t **)&fi.fin_state);
 	}
 
 	return(0);
