@@ -2462,6 +2462,19 @@ typedef	struct	tcpiphdr	tcpiphdr_t;
 # define	ICMP6_NI_SUBJ_IPV4	2
 #endif
 
+#ifndef	MLD_MTRACE_RESP
+# define	MLD_MTRACE_RESP		200
+#endif
+#ifndef	MLD_MTRACE
+# define	MLD_MTRACE		201
+#endif
+#ifndef	MLD6_MTRACE_RESP
+# define	MLD6_MTRACE_RESP	MLD_MTRACE_RESP
+#endif
+#ifndef	MLD6_MTRACE
+# define	MLD6_MTRACE		MLD_MTRACE
+#endif
+
 /*
  * ECN is a new addition to TCP - RFC 2481
  */
