@@ -704,9 +704,9 @@ int ipfattach()
 	SPL_X(s);
 
 #ifdef STES
-	/* timeout(fr_slowtimer, NULL, (hz / IPF_HZ_DIVIDE) * IPF_HZ_MULT); */
+	/* timeout(ipf_slowtimer, NULL, (hz / IPF_HZ_DIVIDE) * IPF_HZ_MULT); */
         init_timer(&ipf_timer);
-        ipf_timer.function = fr_slowtimer;
+        ipf_timer.function = ipf_slowtimer;
         ipf_timer.data = NULL;
         ipf_timer.expires = (HZ / IPF_HZ_DIVIDE) * IPF_HZ_MULT;
         add_timer(&ipf_timer);
@@ -726,7 +726,7 @@ int ipfdetach()
 
         for (i = 0; i < sizeof(ipf_hooks)/sizeof(ipf_hooks[0]); i++)
                 nf_unregister_hook(&ipf_hooks[i]);
-        /* untimeout(fr_slowtimer, NULL); */
+        /* untimeout(ipf_slowtimer, NULL); */
 
 #ifdef notyet
 	if (ipf_control_forwarding & 2)
@@ -1006,24 +1006,24 @@ ipf_random(int range)
 
 #ifdef STES
 /* ------------------------------------------------------------------------ */
-/* Function:    fr_slowtimer                                                */
+/* Function:    ipf_slowtimer                                               */
 /* Returns:     Nil                                                         */
 /* Parameters:  Nil                                                         */
 /*                                                                          */
 /* Slowly expire held state for fragments.  Timeouts are set * in           */
 /* expectation of this being called twice per second.                       */
 /* ------------------------------------------------------------------------ */
-void fr_slowtimer(long value)
+void ipf_slowtimer(long value)
 {
         READ_ENTER(&ipf_global);
 
         ipf_expiretokens();
-        fr_fragexpire();
-        fr_timeoutstate();
-        fr_natexpire();
-        fr_authexpire();
-        fr_ticks++;
-        if (fr_running <= 0)
+        ipf_fragexpire();
+        ipf_timeoutstate();
+        ipf_natexpire();
+        ipf_authexpire();
+        ipf_ticks++;
+        if (ipf_running <= 0)
                 goto done;
         mod_timer(&ipf_timer, HZ/2 + jiffies);
 

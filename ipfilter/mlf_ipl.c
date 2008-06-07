@@ -94,7 +94,7 @@ int sysctl_ipf_int SYSCTL_HANDLER_ARGS;
 # define	CTLFLAG_RWO	(CTLFLAG_RW|CTLFLAG_OFF)
 SYSCTL_NODE(_net_inet, OID_AUTO, ipf, CTLFLAG_RW, 0, "IPF");
 SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_flags, CTLFLAG_RW, &ipf_flags, 0, "");
-SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_pass, CTLFLAG_RW, &ipf_pass, 0, "");
+SYSCTL_IPF(_net_inet_ipf, OID_AUTO, ipf_pass, CTLFLAG_RW, &ipf_pass, 0, "");
 SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_active, CTLFLAG_RD, &ipf_active, 0, "");
 SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_chksrc, CTLFLAG_RW, &ipf_chksrc, 0, "");
 SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_minttl, CTLFLAG_RW, &ipf_minttl, 0, "");
@@ -118,7 +118,7 @@ SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_defnatage, CTLFLAG_RWO,
 	   &ipf_defnatage, 0, "");
 SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_ipfrttl, CTLFLAG_RW,
 	   &ipf_ipfrttl, 0, "");
-SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_running, CTLFLAG_RD,
+SYSCTL_IPF(_net_inet_ipf, OID_AUTO, ipf_running, CTLFLAG_RD,
 	   &ipf_running, 0, "");
 SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_statesize, CTLFLAG_RWO,
 	   &ipf_statesize, 0, "");
@@ -450,7 +450,7 @@ sysctl_ipf_int SYSCTL_HANDLER_ARGS
 	if (!arg1)
 		error = EPERM;
 	else {
-		if ((oidp->oid_kind & CTLFLAG_OFF) && (fr_running > 0))
+		if ((oidp->oid_kind & CTLFLAG_OFF) && (ipf_running > 0))
 			error = EBUSY;
 		else
 			error = SYSCTL_IN(req, arg1, sizeof(int));
@@ -551,7 +551,7 @@ int iplread(dev, uio)
 	if (unit < 0)
 		return ENXIO;
 
-	if (fr_running < 1)
+	if (ipf_running < 1)
 		return EIO;
 
 # ifdef	IPFILTER_SYNC
@@ -587,7 +587,7 @@ int iplwrite(dev, uio)
 	register struct uio *uio;
 {
 
-	if (fr_running < 1)
+	if (ipf_running < 1)
 		return EIO;
 
 #ifdef	IPFILTER_SYNC

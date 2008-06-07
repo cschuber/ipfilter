@@ -2467,7 +2467,7 @@ ipf_scanlist(fin, pass)
 /* IP protocol version.                                                     */
 /*                                                                          */
 /* N.B.: this function returns NULL to match the prototype used by other    */
-/* functions called from the IPFilter "mainline" in fr_check().             */
+/* functions called from the IPFilter "mainline" in ipf_check().            */
 /* ------------------------------------------------------------------------ */
 frentry_t *
 ipf_acctpkt(fin, passp)
@@ -2687,7 +2687,7 @@ ipf_check(ip, hlen, ifp, out
 	mb_t *mc = NULL;
 	mb_t *m;
 	/*
-	 * The first part of fr_check() deals with making sure that what goes
+	 * The first part of ipf_check() deals with making sure that what goes
 	 * into the filtering engine makes some sense.  Information about the
 	 * the packet is distilled, collected into a fr_info_t structure and
 	 * the an attempt to ensure the buffer the packet is in is big enough
@@ -2955,7 +2955,7 @@ filterdone:
 #endif
 
 	/*
-	 * The FI_STATE flag is cleared here so that calling fr_checkstate
+	 * The FI_STATE flag is cleared here so that calling ipf_state_check
 	 * will work when called from inside of fr_fastroute.  Although
 	 * there is a similar flag, FI_NATED, for NAT, it does have the same
 	 * impact on code execution.
@@ -8408,21 +8408,21 @@ ipf_fr_matcharray(fin, array)
 /* 2) Look for the oldest entries on each timeout queue and free them if    */
 /*    they are within the given window we are considering.  Where the       */
 /*    window starts and the steps taken to increase its size depend upon    */
-/*    how long ipf has been running (fr_ticks.)  Anything modified in the   */
+/*    how long ipf has been running (ipf_ticks.)  Anything modified in the  */
 /*    last 30 seconds is not touched.                                       */
 /*                                              touched                     */
-/*         die     fr_ticks   30*1.5    1800*1.5   |  43200*1.5             */
+/*         die     ipf_ticks  30*1.5    1800*1.5   |  43200*1.5             */
 /*           |          |        |           |     |     |                  */
 /* future <--+----------+--------+-----------+-----+-----+-----------> past */
 /*                     now        \_int=30s_/ \_int=1hr_/ \_int=12hr        */
 /*                                                                          */
 /* Points to note:                                                          */
 /* - tqe_die is the time, in the future, when entries die.                  */
-/* - tqe_die - fr_ticks is how long left the connection has to live in ipf  */
+/* - tqe_die - ipf_ticks is how long left the connection has to live in ipf */
 /*   ticks.                                                                 */
 /* - tqe_touched is when the entry was last used by NAT/state               */
-/* - the closer tqe_touched is to fr_ticks, the further tqe_die will be for */
-/*   any given timeout queue and vice versa.                                */
+/* - the closer tqe_touched is to ipf_ticks, the further tqe_die will be    */
+/*   ipf_ticks any given timeout queue and vice versa.                      */
 /* - both tqe_die and tqe_touched increase over time                        */
 /* - timeout queues are sorted with the highest value of tqe_die at the     */
 /*   bottom and therefore the smallest values of each are at the top        */

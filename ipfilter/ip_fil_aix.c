@@ -170,7 +170,7 @@ ipfattach()
 	int s;
 
 	SPL_NET(s);
-	if ((fr_running > 0) || (inbound_fw == ipf_check_inbound)) {
+	if ((ipf_running > 0) || (inbound_fw == ipf_check_inbound)) {
 		printf("IP Filter: already initialized\n");
 		SPL_X(s);
 		return EBUSY;
@@ -238,7 +238,7 @@ ipf_check_inbound(ifp, m, args)
 {
 	ip_t *ip;
 
-	if (fr_check_mbuf(&m) == -1) {
+	if (ipf_check_mbuf(&m) == -1) {
 		if (m != NULL) {
 			FREE_MB_T(m);
 		}
@@ -247,7 +247,7 @@ ipf_check_inbound(ifp, m, args)
 
 	ip = mtod(m, ip_t *);
 
-	switch (fr_check (ip, ip->ip_hl << 2, ifp, 0, &m))
+	switch (ipf_check(ip, ip->ip_hl << 2, ifp, 0, &m))
 	{
 	case 0 :
 		ipintr_noqueue_post_fw(ifp, m, args);
@@ -274,7 +274,7 @@ ipf_check_outbound(ifp, m, args)
 {
 	ip_t *ip;
 
-	if (fr_check_mbuf(&m) == -1) {
+	if (ipf_check_mbuf(&m) == -1) {
 		if (m != NULL) {
 			FREE_MB_T(m);
 		}
@@ -283,7 +283,7 @@ ipf_check_outbound(ifp, m, args)
 
 	ip = mtod(m, ip_t *);
 
-	switch (fr_check (ip, ip->ip_hl << 2, ifp, 1, &m))
+	switch (ipf_check(ip, ip->ip_hl << 2, ifp, 1, &m))
 	{
 	case 0 :
 		ip_output_post_fw(ifp, m, args);
@@ -403,7 +403,7 @@ ipfioctl(dev, cmd, data, mode)
 	if ((IPL_LOGMAX < unit) || (unit < 0))
 		return ENXIO;
 
-	if (fr_running <= 0) {
+	if (ipf_running <= 0) {
 		if (unit != IPL_LOGIPF)
 			return EIO;
 		if (cmd != SIOCIPFGETNEXT && cmd != SIOCIPFGET &&
@@ -534,7 +534,7 @@ ipf_send_reset(fin)
 	if (tcp->th_flags & TH_RST)
 		return -1;		/* feedback loop */
 
-	if (fr_checkl4sum(fin) == -1)
+	if (ipf_checkl4sum(fin) == -1)
 		return -1;
 
 	tlen = fin->fin_dlen - (TCP_OFF(tcp) << 2) +
@@ -711,7 +711,7 @@ ipf_send_icmp_err(type, fin, dst)
 		return -1;
 #endif
 
-	if (fr_checkl4sum(fin) == -1)
+	if (ipf_checkl4sum(fin) == -1)
 		return -1;
 #ifdef MGETHDR
 	MGETHDR(m, M_DONTWAIT, MT_HEADER);
@@ -1428,14 +1428,14 @@ ipf_checkv4sum(fin)
 skipauto:
 # ifdef IPFILTER_CKSUM
 	if (manual != 0)
-		if (fr_checkl4sum(fin) == -1)
+		if (ipf_checkl4sum(fin) == -1)
 			fin->fin_flx |= FI_BAD;
 # else
 	;
 # endif
 #else
 # ifdef IPFILTER_CKSUM
-	if (fr_checkl4sum(fin) == -1)
+	if (ipf_checkl4sum(fin) == -1)
 		fin->fin_flx |= FI_BAD;
 # endif
 #endif
@@ -1494,12 +1494,12 @@ ipf_checkv6sum(fin)
 	}
 #  ifdef IPFILTER_CKSUM
 	if (manual != 0)
-		if (fr_checkl4sum(fin) == -1)
+		if (ipf_checkl4sum(fin) == -1)
 			fin->fin_flx |= FI_BAD;
 #  endif
 # else
 #  ifdef IPFILTER_CKSUM
-	if (fr_checkl4sum(fin) == -1)
+	if (ipf_checkl4sum(fin) == -1)
 		fin->fin_flx |= FI_BAD;
 #  endif
 # endif

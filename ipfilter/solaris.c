@@ -55,7 +55,7 @@
 
 struct pollhead ipf_poll_head[IPL_LOGSIZE];
 
-extern	int	fr_running;
+extern	int	ipf_running;
 extern	int	iplwrite __P((dev_t, struct uio *, cred_t *));
 
 extern ipnat_t *nat_list;
@@ -67,7 +67,7 @@ static	int	ipf_identify __P((dev_info_t *));
 #endif
 static	int	ipf_attach __P((dev_info_t *, ddi_attach_cmd_t));
 static	int	ipf_detach __P((dev_info_t *, ddi_detach_cmd_t));
-static	int	fr_qifsync __P((ip_t *, int, void *, int, void *, mblk_t **));
+static	int	ipf_qifsync __P((ip_t *, int, void *, int, void *, mblk_t **));
 static	int	ipf_property_update __P((dev_info_t *));
 static 	int	iplpoll __P((dev_t, short, int, short *, struct pollhead **));
 static	char	*ipf_devfiles[] = { IPL_NAME, IPNAT_NAME, IPSTATE_NAME,
@@ -80,9 +80,9 @@ static	int	iplwrite __P((dev_t, struct uio *, cred_t *));
 
 
 #if SOLARIS2 >= 7
-extern	timeout_id_t	fr_timer_id;
+extern	timeout_id_t	ipf_timer_id;
 #else
-extern	int		fr_timer_id;
+extern	int		ipf_timer_id;
 #endif
 
 
@@ -271,7 +271,7 @@ ipf_attach(dip, cmd)
 	switch (cmd)
 	{
 	case DDI_ATTACH:
-		if (fr_running != 0)
+		if (ipf_running != 0)
 			break;
 #ifdef	IPFDEBUG
 		instance = ddi_get_instance(dip);
@@ -336,24 +336,24 @@ ipf_detach(dip, cmd)
 		if (ipf_refcnt != 0)
 			return DDI_FAILURE;
 
-		if (fr_running == -2 || fr_running == 0)
+		if (ipf_running == -2 || ipf_running == 0)
 			break;
 		/*
 		 * Make sure we're the only one's modifying things.  With
 		 * this lock others should just fall out of the loop.
 		 */
 		WRITE_ENTER(&ipf_global);
-		if (fr_running == -2) {
+		if (ipf_running == -2) {
 			RWLOCK_EXIT(&ipf_global);
 			return DDI_FAILURE;
 		}
-		fr_running = -2;
+		ipf_running = -2;
 
 		RWLOCK_EXIT(&ipf_global);
 
-		if (fr_timer_id != 0) {
-			(void) untimeout(fr_timer_id);
-			fr_timer_id = 0;
+		if (ipf_timer_id != 0) {
+			(void) untimeout(ipf_timer_id);
+			ipf_timer_id = 0;
 		}
 
 		/*
@@ -398,7 +398,7 @@ ipf_getinfo(dip, infocmd, arg, result)
 {
 	int error;
 
-	if (fr_running <= 0)
+	if (ipf_running <= 0)
 		return DDI_FAILURE;
 	error = DDI_FAILURE;
 #ifdef	IPFDEBUG
@@ -426,7 +426,7 @@ ipf_getinfo(dip, infocmd, arg, result)
  */
 /*ARGSUSED*/
 static int
-fr_qifsync(ip, hlen, il, out, qif, mp)
+ipf_qifsync(ip, hlen, il, out, qif, mp)
 	ip_t *ip;
 	int hlen;
 	void *il;
@@ -439,8 +439,8 @@ fr_qifsync(ip, hlen, il, out, qif, mp)
 	/*
 	 * Resync. any NAT `connections' using this interface and its IP #.
 	 */
-	fr_natsync(qif);
-	fr_statesync(qif);
+	ipf_nat_sync(qif);
+	ipf_state_sync(qif);
 	return 0;
 }
 
@@ -568,7 +568,7 @@ iplpoll(dev, events, anyyet, reventsp, phpp)
 #endif
 		break;
 	case IPL_LOGAUTH :
-		if ((events & (POLLIN | POLLRDNORM)) && fr_auth_waiting())
+		if ((events & (POLLIN | POLLRDNORM)) && ipf_auth_waiting())
 			revents |= events & (POLLIN | POLLRDNORM);
 		break;
 	case IPL_LOGSYNC :
@@ -677,7 +677,7 @@ iplread(dev, uio, cp)
 	cmn_err(CE_CONT, "iplread(%x,%x,%x)\n", dev, uio, cp);
 #endif
 
-	if (fr_running < 1)
+	if (ipf_running < 1)
 		return EIO;
 
 #ifdef	IPFILTER_SYNC
@@ -709,7 +709,7 @@ iplwrite(dev, uio, cp)
 	cmn_err(CE_CONT, "iplwrite(%x,%x,%x)\n", dev, uio, cp);
 #endif
 
-	if (fr_running < 1)
+	if (ipf_running < 1)
 		return EIO;
 
 #ifdef	IPFILTER_SYNC
@@ -722,15 +722,15 @@ iplwrite(dev, uio, cp)
 void
 ipf_pfil_hooks_add()
 {
-	if (pfil_add_hook(fr_check, PFIL_IN|PFIL_OUT, &pfh_inet4))
+	if (pfil_add_hook(ipf_check, PFIL_IN|PFIL_OUT, &pfh_inet4))
 		cmn_err(CE_WARN, "IP Filter: %s(pfh_inet4) failed",
 			"pfil_add_hook");
 #ifdef USE_INET6
-	if (pfil_add_hook(fr_check, PFIL_IN|PFIL_OUT, &pfh_inet6))
+	if (pfil_add_hook(ipf_check, PFIL_IN|PFIL_OUT, &pfh_inet6))
 		cmn_err(CE_WARN, "IP Filter: %s(pfh_inet6) failed",
 			"pfil_add_hook");
 #endif
-	if (pfil_add_hook(fr_qifsync, PFIL_IN|PFIL_OUT, &pfh_sync))
+	if (pfil_add_hook(ipf_qifsync, PFIL_IN|PFIL_OUT, &pfh_sync))
 		cmn_err(CE_WARN, "IP Filter: %s(pfh_sync) failed",
 			"pfil_add_hook");
 }
@@ -738,15 +738,15 @@ ipf_pfil_hooks_add()
 void
 ipf_pfil_hooks_remove()
 {
-	if (pfil_remove_hook(fr_check, PFIL_IN|PFIL_OUT, &pfh_inet4))
+	if (pfil_remove_hook(ipf_check, PFIL_IN|PFIL_OUT, &pfh_inet4))
 		cmn_err(CE_WARN, "IP Filter: %s(pfh_inet4) failed",
 			"pfil_remove_hook");
 #ifdef USE_INET6
-	if (pfil_remove_hook(fr_check, PFIL_IN|PFIL_OUT, &pfh_inet6))
+	if (pfil_remove_hook(ipf_check, PFIL_IN|PFIL_OUT, &pfh_inet6))
 		cmn_err(CE_WARN, "IP Filter: %s(pfh_inet6) failed",
 			"pfil_add_hook");
 #endif
-	if (pfil_remove_hook(fr_qifsync, PFIL_IN|PFIL_OUT, &pfh_sync))
+	if (pfil_remove_hook(ipf_qifsync, PFIL_IN|PFIL_OUT, &pfh_sync))
 		cmn_err(CE_WARN, "IP Filter: %s(pfh_sync) failed",
 			"pfil_remove_hook");
 

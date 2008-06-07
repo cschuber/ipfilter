@@ -74,7 +74,7 @@ int _init()
 #endif
 
 	if (ipfruleinst == 0) {
-		if (fr_running >= 0) {
+		if (ipf_running >= 0) {
 			ipfruleinst = ipfrule_add();
 			if (!ipfruleinst)
 				ipf_refcnt++;

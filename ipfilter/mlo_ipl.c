@@ -175,11 +175,11 @@ static int ipl_unload()
 	 */
         if (ipf_refcnt)
                 error = EBUSY;
-	else if (fr_running >= 0)
+	else if (ipf_running >= 0)
 		error = ipfdetach();
 
 	if (error == 0) {
-		fr_running = -2;
+		ipf_running = -2;
 		error = ipl_remove();
 		printf("%s unloaded\n", ipfilter_version);
 	}
@@ -228,9 +228,9 @@ static int ipl_load()
 	if (error == 0) {
 		char *defpass;
 
-		if (FR_ISPASS(fr_pass))
+		if (FR_ISPASS(ipf_pass))
 			defpass = "pass";
-		else if (FR_ISBLOCK(fr_pass))
+		else if (FR_ISBLOCK(ipf_pass))
 			defpass = "block";
 		else
 			defpass = "no-match -> block";
@@ -248,7 +248,7 @@ static int ipl_load()
 			""
 #endif
 			);
-		fr_running = 1;
+		ipf_running = 1;
 	}
 	return error;
 }

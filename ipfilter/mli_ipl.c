@@ -59,7 +59,7 @@ ipfmutex_t	ipf_nat_new, ipf_natio, ipf_timeoutlock;
 ipfrwlock_t	ipf_frag, ipf_state, ipf_nat, ipf_natfrag, ipf_auth;
 ipfrwlock_t	ipf_global, ipf_mutex, ipf_ipidfrag, ipf_frcache, ipf_tokens;
 
-int     (*fr_checkp) __P((struct ip *, int, void *, int, mb_t **));
+int     (*ipf_checkp) __P((struct ip *, int, void *, int, mb_t **));
 
 #ifdef IPFILTER_LKM
 static int *ipff_addr = 0;
@@ -87,7 +87,7 @@ static nif_t *nif_head = 0;
 static int nif_interfaces = 0;
 extern int in_interfaces;
 #if IRIX >= 60500
-toid_t	fr_timer_id;
+toid_t	ipf_timer_id;
 #endif
 
 extern ipnat_t *nat_list;
@@ -152,7 +152,7 @@ ipl_if_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 		printf("IP Filter: ipl_if_output(ifp=0x%lx, m=0x%lx, dst=0x%lx), m_type=%d m_flags=0x%lx m_off=0x%lx\n", ifp, m, dst, m->m_type, (u_long)m->m_flags, m->m_off);
 #endif
 
-	if (fr_checkp) {
+	if (ipf_checkp) {
 		struct mbuf *m1 = m;
 		struct ip *ip;
 		int hlen;
@@ -190,7 +190,7 @@ ipl_if_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 			}
 
 			hlen = ip->ip_hl << 2;
-			if ((*fr_checkp)(ip, hlen, ifp, 1, &m1) || (m1 == NULL))
+			if ((*ipf_checkp)(ip, hlen, ifp, 1, &m1) || (m1 == NULL))
 				return EHOSTUNREACH;
 
 			m = m1;
@@ -227,14 +227,14 @@ ipl_kernel(struct ifnet *rcvif, struct mbuf *m)
 			rcvif, m);
 #endif
 
-	if (fr_running <= 0)
+	if (ipf_running <= 0)
 		return IPF_ACCEPTIT;
 
 	/*
 	 * Check if we want to allow this packet to be processed.
 	 * Consider it to be bad if not.
 	 */
-	if (fr_checkp) {
+	if (ipf_checkp) {
 		struct mbuf *m1 = m;
 		struct ip *ip;
 		int hlen;
@@ -273,7 +273,7 @@ ipl_kernel(struct ifnet *rcvif, struct mbuf *m)
 		ip->ip_len = htons(ip->ip_len);
 		ip->ip_off = htons(ip->ip_off);
 		hlen = ip->ip_hl << 2;
-		if ((*fr_checkp)(ip, hlen, rcvif, 0, &m1) || !m1)
+		if ((*ipf_checkp)(ip, hlen, rcvif, 0, &m1) || !m1)
 			return IPF_DROPIT;
 		ip = mtod(m1, struct ip *);
 		ip->ip_len = ntohs(ip->ip_len);
@@ -535,7 +535,7 @@ ipl_ipfilter_detach(void)
 }
 
 
-/* this function is called from fr_slowtimer at 500ms intervals to
+/* this function is called from ipf_slowtimer at 500ms intervals to
    keep our interface list in sync */
 void
 ipl_ipfilter_intfsync(void)
@@ -568,7 +568,7 @@ iplunload(void)
 		RWLOCK_EXIT(&ipf_global);
 		return error;
 	}
-	fr_running = -2;
+	ipf_running = -2;
 
 #if (IRIX < 60500)
 	LOCK_DEALLOC(ipl_mutex.l);
@@ -654,9 +654,9 @@ ipf_timeoutlock.l = LOCK_ALLOC((uchar_t)-1, IPF_LOCK_PL, (lkinfo_t *)-1, KM_NOSL
 	} else {
 		char *defpass;
 
-		if (FR_ISPASS(fr_pass))
+		if (FR_ISPASS(ipf_pass))
 			defpass = "pass";
-		else if (FR_ISBLOCK(fr_pass))
+		else if (FR_ISBLOCK(ipf_pass))
 			defpass = "block";
 		else
 			defpass = "no-match -> block";

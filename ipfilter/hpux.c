@@ -45,9 +45,9 @@ struct uio;
 #undef	untimeout
 #undef	IPFDEBUG
 
-extern	int	fr_running;
+extern	int	ipf_running;
 extern	int	ipf_flags;
-extern	int	fr_check __P(());
+extern	int	ipf_check __P(());
 
 extern ipnat_t *nat_list;
 
@@ -58,7 +58,7 @@ static	int	(*ipf_ip_inp) __P((queue_t *, mblk_t *)) = NULL;
 
 
 static	int	fr_slowtimer __P((void));
-struct	callout	*fr_timer_id = NULL;
+struct	callout	*ipf_timer_id = NULL;
 struct	callout	*synctimeoutid = NULL;
 #ifdef	IPFDEBUG
 void	printiri __P((irinfo_t *));
@@ -71,7 +71,7 @@ static	int	ipf_write(dev_t, struct uio *);
 
 static	int	ipf_attach(void);
 static	int	ipf_detach(void);
-static	int	fr_qifsync(ip_t *, int, void *, int, qif_t *, mblk_t **);
+static	int	ipf_qifsync(ip_t *, int, void *, int, qif_t *, mblk_t **);
 
 
 /*
@@ -302,18 +302,18 @@ static int ipf_attach()
 	 */
 	WRITE_ENTER(&ipf_global);
 
-	if (pfil_add_hook(fr_check, PFIL_IN|PFIL_OUT, &pfh_inet4))
+	if (pfil_add_hook(ipf_check, PFIL_IN|PFIL_OUT, &pfh_inet4))
 		cmn_err(CE_WARN, "IP Filter: pfil_add_hook(pfh_inet4) failed");
-	if (pfil_add_hook(fr_qifsync, PFIL_IN|PFIL_OUT, &pfh_sync))
+	if (pfil_add_hook(ipf_qifsync, PFIL_IN|PFIL_OUT, &pfh_sync))
 		cmn_err(CE_WARN, "IP Filter: pfil_add_hook(pfh_sync) failed");
 	/*
 	 * Release lock
 	 */
 	RWLOCK_EXIT(&ipf_global);
 
-	if (FR_ISPASS(fr_pass))
+	if (FR_ISPASS(ipf_pass))
 		defpass = "pass";
-	else if (FR_ISBLOCK(fr_pass))
+	else if (FR_ISBLOCK(ipf_pass))
 		defpass = "block";
 	else
 		defpass = "no-match -> block";
@@ -329,11 +329,11 @@ static int ipf_attach()
 # endif
 #endif
 	sync();
-	if (fr_running == 0)
-		fr_running = 1;
-	if (fr_timer_id == NULL)
-		fr_timer_id = mp_timeout(fr_slowtimer, NULL, hz/2);
-	if (fr_running == 1)
+	if (ipf_running == 0)
+		ipf_running = 1;
+	if (ipf_timer_id == NULL)
+		ipf_timer_id = mp_timeout(fr_slowtimer, NULL, hz/2);
+	if (ipf_running == 1)
 		return 0;
 attachfailed:
 	RW_DESTROY(&ipf_global);
@@ -355,15 +355,15 @@ static int ipf_detach()
 	 * this lock others should just fall out of the loop.
 	 */
 	MUTEX_ENTER(&ipf_rw);
-	if (fr_running <= 0) {
+	if (ipf_running <= 0) {
 		MUTEX_EXIT(&ipf_rw);
 		return -1;
 	}
-	if (fr_timer_id) {
+	if (ipf_timer_id) {
 		untimeout(fr_slowtimer, NULL);
-		fr_timer_id = 0;
+		ipf_timer_id = 0;
 	}
-	fr_running = -1;
+	ipf_running = -1;
 	MUTEX_EXIT(&ipf_rw);
 
 	/*
@@ -374,13 +374,13 @@ static int ipf_detach()
 	 */
 	sync();
 
-	if (pfil_remove_hook(fr_check, PFIL_IN|PFIL_OUT, &pfh_inet4))
+	if (pfil_remove_hook(ipf_check, PFIL_IN|PFIL_OUT, &pfh_inet4))
 		cmn_err(CE_WARN,
 			"IP Filter: pfil_remove_hook(pfh_inet4) failed");
-	if (pfil_remove_hook(fr_qifsync, PFIL_IN|PFIL_OUT, &pfh_sync))
+	if (pfil_remove_hook(ipf_qifsync, PFIL_IN|PFIL_OUT, &pfh_sync))
 		cmn_err(CE_WARN,
 			"IP Filter: pfil_remove_hook(pfh_sync) failed");
-	while (fr_timer_id != NULL)
+	while (ipf_timer_id != NULL)
 		sched_yield();
 	i = ipfdetach();
 
@@ -403,7 +403,7 @@ static int ipf_detach()
  * here, and if they do, well, we would like to see as much information as
  * possible about them and what they claim to hold.
  */
-void fr_donotip(out, qif, q, m, mt, ip, off)
+void ipf_donotip(out, qif, q, m, mt, ip, off)
 	int out;
 	qif_t *qif;
 	queue_t *q;
@@ -471,7 +471,7 @@ void fr_donotip(out, qif, q, m, mt, ip, off)
  * look for bad consistancies between the list of interfaces the filter knows
  * about and those which are currently configured.
  */
-static int fr_qifsync(ip, hlen, il, out, qif, mp)
+static int ipf_qifsync(ip, hlen, il, out, qif, mp)
 	ip_t *ip;
 	int hlen;
 	void *il;
@@ -510,17 +510,17 @@ int ipfsync()
 		spinlock(&pfil_rw);
 		qif = qif_iflookup(name, 0);
 		if (qif != NULL)
-			fr_qifsync(NULL, 0, qif->qf_ill, -1, qif, NULL);
+			ipf_qifsync(NULL, 0, qif->qf_ill, -1, qif, NULL);
 		spinunlock(&pfil_rw);
 	}
 	return 0;
 }
 
 
-static int fr_slowtimer()
+static int ipf_slowtimer()
 {
-	if (fr_running <= 0) {
-		fr_timer_id = NULL;
+	if (ipf_running <= 0) {
+		ipf_timer_id = NULL;
 		return;
 	}
 
@@ -531,12 +531,12 @@ static int fr_slowtimer()
 	fr_natexpire();
 	fr_authexpire();
 	fr_ticks++;
-	fr_timer_id = NULL;
-	if (fr_running <= 0) {
+	ipf_timer_id = NULL;
+	if (ipf_running <= 0) {
 		RWLOCK_EXIT(&ipf_global);
 		return;
 	}
-	fr_timer_id = mp_timeout(fr_slowtimer, NULL, hz/2);
+	ipf_timer_id = mp_timeout(fr_slowtimer, NULL, hz/2);
 	RWLOCK_EXIT(&ipf_global);
 }
 
@@ -594,7 +594,7 @@ int iplclose(dev, flag, mode)
 	cmn_err(CE_CONT, "iplclose(%x,%x,%x)\n", dev, flag, mode);
 #endif
 
-	if (fr_running < 1)
+	if (ipf_running < 1)
 		return EIO;
 
 	unit = (IPL_LOGMAX < unit) ? ENXIO : 0;
@@ -617,7 +617,7 @@ int iplread(dev, uio)
 	cmn_err(CE_CONT, "iplread(%x,%x)\n", dev, uio);
 #endif
 
-	if (fr_running < 1)
+	if (ipf_running < 1)
 		return EIO;
 
 	return ipflog_read(getminor(dev), uio);
@@ -641,7 +641,7 @@ int iplwrite(dev, uio, cp)
 	cmn_err(CE_CONT, "iplwrite(%x,%x,%x)\n", dev, uio, cp);
 #endif
 
-	if (fr_running < 1)
+	if (ipf_running < 1)
 		return EIO;
 
 	if (getminor(dev) != IPL_LOGSYNC)

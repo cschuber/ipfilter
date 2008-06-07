@@ -1434,11 +1434,11 @@ int ipf_pfil_unhook(void) {
 		pfil_remove_hook((void *)ipf_check_wrapper, NULL,
 		    PFIL_IN|PFIL_OUT|PFIL_WAITOK, ph_inet);
 #  else
-	pfil_remove_hook((void *)fr_check, PFIL_IN|PFIL_OUT|PFIL_WAITOK,
+	pfil_remove_hook((void *)ipf_check, PFIL_IN|PFIL_OUT|PFIL_WAITOK,
 	    &inetsw[ip_protox[IPPROTO_IP]].pr_pfh);
 #  endif
 # else
-	pfil_remove_hook((void *)fr_check, PFIL_IN|PFIL_OUT|PFIL_WAITOK);
+	pfil_remove_hook((void *)ipf_check, PFIL_IN|PFIL_OUT|PFIL_WAITOK);
 # endif
 # ifdef USE_INET6
 #  if (__FreeBSD_version >= 501108)
@@ -1447,7 +1447,7 @@ int ipf_pfil_unhook(void) {
 		pfil_remove_hook((void *)ipf_check_wrapper6, NULL,
 		    PFIL_IN|PFIL_OUT|PFIL_WAITOK, ph_inet6);
 #  else
-	pfil_remove_hook((void *)fr_check, PFIL_IN|PFIL_OUT|PFIL_WAITOK,
+	pfil_remove_hook((void *)ipf_check, PFIL_IN|PFIL_OUT|PFIL_WAITOK,
 				 &inet6sw[ip6_protox[IPPROTO_IPV6]].pr_pfh);
 #  endif
 # endif
@@ -1484,11 +1484,11 @@ int ipf_pfil_hook(void) {
 		pfil_add_hook((void *)ipf_check_wrapper, NULL,
 		    PFIL_IN|PFIL_OUT|PFIL_WAITOK, ph_inet);
 #  else
-	pfil_add_hook((void *)fr_check, PFIL_IN|PFIL_OUT|PFIL_WAITOK,
+	pfil_add_hook((void *)ipf_check, PFIL_IN|PFIL_OUT|PFIL_WAITOK,
 			      &inetsw[ip_protox[IPPROTO_IP]].pr_pfh);
 #  endif
 #  else
-	pfil_add_hook((void *)fr_check, PFIL_IN|PFIL_OUT|PFIL_WAITOK);
+	pfil_add_hook((void *)ipf_check, PFIL_IN|PFIL_OUT|PFIL_WAITOK);
 #  endif
 #  ifdef USE_INET6
 #   if __FreeBSD_version >= 501108
@@ -1496,7 +1496,7 @@ int ipf_pfil_hook(void) {
 		pfil_add_hook((void *)ipf_check_wrapper6, NULL,
 				      PFIL_IN|PFIL_OUT|PFIL_WAITOK, ph_inet6);
 #   else
-	pfil_add_hook((void *)fr_check, PFIL_IN|PFIL_OUT|PFIL_WAITOK,
+	pfil_add_hook((void *)ipf_check, PFIL_IN|PFIL_OUT|PFIL_WAITOK,
 			      &inet6sw[ip6_protox[IPPROTO_IPV6]].pr_pfh);
 #   endif
 #  endif

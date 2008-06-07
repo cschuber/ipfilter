@@ -217,7 +217,7 @@ cfg_subsys_attr_t ipfilter_attributes[] = {
 { "fr_minttl",		CFG_ATTR_INTTYPE, CFG_OP_QUERY |
 				CFG_OP_CONFIGURE | CFG_OP_RECONFIGURE,
 				(caddr_t)&fr_minttl, 0, 255, 0 },
-{ "fr_pass",		CFG_ATTR_INTTYPE, CFG_OP_QUERY |
+{ "ipf_pass",		CFG_ATTR_INTTYPE, CFG_OP_QUERY |
 				CFG_OP_CONFIGURE | CFG_OP_RECONFIGURE,
 				(caddr_t)&fr_minttl, 0, 0xffffffff, 0 },
 { "fr_flags",		CFG_ATTR_INTTYPE, CFG_OP_QUERY |
@@ -225,7 +225,7 @@ cfg_subsys_attr_t ipfilter_attributes[] = {
 				(caddr_t)&ipf_flags, 0, 0xffffffff, 0 },
 { "fr_active",		CFG_ATTR_INTTYPE, CFG_OP_QUERY,
 				(caddr_t)&fr_minttl, 0, 1, 0 },
-{ "fr_running",		CFG_ATTR_INTTYPE, CFG_OP_QUERY,
+{ "ipf_running",		CFG_ATTR_INTTYPE, CFG_OP_QUERY,
 				(caddr_t)&fr_minttl, 0, 1, 0 },
 { "fr_control_forwarding",
 			CFG_ATTR_INTTYPE, CFG_OP_QUERY |
@@ -502,7 +502,7 @@ void ipfilter_ip_input(m)
 			m_adj(m, len - m->m_pkthdr.len);
 	}
 
-	if (fr_check(ip, hlen, m->m_pkthdr.rcvif, 0, &m) == 0) {
+	if (ipf_check(ip, hlen, m->m_pkthdr.rcvif, 0, &m) == 0) {
 		if (m != NULL) {
 			m->m_flags &= ~M_PROTOCOL_SUM|M_NOCHECKSUM|M_CHECKSUM;
 
@@ -557,7 +557,7 @@ int ipfilter_ip_output(ifp, m, in_ro, flags, imo)
 	hlen = IP_HL(ip);
 	hlen <<= 2;
 
-	if (fr_check(ip, hlen, ifp, 1, &m) == 0) {
+	if (ipf_check(ip, hlen, ifp, 1, &m) == 0) {
 		if (m != NULL) {
 			m->m_flags |= M_OUTPUT_PROCESSING_DONE;
 			RWLOCK_EXIT(&ipf_tru64);
@@ -681,7 +681,7 @@ ipfilter_attach(void)
 
 		ipfilter_registered = 2;
 		ipfilter_ifattach();
-		fr_running = 1;
+		ipf_running = 1;
 
 		/*
 		 * Start timeout thread
@@ -691,9 +691,9 @@ ipfilter_attach(void)
 		timeout(ipfilter_clock, NULL,
 			(hz / IPF_HZ_DIVIDE) * IPF_HZ_MULT);
 
-		if (FR_ISPASS(fr_pass))
+		if (FR_ISPASS(ipf_pass))
 			defpass = "pass";
-		else if (FR_ISBLOCK(fr_pass))
+		else if (FR_ISBLOCK(ipf_pass))
 			defpass = "block";
 		else
 			defpass = "no-match -> block";
@@ -783,7 +783,7 @@ ipfilter_detach(void)
 	}
 
 	if (status == ESUCCESS) {
-		fr_running = 0;
+		ipf_running = 0;
 		RWLOCK_EXIT(&ipf_tru64);
 		if (ipftru64_inited == 1) {
 			RW_DESTROY(&ipf_tru64);
@@ -1160,7 +1160,7 @@ int ipfilterioctl(dev_t dev, unsigned int cmd, caddr_t data, int flag)
 void ipfilter_clock(void *arg)
 {
 	thread_wakeup_one((vm_offset_t)&ipf_timeout);
-	if (fr_running != 0) {
+	if (ipf_running != 0) {
 		timeout(ipfilter_clock, NULL,
 			(hz / IPF_HZ_DIVIDE) * IPF_HZ_MULT);
 	}
@@ -1190,14 +1190,14 @@ void ipfilter_timer()
 
 		thread_block();
 #else
-		if (fr_running == 0)
+		if (ipf_running == 0)
 			break;
 		mpsleep((vm_offset_t)&ipf_timeout, PCATCH,
 			"ipftimer", 0, &ipfdelaylock,
 			MS_LOCK_SIMPLE | MS_LOCK_ON_ERROR);
 #endif
 
-		if (fr_running == 0)
+		if (ipf_running == 0)
 			break;
 		simple_unlock(&ipfdelaylock);
 		fr_slowtimer(NULL);
@@ -1256,7 +1256,7 @@ static int iplread(dev, uio)
 	register struct uio *uio;
 {
 
-	if (fr_running < 1)
+	if (ipf_running < 1)
 		return EIO;
 
 #ifdef IPFILTER_LOG

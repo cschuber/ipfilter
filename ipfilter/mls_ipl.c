@@ -180,12 +180,12 @@ static	int	unload()
 
 	if (ipf_refcnt != 0)
 		err = EBUSY;
-	else if (fr_running >= 0)
+	else if (ipf_running >= 0)
 		err = ipfdetach();
 	if (err)
 		return err;
 
-	fr_running = -2;
+	ipf_running = -2;
 	for (i = 0; (name = ipf_devfiles[i]); i++)
 		(void) vn_remove(name, UIO_SYSSPACE, FILE);
 	printf("%s unloaded\n", ipfilter_version);
@@ -223,9 +223,9 @@ static	int	ipl_attach()
 	if (error == 0) {
 		char *defpass;
 
-		if (FR_ISPASS(fr_pass))
+		if (FR_ISPASS(ipf_pass))
 			defpass = "pass";
-		else if (FR_ISBLOCK(fr_pass))
+		else if (FR_ISBLOCK(ipf_pass))
 			defpass = "block";
 		else
 			defpass = "no-match -> block";
@@ -243,7 +243,7 @@ static	int	ipl_attach()
 			""
 #endif
 			);
-		fr_running = 1;
+		ipf_running = 1;
 	}
 	return error;
 }
@@ -311,7 +311,7 @@ static int iplread(dev, uio)
 	register struct uio *uio;
 {
 
-	if (fr_running < 1)
+	if (ipf_running < 1)
 		return EIO;
 
 #ifdef IPFILTER_LOG
@@ -330,7 +330,7 @@ static int iplwrite(dev, uio)
 	register struct uio *uio;
 {
 
-	if (fr_running < 1)
+	if (ipf_running < 1)
 		return EIO;
 
 #ifdef IPFILTER_SYNC

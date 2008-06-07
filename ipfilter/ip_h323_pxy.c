@@ -135,7 +135,7 @@ ippr_h323_del(aps)
 		{
 			/*
 			 * Check the comment in ippr_h323_in() function,
-			 * just above fr_nat_ioctl() call.
+			 * just above ipf_nat_ioctl() call.
 			 * We are lucky here because this function is not
 			 * called with ipf_nat locked.
 			 */
@@ -195,16 +195,16 @@ ippr_h323_in(fin, aps, nat)
 		ipn->in_odport = htons(port);
 		MUTEX_INIT(&ipn->in_lock, "h323 proxy NAT rule");
 		/*
-		 * we got a problem here. we need to call fr_nat_ioctl() to add
-		 * the h245 proxy rule, but since we already hold (READ locked)
-		 * the nat table rwlock (ipf_nat), if we go into fr_nat_ioctl(),
-		 * it will try to WRITE lock it. This will causing dead lock
-		 * on RTP.
+		 * we got a problem here. we need to call ipf_nat_ioctl() to
+		 * add the h245 proxy rule, but since we already hold (READ
+		 * locked) the nat table rwlock (ipf_nat), if we go into
+		 * ipf_nat_ioctl(), it will try to WRITE lock it. This will
+		 * causing dead lock on RTP.
 		 *
 		 * The quick & dirty solution here is release the read lock,
-		 * call fr_nat_ioctl() and re-lock it.
+		 * call ipf_nat_ioctl() and re-lock it.
 		 * A (maybe better) solution is do a UPGRADE(), and instead
-		 * of calling fr_nat_ioctl(), we add the nat rule ourself.
+		 * of calling ipf_nat_ioctl(), we add the nat rule ourself.
 		 */
 		RWLOCK_EXIT(&ipf_nat);
 		if (ipf_nat_ioctl((caddr_t)ipn, SIOCADNAT,
