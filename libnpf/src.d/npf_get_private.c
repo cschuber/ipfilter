@@ -26,7 +26,7 @@
  */
 #include <npf.h>
 
-static char rcsid[] = "$Id$";
+NPF_RCSID(rcsid,"$Id$");
 
 void *
 npf_get_private(npf_handle_t *npf)

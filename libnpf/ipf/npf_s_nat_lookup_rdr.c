@@ -33,16 +33,15 @@ static char rcsid[] = "$Id$";
 int
 npf_s_nat_lookup_rdr(npf_handle_t *handle, void *param, const char *options)
 {
-	npf_nat_desc_t *npfn = param;
-	struct sockaddr_in *sin;
+	npf_nat_desc_t *nnd = param;
 	natlookup_t nl;
 	ipfobj_t obj;
 	npf_ipf_t *ipf;
 
-	if (npfn->npfn_inout != 0)
+	if (nnd->nnd_inout != NPF_IN)
 		return (-1);
 
-	switch (npfn->npfn_inprotocol)
+	switch (nnd->nnd_inprotocol)
 	{
 	case IPPROTO_TCP :
 		nl.nl_flags |= IPN_TCP;
@@ -54,22 +53,17 @@ npf_s_nat_lookup_rdr(npf_handle_t *handle, void *param, const char *options)
 		break;
 	}
 
-	sin = (struct sockaddr_in *)&npfn->npfn_external_src;
-	if (sin->sin_family != AF_INET)
+	if (nnd->nnd_ext_src.na_ipv4.sin_family != AF_INET)
 		return (-1);
-	nl.nl_outip = sin->sin_addr;
+	nl.nl_outip = nnd->nnd_ext_src.na_ipv4.sin_addr;
 
-	sin = (struct sockaddr_in *)&npfn->npfn_external_dst;
-	if (sin->sin_family != AF_INET)
+	if (nnd->nnd_ext_dst.na_ipv4.sin_family != AF_INET)
 		return (-1);
-
-	nl.nl_inip = sin->sin_addr;
+	nl.nl_inip = nnd->nnd_ext_dst.na_ipv4.sin_addr;
 
 	if ((nl.nl_flags & (IPN_UDP|IPN_TCP)) != 0) {
-		sin = (struct sockaddr_in *)&npfn->npfn_external_src;
-		nl.nl_outport = sin->sin_port;
-		sin = (struct sockaddr_in *)&npfn->npfn_external_dst;
-		nl.nl_inport = sin->sin_port;
+		nl.nl_outport = nnd->nnd_ext_src.na_ipv4.sin_port;
+		nl.nl_inport = nnd->nnd_ext_dst.na_ipv4.sin_port;
 	}
 
 	obj.ipfo_rev = IPFILTER_VERSION;
@@ -81,11 +75,10 @@ npf_s_nat_lookup_rdr(npf_handle_t *handle, void *param, const char *options)
 	ipf = npf_get_private(handle);
 
 	if (ioctl(ipf->npfi_natfd, SIOCGNATL, &obj) == 0) {
-		sin = (struct sockaddr_in *)&npfn->npfn_internal_dst;
-		sin->sin_family = AF_INET;
-		sin->sin_addr = nl.nl_realip;
+		nnd->nnd_int_dst.na_ipv4.sin_family = AF_INET;
+		nnd->nnd_int_dst.na_ipv4.sin_addr = nl.nl_realip;
 		if ((nl.nl_flags & (IPN_UDP|IPN_TCP)) != 0) {
-			sin->sin_port = nl.nl_realport;
+			nnd->nnd_int_dst.na_ipv4.sin_port = nl.nl_realport;
 		}
 		return (0);
 	}

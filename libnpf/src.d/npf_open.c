@@ -30,10 +30,12 @@
 #include <stdio.h>
 #include <dlfcn.h>
 
-static char rcsid[] = "$Id$";
+NPF_RCSID(rcsid,"$Id$");
+
+static npf_func_t findfunc(void *lib, char *name);
 
 npf_handle_t *
-npf_open(const char *name)
+npf_open(const char *name, const npf_version_t version)
 {
 	npf_handle_t *npf;
 	int libnamesiz;
@@ -74,21 +76,26 @@ npf_open(const char *name)
 
 	if (npf->init_lib != NULL) {
 		if (npf->init_lib(npf, NULL, NULL) == -1) {
-			return (npf);
+			dlclose(npf->lib);
+			free(npf);
+			return (NULL);
 		}
 	}
 
-	npf->nat_delete_rule = (npf_func_t)dlfunc(npf->lib,
-						  "npf_s_nat_delete_rule");
-	npf->nat_find_rule = (npf_func_t)dlfunc(npf->lib,
-						"npf_s_nat_find_rule");
-	npf->nat_getnext_rule = (npf_func_t)dlfunc(npf->lib,
-						   "npf_s_nat_getnext_rule");
-	npf->nat_insert_rule = (npf_func_t)dlfunc(npf->lib,
-						  "npf_s_nat_insert_rule");
-	npf->fw_insert_rule = (npf_func_t)dlfunc(npf->lib,
-						 "npf_s_fw_insert_rule");
-	npf->fw_delete_rule = (npf_func_t)dlfunc(npf->lib,
-						 "npf_s_fw_delete_rule");
+	npf->version = version;
+
+	npf->nat_delete_rule = findfunc(npf->lib, "npf_s_nat_delete_rule");
+	npf->nat_find_rule = findfunc(npf->lib, "npf_s_nat_find_rule");
+	npf->nat_getnext_rule = findfunc(npf->lib, "npf_s_nat_getnext_rule");
+	npf->nat_insert_rule = findfunc(npf->lib, "npf_s_nat_insert_rule");
+	npf->fw_insert_rule = findfunc(npf->lib, "npf_s_fw_insert_rule");
+	npf->fw_delete_rule = findfunc(npf->lib, "npf_s_fw_delete_rule");
 	return (npf);
+}
+
+
+static npf_func_t
+findfunc(void *lib, char *name)
+{
+	return ((npf_func_t)dlfunc(lib, name));
 }

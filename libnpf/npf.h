@@ -31,6 +31,7 @@
 
 #include <sys/socket.h>
 #include <net/if.h>
+#include <netinet/in.h>
 
 #ifndef LIFNAMSIZ
 # ifdef IF_NAMESIZE
@@ -45,52 +46,160 @@
 #endif
 
 #define	NPF_DEFAULT		"ipf"
+#define	NPF_GROUP_NAME_SIZE	64
+#define	NPF_TABLE_NAME_SIZE	64
+
+/* AF_UNSPEC => sockaddr_storage is a string */
+
+typedef enum npf_version_e {
+	NPF_VERSION = 0
+} npf_version_t;
+
+typedef enum npf_inout_e {
+	NPF_IN = 0,
+	NPF_OUT = 1
+} npf_inout_t;
+
+typedef enum npf_addr_type_e {
+	NPF_ATYPE_ADDR = 0,
+	NPF_ATYPE_IF_NAME = 1,
+	NPF_ATYPE_TABLE_NAME = 2
+} npf_addr_type_t;
+
+typedef union {
+	struct sockaddr_storage	na_addr;
+	struct sockaddr_in	na_ipv4;
+	struct sockaddr_in6	na_ipv6;
+} npf_addr_t;
+
+typedef struct npf_rule_addr_s {
+	npf_addr_type_t		nra_type;
+	int			nra_mask;
+	union {
+		npf_addr_t	nrau_addr;
+		char		nrau_name[NPF_TABLE_NAME_SIZE];
+	} nra_un;
+} npf_rule_addr_t;
+
+#define	nra_addr		nra_un.nrau_addr.na_addr
+#define	nra_ipv4		nra_un.nrau_addr.na_ipv4
+#define	nra_ipv6		nra_un.nrau_addr.na_ipv6
+#define	nra_table_name		nra_un.nrau_name
 
 
-typedef struct npf_nat_desc {
-	int			npfn_inout;
-	int			npfn_inprotocol;
-	int			npfn_outprotocol;
-	char			npfn_inifname[LIFNAMSIZ];
-	char			npfn_outifname[LIFNAMSIZ];
-	int			npfn_ext_dstmsk;	/* # of bits to mask */
-	int			npfn_ext_srcmsk;	/* # of bits to mask */
-	int			npfn_int_dstmsk;	/* # of bits to mask */
-	int			npfn_int_srcmsk;	/* # of bits to mask */
-	struct sockaddr_storage	npfn_external_src;
-	struct sockaddr_storage	npfn_external_dst;
-	struct sockaddr_storage	npfn_internal_src;
-	struct sockaddr_storage	npfn_internal_dst;
+typedef enum npf_nat_style_e {
+	NPF_NS_NO_CHANGE = 0,
+	NPF_NS_CHANGE_DST = 1,
+	NPF_NS_CHANGE_SRC = 2,
+	NPF_NS_CHANGE_ALL = 3,
+} npf_nat_style_t;
+
+/*
+ * Needed:
+ * - negation matching on fields
+ */
+typedef struct npf_nat_rule_s {
+	npf_inout_t		nnr_inout;
+	int			nnr_inprotocol;
+	int			nnr_outprotocol;
+	int			nnr_tcp_mss;
+	char			nnr_inifname[LIFNAMSIZ];
+	char			nnr_outifname[LIFNAMSIZ];
+	npf_rule_addr_t		nnr_ext_dst;
+	npf_rule_addr_t		nnr_ext_src;
+	npf_rule_addr_t		nnr_int_dst;
+	npf_rule_addr_t		nnr_int_src;
+} npf_nat_rule_t;
+
+typedef struct npf_nat_desc_s {
+	npf_inout_t		nnd_inout;
+	int			nnd_inprotocol;
+	int			nnd_outprotocol;
+	npf_addr_t		nnd_ext_dst;
+	npf_addr_t		nnd_ext_src;
+	npf_addr_t		nnd_int_dst;
+	npf_addr_t		nnd_int_src;
 } npf_nat_desc_t;
 
-
 typedef enum npf_permission_e {
-	NPFE_ALLOW = 0,
-	NPFE_BLOCK,
-	NPFE_BLOCK_RETURN_ICMP,
-	NPFE_BLOCK_RETURN_RESET
+	NPF_ALLOW = 0,
+	NPF_BLOCK = 1,
+	NPF_BLOCK_RETURN_REFUSE = 2,
+	NPF_BLOCK_RETURN_UNREACH = 3,
+	NPF_COUNT = 4,
+	NPF_DIVERT = 5
 } npf_permission_t;
 
-#define	NPF_GROUP_NAME_SIZE	64
+typedef enum npf_logaction_e {
+	NPFL_NONE = 0,
+	NPFL_LOG_ALL = 1,
+	NPFL_LOG_FIRST = 2,
+	NPFL_LOG_BODY = 4
+} npf_logaction_t;
 
-typedef struct npf_filter_desc {
-	npf_permission_t	npff_action;
-	int			npff_log;
-	int			npff_inout;
-	int			npff_protocol;
-	int			npff_srcmsk;	/* # of bits to mask */
-	int			npff_dstmsk;	/* # of bits to mask */
-	struct sockaddr_storage	npff_src;
-	struct sockaddr_storage	npff_dst;
-	char			npff_ifname[LIFNAMSIZ];
-	char			npff_group[NPF_GROUP_NAME_SIZE];
-} npf_filter_desc_t;
+typedef struct npf_destination_s {
+	struct sockaddr_storage	npfd_address;
+	char			npfd_ifname[LIFNAMSIZ];
+} npf_destination_t;
+
+/*
+ * Needed:
+ * - negation matching on fields
+ * - how to indicate state-based filtering/tracking
+ */
+typedef struct npf_filter_rule_s {
+	npf_permission_t	nfr_action;
+	npf_inout_t		nfr_inout;
+	npf_logaction_t		nfr_log;
+	int			nfr_log_level;
+	int			nfr_family;
+	int			nfr_protocol;
+	int			nfr_tos;
+	npf_rule_addr_t		nfr_src;
+	npf_rule_addr_t		nfr_dst;
+	char			nfr_ifname[LIFNAMSIZ];
+	char			nfr_group[NPF_GROUP_NAME_SIZE];
+	npf_destination_t	nfr_nexthop[2];	/* fwd & rev */
+} npf_filter_rule_t;
+
+typedef struct npf_tcp_filter_rule_s {
+	int			ntfr_sportlo;
+	int			ntfr_sporthi;
+	int			ntfr_sportcmp;
+	int			ntfr_dportlo;
+	int			ntfr_dporthi;
+	int			ntfr_dportcmp;
+	int			ntfr_flags;
+	int			ntfr_flagmask;
+} npf_tcp_filter_rule_t;
+
+typedef struct npf_udp_filter_rule {
+	int			nufr_sportlo;
+	int			nufr_sporthi;
+	int			nufr_sportcmp;
+	int			nufr_dportlo;
+	int			nufr_dporthi;
+	int			nufr_dportcmp;
+} npf_udp_filter_rule_t;
+
+typedef struct npf_icmp_filter_rule_s {
+	int			nifr_type;
+	int			nifr_code;
+} npf_icmp_filter_rule_t;
+
+/*
+ * 1 bit per option # for matching on.
+ */
+typedef struct npf_ip_option_rule_s {
+	uint32_t		nior_options[8];
+	uint32_t		nior_optionmask[8];
+} npf_ip_option_rule_t;
 
 
-struct npf_handle;
-typedef int (*npf_func_t)(struct npf_handle *, void *, const char *);
+struct npf_handle_s;
+typedef int (*npf_func_t)(struct npf_handle_s *, void *, const char *);
 
-typedef struct npf_handle {
+typedef struct npf_handle_s {
 	void		*lib;
 	char		*libname;
 	int		error;
@@ -105,23 +214,40 @@ typedef struct npf_handle {
 	npf_func_t	nat_insert_rule;
 	npf_func_t	nat_lookup_rdr;
 	void		*private;
+	npf_version_t	version;
 } npf_handle_t;
 
-extern npf_handle_t *npf_open(const char *name);
+extern npf_handle_t *npf_open(const char *name, const npf_version_t version);
 extern int npf_close(npf_handle_t *);
 extern void npf_set_private(npf_handle_t *, void *);
 extern void *npf_get_private(npf_handle_t *);
 
-extern int npf_fw_delete_rule(npf_handle_t *, npf_filter_desc_t *,
+extern int npf_fw_delete_rule(npf_handle_t *, npf_filter_rule_t *,
 			      const char *);
-extern int npf_fw_insert_rule(npf_handle_t *, npf_filter_desc_t *,
+extern int npf_fw_insert_rule(npf_handle_t *, npf_filter_rule_t *,
 			      const char *);
 
-extern int npf_nat_delete_rule(npf_handle_t *, npf_nat_desc_t *, const char *);
-extern int npf_nat_find_rule(npf_handle_t *, npf_nat_desc_t *, const char *);
+extern int npf_nat_delete_rule(npf_handle_t *, npf_nat_rule_t *, const char *);
+extern int npf_nat_find_rule(npf_handle_t *, npf_nat_rule_t *, const char *);
 extern int npf_nat_lookup_rdr(npf_handle_t *, npf_nat_desc_t *, const char *);
-extern int npf_nat_getnext_rule(npf_handle_t *, npf_nat_desc_t *, const char *);
-extern int npf_nat_insert_rule(npf_handle_t *, npf_nat_desc_t *, const char *);
+extern int npf_nat_getnext_rule(npf_handle_t *, npf_nat_rule_t *, const char *);
+extern int npf_nat_insert_rule(npf_handle_t *, npf_nat_rule_t *, const char *);
+
+/*
+ * From FreeBSD...
+ */
+#if defined(__GNUC__) || defined(__INTEL_COMPILER)
+#define NPF_RCSID(name,string) __asm__(".ident\t\"" string "\"")
+#else
+/*
+ * The following definition might not work well if used in header files,
+ * but it should be better than nothing.  If you want a "do nothing"
+ * version, then it should generate some harmless declaration, such as:
+ *    #define __IDSTRING(name,string)   struct __hack
+ */
+#define NPF_RCSID(name,string) static const char name[] __unused = string
+#endif
+
 
 
 /*

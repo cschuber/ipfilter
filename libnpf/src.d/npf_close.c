@@ -29,7 +29,7 @@
 #include <string.h>
 #include <dlfcn.h>
 
-static char rcsid[] = "$Id$";
+NPF_RCSID(rcsid,"$Id$");
 
 int
 npf_close(npf_handle_t *npf)

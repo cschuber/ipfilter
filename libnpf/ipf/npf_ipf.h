@@ -42,6 +42,6 @@ typedef struct npf_ipf_s {
 } npf_ipf_t;
 
 
-extern int npf_ipf_fw_desc_to_frentry(npf_filter_desc_t *nf, frentry_t *fr);
+extern int npf_ipf_fw_rule_to_frentry(npf_filter_rule_t *nf, frentry_t *fr);
 extern void npf_ipf_setv6mask(i6addr_t *addr, i6addr_t *mask, int masklen);
 

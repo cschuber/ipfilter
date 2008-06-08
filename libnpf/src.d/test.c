@@ -32,7 +32,7 @@ static char rcsid[] = "$Id$";
 int
 main(int argc, char *argv[])
 {
-	npf_handle_t *npf = npf_open(NULL);
+	npf_handle_t *npf = npf_open(NULL, NPF_VERSION);
 	if (npf != NULL) {
 		printf("npf %p\n", npf);
 		npf_close(npf);
