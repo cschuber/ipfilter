@@ -31,46 +31,46 @@
 static char rcsid[] = "$Id$";
 
 int
-npf_ipf_fw_desc_to_frentry(npf_filter_desc_t *nf, frentry_t *fr)
+npf_ipf_fw_rule_to_frentry(npf_filter_rule_t *nf, frentry_t *fr)
 {
 
 	/*
 	 * Make sure the address families line up.
 	 */
-	if (nf->npff_src.ss_family == AF_INET) {
+	if (nf->nfr_src.nra_addr.ss_family == AF_INET) {
 		fr->fr_v = 4;
-		if (nf->npff_dst.ss_family != AF_INET &&
-		    nf->npff_dst.ss_family != AF_UNSPEC)
+		if (nf->nfr_dst.nra_addr.ss_family != AF_INET &&
+		    nf->nfr_dst.nra_addr.ss_family != AF_UNSPEC)
 			return (-1);
-	} else if (nf->npff_src.ss_family == AF_INET6) {
+	} else if (nf->nfr_src.nra_addr.ss_family == AF_INET6) {
 		fr->fr_v = 6;
-		if (nf->npff_dst.ss_family != AF_INET6 &&
-		    nf->npff_dst.ss_family != AF_UNSPEC)
+		if (nf->nfr_dst.nra_addr.ss_family != AF_INET6 &&
+		    nf->nfr_dst.nra_addr.ss_family != AF_UNSPEC)
 			return (-1);
-	} else if (nf->npff_dst.ss_family == AF_INET) {
+	} else if (nf->nfr_dst.nra_addr.ss_family == AF_INET) {
 		fr->fr_v = 4;
-		if (nf->npff_src.ss_family != AF_INET &&
-		    nf->npff_src.ss_family != AF_UNSPEC)
+		if (nf->nfr_src.nra_addr.ss_family != AF_INET &&
+		    nf->nfr_src.nra_addr.ss_family != AF_UNSPEC)
 			return (-1);
-	} else if (nf->npff_dst.ss_family == AF_INET6) {
+	} else if (nf->nfr_dst.nra_addr.ss_family == AF_INET6) {
 		fr->fr_v = 6;
-		if (nf->npff_src.ss_family != AF_INET6 &&
-		    nf->npff_src.ss_family != AF_UNSPEC)
+		if (nf->nfr_src.nra_addr.ss_family != AF_INET6 &&
+		    nf->nfr_src.nra_addr.ss_family != AF_UNSPEC)
 			return (-1);
 	}
 
-	switch (nf->npff_action)
+	switch (nf->nfr_action)
 	{
-	case NPFE_ALLOW :
+	case NPF_ALLOW :
 		fr->fr_flags = FR_PASS;
 		break;
-	case NPFE_BLOCK :
+	case NPF_BLOCK :
 		fr->fr_flags = FR_BLOCK;
 		break;
-	case NPFE_BLOCK_RETURN_ICMP :
+	case NPF_BLOCK_RETURN_UNREACH :
 		fr->fr_flags = FR_BLOCK|FR_RETICMP;
 		break;
-	case NPFE_BLOCK_RETURN_RESET :
+	case NPF_BLOCK_RETURN_REFUSE :
 		fr->fr_flags = FR_BLOCK|FR_RETRST;
 		break;
 	}
@@ -80,7 +80,7 @@ npf_ipf_fw_desc_to_frentry(npf_filter_desc_t *nf, frentry_t *fr)
 	 * The default is for rules to include "keep state" for the protocols
 	 * that we know something about.
 	 */
-	fr->fr_proto = nf->npff_protocol;
+	fr->fr_proto = nf->nfr_protocol;
 	switch (fr->fr_proto)
 	{
 	case IPPROTO_TCP :
@@ -101,59 +101,59 @@ npf_ipf_fw_desc_to_frentry(npf_filter_desc_t *nf, frentry_t *fr)
 		break;
 	}
 
-	if (nf->npff_inout == 1)
+	if (nf->nfr_inout == 1)
 		fr->fr_flags |= FR_OUTQUE;
 	else
 		fr->fr_flags |= FR_INQUE;
 
-	strncpy(fr->fr_group, nf->npff_group, sizeof(fr->fr_group));
+	strncpy(fr->fr_group, nf->nfr_group, sizeof(fr->fr_group));
 	fr->fr_group[FR_GROUPLEN - 1] = '\0';
 
-	strncpy(fr->fr_ifnames[0], nf->npff_ifname, LIFNAMSIZ);
+	strncpy(fr->fr_ifnames[0], nf->nfr_ifname, LIFNAMSIZ);
 	fr->fr_ifnames[0][LIFNAMSIZ - 1] = '\0';
 
-	strncpy(fr->fr_ifnames[1], nf->npff_ifname, LIFNAMSIZ);
+	strncpy(fr->fr_ifnames[1], nf->nfr_ifname, LIFNAMSIZ);
 	fr->fr_ifnames[1][LIFNAMSIZ - 1] = '\0';
 
 	if (fr->fr_v == 4) {
 		struct sockaddr_in *sin;
 
-		if (nf->npff_srcmsk < 0 || nf->npff_srcmsk > 32)
+		if (nf->nfr_src.nra_mask < 0 || nf->nfr_src.nra_mask > 32)
 			return (-1);
-		fr->fr_smask = 0xffffffff << (32 - nf->npff_srcmsk);
+		fr->fr_smask = 0xffffffff << (32 - nf->nfr_src.nra_mask);
 
-		if (nf->npff_dstmsk < 0 || nf->npff_dstmsk > 32)
+		if (nf->nfr_dst.nra_mask < 0 || nf->nfr_dst.nra_mask > 32)
 			return (-1);
-		fr->fr_dmask = 0xffffffff << (32 - nf->npff_dstmsk);
+		fr->fr_dmask = 0xffffffff << (32 - nf->nfr_dst.nra_mask);
 
-		sin = (struct sockaddr_in *)&nf->npff_src;
+		sin = &nf->nfr_src.nra_ipv4;
 		if (sin->sin_family == AF_INET)
 			fr->fr_saddr = sin->sin_addr.s_addr & fr->fr_smask;
 
-		sin = (struct sockaddr_in *)&nf->npff_dst;
+		sin = &nf->nfr_dst.nra_ipv4;
 		if (sin->sin_family == AF_INET)
 			fr->fr_daddr = sin->sin_addr.s_addr & fr->fr_dmask;
 
 	} else if (fr->fr_v == 6) {
 		struct sockaddr_in6 *sin6;
 
-		if (nf->npff_srcmsk < 0 || nf->npff_srcmsk > 128)
+		if (nf->nfr_src.nra_mask < 0 || nf->nfr_src.nra_mask > 128)
 			return (-1);
 
-		if (nf->npff_dstmsk < 0 || nf->npff_dstmsk > 128)
+		if (nf->nfr_dst.nra_mask < 0 || nf->nfr_dst.nra_mask > 128)
 			return (-1);
 
-		sin6 = (struct sockaddr_in6 *)&nf->npff_src;
+		sin6 = &nf->nfr_src.nra_ipv6;
 		if (sin6->sin6_family == AF_INET6)
 			fr->fr_ip.fi_src.in6 = sin6->sin6_addr;
 		npf_ipf_setv6mask(&fr->fr_ip.fi_src, &fr->fr_mip.fi_src,
-				  nf->npff_srcmsk);
+				  nf->nfr_src.nra_mask);
 
-		sin6 = (struct sockaddr_in6 *)&nf->npff_dst;
+		sin6 = &nf->nfr_dst.nra_ipv6;
 		if (sin6->sin6_family == AF_INET6)
 			fr->fr_ip.fi_dst.in6 = sin6->sin6_addr;
 		npf_ipf_setv6mask(&fr->fr_ip.fi_dst, &fr->fr_mip.fi_dst,
-				  nf->npff_dstmsk);
+				  nf->nfr_dst.nra_mask);
 	}
 	return (0);
 }

@@ -29,14 +29,14 @@ TOP=..
 CFLAGS+=-I$(TOP) -I.
 SO_CFLAGS=$(CFLAGS) -fPIC -shared
 
-IPFOBJSO=npf_ipf_fw_desc_to_frentry.o npf_ipf_setv6mask.o \
+IPFOBJSO=npf_ipf_fw_rule_to_frentry.o npf_ipf_setv6mask.o \
 	 npf_s_fini_lib.o npf_s_init_lib.o \
 	 npf_s_nat_lookup_rdr.o
 #	 npf_s_delete_filter_rule.o npf_s_delete_nat_rule.o \
 #	 npf_s_find_nat_rule.o npf_s_getnext_nat_rule.o \
 #	 npf_s_insert_filter_rule.o npf_s_insert_nat_rule.o \
 
-IPFOBJS_SO=npf_ipf_fw_desc_to_frentry.so npf_ipf_setv6mask.so \
+IPFOBJS_SO=npf_ipf_fw_rule_to_frentry.so npf_ipf_setv6mask.so \
 	  npf_s_fini_lib.so npf_s_init_lib.so \
 	  npf_s_nat_lookup_rdr.so
 #	  npf_s_delete_filter_rule.so npf_s_delete_nat_rule.so \
@@ -51,9 +51,9 @@ libnpf_ipf.a: $(IPFOBJSO)
 libnpf_ipf.so: $(IPFOBJS_SO)
 	ld -shared $(IPFOBJS_SO) -o $@
 
-npf_ipf_fw_desc_to_frentry.o: npf_ipf_fw_desc_to_frentry.c $(TOP)/npf.h \
+npf_ipf_fw_rule_to_frentry.o: npf_ipf_fw_rule_to_frentry.c $(TOP)/npf.h \
 			      npf_ipf.h
-	$(CC) $(CFLAGS) -c npf_ipf_fw_desc_to_frentry.c -o $@
+	$(CC) $(CFLAGS) -c npf_ipf_fw_rule_to_frentry.c -o $@
 
 npf_ipf_setv6mask.o: npf_ipf_setv6mask.c $(TOP)/npf.h npf_ipf.h
 	$(CC) $(CFLAGS) -c npf_ipf_setv6mask.c -o $@
@@ -67,9 +67,9 @@ npf_s_fini_lib.o: npf_s_fini_lib.c $(TOP)/npf.h npf_ipf.h
 npf_s_init_lib.o: npf_s_init_lib.c $(TOP)/npf.h npf_ipf.h
 	$(CC) $(CFLAGS) -c npf_s_init_lib.c -o $@
 
-npf_ipf_fw_desc_to_frentry.so: npf_ipf_fw_desc_to_frentry.c $(TOP)/npf.h \
+npf_ipf_fw_rule_to_frentry.so: npf_ipf_fw_rule_to_frentry.c $(TOP)/npf.h \
 			       npf_ipf.h
-	$(CC) $(SO_CFLAGS) -c npf_ipf_fw_desc_to_frentry.c -o $@
+	$(CC) $(SO_CFLAGS) -c npf_ipf_fw_rule_to_frentry.c -o $@
 
 npf_ipf_setv6mask.so: npf_ipf_setv6mask.c $(TOP)/npf.h npf_ipf.h
 	$(CC) $(SO_CFLAGS) -c npf_ipf_setv6mask.c -o $@
