@@ -3123,7 +3123,6 @@ ipf_state_check(fin, passp)
 	fin->fin_rule = is->is_rulen;
 	fin->fin_fr = is->is_rule;
 	fin->fin_state = is;
-	is->is_touched = ipf_ticks;
 
 	/*
 	 * If this packet is a fragment and the rule says to track fragments,

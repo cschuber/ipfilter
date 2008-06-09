@@ -5565,18 +5565,31 @@ ipf_movequeue(tqe, oifq, nifq)
 	ipftqent_t *tqe;
 	ipftq_t *oifq, *nifq;
 {
+
 	/*
-	 * Is the operation here going to be a no-op ?
+	 * If the queue hasn't changed and we last touched this entry at the
+	 * same ipf time, then we're not going to achieve anything by either
+	 * changing the ttl or moving it on the queue.
+	 */
+	if (oifq == nifq && tqe->tqe_touched == fr_ticks)
+		return;
+
+	/*
+	 * For any of this to be outside the lock, there is a risk that two
+	 * packets entering simultaneously, with one changing to a different
+	 * queue and one not, could end up with things in a bizarre state.
 	 */
 	MUTEX_ENTER(&oifq->ifq_lock);
-	tqe->tqe_die = ipf_ticks + nifq->ifq_ttl;
+
+	tqe->tqe_touched = fr_ticks;
+	tqe->tqe_die = fr_ticks + nifq->ifq_ttl;
 	/*
 	 * Is the operation here going to be a no-op ?
 	 */
 	if (oifq == nifq) {
 		if ((tqe->tqe_next == NULL) ||
 		    (tqe->tqe_next->tqe_die == tqe->tqe_die)) {
-			MUTEX_EXIT(&nifq->ifq_lock);
+			MUTEX_EXIT(&oifq->ifq_lock);
 			return;
 		}
 	}
