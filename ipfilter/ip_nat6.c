@@ -227,7 +227,7 @@ ipf_nat6_addrdr(n)
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    ipf_nat6_addnat                                             */
+/* Function:    ipf_nat6_addmap                                             */
 /* Returns:     Nil                                                         */
 /* Parameters:  n(I) - pointer to NAT rule to add                           */
 /*                                                                          */
@@ -237,7 +237,7 @@ ipf_nat6_addrdr(n)
 /* ------------------------------------------------------------------------ */
 extern void  printhost __P((int, u_32_t *));
 void
-ipf_nat6_addnat(n)
+ipf_nat6_addmap(n)
 	ipnat_t *n;
 {
 	ipnat_t **np;
@@ -1080,8 +1080,8 @@ ipf_nat6_add(fin, np, natsave, flags, direction)
 			ipf_nat_delrdr(np);
 			ipf_nat6_addrdr(np);
 		} else if ((np->in_redir & (NAT_REDIRECT|NAT_MAP)) == NAT_MAP) {
-			ipf_nat_delnat(np);
-			ipf_nat6_addnat(np);
+			ipf_nat_delmap(np);
+			ipf_nat6_addmap(np);
 		}
 	}
 
@@ -4561,8 +4561,8 @@ ipf_nat6_icmpquerytype(icmptype)
 	case ICMP6_MEMBERSHIP_REDUCTION:
 	case ICMP6_WRUREQUEST:
 	case ICMP6_WRUREPLY:
-	case MLD_MTRACE_RESP:
-	case MLD_MTRACE:
+	case MLD6_MTRACE_RESP:
+	case MLD6_MTRACE:
 		return 1;
 	default:
 		return 0;
