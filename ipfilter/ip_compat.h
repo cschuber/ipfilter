@@ -46,6 +46,9 @@
 #if defined(__NetBSD_Version__) && (__NetBSD_Version__ >= 105000000) && \
     !defined(_KERNEL) && !defined(USE_INET6)
 # define	USE_INET6
+#endif
+#if defined(__NetBSD_Version__) && (__NetBSD_Version__ >= 106140000) && \
+    defined(_KERNEL) && !defined(IPFILTER_LKM)
 # define	IPFILTER_M_IPFILTER
 #endif
 #if defined(OpenBSD) && (OpenBSD >= 200206) && \

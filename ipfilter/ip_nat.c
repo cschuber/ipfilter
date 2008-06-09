@@ -3891,7 +3891,6 @@ nonatfrag:
 			nat->nat_bytes[1] += fin->fin_plen;
 			nat->nat_pkts[1]++;
 			MUTEX_EXIT(&nat->nat_lock);
-			nat->nat_touched = fr_ticks;
 			fin->fin_nat = nat;
 		}
 	} else
@@ -4204,7 +4203,6 @@ nonatfrag:
 			nat->nat_bytes[0] += fin->fin_plen;
 			nat->nat_pkts[0]++;
 			MUTEX_EXIT(&nat->nat_lock);
-			nat->nat_touched = fr_ticks;
 			fin->fin_nat = nat;
 		}
 	} else

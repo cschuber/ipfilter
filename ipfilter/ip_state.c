@@ -1036,7 +1036,6 @@ ipf_state_matchisps(is1, is2)
 		{
 		case IPPROTO_TCP :
 		case IPPROTO_UDP :
-		case IPPROTO_GRE :
 			/* greinfo_t can be also interprted as port pair */
 			rv = ipf_state_matchports(&is1->is_ps.is_us,
 						  &is2->is_ps.is_us);
@@ -2984,7 +2983,6 @@ matched:
 	fr_updatestate(fin, is, ifq);
 
 	fin->fin_state = is;
-	is->is_touched = fr_ticks;
 	MUTEX_ENTER(&is->is_lock);
 	is->is_ref++;
 	MUTEX_EXIT(&is->is_lock);
