@@ -4656,6 +4656,7 @@ retry_roundrobin:
 					   NAT_OUTBOUND))) {
 				np->in_hits++;
 				np->in_use--;
+				natfailed = 0;
 				break;
 			}
 			natfailed = -1;
@@ -5254,6 +5255,7 @@ retry_roundrobin:
 			if (nat != NULL) {
 				np->in_hits++;
 				np->in_use--;
+				natfailed = 0;
 				break;
 			}
 			natfailed = -1;
