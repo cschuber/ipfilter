@@ -453,7 +453,7 @@ u_32_t port;
 	hv += src.s_addr;
 	hv += dst.s_addr;
 	hv %= HOSTMAP_SIZE;
-	for (hm = ipf_hm_maptable[hv]; hm; hm = hm->hm_next)
+	for (hm = ipf_hm_maptable[hv]; hm; hm = hm->hm_hnext)
 		if ((hm->hm_srcip.s_addr == src.s_addr) &&
 		    (hm->hm_dstip.s_addr == dst.s_addr) &&
 		    ((np == NULL) || (np == hm->hm_ipnat)) &&
@@ -2109,8 +2109,8 @@ natinfo_t *ni;
 		((icmphdr_t *)fin->fin_dp)->icmp_id = port;
 		nat->nat_inport = port;
 		nat->nat_outport = port;
-	} else if (fin->fin_p == IPPROTO_GRE) {
 #if 0
+	} else if (fin->fin_p == IPPROTO_GRE) {
 		nat->nat_gre.gs_flags = ((grehdr_t *)fin->fin_dp)->gr_flags;
 		if (GRE_REV(nat->nat_gre.gs_flags) == 1) {
 			nat->nat_oport = 0;/*fin->fin_data[1];*/
@@ -2301,8 +2301,8 @@ natinfo_t *ni;
 		((icmphdr_t *)fin->fin_dp)->icmp_id = nport;
 		nat->nat_inport = nport;
 		nat->nat_outport = nport;
-	} else if (fin->fin_p == IPPROTO_GRE) {
 #if 0
+	} else if (fin->fin_p == IPPROTO_GRE) {
 		nat->nat_gre.gs_flags = ((grehdr_t *)fin->fin_dp)->gr_flags;
 		if (GRE_REV(nat->nat_gre.gs_flags) == 1) {
 			nat->nat_call[0] = fin->fin_data[0];
@@ -3861,6 +3861,7 @@ maskloop:
 				np->in_hits++;
 				np->in_use--;
 				MUTEX_DOWNGRADE(&ipf_nat);
+				natfailed = 0;
 				break;
 			}
 			natfailed = -1;
@@ -4172,6 +4173,7 @@ maskloop:
 				np->in_hits++;
 				np->in_use--;
 				MUTEX_DOWNGRADE(&ipf_nat);
+				natfailed = 0;
 				break;
 			}
 			natfailed = -1;
