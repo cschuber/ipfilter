@@ -46,6 +46,9 @@
 #if defined(__NetBSD_Version__) && (__NetBSD_Version__ >= 105000000) && \
     !defined(_KERNEL) && !defined(USE_INET6)
 # define	USE_INET6
+#endif
+#if defined(__NetBSD_Version__) && (__NetBSD_Version__ >= 106140000) && \
+    defined(_KERNEL) && !defined(IPFILTER_LKM)
 # define	IPFILTER_M_IPFILTER
 #endif
 #if defined(OpenBSD) && (OpenBSD >= 200206) && \
@@ -1641,7 +1644,12 @@ extern  vm_map_t        kmem_map;
 
 #  ifdef IPFILTER_M_IPFILTER
 #    include <sys/malloc.h>
+#     ifdef MALLOC_DEFINE
+MALLOC_DEFINE(M_IPFILTER, "IP Filter", \
+	      "IP Filter packet filter data structures");
+#     else
 MALLOC_DECLARE(M_IPFILTER);
+#     endif
 #    define	_M_IPF		M_IPFILTER
 #  else /* IPFILTER_M_IPFILTER */
 #   ifdef M_PFIL
