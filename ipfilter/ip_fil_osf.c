@@ -1016,7 +1016,7 @@ ipf_slowtimer __P((void *ptr))
 
 	if (ipf_running == 1) {
 		ipf_fragexpire();
-		ipf_timeoutstate();
+		ipf_state_expire();
 		ipf_natexpire();
 		ipf_authexpire();
 		ipf_ticks++;

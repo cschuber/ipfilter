@@ -1033,7 +1033,7 @@ ipf_slowtimer()
 	ipl_ipfilter_intfsync();
 
 	ipf_fragexpire();
-	ipf_timeoutstate();
+	ipf_state_expire();
 	ipf_natexpire();
 	ipf_authexpire();
 	ipf_ticks++;

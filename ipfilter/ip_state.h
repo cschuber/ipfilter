@@ -295,6 +295,7 @@ extern	int	ipf_tcpinwindow __P((struct fr_info *, struct tcpdata *,
 extern	int	ipf_state_add __P((fr_info_t *, ipstate_t **, u_int));
 extern	frentry_t *ipf_state_check __P((struct fr_info *, u_32_t *));
 extern	void	ipf_state_deref __P((ipstate_t **));
+extern	void	ipf_state_expire __P((void));
 extern	ipstate_t *ipf_state_lookup __P((fr_info_t *, tcphdr_t *, ipftq_t **));
 extern	int	ipf_state_init __P((void));
 extern	void	ipf_state_insert __P((struct ipstate *, int));
@@ -306,7 +307,6 @@ extern	void	ipf_state_setqueue __P((ipstate_t *, int));
 extern	void	ipf_state_setpending __P((ipstate_t *));
 extern	int	ipf_state_settimeout __P((ipftuneable_t *, ipftuneval_t *));
 extern	void	ipf_state_sync __P((void *));
-extern	void	ipf_state_timeout __P((void));
 extern	void	ipf_state_unload __P((void));
 extern	void	ipf_state_update __P((fr_info_t *, ipstate_t *));
 

@@ -3444,7 +3444,7 @@ ipf_state_del(is, why)
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    ipf_state_timeout                                           */
+/* Function:    ipf_state_expire                                            */
 /* Returns:     Nil                                                         */
 /* Parameters:  Nil                                                         */
 /*                                                                          */
@@ -3454,7 +3454,7 @@ ipf_state_del(is, why)
 /* expired then neither will any under it.                                  */
 /* ------------------------------------------------------------------------ */
 void
-ipf_state_timeout()
+ipf_state_expire()
 {
 	ipftq_t *ifq, *ifqnext;
 	ipftqent_t *tqe, *tqn;

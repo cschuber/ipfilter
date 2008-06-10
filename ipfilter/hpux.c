@@ -527,7 +527,7 @@ static int ipf_slowtimer()
 	READ_ENTER(&ipf_global);
 
 	ipf_frag_expire();
-	fr_timeoutstate();
+	ipf_state_expire();
 	ipf_nat_expire();
 	ipf_auth_expire();
 	ipf_ticks++;

@@ -977,7 +977,7 @@ ipf_slowtimer()
 
 	ipf_expiretokens();
 	ipf_frag_expire();
-	ipf_state_timeout();
+	ipf_state_expire();
 	ipf_nat_expire();
 	ipf_auth_expire();
 #ifdef IPFILTER_SYNC

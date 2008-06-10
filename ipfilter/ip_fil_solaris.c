@@ -797,7 +797,7 @@ ipf_slowtimer __P((void *ptr))
 
 	ipf_expiretokens();
 	ipf_fragexpire();
-	ipf_timeoutstate();
+	ipf_state_expire();
 	ipf_natexpire();
 	ipf_authexpire();
 	ipf_ticks++;
