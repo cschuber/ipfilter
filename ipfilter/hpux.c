@@ -57,7 +57,7 @@ static	char	*ipf_devfiles[] = { IPL_NAME, IPNAT_NAME, IPSTATE_NAME,
 static	int	(*ipf_ip_inp) __P((queue_t *, mblk_t *)) = NULL;
 
 
-static	int	fr_slowtimer __P((void));
+static	int	ipf_slowtimer __P((void));
 struct	callout	*ipf_timer_id = NULL;
 struct	callout	*synctimeoutid = NULL;
 #ifdef	IPFDEBUG
@@ -332,7 +332,7 @@ static int ipf_attach()
 	if (ipf_running == 0)
 		ipf_running = 1;
 	if (ipf_timer_id == NULL)
-		ipf_timer_id = mp_timeout(fr_slowtimer, NULL, hz/2);
+		ipf_timer_id = mp_timeout(ipf_slowtimer, NULL, hz/2);
 	if (ipf_running == 1)
 		return 0;
 attachfailed:
@@ -360,7 +360,7 @@ static int ipf_detach()
 		return -1;
 	}
 	if (ipf_timer_id) {
-		untimeout(fr_slowtimer, NULL);
+		untimeout(ipf_slowtimer, NULL);
 		ipf_timer_id = 0;
 	}
 	ipf_running = -1;
@@ -526,17 +526,17 @@ static int ipf_slowtimer()
 
 	READ_ENTER(&ipf_global);
 
-	fr_fragexpire();
+	ipf_frag_expire();
 	fr_timeoutstate();
-	fr_natexpire();
-	fr_authexpire();
+	ipf_nat_expire();
+	ipf_auth_expire();
 	ipf_ticks++;
 	ipf_timer_id = NULL;
 	if (ipf_running <= 0) {
 		RWLOCK_EXIT(&ipf_global);
 		return;
 	}
-	ipf_timer_id = mp_timeout(fr_slowtimer, NULL, hz/2);
+	ipf_timer_id = mp_timeout(ipf_slowtimer, NULL, hz/2);
 	RWLOCK_EXIT(&ipf_global);
 }
 
