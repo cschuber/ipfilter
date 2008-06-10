@@ -1,9 +1,9 @@
 
-/*                                                                              
- * Copyright (C) 1993-2001 by Darren Reed.                                      
- *                                                                              
- * See the IPFILTER.LICENCE file for details on licencing.                      
- *                      
+/*
+ * Copyright (C) 1993-2001 by Darren Reed.
+ *
+ * See the IPFILTER.LICENCE file for details on licencing.
+ *
  * $Id$
  */
 
@@ -1017,13 +1017,13 @@ void ipf_slowtimer(long value)
 {
         READ_ENTER(&ipf_global);
 
-        ipf_expiretokens();
-        ipf_fragexpire();
-        ipf_timeoutstate();
-        ipf_natexpire();
-        ipf_authexpire();
-        ipf_ticks++;
-        if (ipf_running <= 0)
+	ipf_expiretokens();
+	ipf_frag_expire();
+	ipf_state_expire();
+	ipf_nat_expire();
+	ipf_auth_expire();
+	ipf_ticks++;
+	if (ipf_running <= 0)
                 goto done;
         mod_timer(&ipf_timer, HZ/2 + jiffies);
 

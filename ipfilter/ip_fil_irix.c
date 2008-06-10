@@ -1031,11 +1031,11 @@ ipf_slowtimer()
 	}
 
 	ipl_ipfilter_intfsync();
-
-	ipf_fragexpire();
+	ipf_expiretokens();
+	ipf_frag_expire();
 	ipf_state_expire();
-	ipf_natexpire();
-	ipf_authexpire();
+	ipf_nat_expire();
+	ipf_auth_expire();
 	ipf_ticks++;
 
 #if IRIX >= 60500
