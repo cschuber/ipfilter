@@ -86,7 +86,8 @@ STATETOP_CFLAGS=-DSTATETOP
 #
 # How to link the ncurses library
 #
-STATETOP_LIB=-lncurses
+STATETOP_LIB=-lcurses
+#STATETOP_LIB=-lncurses
 #STATETOP_LIB=-L/usr/local/lib -lncurses
 
 #

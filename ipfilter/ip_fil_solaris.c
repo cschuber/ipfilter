@@ -112,7 +112,7 @@ ipfdetach()
 	ipf_pfil_hooks_remove();
 
 	if (ipf_timer_id != 0) {
-		(void) untimeout(ipf_timer_id0;
+		(void) untimeout(ipf_timer_id);
 		ipf_timer_id = 0;
 	}
 
@@ -204,7 +204,7 @@ ipfattach __P((void))
 #endif
 	}
 
-	ipf_timer_id = timeout(fr_slowtimer, NULL, drv_usectohz(500000));
+	ipf_timer_id = timeout(ipf_slowtimer, NULL, drv_usectohz(500000));
 
 	ipf_set_pfil_hooks();
 

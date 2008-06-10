@@ -5571,7 +5571,7 @@ ipf_movequeue(tqe, oifq, nifq)
 	 * same ipf time, then we're not going to achieve anything by either
 	 * changing the ttl or moving it on the queue.
 	 */
-	if (oifq == nifq && tqe->tqe_touched == fr_ticks)
+	if (oifq == nifq && tqe->tqe_touched == ipf_ticks)
 		return;
 
 	/*
@@ -5581,8 +5581,8 @@ ipf_movequeue(tqe, oifq, nifq)
 	 */
 	MUTEX_ENTER(&oifq->ifq_lock);
 
-	tqe->tqe_touched = fr_ticks;
-	tqe->tqe_die = fr_ticks + nifq->ifq_ttl;
+	tqe->tqe_touched = ipf_ticks;
+	tqe->tqe_die = ipf_ticks + nifq->ifq_ttl;
 	/*
 	 * Is the operation here going to be a no-op ?
 	 */

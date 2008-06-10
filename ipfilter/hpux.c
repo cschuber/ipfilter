@@ -530,7 +530,7 @@ static int ipf_slowtimer()
 	fr_timeoutstate();
 	fr_natexpire();
 	fr_authexpire();
-	fr_ticks++;
+	ipf_ticks++;
 	ipf_timer_id = NULL;
 	if (ipf_running <= 0) {
 		RWLOCK_EXIT(&ipf_global);
