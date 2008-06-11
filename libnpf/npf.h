@@ -86,13 +86,61 @@ typedef struct npf_rule_addr_s {
 #define	nra_ipv6		nra_un.nrau_addr.na_ipv6
 #define	nra_table_name		nra_un.nrau_name
 
+typedef enum npf_compare_e {
+	NPF_COMP_NONE = 0,
+	NPF_COMP_EQ = 1,
+	NPF_COMP_NE = 2,
+	NPF_COMP_GT = 3,
+	NPF_COMP_GE = 4,
+	NPF_COMP_LT = 5,
+	NPF_COMP_LE = 6,
+	NPF_COMP_OUTSIDE = 7,
+	NPF_COMP_INSIDE = 8,
+	NPF_COMP_RANGE = 9
+} npf_compare_t;
 
-typedef enum npf_nat_style_e {
-	NPF_NS_NO_CHANGE = 0,
-	NPF_NS_CHANGE_DST = 1,
-	NPF_NS_CHANGE_SRC = 2,
-	NPF_NS_CHANGE_ALL = 3,
-} npf_nat_style_t;
+typedef struct npf_tcp_filter_rule_s {
+	int			ntfr_sport_lo;
+	int			ntfr_sport_hi;
+	npf_compare_t		ntfr_sport_cmp;
+	int			ntfr_dport_lo;
+	int			ntfr_dport_hi;
+	npf_compare_t		ntfr_dport_cmp;
+	int			ntfr_flags;
+	int			ntfr_flag_mask;
+} npf_tcp_filter_rule_t;
+
+typedef struct npf_udp_filter_rule_s {
+	int			nufr_sport_lo;
+	int			nufr_sport_hi;
+	npf_compare_t		nufr_sport_cmp;
+	int			nufr_dport_lo;
+	int			nufr_dport_hi;
+	npf_compare_t		nufr_dport_cmp;
+} npf_udp_filter_rule_t;
+
+typedef struct npf_icmp_filter_rule_s {
+	int			nifr_type;
+	npf_compare_t		nifr_type_cmp;
+	int			nifr_code;
+	npf_compare_t		nifr_code_cmp;
+} npf_icmp_filter_rule_t;
+
+typedef union {
+	npf_tcp_filter_rule_t	n4_tcp;
+	npf_udp_filter_rule_t	n4_udp;
+	npf_icmp_filter_rule_t	n4_icmp;
+} npf_l4hdr_match_t;
+
+typedef enum npf_nat_change_e {
+	NPF_NC_NONE = 0,
+	NPF_NC_SERIAL = 1,	/* Includes serial space of 1 (fixed) */
+	NPF_NC_RANDOM = 2,
+	NPF_NC_HASH_SRC = 3,
+	NPF_NC_HASH_DST = 4,
+	NPF_NC_HASH_SRC_DST = 5,
+	NPF_NC_FITTED = 6
+} npf_nat_change_t;
 
 /*
  * Needed:
@@ -105,10 +153,13 @@ typedef struct npf_nat_rule_s {
 	int			nnr_tcp_mss;
 	char			nnr_inifname[LIFNAMSIZ];
 	char			nnr_outifname[LIFNAMSIZ];
+	npf_nat_change_t	nnr_dst_change;
+	npf_nat_change_t	nnr_src_change;
 	npf_rule_addr_t		nnr_ext_dst;
 	npf_rule_addr_t		nnr_ext_src;
 	npf_rule_addr_t		nnr_int_dst;
 	npf_rule_addr_t		nnr_int_src;
+	npf_l4hdr_match_t	nnr_l4match;
 } npf_nat_rule_t;
 
 typedef struct npf_nat_desc_s {
@@ -157,35 +208,11 @@ typedef struct npf_filter_rule_s {
 	int			nfr_tos;
 	npf_rule_addr_t		nfr_src;
 	npf_rule_addr_t		nfr_dst;
+	npf_l4hdr_match_t	nfr_l4match;
 	char			nfr_ifname[LIFNAMSIZ];
 	char			nfr_group[NPF_GROUP_NAME_SIZE];
 	npf_destination_t	nfr_nexthop[2];	/* fwd & rev */
 } npf_filter_rule_t;
-
-typedef struct npf_tcp_filter_rule_s {
-	int			ntfr_sportlo;
-	int			ntfr_sporthi;
-	int			ntfr_sportcmp;
-	int			ntfr_dportlo;
-	int			ntfr_dporthi;
-	int			ntfr_dportcmp;
-	int			ntfr_flags;
-	int			ntfr_flagmask;
-} npf_tcp_filter_rule_t;
-
-typedef struct npf_udp_filter_rule {
-	int			nufr_sportlo;
-	int			nufr_sporthi;
-	int			nufr_sportcmp;
-	int			nufr_dportlo;
-	int			nufr_dporthi;
-	int			nufr_dportcmp;
-} npf_udp_filter_rule_t;
-
-typedef struct npf_icmp_filter_rule_s {
-	int			nifr_type;
-	int			nifr_code;
-} npf_icmp_filter_rule_t;
 
 /*
  * 1 bit per option # for matching on.
