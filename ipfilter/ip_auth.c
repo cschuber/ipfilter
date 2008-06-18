@@ -147,7 +147,7 @@ frentry_t	*ipf_auth_ip = NULL,
 void ipf_auth_deref __P((frauthent_t **));
 int ipf_auth_geniter __P((ipftoken_t *, ipfgeniter_t *));
 int ipf_auth_reply __P((char *));
-int ipf_auth_wait __P((char *));
+int ipf_auth_wait_pkt __P((char *));
 
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_auth_init                                               */
@@ -480,7 +480,7 @@ ipf_auth_ioctl(data, cmd, mode, uid, ctx)
 		break;
 
 	case SIOCAUTHW:
-		error = ipf_auth_wait(data);
+		error = ipf_auth_wait_pkt(data);
 		break;
 
 	case SIOCAUTHR:
@@ -512,7 +512,7 @@ ipf_auth_unload()
 	int i;
 
 	if (ipf_auth != NULL) {
-		KFREES(ipf_auth, ipf_auth_size * sizeof(*ipf_authlk));
+		KFREES(ipf_auth, ipf_auth_size * sizeof(*ipf_auth));
 		ipf_auth = NULL;
 	}
 
@@ -865,7 +865,7 @@ ipf_auth_deref(faep)
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    ipf_auth_wait                                               */
+/* Function:    ipf_auth_wait_pkt                                           */
 /* Returns:     int - 0 == success, else error                              */
 /* Parameters:  data(I) - pointer to data from ioctl call                   */
 /*                                                                          */
@@ -876,7 +876,7 @@ ipf_auth_deref(faep)
 /* to sleep.                                                                */
 /* ------------------------------------------------------------------------ */
 int
-ipf_auth_wait(data)
+ipf_auth_wait_pkt(data)
 	char *data;
 {
 	frauth_t auth, *au = &auth;

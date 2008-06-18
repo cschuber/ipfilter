@@ -1661,11 +1661,7 @@ extern	int		ipf_getnextrule __P((ipftoken_t *, void *));
 extern	void		ipf_expiretokens __P((void));
 extern	void		ipf_freetoken __P((ipftoken_t *));
 extern	int		ipf_deltoken __P((int,int, void *));
-#if defined(MENTAT) && defined(_KERNEL)
-extern	int		ipf_sync __P((void));
-#else
 extern	int		ipf_sync __P((void *));
-#endif
 extern	int		ipf_genericiter __P((void *, int, void *));
 #ifdef	IPFILTER_LOOKUP
 extern	void		*ipf_resolvelookup __P((int, u_int, u_int, lookupfunc_t *));

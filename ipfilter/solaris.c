@@ -56,7 +56,6 @@
 struct pollhead ipf_poll_head[IPL_LOGSIZE];
 
 extern	int	ipf_running;
-extern	int	iplwrite __P((dev_t, struct uio *, cred_t *));
 
 extern ipnat_t *nat_list;
 
@@ -74,7 +73,7 @@ static	char	*ipf_devfiles[] = { IPL_NAME, IPNAT_NAME, IPSTATE_NAME,
 				    IPAUTH_NAME, IPSYNC_NAME, IPSCAN_NAME,
 				    IPLOOKUP_NAME, NULL };
 static	int	iplclose __P((dev_t, int, int, cred_t *));
-static	int	iplopen __P((dev_t, int, int, cred_t *));
+static	int	iplopen __P((dev_t *, int, int, cred_t *));
 static	int	iplread __P((dev_t, struct uio *, cred_t *));
 static	int	iplwrite __P((dev_t, struct uio *, cred_t *));
 
@@ -94,7 +93,7 @@ static struct cb_ops ipf_cb_ops = {
 	nodev,		/* dump */
 	iplread,
 	iplwrite,	/* write */
-	iplioctl,	/* ioctl */
+	ipfioctl,	/* ioctl */
 	nodev,		/* devmap */
 	nodev,		/* mmap */
 	nodev,		/* segmap */
@@ -466,8 +465,8 @@ ipf_property_update(dip)
 	dev_info_t *dip;
 {
 	ipftuneable_t *ipft;
+	const char *name;
 	int64_t *i64p;
-	char *name;
 	u_int one;
 	int *i32p;
 	int err;
@@ -487,7 +486,6 @@ ipf_property_update(dip)
 #endif
 
 	err = DDI_SUCCESS;
-	ipft = ipf_tuneables;
 	for (ipft = ipf_tuneables; (name = ipft->ipft_name) != NULL; ipft++) {
 		one = 1;
 		switch (ipft->ipft_sz)
@@ -495,7 +493,8 @@ ipf_property_update(dip)
 		case 4 :
 			i32p = NULL;
 			err = ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip,
-							0, name, &i32p, &one);
+							0, (char *)name,
+							&i32p, &one);
 			if (err == DDI_PROP_NOT_FOUND)
 				continue;
 #ifdef	IPFDEBUG
@@ -515,7 +514,8 @@ ipf_property_update(dip)
 		case 8 :
 			i64p = NULL;
 			err = ddi_prop_lookup_int64_array(DDI_DEV_T_ANY, dip,
-							  0, name, &i64p, &one);
+							  0, (char *)name,
+							  &i64p, &one);
 			if (err == DDI_PROP_NOT_FOUND)
 				continue;
 # ifdef	IPFDEBUG
@@ -606,7 +606,7 @@ iplopen(devp, flags, otype, cred)
 	int flags, otype;
 	cred_t *cred;
 {
-	minor_t min = getminor(*devp);
+	minor_t unit = getminor(*devp);
 	int error;
 
 #ifdef	IPFDEBUG

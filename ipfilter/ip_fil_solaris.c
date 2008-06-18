@@ -335,8 +335,8 @@ ipf_send_reset(fr_info_t *fin)
 	if (fin->fin_v == 6) {
 		ip6 = (ip6_t *)m->b_rptr;
 		ip6->ip6_flow = ((ip6_t *)fin->fin_ip)->ip6_flow;
-		ip6->ip6_src = fin->fin_dst6;
-		ip6->ip6_dst = fin->fin_src6;
+		ip6->ip6_src = fin->fin_dst6.in6;
+		ip6->ip6_dst = fin->fin_src6.in6;
 		ip6->ip6_plen = htons(sizeof(*tcp));
 		ip6->ip6_nxt = IPPROTO_TCP;
 	} else
@@ -349,8 +349,8 @@ ipf_send_reset(fr_info_t *fin)
 		ip->ip_p = IPPROTO_TCP;
 		ip->ip_len = htons(sizeof(*ip) + sizeof(*tcp));
 		ip->ip_tos = fin->fin_ip->ip_tos;
-		tcp2->th_sum = ipf_cksum(m, ip, IPPROTO_TCP, tcp2,
-					 ntohs(ip->ip_len));
+		tcp2->th_sum = fr_cksum(m, ip, IPPROTO_TCP, tcp2,
+					ntohs(ip->ip_len));
 	}
 	return ipf_send_ip(fin, m, &m);
 }
@@ -530,8 +530,8 @@ ipf_send_icmp_err(int type, fr_info_t *fin, int dst)
 		ip6->ip6_flow = ((ip6_t *)fin->fin_ip)->ip6_flow;
 		ip6->ip6_plen = htons((u_short)sz);
 		ip6->ip6_nxt = IPPROTO_ICMPV6;
-		ip6->ip6_src = dst6;
-		ip6->ip6_dst = fin->fin_src6;
+		ip6->ip6_src = dst6.in6;
+		ip6->ip6_dst = fin->fin_src6.in6;
 		sz -= offsetof(struct icmp, icmp_ip);
 		bcopy((char *)mb->b_rptr, (char *)&icmp->icmp_ip, sz);
 		icmp->icmp_cksum = csz - sizeof(ip6_t);
@@ -926,7 +926,7 @@ ipf_fastroute(mb, mpp, fin, fdp)
 			if (IP6_NOTZERO(&fdp->fd_ip))
 				dst6 = fdp->fd_ip6.in6;
 			else
-				dst6 = fin->fin_dst6;
+				dst6 = fin->fin_dst6.in6;
 		}
 #endif
 	}
@@ -988,12 +988,17 @@ ipf_fastroute(mb, mpp, fin, fdp)
 #endif
 	}
 
-  #ifndef sparc
-  	if (fin->fin_v == 4) {
-  		__iplen = (u_short)ip->ip_len,
+#ifndef sparc
+	if (fin->fin_v == 4) {
+		__iplen = (u_short)ip->ip_len,
+		__ipoff = (u_short)ip->ip_off;
 
-	if (pfil_sendbuf(ifp, mb) == 0) {
-		ATOMIC_INCL(fr_frouteok[0]);
+		ip->ip_len = htons(__iplen);
+		ip->ip_off = htons(__ipoff);
+	}
+#endif
+	if (pfil_sendbuf(ifp, mb, ip, dstp) == 0) {
+		ATOMIC_INCL(ipf_frouteok[0]);
 	} else {
 		ATOMIC_INCL(ipf_frouteok[1]);
 	}
@@ -1127,8 +1132,8 @@ ipf_fixl4sum(fr_info_t *fin)
 
 	if (csump != NULL) {
 		*csump = 0;
-		*csump = ipf_cksum(fin->fin_m, fin->fin_ip, fin->fin_p,
-				   fin->fin_dp, fin->fin_plen);
+		*csump = fr_cksum(fin->fin_m, fin->fin_ip, fin->fin_p,
+				  fin->fin_dp, fin->fin_plen);
 	}
 }
 
