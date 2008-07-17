@@ -1134,15 +1134,16 @@ frdest_t *fdp;
 	int len, off, error = 0, hlen, code;
 	struct ifnet *ifp, *sifp;
 #if __NetBSD_Version__ >= 499001100
-	const struct sockaddr *dst;
 	union {
 		struct sockaddr         dst;
 		struct sockaddr_in      dst4;
 	} u;
 #else
-	struct sockaddr_in *dst;
+	struct sockaddr_in *dst4;
 #endif
+	struct sockaddr *dst;
 	struct route iproute;
+	struct rtentry *rt;
 	u_short ip_off;
 	frentry_t *fr;
 
@@ -1164,6 +1165,7 @@ frdest_t *fdp;
 
 	hlen = fin->fin_hlen;
 	ip = mtod(m0, struct ip *);
+	rt = NULL;
 
 # if defined(M_CSUM_IPv4)
 	/*
@@ -1196,23 +1198,28 @@ frdest_t *fdp;
 		sockaddr_in_init(&u.dst4, &ip->ip_dst, 0);
 	dst = &u.dst;
 	rtcache_setdst(ro, dst);
-	rtcache_init(ro);
+	rt = rtcache_init(ro);
+	if ((ifp == NULL) && (rt != NULL))
+		ifp = rt->rt_ifp;
+
 # else
-	dst = (struct sockaddr_in *)&ro->ro_dst;
-	dst->sin_family = AF_INET;
-	dst->sin_addr = ip->ip_dst;
+	dst4 = (struct sockaddr_in *)&ro->ro_dst;
+	dst4->sin_family = AF_INET;
+	dst4->sin_addr = ip->ip_dst;
+	dst = (struct sockaddr *)dst4;
 
 	if ((fdp != NULL) && (fdp->fd_ip.s_addr != 0))
-		dst->sin_addr = fdp->fd_ip;
+		dst4->sin_addr = fdp->fd_ip;
 
-	dst->sin_len = sizeof(*dst);
+	dst4->sin_len = sizeof(*dst4);
 	rtalloc(ro);
-# endif
-
 	if ((ifp == NULL) && (ro->ro_rt != NULL))
 		ifp = ro->ro_rt->rt_ifp;
 
-	if ((ro->ro_rt == NULL) || (ifp == NULL)) {
+	rt = ro->ro_rt;
+# endif
+	if ((rt == NULL) || (ifp == NULL)) {
+
 		if (in_localaddr(ip->ip_dst))
 			error = EHOSTUNREACH;
 		else
@@ -1221,16 +1228,10 @@ frdest_t *fdp;
 	}
 
 
-# if __NetBSD_Version__ >= 499001100
-	if (ro->ro_rt->rt_flags & RTF_GATEWAY)
-		dst = ro->ro_rt->rt_gateway;
-# else
-	if (ro->ro_rt->rt_flags & RTF_GATEWAY)
-		dst = (struct sockaddr_in *)ro->ro_rt->rt_gateway;
-# endif
+	if (rt->rt_flags & RTF_GATEWAY)
+		dst = rt->rt_gateway;
 
-	if (ro->ro_rt)
-		ro->ro_rt->rt_use++;
+	rt->rt_use++;
 
 	/*
 	 * For input packets which are being "fastrouted", they won't
@@ -1296,10 +1297,9 @@ frdest_t *fdp;
 			ip->ip_sum = in_cksum(m, hlen);
 # endif /* M_CSUM_IPv4 */
 # if __NetBSD_Version__ >= 499001100
-		error = (*ifp->if_output)(ifp, m, dst, ro->ro_rt);
+		error = (*ifp->if_output)(ifp, m, dst, rt);
 # else
-		error = (*ifp->if_output)(ifp, m, (struct sockaddr *)dst,
-					  ro->ro_rt);
+		error = (*ifp->if_output)(ifp, m, (struct sockaddr *)dst, rt);
 # endif
 		if (i) {
 			ip->ip_len = ntohs(ip->ip_len);
@@ -1386,13 +1386,13 @@ sendorfree:
 		m->m_act = 0;
 # if __NetBSD_Version__ >= 499001100
 		if (error == 0)
-			error = (*ifp->if_output)(ifp, m, dst, ro->ro_rt);
+			error = (*ifp->if_output)(ifp, m, dst, rt);
 		else
 			FREE_MB_T(m);
 # else
 		if (error == 0)
 			error = (*ifp->if_output)(ifp, m,
-			    (struct sockaddr *)dst, ro->ro_rt);
+			    (struct sockaddr *)dst, rt);
 		else
 			FREE_MB_T(m);
 # endif
@@ -1407,7 +1407,7 @@ done:
 # if __NetBSD_Version__ >= 499001100
 	rtcache_free(ro);
 # else
-	if (ro->ro_rt) {
+	if (rt) {
 		RTFREE(((struct route *)ro)->ro_rt);
 	}
 # endif
@@ -1578,13 +1578,15 @@ fr_info_t *fin;
 	int rc;
 
 #if __NetBSD_Version__ >= 499001100
+	struct rtentry *rt;
+
 	sockaddr_in_init(&u.dst4, &fin->fin_src, 0);
 	rtcache_setdst(&iproute, &u.dst);
-	rtcache_init(&iproute);
-	if (iproute.ro_rt == NULL)
+	rt = rtcache_init(&iproute);
+	if (rt == NULL)
 		rc = 0;
 	else
-		rc = (fin->fin_ifp == iproute.ro_rt->rt_ifp);
+		rc = (fin->fin_ifp == rt->rt_ifp);
 	rtcache_free(&iproute);
 #else
 	dst = (struct sockaddr_in *)&iproute.ro_dst;
