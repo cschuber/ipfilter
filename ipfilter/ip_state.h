@@ -292,7 +292,7 @@ extern	int	ipf_tcp_age __P((struct ipftqent *, struct fr_info *,
 extern	int	ipf_tcpinwindow __P((struct fr_info *, struct tcpdata *,
 				    struct tcpdata *, tcphdr_t *, int));
 
-extern	int	ipf_state_add __P((fr_info_t *, ipstate_t **, u_int));
+extern	int	ipf_state_add __P((fr_info_t *, void **, u_int));
 extern	frentry_t *ipf_state_check __P((struct fr_info *, u_32_t *));
 extern	void	ipf_state_deref __P((ipstate_t **));
 extern	void	ipf_state_expire __P((void));

@@ -1268,7 +1268,7 @@ ippr_rpcb_getnat(fin, nat, proto, port)
 		nflags &= NAT_TCPUDP;
 		nflags |= SI_W_SPORT|SI_CLONE;
 
-		if (ipf_state_add(&fi, NULL, nflags) != 0) {
+		if (ipf_state_add(&fi, &fin->fin_state, nflags) != 0) {
 			/*
 			 * XXX nat_delete is private to ip_nat.c.  Should
 			 * check w/ Darren about this one.

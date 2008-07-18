@@ -273,7 +273,7 @@ ippr_rcmd_portmsg(fin, aps, nat)
 			fi.fin_ifp = NULL;
 			if (nat2->nat_dir == NAT_INBOUND)
 				fi.fin_fi.fi_daddr = nat->nat_osrcaddr;
-			if (ipf_state_add(&fi, NULL, SI_W_SPORT) == 0)
+			if (ipf_state_add(&fi, &fi.fin_state, SI_W_SPORT) == 0)
 				ipf_state_deref((ipstate_t **)&fi.fin_state);
 		}
 		ip->ip_len = slen;

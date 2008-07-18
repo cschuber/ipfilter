@@ -435,7 +435,7 @@ ippr_ftp_addport(fin, ip, nat, ftp, dlen, nport, inc)
 			(void) ipf_nat_proto(&fi, nat2, IPN_TCP);
 			ipf_nat_update(&fi, nat2, nat->nat_ptr);
 			fi.fin_ifp = NULL;
-			if (ipf_state_add(&fi, &ftp->ftp_pendstate,
+			if (ipf_state_add(&fi, (void **)&ftp->ftp_pendstate,
 					SI_W_DPORT) != 0) {
 				ipf_nat_setpending(nat2);
 			}
@@ -801,7 +801,7 @@ ippr_ftp_pasvreply(fin, ip, nat, ftp, port, newmsg, s, data_ip)
 				fi.fin_fi.fi_daddr = nat->nat_ndstaddr;
 				ip->ip_dst = nat->nat_ndstip;
 			}
-			if (ipf_state_add(&fi, &ftp->ftp_pendstate,
+			if (ipf_state_add(&fi, (void **)&ftp->ftp_pendstate,
 					sflags) != 0) {
 				ipf_nat_setpending(nat2);
 			}

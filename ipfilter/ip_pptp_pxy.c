@@ -222,7 +222,7 @@ ippr_pptp_donatstate(fin, nat, pptp)
 				fi.fin_fi.fi_saddr = nat2->nat_osrcaddr;
 		}
 		fi.fin_ifp = NULL;
-		if (ipf_state_add(&fi, &pptp->pptp_state, 0) == 0)
+		if (ipf_state_add(&fi, (void **)&pptp->pptp_state, 0) == 0)
 			ipf_state_deref((ipstate_t **)&fi.fin_state);
 	}
 	ip->ip_p = p;

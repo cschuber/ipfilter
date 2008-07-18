@@ -181,7 +181,8 @@ ippr_ipsec_new(fin, aps, nat)
 
 		fi.fin_data[0] = 0;
 		fi.fin_data[1] = 0;
-		if (ipf_state_add(&fi, &ipsec->ipsc_state, SI_WILDP) == 0)
+		if (ipf_state_add(&fi, (void **)&ipsec->ipsc_state,
+				  SI_WILDP) == 0)
 			ipf_state_deref((ipstate_t **)&fi.fin_state);
 	}
 	ip->ip_p = p & 0xff;
@@ -258,7 +259,7 @@ ippr_ipsec_inout(fin, aps, nat)
 			RWLOCK_EXIT(&ipf_state);
 			fi.fin_data[0] = 0;
 			fi.fin_data[1] = 0;
-			if (ipf_state_add(&fi, &ipsec->ipsc_state,
+			if (ipf_state_add(&fi, (void **)&ipsec->ipsc_state,
 					  SI_WILDP) == 0)
 				ipf_state_deref((ipstate_t **)&fi.fin_state);
 		}
