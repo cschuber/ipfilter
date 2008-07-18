@@ -47,7 +47,7 @@ INSTALL=$(TOP)/bsdinstall
 #
 MODOBJS=ip_fil.o fil.o md5.o ip_nat.o ip_frag.o ip_state.o ip_nat6.o \
 	ip_proxy.o ip_auth.o ip_log.o ip_pool.o ip_htable.o ip_lookup.o \
-	ip_sync.o ip_scan.o ip_rules.o radix.o tru64.o
+	ip_dstlist.o ip_sync.o ip_scan.o ip_rules.o radix.o tru64.o
 DFLAGS=$(DEBUG) -DTRU64=$(TRU64) $(IPFLKM) $(IPFLOG) $(DEF) $(CFLAGS) $(DLKM) \
 	$(IPFBPF) $(LOOKUP) -I.
 IPF=ipf.o ipfcomp.o ipf_y.o ipf_l.o
@@ -55,7 +55,7 @@ IPT=ipftest.o fil_u.o ip_frag_u.o ip_state_u.o ip_nat_u.o ip_nat6_u.o \
 	ip_proxy_u.o ip_auth_u.o ip_fil_u.o ip_sync_u.o ip_scan_u.o \
 	ip_log_u.o ip_pool_u.o ip_htable_u.o ip_lookup_u.o ip_rules_u.o \
 	ipf_y.o ipf_l.o ipnat_y.o ipnat_l.o ippool_y.o ippool_l.o \
-	bpf_filter_u.o md5_u.o radix_u.o
+	bpf_filter_u.o md5_u.o radix_u.o ip_dstlist_u.o
 IPNAT=ipnat.o ipnat_y.o ipnat_l.o
 IPMON=ipmon.o ipmon_y.o ipmon_l.o
 IPPOOL=ippool_y.o ippool_l.o kmem.o ippool.o
@@ -165,6 +165,9 @@ $(TOP)/ip_rules.h: ip_rules.c
 ip_nat_u.o: $(TOP)/ip_nat.c $(TOP)/ip_nat.h $(TOP)/ip_compat.h $(TOP)/ip_fil.h
 	$(CC) $(CCARGS) $(EXTRA) -c $(TOP)/ip_nat.c -o $@
 
+ip_nat6_u.o: $(TOP)/ip_nat6.c $(TOP)/ip_nat.h $(TOP)/ip_compat.h $(TOP)/ip_fil.h
+	$(CC) $(CCARGS) $(EXTRA) -c $(TOP)/ip_nat6.c -o $@
+
 ip_proxy_u.o: $(TOP)/ip_proxy.c $(TOP)/ip_proxy.h $(TOP)/ip_compat.h \
 	$(TOP)/ip_ftp_pxy.c $(TOP)/ip_rcmd_pxy.c $(TOP)/ip_raudio_pxy.c \
 	$(TOP)/ip_rpcb_pxy.c $(TOP)/ip_ipsec_pxy.c $(TOP)/ip_nat.h \
@@ -208,6 +211,10 @@ ip_htable_u.o: $(TOP)/ip_htable.c $(TOP)/ip_compat.h $(TOP)/ip_fil.h \
 		$(TOP)/ip_htable.h
 	$(CC) $(CCARGS) $(EXTRA) -c $(TOP)/ip_htable.c -o $@
 
+ip_dstlist_u.o: $(TOP)/ip_dstlist.c $(TOP)/ip_compat.h $(TOP)/ip_fil.h \
+		$(TOP)/ip_dstlist.h
+	$(CC) $(CCARGS) $(EXTRA) -c $(TOP)/ip_dstlist.c -o $@
+
 ip_lookup_u.o: $(TOP)/ip_lookup.c $(TOP)/ip_compat.h $(TOP)/ip_fil.h \
 		$(TOP)/ip_lookup.h
 	$(CC) $(CCARGS) $(EXTRA) -c $(TOP)/ip_lookup.c -o $@
@@ -230,6 +237,9 @@ fil.o: $(TOP)/fil.c $(TOP)/ip_fil.h $(TOP)/ipf.h $(TOP)/ip_compat.h $(TOP)/ipl.h
 
 ip_nat.o: $(TOP)/ip_nat.c $(TOP)/ip_nat.h $(TOP)/ip_compat.h $(TOP)/ip_fil.h
 	$(CC) $(DFLAGS) -c $(TOP)/ip_nat.c -o $@
+
+ip_nat6.o: $(TOP)/ip_nat6.c $(TOP)/ip_nat.h $(TOP)/ip_compat.h $(TOP)/ip_fil.h
+	$(CC) $(DFLAGS) -c $(TOP)/ip_nat6.c -o $@
 
 ip_frag.o: $(TOP)/ip_frag.c $(TOP)/ip_frag.h $(TOP)/ip_compat.h $(TOP)/ip_fil.h
 	$(CC) $(DFLAGS) -c $(TOP)/ip_frag.c -o $@
@@ -270,6 +280,10 @@ ip_pool.o: $(TOP)/ip_pool.c $(TOP)/ip_compat.h $(TOP)/ip_fil.h \
 ip_htable.o: $(TOP)/ip_htable.c $(TOP)/ip_compat.h $(TOP)/ip_fil.h \
 	$(TOP)/ip_htable.h
 	$(CC) $(DFLAGS) -c $(TOP)/ip_htable.c -o $@
+
+ip_dstlist.o: $(TOP)/ip_dstlist.c $(TOP)/ip_compat.h $(TOP)/ip_fil.h \
+	$(TOP)/ip_dstlist.h
+	$(CC) $(DFLAGS) -c $(TOP)/ip_dstlist.c -o $@
 
 ip_lookup.o: $(TOP)/ip_lookup.c $(TOP)/ip_compat.h $(TOP)/ip_fil.h \
 	$(TOP)/ip_lookup.h
