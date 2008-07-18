@@ -300,8 +300,8 @@ ipf_send_reset(fin)
 		ip6->ip6_plen = htons(sizeof(struct tcphdr));
 		ip6->ip6_nxt = IPPROTO_TCP;
 		ip6->ip6_hlim = 0;
-		ip6->ip6_src = fin->fin_dst6;
-		ip6->ip6_dst = fin->fin_src6;
+		ip6->ip6_src = fin->fin_dst6.in6;
+		ip6->ip6_dst = fin->fin_src6.in6;
 /*
 		tcp2->th_sum = in6_cksum(m, IPPROTO_TCP,
 					 sizeof(*ip6), sizeof(*tcp2));
@@ -543,8 +543,8 @@ ipf_send_icmp_err(type, fin, dst)
 		ip6->ip6_plen = htons(iclen - hlen);
 		ip6->ip6_nxt = IPPROTO_ICMPV6;
 		ip6->ip6_hlim = 0;
-		ip6->ip6_src = dst6;
-		ip6->ip6_dst = fin->fin_src6;
+		ip6->ip6_src = dst6.in6;
+		ip6->ip6_dst = fin->fin_src6.in6;
 		if (xtra > 0)
 			bcopy((char *)fin->fin_ip + ohlen,
 			      (char *)&icmp->icmp_ip + ohlen, xtra);
@@ -1223,7 +1223,7 @@ ipf_pullup(xmin, fin, len)
 
 			*fin->fin_mp = NULL;
 			fin->fin_m = NULL;
-			ATOMIC_INCL(frstats[out].fr_pull[1]);
+			ATOMIC_INCL(ipf_stats[out].fr_pull[1]);
 			return NULL;
 		}
 
@@ -1236,7 +1236,7 @@ ipf_pullup(xmin, fin, len)
 		fin->fin_m = m;
 		ip = MTOD(m, char *) + ipoff;
 
-		ATOMIC_INCL(frstats[out].fr_pull[0]);
+		ATOMIC_INCL(ipf_stats[out].fr_pull[0]);
 		fin->fin_ip = (ip_t *)ip;
 		if (fin->fin_dp != NULL)
 			fin->fin_dp = (char *)fin->fin_ip + dpoff;
