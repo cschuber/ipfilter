@@ -1161,7 +1161,7 @@ ipf_state_match(is1, is2)
 int
 ipf_state_add(fin, stsave, flags)
 	fr_info_t *fin;
-	ipstate_t **stsave;
+	void **stsave;
 	u_int flags;
 {
 	ipstate_t *is, ips;
@@ -1604,7 +1604,7 @@ ipf_state_add(fin, stsave, flags)
 						  fdp->fd_name, NULL);
 
 	ATOMIC_INCL(ipf_state_stats.iss_proto[is->is_p]);
-	ATOMIC_INC(ipf_state_stats.iss_active_proto[is->is_p]);
+	ATOMIC_INC32(ipf_state_stats.iss_active_proto[is->is_p]);
 
 	return 0;
 }

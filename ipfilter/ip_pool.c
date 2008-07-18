@@ -1053,7 +1053,7 @@ ipf_pool_iter_next(token, ilp)
 		}
 
 		if (nextipo != NULL) {
-			ATOMIC_INC(nextipo->ipo_ref);
+			ATOMIC_INC32(nextipo->ipo_ref);
 			token->ipt_data = nextipo;
 		} else {
 			bzero((char *)&zp, sizeof(zp));
@@ -1078,7 +1078,7 @@ ipf_pool_iter_next(token, ilp)
 		}
 
 		if (nextnode != NULL) {
-			ATOMIC_INC(nextnode->ipn_ref);
+			ATOMIC_INC32(nextnode->ipn_ref);
 			token->ipt_data = nextnode;
 		} else {
 			bzero((char *)&zn, sizeof(zn));
