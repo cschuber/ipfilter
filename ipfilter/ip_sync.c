@@ -104,9 +104,13 @@ static const char rcsid[] = "@(#)$Id$";
 #define	SYNC_NATTABSZ	256
 
 #ifdef	IPFILTER_SYNC
-# if SOLARIS && defined(_KERNEL)
+# if defined(_KERNEL)
+#  if SOLARIS
 extern	struct pollhead	ipf_poll_head[IPL_LOGSIZE];
-# endif 
+#  else
+extern struct selinfo ipfselwait[IPL_LOGSIZE];
+#  endif
+# endif
 
 ipfmutex_t	ipf_syncadd, ipsl_mutex;
 ipfrwlock_t	ipf_syncstate, ipf_syncnat;

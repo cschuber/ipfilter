@@ -137,12 +137,17 @@ iplog_select_t	iplog_ss[IPL_LOGMAX+1];
 extern int selwait;
 # endif /* IPL_SELECT */
 
-# if defined(linux) && defined(_KERNEL)
+# ifdef _KERNEL
+#  if defined(linux)
 wait_queue_head_t	iplh_linux[IPL_LOGSIZE];
-# endif
-# if SOLARIS && defined(_KERNEL)
+#  else
+#   if SOLARIS
 extern	kcondvar_t	iplwait;
 extern	struct pollhead	ipf_poll_head[IPL_LOGSIZE];
+#   else
+extern struct selinfo ipfselwait[IPL_LOGSIZE];
+#   endif
+#  endif
 # endif
 
 iplog_t	**iplh[IPL_LOGSIZE], *iplt[IPL_LOGSIZE], *ipll[IPL_LOGSIZE];
