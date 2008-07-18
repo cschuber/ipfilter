@@ -196,14 +196,6 @@ int changenatif(ifs, fname)
 			strcpy(nat->nat_ifnames[1], s);
 			rw = 1;
 		}
-		if (!strncmp(nat->nat_ifnames[2], ifs, olen + 1)) {
-			strcpy(nat->nat_ifnames[2], s);
-			rw = 1;
-		}
-		if (!strncmp(nat->nat_ifnames[3], ifs, olen + 1)) {
-			strcpy(nat->nat_ifnames[3], s);
-			rw = 1;
-		}
 		if (rw == 1) {
 			if (lseek(fd, pos, SEEK_SET) != pos) {
 				perror("lseek");
