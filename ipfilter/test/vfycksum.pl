@@ -248,6 +248,9 @@ sub ipv4check {
 	#
 	# Recognise TCP & UDP and calculate checksums for each of these.
 	#
+	if (($bytes[$base + 4] & 0xff) == 4) {
+		&ipv4check($hl);
+	}
 	if (($bytes[$base + 4] & 0xff) == 6) {
 		&tcpcheck($base);
 	}
