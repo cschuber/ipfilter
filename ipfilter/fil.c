@@ -120,7 +120,6 @@ struct file;
 #include "netinet/ip_state.h"
 #include "netinet/ip_proxy.h"
 #include "netinet/ip_auth.h"
-#include "netinet/ip_lookup.h"
 #ifdef IPFILTER_SCAN
 # include "netinet/ip_scan.h"
 #endif
@@ -2441,7 +2440,7 @@ ipf_scanlist(fin, pass)
 				int out = fin->fin_out;
 
 				fin->fin_fr = fr;
-				if (ipf_state_add(fin, NULL, 0) == 0) {
+				if (ipf_state_add(fin, &fin->fin_state, 0) == 0) {
 					ATOMIC_INCL(ipf_stats[out].fr_ads);
 				} else {
 					ATOMIC_INCL(ipf_stats[out].fr_bads);
@@ -2898,7 +2897,7 @@ ipf_check(ip, hlen, ifp, out
 	 */
 	if ((pass & FR_KEEPSTATE) && (fin->fin_m != NULL) &&
 	    !(fin->fin_flx & FI_STATE)) {
-		if (ipf_state_add(fin, NULL, 0) == 0) {
+		if (ipf_state_add(fin, &fin->fin_state, 0) == 0) {
 			ATOMIC_INCL(ipf_stats[out].fr_ads);
 		} else {
 			ATOMIC_INCL(ipf_stats[out].fr_bads);
@@ -6401,7 +6400,7 @@ ipf_coalesce(fin)
 
 #if defined(_KERNEL)
 	if (ipf_pullup(fin->fin_m, fin, fin->fin_plen) == NULL) {
-		ATOMIC_INC(ipf_badcoalesces[fin->fin_out]);
+		ATOMIC_INCL(ipf_badcoalesces[fin->fin_out]);
 # ifdef MENTAT
 		FREE_MB_T(*fin->fin_mp);
 # endif
@@ -8125,9 +8124,9 @@ ipf_checkrulefunc(funcptr, addrem, set)
 		return;
 
 	if (addrem == 0) {
-		ATOMIC_INC(ft->ipfu_ref[set]);
+		ATOMIC_INC32(ft->ipfu_ref[set]);
 	} else if (addrem == 1) {
-		ATOMIC_DEC(ft->ipfu_ref[set]);
+		ATOMIC_DEC32(ft->ipfu_ref[set]);
 	}
 }
 
