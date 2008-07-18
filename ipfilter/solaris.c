@@ -576,7 +576,11 @@ iplpoll(dev, events, anyyet, reventsp, phpp)
 		if ((events & (POLLIN | POLLRDNORM)) && ipf_sync_canread())
 			revents |= events & (POLLIN | POLLRDNORM);
 		if ((events & (POLLOUT | POLLWRNORM)) && ipf_sync_canwrite())
+# ifdef POLLOUTNORM
 			revents |= events & (POLLOUT | POLLOUTNORM);
+# else
+			revents |= events & (POLLOUT);
+# endif
 #endif
 		break;
 	case IPL_LOGSCAN :
