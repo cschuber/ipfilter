@@ -56,7 +56,7 @@
 # define	USE_INET6
 #endif
 #if defined(__osf__)
-# define	USE_INET6
+# define	USE_INET6	1
 #endif
 #if defined(linux) && (!defined(_KERNEL) || defined(CONFIG_IPV6))
 # define	USE_INET6
@@ -695,6 +695,9 @@ typedef struct mbuf mb_t;
 #  define	TCP_X2_A(x,y)	(x)->th_xoff |= ((y) & 0xf)
 #  define	TCP_OFF(x)	((x)->th_xoff >> 4)
 #  define	TCP_OFF_A(x,y)	(x)->th_xoff |= (((y) << 4) & 0xf0)
+# endif
+# if TRU64 <= 1885
+#  define	ip6_vfc		ip6_vcf
 # endif
 
 /*
@@ -1614,7 +1617,6 @@ typedef	struct ip6_hdr	ip6_t;
 #endif
 
 #if defined(_KERNEL)
-extern struct selinfo ipfselwait[];
 # ifdef MENTAT
 #  define	COPYDATA	mb_copydata
 #  define	COPYBACK	mb_copyback
@@ -1644,12 +1646,7 @@ extern  vm_map_t        kmem_map;
 
 #  ifdef IPFILTER_M_IPFILTER
 #    include <sys/malloc.h>
-#     ifdef MALLOC_DEFINE
-MALLOC_DEFINE(M_IPFILTER, "IP Filter", \
-	      "IP Filter packet filter data structures");
-#     else
 MALLOC_DECLARE(M_IPFILTER);
-#     endif
 #    define	_M_IPF		M_IPFILTER
 #  else /* IPFILTER_M_IPFILTER */
 #   ifdef M_PFIL
@@ -2270,8 +2267,11 @@ typedef	struct	tcpiphdr	tcpiphdr_t;
 #ifndef	IPPROTO_HOPOPTS
 # define	IPPROTO_HOPOPTS	0
 #endif
+#ifndef	IPPROTO_IPIP
+# define	IPPROTO_IPIP	4
+#endif
 #ifndef	IPPROTO_ENCAP
-# define	IPPROTO_ENCAP	4
+# define	IPPROTO_ENCAP	98
 #endif
 #ifndef	IPPROTO_IPV6
 # define	IPPROTO_IPV6	41
