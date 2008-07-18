@@ -211,29 +211,29 @@ cfg_subsys_attr_t ipfilter_attributes[] = {
 				sizeof(ipfilter_unused), 0 },
 { "version",		CFG_ATTR_STRTYPE, CFG_OP_QUERY,
 				(caddr_t)ipfilter_version, 0, 5, 0 },
-{ "fr_chksrc",		CFG_ATTR_INTTYPE, CFG_OP_QUERY |
+{ "ipf_chksrc",		CFG_ATTR_INTTYPE, CFG_OP_QUERY |
 				CFG_OP_CONFIGURE | CFG_OP_RECONFIGURE,
-				(caddr_t)&fr_chksrc, 0, 1, 0 },
-{ "fr_minttl",		CFG_ATTR_INTTYPE, CFG_OP_QUERY |
+				(caddr_t)&ipf_chksrc, 0, 1, 0 },
+{ "ipf_minttl",		CFG_ATTR_INTTYPE, CFG_OP_QUERY |
 				CFG_OP_CONFIGURE | CFG_OP_RECONFIGURE,
-				(caddr_t)&fr_minttl, 0, 255, 0 },
+				(caddr_t)&ipf_minttl, 0, 255, 0 },
 { "ipf_pass",		CFG_ATTR_INTTYPE, CFG_OP_QUERY |
 				CFG_OP_CONFIGURE | CFG_OP_RECONFIGURE,
-				(caddr_t)&fr_minttl, 0, 0xffffffff, 0 },
-{ "fr_flags",		CFG_ATTR_INTTYPE, CFG_OP_QUERY |
+				(caddr_t)&ipf_minttl, 0, 0xffffffff, 0 },
+{ "ipf_flags",		CFG_ATTR_INTTYPE, CFG_OP_QUERY |
 				CFG_OP_CONFIGURE | CFG_OP_RECONFIGURE,
 				(caddr_t)&ipf_flags, 0, 0xffffffff, 0 },
-{ "fr_active",		CFG_ATTR_INTTYPE, CFG_OP_QUERY,
-				(caddr_t)&fr_minttl, 0, 1, 0 },
+{ "ipf_active",		CFG_ATTR_INTTYPE, CFG_OP_QUERY,
+				(caddr_t)&ipf_minttl, 0, 1, 0 },
 { "ipf_running",		CFG_ATTR_INTTYPE, CFG_OP_QUERY,
-				(caddr_t)&fr_minttl, 0, 1, 0 },
-{ "fr_control_forwarding",
+				(caddr_t)&ipf_minttl, 0, 1, 0 },
+{ "ipf_control_forwarding",
 			CFG_ATTR_INTTYPE, CFG_OP_QUERY |
 				CFG_OP_CONFIGURE | CFG_OP_RECONFIGURE,
-				(caddr_t) &fr_control_forwarding, 0, 1, 0 },
-{ "fr_update_ipid",	CFG_ATTR_INTTYPE, CFG_OP_QUERY |
+				(caddr_t) &ipf_control_forwarding, 0, 1, 0 },
+{ "ipf_update_ipid",	CFG_ATTR_INTTYPE, CFG_OP_QUERY |
 				CFG_OP_CONFIGURE | CFG_OP_RECONFIGURE,
-				(caddr_t) &fr_update_ipid, 0, 1, 0 },
+				(caddr_t) &ipf_update_ipid, 0, 1, 0 },
 { "",			0, 0, 0, 0, 0, 0 }
 };
 
