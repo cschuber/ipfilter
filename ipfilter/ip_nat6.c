@@ -2505,7 +2505,7 @@ ipf_nat6_match(fin, np)
 	frtuc_t *ft;
 	int match;
 
-	if ((fin->fin_p == IPPROTO_ENCAP) && (np->in_redir & NAT_ENCAP))
+	if ((fin->fin_p == IPPROTO_IPIP) && (np->in_redir & NAT_ENCAP))
 		return ipf_nat6_matchencap(fin, np);
 
 	match = 0;
@@ -3827,7 +3827,7 @@ ipf_nat6_newdivert(fin, nat, nai)
 		p = IPPROTO_UDP;
 	} else {
 		frnat.fin_flx &= ~FI_TCPUDP;
-		p = IPPROTO_ENCAP;
+		p = IPPROTO_IPIP;
 	}
 
 	if (fin->fin_out == 1) {
@@ -3908,7 +3908,7 @@ ipf_nat6_builddivertmp(np)
 	if ((np->in_redir & NAT_DIVERTUDP) != 0)
 		ip6->ip6_nxt = IPPROTO_UDP;
 	else
-		ip6->ip6_nxt = IPPROTO_ENCAP;
+		ip6->ip6_nxt = IPPROTO_IPIP;
 	ip6->ip6_hlim = 255;
 	ip6->ip6_plen = 0;
 	ip6->ip6_src = np->in_snip6.in6;

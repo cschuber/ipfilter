@@ -2780,9 +2780,6 @@ ipf_nat_add(fin, np, natsave, flags, direction)
 	u_int nflags;
 	natinfo_t ni;
 	int move;
-#if SOLARIS && defined(_KERNEL) && (SOLARIS2 >= 6) && defined(ICK_M_CTL_MAGIC)
-	qpktinfo_t *qpi = fin->fin_qpi;
-#endif
 
 	if ((ipf_nat_stats.ns_active * 100 / ipf_nat_table_max) >
 	    ipf_nat_table_wm_high) {
@@ -2968,6 +2965,9 @@ ipf_nat_finalise(fin, nat)
 	u_32_t sum1, sum2, sumd;
 	frentry_t *fr;
 	u_32_t flags;
+#if SOLARIS && defined(_KERNEL) && (SOLARIS2 >= 6) && defined(ICK_M_CTL_MAGIC)
+	qpktinfo_t *qpi = fin->fin_qpi;
+#endif
 
 	flags = nat->nat_flags;
 
@@ -3001,10 +3001,7 @@ ipf_nat_finalise(fin, nat)
 #if SOLARIS && defined(_KERNEL) && (SOLARIS2 >= 6) && defined(ICK_M_CTL_MAGIC)
 	if ((flags & IPN_TCP) && dohwcksum &&
 	    (((ill_t *)qpi->qpi_ill)->ill_ick.ick_magic == ICK_M_CTL_MAGIC)) {
-		if (nat->nat_dir == NAT_OUTBOUND)
-			sum1 = LONG_SUM(in.s_addr);
-		else
-			sum1 = LONG_SUM(ntohl(nat->nat_osrcaddr));
+		sum1 = LONG_SUM(ntohl(nat->nat_osrcaddr));
 		sum1 += LONG_SUM(ntohl(nat->nat_odstaddr));
 		sum1 += 30;
 		sum1 = (sum1 & 0xffff) + (sum1 >> 16);
@@ -4328,7 +4325,7 @@ ipf_nat_match(fin, np)
 	frtuc_t *ft;
 	int match;
 
-	if ((fin->fin_p == IPPROTO_ENCAP) && (np->in_redir & NAT_ENCAP))
+	if ((fin->fin_p == IPPROTO_IPIP) && (np->in_redir & NAT_ENCAP))
 		return ipf_nat_matchencap(fin, np);
 
 	match = 0;
@@ -7135,7 +7132,7 @@ ipf_nat_newdivert(fin, nat, nai)
 		p = IPPROTO_UDP;
 	} else {
 		frnat.fin_flx &= ~FI_TCPUDP;
-		p = IPPROTO_ENCAP;
+		p = IPPROTO_IPIP;
 	}
 
 	if (fin->fin_out == 1) {
@@ -7218,7 +7215,7 @@ ipf_nat_builddivertmp(np)
 	if ((np->in_redir & NAT_DIVERTUDP) != 0)
 		ip->ip_p = IPPROTO_UDP;
 	else
-		ip->ip_p = IPPROTO_ENCAP;
+		ip->ip_p = IPPROTO_IPIP;
 	ip->ip_ttl = 255;
 	ip->ip_off = 0;
 	ip->ip_sum = 0;
