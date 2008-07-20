@@ -347,6 +347,21 @@ static int
 ipf_dstlist_node_deref(node)
 	ipf_dstnode_t *node;
 {
+	int ref;
+
+	/*
+	 * ipfd_plock points back to the lock in the ippool_dst_t that is
+	 * used to synchronise additions/deletions from its node list.
+	 */
+	MUTEX_ENTER(node->ipfd_plock);
+	ref = --node->ipfd_ref;
+	MUTEX_EXIT(node->ipfd_plock);
+
+	if (ref > 0) {
+		return 0;
+	}
+
+	KFREE(node);
 	return 0;
 }
 
