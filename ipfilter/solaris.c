@@ -541,7 +541,7 @@ static int ipf_property_update(dip)
 dev_info_t *dip;
 {
 	ipftuneable_t *ipft;
-	int64_t *i64p;
+	u_long i64;
 	char *name;
 	u_int one;
 	int *i32p;
@@ -565,53 +565,19 @@ dev_info_t *dip;
 	ipft = ipf_tuneables;
 	for (ipft = ipf_tuneables; (name = ipft->ipft_name) != NULL; ipft++) {
 		one = 1;
-		switch (ipft->ipft_sz)
-		{
-		case 4 :
-			i32p = NULL;
-			err = ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip,
-							0, name, &i32p, &one);
-			if (err == DDI_PROP_NOT_FOUND)
-				continue;
-#ifdef	IPFDEBUG
-			cmn_err(CE_CONT, "IP Filter: lookup_int(%s) = %d\n",
-				name, err);
-#endif
-			if (err != DDI_PROP_SUCCESS)
-				return err;
-			if (*i32p >= ipft->ipft_min && *i32p <= ipft->ipft_max)
+		i32p = NULL;
+		err = ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip,
+						0, name, &i32p, &one);
+		if (err == DDI_PROP_NOT_FOUND)
+			continue;
+		if (*i32p >= ipft->ipft_min && *i32p <= ipft->ipft_max) {
+			if (ipft->ipft_sz == sizeof(int)) {
 				*ipft->ipft_pint = *i32p;
-			else
-				err = DDI_PROP_CANNOT_DECODE;
-			ddi_prop_free(i32p);
-			break;
-
-#if SOLARIS2 > 8
-		case 8 :
-			i64p = NULL;
-			err = ddi_prop_lookup_int64_array(DDI_DEV_T_ANY, dip,
-							  0, name, &i64p, &one);
-			if (err == DDI_PROP_NOT_FOUND)
-				continue;
-# ifdef	IPFDEBUG
-			cmn_err(CE_CONT, "IP Filter: lookup_int64(%s) = %d\n",
-				name, err);
-# endif
-			if (err != DDI_PROP_SUCCESS)
-				return err;
-			if (*i64p >= ipft->ipft_min && *i64p <= ipft->ipft_max)
-				*ipft->ipft_pint = *i64p;
-			else
-				err = DDI_PROP_CANNOT_DECODE;
-			ddi_prop_free(i64p);
-			break;
-#endif
-
-		default :
-			break;
+			} else {
+				i64 = *(u_int *)i32p;
+				*(u_long *)ipft->ipft_pint = i64;
+			}
 		}
-		if (err != DDI_SUCCESS)
-			break;
 	}
 
 	return err;
