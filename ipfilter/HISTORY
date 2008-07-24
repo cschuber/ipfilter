@@ -10,6 +10,30 @@
 # and especially those who have found the time to port IP Filter to new
 # platforms.
 #
+4.1.30 - Release 24 July 2008
+
+2022104 solaris's driver.conf cannot set timeout values
+
+2020447 IPFilter's NAT can undo name server random port selection
+
+1988795 NetBSD doesn't build with kernel malloc stats
+
+1988782 fr_movequeue can take a short cut
+
+1988669 first nat creation failure prevents further success
+
+1988668 hostmap searching does not work properly
+
+* on some 64bit architectures (such as alpha), the addrfamily_t is packed
+  differently, throwing off the calculations for adf_len
+
+* one too many READ_ENTERs in ip_sync code.
+
+* clean up fr_fastroute a little by removing some #ifdefs and pushing the
+  code around a bit to use the same variables (NetBSD)
+
+* more recent NetBSDs use VOP related macros differently
+
 4.1.29 - Release 14 April 2008
 
 * #ifdef warning fixes from Victor M Blood (FreeBSD) - #1821249
