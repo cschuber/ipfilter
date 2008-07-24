@@ -22,6 +22,7 @@ typedef	int	boolean_t;
 #if !defined(__osf__)
 # ifdef __NetBSD__
 #  include <machine/lock.h>
+#  include <machine/mutex.h>
 # endif
 # define _KERNEL
 # define KERNEL

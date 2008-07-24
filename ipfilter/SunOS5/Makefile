@@ -81,7 +81,8 @@ DFLAGS=$(IPFLKM) $(DEF) $(SOLARIS2) $(IPFLOG) $(LOOKUP) $(SYNC)
 MODOBJS=$(OBJ)/ip_fil.o $(OBJ)/fil.o $(OBJ)/solaris.o $(OBJ)/ip_state.o \
     $(OBJ)/ip_frag.o $(OBJ)/ip_nat.o $(OBJ)/ip_proxy.o $(OBJ)/ip_auth.o \
     $(OBJ)/ip_pool.o $(OBJ)/ip_htable.o $(OBJ)/ip_lookup.o $(OBJ)/ip_log.o \
-    $(OBJ)/ip_scan.o $(OBJ)/ip_sync.o $(OBJ)/radix.o $(OBJ)/md5.o $(BPFILTER)
+    $(OBJ)/ip_scan.o $(OBJ)/ip_sync.o $(OBJ)/radix.o $(OBJ)/md5.o \
+    $(OBJ)/arc4random.o $(BPFILTER)
 #	$(OBJ)/ip_trafcon.o
 IPF=$(OBJ)/ipf.o $(OBJ)/ipfcomp.o $(OBJ)/ipf_y.o $(OBJ)/ipf_l.o
 IPT=$(OBJ)/ipftest.o $(OBJ)/ip_fil_u.o $(OBJ)/ip_state_u.o \
@@ -238,6 +239,9 @@ $(OBJ)/ipf: $(MODOBJS)
 
 $(OBJ)/md5.o: $(TOP)/md5.c $(TOP)/md5.h
 	$(CC) -I. -I$(TOP) $(DFLAGS) -c $(TOP)/md5.c -o $@
+
+$(OBJ)/arc4random.o: $(TOP)/arc4random.c
+	$(CC) -I. -I$(TOP) $(DFLAGS) -DNEED_LOCAL_RAND=1 -c $(TOP)/arc4random.c -o $@
 
 $(OBJ)/radix.o: $(TOP)/md5.c $(TOP)/radix_ipf.h radix_ipf_local.h
 	$(CC) -I. -I$(TOP) $(DFLAGS) -c $(TOP)/radix.c -o $@
