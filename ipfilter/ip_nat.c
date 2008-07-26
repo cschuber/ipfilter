@@ -2033,6 +2033,7 @@ natinfo_t *ni;
 			} else {
 				port = ipf_random() % (ntohs(np->in_pmax) -
 						       ntohs(np->in_pmin));
+				port += ntohs(np->in_pmin);
 			}
 			np->in_pnext++;
 
