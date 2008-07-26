@@ -20,6 +20,8 @@
 #include <sys/mbuf.h>
 #include <sys/protosw.h>
 #include <sys/socket.h>
+#include <sys/proc.h>
+#include <sys/user.h>
 
 #include <net/if.h>
 #include <net/af.h>
@@ -161,7 +163,8 @@ int mode;
 
 	SPL_NET(s);
 
-	error = fr_ioctlswitch(unit, data, cmd, mode, curproc->p_uid, curproc);
+	error = fr_ioctlswitch(unit, data, cmd, mode, u.u_procp->p_uid,
+			       u.u_procp);
 	if (error != -1) {
 		SPL_X(s);
 		return error;
