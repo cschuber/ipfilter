@@ -9,8 +9,6 @@
  * Dan Moschuk
  */
 
-#include <sys/cdefs.h>
-
 #include <sys/types.h>
 #include <sys/param.h>
 #ifdef __FreeBSD__
@@ -195,6 +193,9 @@ ipf_rand_push(void *src, int length)
 	nsrc = src;
 	mylen = length;
 
+#if defined(_SYS_MD5_H) && defined(SOLARIS2)
+# define	buf	buf_un.buf8
+#endif
 	while ((mylen > 64)  && (sizeof(pot) - inpot > sizeof(md5ctx.buf))) {
 		MD5Update(&md5ctx, nsrc, 64);
 		mylen -= 64;
@@ -217,6 +218,9 @@ ipf_rand_push(void *src, int length)
 		inpot += 64;
 		MUTEX_EXIT(&arc4_mtx);
 	}
+#if defined(_SYS_MD5_H) && defined(SOLARIS2)
+# undef buf
+#endif
 }
 
 
