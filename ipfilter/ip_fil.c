@@ -839,6 +839,16 @@ ipf_random()
 		number = 49000;
 		break;
 	default :
+		/*
+		 * So why not use srand/rand/srandom/random?  Because the
+		 * actual values returned vary from platform to platform
+		 * and what is needed is seomthing that is the same everywhere
+		 * so that regression tests can work.  Well, they could be
+		 * built on each platform to suit but that's a whole lot of
+		 * work for little gain given that we don't actually need
+		 * random numbers here, just a spread to test the NAT code
+		 * with.
+		 */
 		number = last;
 		last *= calls;
 		last++;
