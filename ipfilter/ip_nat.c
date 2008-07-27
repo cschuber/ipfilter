@@ -2471,7 +2471,15 @@ ipf_nat_newmap(fin, nat, ni)
 			/*
 			 * Standard port translation.  Select next port.
 			 */
-			port = htons(np->in_spnext++);
+			if (np->in_flags & IPN_SEQUENTIAL) {       
+				port = np->in_spnext;
+			} else {
+				port = ipf_random() % (np->in_spmax -
+						       np->in_spmin);
+				port += np->in_spmin;
+			}
+			port = htons(port);
+			np->in_spnext++;
 
 			if (np->in_spnext > np->in_spmax) {
 				np->in_spnext = np->in_spmin;
@@ -7540,7 +7548,7 @@ ipf_nat_nextaddr(fin, na, old, dst)
 	{
 	case NA_RANDOM :
 		range = ntohl(max) - ntohl(min);
-		new = ipf_random(range);
+		new = ipf_random() % range;
 		new += ntohl(min);
 		new = htonl(new);
 		break;
