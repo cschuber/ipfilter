@@ -1536,13 +1536,8 @@ ipf_event_dereg(void)
 }
 
 
-int
-ipf_random(range)
-	int range;
+u_32_t
+ipf_random()
 {
-	int number;
-
-	number = arc4random();
-	number %= range;
-	return number;
+	return arc4random();
 }

@@ -113,6 +113,7 @@ static	void	proxy_loadrules __P((int, ioctlfunc_t, proxyrule_t *));
 %token	IPNY_TLATE IPNY_POOL IPNY_HASH IPNY_NO IPNY_REWRITE IPNY_PROTO
 %token	IPNY_ON IPNY_SRC IPNY_DST IPNY_IN IPNY_OUT IPNY_DIVERT IPNY_ENCAP
 %token	IPNY_RANDOM IPNY_HASHMD5 IPNY_CONFIG IPNY_ALLOW IPNY_DENY IPNY_DNS
+%token	IPNY_SEQUENTIAL
 %type	<port> portspec
 %type	<num> hexnumber compare range proto functype
 %type	<num> saddr daddr sobject dobject mapfrom rdrfrom dip
@@ -860,20 +861,20 @@ otherifname:
 	;
 
 mapport:
-	IPNY_PORTMAP tcpudp portpair
+	IPNY_PORTMAP tcpudp portpair sequential
 				{ nat->in_spmin = $3.p1;
 				  nat->in_spmax = $3.p2;
 				}
-	| IPNY_PORTMAP portpair tcpudp
+	| IPNY_PORTMAP portpair tcpudp sequential
 				{ nat->in_spmin = $2.p1;
 				  nat->in_spmax = $2.p2;
 				}
-	| IPNY_PORTMAP tcpudp IPNY_AUTO
+	| IPNY_PORTMAP tcpudp IPNY_AUTO sequential
 				{ nat->in_flags |= IPN_AUTOPORTMAP;
 				  nat->in_spmin = 1024;
 				  nat->in_spmax = 65535;
 				}
-	| IPNY_ICMPIDMAP YY_STR portpair
+	| IPNY_ICMPIDMAP YY_STR portpair sequential
 			{ if (strcmp($2, "icmp") != 0) {
 				yyerror("icmpidmap not followed by icmp");
 			  }
@@ -1094,6 +1095,10 @@ tcpudp:	IPNY_TCP			{ setnatproto(IPPROTO_TCP); }
 					}
 	;
 
+sequential:
+	| IPNY_SEQUENTIAL		{ nat->in_flags |= IPN_SEQUENTIAL; }
+	;
+
 rdrproxy:
 	IPNY_PROXY YY_STR
 				{ strncpy(nat->in_plabel, $2,
@@ -1241,6 +1246,7 @@ static	wordtab_t	yywords[] = {
 	{ "rewrite",	IPNY_REWRITE },
 	{ "rdr",	IPNY_RDR },
 	{ "round-robin",IPNY_ROUNDROBIN },
+	{ "sequential",	IPNY_SEQUENTIAL },
 	{ "src",	IPNY_SRC },
 	{ "sticky",	IPNY_STICKY },
 	{ "tag",	IPNY_TAG },

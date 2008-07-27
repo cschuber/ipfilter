@@ -88,8 +88,8 @@ ni1 hex hex update_ipid=1
 ni2 hex hex update_ipid=1
 ni3 hex hex update_ipid=1
 ni4 hex hex update_ipid=1
-ni5 hex hex update_ipid=1
-ni6 hex hex update_ipid=1
+ni5 hex hex update_ipid=1 -D
+ni6 hex hex update_ipid=1 -D
 ni7 hex hex update_ipid=1
 ni8 hex hex update_ipid=1
 ni9 hex hex update_ipid=1
@@ -130,3 +130,4 @@ n15_6 text text -6
 n17_6 hex hex -6
 n13 text text
 n14 text text
+n18 text text -D

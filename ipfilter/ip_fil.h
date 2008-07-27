@@ -1666,7 +1666,7 @@ extern	int		ipf_genericiter __P((void *, int, void *));
 #ifdef	IPFILTER_LOOKUP
 extern	void		*ipf_resolvelookup __P((int, u_int, u_int, lookupfunc_t *));
 #endif
-extern	int		ipf_random __P((int));
+extern	u_32_t		ipf_random __P((void));
 
 extern	int	ipf_running;
 extern	u_long	ipf_frouteok[2];
