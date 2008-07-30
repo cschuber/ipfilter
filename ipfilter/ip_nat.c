@@ -4521,7 +4521,9 @@ ipf_nat_checkout(fin, passp)
 #endif
 	}
 
-	if (ipf_nat_stats.ns_rules == 0 || ipf_nat_lock != 0)
+	if (ipf_nat_lock != 0)
+		return 0;
+	if (ipf_nat_stats.ns_rules == 0 && ipf_nat_instances == NULL)
 		return 0;
 
 	natfailed = 0;
@@ -5118,7 +5120,9 @@ ipf_nat_checkin(fin, passp)
 	nat_t *nat;
 	u_32_t iph;
 
-	if (ipf_nat_stats.ns_rules == 0 || ipf_nat_lock != 0)
+	if (ipf_nat_lock != 0)
+		return 0;
+	if (ipf_nat_stats.ns_rules == 0 && ipf_nat_instances == NULL)
 		return 0;
 
 	tcp = NULL;
