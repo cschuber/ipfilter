@@ -3756,7 +3756,9 @@ u_32_t *passp;
 	frentry_t *fr;
 	nat_t *nat;
 
-	if (nat_stats.ns_rules == 0 || fr_nat_lock != 0)
+	if (fr_nat_lock != 0)
+		return 0;
+	if (nat_stats.ns_rules == 0 && nat_instances == NULL)
 		return 0;
 
 	natfailed = 0;
@@ -3816,7 +3818,7 @@ u_32_t *passp;
 		 * create one for it (if there is a matching rule).
 		 */
 		if ((fin->fin_off != 0) && (fin->fin_flx & FI_TCPUDP)) {
-			natfailed = 0;
+			natfailed = -1;
 			goto nonatfrag;
 		}
 		msk = 0xffffffff;
@@ -4068,7 +4070,9 @@ u_32_t *passp;
 	nat_t *nat;
 	u_32_t iph;
 
-	if (nat_stats.ns_rules == 0 || fr_nat_lock != 0)
+	if (fr_nat_lock != 0)
+		return 0;
+	if (nat_stats.ns_rules == 0 && nat_instances == NULL)
 		return 0;
 
 	tcp = NULL;
@@ -4125,7 +4129,7 @@ u_32_t *passp;
 		u_32_t hv, msk, rmsk;
 
 		if ((fin->fin_off != 0) && (fin->fin_flx & FI_TCPUDP)) {
-			natfailed = 0;
+			natfailed = -1;
 			goto nonatfrag;
 		}
 		rmsk = rdr_masks;
