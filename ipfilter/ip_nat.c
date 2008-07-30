@@ -2598,7 +2598,7 @@ int direction;
 	nat->nat_ptr = np;
 	nat->nat_p = fin->fin_p;
 	nat->nat_mssclamp = np->in_mssclamp;
-	if (nat->nat_p == IPPROTO_TCP)
+	if (nat->nat_flags & IPN_TCP)
 		nat->nat_seqnext[0] = ntohl(tcp->th_seq);
 
 	if ((np->in_apr != NULL) && ((ni->nai_flags & NAT_SLAVE) == 0))
