@@ -3816,7 +3816,7 @@ u_32_t *passp;
 		 * create one for it (if there is a matching rule).
 		 */
 		if ((fin->fin_off != 0) && (fin->fin_flx & FI_TCPUDP)) {
-			natfailed = -1;
+			natfailed = 0;
 			goto nonatfrag;
 		}
 		msk = 0xffffffff;
@@ -4125,7 +4125,7 @@ u_32_t *passp;
 		u_32_t hv, msk, rmsk;
 
 		if ((fin->fin_off != 0) && (fin->fin_flx & FI_TCPUDP)) {
-			natfailed = -1;
+			natfailed = 0;
 			goto nonatfrag;
 		}
 		rmsk = rdr_masks;
