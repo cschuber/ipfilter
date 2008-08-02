@@ -3666,6 +3666,8 @@ ipnat_t *np;
 /*                                                                          */
 /* Updates the lifetime of a NAT table entry for non-TCP packets.  Must be  */
 /* called with fin_rev updated - i.e. after calling nat_proto().            */
+/*                                                                          */
+/* This must be called *after* nat_proto() because we need fin_rev set.     */
 /* ------------------------------------------------------------------------ */
 void nat_update(fin, nat)
 fr_info_t *fin;
@@ -3937,14 +3939,12 @@ int natadd;
 u_32_t nflags;
 {
 	icmphdr_t *icmp;
-	u_short *csump;
 	tcphdr_t *tcp;
 	ipnat_t *np;
 	int i;
 
 	tcp = NULL;
 	icmp = NULL;
-	csump = NULL;
 	np = nat->nat_ptr;
 
 	if ((natadd != 0) && (fin->fin_flx & FI_FRAG) && (np != NULL))
@@ -3987,6 +3987,8 @@ u_32_t nflags;
 	}
 
 	if (!(fin->fin_flx & FI_SHORT) && (fin->fin_off == 0)) {
+		u_short *csump;
+
 		if ((nat->nat_outport != 0) && (nflags & IPN_TCPUDP)) {
 			tcp = fin->fin_dp;
 
@@ -4000,19 +4002,20 @@ u_32_t nflags;
 		}
 
 		csump = nat_proto(fin, nat, nflags);
+
+		/*
+		 * The above comments do not hold for layer 4 (or higher)
+		 * checksums...
+		 */
+		if (csump != NULL) {
+			if (nat->nat_dir == NAT_OUTBOUND)
+				fix_outcksum(fin, csump, nat->nat_sumd[1]);
+			else
+				fix_incksum(fin, csump, nat->nat_sumd[1]);
+		}
 	}
 
 	fin->fin_ip->ip_src = nat->nat_outip;
-
-	/*
-	 * The above comments do not hold for layer 4 (or higher) checksums...
-	 */
-	if (csump != NULL) {
-		if (nat->nat_dir == NAT_OUTBOUND)
-			fix_outcksum(fin, csump, nat->nat_sumd[1]);
-		else
-			fix_incksum(fin, csump, nat->nat_sumd[1]);
-	}
 #ifdef	IPFILTER_SYNC
 	ipfsync_update(SMC_NAT, fin, nat->nat_sync);
 #endif
@@ -4251,13 +4254,11 @@ int natadd;
 u_32_t nflags;
 {
 	icmphdr_t *icmp;
-	u_short *csump;
 	tcphdr_t *tcp;
 	ipnat_t *np;
 	int i;
 
 	tcp = NULL;
-	csump = NULL;
 	np = nat->nat_ptr;
 	fin->fin_fr = nat->nat_fr;
 
@@ -4311,6 +4312,8 @@ u_32_t nflags;
 #endif
 
 	if (!(fin->fin_flx & FI_SHORT) && (fin->fin_off == 0)) {
+		u_short *csump;
+
 		if ((nat->nat_inport != 0) && (nflags & IPN_TCPUDP)) {
 			tcp->th_dport = nat->nat_inport;
 			fin->fin_data[1] = ntohs(nat->nat_inport);
@@ -4324,16 +4327,17 @@ u_32_t nflags;
 		}
 
 		csump = nat_proto(fin, nat, nflags);
-	}
 
-	/*
-	 * The above comments do not hold for layer 4 (or higher) checksums...
-	 */
-	if (csump != NULL) {
-		if (nat->nat_dir == NAT_OUTBOUND)
-			fix_incksum(fin, csump, nat->nat_sumd[0]);
-		else
-			fix_outcksum(fin, csump, nat->nat_sumd[0]);
+		/*
+		 * The above comments do not hold for layer 4 (or higher)
+		 * checksums...
+		 */
+		if (csump != NULL) {
+			if (nat->nat_dir == NAT_OUTBOUND)
+				fix_incksum(fin, csump, nat->nat_sumd[0]);
+			else
+				fix_outcksum(fin, csump, nat->nat_sumd[0]);
+		}
 	}
 	ATOMIC_INCL(nat_stats.ns_mapped[0]);
 	fin->fin_flx |= FI_NATED;
