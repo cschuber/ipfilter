@@ -10,6 +10,16 @@
 # and especially those who have found the time to port IP Filter to new
 # platforms.
 #
+4.1.31 - Release 27 July 2008
+
+* compiling arc4random.c is challenging on solaris 10 or solaris without gcc
+
+* SunOS4 doesn't have a curproc, but it does have u.
+
+* The fix for 2020447 generated random port numbers but not within the
+  range specified in the map rule.  Add in a regression test to verify
+  that the "random" part works.
+
 4.1.30 - Release 24 July 2008
 
 2022104 solaris's driver.conf cannot set timeout values
