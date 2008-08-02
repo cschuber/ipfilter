@@ -794,9 +794,8 @@ typedef unsigned int    u_32_t;
 typedef	char *	caddr_t;
 # endif
 
-# define	ipf_random	arc4random
-
 # ifdef _KERNEL
+#  define	ipf_random	arc4random
 #  if (__NetBSD_Version__ >= 399001400)
 #   define	KMALLOCS(a, b, c)	(a) = (b)malloc((c), _M_IPF, M_NOWAIT)
 #  endif
@@ -840,8 +839,6 @@ typedef	u_int32_t	u_32_t;
 #ifdef __FreeBSD__
 # if  (__FreeBSD_version < 400000)
 #  define	NEED_LOCAL_RAND	1
-# else
-#  define	ipf_random	arc4random
 # endif
 # if defined(_KERNEL)
 #  if (__FreeBSD_version >= 500000)
@@ -859,6 +856,7 @@ typedef	u_int32_t	u_32_t;
 
 # if defined(_KERNEL)
 #  if (__FreeBSD_version >= 400000)
+#   define	ipf_random	arc4random
 /*
  * When #define'd, the 5.2.1 kernel panics when used with the ftp proxy.
  * There may be other, safe, kernels but this is not extensively tested yet.
