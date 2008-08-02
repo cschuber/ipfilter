@@ -2598,7 +2598,7 @@ int direction;
 	nat->nat_ptr = np;
 	nat->nat_p = fin->fin_p;
 	nat->nat_mssclamp = np->in_mssclamp;
-	if (nat->nat_flags & IPN_TCP)
+	if (nat->nat_p == IPPROTO_TCP)
 		nat->nat_seqnext[0] = ntohl(tcp->th_seq);
 
 	if ((np->in_apr != NULL) && ((ni->nai_flags & NAT_SLAVE) == 0))
@@ -3756,9 +3756,7 @@ u_32_t *passp;
 	frentry_t *fr;
 	nat_t *nat;
 
-	if (fr_nat_lock != 0)
-		return 0;
-	if (nat_stats.ns_rules == 0 && nat_instances == NULL)
+	if (nat_stats.ns_rules == 0 || fr_nat_lock != 0)
 		return 0;
 
 	natfailed = 0;
@@ -3818,7 +3816,7 @@ u_32_t *passp;
 		 * create one for it (if there is a matching rule).
 		 */
 		if ((fin->fin_off != 0) && (fin->fin_flx & FI_TCPUDP)) {
-			natfailed = -1;
+			natfailed = 0;
 			goto nonatfrag;
 		}
 		msk = 0xffffffff;
@@ -4070,9 +4068,7 @@ u_32_t *passp;
 	nat_t *nat;
 	u_32_t iph;
 
-	if (fr_nat_lock != 0)
-		return 0;
-	if (nat_stats.ns_rules == 0 && nat_instances == NULL)
+	if (nat_stats.ns_rules == 0 || fr_nat_lock != 0)
 		return 0;
 
 	tcp = NULL;
@@ -4129,7 +4125,7 @@ u_32_t *passp;
 		u_32_t hv, msk, rmsk;
 
 		if ((fin->fin_off != 0) && (fin->fin_flx & FI_TCPUDP)) {
-			natfailed = -1;
+			natfailed = 0;
 			goto nonatfrag;
 		}
 		rmsk = rdr_masks;
