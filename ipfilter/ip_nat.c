@@ -4380,22 +4380,21 @@ ipf_nat_match(fin, np)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_nat_update                                              */
 /* Returns:     Nil                                                         */
-/* Parameters:  nat(I)    - pointer to NAT structure                        */
-/*              np(I)     - pointer to NAT rule                             */
+/* Parameters:  fin(I)   - pointer to packet information                    */
+/*              nat(I)    - pointer to NAT structure                        */
 /*                                                                          */
 /* Updates the lifetime of a NAT table entry for non-TCP packets.  Must be  */
 /* called with fin_rev updated - i.e. after calling ipf_nat_proto().        */
 /* ------------------------------------------------------------------------ */
 void
-ipf_nat_update(fin, nat, np)
+ipf_nat_update(fin, nat)
 	fr_info_t *fin;
 	nat_t *nat;
-	ipnat_t *np;
 {
 	ipftq_t *ifq, *ifq2;
 	ipftqent_t *tqe;
+	ipnat_t *np = nat->nat_ptr;
 
-	MUTEX_ENTER(&nat->nat_lock);
 	tqe = &nat->nat_tqe;
 	ifq = tqe->tqe_ifq;
 
@@ -4414,16 +4413,17 @@ ipf_nat_update(fin, nat, np)
 	} else {
 		if (ifq2 == NULL) {
 			if (nat->nat_pr[0] == IPPROTO_UDP)
-				ifq2 = &ipf_nat_udptq;
+				ifq2 = fin->fin_rev ? &ipf_nat_udpacktq :
+						      &ipf_nat_udptq;
 			else if (nat->nat_pr[0] == IPPROTO_ICMP)
-				ifq2 = &ipf_nat_icmptq;
+				ifq2 = fin->fin_rev ? &ipf_nat_icmpacktq :
+						      &ipf_nat_icmptq;
 			else
 				ifq2 = &ipf_nat_iptq;
 		}
 
 		ipf_movequeue(tqe, ifq, ifq2);
 	}
-	MUTEX_EXIT(&nat->nat_lock);
 }
 
 
@@ -4688,6 +4688,7 @@ retry_roundrobin:
 		rval = ipf_nat_out(fin, nat, natadd, nflags);
 		if (rval == 1) {
 			MUTEX_ENTER(&nat->nat_lock);
+			ipf_nat_update(fin, nat);
 			nat->nat_ref++;
 			nat->nat_bytes[1] += fin->fin_plen;
 			nat->nat_pkts[1]++;
@@ -4860,8 +4861,9 @@ ipf_nat_out(fin, nat, natadd, nflags)
 # endif
 #endif
 
-		ipf_nat_update(fin, nat, np);
-		nflags &= ~IPN_TCPUDPICMP;
+		MUTEX_ENTER(&nat->nat_lock);
+		ipf_nat_update(fin, nat);
+		MUTEX_EXIT(&nat->nat_lock);
 		fin->fin_flx |= FI_NATED;
 		if (np != NULL && np->in_tag.ipt_num[0] != 0)
 			fin->fin_nattag = &np->in_tag;
@@ -4994,8 +4996,6 @@ ipf_nat_out(fin, nat, natadd, nflags)
 
 		csump = ipf_nat_proto(fin, nat, nflags);
 	}
-
-	ipf_nat_update(fin, nat, np);
 
 	/*
 	 * The above comments do not hold for layer 4 (or higher) checksums...
@@ -5288,6 +5288,7 @@ retry_roundrobin:
 		rval = ipf_nat_in(fin, nat, natadd, nflags);
 		if (rval == 1) {
 			MUTEX_ENTER(&nat->nat_lock);
+			ipf_nat_update(fin, nat);
 			nat->nat_ref++;
 			nat->nat_bytes[0] += fin->fin_plen;
 			nat->nat_pkts[0]++;
@@ -5546,7 +5547,7 @@ ipf_nat_in(fin, nat, natadd, nflags)
 # endif
 #endif
 
-		ipf_nat_update(fin, nat, np);
+		ipf_nat_update(fin, nat);
 		nflags &= ~IPN_TCPUDPICMP;
 		fin->fin_flx |= FI_NATED;
 		if (np != NULL && np->in_tag.ipt_num[0] != 0)
@@ -5587,8 +5588,6 @@ ipf_nat_in(fin, nat, natadd, nflags)
 
 		csump = ipf_nat_proto(fin, nat, nflags);
 	}
-
-	ipf_nat_update(fin, nat, np);
 
 	/*
 	 * The above comments do not hold for layer 4 (or higher) checksums...
@@ -5751,7 +5750,9 @@ ipf_nat_unload()
 		MUTEX_DESTROY(&ipf_natio);
 
 		MUTEX_DESTROY(&ipf_nat_udptq.ifq_lock);
+		MUTEX_DESTROY(&ipf_nat_udpacktq.ifq_lock);
 		MUTEX_DESTROY(&ipf_nat_icmptq.ifq_lock);
+		MUTEX_DESTROY(&ipf_nat_icmpacktq.ifq_lock);
 		MUTEX_DESTROY(&ipf_nat_iptq.ifq_lock);
 	}
 }

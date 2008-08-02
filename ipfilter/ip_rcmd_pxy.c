@@ -269,7 +269,9 @@ ippr_rcmd_portmsg(fin, aps, nat)
 
 		if (nat2 != NULL) {
 			(void) ipf_nat_proto(&fi, nat2, IPN_TCP);
-			ipf_nat_update(&fi, nat2, nat2->nat_ptr);
+			MUTEX_ENTER(&nat2->nat_lock);
+			ipf_nat_update(&fi, nat2);
+			MUTEX_EXIT(&nat2->nat_lock);
 			fi.fin_ifp = NULL;
 			if (nat2->nat_dir == NAT_INBOUND)
 				fi.fin_fi.fi_daddr = nat->nat_osrcaddr;

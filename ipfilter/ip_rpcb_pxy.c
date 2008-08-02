@@ -1255,7 +1255,9 @@ ippr_rpcb_getnat(fin, nat, proto, port)
 
 		ipn->in_use++;
 		(void) ipf_nat_proto(&fi, natl, nflags);
-		ipf_nat_update(&fi, natl, natl->nat_ptr);
+		MUTEX_ENTER(&natl->nat_lock);
+		ipf_nat_update(&fi, natl);
+		MUTEX_EXIT(&natl->nat_lock);
 	}
 	MUTEX_DOWNGRADE(&ipf_nat);
 

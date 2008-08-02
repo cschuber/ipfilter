@@ -668,7 +668,7 @@ extern	void	ipf_nat_setqueue __P((nat_t *));
 extern	void	ipf_nat_setpending __P((nat_t *));
 extern	nat_t	*ipf_nat_tnlookup __P((fr_info_t *, int));
 extern	void	ipf_nat_unload __P((void));
-extern	void	ipf_nat_update __P((fr_info_t *, nat_t *, ipnat_t *));
+extern	void	ipf_nat_update __P((fr_info_t *, nat_t *));
 extern	frentry_t *ipf_nat_ipfin __P((fr_info_t *, u_32_t *));
 extern	frentry_t *ipf_nat_ipfout __P((fr_info_t *, u_32_t *));
 extern	int	ipf_nat_in __P((fr_info_t *, nat_t *, int, u_32_t));

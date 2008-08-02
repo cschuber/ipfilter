@@ -418,7 +418,9 @@ ippr_irc_send(fin, nat)
 			       NAT_SLAVE|IPN_TCP|SI_W_DPORT, NAT_OUTBOUND);
 		if (nat2 != NULL) {
 			(void) ipf_nat_proto(&fi, nat2, 0);
-			ipf_nat_update(&fi, nat2, nat2->nat_ptr);
+			MUTEX_ENTER(&nat2->nat_lock);
+			ipf_nat_update(&fi, nat2);
+			MUTEX_EXIT(&nat2->nat_lock);
 
 			if (ipf_state_add(&fi, NULL, SI_W_DPORT) == 0)
 				ipf_state_deref((ipstate_t **)&fi.fin_state);

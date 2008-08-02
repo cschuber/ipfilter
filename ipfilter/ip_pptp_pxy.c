@@ -205,7 +205,9 @@ ippr_pptp_donatstate(fin, nat, pptp)
 		pptp->pptp_nat = nat2;
 		if (nat2 != NULL) {
 			(void) ipf_nat_proto(&fi, nat2, 0);
-			ipf_nat_update(&fi, nat2, nat2->nat_ptr);
+			MUTEX_ENTER(&nat2->nat_lock);
+			ipf_nat_update(&fi, nat2);
+			MUTEX_EXIT(&nat2->nat_lock);
 		}
 	}
 

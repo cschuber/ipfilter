@@ -2780,7 +2780,10 @@ maskloop:
 		rval = ipf_nat6_out(fin, nat, natadd, nflags);
 		if (rval == 1) {
 			MUTEX_ENTER(&nat->nat_lock);
+			ipf_nat_update(fin, nat);
 			nat->nat_ref++;
+			nat->nat_bytes[1] += fin->fin_plen;
+			nat->nat_pkts[1]++;
 			MUTEX_EXIT(&nat->nat_lock);
 			nat->nat_touched = ipf_ticks;
 			fin->fin_nat = nat;
@@ -2845,11 +2848,6 @@ ipf_nat6_out(fin, nat, natadd, nflags)
 	if ((natadd != 0) && (fin->fin_flx & FI_FRAG) && (np != NULL))
 		(void) ipf_frag_natnew(fin, 0, nat);
 
-	MUTEX_ENTER(&nat->nat_lock);
-	nat->nat_bytes[1] += fin->fin_plen;
-	nat->nat_pkts[1]++;
-	MUTEX_EXIT(&nat->nat_lock);
-
 	/*
 	 * Address assignment is after the checksum modification because
 	 * we are using the address in the packet for determining the
@@ -2898,8 +2896,9 @@ ipf_nat6_out(fin, nat, natadd, nflags)
 # endif
 #endif
 
-		ipf_nat_update(fin, nat, np);
-		nflags &= ~IPN_TCPUDPICMP;
+		MUTEX_ENTER(&nat->nat_lock);
+		ipf_nat_update(fin, nat);
+		MUTEX_EXIT(&nat->nat_lock);
 		fin->fin_flx |= FI_NATED;
 		if (np != NULL && np->in_tag.ipt_num[0] != 0)
 			fin->fin_nattag = &np->in_tag;
@@ -3001,8 +3000,6 @@ ipf_nat6_out(fin, nat, natadd, nflags)
 
 		csump = ipf_nat_proto(fin, nat, nflags);
 	}
-
-	ipf_nat_update(fin, nat, np);
 
 	/*
 	 * The above comments do not hold for layer 4 (or higher) checksums...
@@ -3273,7 +3270,10 @@ maskloop:
 		rval = ipf_nat6_in(fin, nat, natadd, nflags);
 		if (rval == 1) {
 			MUTEX_ENTER(&nat->nat_lock);
+			ipf_nat_update(fin, nat);
 			nat->nat_ref++;
+			nat->nat_bytes[0] += fin->fin_plen;
+			nat->nat_pkts[0]++;
 			MUTEX_EXIT(&nat->nat_lock);
 			nat->nat_touched = ipf_ticks;
 			fin->fin_nat = nat;
@@ -3364,11 +3364,6 @@ ipf_nat6_in(fin, nat, natadd, nflags)
 #ifdef	IPFILTER_SYNC
 	ipf_sync_update(SMC_NAT, fin, nat->nat_sync);
 #endif
-
-	MUTEX_ENTER(&nat->nat_lock);
-	nat->nat_bytes[0] += fin->fin_plen;
-	nat->nat_pkts[0]++;
-	MUTEX_EXIT(&nat->nat_lock);
 
 	/*
 	 * Fix up checksums, not by recalculating them, but
@@ -3494,8 +3489,7 @@ ipf_nat6_in(fin, nat, natadd, nflags)
 # endif
 #endif
 
-		ipf_nat_update(fin, nat, np);
-		nflags &= ~IPN_TCPUDPICMP;
+		ipf_nat_update(fin, nat);
 		fin->fin_flx |= FI_NATED;
 		if (np != NULL && np->in_tag.ipt_num[0] != 0)
 			fin->fin_nattag = &np->in_tag;
@@ -3535,8 +3529,6 @@ ipf_nat6_in(fin, nat, natadd, nflags)
 
 		csump = ipf_nat_proto(fin, nat, nflags);
 	}
-
-	ipf_nat_update(fin, nat, np);
 
 	/*
 	 * The above comments do not hold for layer 4 (or higher) checksums...
