@@ -196,7 +196,9 @@ nat_t *nat;
 
 		if (nat2 != NULL) {
 			(void) nat_proto(&fi, nat2, IPN_TCP);
-			nat_update(&fi, nat2, nat2->nat_ptr);
+			MUTEX_ENTER(&nat2->nat_lock);
+			nat_update(&fi, nat2);
+			MUTEX_EXIT(&nat2->nat_lock);
 			fi.fin_ifp = NULL;
 			if (nat->nat_dir == NAT_INBOUND) {
 				fi.fin_fi.fi_daddr = nat->nat_inip.s_addr;

@@ -3662,19 +3662,19 @@ ipnat_t *np;
 /* Returns:     Nil                                                         */
 /* Parameters:  nat(I)    - pointer to NAT structure                        */
 /*              np(I)     - pointer to NAT rule                             */
+/* Locks:       nat_lock                                                    */
 /*                                                                          */
 /* Updates the lifetime of a NAT table entry for non-TCP packets.  Must be  */
 /* called with fin_rev updated - i.e. after calling nat_proto().            */
 /* ------------------------------------------------------------------------ */
-void nat_update(fin, nat, np)
+void nat_update(fin, nat)
 fr_info_t *fin;
 nat_t *nat;
-ipnat_t *np;
 {
 	ipftq_t *ifq, *ifq2;
 	ipftqent_t *tqe;
+	ipnat_t *np = nat->nat_ptr;
 
-	MUTEX_ENTER(&nat->nat_lock);
 	tqe = &nat->nat_tqe;
 	ifq = tqe->tqe_ifq;
 
@@ -3722,7 +3722,6 @@ ipnat_t *np;
 
 		fr_movequeue(tqe, ifq, ifq2);
 	}
-	MUTEX_EXIT(&nat->nat_lock);
 }
 
 
@@ -3900,6 +3899,7 @@ nonatfrag:
 		rval = fr_natout(fin, nat, natadd, nflags);
 		if (rval == 1) {
 			MUTEX_ENTER(&nat->nat_lock);
+			nat_update(fin, nat);
 			nat->nat_ref++;
 			nat->nat_bytes[1] += fin->fin_plen;
 			nat->nat_pkts[1]++;
@@ -4003,8 +4003,6 @@ u_32_t nflags;
 	}
 
 	fin->fin_ip->ip_src = nat->nat_outip;
-
-	nat_update(fin, nat, np);
 
 	/*
 	 * The above comments do not hold for layer 4 (or higher) checksums...
@@ -4214,6 +4212,7 @@ nonatfrag:
 		rval = fr_natin(fin, nat, natadd, nflags);
 		if (rval == 1) {
 			MUTEX_ENTER(&nat->nat_lock);
+			nat_update(fin, nat);
 			nat->nat_ref++;
 			nat->nat_bytes[0] += fin->fin_plen;
 			nat->nat_pkts[0]++;
@@ -4326,8 +4325,6 @@ u_32_t nflags;
 
 		csump = nat_proto(fin, nat, nflags);
 	}
-
-	nat_update(fin, nat, np);
 
 	/*
 	 * The above comments do not hold for layer 4 (or higher) checksums...

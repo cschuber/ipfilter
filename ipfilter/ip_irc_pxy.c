@@ -411,7 +411,9 @@ nat_t *nat;
 			       NAT_SLAVE|IPN_TCP|SI_W_DPORT, NAT_OUTBOUND);
 		if (nat2 != NULL) {
 			(void) nat_proto(&fi, nat2, 0);
-			nat_update(&fi, nat2, nat2->nat_ptr);
+			MUTEX_ENTER(&nat2->nat_lock);
+			nat_update(&fi, nat2);
+			MUTEX_EXIT(&nat2->nat_lock);
 
 			(void) fr_addstate(&fi, NULL, SI_W_DPORT);
 			if (fi.fin_state != NULL)

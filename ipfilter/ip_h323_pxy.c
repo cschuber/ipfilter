@@ -279,7 +279,9 @@ nat_t *nat;
 				       NAT_OUTBOUND);
 			if (nat2 != NULL) {
 				(void) nat_proto(&fi, nat2, IPN_UDP);
-				nat_update(&fi, nat2, nat2->nat_ptr);
+				MUTEX_ENTER(&nat2->nat_lock);
+				nat_update(&fi, nat2);
+				MUTEX_EXIT(&nat2->nat_lock);
 
 				nat2->nat_ptr->in_hits++;
 #ifdef	IPFILTER_LOG

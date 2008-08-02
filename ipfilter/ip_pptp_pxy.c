@@ -203,7 +203,9 @@ pptp_pxy_t *pptp;
 		pptp->pptp_nat = nat2;
 		if (nat2 != NULL) {
 			(void) nat_proto(&fi, nat2, 0);
-			nat_update(&fi, nat2, nat2->nat_ptr);
+			MUTEX_ENTER(&nat2->nat_lock);
+			nat_update(&fi, nat2);
+			MUTEX_EXIT(&nat2->nat_lock);
 		}
 	}
 

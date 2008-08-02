@@ -170,7 +170,9 @@ nat_t *nat;
 				  NAT_SLAVE|SI_WILDP, NAT_OUTBOUND);
 	if (ipsec->ipsc_nat != NULL) {
 		(void) nat_proto(&fi, ipsec->ipsc_nat, 0);
-		nat_update(&fi, ipsec->ipsc_nat, ipn);
+		MUTEX_ENTER(&ipsec->ipsc_nat->nat_lock);
+		nat_update(&fi, ipsec->ipsc_nat);
+		MUTEX_EXIT(&ipsec->ipsc_nat->nat_lock);
 
 		fi.fin_data[0] = 0;
 		fi.fin_data[1] = 0;
@@ -235,8 +237,9 @@ nat_t *nat;
 						  nat->nat_dir);
 			if (ipsec->ipsc_nat != NULL) {
 				(void) nat_proto(&fi, ipsec->ipsc_nat, 0);
-				nat_update(&fi, ipsec->ipsc_nat,
-					   &ipsec->ipsc_rule);
+				MUTEX_ENTER(&ipsec->ipsc_nat->nat_lock);
+				nat_update(&fi, ipsec->ipsc_nat);
+				MUTEX_EXIT(&ipsec->ipsc_nat->nat_lock);
 			}
 		}
 
