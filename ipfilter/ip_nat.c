@@ -2,6 +2,8 @@
  * Copyright (C) 1995-2003 by Darren Reed.
  *
  * See the IPFILTER.LICENCE file for details on licencing.
+ *
+ * Copyright 2008 Sun Microsystems.
  */
 #if defined(KERNEL) || defined(_KERNEL)
 # undef KERNEL
@@ -6447,9 +6449,6 @@ ipf_nat_setqueue(nat)
 /* Fetch the next nat/ipnat structure pointer from the linked list and      */
 /* copy it out to the storage space pointed to by itp_data.  The next item  */
 /* in the list to look at is put back in the ipftoken struture.             */
-/* If we call ipf_freetoken, the accompanying pointer is set to NULL because*/
-/* ipf_freetoken will call a deref function for us and we dont want to call */
-/* that twice (second time would be in the second switch statement below.   */
 /* ------------------------------------------------------------------------ */
 static int
 ipf_nat_getnext(t, itp)
@@ -6460,16 +6459,16 @@ ipf_nat_getnext(t, itp)
 	ipnat_t *ipn, *nextipnat = NULL, zeroipn;
 	nat_t *nat, *nextnat = NULL, zeronat;
 	int error = 0, count;
-	ipftoken_t *freet;
 	char *dst;
 
-	freet = NULL;
-	count = itp->igi_nitems;
-	if (count < 1)
+	if (itp->igi_nitems < 1)
 		return ENOSPC;
 
 	READ_ENTER(&ipf_nat);
 
+	/*
+	 * Get "previous" entry from the token and find the next entry.
+	 */
 	switch (itp->igi_type)
 	{
 	case IPFGENITER_HOSTMAP :
@@ -6498,6 +6497,7 @@ ipf_nat_getnext(t, itp)
 			nextnat = nat->nat_next;
 		}
 		break;
+
 	default :
 		RWLOCK_EXIT(&ipf_nat);
 		ipf_interror = 60055;
@@ -6505,113 +6505,122 @@ ipf_nat_getnext(t, itp)
 	}
 
 	dst = itp->igi_data;
-	for (;;) {
+	for (count = itp->igi_nitems; count > 0; count--) {
+		/*
+		 * If we found an entry, add a reference and update the token.
+		 * Otherwise, zero out data to be returned and NULL out token.
+		 */
 		switch (itp->igi_type)
 		{
 		case IPFGENITER_HOSTMAP :
 			if (nexthm != NULL) {
-				if (nexthm->hm_next == NULL) {
-					freet = t;
-					count = 1;
-				}
-				if (count == 1) {
-					ATOMIC_INC32(nexthm->hm_ref);
-				}
+				ATOMIC_INC32(nexthm->hm_ref);
+				t->ipt_data = nexthm;
 			} else {
 				bzero(&zerohm, sizeof(zerohm));
 				nexthm = &zerohm;
-				count = 1;
+				t->ipt_data = NULL;
 			}
 			break;
 
 		case IPFGENITER_IPNAT :
 			if (nextipnat != NULL) {
-				if (nextipnat->in_next == NULL) {
-					freet = t;
-					count = 1;
-				}
-				if (count == 1) {
-					MUTEX_ENTER(&nextipnat->in_lock);
-					nextipnat->in_use++;
-					MUTEX_EXIT(&nextipnat->in_lock);
-				}
+				ATOMIC_INC32(nextipnat->in_use);
+				t->ipt_data = nextipnat;
 			} else {
 				bzero(&zeroipn, sizeof(zeroipn));
 				nextipnat = &zeroipn;
-				count = 1;
+				t->ipt_data = NULL;
 			}
 			break;
 
 		case IPFGENITER_NAT :
 			if (nextnat != NULL) {
-				if (nextnat->nat_next == NULL) {
-					count = 1;
-					freet = t;
-				}
-				if (count == 1) {
-					MUTEX_ENTER(&nextnat->nat_lock);
-					nextnat->nat_ref++;
-					MUTEX_EXIT(&nextnat->nat_lock);
-				}
+				MUTEX_ENTER(&nextnat->nat_lock);
+				nextnat->nat_ref++;
+				MUTEX_EXIT(&nextnat->nat_lock);
 			} else {
 				bzero(&zeronat, sizeof(zeronat));
 				nextnat = &zeronat;
-				count = 1;
+				t->ipt_data = NULL;
 			}
 			break;
-		default :
-			break;
 		}
+
+		/*
+		 * Now that we have ref, it's save to give up lock.
+		 */
 		RWLOCK_EXIT(&ipf_nat);
 
-		if (freet != NULL) {
-			ipf_freetoken(freet);
-		}
-
+		/*
+		 * Copy out data and clean up references and token as needed.
+		 */
 		switch (itp->igi_type)
 		{
 		case IPFGENITER_HOSTMAP :
 			error = COPYOUT(nexthm, dst, sizeof(*nexthm));
-			if (error != 0) {
-				ipf_interror = 60049;
+			if (error != 0)
 				error = EFAULT;
+			if (t->ipt_data == NULL) {
+				ipf_freetoken(t);
+				break;
 			} else {
+				if (hm != NULL) {
+					WRITE_ENTER(&ipf_nat);
+					ipf_nat_hostmapdel(&hm);
+					RWLOCK_EXIT(&ipf_nat);
+				}
+				if (nexthm->hm_next == NULL) {
+					ipf_freetoken(t);
+					break;
+				}
 				dst += sizeof(*nexthm);
-			}
-			if (freet == NULL) {
-				t->ipt_data = nexthm;
 				hm = nexthm;
-				nexthm = hm->hm_next;
+				nexthm = nexthm->hm_next;
 			}
 			break;
 
 		case IPFGENITER_IPNAT :
 			error = COPYOUT(nextipnat, dst, sizeof(*nextipnat));
-			if (error != 0) {
-				ipf_interror = 60050;
+			if (error != 0)
 				error = EFAULT;
+			if (t->ipt_data == NULL) {
+				ipf_freetoken(t);
+				break;
 			} else {
+				if (ipn != NULL) {
+					WRITE_ENTER(&ipf_nat);
+					ipf_nat_rulederef(&ipn);
+					RWLOCK_EXIT(&ipf_nat);
+				}
+				if (nextipnat->in_next == NULL) {
+					ipf_freetoken(t);
+					break;
+				}
 				dst += sizeof(*nextipnat);
-			}
-			if (freet == NULL) {
-				t->ipt_data = nextipnat;
 				ipn = nextipnat;
-				nextipnat = ipn->in_next;
+				nextipnat = nextipnat->in_next;
 			}
 			break;
 
 		case IPFGENITER_NAT :
 			error = COPYOUT(nextnat, dst, sizeof(*nextnat));
-			if (error != 0) {
-				ipf_interror = 60051;
+			if (error != 0)
 				error = EFAULT;
+			if (t->ipt_data == NULL) {
+				ipf_freetoken(t);
+				break;
 			} else {
+				if (nat != NULL) {
+					ipf_nat_deref(&nat);
+				}
+				if (nextnat->nat_next == NULL) {
+					ipf_freetoken(t);
+					break;
+				}
 				dst += sizeof(*nextnat);
-			}
-			if (freet == NULL) {
-				t->ipt_data = nextnat;
 				nat = nextnat;
-				nextnat = nat->nat_next;
+				nextnat = nextnat->nat_next;
 			}
 			break;
 		}

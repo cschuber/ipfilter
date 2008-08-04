@@ -2,6 +2,8 @@
  * Copyright (C) 1993-2001, 2003 by Darren Reed.
  *
  * See the IPFILTER.LICENCE file for details on licencing.
+ *
+ * Copyright 2008 Sun Microsystems.
  */
 #if defined(KERNEL) || defined(_KERNEL)
 # undef KERNEL
@@ -788,6 +790,12 @@ ipf_htable_iter_next(token, ilp)
 
 	READ_ENTER(&ipf_poolrw);
 
+	/*
+	 * Get "previous" entry from the token and find the next entry.
+	 *
+	 * If we found an entry, add a reference to it and update the token.
+	 * Otherwise, zero out data to be returned and NULL out token.
+	 */
 	switch (ilp->ili_otype)
 	{
 	case IPFLOOKUPITER_LIST :
@@ -831,43 +839,60 @@ ipf_htable_iter_next(token, ilp)
 			token->ipt_data = NULL;
 		}
 		break;
+
 	default :
 		ipf_interror = 30010;
 		err = EINVAL;
 		break;
 	}
 
+	/*
+	 * Now that we have ref, it's save to give up lock.
+	 */
 	RWLOCK_EXIT(&ipf_poolrw);
 	if (err != 0)
 		return err;
 
+	/*
+	 * Copy out data and clean up references and token as needed.
+	 */
 	switch (ilp->ili_otype)
 	{
 	case IPFLOOKUPITER_LIST :
-		if (iph != NULL) {
-			WRITE_ENTER(&ipf_poolrw);
-			ipf_htable_deref(iph);
-			RWLOCK_EXIT(&ipf_poolrw);
-		}
-
 		err = COPYOUT(nextiph, ilp->ili_data, sizeof(*nextiph));
 		if (err != 0) {
 			ipf_interror = 30011;
 			err = EFAULT;
 		}
+		if (token->ipt_data == NULL) {
+			ipf_freetoken(token);
+		} else {
+			if (iph != NULL) {
+				WRITE_ENTER(&ipf_poolrw);
+				ipf_htable_deref(iph);
+				RWLOCK_EXIT(&ipf_poolrw);
+			}
+			if (nextiph->iph_next == NULL)
+				ipf_freetoken(token);
+		}
 		break;
 
 	case IPFLOOKUPITER_NODE :
-		if (node != NULL) {
-			WRITE_ENTER(&ipf_poolrw);
-			ipf_htent_deref(node);
-			RWLOCK_EXIT(&ipf_poolrw);
-		}
-
 		err = COPYOUT(nextnode, ilp->ili_data, sizeof(*nextnode));
 		if (err != 0) {
 			ipf_interror = 30012;
 			err = EFAULT;
+		}
+		if (token->ipt_data == NULL) {
+			ipf_freetoken(token);
+		} else {
+			if (node != NULL) {
+				WRITE_ENTER(&ipf_poolrw);
+				ipf_htent_deref(node);
+				RWLOCK_EXIT(&ipf_poolrw);
+			}
+			if (nextnode->ipe_next == NULL)
+				ipf_freetoken(token);
 		}
 		break;
 	}

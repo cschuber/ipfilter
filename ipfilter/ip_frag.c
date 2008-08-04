@@ -2,6 +2,8 @@
  * Copyright (C) 1993-2003 by Darren Reed.
  *
  * See the IPFILTER.LICENCE file for details on licencing.
+ *
+ * Copyright 2008 Sun Microsystems.
  */
 #if defined(KERNEL) || defined(_KERNEL)
 # undef KERNEL
@@ -977,7 +979,7 @@ ipf_slowtimer()
 
 	ipf_expiretokens();
 	ipf_frag_expire();
-	ipf_state_expire();
+	ipf_state_timeout();
 	ipf_nat_expire();
 	ipf_auth_expire();
 #ifdef IPFILTER_SYNC
@@ -1046,19 +1048,21 @@ ipf_frag_next(token, itp, top, tail
 	ipfr_t *frag, *next, zero;
 	int error = 0;
 
-	frag = token->ipt_data;
-	if (frag == (ipfr_t *)-1) {
-		ipf_freetoken(token);
-		ipf_interror = 20001;
-		return ESRCH;
-	}
-
 	READ_ENTER(lock);
+
+	/*
+	 * Retrieve "previous" entry from token and find the next entry.
+	 */
+	frag = token->ipt_data;
 	if (frag == NULL)
 		next = *top;
 	else
 		next = frag->ipfr_next;
 
+	/*
+	 * If we found an entry, add reference to it and update token.
+	 * Otherwise, zero out data to be returned and NULL out token.
+	 */
 	if (next != NULL) {
 		ATOMIC_INC(next->ipfr_ref);
 		token->ipt_data = next;
@@ -1067,23 +1071,33 @@ ipf_frag_next(token, itp, top, tail
 		next = &zero;
 		token->ipt_data = NULL;
 	}
+
+	/*
+	 * Now that we have ref, it's save to give up lock.
+	 */
 	RWLOCK_EXIT(lock);
 
-	if (frag != NULL) {
-#ifdef USE_MUTEXES
-		ipf_frag_deref(&frag, lock);
-#else
-		ipf_frag_deref(&frag);
-#endif
-	}
-
+	/*
+	 * Copy out data and clean up references and token as needed.
+	 */
 	error = COPYOUT(next, itp->igi_data, sizeof(*next));
 	if (error != 0) {
 		ipf_interror = 20002;
 		error = EFAULT;
 	}
-
-	return error;
+        if (token->ipt_data == NULL) {
+                ipf_freetoken(token);
+        } else {
+                if (frag != NULL)
+#ifdef USE_MUTEXES
+                        ipf_frag_deref(&frag, lock);
+#else
+                        ipf_frag_deref(&frag);
+#endif
+                if (next->ipfr_next == NULL)
+                        ipf_freetoken(token);
+        }
+        return error;
 }
 
 

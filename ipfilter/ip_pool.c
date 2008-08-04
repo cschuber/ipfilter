@@ -2,6 +2,8 @@
  * Copyright (C) 1993-2001, 2003 by Darren Reed.
  *
  * See the IPFILTER.LICENCE file for details on licencing.
+ *
+ * Copyright 2008 Sun Microsystems.
  */
 #if defined(KERNEL) || defined(_KERNEL)
 # undef KERNEL
@@ -1022,7 +1024,7 @@ ipf_pool_node_deref(ipn)
 /* Function:    ipf_pool_iter_next                                          */
 /* Returns:     void                                                        */
 /* Parameters:  token(I) - pointer to pool structure                        */
-/* Parameters:  ilp(IO)   - pointer to pool iterating structure             */
+/*              ilp(IO)   - pointer to pool iterating structure             */
 /*                                                                          */
 /* ------------------------------------------------------------------------ */
 static int
@@ -1042,6 +1044,10 @@ ipf_pool_iter_next(token, ilp)
 
 	READ_ENTER(&ipf_poolrw);
 
+	/*
+	 * Get "previous" entry from token.  Find next entry to process,
+	 * and add reference to it and update the token.
+	 */
 	switch (ilp->ili_otype)
 	{
 	case IPFLOOKUPITER_LIST :
@@ -1086,43 +1092,61 @@ ipf_pool_iter_next(token, ilp)
 			token->ipt_data = NULL;
 		}
 		break;
+
 	default :
 		ipf_interror = 70011;
 		err = EINVAL;
 		break;
 	}
 
+	/*
+	 * Now that we have ref, it's save to give up lock.
+	 */
 	RWLOCK_EXIT(&ipf_poolrw);
 
 	if (err != 0)
 		return err;
 
+	/*
+	 * Copy out the data and update the references and token as needed.
+	 */
 	switch (ilp->ili_otype)
 	{
 	case IPFLOOKUPITER_LIST :
-		if (ipo != NULL) {
-			WRITE_ENTER(&ipf_poolrw);
-			ipf_pool_deref(ipo);
-			RWLOCK_EXIT(&ipf_poolrw);
-		}
-		token->ipt_data = nextipo;
 		err = COPYOUT(nextipo, ilp->ili_data, sizeof(*nextipo));
 		if (err != 0)  {
 			ipf_interror = 70012;
 			err = EFAULT;
 		}
+		if (token->ipt_data == NULL) {
+			ipf_freetoken(token);
+		} else {
+			if (ipo != NULL) {
+				WRITE_ENTER(&ipf_poolrw);
+				ipf_pool_deref(ipo);
+				RWLOCK_EXIT(&ipf_poolrw);
+			}
+			if (nextipo->ipo_next == NULL)
+				ipf_freetoken(token);
+		}
 		break;
 
 	case IPFLOOKUPITER_NODE :
-		if (node != NULL) {
-			WRITE_ENTER(&ipf_poolrw);
-			ipf_pool_node_deref(node);
-			RWLOCK_EXIT(&ipf_poolrw);
-		}
 		err = COPYOUT(nextnode, ilp->ili_data, sizeof(*nextnode));
 		if (err != 0) {
 			ipf_interror = 70013;
 			err = EFAULT;
+		}
+		if (token->ipt_data == NULL) {
+			ipf_freetoken(token);
+		} else {
+			if (node != NULL) {
+				WRITE_ENTER(&ipf_poolrw);
+				ipf_pool_node_deref(node);
+				RWLOCK_EXIT(&ipf_poolrw);
+			}
+			if (nextnode->ipn_next == NULL)
+				ipf_freetoken(token);
 		}
 		break;
 	}
