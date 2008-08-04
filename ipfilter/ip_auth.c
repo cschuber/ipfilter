@@ -2,6 +2,8 @@
  * Copyright (C) 1998-2003 by Darren Reed & Guido van Rooij.
  *
  * See the IPFILTER.LICENCE file for details on licencing.
+ *
+ * Copyright 2008 Sun Microsystems, Inc.
  */
 #if defined(KERNEL) || defined(_KERNEL)
 # undef KERNEL
@@ -757,49 +759,57 @@ ipfgeniter_t *itp;
 	if (itp->igi_type != IPFGENITER_AUTH)
 		return EINVAL;
 
-	fae = token->ipt_data;
 	READ_ENTER(&ipf_auth);
+
+	/*
+	 * Retrieve "previous" entry from token and find the next entry.
+	 */
+	fae = token->ipt_data;
 	if (fae == NULL) {
 		next = fae_list;
 	} else {
 		next = fae->fae_next;
 	}
 
+	/*
+	 * If we found an entry, add reference to it and update token.
+	 * Otherwise, zero out data to be returned and NULL out token.
+	 */
 	if (next != NULL) {
-		/*
-		 * If we find an auth entry to use, bump its reference count
-		 * so that it can be used for is_next when we come back.
-		 */
 		ATOMIC_INC(next->fae_ref);
-		if (next->fae_next == NULL) {
-			ipf_freetoken(token);
-			token = NULL;
-		} else {
-			token->ipt_data = next;
-		}
+		token->ipt_data = next;
 	} else {
 		bzero(&zero, sizeof(zero));
 		next = &zero;
+		token->ipt_data = NULL;
 	}
+
+	/*
+	 * Safe to release the lock now that we have a reference.
+	 */
 	RWLOCK_EXIT(&ipf_auth);
 
 	/*
-	 * If we had a prior pointer to an auth entry, release it.
-	 */
-	if (fae != NULL) {
-		WRITE_ENTER(&ipf_auth);
-		fr_authderef(&fae);
-		RWLOCK_EXIT(&ipf_auth);
-	}
-
-	/*
-	 * This should arguably be via fr_outobj() so that the auth
-	 * structure can (if required) be massaged going out.
+	 * Copy out the data and clean up references and token as needed.
 	 */
 	error = COPYOUT(next, itp->igi_data, sizeof(*next));
 	if (error != 0)
 		error = EFAULT;
 
+	/*
+	 * Clean up reference and token.
+	 */
+	if (token->ipt_data == NULL) {
+		ipf_freetoken(token);
+	} else {
+		if (fae != NULL) {
+			WRITE_ENTER(&ipf_auth);
+			fr_authderef(&fae);
+			RWLOCK_EXIT(&ipf_auth);
+		}
+		if (next->fae_next == NULL)
+			ipf_freetoken(token);
+	}
 	return error;
 }
 

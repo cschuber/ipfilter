@@ -2,6 +2,8 @@
  * Copyright (C) 1993-2003 by Darren Reed.
  *
  * See the IPFILTER.LICENCE file for details on licencing.
+ *
+ * Copyright 2008 Sun Microsystems, Inc.
  */
 #if defined(KERNEL) || defined(_KERNEL)
 # undef KERNEL
@@ -6833,8 +6835,12 @@ int ipf_getnextrule(ipftoken_t *t, void *ptr)
 		return EFAULT;
 
 	out = it.iri_inout & F_OUT;
-	fr = t->ipt_data;
 	READ_ENTER(&ipf_mutex);
+
+	/*
+	 * Retrieve "previous" entry from token and find the next entry.
+	 */
+	fr = t->ipt_data;
 	if (fr == NULL) {
 		if (*it.iri_group == '\0') {
 			if ((it.iri_inout & F_ACIN) != 0) {
@@ -6861,51 +6867,64 @@ int ipf_getnextrule(ipftoken_t *t, void *ptr)
 	}
 
 	dst = (char *)it.iri_rule;
-	count = it.iri_nrules;
 	/*
 	 * The ipfruleiter may ask for more than 1 rule at a time to be
 	 * copied out, so long as that many exist in the list to start with!
 	 */
-	for (;;) {
+	for (count = it.iri_nrules; count > 0; count--) {
+		/*
+		 * If we found an entry, add reference to it and update token.
+		 * Otherwise, zero out data to be returned and NULL out token.
+		 */
 		if (next != NULL) {
-			if (count == 1) {
-				MUTEX_ENTER(&next->fr_lock);
-				next->fr_ref++;
-				MUTEX_EXIT(&next->fr_lock);
-				t->ipt_data = next;
-			}
+			MUTEX_ENTER(&next->fr_lock);
+			next->fr_ref++;
+			MUTEX_EXIT(&next->fr_lock);
+			t->ipt_data = next;
 		} else {
 			bzero(&zero, sizeof(zero));
 			next = &zero;
-			count = 1;
 			t->ipt_data = NULL;
 		}
+
+		/*
+		 * Now that we have ref, it's save to give up lock.
+		 */
 		RWLOCK_EXIT(&ipf_mutex);
 
+		/*
+		 * Copy out data and clean up references and token as needed.
+		 */
 		error = COPYOUT(next, dst, sizeof(*next));
 		if (error != 0)
 			return EFAULT;
-
-		if (next->fr_data != NULL) {
-			dst += sizeof(*next);
-			error = COPYOUT(next->fr_data, dst, next->fr_dsize);
-			if (error != 0)
-				error = EFAULT;
-			else
-				dst += next->fr_dsize;
+		if (t->ipt_data == NULL) {
+			ipf_freetoken(t);
+			break;
+		} else {
+			if (fr != NULL)
+				(void) fr_derefrule(&fr);
+			if (next->fr_data != NULL) {
+				dst += sizeof(*next);
+				error = COPYOUT(next->fr_data, dst,
+						next->fr_dsize);
+				if (error != 0)
+					error = EFAULT;
+				else
+					dst += next->fr_dsize;
+			}
+			if (next->fr_next == NULL) {
+				ipf_freetoken(t);
+				break;
+			}
 		}
 
 		if ((count == 1) || (error != 0))
 			break;
 
-		count--;
-
 		READ_ENTER(&ipf_mutex);
+		fr = next;
 		next = next->fr_next;
-	}
-
-	if (fr != NULL) {
-		(void) fr_derefrule(&fr);
 	}
 	return error;
 }

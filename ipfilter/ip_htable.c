@@ -2,6 +2,8 @@
  * Copyright (C) 1993-2001, 2003 by Darren Reed.
  *
  * See the IPFILTER.LICENCE file for details on licencing.
+ *
+ * Copyright 2008 Sun Microsystems, Inc.
  */
 #if defined(KERNEL) || defined(_KERNEL)
 # undef KERNEL
@@ -527,6 +529,12 @@ ipflookupiter_t *ilp;
 
 	READ_ENTER(&ip_poolrw);
 
+	/*
+	 * Get "previous" entry from the token and find the next entry.
+	 *
+	 * If we found an entry, add a reference to it and update the token.
+	 * Otherwise, zero out data to be returned and NULL out token.
+	 */
 	switch (ilp->ili_otype)
 	{
 	case IPFLOOKUPITER_LIST :
@@ -569,37 +577,56 @@ ipflookupiter_t *ilp;
 			token->ipt_data = NULL;
 		}
 		break;
+
 	default :
 		err = EINVAL;
 		break;
 	}
 
+	/*
+	 * Now that we have ref, it's save to give up lock.
+	 */
 	RWLOCK_EXIT(&ip_poolrw);
 	if (err != 0)
 		return err;
 
+	/*
+	 * Copy out data and clean up references and token as needed.
+	 */
 	switch (ilp->ili_otype)
 	{
 	case IPFLOOKUPITER_LIST :
-		if (iph != NULL) {
-			WRITE_ENTER(&ip_poolrw);
-			fr_derefhtable(iph);
-			RWLOCK_EXIT(&ip_poolrw);
-		}
 		err = COPYOUT(nextiph, ilp->ili_data, sizeof(*nextiph));
 		if (err != 0)
 			err = EFAULT;
+		if (token->ipt_data == NULL) {
+			ipf_freetoken(token);
+		} else {
+			if (iph != NULL) {
+				WRITE_ENTER(&ip_poolrw);
+				fr_derefhtable(iph);
+				RWLOCK_EXIT(&ip_poolrw);
+			}
+			if (nextiph->iph_next == NULL)
+				ipf_freetoken(token);
+		}
 		break;
 
 	case IPFLOOKUPITER_NODE :
-		if (node != NULL) {
-			WRITE_ENTER(&ip_poolrw);
-			fr_derefhtent(node);
-			RWLOCK_EXIT(&ip_poolrw);
-		}
 		err = COPYOUT(nextnode, ilp->ili_data, sizeof(*nextnode));
 		if (err != 0)
 			err = EFAULT;
+		if (token->ipt_data == NULL) {
+			ipf_freetoken(token);
+		} else {
+			if (node != NULL) {
+				WRITE_ENTER(&ip_poolrw);
+				fr_derefhtent(node);
+				RWLOCK_EXIT(&ip_poolrw);
+			}
+			if (nextnode->ipe_next == NULL)
+				ipf_freetoken(token);
+		}
 		break;
 	}
 

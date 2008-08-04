@@ -2,6 +2,8 @@
  * Copyright (C) 1995-2003 by Darren Reed.
  *
  * See the IPFILTER.LICENCE file for details on licencing.
+ *
+ * Copyright 2008 Sun Microsystems, Inc.
  */
 #if defined(KERNEL) || defined(_KERNEL)
 # undef KERNEL
@@ -4323,63 +4325,68 @@ ipfgeniter_t *itp;
 	if (itp->igi_type != IPFGENITER_STATE)
 		return EINVAL;
 
-	is = token->ipt_data;
-	if (is == (void *)-1) {
-		ipf_freetoken(token);
-		return ESRCH;
-	}
-
 	error = 0;
-	dst = itp->igi_data;
 
 	READ_ENTER(&ipf_state);
+
+	/*
+	 * Get "previous" entry from the token, and find the next entry
+	 * to be processed.
+	 */
+	is = token->ipt_data;
 	if (is == NULL) {
 		next = ips_list;
 	} else {
 		next = is->is_next;
 	}
 
-	count = itp->igi_nitems;
-	for (;;) {
+	dst = itp->igi_data;
+	for (count = itp->igi_nitems; count > 0; count--) {
+		/*
+		 * If we found an entry, add a reference and update the token.
+		 * Otherwise, zero out data to be returned and NULL out token.
+		 */
 		if (next != NULL) {
-			/*
-			 * If we find a state entry to use, bump its
-			 * reference count so that it can be used for
-			 * is_next when we come back.
-			 */
-			if (count == 1) {
-				MUTEX_ENTER(&next->is_lock);
-				next->is_ref++;
-				MUTEX_EXIT(&next->is_lock);
-				token->ipt_data = next;
-			}
+			MUTEX_ENTER(&next->is_lock);
+			next->is_ref++;
+			MUTEX_EXIT(&next->is_lock);
+			token->ipt_data = next;
 		} else {
 			bzero(&zero, sizeof(zero));
 			next = &zero;
-			count = 1;
 			token->ipt_data = NULL;
 		}
+
+		/*
+		 * Safe to release lock now the we have a reference.
+		 */
 		RWLOCK_EXIT(&ipf_state);
 
 		/*
-		 * This should arguably be via fr_outobj() so that the state
-		 * structure can (if required) be massaged going out.
+		 * Copy out data and clean up references and tokens.
 		 */
 		error = COPYOUT(next, dst, sizeof(*next));
 		if (error != 0)
 			error = EFAULT;
+		if (token->ipt_data == NULL) {
+			ipf_freetoken(token);
+			break;
+		} else {
+			if (is != NULL)
+				fr_statederef(&is);
+			if (next->is_next == NULL) {
+				ipf_freetoken(token);
+				break;
+			}
+		}
+
 		if ((count == 1) || (error != 0))
 			break;
 
-		dst += sizeof(*next);
-		count--;
-
 		READ_ENTER(&ipf_state);
-		next = next->is_next;
-	}
-
-	if (is != NULL) {
-		fr_statederef(&is);
+		dst += sizeof(*next);
+		is = next;
+		next = is->is_next;
 	}
 
 	return error;

@@ -2,6 +2,8 @@
  * Copyright (C) 1993-2003 by Darren Reed.
  *
  * See the IPFILTER.LICENCE file for details on licencing.
+ *
+ * Copyright 2008 Sun Microsystems, Inc.
  */
 #if defined(KERNEL) || defined(_KERNEL)
 # undef KERNEL
@@ -918,18 +920,21 @@ ipfrwlock_t *lock;
 	ipfr_t *frag, *next, zero;
 	int error = 0;
 
-	frag = token->ipt_data;
-	if (frag == (ipfr_t *)-1) {
-		ipf_freetoken(token);
-		return ESRCH;
-	}
-
 	READ_ENTER(lock);
+
+	/*
+	 * Retrieve "previous" entry from token and find the next entry.
+	 */
+	frag = token->ipt_data;
 	if (frag == NULL)
 		next = *top;
 	else
 		next = frag->ipfr_next;
 
+	/*
+	 * If we found an entry, add reference to it and update token.
+	 * Otherwise, zero out data to be returned and NULL out token.
+	 */
 	if (next != NULL) {
 		ATOMIC_INC(next->ipfr_ref);
 		token->ipt_data = next;
@@ -938,20 +943,30 @@ ipfrwlock_t *lock;
 		next = &zero;
 		token->ipt_data = NULL;
 	}
+
+	/*
+	 * Now that we have ref, it's save to give up lock.
+	 */
 	RWLOCK_EXIT(lock);
 
-	if (frag != NULL) {
-#ifdef USE_MUTEXES
-		fr_fragderef(&frag, lock);
-#else
-		fr_fragderef(&frag);
-#endif
-	}
-
+	/*
+	 * Copy out data and clean up references and token as needed.
+	 */
 	error = COPYOUT(next, itp->igi_data, sizeof(*next));
 	if (error != 0)
 		error = EFAULT;
-
+	if (token->ipt_data == NULL) {
+		ipf_freetoken(token);
+	} else {
+		if (frag != NULL)
+#ifdef USE_MUTEXES
+			fr_fragderef(&frag, lock);
+#else
+			fr_fragderef(&frag);
+#endif
+		if (next->ipfr_next == NULL)
+			ipf_freetoken(token);
+	}
 	return error;
 }
 
