@@ -428,8 +428,10 @@ ippr_ftp_addport(fin, ip, nat, ftp, dlen, nport, inc)
 		flags = NAT_SLAVE|IPN_TCP|SI_W_DPORT;
 		if (nat->nat_dir == NAT_INBOUND)
 			flags |= NAT_NOTRULEPORT;
+		MUTEX_ENTER(&ipf_nat_new);
 		nat2 = ipf_nat_add(&fi, nat->nat_ptr, &ftp->ftp_pendnat,
 			       flags, nat->nat_dir);
+		MUTEX_EXIT(&ipf_nat_new);
 
 		if (nat2 != NULL) {
 			(void) ipf_nat_proto(&fi, nat2, IPN_TCP);
@@ -792,8 +794,10 @@ ippr_ftp_pasvreply(fin, ip, nat, ftp, port, newmsg, s, data_ip)
 		nflags |= NAT_SLAVE;
 		if (nat->nat_dir == NAT_INBOUND)
 			nflags |= NAT_NOTRULEPORT;
+		MUTEX_ENTER(&ipf_nat_new);
 		nat2 = ipf_nat_add(&fi, nat->nat_ptr, &ftp->ftp_pendnat,
 			       nflags, nat->nat_dir);
+		MUTEX_EXIT(&ipf_nat_new);
 
 		if (nat2 != NULL) {
 			(void) ipf_nat_proto(&fi, nat2, IPN_TCP);

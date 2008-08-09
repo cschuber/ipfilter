@@ -265,7 +265,10 @@ ippr_rcmd_portmsg(fin, aps, nat)
 		fi.fin_flx &= FI_LOWTTL|FI_FRAG|FI_TCPUDP|FI_OPTIONS|FI_IGNORE;
 
 		nflags |= NAT_SLAVE|IPN_TCP;
-		nat2 = ipf_nat_add(&fi, &rc->rcmd_rule, NULL, nflags, direction);
+		MUTEX_ENTER(&ipf_nat_new);
+		nat2 = ipf_nat_add(&fi, &rc->rcmd_rule, NULL, nflags,
+				   direction);
+		MUTEX_ENTER(&ipf_nat_new);
 
 		if (nat2 != NULL) {
 			(void) ipf_nat_proto(&fi, nat2, IPN_TCP);

@@ -173,8 +173,10 @@ ippr_ipsec_new(fin, aps, nat)
 	if ((ipsec->ipsc_rcookie[0]|ipsec->ipsc_rcookie[1]) != 0)
 		ipsec->ipsc_rckset = 1;
 
+	MUTEX_ENTER(&ipf_nat_new);
 	ipsec->ipsc_nat = ipf_nat_add(&fi, ipn, &ipsec->ipsc_nat,
-				  NAT_SLAVE|SI_WILDP, NAT_OUTBOUND);
+				      NAT_SLAVE|SI_WILDP, NAT_OUTBOUND);
+	MUTEX_EXIT(&ipf_nat_new);
 	if (ipsec->ipsc_nat != NULL) {
 		(void) ipf_nat_proto(&fi, ipsec->ipsc_nat, 0);
 		MUTEX_ENTER(&ipsec->ipsc_nat->nat_lock);
@@ -238,10 +240,12 @@ ippr_ipsec_inout(fin, aps, nat)
 		if (ipsec->ipsc_nat != NULL)
 			ipf_queueback(&ipsec->ipsc_nat->nat_tqe);
 		else {
+			MUTEX_ENTER(&ipf_nat_new);
 			ipsec->ipsc_nat = ipf_nat_add(&fi, &ipsec->ipsc_rule,
 						  &ipsec->ipsc_nat,
 						  NAT_SLAVE|SI_WILDP,
 						  nat->nat_dir);
+			MUTEX_EXIT(&ipf_nat_new);
 			if (ipsec->ipsc_nat != NULL) {
 				(void) ipf_nat_proto(&fi, ipsec->ipsc_nat, 0);
 				MUTEX_ENTER(&ipsec->ipsc_nat->nat_lock);

@@ -414,8 +414,10 @@ ippr_irc_send(fin, nat)
 		fi.fin_plen = fi.fin_hlen + sizeof(*tcp2);
 		swip = ip->ip_src;
 		ip->ip_src = nat->nat_nsrcip;
+		MUTEX_ENTER(&ipf_nat_new);
 		nat2 = ipf_nat_add(&fi, nat->nat_ptr, NULL,
 			       NAT_SLAVE|IPN_TCP|SI_W_DPORT, NAT_OUTBOUND);
+		MUTEX_EXIT(&ipf_nat_new);
 		if (nat2 != NULL) {
 			(void) ipf_nat_proto(&fi, nat2, 0);
 			MUTEX_ENTER(&nat2->nat_lock);

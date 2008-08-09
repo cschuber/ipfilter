@@ -2949,9 +2949,8 @@ badnat:
 	KFREE(nat);
 	nat = NULL;
 done:
-	if ((flags & NAT_SLAVE) == 0) {
-		MUTEX_EXIT(&ipf_nat_new);
-	}
+	if (nat != NULL && np != NULL)
+		np->in_hits++;
 	return nat;
 }
 
@@ -4647,10 +4646,8 @@ retry_roundrobin:
 				np->in_hits++;
 				break;
 			}
-			ATOMIC_INC32(np->in_use);
-			RWLOCK_EXIT(&ipf_nat);
 
-			WRITE_ENTER(&ipf_nat);
+			MUTEX_ENTER(&ipf_nat_new);
 			/*
 			 * If we've matched a round-robin rule but it has
 			 * moved in the list since we got it, start over as
@@ -4658,22 +4655,19 @@ retry_roundrobin:
 			 */
 			if (npnext != np->in_mnext) {
 				if ((np->in_flags & IPN_ROUNDR) != 0) {
-					MUTEX_DOWNGRADE(&ipf_nat);
+					MUTEX_EXIT(&ipf_nat_new);
 					goto retry_roundrobin;
 				}
 				npnext = np->in_mnext;
 			}
 
-			if ((nat = ipf_nat_add(fin, np, NULL, nflags,
-					   NAT_OUTBOUND))) {
-				np->in_hits++;
-				np->in_use--;
+			nat = ipf_nat_add(fin, np, NULL, nflags, NAT_OUTBOUND);
+			MUTEX_EXIT(&ipf_nat_new);
+			if (nat != NULL) {
 				natfailed = 0;
 				break;
 			}
 			natfailed = -1;
-			ipf_nat_rulederef(&np);
-			MUTEX_DOWNGRADE(&ipf_nat);
 		}
 		if ((np == NULL) && (nmsk != 0)) {
 			while (nmsk) {
@@ -5249,10 +5243,8 @@ retry_roundrobin:
 				np->in_hits++;
 				break;
 			}
-			ATOMIC_INC32(np->in_use);
-			RWLOCK_EXIT(&ipf_nat);
 
-			WRITE_ENTER(&ipf_nat);
+			MUTEX_ENTER(&ipf_nat_new);
 			/*
 			 * If we've matched a round-robin rule but it has
 			 * moved in the list since we got it, start over as
@@ -5261,21 +5253,19 @@ retry_roundrobin:
 			if (npnext != np->in_rnext) {
 				if ((np->in_flags & IPN_ROUNDR) != 0) {
 					MUTEX_DOWNGRADE(&ipf_nat);
+					MUTEX_EXIT(&ipf_nat_new);
 					goto retry_roundrobin;
 				}
 				npnext = np->in_rnext;
 			}
 
 			nat = ipf_nat_add(fin, np, NULL, nflags, NAT_INBOUND);
+			MUTEX_EXIT(&ipf_nat_new);
 			if (nat != NULL) {
-				np->in_hits++;
-				np->in_use--;
 				natfailed = 0;
 				break;
 			}
 			natfailed = -1;
-			ipf_nat_rulederef(&np);
-			MUTEX_DOWNGRADE(&ipf_nat);
 		}
 
 		if ((np == NULL) && (rmsk != 0)) {

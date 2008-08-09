@@ -300,9 +300,11 @@ ippr_raudio_in(fin, aps, nat)
 		fi.fin_data[0] = dp;
 		fi.fin_data[1] = sp;
 		fi.fin_out = 0;
+		MUTEX_ENTER(&ipf_nat_new);
 		nat2 = ipf_nat_add(&fi, nat->nat_ptr, NULL,
 			       NAT_SLAVE|IPN_UDP | (sp ? 0 : SI_W_SPORT),
 			       NAT_OUTBOUND);
+		MUTEX_EXIT(&ipf_nat_new);
 		if (nat2 != NULL) {
 			(void) ipf_nat_proto(&fi, nat2, IPN_UDP);
 			MUTEX_ENTER(&nat2->nat_lock);
@@ -322,9 +324,11 @@ ippr_raudio_in(fin, aps, nat)
 		fi.fin_data[0] = sp;
 		fi.fin_data[1] = 0;
 		fi.fin_out = 1;
+		MUTEX_ENTER(&ipf_nat_new);
 		nat2 = ipf_nat_add(&fi, nat->nat_ptr, NULL,
 			       NAT_SLAVE|IPN_UDP|SI_W_DPORT,
 			       NAT_OUTBOUND);
+		MUTEX_EXIT(&ipf_nat_new);
 		if (nat2 != NULL) {
 			(void) ipf_nat_proto(&fi, nat2, IPN_UDP);
 			MUTEX_ENTER(&nat2->nat_lock);
