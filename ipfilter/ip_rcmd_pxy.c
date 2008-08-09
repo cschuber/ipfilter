@@ -268,7 +268,7 @@ ippr_rcmd_portmsg(fin, aps, nat)
 		MUTEX_ENTER(&ipf_nat_new);
 		nat2 = ipf_nat_add(&fi, &rc->rcmd_rule, NULL, nflags,
 				   direction);
-		MUTEX_ENTER(&ipf_nat_new);
+		MUTEX_EXIT(&ipf_nat_new);
 
 		if (nat2 != NULL) {
 			(void) ipf_nat_proto(&fi, nat2, IPN_TCP);

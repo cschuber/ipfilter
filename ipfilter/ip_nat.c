@@ -2853,10 +2853,6 @@ ipf_nat_add(fin, np, natsave, flags, direction)
 	nat->nat_pr[0] = fin->fin_p;
 	nat->nat_pr[1] = fin->fin_p;
 
-	if ((flags & NAT_SLAVE) == 0) {
-		MUTEX_ENTER(&ipf_nat_new);
-	}
-
 	/*
 	 * Search the current table for a match and create a new mapping
 	 * if there is none found.
