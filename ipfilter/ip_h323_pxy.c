@@ -274,9 +274,11 @@ nat_t *nat;
 			fi.fin_data[1] = 0;
 			fi.fin_dp = (char *)&udp;
 
+			MUTEX_ENTER(&ipf_nat_new);
 			nat2 = nat_new(&fi, nat->nat_ptr, NULL,
 				       NAT_SLAVE|IPN_UDP|SI_W_DPORT,
 				       NAT_OUTBOUND);
+			MUTEX_EXIT(&ipf_nat_new);
 			if (nat2 != NULL) {
 				(void) nat_proto(&fi, nat2, IPN_UDP);
 				MUTEX_ENTER(&nat2->nat_lock);

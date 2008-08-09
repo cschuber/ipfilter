@@ -356,7 +356,9 @@ int dlen;
 		flags = NAT_SLAVE|IPN_TCP|SI_W_DPORT;
 		if (nat->nat_dir == NAT_INBOUND)
 			flags |= NAT_NOTRULEPORT;
+		MUTEX_ENTER(&ipf_nat_new);
 		nat2 = nat_new(&fi, nat->nat_ptr, NULL, flags, nat->nat_dir);
+		MUTEX_EXIT(&ipf_nat_new);
 
 		if (nat2 != NULL) {
 			(void) nat_proto(&fi, nat2, IPN_TCP);
@@ -708,7 +710,9 @@ u_int data_ip;
 		nflags |= NAT_SLAVE;
 		if (nat->nat_dir == NAT_INBOUND)
 			nflags |= NAT_NOTRULEPORT;
+		MUTEX_ENTER(&ipf_nat_new);
 		nat2 = nat_new(&fi, nat->nat_ptr, NULL, nflags, nat->nat_dir);
+		MUTEX_EXIT(&ipf_nat_new);
 		if (nat2 != NULL) {
 			(void) nat_proto(&fi, nat2, IPN_TCP);
 			MUTEX_ENTER(&nat2->nat_lock);

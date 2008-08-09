@@ -2432,10 +2432,6 @@ int direction;
 	nat->nat_flags = flags;
 	nat->nat_redir = np->in_redir;
 
-	if ((flags & NAT_SLAVE) == 0) {
-		MUTEX_ENTER(&ipf_nat_new);
-	}
-
 	/*
 	 * Search the current table for a match.
 	 */
@@ -2549,9 +2545,8 @@ badnat:
 	KFREE(nat);
 	nat = NULL;
 done:
-	if ((flags & NAT_SLAVE) == 0) {
-		MUTEX_EXIT(&ipf_nat_new);
-	}
+	if (nat != NULL && np != NULL)
+		np->in_hits++;
 	return nat;
 }
 
@@ -2677,10 +2672,6 @@ int	rev;
 
 	nat->nat_rev = rev;
 	nat->nat_ref = 1;
-	nat->nat_bytes[0] = 0;
-	nat->nat_pkts[0] = 0;
-	nat->nat_bytes[1] = 0;
-	nat->nat_pkts[1] = 0;
 
 	nat->nat_ifnames[0][LIFNAMSIZ - 1] = '\0';
 	nat->nat_ifps[0] = fr_resolvenic(nat->nat_ifnames[0], 4);
@@ -2701,25 +2692,29 @@ int	rev;
 		nat_instances->nat_pnext = &nat->nat_next;
 	nat_instances = nat;
 
+	/*
+	 * Bump this before the hash table inserts.
+	 */
+	nat_stats.ns_added++;
+
 	natp = &nat_table[0][hv1];
-	if (*natp)
-		(*natp)->nat_phnext[0] = &nat->nat_hnext[0];
 	nat->nat_phnext[0] = natp;
 	nat->nat_hnext[0] = *natp;
+	if (*natp)
+		(*natp)->nat_phnext[0] = &nat->nat_hnext[0];
 	*natp = nat;
 	nat_stats.ns_bucketlen[0][hv1]++;
 
 	natp = &nat_table[1][hv2];
-	if (*natp)
-		(*natp)->nat_phnext[1] = &nat->nat_hnext[1];
 	nat->nat_phnext[1] = natp;
 	nat->nat_hnext[1] = *natp;
+	if (*natp)
+		(*natp)->nat_phnext[1] = &nat->nat_hnext[1];
 	*natp = nat;
 	nat_stats.ns_bucketlen[1][hv2]++;
 
 	fr_setnatqueue(nat, rev);
 
-	nat_stats.ns_added++;
 	nat_stats.ns_inuse++;
 	return 0;
 }
@@ -3857,32 +3852,14 @@ maskloop:
 					continue;
 			}
 
-			ATOMIC_INC32(np->in_use);
-			RWLOCK_EXIT(&ipf_nat);
-			WRITE_ENTER(&ipf_nat);
-			/*
-			 * If we've matched a round-robin rule but it has
-			 * moved in the list since we got it, start over as
-			 * this is now no longer correct.
-			 */
-			if (npnext != np->in_mnext) {
-				if (np->in_flags & IPN_ROUNDR) {
-					MUTEX_DOWNGRADE(&ipf_nat);
-					goto maskloop;
-				}
-				npnext = np->in_mnext;
-			}
+			MUTEX_ENTER(&ipf_nat_new);
 			nat = nat_new(fin, np, NULL, nflags, NAT_OUTBOUND);
+			MUTEX_EXIT(&ipf_nat_new);
 			if (nat != NULL) {
-				np->in_hits++;
-				np->in_use--;
-				MUTEX_DOWNGRADE(&ipf_nat);
 				natfailed = 0;
 				break;
 			}
 			natfailed = -1;
-			fr_ipnatderef(&np);
-			MUTEX_DOWNGRADE(&ipf_nat);
 		}
 		if ((np == NULL) && (nmsk != 0)) {
 			while (nmsk) {
@@ -4172,30 +4149,24 @@ maskloop:
 				}
 			}
 
-			ATOMIC_INC32(np->in_use);
-			RWLOCK_EXIT(&ipf_nat);
-			WRITE_ENTER(&ipf_nat);
 			/*
 			 * If we've matched a round-robin rule but it has
 			 * moved in the list since we got it, start over as
 			 * this is now no longer correct.
 			 */
+			MUTEX_ENTER(&ipf_nat_new);
 			if ((npnext != np->in_rnext) &&
 			    (np->in_flags & IPN_ROUNDR)) {
-				MUTEX_DOWNGRADE(&ipf_nat);
+				MUTEX_EXIT(&ipf_nat_new);
 				goto maskloop;
 			}
 			nat = nat_new(fin, np, NULL, nflags, NAT_INBOUND);
+			MUTEX_EXIT(&ipf_nat_new);
 			if (nat != NULL) {
-				np->in_hits++;
-				np->in_use--;
-				MUTEX_DOWNGRADE(&ipf_nat);
 				natfailed = 0;
 				break;
 			}
 			natfailed = -1;
-			fr_ipnatderef(&np);
-			MUTEX_DOWNGRADE(&ipf_nat);
 		}
 
 		if ((np == NULL) && (rmsk != 0)) {

@@ -192,7 +192,9 @@ nat_t *nat;
 			nflags |= NAT_NOTRULEPORT;
 		}
 
+		MUTEX_ENTER(&ipf_nat_new);
 		nat2 = nat_new(&fi, nat->nat_ptr, NULL, nflags, nat->nat_dir);
+		MUTEX_EXIT(&ipf_nat_new);
 
 		if (nat2 != NULL) {
 			(void) nat_proto(&fi, nat2, IPN_TCP);

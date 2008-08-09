@@ -295,9 +295,11 @@ nat_t *nat;
 		fi.fin_data[0] = dp;
 		fi.fin_data[1] = sp;
 		fi.fin_out = 0;
+		MUTEX_ENTER(&ipf_nat_new);
 		nat2 = nat_new(&fi, nat->nat_ptr, NULL,
 			       NAT_SLAVE|IPN_UDP | (sp ? 0 : SI_W_SPORT),
 			       NAT_OUTBOUND);
+		MUTEX_EXIT(&ipf_nat_new);
 		if (nat2 != NULL) {
 			(void) nat_proto(&fi, nat2, IPN_UDP);
 			MUTEX_ENTER(&nat2->nat_lock);
@@ -317,9 +319,11 @@ nat_t *nat;
 		fi.fin_data[0] = sp;
 		fi.fin_data[1] = 0;
 		fi.fin_out = 1;
+		MUTEX_ENTER(&ipf_nat_new);
 		nat2 = nat_new(&fi, nat->nat_ptr, NULL,
 			       NAT_SLAVE|IPN_UDP|SI_W_DPORT,
 			       NAT_OUTBOUND);
+		MUTEX_EXIT(&ipf_nat_new);
 		if (nat2 != NULL) {
 			(void) nat_proto(&fi, nat2, IPN_UDP);
 			MUTEX_ENTER(&nat2->nat_lock);

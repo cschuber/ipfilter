@@ -1241,8 +1241,10 @@ ippr_rpcb_getnat(fin, nat, proto, port)
 		*ipn->in_plabel = '\0';
 
 		/* Create NAT entry.  return NULL if this fails. */
+		MUTEX_ENTER(&ipf_nat_new);
 		natl = nat_new(&fi, ipn, NULL, nflags|SI_CLONE|NAT_SLAVE,
 			       NAT_INBOUND);
+		MUTEX_EXIT(&ipf_nat_new);
 
 		bcopy((char *)&ipnat, (char *)ipn, sizeof(ipnat));
 

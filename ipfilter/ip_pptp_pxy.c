@@ -198,8 +198,10 @@ pptp_pxy_t *pptp;
 	if (nat2 != NULL)
 		fr_queueback(&nat2->nat_tqe);
 	else {
+		MUTEX_ENTER(&ipf_nat_new);
 		nat2 = nat_new(&fi, &pptp->pptp_rule, &pptp->pptp_nat,
 			       NAT_SLAVE, nat->nat_dir);
+		MUTEX_EXIT(&ipf_nat_new);
 		pptp->pptp_nat = nat2;
 		if (nat2 != NULL) {
 			(void) nat_proto(&fi, nat2, 0);
