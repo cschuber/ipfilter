@@ -2059,7 +2059,6 @@ static int sort_dstpt(a, b)
 ipstate_t *fetchstate(src, dst)
 	ipstate_t *src, *dst;
 {
-	int i;
 
 	if (live_kernel == 1) {
 		ipfgeniter_t state;
