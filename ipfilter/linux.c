@@ -136,12 +136,12 @@ static ssize_t ipf_write(struct file *fp, const char *buf, size_t count,
 		return -ENXIO;
 
 	uio.uio_rw = UIO_WRITE;
-        uio.uio_iov = NULL;
-        uio.uio_file = fp;
-        uio.uio_buf = (char *)buf;
-        uio.uio_iovcnt = 0;
-        uio.uio_offset = *posp;
-        uio.uio_resid = count;
+	uio.uio_iov = NULL;
+	uio.uio_file = fp;
+	uio.uio_buf = (char *)buf;
+	uio.uio_iovcnt = 0;
+	uio.uio_offset = *posp;
+	uio.uio_resid = count;
 
 	err = ipf_sync_write(&uio);
 	if (err > 0)
@@ -163,12 +163,12 @@ static ssize_t ipf_read(struct file *fp, char *buf, size_t count, loff_t *posp)
 	unit = MINOR(i->i_rdev);
 
 	uio.uio_rw = UIO_READ;
-        uio.uio_iov = NULL;
-        uio.uio_file = fp;
-        uio.uio_buf = (char *)buf;
-        uio.uio_iovcnt = 0;
-        uio.uio_offset = *posp;
-        uio.uio_resid = count;
+	uio.uio_iov = NULL;
+	uio.uio_file = fp;
+	uio.uio_buf = (char *)buf;
+	uio.uio_iovcnt = 0;
+	uio.uio_offset = *posp;
+	uio.uio_resid = count;
 
 	switch (unit)
 	{

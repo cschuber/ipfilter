@@ -338,12 +338,12 @@ ipf_send_icmp_err(int type, fr_info_t *fin, int isdst)
 	leader = m0->data - m0->head;
 	if ((leader & 15) != 0)
 		leader += 16 - (leader & 15);
-        m = alloc_skb(sz + leader, GFP_ATOMIC);
-        if (m == NULL)
-                return -1;
+	m = alloc_skb(sz + leader, GFP_ATOMIC);
+	if (m == NULL)
+		return -1;
 
-        /* Set the data pointer */
-        skb_reserve(m, leader);
+	/* Set the data pointer */
+	skb_reserve(m, leader);
 
 	bzero(MTOD(m, char *), (size_t)sz);
 
@@ -681,7 +681,7 @@ int ipfattach()
 	MUTEX_INIT(&ipl_mutex, "ipf log mutex");
 	MUTEX_INIT(&ipf_timeoutlock, "ipf timeout lock mutex");
 	RWLOCK_INIT(&ipf_ipidfrag, "ipf IP NAT-Frag rwlock");
-        RWLOCK_INIT(&ipf_tokens, "ipf token rwlock");
+	RWLOCK_INIT(&ipf_tokens, "ipf token rwlock");
 
 	for (i = 0; i < sizeof(ipf_hooks)/sizeof(ipf_hooks[0]); i++) {
 		err = nf_register_hook(&ipf_hooks[i]);
@@ -705,12 +705,12 @@ int ipfattach()
 
 #ifdef STES
 	/* timeout(ipf_slowtimer, NULL, (hz / IPF_HZ_DIVIDE) * IPF_HZ_MULT); */
-        init_timer(&ipf_timer);
-        ipf_timer.function = ipf_slowtimer;
-        ipf_timer.data = NULL;
-        ipf_timer.expires = (HZ / IPF_HZ_DIVIDE) * IPF_HZ_MULT;
-        add_timer(&ipf_timer);
-        mod_timer(&ipf_timer, HZ/2 + jiffies);
+	init_timer(&ipf_timer);
+	ipf_timer.function = ipf_slowtimer;
+	ipf_timer.data = NULL;
+	ipf_timer.expires = (HZ / IPF_HZ_DIVIDE) * IPF_HZ_MULT;
+	add_timer(&ipf_timer);
+	mod_timer(&ipf_timer, HZ/2 + jiffies);
 #endif
 
 	return 0;
@@ -718,15 +718,15 @@ int ipfattach()
 
 int ipfdetach()
 {
-        int i;
+	int i;
 
-        del_timer(&ipf_timer);
+	del_timer(&ipf_timer);
 
-        SPL_NET(s);
+	SPL_NET(s);
 
-        for (i = 0; i < sizeof(ipf_hooks)/sizeof(ipf_hooks[0]); i++)
-                nf_unregister_hook(&ipf_hooks[i]);
-        /* untimeout(ipf_slowtimer, NULL); */
+	for (i = 0; i < sizeof(ipf_hooks)/sizeof(ipf_hooks[0]); i++)
+		nf_unregister_hook(&ipf_hooks[i]);
+	/* untimeout(ipf_slowtimer, NULL); */
 
 #ifdef notyet
 	if (ipf_control_forwarding & 2)
@@ -741,7 +741,7 @@ int ipfdetach()
 	MUTEX_DESTROY(&ipf_timeoutlock);
 	MUTEX_DESTROY(&ipl_mutex);
 	MUTEX_DESTROY(&ipf_rw);
-        RW_DESTROY(&ipf_tokens);
+	RW_DESTROY(&ipf_tokens);
 	RW_DESTROY(&ipf_ipidfrag);
 
 	SPL_X(s);
@@ -868,9 +868,9 @@ void ipf_rw_init(rwlck, name)
 ipfrwlock_t *rwlck;
 char *name;
 {
-        memset(rwlck, 0, sizeof(*rwlck));
-        rwlck->ipf_lname = name;
-        rwlock_init(&rwlck->ipf_lk);
+	memset(rwlck, 0, sizeof(*rwlck));
+	rwlck->ipf_lname = name;
+	rwlock_init(&rwlck->ipf_lk);
 }
 
 #if 0
@@ -1015,7 +1015,7 @@ ipf_random(int range)
 /* ------------------------------------------------------------------------ */
 void ipf_slowtimer(long value)
 {
-        READ_ENTER(&ipf_global);
+	READ_ENTER(&ipf_global);
 
 	ipf_expiretokens();
 	ipf_frag_expire();
@@ -1024,11 +1024,11 @@ void ipf_slowtimer(long value)
 	ipf_auth_expire();
 	ipf_ticks++;
 	if (ipf_running <= 0)
-                goto done;
-        mod_timer(&ipf_timer, HZ/2 + jiffies);
+		goto done;
+	mod_timer(&ipf_timer, HZ/2 + jiffies);
 
 done:
-        RWLOCK_EXIT(&ipf_global);
+	RWLOCK_EXIT(&ipf_global);
 }
 #endif
 
@@ -1036,11 +1036,11 @@ int ipf_inject(fin, m)
 fr_info_t *fin;
 mb_t *m;
 {
-        FREE_MB_T(m);
+	FREE_MB_T(m);
 
-        fin->fin_m = NULL;
-        fin->fin_ip = NULL;
+	fin->fin_m = NULL;
+	fin->fin_ip = NULL;
 
-        return EINVAL;
+	return EINVAL;
 }
 
