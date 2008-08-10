@@ -220,10 +220,10 @@ typedef unsigned int	u_32_t;
 #   define	ATOMIC_DEC32(x)		atomic_add_32((uint32_t*)&(x), -1)
 #   define	ATOMIC_DEC16(x)		atomic_add_16((uint16_t*)&(x), -1)
 #  else
-#   define	ATOMIC_INC(x)		{ mutex_enter(&ipf_rw); (x)++; \
-					  mutex_exit(&ipf_rw); }
-#   define	ATOMIC_DEC(x)		{ mutex_enter(&ipf_rw); (x)--; \
-					  mutex_exit(&ipf_rw); }
+#   define	ATOMIC_INC(x)		{ mutex_enter(&softc->ipf_rw); (x)++; \
+					  mutex_exit(&softc->ipf_rw); }
+#   define	ATOMIC_DEC(x)		{ mutex_enter(&softc->ipf_rw); (x)--; \
+					  mutex_exit(&softc->ipf_rw); }
 #  endif /* SOLARIS2 >= 6 */
 #  define	USE_MUTEXES
 #  define	MUTEX_ENTER(x)		mutex_enter(&(x)->ipf_lk)
@@ -354,35 +354,35 @@ typedef	struct	iplog_select_s {
  */
 #  if 1
 #   ifdef __LP64__
-#    define	ATOMIC_INCL(x)		lock_and_incr_int64(&ipf_rw.ipf_lk, &(x), 1)
-#    define	ATOMIC_DECL(x)		lock_and_incr_int64(&ipf_rw.ipf_lk, &(x), -1)
+#    define	ATOMIC_INCL(x)		lock_and_incr_int64(&softc->ipf_rw.ipf_lk, &(x), 1)
+#    define	ATOMIC_DECL(x)		lock_and_incr_int64(&softc->ipf_rw.ipf_lk, &(x), -1)
 #   else
-#    define	ATOMIC_INCL(x)		lock_and_incr_int32(&ipf_rw.ipf_lk, &(x), 1)
-#    define	ATOMIC_DECL(x)		lock_and_incr_int32(&ipf_rw.ipf_lk, &(x), -1)
+#    define	ATOMIC_INCL(x)		lock_and_incr_int32(&softc->ipf_rw.ipf_lk, &(x), 1)
+#    define	ATOMIC_DECL(x)		lock_and_incr_int32(&softc->ipf_rw.ipf_lk, &(x), -1)
 #   endif
-#   define	ATOMIC_INC64(x)		lock_and_incr_int64(&ipf_rw.ipf_lk, &(x), 1)
-#   define	ATOMIC_INC32(x)		lock_and_incr_int32(&ipf_rw.ipf_lk, &(x), 1)
-#   define	ATOMIC_INC16(x)		lock_and_incr_int16(&ipf_rw.ipf_lk, &(x), 1)
-#   define	ATOMIC_DEC64(x)		lock_and_incr_int64(&ipf_rw.ipf_lk, &(x), -1)
-#   define	ATOMIC_DEC32(x)		lock_and_incr_int32(&ipf_rw.ipf_lk, &(x), -1)
-#   define	ATOMIC_DEC16(x)		lock_and_incr_int16(&ipf_rw.ipf_lk, &(x), -1)
+#   define	ATOMIC_INC64(x)		lock_and_incr_int64(&softc->ipf_rw.ipf_lk, &(x), 1)
+#   define	ATOMIC_INC32(x)		lock_and_incr_int32(&softc->ipf_rw.ipf_lk, &(x), 1)
+#   define	ATOMIC_INC16(x)		lock_and_incr_int16(&softc->ipf_rw.ipf_lk, &(x), 1)
+#   define	ATOMIC_DEC64(x)		lock_and_incr_int64(&softc->ipf_rw.ipf_lk, &(x), -1)
+#   define	ATOMIC_DEC32(x)		lock_and_incr_int32(&softc->ipf_rw.ipf_lk, &(x), -1)
+#   define	ATOMIC_DEC16(x)		lock_and_incr_int16(&softc->ipf_rw.ipf_lk, &(x), -1)
 #  else /* 0 */
-#   define	ATOMIC_INC64(x)		{ MUTEX_ENTER(&ipf_rw); (x)++; \
-					  MUTEX_EXIT(&ipf_rw); }
-#   define	ATOMIC_DEC64(x)		{ MUTEX_ENTER(&ipf_rw); (x)--; \
-					  MUTEX_EXIT(&ipf_rw); }
-#   define	ATOMIC_INC32(x)		{ MUTEX_ENTER(&ipf_rw); (x)++; \
-					  MUTEX_EXIT(&ipf_rw); }
-#   define	ATOMIC_DEC32(x)		{ MUTEX_ENTER(&ipf_rw); (x)--; \
-					  MUTEX_EXIT(&ipf_rw); }
-#   define	ATOMIC_INCL(x)		{ MUTEX_ENTER(&ipf_rw); (x)++; \
-					  MUTEX_EXIT(&ipf_rw); }
-#   define	ATOMIC_DECL(x)		{ MUTEX_ENTER(&ipf_rw); (x)--; \
-					  MUTEX_EXIT(&ipf_rw); }
-#   define	ATOMIC_INC(x)		{ MUTEX_ENTER(&ipf_rw); (x)++; \
-					  MUTEX_EXIT(&ipf_rw); }
-#   define	ATOMIC_DEC(x)		{ MUTEX_ENTER(&ipf_rw); (x)--; \
-					  MUTEX_EXIT(&ipf_rw); }
+#   define	ATOMIC_INC64(x)		{ MUTEX_ENTER(&softc->ipf_rw); (x)++; \
+					  MUTEX_EXIT(&softc->ipf_rw); }
+#   define	ATOMIC_DEC64(x)		{ MUTEX_ENTER(&softc->ipf_rw); (x)--; \
+					  MUTEX_EXIT(&softc->ipf_rw); }
+#   define	ATOMIC_INC32(x)		{ MUTEX_ENTER(&softc->ipf_rw); (x)++; \
+					  MUTEX_EXIT(&softc->ipf_rw); }
+#   define	ATOMIC_DEC32(x)		{ MUTEX_ENTER(&softc->ipf_rw); (x)--; \
+					  MUTEX_EXIT(&softc->ipf_rw); }
+#   define	ATOMIC_INCL(x)		{ MUTEX_ENTER(&softc->ipf_rw); (x)++; \
+					  MUTEX_EXIT(&softc->ipf_rw); }
+#   define	ATOMIC_DECL(x)		{ MUTEX_ENTER(&softc->ipf_rw); (x)--; \
+					  MUTEX_EXIT(&softc->ipf_rw); }
+#   define	ATOMIC_INC(x)		{ MUTEX_ENTER(&softc->ipf_rw); (x)++; \
+					  MUTEX_EXIT(&softc->ipf_rw); }
+#   define	ATOMIC_DEC(x)		{ MUTEX_ENTER(&softc->ipf_rw); (x)--; \
+					  MUTEX_EXIT(&softc->ipf_rw); }
 #  endif
 #  define	ip_cksum		ip_csuma
 #  define	memcpy(a,b,c)		bcopy((caddr_t)b, (caddr_t)a, c)
@@ -529,10 +529,10 @@ typedef struct {
 # endif
 
 # ifdef _KERNEL
-#  define	ATOMIC_INC(x)		{ MUTEX_ENTER(&ipf_rw); \
-					  (x)++; MUTEX_EXIT(&ipf_rw); }
-#  define	ATOMIC_DEC(x)		{ MUTEX_ENTER(&ipf_rw); \
-					  (x)--; MUTEX_EXIT(&ipf_rw); }
+#  define	ATOMIC_INC(x)		{ MUTEX_ENTER(&softc->ipf_rw); \
+					  (x)++; MUTEX_EXIT(&softc->ipf_rw); }
+#  define	ATOMIC_DEC(x)		{ MUTEX_ENTER(&softc->ipf_rw); \
+					  (x)--; MUTEX_EXIT(&softc->ipf_rw); }
 #  define	USE_MUTEXES
 #  ifdef MUTEX_INIT
 #   include <sys/atomic_ops.h>
@@ -645,16 +645,16 @@ typedef struct mbuf mb_t;
 #  define	ATOMIC_DEC64(x)		atomic_decq((uint64_t*)&(x))
 #  define	ATOMIC_INC32(x)		atomic_incl((uint32_t*)&(x))
 #  define	ATOMIC_DEC32(x)		atomic_decl((uint32_t*)&(x))
-#  define	ATOMIC_INC16(x)		{ simple_lock(&ipf_rw); (x)++; \
-					  simple_unlock(&ipf_rw); }
-#  define	ATOMIC_DEC16(x)		{ simple_lock(&ipf_rw); (x)--; \
-					  simple_unlock(&ipf_rw); }
+#  define	ATOMIC_INC16(x)		{ simple_lock(&softc->ipf_rw); (x)++; \
+					  simple_unlock(&softc->ipf_rw); }
+#  define	ATOMIC_DEC16(x)		{ simple_lock(&softc->ipf_rw); (x)--; \
+					  simple_unlock(&softc->ipf_rw); }
 #  define	ATOMIC_INCL(x)		atomic_incl((uint32_t*)&(x))
 #  define	ATOMIC_DECL(x)		atomic_decl((uint32_t*)&(x))
-#  define	ATOMIC_INC(x)		{ simple_lock(&ipf_rw); (x)++; \
-					  simple_unlock(&ipf_rw); }
-#  define	ATOMIC_DEC(x)		{ simple_lock(&ipf_rw); (x)--; \
-					  simple_unlock(&ipf_rw); }
+#  define	ATOMIC_INC(x)		{ simple_lock(&softc->ipf_rw); (x)++; \
+					  simple_unlock(&softc->ipf_rw); }
+#  define	ATOMIC_DEC(x)		{ simple_lock(&softc->ipf_rw); (x)--; \
+					  simple_unlock(&softc->ipf_rw); }
 #  define	SPL_SCHED(x)		;
 #  define	SPL_NET(x)		;
 #  define	SPL_IMP(x)		;
@@ -756,6 +756,9 @@ typedef	char *	caddr_t;
 # endif
 
 # ifdef _KERNEL
+#  if (__NetBSD_Version__ > 299001400)
+#   include <sys/selinfo.h>
+#  endif
 #  if (__NetBSD_Version__ >= 399001400)
 #   define	KMALLOCS(a, b, c)	(a) = (b)malloc((c), _M_IPF, M_NOWAIT)
 #  endif
@@ -767,7 +770,7 @@ typedef	char *	caddr_t;
 #  define	COPYIN(a,b,c)	copyin((caddr_t)(a), (caddr_t)(b), (c))
 #  define	COPYOUT(a,b,c)	copyout((caddr_t)(a), (caddr_t)(b), (c))
 #  if (defined(__NetBSD_Version__) && (__NetBSD_Version__ >= 499004900))
-#   define	POLLWAKEUP(x)	selnotify(ipfselwait+x, 0, 0)
+#   define	POLLWAKEUP(x)	selnotify(softc->ipf_selwait+x, 0, 0)
 #  endif
 typedef struct mbuf mb_t;
 # endif /* _KERNEL */
@@ -812,6 +815,7 @@ typedef	u_int32_t	u_32_t;
 # endif
 
 # if defined(_KERNEL)
+#  include <netinet/ip_var.h>
 #  if (__FreeBSD_version >= 400000)
 /*
  * When #define'd, the 5.2.1 kernel panics when used with the ftp proxy.
@@ -932,10 +936,10 @@ typedef	u_int32_t	u_32_t;
  * with a WITNESS kernel, it generates LOR messages.
  */
 #   include <machine/atomic.h>
-#   define	ATOMIC_INC(x)		{ mtx_lock(&ipf_rw.ipf_lk); (x)++; \
-					  mtx_unlock(&ipf_rw.ipf_lk); }
-#   define	ATOMIC_DEC(x)		{ mtx_lock(&ipf_rw.ipf_lk); (x)--; \
-					  mtx_unlock(&ipf_rw.ipf_lk); }
+#   define	ATOMIC_INC(x)		{ mtx_lock(&softc->ipf_rw.ipf_lk); (x)++; \
+					  mtx_unlock(&softc->ipf_rw.ipf_lk); }
+#   define	ATOMIC_DEC(x)		{ mtx_lock(&softc->ipf_rw.ipf_lk); (x)--; \
+					  mtx_unlock(&softc->ipf_rw.ipf_lk); }
 #   define	ATOMIC_INCL(x)		atomic_add_long(&(x), 1)
 #   define	ATOMIC_INC64(x)		ATOMIC_INC(x)
 #   define	ATOMIC_INC32(x)		atomic_add_32((u_int *)&(x), 1)
@@ -1150,22 +1154,22 @@ struct ip6_ext {
 #  define	RW_DESTROY(x)		do { } while (0)
 #  define	RWLOCK_EXIT(x)		ipf_rw_exit(x)
 #  define	MUTEX_DOWNGRADE(x)	ipf_rw_downgrade(x)
-#  define	ATOMIC_INCL(x)		MUTEX_ENTER(&ipf_rw); (x)++; \
-					MUTEX_EXIT(&ipf_rw)
-#  define	ATOMIC_DECL(x)		MUTEX_ENTER(&ipf_rw); (x)--; \
-					MUTEX_EXIT(&ipf_rw)
-#  define	ATOMIC_INC64(x)		MUTEX_ENTER(&ipf_rw); (x)++; \
-					MUTEX_EXIT(&ipf_rw)
-#  define	ATOMIC_INC32(x)		MUTEX_ENTER(&ipf_rw); (x)++; \
-					MUTEX_EXIT(&ipf_rw)
-#  define	ATOMIC_INC16(x)		MUTEX_ENTER(&ipf_rw); (x)++; \
-					MUTEX_EXIT(&ipf_rw)
-#  define	ATOMIC_DEC64(x)		MUTEX_ENTER(&ipf_rw); (x)--; \
-					MUTEX_EXIT(&ipf_rw)
-#  define	ATOMIC_DEC32(x)		MUTEX_ENTER(&ipf_rw); (x)--; \
-					MUTEX_EXIT(&ipf_rw)
-#  define	ATOMIC_DEC16(x)		MUTEX_ENTER(&ipf_rw); (x)--; \
-					MUTEX_EXIT(&ipf_rw)
+#  define	ATOMIC_INCL(x)		MUTEX_ENTER(&softc->ipf_rw); (x)++; \
+					MUTEX_EXIT(&softc->ipf_rw)
+#  define	ATOMIC_DECL(x)		MUTEX_ENTER(&softc->ipf_rw); (x)--; \
+					MUTEX_EXIT(&softc->ipf_rw)
+#  define	ATOMIC_INC64(x)		MUTEX_ENTER(&softc->ipf_rw); (x)++; \
+					MUTEX_EXIT(&softc->ipf_rw)
+#  define	ATOMIC_INC32(x)		MUTEX_ENTER(&softc->ipf_rw); (x)++; \
+					MUTEX_EXIT(&softc->ipf_rw)
+#  define	ATOMIC_INC16(x)		MUTEX_ENTER(&softc->ipf_rw); (x)++; \
+					MUTEX_EXIT(&softc->ipf_rw)
+#  define	ATOMIC_DEC64(x)		MUTEX_ENTER(&softc->ipf_rw); (x)--; \
+					MUTEX_EXIT(&softc->ipf_rw)
+#  define	ATOMIC_DEC32(x)		MUTEX_ENTER(&softc->ipf_rw); (x)--; \
+					MUTEX_EXIT(&softc->ipf_rw)
+#  define	ATOMIC_DEC16(x)		MUTEX_ENTER(&softc->ipf_rw); (x)--; \
+					MUTEX_EXIT(&softc->ipf_rw)
 #  define	SPL_SCHED(x)		do { } while (0)
 #  define	SPL_IMP(x)		do { } while (0)
 #  define	SPL_NET(x)		do { } while (0)
@@ -1301,22 +1305,22 @@ typedef u_int32_t 	u_32_t;
 #  define	MUTEX_DESTROY(x)	lock_free(&(x)->ipf_lk)
 #  define	MUTEX_EXIT(x)		simple_unlock((x)->ipf_lk)
 #  define	MUTEX_NUKE(x)		bzero(&(x)->ipf_lk, sizeof((x)->ipf_lk))
-#   define	ATOMIC_INC64(x)		{ MUTEX_ENTER(&ipf_rw); (x)++; \
-					  MUTEX_EXIT(&ipf_rw); }
-#   define	ATOMIC_DEC64(x)		{ MUTEX_ENTER(&ipf_rw); (x)--; \
-					  MUTEX_EXIT(&ipf_rw); }
-#   define	ATOMIC_INC32(x)		{ MUTEX_ENTER(&ipf_rw); (x)++; \
-					  MUTEX_EXIT(&ipf_rw); }
-#   define	ATOMIC_DEC32(x)		{ MUTEX_ENTER(&ipf_rw); (x)--; \
-					  MUTEX_EXIT(&ipf_rw); }
-#   define	ATOMIC_INCL(x)		{ MUTEX_ENTER(&ipf_rw); (x)++; \
-					  MUTEX_EXIT(&ipf_rw); }
-#   define	ATOMIC_DECL(x)		{ MUTEX_ENTER(&ipf_rw); (x)--; \
-					  MUTEX_EXIT(&ipf_rw); }
-#   define	ATOMIC_INC(x)		{ MUTEX_ENTER(&ipf_rw); (x)++; \
-					  MUTEX_EXIT(&ipf_rw); }
-#   define	ATOMIC_DEC(x)		{ MUTEX_ENTER(&ipf_rw); (x)--; \
-					  MUTEX_EXIT(&ipf_rw); }
+#   define	ATOMIC_INC64(x)		{ MUTEX_ENTER(&softc->ipf_rw); (x)++; \
+					  MUTEX_EXIT(&softc->ipf_rw); }
+#   define	ATOMIC_DEC64(x)		{ MUTEX_ENTER(&softc->ipf_rw); (x)--; \
+					  MUTEX_EXIT(&softc->ipf_rw); }
+#   define	ATOMIC_INC32(x)		{ MUTEX_ENTER(&softc->ipf_rw); (x)++; \
+					  MUTEX_EXIT(&softc->ipf_rw); }
+#   define	ATOMIC_DEC32(x)		{ MUTEX_ENTER(&softc->ipf_rw); (x)--; \
+					  MUTEX_EXIT(&softc->ipf_rw); }
+#   define	ATOMIC_INCL(x)		{ MUTEX_ENTER(&softc->ipf_rw); (x)++; \
+					  MUTEX_EXIT(&softc->ipf_rw); }
+#   define	ATOMIC_DECL(x)		{ MUTEX_ENTER(&softc->ipf_rw); (x)--; \
+					  MUTEX_EXIT(&softc->ipf_rw); }
+#   define	ATOMIC_INC(x)		{ MUTEX_ENTER(&softc->ipf_rw); (x)++; \
+					  MUTEX_EXIT(&softc->ipf_rw); }
+#   define	ATOMIC_DEC(x)		{ MUTEX_ENTER(&softc->ipf_rw); (x)--; \
+					  MUTEX_EXIT(&softc->ipf_rw); }
 #  define	SPL_SCHED(x)		x = splsched()
 #  define	SPL_NET(x)		x = splnet()
 #  define	SPL_IMP(x)		x = splimp()
@@ -1669,7 +1673,7 @@ MALLOC_DECLARE(M_IPFILTER);
 #  define	SLEEP(id, n)	tsleep((id), PPAUSE|PCATCH, n, 0)
 #  define	WAKEUP(id,x)	wakeup(id+x)
 #  if !defined(POLLWAKEUP)
-#   define	POLLWAKEUP(x)	selwakeup(ipfselwait+x)
+#   define	POLLWAKEUP(x)	selwakeup(softc->ipf_selwait+x)
 #  endif
 #  define	GETIFP(n, v)	ifunit(n)
 #  define	GETIFMTU(x)	((struct ifnet *)x)->if_mtu
@@ -1854,6 +1858,9 @@ typedef	struct	tcpiphdr	tcpiphdr_t;
 
 #ifndef offsetof
 # define offsetof(t,m) (int)((&((t *)0L)->m))
+#endif
+#ifndef stsizeof
+# define stsizeof(t,m)	sizeof(((t *)0L)->m)
 #endif
 
 /*

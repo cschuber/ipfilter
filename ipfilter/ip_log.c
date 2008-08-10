@@ -140,27 +140,101 @@ extern int selwait;
 # ifdef _KERNEL
 #  if defined(linux)
 wait_queue_head_t	iplh_linux[IPL_LOGSIZE];
-#  else
-#   if SOLARIS
-extern	kcondvar_t	iplwait;
-extern	struct pollhead	ipf_poll_head[IPL_LOGSIZE];
-#   else
-extern struct selinfo ipfselwait[IPL_LOGSIZE];
-#   endif
 #  endif
 # endif
 
-iplog_t	**iplh[IPL_LOGSIZE], *iplt[IPL_LOGSIZE], *ipll[IPL_LOGSIZE];
-int	iplused[IPL_LOGSIZE];
-static fr_info_t	iplcrc[IPL_LOGSIZE];
-int	ipl_suppress = 1;
-int	ipl_logall = 0;
-int	ipl_log_init = 0;
-int	ipl_logsize = IPFILTER_LOGSIZE;
-int	ipl_magic[IPL_LOGSIZE] = { IPL_MAGIC, IPL_MAGIC_NAT, IPL_MAGIC_STATE,
-				   IPL_MAGIC, IPL_MAGIC, IPL_MAGIC,
-				   IPL_MAGIC, IPL_MAGIC };
+typedef struct ipf_log_softc_s {
+	ipfmutex_t	ipl_mutex[IPL_LOGSIZE];
+# if SOLARIS && defined(_KERNEL)
+	kcondvar_t	ipl_wait[IPL_LOGSIZE];
+# endif
+# if defined(linux) && defined(_KERNEL)
+	waitqueue	iplh_linux[IPL_LOGSIZE];
+# endif
+# if defined(__hpux) && defined(_KERNEL)
+	iplog_select_t	ipl_ss[IPL_LOGSIZE];
+# endif
+	iplog_t		**iplh[IPL_LOGSIZE];
+	iplog_t		*iplt[IPL_LOGSIZE];
+	iplog_t		*ipll[IPL_LOGSIZE];
+	fr_info_t	ipl_crc[IPL_LOGSIZE];
+	int		ipl_suppress;
+	int		ipl_logall;
+	int		ipl_log_init;
+	int		ipl_logsize;
+	int		ipl_used[IPL_LOGSIZE];
+	int		ipl_magic[IPL_LOGSIZE];
+	ipftuneable_t	*ipf_log_tune;
+} ipf_log_softc_t;
 
+static int magic[IPL_LOGSIZE] = { IPL_MAGIC, IPL_MAGIC_NAT, IPL_MAGIC_STATE,
+				  IPL_MAGIC, IPL_MAGIC, IPL_MAGIC,
+				  IPL_MAGIC, IPL_MAGIC };
+
+static ipftuneable_t ipf_log_tuneables[] = {
+	/* log */
+	{ { (void *)offsetof(ipf_log_softc_t, ipl_suppress) },
+		"log_suppress",		0,	1,
+		stsizeof(ipf_log_softc_t, ipl_suppress),
+		0,			NULL },
+	{ { (void *)offsetof(ipf_log_softc_t, ipl_logall) },
+		"log_all",		0,	1,
+		stsizeof(ipf_log_softc_t, ipl_logall),
+		0,			NULL },
+	{ { (void *)offsetof(ipf_log_softc_t, ipl_logsize) },
+		"log_size",		0,	0x80000,
+		stsizeof(ipf_log_softc_t, ipl_logsize),	
+		0,			NULL },
+	{ { NULL },		NULL,			0,	0,
+		0,				0,	NULL }
+};
+
+
+int
+ipf_log_main_load()
+{
+	return 0;
+}
+
+
+int
+ipf_log_main_unload()
+{
+	return 0;
+}
+
+void *
+ipf_log_soft_create(softc)
+	ipf_main_softc_t *softc;
+{
+	ipf_log_softc_t *softl;
+
+	KMALLOC(softl, ipf_log_softc_t *);
+	if (softl == NULL)
+		return NULL;
+
+	bzero((char *)softl, sizeof(*softl));
+	bcopy((char *)magic, (char *)softl->ipl_magic, sizeof(magic));
+
+	softl->ipf_log_tune = ipf_tune_array_copy(softl,
+						  sizeof(ipf_log_tuneables),
+						  ipf_log_tuneables);
+	if (softl->ipf_log_tune == NULL) { 
+		ipf_log_soft_destroy(softc, softl);
+		return NULL;
+	}
+	if (ipf_tune_array_link(softc, softl->ipf_log_tune) == -1) {
+		ipf_log_soft_destroy(softc, softl);
+		return NULL;
+	}
+
+	softl->ipl_suppress = 1;
+	softl->ipl_logall = 0;
+	softl->ipl_log_init = 0;
+	softl->ipl_logsize = IPFILTER_LOGSIZE;
+
+	return softl;
+}
 
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_log_init                                                */
@@ -171,31 +245,33 @@ int	ipl_magic[IPL_LOGSIZE] = { IPL_MAGIC, IPL_MAGIC_NAT, IPL_MAGIC_STATE,
 /* secret for use in calculating the "last log checksum".                   */
 /* ------------------------------------------------------------------------ */
 int
-ipf_log_init()
+ipf_log_soft_init(softc, arg)
+	ipf_main_softc_t *softc;
+	void *arg;
 {
+	ipf_log_softc_t *softl = arg;
 	int	i;
 
 	for (i = IPL_LOGMAX; i >= 0; i--) {
-		iplt[i] = NULL;
-		ipll[i] = NULL;
-		iplh[i] = &iplt[i];
-		iplused[i] = 0;
-		bzero((char *)&iplcrc[i], sizeof(iplcrc[i]));
+		softl->iplt[i] = NULL;
+		softl->ipll[i] = NULL;
+		softl->iplh[i] = &softl->iplt[i];
+		bzero((char *)&softl->ipl_crc[i], sizeof(softl->ipl_crc[i]));
 # ifdef	IPL_SELECT
-		iplog_ss[i].read_waiter = 0;
-		iplog_ss[i].state = 0;
+		softl->iplog_ss[i].read_waiter = 0;
+		softl->iplog_ss[i].state = 0;
 # endif
 # if defined(linux) && defined(_KERNEL)
-		init_waitqueue_head(iplh_linux + i);
+		init_waitqueue_head(softl->iplh_linux + i);
 # endif
+# if SOLARIS && defined(_KERNEL)
+		cv_init(&softl->ipl_wait[i], NULL, CV_DRIVER, NULL);
+# endif
+		MUTEX_INIT(&softl->ipl_mutex[i], "ipf log mutex");
 	}
 
-# if SOLARIS && defined(_KERNEL)
-	cv_init(&iplwait, "ipl condvar", CV_DRIVER, NULL);
-# endif
-	MUTEX_INIT(&ipl_mutex, "ipf log mutex");
 
-	ipl_log_init = 1;
+	softl->ipl_log_init = 1;
 
 	return 0;
 }
@@ -208,23 +284,46 @@ ipf_log_init()
 /*                                                                          */
 /* Clean up any log data that has accumulated without being read.           */
 /* ------------------------------------------------------------------------ */
-void
-ipf_log_unload()
+int
+ipf_log_soft_fini(softc, arg)
+	ipf_main_softc_t *softc;
+	void *arg;
 {
+	ipf_log_softc_t *softl = arg;
 	int i;
 
-	if (ipl_log_init == 0)
-		return;
+	if (softl->ipl_log_init == 0)
+		return 0;
 
-	for (i = IPL_LOGMAX; i >= 0; i--)
-		(void) ipf_log_clear(i);
+	for (i = IPL_LOGMAX; i >= 0; i--) {
+		(void) ipf_log_clear(softc, i);
 
 # if SOLARIS && defined(_KERNEL)
-	cv_destroy(&iplwait);
+		cv_destroy(&softl->ipl_wait[i]);
 # endif
-	MUTEX_DESTROY(&ipl_mutex);
+		MUTEX_DESTROY(&softl->ipl_mutex[i]);
+	}
 
-	ipl_log_init = 0;
+	softl->ipl_log_init = 0;
+
+	return 0;
+}
+
+
+void
+ipf_log_soft_destroy(softc, arg)
+	ipf_main_softc_t *softc;
+	void *arg;
+{
+	ipf_log_softc_t *softl = arg;
+
+	if (softl->ipf_log_tune != NULL) {
+		ipf_tune_array_unlink(softc, softl->ipf_log_tune);
+		KFREES(softl->ipf_log_tune, sizeof(ipf_log_tuneables));
+		softl->ipf_log_tune = NULL;
+	}
+
+	KFREE(softl);
 }
 
 
@@ -245,6 +344,8 @@ ipf_log_pkt(fin, flags)
 	fr_info_t *fin;
 	u_int flags;
 {
+	ipf_main_softc_t *softc = fin->fin_main_soft;
+	ipf_log_softc_t *softl = softc->ipf_log_soft;
 	register size_t hlen;
 	int types[2], mlen;
 	size_t sizes[2];
@@ -348,7 +449,7 @@ ipf_log_pkt(fin, flags)
 #  endif
 # endif /* __hpux || SOLARIS */
 	mlen = fin->fin_plen - hlen;
-	if (!ipl_logall) {
+	if (!softl->ipl_logall) {
 		mlen = (flags & FR_LOGBODY) ? MIN(mlen, 128) : 0;
 	} else if ((flags & FR_LOGBODY) == 0) {
 		mlen = 0;
@@ -394,14 +495,14 @@ ipf_log_pkt(fin, flags)
 	sizes[1] = hlen + mlen;
 	types[1] = 1;
 # endif /* MENTAT */
-	return ipf_log_items(IPL_LOGIPF, fin, ptrs, sizes, types, 2);
+	return ipf_log_items(softc, IPL_LOGIPF, fin, ptrs, sizes, types, 2);
 }
 
 
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_log_items                                               */
 /* Returns:     int - 0 == success, -1 == failure                           */
-/* Parameters:  dev(I)    - device that owns this log record                */
+/* Parameters:  unit(I)   - device that owns this log record                */
 /*              fin(I)    - pointer to packet information                   */
 /*              items(I)  - array of pointers to log data                   */
 /*              itemsz(I) - array of size of valid memory pointed to        */
@@ -413,13 +514,15 @@ ipf_log_pkt(fin, flags)
 /* from the log device.                                                     */
 /* ------------------------------------------------------------------------ */
 int
-ipf_log_items(dev, fin, items, itemsz, types, cnt)
-	int dev;
+ipf_log_items(softc, unit, fin, items, itemsz, types, cnt)
+	ipf_main_softc_t *softc;
+	int unit;
 	fr_info_t *fin;
 	void **items;
 	size_t *itemsz;
 	int *types, cnt;
 {
+	ipf_log_softc_t *softl = softc->ipf_log_soft;
 	caddr_t buf, ptr;
 	iplog_t *ipl;
 	size_t len;
@@ -431,20 +534,21 @@ ipf_log_items(dev, fin, items, itemsz, types, cnt)
 	 * record logged.  If it does, just up the count on the previous one
 	 * rather than create a new one.
 	 */
-	if (ipl_suppress) {
-		MUTEX_ENTER(&ipl_mutex);
+	if (softl->ipl_suppress) {
+		MUTEX_ENTER(&softl->ipl_mutex[unit]);
 		if ((fin != NULL) && (fin->fin_off == 0)) {
-			if ((ipll[dev] != NULL) &&
-			    bcmp((char *)fin, (char *)&iplcrc[dev],
+			if ((softl->ipll[unit] != NULL) &&
+			    bcmp((char *)fin, (char *)&softl->ipl_crc[unit],
 				 FI_LCSIZE) == 0) {
-				ipll[dev]->ipl_count++;
-				MUTEX_EXIT(&ipl_mutex);
+				softl->ipll[unit]->ipl_count++;
+				MUTEX_EXIT(&softl->ipl_mutex[unit]);
 				return 0;
 			}
-			bcopy((char *)fin, (char *)&iplcrc[dev], FI_LCSIZE);
+			bcopy((char *)fin, (char *)&softl->ipl_crc[unit],
+			      FI_LCSIZE);
 		} else
-			bzero((char *)&iplcrc[dev], FI_CSIZE);
-		MUTEX_EXIT(&ipl_mutex);
+			bzero((char *)&softl->ipl_crc[unit], FI_CSIZE);
+		MUTEX_EXIT(&softl->ipl_mutex[unit]);
 	}
 
 	/*
@@ -461,15 +565,15 @@ ipf_log_items(dev, fin, items, itemsz, types, cnt)
 	if (buf == NULL)
 		return -1;
 	SPL_NET(s);
-	MUTEX_ENTER(&ipl_mutex);
-	if ((iplused[dev] + len) > ipl_logsize) {
-		MUTEX_EXIT(&ipl_mutex);
+	MUTEX_ENTER(&softl->ipl_mutex[unit]);
+	if ((softl->ipl_used[unit] + len) > softl->ipl_logsize) {
+		MUTEX_EXIT(&softl->ipl_mutex[unit]);
 		SPL_X(s);
 		KFREES(buf, len);
 		return -1;
 	}
-	iplused[dev] += len;
-	MUTEX_EXIT(&ipl_mutex);
+	softl->ipl_used[unit] += len;
+	MUTEX_EXIT(&softl->ipl_mutex[unit]);
 	SPL_X(s);
 
 	/*
@@ -477,7 +581,7 @@ ipf_log_items(dev, fin, items, itemsz, types, cnt)
 	 * amount of space we're going to use.
 	 */
 	ipl = (iplog_t *)buf;
-	ipl->ipl_magic = ipl_magic[dev];
+	ipl->ipl_magic = softl->ipl_magic[unit];
 	ipl->ipl_count = 1;
 	ipl->ipl_next = NULL;
 	ipl->ipl_dsize = len;
@@ -501,27 +605,27 @@ ipf_log_items(dev, fin, items, itemsz, types, cnt)
 		ptr += itemsz[i];
 	}
 	SPL_NET(s);
-	MUTEX_ENTER(&ipl_mutex);
-	ipll[dev] = ipl;
-	*iplh[dev] = ipl;
-	iplh[dev] = &ipl->ipl_next;
+	MUTEX_ENTER(&softl->ipl_mutex[unit]);
+	softl->ipll[unit] = ipl;
+	*softl->iplh[unit] = ipl;
+	softl->iplh[unit] = &ipl->ipl_next;
 
 	/*
 	 * Now that the log record has been completed and added to the queue,
 	 * wake up any listeners who may want to read it.
 	 */
 # if SOLARIS && defined(_KERNEL)
-	cv_signal(&iplwait);
-	MUTEX_EXIT(&ipl_mutex);
-	pollwakeup(&ipf_poll_head[dev], POLLRDNORM);
+	cv_signal(&softl->ipl_wait[unit]);
+	MUTEX_EXIT(&softl->ipl_mutex[unit]);
+	pollwakeup(&softc->ipf_poll_head[unit], POLLRDNORM);
 # else
-	MUTEX_EXIT(&ipl_mutex);
-	WAKEUP(iplh, dev);
-	POLLWAKEUP(dev);
+	MUTEX_EXIT(&softl->ipl_mutex[unit]);
+	WAKEUP(softl->iplh, unit);
+	POLLWAKEUP(unit);
 # endif
 	SPL_X(s);
 # ifdef	IPL_SELECT
-	iplog_input_ready(dev);
+	iplog_input_ready(unit);
 # endif
 	return 0;
 }
@@ -540,10 +644,12 @@ ipf_log_items(dev, fin, items, itemsz, types, cnt)
 /* there is none present.  Asynchronous I/O is not implemented.             */
 /* ------------------------------------------------------------------------ */
 int
-ipf_log_read(unit, uio)
+ipf_log_read(softc, unit, uio)
+	ipf_main_softc_t *softc;
 	minor_t unit;
 	struct uio *uio;
 {
+	ipf_log_softc_t *softl = softc->ipf_log_soft;
 	size_t dlen, copied;
 	int error = 0;
 	iplog_t *ipl;
@@ -554,18 +660,18 @@ ipf_log_read(unit, uio)
 	 * a valid chunk of data.
 	 */
 	if (IPL_LOGMAX < unit) {
-		ipf_interror = 40001;
+		softc->ipf_interror = 40001;
 		return ENXIO;
 	}
 	if (uio->uio_resid == 0)
 		return 0;
 
 	if (uio->uio_resid < sizeof(iplog_t)) {
-		ipf_interror = 40002;
+		softc->ipf_interror = 40002;
 		return EINVAL;
 	}
-	if (uio->uio_resid > ipl_logsize) {
-		ipf_interror = 40005;
+	if (uio->uio_resid > softl->ipl_logsize) {
+		softc->ipf_interror = 40005;
 		return EINVAL;
 	}
 
@@ -574,13 +680,13 @@ ipf_log_read(unit, uio)
 	 * if the log is empty.
 	 */
 	SPL_NET(s);
-	MUTEX_ENTER(&ipl_mutex);
+	MUTEX_ENTER(&softl->ipl_mutex[unit]);
 
-	while (iplt[unit] == NULL) {
+	while (softl->iplt[unit] == NULL) {
 # if SOLARIS && defined(_KERNEL)
-		if (!cv_wait_sig(&iplwait, &ipl_mutex.ipf_lk)) {
-			MUTEX_EXIT(&ipl_mutex);
-			ipf_interror = 40003;
+		if (!cv_wait_sig(&softl->ipl_wait[unit], &softl->ipl_mutex[unit].ipf_lk)) {
+			MUTEX_EXIT(&softl->ipl_mutex[unit]);
+			softc->ipf_interror = 40003;
 			return EINTR;
 		}
 # else
@@ -590,31 +696,31 @@ ipf_log_read(unit, uio)
 #   ifdef IPL_SELECT
 		if (uio->uio_fpflags & (FNBLOCK|FNDELAY)) {
 			/* this is no blocking system call */
-			MUTEX_EXIT(&ipl_mutex);
+			MUTEX_EXIT(&softl->ipl_mutex[unit]);
 			return 0;
 		}
 #   endif
 
-		MUTEX_EXIT(&ipl_mutex);
-		l = get_sleep_lock(&iplh[unit]);
-		error = sleep(&iplh[unit], PZERO+1);
+		MUTEX_EXIT(&softl->ipl_mutex[unit]);
+		l = get_sleep_lock(&softl->iplh[unit]);
+		error = sleep(&softl->iplh[unit], PZERO+1);
 		spinunlock(l);
 #  else
 #   if defined(__osf__) && defined(_KERNEL)
-		error = mpsleep(&iplh[unit], PSUSP|PCATCH,  "iplread", 0,
-				&ipl_mutex, MS_LOCK_SIMPLE);
+		error = mpsleep(&softl->iplh[unit], PSUSP|PCATCH,  "iplread", 0,
+				&softl->ipl_mutex, MS_LOCK_SIMPLE);
 #   else
-		MUTEX_EXIT(&ipl_mutex);
+		MUTEX_EXIT(&softl->ipl_mutex[unit]);
 		SPL_X(s);
-		error = SLEEP(unit + iplh, "ipl sleep");
+		error = SLEEP(unit + softl->iplh, "ipl sleep");
 #   endif /* __osf__ */
 #  endif /* __hpux */
 		if (error) {
-			ipf_interror = 40004;
+			softc->ipf_interror = 40004;
 			return error;
 		}
 		SPL_NET(s);
-		MUTEX_ENTER(&ipl_mutex);
+		MUTEX_ENTER(&softl->ipl_mutex[unit]);
 # endif /* SOLARIS */
 	}
 
@@ -622,38 +728,38 @@ ipf_log_read(unit, uio)
 	uio->uio_rw = UIO_READ;
 # endif
 
-	for (copied = 0; (ipl = iplt[unit]) != NULL; copied += dlen) {
+	for (copied = 0; (ipl = softl->iplt[unit]) != NULL; copied += dlen) {
 		dlen = ipl->ipl_dsize;
 		if (dlen > uio->uio_resid)
 			break;
 		/*
 		 * Don't hold the mutex over the uiomove call.
 		 */
-		iplt[unit] = ipl->ipl_next;
-		iplused[unit] -= dlen;
-		MUTEX_EXIT(&ipl_mutex);
+		softl->iplt[unit] = ipl->ipl_next;
+		softl->ipl_used[unit] -= dlen;
+		MUTEX_EXIT(&softl->ipl_mutex[unit]);
 		SPL_X(s);
 		error = UIOMOVE(ipl, dlen, UIO_READ, uio);
 		if (error) {
 			SPL_NET(s);
-			MUTEX_ENTER(&ipl_mutex);
-			ipf_interror = 40006;
-			ipl->ipl_next = iplt[unit];
-			iplt[unit] = ipl;
-			iplused[unit] += dlen;
+			MUTEX_ENTER(&softl->ipl_mutex[unit]);
+			softc->ipf_interror = 40006;
+			ipl->ipl_next = softl->iplt[unit];
+			softl->iplt[unit] = ipl;
+			softl->ipl_used[unit] += dlen;
 			break;
 		}
-		MUTEX_ENTER(&ipl_mutex);
+		MUTEX_ENTER(&softl->ipl_mutex[unit]);
 		KFREES((caddr_t)ipl, dlen);
 		SPL_NET(s);
 	}
-	if (!iplt[unit]) {
-		iplused[unit] = 0;
-		iplh[unit] = &iplt[unit];
-		ipll[unit] = NULL;
+	if (!softl->iplt[unit]) {
+		softl->ipl_used[unit] = 0;
+		softl->iplh[unit] = &softl->iplt[unit];
+		softl->ipll[unit] = NULL;
 	}
 
-	MUTEX_EXIT(&ipl_mutex);
+	MUTEX_EXIT(&softl->ipl_mutex[unit]);
 	SPL_X(s);
 	return error;
 }
@@ -667,25 +773,27 @@ ipf_log_read(unit, uio)
 /* Deletes all queued up log records for a given output device.             */
 /* ------------------------------------------------------------------------ */
 int
-ipf_log_clear(unit)
+ipf_log_clear(softc, unit)
+	ipf_main_softc_t *softc;
 	minor_t unit;
 {
+	ipf_log_softc_t *softl = softc->ipf_log_soft;
 	iplog_t *ipl;
 	int used;
 	SPL_INT(s);
 
 	SPL_NET(s);
-	MUTEX_ENTER(&ipl_mutex);
-	while ((ipl = iplt[unit]) != NULL) {
-		iplt[unit] = ipl->ipl_next;
+	MUTEX_ENTER(&softl->ipl_mutex[unit]);
+	while ((ipl = softl->iplt[unit]) != NULL) {
+		softl->iplt[unit] = ipl->ipl_next;
 		KFREES((caddr_t)ipl, ipl->ipl_dsize);
 	}
-	iplh[unit] = &iplt[unit];
-	ipll[unit] = NULL;
-	used = iplused[unit];
-	iplused[unit] = 0;
-	bzero((char *)&iplcrc[unit], FI_CSIZE);
-	MUTEX_EXIT(&ipl_mutex);
+	softl->iplh[unit] = &softl->iplt[unit];
+	softl->ipll[unit] = NULL;
+	used = softl->ipl_used[unit];
+	softl->ipl_used[unit] = 0;
+	bzero((char *)&softl->ipl_crc[unit], FI_CSIZE);
+	MUTEX_EXIT(&softl->ipl_mutex[unit]);
 	SPL_X(s);
 	return used;
 }
@@ -700,9 +808,23 @@ ipf_log_clear(unit)
 /* current buffer for the selected ipf device.                              */
 /* ------------------------------------------------------------------------ */
 int
-ipf_log_canread(unit)
+ipf_log_canread(softc, unit)
+	ipf_main_softc_t *softc;
 	int unit;
 {
-	return iplt[unit] != NULL;
+	ipf_log_softc_t *softl = softc->ipf_log_soft;
+
+	return softl->iplt[unit] != NULL;
+}
+
+
+int
+ipf_log_bytesused(softc, unit)
+	ipf_main_softc_t *softc;
+	int unit;
+{
+	ipf_log_softc_t *softl = softc->ipf_log_soft;
+
+	return softl->ipl_used[unit];
 }
 #endif /* IPFILTER_LOG */

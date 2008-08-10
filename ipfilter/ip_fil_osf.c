@@ -26,8 +26,8 @@ static const char rcsid[] = "@(#)$Id$";
 #include <sys/protosw.h>
 #include <sys/socket.h>
 
-#include "radix_ipf_local.h"
 #include <net/if.h>
+#include <net/radix.h>
 #include <netinet/in.h>
 #include <netinet/in_var.h>
 #include <netinet/in_systm.h>
@@ -61,7 +61,6 @@ static const char rcsid[] = "@(#)$Id$";
 #define radix_mask ipf_radix_mask
 #define radix_node ipf_radix_node
 #define radix_node_head ipf_radix_node_head
-#include "netinet/ip_pool.h"
 #undef radix_mask
 #undef radix_node
 #undef radix_node_head
@@ -71,6 +70,8 @@ extern	int	ip_optcopy __P((struct ip *, struct ip *));
 extern	int	udp_ttl;
 extern	int	ipdefttl;
 extern	int	ipforwarding;
+
+extern	ipf_main_softc_t	ipfmain;
 
 /* #undef	IPFDEBUG	*/
 
@@ -96,25 +97,19 @@ iplidentify(s)
 
 
 int
-ipfattach()
+ipfattach(softc)
+	ipf_main_softc_t *softc;
 {
 	int s, i;
 
 	SPL_NET(s);
-	if (ipf_running > 0) {
+	if (softc->ipf_running > 0) {
 		printf("IP Filter: already initialized\n");
 		SPL_X(s);
 		return EBUSY;
 	}
 
-	MUTEX_INIT(&ipf_rw, 0);
-	MUTEX_INIT(&ipf_timeoutlock, 0);
-	RWLOCK_INIT(&ipf_ipidfrag, 1);
-	RWLOCK_INIT(&ipf_tokens, 1);
-	ipf_locks_done = 1;
-
-	i = ipf_initialise();
-	if (i < 0) {
+	if (ipf_init_all(softc) < 0) {
 		SPL_X(s);
 #ifdef IPFDEBUG
 		printf("ipf_initialise() == %d\n", i);
@@ -122,14 +117,12 @@ ipfattach()
 		return EIO;
 	}
 
-	bzero((char *)ipf_cache, sizeof(ipf_cache));
-
-	if (ipf_control_forwarding & 1)
+	if (softc->ipf_control_forwarding & 1)
 		ipforwarding = 1;
 
 	SPL_X(s);
 
-	/* timeout(ipf_slowtimer, NULL, (hz / IPF_HZ_DIVIDE) * IPF_HZ_MULT); */
+	/* timeout(ipf_slowtimer, &ipfmain, (hz / IPF_HZ_DIVIDE) * IPF_HZ_MULT); */
 
 	return 0;
 }
@@ -140,34 +133,28 @@ ipfattach()
  * stream.
  */
 int
-ipfdetach()
+ipfdetach(softc)
+	ipf_main_softc_t *softc;
 {
 	int s;
 
-	if (ipf_refcnt)
+	if (softc->ipf_refcnt)
 		return EBUSY;
 
 	SPL_NET(s);
 
-	if (ipf_control_forwarding & 2)
+	if (softc->ipf_control_forwarding & 2)
 		ipforwarding = 0;
 
 	/* untimeout(ipf_slowtimer, NULL); */
 
-	ipf_deinitialise();
+	ipf_fini_all(softc);
 
-	(void) frflush(IPL_LOGIPF, FR_INQUE|FR_OUTQUE|FR_INACTIVE);
-	(void) frflush(IPL_LOGIPF, FR_INQUE|FR_OUTQUE);
+	(void) frflush(softc, IPL_LOGIPF, FR_INQUE|FR_OUTQUE|FR_INACTIVE);
+	(void) frflush(softc, IPL_LOGIPF, FR_INQUE|FR_OUTQUE);
 
 	SPL_X(s);
 
-	if (ipf_locks_done == 1) {
-		MUTEX_DESTROY(&ipf_rw);
-		MUTEX_DESTROY(&ipf_timeoutlock);
-		RW_DESTROY(&ipf_tokens);
-		RW_DESTROY(&ipf_ipidfrag);
-		ipf_locks_done = 0;
-	}
 	return 0;
 }
 
@@ -176,7 +163,7 @@ ipfdetach()
  * Filter ioctl interface.
  */
 int
-iplioctl(dev, cmd, data, mode)
+ipwwwwtl(dev, cmd, data, mode)
 	dev_t dev;
 	int cmd;
 	caddr_t data;
@@ -190,7 +177,7 @@ iplioctl(dev, cmd, data, mode)
 	if ((IPL_LOGMAX < unit) || (unit < 0))
 		return ENXIO;
 
-	if (ipf_running <= 0) {
+	if (ipfmain.ipf_running <= 0) {
 		if (unit != IPL_LOGIPF)
 			return EIO;
 		if (cmd != (ioctlcmd_t)SIOCIPFGETNEXT &&
@@ -205,7 +192,7 @@ iplioctl(dev, cmd, data, mode)
 	SPL_NET(s);
 
 	p = task_to_proc(current_task());
-	error = ipf_ioctlswitch(unit, data, cmd, mode, p->p_ruid, p);
+	error = ipf_ioctlswitch(&ipfmain, unit, data, cmd, mode, p->p_ruid, p);
 	if (error != -1) {
 		SPL_X(s);
 		return error;
@@ -576,7 +563,7 @@ void iplinit __P((void));
 
 void iplinit()
 {
-	if (ipfattach() != 0)
+	if (ipfattach(&ipfmain) != 0)
 		printf("IP Filter failed to attach\n");
 	ip_init();
 }
@@ -598,9 +585,12 @@ ipf_fastroute(m0, mpp, fin, fdp)
 	int len, off, error = 0, hlen, code;
 	struct ifnet *ifp, *sifp;
 	struct sockaddr_in *dst;
+	ipf_main_softc_t *softc;
 	u_short ip_off, ip_len;
 	struct route iproute;
 	frentry_t *fr;
+
+	softc = fin->fin_main_soft;
 
 #ifdef	M_WRITABLE
 	/*
@@ -623,7 +613,7 @@ ipf_fastroute(m0, mpp, fin, fdp)
 			error = ENOBUFS;
 			FREE_MB_T(m);
 			*mpp = NULL;
-			ipf_frouteok[1]++;
+			softc->ipf_frouteok[1]++;
 		}
 	}
 #endif
@@ -721,7 +711,7 @@ ipf_fastroute(m0, mpp, fin, fdp)
 			u_32_t pass;
 
 			if (ipf_state_check(fin, &pass) != NULL)
-				ipf_state_deref((ipstate_t **)&fin->fin_state);
+				ipf_state_deref(softc, (ipstate_t **)&fin->fin_state);
 		}
 
 		switch (ipf_nat_checkout(fin, NULL))
@@ -729,7 +719,7 @@ ipf_fastroute(m0, mpp, fin, fdp)
 		case 0 :
 			break;
 		case 1 :
-			ipf_nat_deref((nat_t **)&fin->fin_nat);
+			ipf_nat_deref(softc, (nat_t **)&fin->fin_nat);
 			ip->ip_sum = 0;
 			break;
 		case -1 :
@@ -848,9 +838,9 @@ sendorfree:
     }
 done:
 	if (!error)
-		ipf_frouteok[0]++;
+		softc->ipf_frouteok[0]++;
 	else
-		ipf_frouteok[1]++;
+		softc->ipf_frouteok[1]++;
 
 	if (ro->ro_rt) {
 		RTFREE(ro->ro_rt);
@@ -965,6 +955,7 @@ ipf_newisn(fin)
 	fr_info_t *fin;
 {
 	static int iss_seq_off = 0;
+	ipf_main_softc_t *softc = fin->fin_main_soft;
 	u_char hash[16];
 	u_32_t newiss;
 	MD5_CTX ctx;
@@ -981,7 +972,7 @@ ipf_newisn(fin)
 		  sizeof(fin->fin_fi.fi_dst));
 	MD5Update(&ctx, (u_char *) &fin->fin_dat, sizeof(fin->fin_dat));
 
-	MD5Update(&ctx, ipf_iss_secret, sizeof(ipf_iss_secret));
+	MD5Update(&ctx, softc->ipf_iss_secret, sizeof(softc->ipf_iss_secret));
 
 	MD5Final(hash, &ctx);
 
@@ -1012,18 +1003,20 @@ ipf_newisn(fin)
 void
 ipf_slowtimer __P((void *ptr))
 {
-        READ_ENTER(&ipf_global);
+	ipf_main_softc_t *softc = ptr;
 
-	if (ipf_running == 1) {
-		ipf_expiretokens();
-		ipf_frag_expire();
-		ipf_state_expire();
-		ipf_nat_expire();
-		ipf_auth_expire();
-		ipf_ticks++;
+        READ_ENTER(&softc->ipf_global);
+
+	if (softc->ipf_running == 1) {
+		ipf_expiretokens(softc);
+		ipf_frag_expire(softc);
+		ipf_state_expire(softc);
+		ipf_nat_expire(softc);
+		ipf_auth_expire(softc);
+		softc->ipf_ticks++;
 	}
 
-	RWLOCK_EXIT(&ipf_global);
+	RWLOCK_EXIT(&softc->ipf_global);
 }
 
 
@@ -1223,7 +1216,6 @@ ipf_pullup(xmin, fin, len)
 
 			*fin->fin_mp = NULL;
 			fin->fin_m = NULL;
-			ATOMIC_INCL(ipf_stats[out].fr_pull[1]);
 			return NULL;
 		}
 
@@ -1236,7 +1228,6 @@ ipf_pullup(xmin, fin, len)
 		fin->fin_m = m;
 		ip = MTOD(m, char *) + ipoff;
 
-		ATOMIC_INCL(ipf_stats[out].fr_pull[0]);
 		fin->fin_ip = (ip_t *)ip;
 		if (fin->fin_dp != NULL)
 			fin->fin_dp = (char *)fin->fin_ip + dpoff;
@@ -1291,7 +1282,7 @@ ipf_random(range)
 
 	GETKTIME(&tv);
 	last *= tv.tv_usec + calls++;
-	last += (int)&range * ipf_ticks;
+	last += (int)&range * ipfmain.ipf_ticks;
 	number = last + tv.tv_sec;
 	number %= range;
 	return number;

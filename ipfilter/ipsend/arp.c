@@ -15,9 +15,6 @@ static const char rcsid[] = "@(#)$Id$";
 #include <sys/ioctl.h>
 #include <netinet/in_systm.h>
 #include <netinet/in.h>
-#ifdef __osf__
-# include "radix_ipf_local.h"
-#endif
 #include <net/if.h>
 #include <netinet/if_ether.h>
 #ifndef	ultrix

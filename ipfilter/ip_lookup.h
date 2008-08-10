@@ -90,28 +90,37 @@ typedef	struct	ipflookupiter	{
 
 typedef struct ipf_lookup {
 	int	ipfl_type;
-	int	(*ipfl_init) __P((void));
-	void	(*ipfl_fini) __P((void));
-	int	(*ipfl_addr_find) __P((void *, int, void *));
-	size_t	(*ipfl_flush) __P((iplookupflush_t *));
-	int	(*ipfl_iter_deref) __P((int, int, void *));
-	int	(*ipfl_iter_next) __P((ipftoken_t *, ipflookupiter_t *));
-	int	(*ipfl_node_add) __P((iplookupop_t *));
-	int	(*ipfl_node_del) __P((iplookupop_t *));
-	int	(*ipfl_stats_get) __P((iplookupop_t *));
-	int	(*ipfl_table_add) __P((iplookupop_t *));
-	int	(*ipfl_table_del) __P((iplookupop_t *));
-	int	(*ipfl_table_deref) __P((void *));
-	void	*(*ipfl_table_find) __P((int, char *));
-	void	*(*ipfl_select_add_ref) __P((int, char *));
+	void	*(*ipfl_create) __P((ipf_main_softc_t *));
+	void	(*ipfl_destroy) __P((ipf_main_softc_t *, void *));
+	int	(*ipfl_init) __P((ipf_main_softc_t *, void *));
+	void	(*ipfl_fini) __P((ipf_main_softc_t *, void *));
+	int	(*ipfl_addr_find) __P((ipf_main_softc_t *, void *, int, void *));
+	size_t	(*ipfl_flush) __P((ipf_main_softc_t *, void *, iplookupflush_t *));
+	int	(*ipfl_iter_deref) __P((ipf_main_softc_t *, void *, int, int, void *));
+	int	(*ipfl_iter_next) __P((ipf_main_softc_t *, void *, ipftoken_t *, ipflookupiter_t *));
+	int	(*ipfl_node_add) __P((ipf_main_softc_t *, void *, iplookupop_t *));
+	int	(*ipfl_node_del) __P((ipf_main_softc_t *, void *, iplookupop_t *));
+	int	(*ipfl_stats_get) __P((ipf_main_softc_t *, void *, iplookupop_t *));
+	int	(*ipfl_table_add) __P((ipf_main_softc_t *, void *, iplookupop_t *));
+	int	(*ipfl_table_del) __P((ipf_main_softc_t *, void *, iplookupop_t *));
+	int	(*ipfl_table_deref) __P((ipf_main_softc_t *, void *, void *));
+	void	*(*ipfl_table_find) __P((void *, int, char *));
+	void	*(*ipfl_select_add_ref) __P((void *, int, char *));
 } ipf_lookup_t;
 
 extern int ipf_lookup_init __P((void));
-extern int ipf_lookup_ioctl __P((caddr_t, ioctlcmd_t, int, int, void *));
-extern void ipf_lookup_unload __P((void));
-extern void ipf_lookup_deref __P((int, void *));
-extern void ipf_lookup_iterderef __P((u_32_t, void *));
-extern void *ipf_lookup_res_name __P((u_int, int, char *, lookupfunc_t *));
-extern void *ipf_lookup_res_num __P((u_int, int, u_int, lookupfunc_t *));
-
+extern int ipf_lookup_ioctl __P((ipf_main_softc_t *, caddr_t, ioctlcmd_t, int, int, void *));
+extern void ipf_lookup_main_unload __P((void));
+extern void ipf_lookup_deref __P((ipf_main_softc_t *, int, void *));
+extern void ipf_lookup_iterderef __P((ipf_main_softc_t *, u_32_t, void *));
+extern void *ipf_lookup_res_name __P((ipf_main_softc_t *, u_int, int, char *, lookupfunc_t *));
+extern void *ipf_lookup_res_num __P((ipf_main_softc_t *, u_int, int, u_int, lookupfunc_t *));
+extern void ipf_lookup_soft_destroy __P((ipf_main_softc_t *, void *));
+extern void *ipf_lookup_soft_create __P((ipf_main_softc_t *));
+extern int ipf_lookup_soft_init __P((ipf_main_softc_t *, void *));
+extern int ipf_lookup_soft_fini __P((ipf_main_softc_t *, void *));
+extern void *ipf_lookup_find_htable __P((ipf_main_softc_t *, int, char *));
+#ifndef _KERNEL
+extern	void	ipf_lookup_dump __P((ipf_main_softc_t *, void *));
+#endif
 #endif /* __IP_LOOKUP_H__ */

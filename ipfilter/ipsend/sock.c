@@ -65,9 +65,6 @@ typedef int     boolean_t;
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
 #include <net/if.h>
-#if defined(__FreeBSD__)
-# include "radix_ipf.h"
-#endif
 #ifndef __osf__
 # include <net/route.h>
 #endif

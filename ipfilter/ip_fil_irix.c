@@ -1175,7 +1175,6 @@ ipf_pullup(xmin, fin, len)
 	if (M_LEN(m) < len) {
 		KMALLOCS(fin->fin_hbuf, void *, fin->fin_plen);
 		if (fin->fin_hbuf == NULL) {
-			ATOMIC_INCL(frstats[out].fr_pull[1]);
 			return NULL;
 		}
 		m_copydata(m, 0, fin->fin_plen, fin->fin_hbuf);
@@ -1185,7 +1184,6 @@ ipf_pullup(xmin, fin, len)
 		fin->fin_flx |= FI_COALESCE;
 	}
 
-	ATOMIC_INCL(frstats[out].fr_pull[0]);
 	fin->fin_ip = (ip_t *)ip;
 	if (fin->fin_dp != NULL)
 		fin->fin_dp = (char *)fin->fin_ip + dpoff;

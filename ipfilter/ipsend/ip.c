@@ -11,14 +11,12 @@ static const char rcsid[] = "@(#)$Id$";
 #include <sys/types.h>
 #include <netinet/in_systm.h>
 #include <sys/socket.h>
-#ifdef __osf__
-# include "radix_ipf_local.h"
-#endif
 #include <net/if.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <sys/param.h>
 #ifndef	linux
+# include <net/route.h>
 # include <netinet/if_ether.h>
 # include <netinet/ip_var.h>
 # if __FreeBSD_version >= 300000

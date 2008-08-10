@@ -252,7 +252,6 @@ void natstat_dead(nsp, kernel)
 		{ "ipf_rdrrules_sz" },		/* 5 */
 		{ "ipf_hostmap_sz" },
 		{ "nat_instances" },
-		{ "ap_sess_list" },
 		{ NULL }
 	};
 	void *tables[2];
@@ -285,8 +284,6 @@ void natstat_dead(nsp, kernel)
 		sizeof(nsp->ns_hostmap_sz));
 	kmemcpy((char *)&nsp->ns_instances, nat_nlist[7].n_value,
 		sizeof(nsp->ns_instances));
-	kmemcpy((char *)&nsp->ns_apslist, nat_nlist[8].n_value,
-		sizeof(nsp->ns_apslist));
 }
 
 
@@ -475,8 +472,10 @@ void dostats(fd, nsp, opts, alive, filter)
 
 		printf("%lu\tlog successes\n", nsp->ns_side[0].ns_log);
 		printf("%lu\tlog failures\n", nsp->ns_side[1].ns_log);
-		printf("%lu\tadded\n%lu\texpired\n",
-			nsp->ns_added, nsp->ns_expire);
+		printf("%lu\tadded in\n%lu\tadded out\n",
+			nsp->ns_side[0].ns_added,
+			nsp->ns_side[1].ns_added);
+		printf("%lu\texpired\n", nsp->ns_expire);
 		printf("%u\twilds\n", nsp->ns_wilds);
 		if (opts & OPT_VERBOSE)
 			printf("list %p\n", nsp->ns_list);

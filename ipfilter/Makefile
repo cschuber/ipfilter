@@ -72,7 +72,7 @@ LINUX=`uname -r | awk -F. ' { printf"%d",$$1;for(i=1;i<NF&&i<3;i++){printf("%02d
 # tools for regression testing.  Well, all except for IPFILTER_LKM, of course.
 #
 ALLOPTS=-DIPFILTER_LOG -DIPFILTER_LOOKUP \
-        -DIPFILTER_SCAN -DIPFILTER_SYNC -DIPFILTER_CKSUM
+        -DIPFILTER_SYNC -DIPFILTER_CKSUM
 
 #
 # Uncomment the next 3 lines if you want to view the state table a la top(1)

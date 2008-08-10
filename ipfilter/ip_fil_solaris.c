@@ -56,6 +56,8 @@ static const char rcsid[] = "@(#)$Id$";
 
 #include "md5.h"
 
+extern	ipf_main_softc_t	ipfmain;
+
 static	int	ipf_send_ip __P((fr_info_t *fin, mblk_t *m, mblk_t **mp));
 static	void	ipf_fixl4sum __P((fr_info_t *));
 
@@ -65,7 +67,6 @@ ipfrwlock_t	ipf_mutex, ipf_global, ipf_ipidfrag, ipf_frcache, ipf_tokens;
 ipfrwlock_t	ipf_frag, ipf_state, ipf_nat, ipf_natfrag, ipf_authlk;
 kcondvar_t	iplwait, ipfauthwait;
 #if SOLARIS2 >= 7
-timeout_id_t	ipf_timer_id;
 u_int		*ip_ttl_ptr = NULL;
 u_int		*ip_mtudisc = NULL;
 # if SOLARIS2 >= 8
@@ -75,7 +76,6 @@ u_int		*ip6_forwarding = NULL;
 u_int		*ip_forwarding = NULL;
 # endif
 #else
-int		ipf_timer_id;
 u_long		*ip_ttl_ptr = NULL;
 u_long		*ip_mtudisc = NULL;
 u_long		*ip_forwarding = NULL;
@@ -95,12 +95,13 @@ int		ipf_locks_done = 0;
 /* for it.                                                                  */
 /* ------------------------------------------------------------------------ */
 int
-ipfdetach()
+ipfdetach(softc)
+	ipf_main_softc_t *softc;
 {
 
 	ASSERT(rw_read_locked(&ipf_global.ipf_lk) == 0);
 
-	if (ipf_control_forwarding & 2) {
+	if (softc->ipf_control_forwarding & 2) {
 		if (ip_forwarding != NULL)
 			*ip_forwarding = 0;
 #if SOLARIS2 >= 8
@@ -111,33 +112,34 @@ ipfdetach()
 
 	ipf_pfil_hooks_remove();
 
-	if (ipf_timer_id != 0) {
-		(void) untimeout(ipf_timer_id);
-		ipf_timer_id = 0;
+	if (softc->ipf_slow_ch != 0) {
+		(void) untimeout(softc->ipf_slow_ch);
+		softc->ipf_slow_ch = 0;
 	}
 
 #ifdef	IPFDEBUG
 	cmn_err(CE_CONT, "ipfdetach()\n");
 #endif
 
-	ipf_deinitialise();
+	(void) ipf_flush(softc, IPL_LOGIPF, FR_INQUE|FR_OUTQUE|FR_INACTIVE);
+	(void) ipf_flush(softc, IPL_LOGIPF, FR_INQUE|FR_OUTQUE);
 
-	(void) ipf_flush(IPL_LOGIPF, FR_INQUE|FR_OUTQUE|FR_INACTIVE);
-	(void) ipf_flush(IPL_LOGIPF, FR_INQUE|FR_OUTQUE);
+        if (ipf_fini_all(softc) < 0)
+		return EIO;
 
-	if (ipf_locks_done == 1) {
-		MUTEX_DESTROY(&ipf_timeoutlock);
-		MUTEX_DESTROY(&ipf_rw);
-		RW_DESTROY(&ipf_tokens);
-		RW_DESTROY(&ipf_ipidfrag);
-		ipf_locks_done = 0;
-	}
+	if (ipf_destroye_all(softc) == NULL)
+		return EIO;
+
+        if (ipf_unload_all() != 0)
+		return EIO;
+
 	return 0;
 }
 
 
 int
-ipfattach __P((void))
+ipfattach(softc)
+	ipf_main_softc_t *softc;
 {
 	int i;
 
@@ -145,17 +147,14 @@ ipfattach __P((void))
 	cmn_err(CE_CONT, "ipfattach()\n");
 #endif
 
-	ASSERT(rw_read_locked(&ipf_global.ipf_lk) == 0);
+        if (ipf_load_all() != 0)
+		return EIO;
 
-	bzero((char *)ipf_cache, sizeof(ipf_cache));
-	MUTEX_INIT(&ipf_rw, "ipf rw mutex");
-	MUTEX_INIT(&ipf_timeoutlock, "ipf timeout lock mutex");
-	RWLOCK_INIT(&ipf_ipidfrag, "ipf IP NAT-Frag rwlock");
-	RWLOCK_INIT(&ipf_tokens, "ipf token rwlock");
-	ipf_locks_done = 1;
+	if (ipf_create_all(softc) == NULL)
+		return EIO;
 
-	if (ipf_initialise() < 0)
-		return -1;
+        if (ipf_init_all(softc) < 0)
+		return EIO;
 
 #if SOLARIS2 >= 8
 	ip_forwarding = &ip_g_forward;
@@ -195,7 +194,7 @@ ipfattach __P((void))
 	}
 #endif
 
-	if (ipf_control_forwarding & 1) {
+	if (softc->ipf_control_forwarding & 1) {
 		if (ip_forwarding != NULL)
 			*ip_forwarding = 1;
 #if SOLARIS2 >= 8
@@ -204,7 +203,8 @@ ipfattach __P((void))
 #endif
 	}
 
-	ipf_timer_id = timeout(ipf_slowtimer, NULL, drv_usectohz(500000));
+	softc->ipf_slow_ch = timeout(ipf_slowtimer, softc,
+				     drv_usectohz(500000));
 
 	ipf_set_pfil_hooks();
 
@@ -229,6 +229,7 @@ iplioctl(dev, cmd, data, mode, cp, rp)
 	cred_t *cp;
 	int *rp;
 {
+	void *softc;
 	int error = 0;
 	minor_t unit;
 
@@ -240,7 +241,7 @@ iplioctl(dev, cmd, data, mode, cp, rp)
 	if (IPL_LOGMAX < unit)
 		return ENXIO;
 
-	if (ipf_running <= 0) {
+	if (ipfmain.ipf_running <= 0) {
 		if (unit != IPL_LOGIPF)
 			return EIO;
 		if (cmd != SIOCIPFGETNEXT && cmd != SIOCIPFGET &&
@@ -249,7 +250,7 @@ iplioctl(dev, cmd, data, mode, cp, rp)
 			return EIO;
 	}
 
-	error = ipf_ioctlswitch(unit, (caddr_t)data, cmd, mode,
+	error = ipf_ioctlswitch(&ipfmain, unit, (caddr_t)data, cmd, mode,
 			       cp->cr_uid, curproc);
 	if (error != -1) {
 		return error;
@@ -279,8 +280,8 @@ get_unit(char *name, int family)
 }
 
 /*
- * ipf_send_reset - this could conceivably be a call to tcp_respond(), but that
- * requires a large amount of setting up and isn't any more efficient.
+ * ipf_send_reset - this could conceivably be a call to tcp_respond(), but
+ * that requires a large amount of setting up and isn't any more efficient.
  */
 int
 ipf_send_reset(fr_info_t *fin)
@@ -662,7 +663,7 @@ ipf_newisn(fr_info_t *fin)
 		  sizeof(fin->fin_fi.fi_dst));
 	MD5Update(&ctx, (u_char *) &fin->fin_dat, sizeof(fin->fin_dat));
 
-	MD5Update(&ctx, ipf_iss_secret, sizeof(ipf_iss_secret));
+	MD5Update(&ctx, ipfmain.ipf_iss_secret, sizeof(ipfmain.ipf_iss_secret));
 
 	MD5Final(hash, &ctx);
 
@@ -788,25 +789,26 @@ ipf_slowtimer()
 ipf_slowtimer __P((void *ptr))
 #endif
 {
+	ipf_main_softc_t *softc = ptr;
 
-	READ_ENTER(&ipf_global);
-	if (ipf_running <= 0) {
-		RWLOCK_EXIT(&ipf_global);
+	READ_ENTER(&softc->ipf_global);
+	if (softc->ipf_running <= 0) {
+		RWLOCK_EXIT(&softc->ipf_global);
 		return;
 	}
 
-	ipf_expiretokens();
-	ipf_frag_expire();
-	ipf_state_expire();
-	ipf_nat_expire();
-	ipf_auth_expire();
-	ipf_ticks++;
-	if (ipf_running == -1 || ipf_running == 1)
-		ipf_timer_id = timeout(ipf_slowtimer, NULL,
+	ipf_expiretokens(softc);
+	ipf_frag_expire(softc);
+	ipf_state_expire(softc);
+	ipf_nat_expire(softc);
+	ipf_auth_expire(softc);
+	softc->ipf_ticks++;
+	if (softc->ipf_running == -1 || softc->ipf_running == 1)
+		softc->ipf_slow_ch = timeout(ipf_slowtimer, NULL,
 				       drv_usectohz(500000));
 	else
-		ipf_timer_id = NULL;
-	RWLOCK_EXIT(&ipf_global);
+		softc->ipf_slow_ch = NULL;
+	RWLOCK_EXIT(&softc->ipf_global);
 }
 
 
@@ -838,6 +840,7 @@ ipf_fastroute(mb, mpp, fin, fdp)
 	fr_info_t *fin;
 	frdest_t *fdp;
 {
+	ipf_main_softc_t *softc = fin->fin_main_soft;
 	struct in_addr dst;
 	qpktinfo_t *qpi;
 	frentry_t *fr;
@@ -948,7 +951,8 @@ ipf_fastroute(mb, mpp, fin, fdp)
 			u_32_t pass;
 
 			if (ipf_state_check(fin, &pass) != NULL)
-				ipf_state_deref((ipstate_t **)&fin->fin_state);
+				ipf_state_deref(softc,
+						(ipstate_t **)&fin->fin_state);
 		}
 
 		switch (ipf_nat_checkout(fin, NULL))
@@ -956,7 +960,7 @@ ipf_fastroute(mb, mpp, fin, fdp)
 		case 0 :
 			break;
 		case 1 :
-			ipf_nat_deref((nat_t **)&fin->fin_nat);
+			ipf_nat_deref(softc, (nat_t **)&fin->fin_nat);
 			ip->ip_sum = 0;
 			break;
 		case -1 :
@@ -998,14 +1002,14 @@ ipf_fastroute(mb, mpp, fin, fdp)
 	}
 #endif
 	if (pfil_sendbuf(ifp, mb, ip, dstp) == 0) {
-		ATOMIC_INCL(ipf_frouteok[0]);
+		ATOMIC_INCL(softc->ipf_frouteok[0]);
 	} else {
-		ATOMIC_INCL(ipf_frouteok[1]);
+		ATOMIC_INCL(softc->ipf_frouteok[1]);
 	}
 	return 0;
 
 bad_fastroute:
-	ATOMIC_INCL(ipf_frouteok[1]);
+	ATOMIC_INCL(softc->ipf_frouteok[1]);
 	freemsg(mb);
 	return -1;
 }
@@ -1057,7 +1061,6 @@ ipf_pullup(mb_t *xmin, fr_info_t *fin, int len)
 		 * the case (should never happen).
 		 */
 		if (((ipoff & 3) != 0) || (pullupmsg(m, len + ipoff) == 0)) {
-			ATOMIC_INCL(ipf_stats[out].fr_pull[1]);
 			FREE_MB_T(*fin->fin_mp);
 			*fin->fin_mp = NULL;
 			fin->fin_m = NULL;
@@ -1072,7 +1075,6 @@ ipf_pullup(mb_t *xmin, fr_info_t *fin, int len)
 		qpi->qpi_data = ip;
 	}
 
-	ATOMIC_INCL(ipf_stats[out].fr_pull[0]);
 	fin->fin_ip = (ip_t *)ip;
 	if (fin->fin_dp != NULL)
 		fin->fin_dp = (char *)fin->fin_ip + dpoff;
@@ -1210,25 +1212,4 @@ ipf_prependmbt(fr_info_t *fin, mblk_t *m)
 	linkb(o, m);
 
 	fin->fin_m = m;
-}
-
-
-/*
- * In the face of no kernel random function, this is implemented...it is
- * not meant to be random, just a fill in.
- */
-int
-ipf_random(int range)
-{
-	static int last = 0;
-	static int calls = 0;
-	struct timeval tv;
-	int number;
-
-	GETKTIME(&tv);
-	last *= tv.tv_usec + calls++;
-	last += (int)&range * ipf_ticks;
-	number = last + tv.tv_sec;
-	number %= range;
-	return number;
 }

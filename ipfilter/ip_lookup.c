@@ -26,6 +26,7 @@
 #if !defined(_KERNEL)
 # include <stdio.h>
 # include <string.h>
+# include <stdlib.h>
 # define _KERNEL
 # ifdef __OpenBSD__
 struct file;
@@ -34,14 +35,10 @@ struct file;
 # undef _KERNEL
 #endif
 #include <sys/socket.h>
-#if (defined(__osf__) || defined(AIX) || defined(__hpux) || defined(__sgi)) && defined(_KERNEL)
-# include "radix_ipf_local.h"
-# define _RADIX_H_
-#endif
 #include <net/if.h>
 #if defined(__FreeBSD__)
-#  include <sys/cdefs.h>
-#  include <sys/proc.h>
+# include <sys/cdefs.h>
+# include <sys/proc.h>
 #endif
 #if defined(_KERNEL)
 # include <sys/systm.h>
@@ -62,17 +59,14 @@ struct file;
 static const char rcsid[] = "@(#)$Id$";
 #endif
 
-#ifdef	IPFILTER_LOOKUP
-int	ipf_lookup_inited = 0;
-
-static int ipf_lookup_addnode __P((caddr_t));
-static int ipf_lookup_delnode __P((caddr_t data));
-static int ipf_lookup_addtable __P((caddr_t));
-static int ipf_lookup_deltable __P((caddr_t));
-static int ipf_lookup_stats __P((caddr_t));
-static int ipf_lookup_flush __P((caddr_t));
-static int ipf_lookup_iterate __P((void *, int, void *));
-static int ipf_lookup_deltok __P((void *, int, void *));
+static int ipf_lookup_addnode __P((ipf_main_softc_t *, caddr_t));
+static int ipf_lookup_delnode __P((ipf_main_softc_t *, caddr_t data));
+static int ipf_lookup_addtable __P((ipf_main_softc_t *, caddr_t));
+static int ipf_lookup_deltable __P((ipf_main_softc_t *, caddr_t));
+static int ipf_lookup_stats __P((ipf_main_softc_t *, caddr_t));
+static int ipf_lookup_flush __P((ipf_main_softc_t *, caddr_t));
+static int ipf_lookup_iterate __P((ipf_main_softc_t *, void *, int, void *));
+static int ipf_lookup_deltok __P((ipf_main_softc_t *, void *, int, void *));
 
 static ipf_lookup_t *backends[] = {
 	&ipf_pool_backend,
@@ -84,6 +78,10 @@ static ipf_lookup_t *backends[] = {
 
 #define	MAX_BACKENDS	(sizeof(backends)/sizeof(backends[0]))
 
+typedef struct ipf_lookup_softc_s {
+	void		*ipf_back[MAX_BACKENDS];
+} ipf_lookup_softc_t;
+
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_lookup_init                                             */
 /* Returns:     int     - 0 = success, else error                           */
@@ -91,20 +89,63 @@ static ipf_lookup_t *backends[] = {
 /*                                                                          */
 /* Initialise all of the subcomponents of the lookup infrstructure.         */
 /* ------------------------------------------------------------------------ */
-int
-ipf_lookup_init()
+void *
+ipf_lookup_soft_create(softc)
+	ipf_main_softc_t *softc;
 {
-
+	ipf_lookup_softc_t *softl;
+	ipf_lookup_t **l;
 	int i;
 
-	RWLOCK_INIT(&ipf_poolrw, "ip pool rwlock");
-	ipf_lookup_inited = 1;
+	KMALLOC(softl, ipf_lookup_softc_t *);
+	if (softl == NULL)
+		return NULL;
+
+	bzero((char *)softl, sizeof(*softl));
+
+	for (i = 0, l = backends; i < MAX_BACKENDS; i++, l++) {
+		softl->ipf_back[i] = (*(*l)->ipfl_create)(softc);
+		if (softl->ipf_back[i] == NULL) {
+			ipf_lookup_soft_destroy(softc, softl);
+			return NULL;
+		}
+	}
+
+	return softl;
+}
+
+
+int
+ipf_lookup_soft_init(softc, arg)
+	ipf_main_softc_t *softc;
+	void *arg;
+{
+	ipf_lookup_softc_t *softl = (ipf_lookup_softc_t *)arg;
+	int err = 0;
+	int i;
 
 	for (i = 0; i < MAX_BACKENDS; i++) {
-		if (backends[i]->ipfl_init != NULL) {
-			if ((*backends[i]->ipfl_init)() == -1)
-				return -1;
-		}
+		err = (*backends[i]->ipfl_init)(softc, softl->ipf_back[i]);
+		if (err != 0)
+			break;
+	}
+
+	return err;
+}
+
+
+int
+ipf_lookup_soft_fini(softc, arg)
+	ipf_main_softc_t *softc;
+	void *arg;
+{
+	ipf_lookup_softc_t *softl = (ipf_lookup_softc_t *)arg;
+	int i;
+
+	for (i = 0; i < MAX_BACKENDS; i++) {
+		if (softl->ipf_back[i] != NULL)
+			(*backends[i]->ipfl_fini)(softc,
+						  softl->ipf_back[i]);
 	}
 
 	return 0;
@@ -112,7 +153,7 @@ ipf_lookup_init()
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    ipf_lookup_unload                                           */
+/* Function:    ipf_lookup_softc_destroy                                    */
 /* Returns:     int     - 0 = success, else error                           */
 /* Parameters:  Nil                                                         */
 /*                                                                          */
@@ -121,17 +162,20 @@ ipf_lookup_init()
 /* ipf_lookup_init() can be called again, safely.                           */
 /* ------------------------------------------------------------------------ */
 void
-ipf_lookup_unload()
+ipf_lookup_soft_destroy(softc, arg)
+	ipf_main_softc_t *softc;
+	void *arg;
 {
+	ipf_lookup_softc_t *softl = (ipf_lookup_softc_t *)arg;
 	int i;
 
 	for (i = 0; i < MAX_BACKENDS; i++) {
-		(*backends[i]->ipfl_fini)();
+		if (softl->ipf_back[i] != NULL)
+			(*backends[i]->ipfl_destroy)(softc,
+						     softl->ipf_back[i]);
 	}
 
-	if (ipf_lookup_inited == 1) {
-		RW_DESTROY(&ipf_poolrw);
-	}
+	KFREE(softl);
 }
 
 
@@ -148,7 +192,8 @@ ipf_lookup_unload()
 /* command.                                                                 */
 /* ------------------------------------------------------------------------ */
 int
-ipf_lookup_ioctl(data, cmd, mode, uid, ctx)
+ipf_lookup_ioctl(softc, data, cmd, mode, uid, ctx)
+	ipf_main_softc_t *softc;
 	caddr_t data;
 	ioctlcmd_t cmd;
 	int mode, uid;
@@ -165,53 +210,53 @@ ipf_lookup_ioctl(data, cmd, mode, uid, ctx)
 	{
 	case SIOCLOOKUPADDNODE :
 	case SIOCLOOKUPADDNODEW :
-		WRITE_ENTER(&ipf_poolrw);
-		err = ipf_lookup_addnode(data);
-		RWLOCK_EXIT(&ipf_poolrw);
+		WRITE_ENTER(&softc->ipf_poolrw);
+		err = ipf_lookup_addnode(softc, data);
+		RWLOCK_EXIT(&softc->ipf_poolrw);
 		break;
 
 	case SIOCLOOKUPDELNODE :
 	case SIOCLOOKUPDELNODEW :
-		WRITE_ENTER(&ipf_poolrw);
-		err = ipf_lookup_delnode(data);
-		RWLOCK_EXIT(&ipf_poolrw);
+		WRITE_ENTER(&softc->ipf_poolrw);
+		err = ipf_lookup_delnode(softc, data);
+		RWLOCK_EXIT(&softc->ipf_poolrw);
 		break;
 
 	case SIOCLOOKUPADDTABLE :
-		WRITE_ENTER(&ipf_poolrw);
-		err = ipf_lookup_addtable(data);
-		RWLOCK_EXIT(&ipf_poolrw);
+		WRITE_ENTER(&softc->ipf_poolrw);
+		err = ipf_lookup_addtable(softc, data);
+		RWLOCK_EXIT(&softc->ipf_poolrw);
 		break;
 
 	case SIOCLOOKUPDELTABLE :
-		WRITE_ENTER(&ipf_poolrw);
-		err = ipf_lookup_deltable(data);
-		RWLOCK_EXIT(&ipf_poolrw);
+		WRITE_ENTER(&softc->ipf_poolrw);
+		err = ipf_lookup_deltable(softc, data);
+		RWLOCK_EXIT(&softc->ipf_poolrw);
 		break;
 
 	case SIOCLOOKUPSTAT :
 	case SIOCLOOKUPSTATW :
-		WRITE_ENTER(&ipf_poolrw);
-		err = ipf_lookup_stats(data);
-		RWLOCK_EXIT(&ipf_poolrw);
+		WRITE_ENTER(&softc->ipf_poolrw);
+		err = ipf_lookup_stats(softc, data);
+		RWLOCK_EXIT(&softc->ipf_poolrw);
 		break;
 
 	case SIOCLOOKUPFLUSH :
-		WRITE_ENTER(&ipf_poolrw);
-		err = ipf_lookup_flush(data);
-		RWLOCK_EXIT(&ipf_poolrw);
+		WRITE_ENTER(&softc->ipf_poolrw);
+		err = ipf_lookup_flush(softc, data);
+		RWLOCK_EXIT(&softc->ipf_poolrw);
 		break;
 
 	case SIOCLOOKUPITER :
-		err = ipf_lookup_iterate(data, uid, ctx);
+		err = ipf_lookup_iterate(softc, data, uid, ctx);
 		break;
 
 	case SIOCIPFDELTOK :
-		err = ipf_lookup_deltok(data, uid, ctx);
+		err = ipf_lookup_deltok(softc, data, uid, ctx);
 		break;
 
 	default :
-		ipf_interror = 50001;
+		softc->ipf_interror = 50001;
 		err = EINVAL;
 		break;
 	}
@@ -230,35 +275,40 @@ ipf_lookup_ioctl(data, cmd, mode, uid, ctx)
 /* add a node to it.                                                        */
 /* ------------------------------------------------------------------------ */
 static int
-ipf_lookup_addnode(data)
+ipf_lookup_addnode(softc, data)
+	ipf_main_softc_t *softc;
 	caddr_t data;
 {
+	ipf_lookup_softc_t *softl = softc->ipf_lookup_soft;
 	iplookupop_t op;
+	ipf_lookup_t **l;
 	int err;
 	int i;
 
 	err = BCOPYIN(data, &op, sizeof(op));
 	if (err != 0) {
-		ipf_interror = 50002;
+		softc->ipf_interror = 50002;
 		return EFAULT;
 	}
 
 	if (op.iplo_unit < 0 || op.iplo_unit > IPL_LOGMAX) {
-		ipf_interror = 50003;
+		softc->ipf_interror = 50003;
 		return EINVAL;
 	}
 
 	op.iplo_name[sizeof(op.iplo_name) - 1] = '\0';
 
-	for (i = 0; i < MAX_BACKENDS; i++) {
-		if (op.iplo_type == backends[i]->ipfl_type) {
-			err = (*backends[i]->ipfl_node_add)(&op);
+	for (i = 0, l = backends; i < MAX_BACKENDS; i++, l++) {
+		if (op.iplo_type == (*l)->ipfl_type) {
+			err = (*(*l)->ipfl_node_add)(softc,
+						     softl->ipf_back[i],
+						     &op);
 			break;
 		}
 	}
 
 	if (i == MAX_BACKENDS) {
-		ipf_interror = 50012;
+		softc->ipf_interror = 50012;
 		err = EINVAL;
 	}
 
@@ -275,35 +325,38 @@ ipf_lookup_addnode(data)
 /* in and then deleting the entry that gets found.                          */
 /* ------------------------------------------------------------------------ */
 static int
-ipf_lookup_delnode(data)
+ipf_lookup_delnode(softc, data)
+	ipf_main_softc_t *softc;
 	caddr_t data;
 {
+	ipf_lookup_softc_t *softl = softc->ipf_lookup_soft;
 	iplookupop_t op;
+	ipf_lookup_t **l;
 	int err;
 	int i;
 
 	err = BCOPYIN(data, &op, sizeof(op));
 	if (err != 0) {
-		ipf_interror = 50042;
+		softc->ipf_interror = 50042;
 		return EFAULT;
 	}
 
 	if (op.iplo_unit < 0 || op.iplo_unit > IPL_LOGMAX) {
-		ipf_interror = 50013;
+		softc->ipf_interror = 50013;
 		return EINVAL;
 	}
 
 	op.iplo_name[sizeof(op.iplo_name) - 1] = '\0';
 
-	for (i = 0; i < MAX_BACKENDS; i++) {
-		if (op.iplo_type == backends[i]->ipfl_type) {
-			err = (*backends[i]->ipfl_node_del)(&op);
+	for (i = 0, l = backends; i < MAX_BACKENDS; i++, l++) {
+		if (op.iplo_type == (*l)->ipfl_type) {
+			err = (*(*l)->ipfl_node_del)(softc, softl->ipf_back[i], &op);
 			break;
 		}
 	}
 
 	if (i == MAX_BACKENDS) {
-		ipf_interror = 50021;
+		softc->ipf_interror = 50021;
 		err = EINVAL;
 	}
 	return err;
@@ -319,34 +372,37 @@ ipf_lookup_delnode(data)
 /* for this one.                                                            */
 /* ------------------------------------------------------------------------ */
 static int
-ipf_lookup_addtable(data)
+ipf_lookup_addtable(softc, data)
+	ipf_main_softc_t *softc;
 	caddr_t data;
 {
+	ipf_lookup_softc_t *softl = softc->ipf_lookup_soft;
 	iplookupop_t op;
+	ipf_lookup_t **l;
 	int err, i;
 
 	err = BCOPYIN(data, &op, sizeof(op));
 	if (err != 0) {
-		ipf_interror = 50022;
+		softc->ipf_interror = 50022;
 		return EFAULT;
 	}
 
 	if (op.iplo_unit < 0 || op.iplo_unit > IPL_LOGMAX) {
-		ipf_interror = 50023;
+		softc->ipf_interror = 50023;
 		return EINVAL;
 	}
 
 	op.iplo_name[sizeof(op.iplo_name) - 1] = '\0';
 
-	for (i = 0; i < MAX_BACKENDS; i++) {
-		if (op.iplo_type == backends[i]->ipfl_type) {
-			err = (*backends[i]->ipfl_table_add)(&op);
+	for (i = 0, l = backends; i < MAX_BACKENDS; i++, l++) {
+		if (op.iplo_type == (*l)->ipfl_type) {
+			err = (*(*l)->ipfl_table_add)(softc, softl->ipf_back[i], &op);
 			break;
 		}
 	}
 
 	if (i == MAX_BACKENDS) {
-		ipf_interror = 50026;
+		softc->ipf_interror = 50026;
 		err = EINVAL;
 	}
 
@@ -357,7 +413,7 @@ ipf_lookup_addtable(data)
 	if ((err == 0) && ((op.iplo_arg & LOOKUP_ANON) != 0)) {
 		err = BCOPYOUT(&op, data, sizeof(op));
 		if (err != 0) {
-			ipf_interror = 50027;
+			softc->ipf_interror = 50027;
 			err = EFAULT;
 		}
 	}
@@ -375,34 +431,39 @@ ipf_lookup_addtable(data)
 /* calls the relevant function to do the cleanup.                           */
 /* ------------------------------------------------------------------------ */
 static int
-ipf_lookup_deltable(data)
+ipf_lookup_deltable(softc, data)
+	ipf_main_softc_t *softc;
 	caddr_t data;
 {
+	ipf_lookup_softc_t *softl = softc->ipf_lookup_soft;
 	iplookupop_t op;
+	ipf_lookup_t **l;
 	int err, i;
 
 	err = BCOPYIN(data, &op, sizeof(op));
 	if (err != 0) {
-		ipf_interror = 50028;
+		softc->ipf_interror = 50028;
 		return EFAULT;
 	}
 
 	if (op.iplo_unit < 0 || op.iplo_unit > IPL_LOGMAX) {
-		ipf_interror = 50029;
+		softc->ipf_interror = 50029;
 		return EINVAL;
 	}
 
 	op.iplo_name[sizeof(op.iplo_name) - 1] = '\0';
 
-	for (i = 0; i < MAX_BACKENDS; i++) {
-		if (op.iplo_type == backends[i]->ipfl_type) {
-			err = (*backends[i]->ipfl_table_del)(&op);
+	for (i = 0, l = backends; i < MAX_BACKENDS; i++, l++) {
+		if (op.iplo_type == (*l)->ipfl_type) {
+			err = (*(*l)->ipfl_table_del)(softc,
+						      softl->ipf_back[i],
+						      &op);
 			break;
 		}
 	}
 
 	if (i == MAX_BACKENDS) {
-		ipf_interror = 50030;
+		softc->ipf_interror = 50030;
 		err = EINVAL;
 	}
 	return err;
@@ -417,33 +478,38 @@ ipf_lookup_deltable(data)
 /* Copy statistical information from inside the kernel back to user space.  */
 /* ------------------------------------------------------------------------ */
 static int
-ipf_lookup_stats(data)
+ipf_lookup_stats(softc, data)
+	ipf_main_softc_t *softc;
 	caddr_t data;
 {
+	ipf_lookup_softc_t *softl = softc->ipf_lookup_soft;
 	iplookupop_t op;
+	ipf_lookup_t **l;
 	int err;
 	int i;
 
 	err = BCOPYIN(data, &op, sizeof(op));
 	if (err != 0) {
-		ipf_interror = 50031;
+		softc->ipf_interror = 50031;
 		return EFAULT;
 	}
 
 	if (op.iplo_unit < 0 || op.iplo_unit > IPL_LOGMAX) {
-		ipf_interror = 50032;
+		softc->ipf_interror = 50032;
 		return EINVAL;
 	}
 
-	for (i = 0; i < MAX_BACKENDS; i++) {
-		if (op.iplo_type == backends[i]->ipfl_type) {
-			err = (*backends[i]->ipfl_stats_get)(&op);
+	for (i = 0, l = backends; i < MAX_BACKENDS; i++, l++) {
+		if (op.iplo_type == (*l)->ipfl_type) {
+			err = (*(*l)->ipfl_stats_get)(softc,
+						      softl->ipf_back[i],
+						      &op);
 			break;
 		}
 	}
 
 	if (i == MAX_BACKENDS) {
-		ipf_interror = 50033;
+		softc->ipf_interror = 50033;
 		err = EINVAL;
 	}
 
@@ -460,35 +526,40 @@ ipf_lookup_stats(data)
 /* entry in the hash table/pool or want to remove all groups from those.    */
 /* ------------------------------------------------------------------------ */
 static int
-ipf_lookup_flush(data)
+ipf_lookup_flush(softc, data)
+	ipf_main_softc_t *softc;
 	caddr_t data;
 {
+	ipf_lookup_softc_t *softl = softc->ipf_lookup_soft;
 	int err, unit, num, type, i;
 	iplookupflush_t flush;
+	ipf_lookup_t **l;
 
 	err = BCOPYIN(data, &flush, sizeof(flush));
 	if (err != 0) {
-		ipf_interror = 50034;
+		softc->ipf_interror = 50034;
 		return EFAULT;
 	}
 
 	unit = flush.iplf_unit;
 	if ((unit < 0 || unit > IPL_LOGMAX) && (unit != IPLT_ALL)) {
-		ipf_interror = 50035;
+		softc->ipf_interror = 50035;
 		return EINVAL;
 	}
 
 	flush.iplf_name[sizeof(flush.iplf_name) - 1] = '\0';
 
 	type = flush.iplf_type;
-	ipf_interror = 50036;
+	softc->ipf_interror = 50036;
 	err = EINVAL;
 	num = 0;
 
-	for (i = 0; i < MAX_BACKENDS; i++) {
-		if (type == backends[i]->ipfl_type || type == IPLT_ALL) {
+	for (i = 0, l = backends; i < MAX_BACKENDS; i++, l++) {
+		if (type == (*l)->ipfl_type || type == IPLT_ALL) {
 			err = 0;
-			num += (*backends[i]->ipfl_flush)(&flush);
+			num += (*(*l)->ipfl_flush)(softc,
+						   softl->ipf_back[i],
+						   &flush);
 		}
 	}
 
@@ -496,7 +567,7 @@ ipf_lookup_flush(data)
 		flush.iplf_count = num;
 		err = BCOPYOUT(&flush, data, sizeof(flush));
 		if (err != 0) {
-			ipf_interror = 50037;
+			softc->ipf_interror = 50037;
 			err = EFAULT;
 		}
 	}
@@ -514,10 +585,12 @@ ipf_lookup_flush(data)
 /* type of object being passed into it.                                     */
 /* ------------------------------------------------------------------------ */
 void
-ipf_lookup_deref(type, ptr)
+ipf_lookup_deref(softc, type, ptr)
+	ipf_main_softc_t *softc;
 	int type;
 	void *ptr;
 {
+	ipf_lookup_softc_t *softl = softc->ipf_lookup_soft;
 	int i;
 
 	if (ptr == NULL)
@@ -525,9 +598,11 @@ ipf_lookup_deref(type, ptr)
 
 	for (i = 0; i < MAX_BACKENDS; i++) {
 		if (type == backends[i]->ipfl_type) {
-			WRITE_ENTER(&ipf_poolrw);
-			(*backends[i]->ipfl_table_deref)(ptr);
-			RWLOCK_EXIT(&ipf_poolrw);
+			WRITE_ENTER(&softc->ipf_poolrw);
+			(*backends[i]->ipfl_table_deref)(softc,
+							 softl->ipf_back[i],
+							 ptr);
+			RWLOCK_EXIT(&softc->ipf_poolrw);
 			break;
 		}
 	}
@@ -544,50 +619,54 @@ ipf_lookup_deref(type, ptr)
 /* Decodes ioctl request to step through either hash tables or pools.       */
 /* ------------------------------------------------------------------------ */
 static int
-ipf_lookup_iterate(data, uid, ctx)
+ipf_lookup_iterate(softc, data, uid, ctx)
+	ipf_main_softc_t *softc;
 	void *data;
 	int uid;
 	void *ctx;
 {
+	ipf_lookup_softc_t *softl = softc->ipf_lookup_soft;
 	ipflookupiter_t iter;
 	ipftoken_t *token;
 	int err, i;
 	SPL_INT(s);
 
-	err = ipf_inobj(data, &iter, IPFOBJ_LOOKUPITER);
+	err = ipf_inobj(softc, data, &iter, IPFOBJ_LOOKUPITER);
 	if (err != 0)
 		return err;
 
 	if (iter.ili_unit > IPL_LOGMAX) {
-		ipf_interror = 50038;
+		softc->ipf_interror = 50038;
 		return EINVAL;
 	}
 
 	if (iter.ili_ival != IPFGENITER_LOOKUP) {
-		ipf_interror = 50039;
+		softc->ipf_interror = 50039;
 		return EINVAL;
 	}
 
 	SPL_SCHED(s);
-	token = ipf_findtoken(iter.ili_key, uid, ctx);
+	token = ipf_findtoken(softc, iter.ili_key, uid, ctx);
 	if (token == NULL) {
-		RWLOCK_EXIT(&ipf_tokens);
+		RWLOCK_EXIT(&softc->ipf_tokens);
 		SPL_X(s);
-		ipf_interror = 50040;
+		softc->ipf_interror = 50040;
 		return ESRCH;
 	}
 
 	for (i = 0; i < MAX_BACKENDS; i++) {
 		if (iter.ili_type == backends[i]->ipfl_type) {
-			err = (*backends[i]->ipfl_iter_next)(token, &iter);
+			err = (*backends[i]->ipfl_iter_next)(softc,
+							     softl->ipf_back[i],
+							     token, &iter);
 			break;
 		}
 	}
-	RWLOCK_EXIT(&ipf_tokens);
+	RWLOCK_EXIT(&softc->ipf_tokens);
 	SPL_X(s);
 
 	if (i == MAX_BACKENDS) {
-		ipf_interror = 50041;
+		softc->ipf_interror = 50041;
 		err = EINVAL;
 	}
 
@@ -604,10 +683,12 @@ ipf_lookup_iterate(data, uid, ctx)
 /* calls the relevant function to do the cleanup.                           */
 /* ------------------------------------------------------------------------ */
 void
-ipf_lookup_iterderef(type, data)
+ipf_lookup_iterderef(softc, type, data)
+	ipf_main_softc_t *softc;
 	u_32_t type;
 	void *data;
 {
+	ipf_lookup_softc_t *softl = softc->ipf_lookup_soft;
 	struct iplookupiterkey *lkey;
 	iplookupiterkey_t key;
 	int i;
@@ -618,17 +699,19 @@ ipf_lookup_iterderef(type, data)
 	if (lkey->ilik_ival != IPFGENITER_LOOKUP)
 		return;
 
-	WRITE_ENTER(&ipf_poolrw);
+	WRITE_ENTER(&softc->ipf_poolrw);
 
 	for (i = 0; i < MAX_BACKENDS; i++) {
 		if (type == backends[i]->ipfl_type) {
-			(*backends[i]->ipfl_iter_deref)(lkey->ilik_otype,
+			(*backends[i]->ipfl_iter_deref)(softc,
+							softl->ipf_back[i],
+							lkey->ilik_otype,
 							lkey->ilik_unit,
 							data);
 			break;
 		}
 	}
-	RWLOCK_EXIT(&ipf_poolrw);
+	RWLOCK_EXIT(&softc->ipf_poolrw);
 }
 
 
@@ -644,7 +727,8 @@ ipf_lookup_iterderef(type, data)
 /* which the token was being used.                                          */
 /* ------------------------------------------------------------------------ */
 int
-ipf_lookup_deltok(data, uid, ctx)
+ipf_lookup_deltok(softc, data, uid, ctx)
+	ipf_main_softc_t *softc;
 	void *data;
 	int uid;
 	void *ctx;
@@ -655,7 +739,7 @@ ipf_lookup_deltok(data, uid, ctx)
 	SPL_SCHED(s);
 	error = BCOPYIN(data, &key, sizeof(key));
 	if (error == 0)
-		error = ipf_deltoken(key, uid, ctx);
+		error = ipf_deltoken(softc, key, uid, ctx);
 	SPL_X(s);
 	return error;
 }
@@ -676,7 +760,8 @@ ipf_lookup_deltok(data, uid, ctx)
 /* or not the "table" number exists.                                        */
 /* ------------------------------------------------------------------------ */
 void *
-ipf_lookup_res_num(type, unit, number, funcptr)
+ipf_lookup_res_num(softc, type, unit, number, funcptr)
+	ipf_main_softc_t *softc;
 	u_int type;
 	int unit;
 	u_int number;
@@ -690,7 +775,7 @@ ipf_lookup_res_num(type, unit, number, funcptr)
 	(void) sprintf(name, "%u", number);
 #endif
 
-	return ipf_lookup_res_name(type, unit, name, funcptr);
+	return ipf_lookup_res_name(softc, type, unit, name, funcptr);
 }
 
 
@@ -709,22 +794,26 @@ ipf_lookup_res_num(type, unit, number, funcptr)
 /* or not the "table" number exists.                                        */
 /* ------------------------------------------------------------------------ */
 void *
-ipf_lookup_res_name(type, unit, name, funcptr)
+ipf_lookup_res_name(softc, type, unit, name, funcptr)
+	ipf_main_softc_t *softc;
 	u_int type;
 	int unit;
 	char *name;
 	lookupfunc_t *funcptr;
 {
+	ipf_lookup_softc_t *softl = softc->ipf_lookup_soft;
+	ipf_lookup_t **l;
 	void *ptr = NULL;
 	int i;
 
-	READ_ENTER(&ipf_poolrw);
+	READ_ENTER(&softc->ipf_poolrw);
 
-	for (i = 0; i < MAX_BACKENDS; i++) {
-		if (type == backends[i]->ipfl_type) {
-			ptr = (*backends[i]->ipfl_select_add_ref)(unit, name);
+	for (i = 0, l = backends; i < MAX_BACKENDS; i++, l++) {
+		if (type == (*l)->ipfl_type) {
+			ptr = (*(*l)->ipfl_select_add_ref)(softl->ipf_back[i],
+							   unit, name);
 			if (ptr != NULL && funcptr != NULL) {
-				*funcptr = backends[i]->ipfl_addr_find;
+				*funcptr = (*l)->ipfl_addr_find;
 			}
 			break;
 		}
@@ -736,11 +825,59 @@ ipf_lookup_res_name(type, unit, name, funcptr)
 			*funcptr = NULL;
 	}
 
-	RWLOCK_EXIT(&ipf_poolrw);
+	RWLOCK_EXIT(&softc->ipf_poolrw);
 
 	return ptr;
 }
 
 
-#endif /* IPFILTER_LOOKUP */
+void *
+ipf_lookup_find_htable(softc, unit, name)
+	ipf_main_softc_t *softc;
+	int unit;
+	char *name;
+{
+	ipf_lookup_softc_t *softl = softc->ipf_lookup_soft;
+	ipf_lookup_t **l;
+	void *tab = NULL;
+	int i;
 
+	READ_ENTER(&softc->ipf_poolrw);
+
+	for (i = 0, l = backends; i < MAX_BACKENDS; i++, l++)
+		if (IPLT_HASH == (*l)->ipfl_type) {
+			tab = ipf_htable_find(softl->ipf_back[i], unit, name);
+			break;
+		}
+
+	RWLOCK_EXIT(&softc->ipf_poolrw);
+
+	return tab;
+}
+
+
+#ifndef _KERNEL
+# include "ipf.h"
+
+void
+ipf_lookup_dump(softc, arg)
+	ipf_main_softc_t *softc;
+	void *arg;
+{
+	ipf_lookup_softc_t *softl = softc->ipf_lookup_soft;
+	ipf_lookup_t **l;
+	int i;
+
+	for (i = 0, l = backends; i < MAX_BACKENDS; i++, l++)
+		if (IPLT_POOL == (*l)->ipfl_type) {
+			ipf_pool_dump(softc, softl->ipf_back[i]);
+			break;
+		}
+
+	for (i = 0, l = backends; i < MAX_BACKENDS; i++, l++)
+		if (IPLT_HASH == (*l)->ipfl_type) {
+			ipf_htable_dump(softc, softl->ipf_back[i]);
+			break;
+		}
+}
+#endif

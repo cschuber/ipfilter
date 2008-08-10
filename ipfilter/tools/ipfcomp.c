@@ -134,6 +134,9 @@ void printc(fr)
 		fprintf(fp, "#endif /* _KERNEL */\n");
 		fprintf(fp, "\n");
 		fprintf(fp, "#ifdef IPFILTER_COMPILED\n");
+		fprintf(fp, "\n");
+		fprintf(fp, "extern ipf_main_softc_t ipfmain;\n");
+		fprintf(fp, "\n");
 	}
 
 	addrule(fp, fr);
@@ -1313,7 +1316,8 @@ int ipfrule_add_%s_%s()\n", instr, group);
 	fprintf(fp, "\
 	fp->fr_family = AF_INET;\n\
 	fp->fr_func = (ipfunc_t)ipfrule_match_%s_%s;\n\
-	err = frrequest(IPL_LOGIPF, SIOCADDFR, (caddr_t)fp, ipf_active, 0);\n",
+	err = frrequest(&ipfmain, IPL_LOGIPF, SIOCADDFR, (caddr_t)fp,\n\
+			ipfmain.ipf_active, 0);\n",
 			instr, group);
 	fprintf(fp, "\treturn err;\n}\n");
 
@@ -1346,8 +1350,9 @@ int ipfrule_remove_%s_%s()\n", instr, group);
 		}\n\
 	}\n\
 	if (err == 0)\n\
-		err = frrequest(IPL_LOGIPF, SIOCDELFR,\n\
-				(caddr_t)&ipfrule_%s_%s, ipf_active, 0);\n",
+		err = frrequest(&ipfmain, IPL_LOGIPF, SIOCDELFR,\n\
+				(caddr_t)&ipfrule_%s_%s,\n\
+				ipfmain.ipf_active, 0);\n",
 		instr, group, instr, group, instr, group);
 	fprintf(fp, "\
 	if (err)\n\

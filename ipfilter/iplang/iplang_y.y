@@ -23,17 +23,13 @@
 #include <unistd.h>
 #include <stddef.h>
 #include <sys/socket.h>
+#include <net/if.h>
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
 #ifndef	linux
 # include <netinet/ip_var.h>
-#endif
-#ifdef __osf__
-# include "radix_ipf_local.h"
-#endif
-#include <net/if.h>
-#ifndef	linux
+# include <net/route.h>
 # include <netinet/if_ether.h>
 #endif
 #include <netdb.h>

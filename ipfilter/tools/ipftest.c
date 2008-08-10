@@ -35,10 +35,8 @@ int	loadrules __P((char *, int));
 int	kmemcpy __P((char *, long, int));
 int     kstrncpy __P((char *, long, int n));
 int	blockreason;
-void	dumpnat __P((void));
-void	dumpstate __P((void));
-void	dumplookups __P((void));
-void	dumpgroups __P((void));
+void	dumpnat __P((void *));
+void	dumpgroups __P((ipf_main_softc_t *));
 void	dumprules __P((frentry_t *));
 void	drain_log __P((char *));
 void	fixv4sums __P((mb_t *, ip_t *));
@@ -71,9 +69,11 @@ static	ioctlfunc_t	iocfunctions[IPL_LOGSIZE] = { ipftestioctl,
 						      ipscantestioctl,
 						      ipooltestioctl,
 						      NULL };
+static	ipf_main_softc_t	*softc = NULL;
 
 
-int main(argc,argv)
+int
+main(argc,argv)
 	int argc;
 	char *argv[];
 {
@@ -97,18 +97,20 @@ int main(argc,argv)
 	sip.s_addr = 0;
 	ifname = "anon0";
 
-	MUTEX_INIT(&ipf_rw, "ipf rw mutex");
-	MUTEX_INIT(&ipf_timeoutlock, "ipf timeout lock");
-	RWLOCK_INIT(&ipf_global, "ipf filter load/unload mutex");
-	RWLOCK_INIT(&ipf_mutex, "ipf filter rwlock");
-	RWLOCK_INIT(&ipf_ipidfrag, "ipf IP NAT-Frag rwlock");
-	RWLOCK_INIT(&ipf_frcache, "ipf filter cache");
-	RWLOCK_INIT(&ipf_tokens, "ipf token rwlock");
-
 	initparse();
-	if (ipf_initialise() == -1)
-		abort();
-	ipf_running = 1;
+
+	ipf_load_all();
+
+	softc = ipf_create_all(NULL);
+	if (softc == NULL)
+		exit(1);
+
+	if (ipf_init_all(softc) == -1)
+		exit(1);
+
+	i = 1;
+	if (ipftestioctl(IPL_LOGIPF, SIOCFRENB, &i) != 0)
+		exit(1);
 
 	while ((c = getopt(argc, argv, "6bCdDF:i:I:l:N:P:or:RS:T:vxX")) != -1)
 		switch (c)
@@ -234,7 +236,7 @@ int main(argc,argv)
 		blockreason = 0;
 		m = &mb;
 		m->mb_len = i;
-		i = ipf_check(ip, hlen, ifp, dir, &m);
+		i = ipf_check(softc, ip, hlen, ifp, dir, &m);
 		if ((opts & OPT_NAT) == 0)
 			switch (i)
 			{
@@ -325,13 +327,15 @@ int main(argc,argv)
 	}
 
 	if (dump == 1)  {
-		dumpnat();
-		dumpstate();
-		dumplookups();
-		dumpgroups();
+		dumpnat(softc->ipf_nat_soft);
+		ipf_state_dump(softc, softc->ipf_state_soft);
+		ipf_lookup_dump(softc, softc->ipf_state_soft);
+		dumpgroups(softc);
 	}
 
-	ipf_deinitialise();
+	ipf_fini_all(softc);
+
+	ipf_destroy_all(softc);
 
 	return 0;
 }
@@ -342,7 +346,6 @@ int main(argc,argv)
 	defined(__osf__) || defined(linux)
 int ipftestioctl(int dev, ioctlcmd_t cmd, ...)
 {
-	extern int ipf_interror;
 	caddr_t data;
 	va_list ap;
 	int i;
@@ -351,10 +354,10 @@ int ipftestioctl(int dev, ioctlcmd_t cmd, ...)
 	data = va_arg(ap, caddr_t);
 	va_end(ap);
 
-	i = ipfioctl(IPL_LOGIPF, cmd, data, FWRITE|FREAD);
+	i = ipfioctl(softc, IPL_LOGIPF, cmd, data, FWRITE|FREAD);
 	if (opts & OPT_DEBUG)
 		fprintf(stderr, "ipfioctl(IPF,%#x,%p) = %d (%d)\n",
-			(u_int)cmd, data, i, ipf_interror);
+			(u_int)cmd, data, i, softc->ipf_interror);
 	if (i != 0) {
 		errno = i;
 		return -1;
@@ -373,7 +376,7 @@ int ipnattestioctl(int dev, ioctlcmd_t cmd, ...)
 	data = va_arg(ap, caddr_t);
 	va_end(ap);
 
-	i = ipfioctl(IPL_LOGNAT, cmd, data, FWRITE|FREAD);
+	i = ipfioctl(softc, IPL_LOGNAT, cmd, data, FWRITE|FREAD);
 	if (opts & OPT_DEBUG)
 		fprintf(stderr, "ipfioctl(NAT,%#x,%p) = %d\n",
 			(u_int)cmd, data, i);
@@ -395,7 +398,7 @@ int ipstatetestioctl(int dev, ioctlcmd_t cmd, ...)
 	data = va_arg(ap, caddr_t);
 	va_end(ap);
 
-	i = ipfioctl(IPL_LOGSTATE, cmd, data, FWRITE|FREAD);
+	i = ipfioctl(softc, IPL_LOGSTATE, cmd, data, FWRITE|FREAD);
 	if ((opts & OPT_DEBUG) || (i != 0))
 		fprintf(stderr, "ipfioctl(STATE,%#x,%p) = %d\n",
 			(u_int)cmd, data, i);
@@ -417,7 +420,7 @@ int ipauthtestioctl(int dev, ioctlcmd_t cmd, ...)
 	data = va_arg(ap, caddr_t);
 	va_end(ap);
 
-	i = ipfioctl(IPL_LOGAUTH, cmd, data, FWRITE|FREAD);
+	i = ipfioctl(softc, IPL_LOGAUTH, cmd, data, FWRITE|FREAD);
 	if ((opts & OPT_DEBUG) || (i != 0))
 		fprintf(stderr, "ipfioctl(AUTH,%#x,%p) = %d\n",
 			(u_int)cmd, data, i);
@@ -439,7 +442,7 @@ int ipscantestioctl(int dev, ioctlcmd_t cmd, ...)
 	data = va_arg(ap, caddr_t);
 	va_end(ap);
 
-	i = ipfioctl(IPL_LOGSCAN, cmd, data, FWRITE|FREAD);
+	i = ipfioctl(softc, IPL_LOGSCAN, cmd, data, FWRITE|FREAD);
 	if ((opts & OPT_DEBUG) || (i != 0))
 		fprintf(stderr, "ipfioctl(SCAN,%#x,%p) = %d\n",
 			(u_int)cmd, data, i);
@@ -461,7 +464,7 @@ int ipsynctestioctl(int dev, ioctlcmd_t cmd, ...)
 	data = va_arg(ap, caddr_t);
 	va_end(ap);
 
-	i = ipfioctl(IPL_LOGSYNC, cmd, data, FWRITE|FREAD);
+	i = ipfioctl(softc, IPL_LOGSYNC, cmd, data, FWRITE|FREAD);
 	if ((opts & OPT_DEBUG) || (i != 0))
 		fprintf(stderr, "ipfioctl(SYNC,%#x,%p) = %d\n",
 			(u_int)cmd, data, i);
@@ -483,10 +486,10 @@ int ipooltestioctl(int dev, ioctlcmd_t cmd, ...)
 	data = va_arg(ap, caddr_t);
 	va_end(ap);
 
-	i = ipfioctl(IPL_LOGLOOKUP, cmd, data, FWRITE|FREAD);
+	i = ipfioctl(softc, IPL_LOGLOOKUP, cmd, data, FWRITE|FREAD);
 	if ((opts & OPT_DEBUG) || (i != 0))
-		fprintf(stderr, "ipfioctl(POOL,%#x,%p) = %d\n",
-			(u_int)cmd, data, i);
+		fprintf(stderr, "ipfioctl(POOL,%#x,%p) = %d (%d)\n",
+			(u_int)cmd, data, i, softc->ipf_interror);
 	if (i != 0) {
 		errno = i;
 		return -1;
@@ -499,12 +502,12 @@ int ipftestioctl(dev, cmd, data)
 	ioctlcmd_t cmd;
 	void *data;
 {
-	extern	int	ipf_interror;
 	int i;
 
-	i = ipfioctl(IPL_LOGIPF, cmd, data, FWRITE|FREAD);
+	i = ipfioctl(softc, IPL_LOGIPF, cmd, data, FWRITE|FREAD);
 	if ((opts & OPT_DEBUG) || (i != 0))
-		fprintf(stderr, "ipfioctl(IPF,%#x,%p) = %d (%d)\n", cmd, data, i, ipf_interror);
+		fprintf(stderr, "ipfioctl(IPF,%#x,%p) = %d (%d)\n",
+			cmd, data, i, softc->ipf_interror);
 	if (i != 0) {
 		errno = i;
 		return -1;
@@ -520,7 +523,7 @@ int ipnattestioctl(dev, cmd, data)
 {
 	int i;
 
-	i = ipfioctl(IPL_LOGNAT, cmd, data, FWRITE|FREAD);
+	i = ipfioctl(softc, IPL_LOGNAT, cmd, data, FWRITE|FREAD);
 	if ((opts & OPT_DEBUG) || (i != 0))
 		fprintf(stderr, "ipfioctl(NAT,%#x,%p) = %d\n", cmd, data, i);
 	if (i != 0) {
@@ -538,7 +541,7 @@ int ipstatetestioctl(dev, cmd, data)
 {
 	int i;
 
-	i = ipfioctl(IPL_LOGSTATE, cmd, data, FWRITE|FREAD);
+	i = ipfioctl(softc, IPL_LOGSTATE, cmd, data, FWRITE|FREAD);
 	if ((opts & OPT_DEBUG) || (i != 0))
 		fprintf(stderr, "ipfioctl(STATE,%#x,%p) = %d\n", cmd, data, i);
 	if (i != 0) {
@@ -556,7 +559,7 @@ int ipauthtestioctl(dev, cmd, data)
 {
 	int i;
 
-	i = ipfioctl(IPL_LOGAUTH, cmd, data, FWRITE|FREAD);
+	i = ipfioctl(softc, IPL_LOGAUTH, cmd, data, FWRITE|FREAD);
 	if ((opts & OPT_DEBUG) || (i != 0))
 		fprintf(stderr, "ipfioctl(AUTH,%#x,%p) = %d\n", cmd, data, i);
 	if (i != 0) {
@@ -574,7 +577,7 @@ int ipsynctestioctl(dev, cmd, data)
 {
 	int i;
 
-	i = ipfioctl(IPL_LOGSYNC, cmd, data, FWRITE|FREAD);
+	i = ipfioctl(softc, IPL_LOGSYNC, cmd, data, FWRITE|FREAD);
 	if ((opts & OPT_DEBUG) || (i != 0))
 		fprintf(stderr, "ipfioctl(SYNC,%#x,%p) = %d\n", cmd, data, i);
 	if (i != 0) {
@@ -592,7 +595,7 @@ int ipscantestioctl(dev, cmd, data)
 {
 	int i;
 
-	i = ipfioctl(IPL_LOGSCAN, cmd, data, FWRITE|FREAD);
+	i = ipfioctl(softc, IPL_LOGSCAN, cmd, data, FWRITE|FREAD);
 	if ((opts & OPT_DEBUG) || (i != 0))
 		fprintf(stderr, "ipfioctl(SCAN,%#x,%p) = %d\n", cmd, data, i);
 	if (i != 0) {
@@ -610,9 +613,10 @@ int ipooltestioctl(dev, cmd, data)
 {
 	int i;
 
-	i = ipfioctl(IPL_LOGLOOKUP, cmd, data, FWRITE|FREAD);
+	i = ipfioctl(softc, IPL_LOGLOOKUP, cmd, data, FWRITE|FREAD);
 	if (opts & OPT_DEBUG)
-		fprintf(stderr, "ipfioctl(POOL,%#x,%p) = %d\n", cmd, data, i);
+		fprintf(stderr, "ipfioctl(POOL,%#x,%p) = %d (%d)\n",
+			cmd, data, i, softc->ipf_interror);
 	if (i != 0) {
 		errno = i;
 		return -1;
@@ -650,68 +654,39 @@ int kstrncpy(buf, pos, n)
 /*
  * Display the built up NAT table rules and mapping entries.
  */
-void dumpnat()
+void dumpnat(arg)
+	void *arg;
 {
+	ipf_nat_softc_t *softn = arg;
 	hostmap_t *hm;
 	ipnat_t	*ipn;
 	nat_t *nat;
 
 	printf("List of active MAP/Redirect filters:\n");
-	for (ipn = ipf_nat_list; ipn != NULL; ipn = ipn->in_next)
+	for (ipn = softn->ipf_nat_list; ipn != NULL; ipn = ipn->in_next)
 		printnat(ipn, opts & (OPT_DEBUG|OPT_VERBOSE));
 	printf("\nList of active sessions:\n");
-	for (nat = ipf_nat_instances; nat; nat = nat->nat_next) {
+	for (nat = softn->ipf_nat_instances; nat; nat = nat->nat_next) {
 		printactivenat(nat, opts, 0, 0);
 		if (nat->nat_aps)
 			printaps(nat->nat_aps, opts);
 	}
 
 	printf("\nHostmap table:\n");
-	for (hm = ipf_hm_maplist; hm != NULL; hm = hm->hm_next)
+	for (hm = softn->ipf_hm_maplist; hm != NULL; hm = hm->hm_next)
 		printhostmap(hm, hm->hm_hv);
 }
 
 
-/*
- * Display the built up state table rules and mapping entries.
- */
-void dumpstate()
-{
-	ipstate_t *ips;
-
-	printf("List of active state sessions:\n");
-	for (ips = ipf_state_list; ips != NULL; )
-		ips = printstate(ips, opts & (OPT_DEBUG|OPT_VERBOSE),
-				 ipf_ticks);
-}
-
-
-void dumplookups()
-{
-	iphtable_t *iph;
-	ip_pool_t *ipl;
-	int i;
-
-	printf("List of configured pools\n");
-	for (i = 0; i < IPL_LOGSIZE; i++)
-		for (ipl = ipf_pool_list[i]; ipl != NULL; ipl = ipl->ipo_next)
-			printpool(ipl, bcopywrap, NULL, opts);
-
-	printf("List of configured hash tables\n");
-	for (i = 0; i < IPL_LOGSIZE; i++)
-		for (iph = ipf_htables[i]; iph != NULL; iph = iph->iph_next)
-			printhash(iph, bcopywrap, NULL, opts);
-}
-
-
-void dumpgroups()
+void dumpgroups(softc)
+	ipf_main_softc_t *softc;
 {
 	frgroup_t *fg;
 	int i;
 
 	printf("List of groups configured (set 0)\n");
 	for (i = 0; i < IPL_LOGSIZE; i++)
-		for (fg =  ipf_groups[i][0]; fg != NULL; fg = fg->fg_next) {
+		for (fg =  softc->ipf_groups[i][0]; fg != NULL; fg = fg->fg_next) {
 			printf("Dev.%d. Group %s Ref %d Flags %#x\n",
 				i, fg->fg_name, fg->fg_ref, fg->fg_flags);
 			dumprules(fg->fg_start);
@@ -719,29 +694,29 @@ void dumpgroups()
 
 	printf("List of groups configured (set 1)\n");
 	for (i = 0; i < IPL_LOGSIZE; i++)
-		for (fg =  ipf_groups[i][1]; fg != NULL; fg = fg->fg_next) {
+		for (fg =  softc->ipf_groups[i][1]; fg != NULL; fg = fg->fg_next) {
 			printf("Dev.%d. Group %s Ref %d Flags %#x\n",
 				i, fg->fg_name, fg->fg_ref, fg->fg_flags);
 			dumprules(fg->fg_start);
 		}
 
 	printf("Rules configured (set 0, in)\n");
-	dumprules(ipf_rules[0][0]);
+	dumprules(softc->ipf_rules[0][0]);
 	printf("Rules configured (set 0, out)\n");
-	dumprules(ipf_rules[1][0]);
+	dumprules(softc->ipf_rules[1][0]);
 	printf("Rules configured (set 1, in)\n");
-	dumprules(ipf_rules[0][1]);
+	dumprules(softc->ipf_rules[0][1]);
 	printf("Rules configured (set 1, out)\n");
-	dumprules(ipf_rules[1][1]);
+	dumprules(softc->ipf_rules[1][1]);
 
 	printf("Accounting rules configured (set 0, in)\n");
-	dumprules(ipf_acct[0][0]);
+	dumprules(softc->ipf_acct[0][0]);
 	printf("Accounting rules configured (set 0, out)\n");
-	dumprules(ipf_acct[0][1]);
+	dumprules(softc->ipf_acct[0][1]);
 	printf("Accounting rules configured (set 1, in)\n");
-	dumprules(ipf_acct[1][0]);
+	dumprules(softc->ipf_acct[1][0]);
 	printf("Accounting rules configured (set 1, out)\n");
-	dumprules(ipf_acct[1][1]);
+	dumprules(softc->ipf_acct[1][1]);
 }
 
 void dumprules(rulehead)
@@ -787,7 +762,7 @@ void drain_log(filename)
 			uio.uio_resid = iov.iov_len;
 			resid = uio.uio_resid;
 
-			if (ipf_log_read(i, &uio) == 0) {
+			if (ipf_log_read(softc, i, &uio) == 0) {
 				/*
 				 * If nothing was read then break out.
 				 */

@@ -107,124 +107,279 @@ static const char rcsid[] = "@(#)$Id$";
 #endif
 
 
-ipfr_t   *ipfr_list = NULL;
-ipfr_t   **ipfr_tail = &ipfr_list;
-
-ipfr_t   *ipfr_natlist = NULL;
-ipfr_t   **ipfr_nattail = &ipfr_natlist;
-
-ipfr_t   *ipfr_ipidlist = NULL;
-ipfr_t   **ipfr_ipidtail = &ipfr_ipidlist;
-
-static ipfr_t	**ipfr_heads;
-static ipfr_t	**ipfr_nattab;
-static ipfr_t	**ipfr_ipidtab;
-
-static ipfrstat_t ipfr_stats;
-static frentry_t ipfr_block;
-static int	ipfr_inuse = 0;
-int		ipfr_size = IPFT_SIZE;
-
-int	ipf_ipfrttl = 120;	/* 60 seconds */
-int	ipf_frag_lock = 0;
-int	ipf_frag_inited = 0;
-u_32_t	ipf_ticks = 0;
+typedef struct ipf_frag_softc_s  {
+	ipfrwlock_t	ipfr_ipidfrag;
+	ipfrwlock_t	ipfr_frag;
+	ipfrwlock_t	ipfr_natfrag;
+	int		ipfr_inuse;
+	int		ipfr_size;
+	int		ipfr_ttl;
+	int		ipfr_lock;
+	int		ipfr_inited;
+	ipfr_t		*ipfr_list;
+	ipfr_t		**ipfr_tail;
+	ipfr_t		*ipfr_natlist;
+	ipfr_t		**ipfr_nattail;
+	ipfr_t		*ipfr_ipidlist;
+	ipfr_t		**ipfr_ipidtail;
+	ipfr_t		**ipfr_heads;
+	ipfr_t		**ipfr_nattab;
+	ipfr_t		**ipfr_ipidtab;
+	ipfrstat_t	ipfr_stats;
+} ipf_frag_softc_t;
 
 
 #ifdef USE_MUTEXES
-static ipfr_t *ipfr_frag_new __P((fr_info_t *, u_32_t, ipfr_t **,
-				 ipfrwlock_t *));
-static ipfr_t *ipf_frag_lookup __P((fr_info_t *, ipfr_t **, ipfrwlock_t *));
+static ipfr_t *ipfr_frag_new __P((ipf_main_softc_t *, ipf_frag_softc_t *,
+				  fr_info_t *, u_32_t, ipfr_t **,
+				  ipfrwlock_t *));
+static ipfr_t *ipf_frag_lookup __P((ipf_main_softc_t *, ipf_frag_softc_t *, fr_info_t *, ipfr_t **, ipfrwlock_t *));
+static void ipf_frag_deref __P((void *, ipfr_t **, ipfrwlock_t *));
+static int ipf_frag_next __P((ipf_main_softc_t *, ipftoken_t *, ipfgeniter_t *,
+			      ipfr_t **, ipfr_t ***, ipfrwlock_t *));
 #else
 static ipfr_t *ipfr_frag_new __P((fr_info_t *, u_32_t, ipfr_t **));
-static ipfr_t *ipf_frag_lookup __P((fr_info_t *, ipfr_t **));
+static ipfr_t *ipf_frag_lookup __P((ipf_main_softc_t *, ipf_frag_softc_t *, fr_info_t *, ipfr_t **));
+static void ipf_frag_deref __P((void *, ipfr_t **));
+static int ipf_frag_next __P((ipf_main_softc_t *, ipftoken_t *, ipfgeniter_t *,
+			      ipfr_t **, ipfr_t ***));
 #endif
-static void ipf_frag_delete __P((ipfr_t *, ipfr_t ***));
-static void ipf_frag_free __P((ipfr_t *));
+static void ipf_frag_delete __P((ipf_main_softc_t *, ipfr_t *, ipfr_t ***));
+static void ipf_frag_free __P((ipf_frag_softc_t *, ipfr_t *));
+
+static frentry_t ipfr_block;
+
+ipftuneable_t ipf_tuneables[] = {
+	{ { (void *)offsetof(ipf_frag_softc_t, ipfr_size) },
+		"frag_size",		1,	0x7fffffff,
+		stsizeof(ipf_frag_softc_t, ipfr_size),
+		IPFT_WRDISABLED,	NULL },
+	{ { (void *)offsetof(ipf_frag_softc_t, ipfr_ttl) },
+		"frag_ttl",		1,	0x7fffffff,
+		stsizeof(ipf_frag_softc_t, ipfr_ttl),	
+		0,			NULL },
+	{ { NULL },
+		NULL,			0,	0,
+		0,				0,	NULL }
+};
+
+#define	FBUMP(x)	ATOMIC_INCL(softf->ipfr_stats.x)
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    ipf_frag_init                                               */
+/* Function:    ipf_frag_main_load                                          */
 /* Returns:     int - 0 == success, -1 == error                             */
 /* Parameters:  Nil                                                         */
 /*                                                                          */
-/* Initialise the hash tables for the fragment cache lookups.               */
+/* Initialise the filter rule associted with blocked packets - everyone can */
+/* use it.                                                                  */
 /* ------------------------------------------------------------------------ */
 int
-ipf_frag_init()
+ipf_frag_main_load()
 {
-	KMALLOCS(ipfr_heads, ipfr_t **, ipfr_size * sizeof(ipfr_t *));
-	if (ipfr_heads == NULL)
-		return -1;
-	bzero((char *)ipfr_heads, ipfr_size * sizeof(ipfr_t *));
-
-	KMALLOCS(ipfr_nattab, ipfr_t **, ipfr_size * sizeof(ipfr_t *));
-	if (ipfr_nattab == NULL)
-		return -1;
-	bzero((char *)ipfr_nattab, ipfr_size * sizeof(ipfr_t *));
-
-	KMALLOCS(ipfr_ipidtab, ipfr_t **, ipfr_size * sizeof(ipfr_t *));
-	if (ipfr_ipidtab == NULL)
-		return -1;
-	bzero((char *)ipfr_ipidtab, ipfr_size * sizeof(ipfr_t *));
-
-	RWLOCK_INIT(&ipf_frag, "ipf fragment rwlock");
-
 	bzero((char *)&ipfr_block, sizeof(ipfr_block));
 	ipfr_block.fr_flags = FR_BLOCK|FR_QUICK;
 	ipfr_block.fr_ref = 1;
-
-	ipf_frag_inited = 1;
 
 	return 0;
 }
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    ipf_frag_unload                                             */
-/* Returns:     Nil                                                         */
+/* Function:    ipf_frag_main_unload                                        */
+/* Returns:     int - 0 == success, -1 == error                             */
 /* Parameters:  Nil                                                         */
+/*                                                                          */
+/* A null-op function that exists as a placeholder so that the flow in      */
+/* other functions is obvious.                                              */
+/* ------------------------------------------------------------------------ */
+int
+ipf_frag_main_unload()
+{
+	return 0;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_frag_soft_create                                        */
+/* Returns:     void *   - NULL = failure, else pointer to local context    */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*                                                                          */
+/* Allocate a new soft context structure to track fragment related info.    */
+/* ------------------------------------------------------------------------ */
+/*ARGSUSED*/
+void *
+ipf_frag_soft_create(softc)
+	ipf_main_softc_t *softc;
+{
+	ipf_frag_softc_t *softf;
+
+	KMALLOC(softf, ipf_frag_softc_t *);
+	if (softf == NULL)
+		return NULL;
+
+	bzero((char *)softf, sizeof(*softf));
+
+	RWLOCK_INIT(&softf->ipfr_ipidfrag, "frag ipid lock");
+	RWLOCK_INIT(&softf->ipfr_frag, "ipf fragment rwlock");
+	RWLOCK_INIT(&softf->ipfr_natfrag, "ipf NAT fragment rwlock");
+
+	softf->ipfr_size = IPFT_SIZE;
+	softf->ipfr_ttl = IPF_TTLVAL(60);
+	softf->ipfr_lock = 1;
+	softf->ipfr_tail = &softf->ipfr_list;
+	softf->ipfr_nattail = &softf->ipfr_natlist;
+	softf->ipfr_ipidtail = &softf->ipfr_ipidlist;
+
+	return softf;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_frag_soft_destroy                                       */
+/* Returns:     Nil                                                         */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              arg(I)   - pointer to local context to use                  */
+/*                                                                          */
+/* Initialise the hash tables for the fragment cache lookups.               */
+/* ------------------------------------------------------------------------ */
+void
+ipf_frag_soft_destroy(softc, arg)
+	ipf_main_softc_t *softc;
+	void *arg;
+{
+	ipf_frag_softc_t *softf = arg;
+
+	RW_DESTROY(&softf->ipfr_ipidfrag);
+	RW_DESTROY(&softf->ipfr_frag);
+	RW_DESTROY(&softf->ipfr_natfrag);
+
+	KFREE(softf);
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_frag_soft_init                                          */
+/* Returns:     int      - 0 == success, -1 == error                        */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              arg(I)   - pointer to local context to use                  */
+/*                                                                          */
+/* Initialise the hash tables for the fragment cache lookups.               */
+/* ------------------------------------------------------------------------ */
+/*ARGSUSED*/
+int
+ipf_frag_soft_init(softc, arg)
+	ipf_main_softc_t *softc;
+	void *arg;
+{
+	ipf_frag_softc_t *softf = arg;
+
+	KMALLOCS(softf->ipfr_heads, ipfr_t **,
+		 softf->ipfr_size * sizeof(ipfr_t *));
+	if (softf->ipfr_heads == NULL)
+		return -1;
+
+	bzero((char *)softf->ipfr_heads, softf->ipfr_size * sizeof(ipfr_t *));
+
+	KMALLOCS(softf->ipfr_nattab, ipfr_t **,
+		 softf->ipfr_size * sizeof(ipfr_t *));
+	if (softf->ipfr_nattab == NULL)
+		return -2;
+
+	bzero((char *)softf->ipfr_nattab, softf->ipfr_size * sizeof(ipfr_t *));
+
+	KMALLOCS(softf->ipfr_ipidtab, ipfr_t **,
+		 softf->ipfr_size * sizeof(ipfr_t *));
+	if (softf->ipfr_ipidtab == NULL)
+		return -3;
+
+	bzero((char *)softf->ipfr_ipidtab,
+	      softf->ipfr_size * sizeof(ipfr_t *));
+
+	softf->ipfr_lock = 0;
+
+	return 0;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_frag_soft_fini                                          */
+/* Returns:     int      - 0 == success, -1 == error                        */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              arg(I)   - pointer to local context to use                  */
 /*                                                                          */
 /* Free all memory allocated whilst running and from initialisation.        */
 /* ------------------------------------------------------------------------ */
-void
-ipf_frag_unload()
+int
+ipf_frag_soft_fini(softc, arg)
+	ipf_main_softc_t *softc;
+	void *arg;
 {
-	if (ipf_frag_inited == 1) {
-		ipf_frag_clear();
+	ipf_frag_softc_t *softf = arg;
 
-		RW_DESTROY(&ipf_frag);
-		ipf_frag_inited = 0;
+	softf->ipfr_lock = 1;
+
+	if (softf->ipfr_inited == 1) {
+		ipf_frag_clear(softc);
+
+		softf->ipfr_inited = 0;
 	}
 
-	if (ipfr_heads != NULL)
-		KFREES(ipfr_heads, ipfr_size * sizeof(ipfr_t *));
-	ipfr_heads = NULL;
+	if (softf->ipfr_heads != NULL)
+		KFREES(softf->ipfr_heads,
+		       softf->ipfr_size * sizeof(ipfr_t *));
+	softf->ipfr_heads = NULL;
 
-	if (ipfr_nattab != NULL)
-		KFREES(ipfr_nattab, ipfr_size * sizeof(ipfr_t *));
-	ipfr_nattab = NULL;
+	if (softf->ipfr_nattab != NULL)
+		KFREES(softf->ipfr_nattab,
+		       softf->ipfr_size * sizeof(ipfr_t *));
+	softf->ipfr_nattab = NULL;
 
-	if (ipfr_ipidtab != NULL)
-		KFREES(ipfr_ipidtab, ipfr_size * sizeof(ipfr_t *));
-	ipfr_ipidtab = NULL;
+	if (softf->ipfr_ipidtab != NULL)
+		KFREES(softf->ipfr_ipidtab,
+		       softf->ipfr_size * sizeof(ipfr_t *));
+	softf->ipfr_ipidtab = NULL;
+
+	return 0;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_frag_set_lock                                           */
+/* Returns:     Nil                                                         */
+/* Parameters:  arg(I) - pointer to local context to use                    */
+/*              tmp(I) - new value for lock                                 */
+/*                                                                          */
+/* Stub function that allows for external manipulation of ipfr_lock         */
+/* ------------------------------------------------------------------------ */
+void
+ipf_frag_setlock(arg, tmp)
+	void *arg;
+	int tmp;
+{
+	ipf_frag_softc_t *softf = arg;
+
+	softf->ipfr_lock = tmp;
 }
 
 
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_frag_stats                                              */
 /* Returns:     ipfrstat_t* - pointer to struct with current frag stats     */
-/* Parameters:  Nil                                                         */
+/* Parameters:  arg(I) - pointer to local context to use                    */
 /*                                                                          */
 /* Updates ipfr_stats with current information and returns a pointer to it  */
 /* ------------------------------------------------------------------------ */
 ipfrstat_t *
-ipf_frag_stats()
+ipf_frag_stats(arg)
+	void *arg;
 {
-	ipfr_stats.ifs_table = ipfr_heads;
-	ipfr_stats.ifs_nattab = ipfr_nattab;
-	ipfr_stats.ifs_inuse = ipfr_inuse;
-	return &ipfr_stats;
+	ipf_frag_softc_t *softf = arg;
+
+	softf->ipfr_stats.ifs_table = softf->ipfr_heads;
+	softf->ipfr_stats.ifs_nattab = softf->ipfr_nattab;
+	softf->ipfr_stats.ifs_inuse = softf->ipfr_inuse;
+	return &softf->ipfr_stats;
 }
 
 
@@ -242,11 +397,13 @@ ipf_frag_stats()
 /* If it fails, no lock is held on return.                                  */
 /* ------------------------------------------------------------------------ */
 static ipfr_t *
-ipfr_frag_new(fin, pass, table
+ipfr_frag_new(softc, softf, fin, pass, table
 #ifdef USE_MUTEXES
 , lock
 #endif
 )
+	ipf_main_softc_t *softc;
+	ipf_frag_softc_t *softf;
 	fr_info_t *fin;
 	u_32_t pass;
 	ipfr_t *table[];
@@ -258,19 +415,19 @@ ipfr_frag_new(fin, pass, table
 	u_int idx, off;
 	frentry_t *fr;
 
-	if (ipfr_inuse >= ipfr_size) {
-		ATOMIC_INCL(ipfr_stats.ifs_maximum);
+	if (softf->ipfr_inuse >= softf->ipfr_size) {
+		FBUMP(ifs_maximum);
 		return NULL;
 	}
 
 	if ((fin->fin_flx & (FI_FRAG|FI_BAD)) != FI_FRAG) {
-		ATOMIC_INCL(ipfr_stats.ifs_newbad);
+		FBUMP(ifs_newbad);
 		return NULL;
 	}
 
 	if (pass & FR_FRSTRICT) {
 		if (fin->fin_off != 0) {
-			ATOMIC_INCL(ipfr_stats.ifs_newrestrictnot0);
+			FBUMP(ifs_newrestrictnot0);
 			return NULL;
 		}
 	}
@@ -285,7 +442,7 @@ ipfr_frag_new(fin, pass, table
 	idx += frag.ipfr_dst.s_addr;
 	frag.ipfr_ifp = fin->fin_ifp;
 	idx *= 127;
-	idx %= ipfr_size;
+	idx %= softf->ipfr_size;
 
 	frag.ipfr_optmsk = fin->fin_fi.fi_optmsk & IPF_OPTCOPY;
 	frag.ipfr_secmsk = fin->fin_fi.fi_secmsk;
@@ -310,7 +467,7 @@ ipfr_frag_new(fin, pass, table
 	 */
 	KMALLOC(fran, ipfr_t *);
 	if (fran == NULL) {
-		ipfr_stats.ifs_nomem++;
+		softf->ipfr_stats.ifs_nomem++;
 		return NULL;
 	}
 
@@ -323,7 +480,7 @@ ipfr_frag_new(fin, pass, table
 		if (!bcmp((char *)&frag.ipfr_ifp, (char *)&fra->ipfr_ifp,
 			  IPFR_CMPSZ)) {
 			RWLOCK_EXIT(lock);
-			ATOMIC_INCL(ipfr_stats.ifs_exists);
+			FBUMP(ifs_exists);
 			KFREE(fra);
 			return NULL;
 		}
@@ -349,7 +506,7 @@ ipfr_frag_new(fin, pass, table
 	fra->ipfr_data = NULL;
 	table[idx] = fra;
 	bcopy((char *)&frag.ipfr_ifp, (char *)&fra->ipfr_ifp, IPFR_CMPSZ);
-	fra->ipfr_ttl = ipf_ticks + ipf_ipfrttl;
+	fra->ipfr_ttl = softc->ipf_ticks + softf->ipfr_ttl;
 	fra->ipfr_firstend = frag.ipfr_firstend;
 
 	/*
@@ -360,8 +517,8 @@ ipfr_frag_new(fin, pass, table
 	fra->ipfr_off = off + (fin->fin_dlen >> 3);
 	fra->ipfr_pass = pass;
 	fra->ipfr_ref = 1;
-	ipfr_stats.ifs_new++;
-	ipfr_inuse++;
+	softf->ipfr_stats.ifs_new++;
+	softf->ipfr_inuse++;
 	return fra;
 }
 
@@ -374,28 +531,30 @@ ipfr_frag_new(fin, pass, table
 /* Add a new entry to the fragment cache table based on the current packet  */
 /* ------------------------------------------------------------------------ */
 int
-ipf_frag_new(fin, pass)
+ipf_frag_new(softc, fin, pass)
+	ipf_main_softc_t *softc;
 	u_32_t pass;
 	fr_info_t *fin;
 {
+	ipf_frag_softc_t *softf = softc->ipf_frag_soft;
 	ipfr_t	*fra;
 
-	if (ipf_frag_lock != 0)
+	if (softf->ipfr_lock != 0)
 		return -1;
 
 #ifdef USE_MUTEXES
-	fra = ipfr_frag_new(fin, pass, ipfr_heads, &ipf_frag);
+	fra = ipfr_frag_new(softc, softf, fin, pass, softf->ipfr_heads, &softc->ipf_frag);
 #else
-	fra = ipfr_frag_new(fin, pass, ipfr_heads);
+	fra = ipfr_frag_new(softc, softf, fin, pass, softf->ipfr_heads);
 #endif
 	if (fra != NULL) {
-		*ipfr_tail = fra;
-		fra->ipfr_prev = ipfr_tail;
-		ipfr_tail = &fra->ipfr_next;
-		if (ipfr_list == NULL)
-			ipfr_list = fra;
+		*softf->ipfr_tail = fra;
+		fra->ipfr_prev = softf->ipfr_tail;
+		softf->ipfr_tail = &fra->ipfr_next;
+		if (softf->ipfr_list == NULL)
+			softf->ipfr_list = fra;
 		fra->ipfr_next = NULL;
-		RWLOCK_EXIT(&ipf_frag);
+		RWLOCK_EXIT(&softc->ipf_frag);
 	}
 	return fra ? 0 : -1;
 }
@@ -411,29 +570,32 @@ ipf_frag_new(fin, pass)
 /* the NAT structure for this "session".                                    */
 /* ------------------------------------------------------------------------ */
 int
-ipf_frag_natnew(fin, pass, nat)
+ipf_frag_natnew(softc, fin, pass, nat)
+	ipf_main_softc_t *softc;
 	fr_info_t *fin;
 	u_32_t pass;
 	nat_t *nat;
 {
+	ipf_frag_softc_t *softf = softc->ipf_frag_soft;
 	ipfr_t	*fra;
 
-	if ((fin->fin_v != 4) || (ipf_frag_lock != 0))
+	if ((fin->fin_v != 4) || (softf->ipfr_lock != 0))
 		return 0;
 
 #ifdef USE_MUTEXES
-	fra = ipfr_frag_new(fin, pass, ipfr_nattab, &ipf_natfrag);
+	fra = ipfr_frag_new(softc, softf, fin, pass, softf->ipfr_nattab,
+			    &softf->ipfr_natfrag);
 #else
-	fra = ipfr_frag_new(fin, pass, ipfr_nattab);
+	fra = ipfr_frag_new(softc, softf, fin, pass, softf->ipfr_nattab);
 #endif
 	if (fra != NULL) {
 		fra->ipfr_data = nat;
 		nat->nat_data = fra;
-		*ipfr_nattail = fra;
-		fra->ipfr_prev = ipfr_nattail;
-		ipfr_nattail = &fra->ipfr_next;
+		*softf->ipfr_nattail = fra;
+		fra->ipfr_prev = softf->ipfr_nattail;
+		softf->ipfr_nattail = &fra->ipfr_next;
 		fra->ipfr_next = NULL;
-		RWLOCK_EXIT(&ipf_natfrag);
+		RWLOCK_EXIT(&softf->ipfr_natfrag);
 	}
 	return fra ? 0 : -1;
 }
@@ -453,23 +615,25 @@ ipf_frag_ipidnew(fin, ipid)
 	fr_info_t *fin;
 	u_32_t ipid;
 {
+	ipf_main_softc_t *softc = fin->fin_main_soft;
+	ipf_frag_softc_t *softf = softc->ipf_frag_soft;
 	ipfr_t	*fra;
 
-	if (ipf_frag_lock)
+	if (softf->ipfr_lock)
 		return 0;
 
 #ifdef USE_MUTEXES
-	fra = ipfr_frag_new(fin, 0, ipfr_ipidtab, &ipf_ipidfrag);
+	fra = ipfr_frag_new(softc, softf, fin, 0, softf->ipfr_ipidtab, &softf->ipfr_ipidfrag);
 #else
-	fra = ipfr_frag_new(fin, 0, ipfr_ipidtab);
+	fra = ipfr_frag_new(softc, softf, fin, 0, softf->ipfr_ipidtab);
 #endif
 	if (fra != NULL) {
 		fra->ipfr_data = (void *)ipid;
-		*ipfr_ipidtail = fra;
-		fra->ipfr_prev = ipfr_ipidtail;
-		ipfr_ipidtail = &fra->ipfr_next;
+		*softf->ipfr_ipidtail = fra;
+		fra->ipfr_prev = softf->ipfr_ipidtail;
+		softf->ipfr_ipidtail = &fra->ipfr_next;
 		fra->ipfr_next = NULL;
-		RWLOCK_EXIT(&ipf_ipidfrag);
+		RWLOCK_EXIT(&softf->ipfr_ipidfrag);
 	}
 	return fra ? 0 : -1;
 }
@@ -489,11 +653,13 @@ ipf_frag_ipidnew(fin, ipid)
 /* If it fails, no lock is held on return.                                  */
 /* ------------------------------------------------------------------------ */
 static ipfr_t *
-ipf_frag_lookup(fin, table
+ipf_frag_lookup(softc, softf, fin, table
 #ifdef USE_MUTEXES
 , lock
 #endif
 )
+	ipf_main_softc_t *softc;
+	ipf_frag_softc_t *softf;
 	fr_info_t *fin;
 	ipfr_t *table[];
 #ifdef USE_MUTEXES
@@ -512,12 +678,12 @@ ipf_frag_lookup(fin, table
 	 * other matching packets had been seen.
 	 */
 	if (fin->fin_flx & FI_SHORT) {
-		ATOMIC_INCL(ipfr_stats.ifs_short);
+		FBUMP(ifs_short);
 		return NULL;
 	}
 
 	if ((fin->fin_flx & FI_BAD) != 0) {
-		ATOMIC_INCL(ipfr_stats.ifs_bad);
+		FBUMP(ifs_bad);
 		return NULL;
 	}
 
@@ -537,7 +703,7 @@ ipf_frag_lookup(fin, table
 	idx += frag.ipfr_dst.s_addr;
 	frag.ipfr_ifp = fin->fin_ifp;
 	idx *= 127;
-	idx %= ipfr_size;
+	idx %= softf->ipfr_size;
 
 	frag.ipfr_optmsk = fin->fin_fi.fi_optmsk & IPF_OPTCOPY;
 	frag.ipfr_secmsk = fin->fin_fi.fi_secmsk;
@@ -562,7 +728,7 @@ ipf_frag_lookup(fin, table
 			off = fin->fin_off >> 3;
 			if (f->ipfr_seen0) {
 				if (off == 0) {
-					ATOMIC_INCL(ipfr_stats.ifs_retrans0);
+					FBUMP(ifs_retrans0);
 					continue;
 				}
 
@@ -571,7 +737,7 @@ ipf_frag_lookup(fin, table
 				 */
 				if ((f->ipfr_firstend != 0) &&
 				    (off < f->ipfr_firstend)) {
-					ATOMIC_INCL(ipfr_stats.ifs_overlap);
+					FBUMP(ifs_overlap);
 					fin->fin_flx |= FI_BAD;
 					break;
 				}
@@ -616,23 +782,23 @@ ipf_frag_lookup(fin, table
 				 */
 				if (!ntohs(fin->fin_ip->ip_off & IP_MF) &&
 				    (f->ipfr_badorder == 0))
-					f->ipfr_ttl = ipf_ticks + 1;
+					f->ipfr_ttl = softc->ipf_ticks + 1;
 
 			} else {
 				f->ipfr_badorder++;
-				ATOMIC_INCL(ipfr_stats.ifs_unordered);
+				FBUMP(ifs_unordered);
 				if (f->ipfr_pass & FR_FRSTRICT) {
-					ATOMIC_INCL(ipfr_stats.ifs_strict);
+					FBUMP(ifs_strict);
 					continue;
 				}
 			}
-			ATOMIC_INCL(ipfr_stats.ifs_hits);
+			FBUMP(ifs_hits);
 			return f;
 		}
 	}
 
 	RWLOCK_EXIT(lock);
-	ATOMIC_INCL(ipfr_stats.ifs_miss);
+	FBUMP(ifs_miss);
 	return NULL;
 }
 
@@ -649,26 +815,29 @@ nat_t *
 ipf_frag_natknown(fin)
 	fr_info_t *fin;
 {
+	ipf_main_softc_t *softc = fin->fin_main_soft;
+	ipf_frag_softc_t *softf = softc->ipf_frag_soft;
 	nat_t	*nat;
 	ipfr_t	*ipf;
 
-	if ((ipf_frag_lock) || !ipfr_natlist)
+	if ((softf->ipfr_lock) || !softf->ipfr_natlist)
 		return NULL;
 #ifdef USE_MUTEXES
-	ipf = ipf_frag_lookup(fin, ipfr_nattab, &ipf_natfrag);
+	ipf = ipf_frag_lookup(softc, softf, fin, softf->ipfr_nattab,
+			      &softf->ipfr_natfrag);
 #else
-	ipf = ipf_frag_lookup(fin, ipfr_nattab);
+	ipf = ipf_frag_lookup(softc, softf, fin, softf->ipfr_nattab);
 #endif
 	if (ipf != NULL) {
 		nat = ipf->ipfr_data;
 		/*
 		 * This is the last fragment for this packet.
 		 */
-		if ((ipf->ipfr_ttl == ipf_ticks + 1) && (nat != NULL)) {
+		if ((ipf->ipfr_ttl == softc->ipf_ticks + 1) && (nat != NULL)) {
 			nat->nat_data = NULL;
 			ipf->ipfr_data = NULL;
 		}
-		RWLOCK_EXIT(&ipf_natfrag);
+		RWLOCK_EXIT(&softf->ipfr_natfrag);
 	} else
 		nat = NULL;
 	return nat;
@@ -687,20 +856,24 @@ u_32_t
 ipf_frag_ipidknown(fin)
 	fr_info_t *fin;
 {
+	ipf_main_softc_t *softc = fin->fin_main_soft;
+	ipf_frag_softc_t *softf = softc->ipf_frag_soft;
 	ipfr_t	*ipf;
 	u_32_t	id;
 
-	if ((fin->fin_v != 4) || (ipf_frag_lock) || !ipfr_ipidlist)
+	if ((fin->fin_v != 4) || (softf->ipfr_lock) ||
+	    !softf->ipfr_ipidlist)
 		return 0xffffffff;
 
 #ifdef USE_MUTEXES
-	ipf = ipf_frag_lookup(fin, ipfr_ipidtab, &ipf_ipidfrag);
+	ipf = ipf_frag_lookup(softc, softf, fin, softf->ipfr_ipidtab,
+			      &softf->ipfr_ipidfrag);
 #else
-	ipf = ipf_frag_lookup(fin, ipfr_ipidtab);
+	ipf = ipf_frag_lookup(softc, softf, fin, softf->ipfr_ipidtab);
 #endif
 	if (ipf != NULL) {
 		id = (u_32_t)ipf->ipfr_data;
-		RWLOCK_EXIT(&ipf_ipidfrag);
+		RWLOCK_EXIT(&softf->ipfr_ipidfrag);
 	} else
 		id = 0xffffffff;
 	return id;
@@ -723,17 +896,20 @@ ipf_frag_known(fin, passp)
 	fr_info_t *fin;
 	u_32_t *passp;
 {
+	ipf_main_softc_t *softc = fin->fin_main_soft;
+	ipf_frag_softc_t *softf = softc->ipf_frag_soft;
 	frentry_t *fr = NULL;
 	ipfr_t	*fra;
 	u_32_t pass;
 
-	if ((ipf_frag_lock) || (ipfr_list == NULL))
+	if ((softf->ipfr_lock) || (softf->ipfr_list == NULL))
 		return NULL;
 
 #ifdef USE_MUTEXES
-	fra = ipf_frag_lookup(fin, ipfr_heads, &ipf_frag);
+	fra = ipf_frag_lookup(softc, softf, fin, softf->ipfr_heads,
+			      &softc->ipf_frag);
 #else
-	fra = ipf_frag_lookup(fin, ipfr_heads);
+	fra = ipf_frag_lookup(softc, softf, fin, softf->ipfr_heads);
 #endif
 	if (fra != NULL) {
 		if (fin->fin_flx & FI_BAD) {
@@ -752,31 +928,9 @@ ipf_frag_known(fin, passp)
 				pass &= ~(FR_LOGFIRST|FR_LOG);
 			*passp = pass;
 		}
-		RWLOCK_EXIT(&ipf_frag);
+		RWLOCK_EXIT(&softc->ipf_frag);
 	}
 	return fr;
-}
-
-
-/* ------------------------------------------------------------------------ */
-/* Function:    ipf_frag_forget                                             */
-/* Returns:     Nil                                                         */
-/* Parameters:  ptr(I) - pointer to data structure                          */
-/*                                                                          */
-/* Search through all of the fragment cache entries and wherever a pointer  */
-/* is found to match ptr, reset it to NULL.                                 */
-/* ------------------------------------------------------------------------ */
-void
-ipf_frag_forget(ptr)
-	void *ptr;
-{
-	ipfr_t	*fr;
-
-	WRITE_ENTER(&ipf_frag);
-	for (fr = ipfr_list; fr; fr = fr->ipfr_next)
-		if (fr->ipfr_data == ptr)
-			fr->ipfr_data = NULL;
-	RWLOCK_EXIT(&ipf_frag);
 }
 
 
@@ -789,16 +943,18 @@ ipf_frag_forget(ptr)
 /* pointer  is found to match ptr, reset it to NULL.                        */
 /* ------------------------------------------------------------------------ */
 void
-ipf_frag_natforget(ptr)
+ipf_frag_natforget(softc, ptr)
+	ipf_main_softc_t *softc;
 	void *ptr;
 {
+	ipf_frag_softc_t *softf = softc->ipf_frag_soft;
 	ipfr_t	*fr;
 
-	WRITE_ENTER(&ipf_natfrag);
-	for (fr = ipfr_natlist; fr; fr = fr->ipfr_next)
+	WRITE_ENTER(&softf->ipfr_natfrag);
+	for (fr = softf->ipfr_natlist; fr; fr = fr->ipfr_next)
 		if (fr->ipfr_data == ptr)
 			fr->ipfr_data = NULL;
-	RWLOCK_EXIT(&ipf_natfrag);
+	RWLOCK_EXIT(&softf->ipfr_natfrag);
 }
 
 
@@ -814,9 +970,11 @@ ipf_frag_natforget(ptr)
 /* result of decreasing the reference count.                                */
 /* ------------------------------------------------------------------------ */
 static void
-ipf_frag_delete(fra, tail)
+ipf_frag_delete(softc, fra, tail)
+	ipf_main_softc_t *softc;
 	ipfr_t *fra, ***tail;
 {
+	ipf_frag_softc_t *softf = softc->ipf_frag_soft;
 
 	if (fra->ipfr_next)
 		fra->ipfr_next->ipfr_prev = fra->ipfr_prev;
@@ -829,21 +987,27 @@ ipf_frag_delete(fra, tail)
 	*fra->ipfr_hprev = fra->ipfr_hnext;
 
 	if (fra->ipfr_rule != NULL) {
-		(void) ipf_derefrule(&fra->ipfr_rule);
+		(void) ipf_derefrule(softc, &fra->ipfr_rule);
 	}
 
 	if (fra->ipfr_ref <= 0)
-		ipf_frag_free(fra);
+		ipf_frag_free(softf, fra);
 }
 
 
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_frag_free                                               */
+/* Returns:     Nil                                                         */
+/*                                                                          */
+/* ------------------------------------------------------------------------ */
 static void
-ipf_frag_free(fra)
+ipf_frag_free(softf, fra)
+	ipf_frag_softc_t *softf;
 	ipfr_t *fra;
 {
 	KFREE(fra);
-	ipfr_stats.ifs_expire++;
-	ipfr_inuse--;
+	softf->ipfr_stats.ifs_expire++;
+	softf->ipfr_inuse--;
 }
 
 
@@ -856,33 +1020,35 @@ ipf_frag_free(fra)
 /* fragment state stuff first and then the NAT-fragment table.              */
 /* ------------------------------------------------------------------------ */
 void
-ipf_frag_clear()
+ipf_frag_clear(softc)
+	ipf_main_softc_t *softc;
 {
+	ipf_frag_softc_t *softf = softc->ipf_frag_soft;
 	ipfr_t	*fra;
 	nat_t	*nat;
 
-	WRITE_ENTER(&ipf_frag);
-	while ((fra = ipfr_list) != NULL) {
+	WRITE_ENTER(&softc->ipf_frag);
+	while ((fra = softf->ipfr_list) != NULL) {
 		fra->ipfr_ref--;
-		ipf_frag_delete(fra, &ipfr_tail);
+		ipf_frag_delete(softc, fra, &softf->ipfr_tail);
 	}
-	ipfr_tail = &ipfr_list;
-	RWLOCK_EXIT(&ipf_frag);
+	softf->ipfr_tail = &softf->ipfr_list;
+	RWLOCK_EXIT(&softc->ipf_frag);
 
-	WRITE_ENTER(&ipf_nat);
-	WRITE_ENTER(&ipf_natfrag);
-	while ((fra = ipfr_natlist) != NULL) {
+	WRITE_ENTER(&softc->ipf_nat);
+	WRITE_ENTER(&softf->ipfr_natfrag);
+	while ((fra = softf->ipfr_natlist) != NULL) {
 		nat = fra->ipfr_data;
 		if (nat != NULL) {
 			if (nat->nat_data == fra)
 				nat->nat_data = NULL;
 		}
 		fra->ipfr_ref--;
-		ipf_frag_delete(fra, &ipfr_nattail);
+		ipf_frag_delete(softc, fra, &softf->ipfr_nattail);
 	}
-	ipfr_nattail = &ipfr_natlist;
-	RWLOCK_EXIT(&ipf_natfrag);
-	RWLOCK_EXIT(&ipf_nat);
+	softf->ipfr_nattail = &softf->ipfr_natlist;
+	RWLOCK_EXIT(&softf->ipfr_natfrag);
+	RWLOCK_EXIT(&softc->ipf_nat);
 }
 
 
@@ -894,37 +1060,39 @@ ipf_frag_clear()
 /* Expire entries in the fragment cache table that have been there too long */
 /* ------------------------------------------------------------------------ */
 void
-ipf_frag_expire()
+ipf_frag_expire(softc)
+	ipf_main_softc_t *softc;
 {
+	ipf_frag_softc_t *softf = softc->ipf_frag_soft;
 	ipfr_t	**fp, *fra;
 	nat_t	*nat;
 	SPL_INT(s);
 
-	if (ipf_frag_lock)
+	if (softf->ipfr_lock)
 		return;
 
 	SPL_NET(s);
-	WRITE_ENTER(&ipf_frag);
+	WRITE_ENTER(&softc->ipf_frag);
 	/*
 	 * Go through the entire table, looking for entries to expire,
 	 * which is indicated by the ttl being less than or equal to ipf_ticks.
 	 */
-	for (fp = &ipfr_list; ((fra = *fp) != NULL); ) {
-		if (fra->ipfr_ttl > ipf_ticks)
+	for (fp = &softf->ipfr_list; ((fra = *fp) != NULL); ) {
+		if (fra->ipfr_ttl > softc->ipf_ticks)
 			break;
 		fra->ipfr_ref--;
-		ipf_frag_delete(fra, &ipfr_tail);
+		ipf_frag_delete(softc, fra, &softf->ipfr_tail);
 	}
-	RWLOCK_EXIT(&ipf_frag);
+	RWLOCK_EXIT(&softc->ipf_frag);
 
-	WRITE_ENTER(&ipf_ipidfrag);
-	for (fp = &ipfr_ipidlist; ((fra = *fp) != NULL); ) {
-		if (fra->ipfr_ttl > ipf_ticks)
+	WRITE_ENTER(&softf->ipfr_ipidfrag);
+	for (fp = &softf->ipfr_ipidlist; ((fra = *fp) != NULL); ) {
+		if (fra->ipfr_ttl > softc->ipf_ticks)
 			break;
 		fra->ipfr_ref--;
-		ipf_frag_delete(fra, &ipfr_ipidtail);
+		ipf_frag_delete(softc, fra, &softf->ipfr_ipidtail);
 	}
-	RWLOCK_EXIT(&ipf_ipidfrag);
+	RWLOCK_EXIT(&softf->ipfr_ipidfrag);
 
 	/*
 	 * Same again for the NAT table, except that if the structure also
@@ -936,11 +1104,11 @@ ipf_frag_expire()
 	 * operations - no need to do that if there are no entries in this
 	 * list, right?
 	 */
-	if (ipfr_natlist != NULL) {
-		WRITE_ENTER(&ipf_nat);
-		WRITE_ENTER(&ipf_natfrag);
-		for (fp = &ipfr_natlist; ((fra = *fp) != NULL); ) {
-			if (fra->ipfr_ttl > ipf_ticks)
+	if (softf->ipfr_natlist != NULL) {
+		WRITE_ENTER(&softc->ipf_nat);
+		WRITE_ENTER(&softf->ipfr_natfrag);
+		for (fp = &softf->ipfr_natlist; ((fra = *fp) != NULL); ) {
+			if (fra->ipfr_ttl > softc->ipf_ticks)
 				break;
 			nat = fra->ipfr_data;
 			if (nat != NULL) {
@@ -948,10 +1116,10 @@ ipf_frag_expire()
 					nat->nat_data = NULL;
 			}
 			fra->ipfr_ref--;
-			ipf_frag_delete(fra, &ipfr_nattail);
+			ipf_frag_delete(softc, fra, &softf->ipfr_nattail);
 		}
-		RWLOCK_EXIT(&ipf_natfrag);
-		RWLOCK_EXIT(&ipf_nat);
+		RWLOCK_EXIT(&softf->ipfr_natfrag);
+		RWLOCK_EXIT(&softc->ipf_nat);
 	}
 	SPL_X(s);
 }
@@ -960,61 +1128,106 @@ ipf_frag_expire()
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_slowtimer                                               */
 /* Returns:     Nil                                                         */
-/* Parameters:  Nil                                                         */
+/* Parameters:  ptr(I) - pointer to main ipf soft context structure         */
 /*                                                                          */
 /* Slowly expire held state for fragments.  Timeouts are set * in           */
 /* expectation of this being called twice per second.                       */
 /* ------------------------------------------------------------------------ */
 #if !defined(_KERNEL) || (!SOLARIS && !defined(__hpux) && !defined(__sgi) && \
 			  !defined(__osf__))
-# if defined(_KERNEL) && ((BSD >= 199103) || defined(__sgi))
-void
-ipf_slowtimer __P((void *ptr))
-# else
+# if (BSD < 199103) || !defined(_KERNEL)
 int
-ipf_slowtimer()
+# else
+void
 # endif
+ipf_slowtimer(ptr)
+	void *ptr;
 {
-	READ_ENTER(&ipf_global);
+	ipf_main_softc_t *softc = ptr;
 
-	ipf_expiretokens();
-	ipf_frag_expire();
-	ipf_state_expire();
-	ipf_nat_expire();
-	ipf_auth_expire();
-#ifdef IPFILTER_SYNC
-	ipf_sync_expire();
-#endif
-	ipf_ticks++;
-	if (ipf_running <= 0)
+	READ_ENTER(&softc->ipf_global);
+
+	ipf_expiretokens(softc);
+	ipf_frag_expire(softc);
+	ipf_state_expire(softc);
+	ipf_nat_expire(softc);
+	ipf_auth_expire(softc);
+# ifdef IPFILTER_SYNC
+	ipf_sync_expire(softc);
+# endif
+	softc->ipf_ticks++;
+	if (softc->ipf_running <= 0)
 		goto done;
 # ifdef _KERNEL
 #  if defined(__NetBSD__) && (__NetBSD_Version__ >= 104240000)
-	callout_reset(&ipf_slowtimer_ch, hz / 2, ipf_slowtimer, NULL);
+	callout_reset(&ipf_slowtimer_ch, hz / 2, ipf_slowtimer, ptr);
 #  else
 #   if defined(__OpenBSD__)
 	timeout_add(&ipf_slowtimer_ch, hz/2);
 #   else
 #    if (__FreeBSD_version >= 300000)
-	ipf_slowtimer_ch = timeout(ipf_slowtimer, NULL, hz/2);
+	softc->ipf_slow_ch = timeout(ipf_slowtimer, ptr, hz/2);
 #    else
 #     ifdef linux
 	;
 #     else
-	timeout(ipf_slowtimer, NULL, hz/2);
+	timeout(ipf_slowtimer, ptr, hz/2);
 #     endif
 #    endif /* FreeBSD */
 #   endif /* OpenBSD */
 #  endif /* NetBSD */
 # endif
 done:
-	RWLOCK_EXIT(&ipf_global);
+	RWLOCK_EXIT(&softc->ipf_global);
 # if (BSD < 199103) || !defined(_KERNEL)
 	return 0;
 # endif
 }
 #endif /* !SOLARIS && !defined(__hpux) && !defined(__sgi) */
 
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_frag_pkt_next                                           */
+/* ------------------------------------------------------------------------ */
+int
+ipf_frag_pkt_next(softc, token, itp)
+	ipf_main_softc_t *softc;
+	ipftoken_t *token;
+	ipfgeniter_t *itp;
+{
+	ipf_frag_softc_t *softf = softc->ipf_frag_soft;
+
+#ifdef USE_MUTEXES
+	return ipf_frag_next(softc, token, itp,
+			     &softf->ipfr_list, &softf->ipfr_tail,
+			     &softf->ipfr_frag);
+#else
+	return ipf_frag_next(softc, token, itp,
+			     &softf->ipfr_list, &softf->ipfr_tail);
+#endif
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_frag_nat_next                                           */
+/* ------------------------------------------------------------------------ */
+int
+ipf_frag_nat_next(softc, token, itp)
+	ipf_main_softc_t *softc;
+	ipftoken_t *token;
+	ipfgeniter_t *itp;
+{
+	ipf_frag_softc_t *softf = softc->ipf_frag_soft;;
+
+#ifdef USE_MUTEXES
+	return ipf_frag_next(softc, token, itp,
+			     &softf->ipfr_natlist, &softf->ipfr_nattail,
+			     &softf->ipfr_natfrag);
+#else
+	return ipf_frag_next(softc, token, itp,
+			     &softf->ipfr_natlist, &softf->ipfr_nattail);
+#endif
+}
 
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_frag_next                                               */
@@ -1032,12 +1245,13 @@ done:
 /* This function is used for both the NAT fragment cache as well as the ipf */
 /* fragment cache - hence the reason for passing in top, tail and lock.     */
 /* ------------------------------------------------------------------------ */
-int
-ipf_frag_next(token, itp, top, tail
+static int
+ipf_frag_next(softc, token, itp, top, tail
 #ifdef USE_MUTEXES
 , lock
 #endif
 )
+	ipf_main_softc_t *softc;
 	ipftoken_t *token;
 	ipfgeniter_t *itp;
 	ipfr_t **top, ***tail;
@@ -1082,22 +1296,66 @@ ipf_frag_next(token, itp, top, tail
 	 */
 	error = COPYOUT(next, itp->igi_data, sizeof(*next));
 	if (error != 0) {
-		ipf_interror = 20002;
+		softc->ipf_interror = 20002;
 		error = EFAULT;
 	}
         if (token->ipt_data == NULL) {
-                ipf_freetoken(token);
+                ipf_freetoken(softc, token);
         } else {
                 if (frag != NULL)
 #ifdef USE_MUTEXES
-                        ipf_frag_deref(&frag, lock);
+                        ipf_frag_deref(softc, &frag, lock);
 #else
-                        ipf_frag_deref(&frag);
+                        ipf_frag_deref(softc, &frag);
 #endif
                 if (next->ipfr_next == NULL)
-                        ipf_freetoken(token);
+                        ipf_freetoken(softc, token);
         }
         return error;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_frag_pkt_deref                                          */
+/* Returns:     Nil                                                         */
+/*                                                                          */
+/* ------------------------------------------------------------------------ */
+void
+ipf_frag_pkt_deref(softc, data)
+	ipf_main_softc_t *softc;
+	void *data;
+{
+	ipfr_t **frp = data;
+
+#ifdef USE_MUTEXES
+	ipf_frag_softc_t *softf = softc->ipf_frag_soft;
+
+	ipf_frag_deref(softc->ipf_frag_soft, frp, &softf->ipfr_frag);
+#else
+	ipf_frag_deref(softc->ipf_frag_soft, frp);
+#endif
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_frag_nat_deref                                          */
+/* Returns:     Nil                                                         */
+/*                                                                          */
+/* ------------------------------------------------------------------------ */
+void
+ipf_frag_nat_deref(softc, data)
+	ipf_main_softc_t *softc;
+	void *data;
+{
+	ipfr_t **frp = data;
+
+#ifdef USE_MUTEXES
+	ipf_frag_softc_t *softf = softc->ipf_frag_soft;
+
+	ipf_frag_deref(softc->ipf_frag_soft, frp, &softf->ipfr_natfrag);
+#else
+	ipf_frag_deref(softc->ipf_frag_soft, frp);
+#endif
 }
 
 
@@ -1112,17 +1370,19 @@ ipf_frag_next(token, itp, top, tail
 /* not freed, to enforce the notion that the caller is no longer entitled   */
 /* to use the pointer it is dropping the reference to.                      */
 /* ------------------------------------------------------------------------ */
-void
-ipf_frag_deref(frp
+static void
+ipf_frag_deref(arg, frp
 #ifdef USE_MUTEXES
 , lock
 #endif
 )
+	void *arg;
 	ipfr_t **frp;
 #ifdef USE_MUTEXES
 	ipfrwlock_t *lock;
 #endif
 {
+	ipf_frag_softc_t *softf = arg;
 	ipfr_t *fra;
 
 	fra = *frp;
@@ -1131,6 +1391,6 @@ ipf_frag_deref(frp
 	WRITE_ENTER(lock);
 	fra->ipfr_ref--;
 	if (fra->ipfr_ref <= 0)
-		ipf_frag_free(fra);
+		ipf_frag_free(softf, fra);
 	RWLOCK_EXIT(lock);
 }

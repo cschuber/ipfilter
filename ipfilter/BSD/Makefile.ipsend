@@ -23,7 +23,8 @@ MFLAGS="BINDEST=$(BINDEST)" "SBINDEST=$(SBINDEST)" "MANDIR=$(MANDIR)" \
 	"SOLARIS2=$(SOLARIS2)" "DEBUG=$(DEBUG)" "DCPU=$(CPU)" \
 	"CPUDIR=$(CPUDIR)" "LOOKUP=$(LOOKUP)"
 #
-all build bsd-bpf : ipsend ipresend iptest
+build:
+all bsd-bpf : ipsend ipresend iptest
 
 iplang_y.o: $(TOP)/iplang/iplang_y.y
 	(cd $(TOP)/iplang; $(MAKE) ../BSD/$(CPUDIR)/$@ $(MFLAGS) 'DESTDIR=../BSD/$(CPUDIR)' )

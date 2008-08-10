@@ -51,6 +51,7 @@
 char	_depends_on[] = "drv/ipf";
 
 
+extern	ipf_main_softc_t	ipfmain;
 extern	struct mod_ops		mod_miscops;
 static	struct modlmisc		ipfrulemod = {
 		&mod_miscops,
@@ -74,10 +75,10 @@ int _init()
 #endif
 
 	if (ipfruleinst == 0) {
-		if (ipf_running >= 0) {
+		if (ipfmain.ipf_running >= 0) {
 			ipfruleinst = ipfrule_add();
 			if (!ipfruleinst)
-				ipf_refcnt++;
+				ipfmain.ipf_refcnt++;
 			else {
 				cmn_err(CE_NOTE,
 					"IP Filter Rules: ipfrule_add failed");
@@ -103,7 +104,7 @@ int _fini(void)
 	if (ipfruleinst == 0) {
 		ipfruleinst = ipfrule_remove();
 		if (!ipfruleinst)
-			ipf_refcnt--;
+			ipfmain.ipf_refcnt--;
 		else
 			ipfruleinst = -1;
 	}

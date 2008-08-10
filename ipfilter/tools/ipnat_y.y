@@ -371,10 +371,10 @@ divert:	IPNY_DIVERT oninout rwrproto mapfrom tlate divdst
 encap:	IPNY_ENCAP oninout rwrproto mapfrom tlate encapdst
 				{ if (nat->in_redir & NAT_MAP) {
 					setmapifnames();
-					nat->in_pr[0] = IPPROTO_ENCAP;
+					nat->in_pr[0] = IPPROTO_IPIP;
 				  } else {
 					setrdrifnames();
-					nat->in_pr[1] = IPPROTO_ENCAP;
+					nat->in_pr[1] = IPPROTO_IPIP;
 				  }
 				  nat->in_flags &= ~IPN_TCPUDP;
 				}

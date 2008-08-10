@@ -30,7 +30,7 @@
 #include "netinet/ip_frag.h"
 #include "netinet/ip_sync.h"
 
-extern	struct	selinfo	ipfselwait[IPL_LOGSIZE];
+ipf_main_softc_t ipfmain;
 
 #if __FreeBSD_version >= 502116
 static struct cdev *ipf_devs[IPL_LOGSIZE];
@@ -38,7 +38,9 @@ static struct cdev *ipf_devs[IPL_LOGSIZE];
 static dev_t ipf_devs[IPL_LOGSIZE];
 #endif
 
+#if 0
 static int sysctl_ipf_int ( SYSCTL_HANDLER_ARGS );
+#endif
 static int ipf_modload(void);
 static int ipf_modunload(void);
 
@@ -71,6 +73,7 @@ SYSCTL_DECL(_net_inet);
 #define	CTLFLAG_OFF	0x00800000	/* IPFilter must be disabled */
 #define	CTLFLAG_RWO	(CTLFLAG_RW|CTLFLAG_OFF)
 SYSCTL_NODE(_net_inet, OID_AUTO, ipf, CTLFLAG_RW, 0, "IPF");
+#if 0
 SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_flags, CTLFLAG_RW, &ipf_flags, 0, "");
 SYSCTL_IPF(_net_inet_ipf, OID_AUTO, ipf_pass, CTLFLAG_RW, &ipf_pass, 0, "");
 SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_active, CTLFLAG_RD, &ipf_active, 0, "");
@@ -118,6 +121,7 @@ SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_defaultauthage, CTLFLAG_RW,
 	   &ipf_auth_defaultage, 0, "");
 SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_chksrc, CTLFLAG_RW, &ipf_chksrc, 0, "");
 SYSCTL_IPF(_net_inet_ipf, OID_AUTO, fr_minttl, CTLFLAG_RW, &ipf_minttl, 0, "");
+#endif
 
 #define CDEV_MAJOR 79
 #include <sys/poll.h>
@@ -199,15 +203,8 @@ ipf_modload()
 	char *defpass, *c, *str;
 	int i, j, error;
 
-	RWLOCK_INIT(&ipf_global, "ipf filter load/unload mutex");
-	RWLOCK_INIT(&ipf_mutex, "ipf filter rwlock");
-	RWLOCK_INIT(&ipf_frcache, "ipf cache rwlock");
-
-	error = ipfattach();
+	error = ipfattach(&ipfmain);
 	if (error) {
-		RW_DESTROY(&ipf_global);
-		RW_DESTROY(&ipf_mutex);
-		RW_DESTROY(&ipf_frcache);
 		return error;
 	}
 
@@ -231,9 +228,9 @@ ipf_modload()
 		return error;
 	ipf_event_reg();
 
-	if (FR_ISPASS(ipf_pass))
+	if (FR_ISPASS(ipfmain.ipf_pass))
 		defpass = "pass";
-	else if (FR_ISBLOCK(ipf_pass))
+	else if (FR_ISBLOCK(ipfmain.ipf_pass))
 		defpass = "block";
 	else
 		defpass = "no-match -> block";
@@ -260,21 +257,17 @@ ipf_modunload()
 {
 	int error, i;
 
-	if (ipf_refcnt)
+	if (ipfmain.ipf_refcnt)
 		return EBUSY;
 
-	if (ipf_running >= 0) {
-		error = ipfdetach();
+	if (ipfmain.ipf_running >= 0) {
+		error = ipfdetach(&ipfmain);
 		if (error != 0)
 			return error;
 	} else
 		error = 0;
 
-	ipf_running = -2;
-
-	RW_DESTROY(&ipf_global);
-	RW_DESTROY(&ipf_mutex);
-	RW_DESTROY(&ipf_frcache);
+	ipfmain.ipf_running = -2;
 
 	for (i = 0; ipf_devfiles[i]; i++) {
 		if (ipf_devs[i] != NULL)
@@ -300,6 +293,7 @@ MODULE_VERSION(ipfilter, 1);
 #endif
 
 
+#if 0
 #ifdef SYSCTL_IPF
 int
 sysctl_ipf_int ( SYSCTL_HANDLER_ARGS )
@@ -317,13 +311,14 @@ sysctl_ipf_int ( SYSCTL_HANDLER_ARGS )
 	if (!arg1)
 		error = EPERM;
 	else {
-		if ((oidp->oid_kind & CTLFLAG_OFF) && (ipf_running > 0))
+		if ((oidp->oid_kind & CTLFLAG_OFF) && (ipfmain.ipf_running > 0))
 			error = EBUSY;
 		else
 			error = SYSCTL_IN(req, arg1, sizeof(int));
 	}
 	return (error);
 }
+#endif
 #endif
 
 
@@ -348,19 +343,19 @@ ipfpoll(dev_t dev, int events, struct proc *td)
 	case IPL_LOGNAT :
 	case IPL_LOGSTATE :
 #ifdef IPFILTER_LOG
-		if ((events & (POLLIN | POLLRDNORM)) && ipf_log_canread(unit))
+		if ((events & (POLLIN | POLLRDNORM)) && ipf_log_canread(&ipfmain, unit))
 			revents |= events & (POLLIN | POLLRDNORM);
 #endif
 		break;
 	case IPL_LOGAUTH :
-		if ((events & (POLLIN | POLLRDNORM)) && ipf_auth_waiting())
+		if ((events & (POLLIN | POLLRDNORM)) && ipf_auth_waiting(&ipfmain))
 			revents |= events & (POLLIN | POLLRDNORM);
 		break;
 	case IPL_LOGSYNC :
 #ifdef IPFILTER_SYNC
-		if ((events & (POLLIN | POLLRDNORM)) && ipf_sync_canread())
+		if ((events & (POLLIN | POLLRDNORM)) && ipf_sync_canread(&ipfmain))
 			revents |= events & (POLLIN | POLLRDNORM);
-		if ((events & (POLLOUT | POLLWRNORM)) && ipf_sync_canwrite())
+		if ((events & (POLLOUT | POLLWRNORM)) && ipf_sync_canwrite(&ipfmain))
 			revents |= events & (POLLOUT | POLLWRNORM);
 #endif
 		break;
@@ -371,7 +366,7 @@ ipfpoll(dev_t dev, int events, struct proc *td)
 	}
 
 	if ((revents == 0) && ((events & (POLLIN|POLLRDNORM)) != 0))
-		selrecord(td, &ipfselwait[unit]);
+		selrecord(td, &ipfmain.ipf_selwait[unit]);
 
 	return revents;
 }
@@ -481,16 +476,16 @@ static int ipfread(dev, uio)
 	if (unit < 0)
 		return ENXIO;
 
-	if (ipf_running < 1)
+	if (ipfmain.ipf_running < 1)
 		return EIO;
 
 # ifdef	IPFILTER_SYNC
 	if (unit == IPL_LOGSYNC)
-		return ipf_sync_read(uio);
+		return ipf_sync_read(&ipfmain, uio);
 # endif
 
 #ifdef IPFILTER_LOG
-	return ipf_log_read(unit, uio);
+	return ipf_log_read(&ipfmain, unit, uio);
 #else
 	return ENXIO;
 #endif
@@ -517,12 +512,12 @@ static int ipfwrite(dev, uio)
 	struct uio *uio;
 {
 
-	if (ipf_running < 1)
+	if (ipfmain.ipf_running < 1)
 		return EIO;
 
 #ifdef	IPFILTER_SYNC
 	if (GET_MINOR(dev) == IPL_LOGSYNC)
-		return ipf_sync_write(uio);
+		return ipf_sync_write(&ipfmain, uio);
 #endif
 	return ENXIO;
 }

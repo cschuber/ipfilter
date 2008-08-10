@@ -53,11 +53,6 @@ struct file;
 # include <sys/malloc.h>
 #endif
 
-#if defined(_KERNEL) && (defined(__osf__) || defined(AIX) || \
-     defined(__hpux) || defined(__sgi))
-# include "radix_ipf_local.h"
-# define _RADIX_H_
-#endif
 #include <net/if.h>
 #include <netinet/in.h>
 
@@ -73,32 +68,35 @@ static const char rcsid[] = "@(#)$Id$";
 #endif
 
 
-static int ipf_dstlist_init __P((void));
-static void ipf_dstlist_fini __P((void));
-static int ipf_dstlist_addr_find __P((void *, int, void *));
-static size_t ipf_dstlist_flush __P((iplookupflush_t *));
-static int ipf_dstlist_iter_deref __P((int, int, void *));
-static int ipf_dstlist_iter_next __P((ipftoken_t *, ipflookupiter_t *));
-static int ipf_dstlist_node_add __P((iplookupop_t *));
-static int ipf_dstlist_node_del __P((iplookupop_t *));
-static int ipf_dstlist_stats_get __P((iplookupop_t *));
-static int ipf_dstlist_table_add __P((iplookupop_t *));
-static int ipf_dstlist_table_del __P((iplookupop_t *));
-static int ipf_dstlist_table_deref __P((void *));
-static void *ipf_dstlist_table_find __P((int, char *));
-static void ipf_dstlist_table_flush __P((ippool_dst_t *));
+static void *ipf_dstlist_soft_create __P((ipf_main_softc_t *));
+static void ipf_dstlist_soft_destroy __P((ipf_main_softc_t *, void *));
+static int ipf_dstlist_soft_init __P((ipf_main_softc_t *, void *));
+static void ipf_dstlist_soft_fini __P((ipf_main_softc_t *, void *));
+static int ipf_dstlist_addr_find __P((ipf_main_softc_t *, void *, int, void *));
+static size_t ipf_dstlist_flush __P((ipf_main_softc_t *, void *, iplookupflush_t *));
+static int ipf_dstlist_iter_deref __P((ipf_main_softc_t *, void *, int, int, void *));
+static int ipf_dstlist_iter_next __P((ipf_main_softc_t *, void *, ipftoken_t *, ipflookupiter_t *));
+static int ipf_dstlist_node_add __P((ipf_main_softc_t *, void *, iplookupop_t *));
+static int ipf_dstlist_node_del __P((ipf_main_softc_t *, void *, iplookupop_t *));
+static int ipf_dstlist_stats_get __P((ipf_main_softc_t *, void *, iplookupop_t *));
+static int ipf_dstlist_table_add __P((ipf_main_softc_t *, void *, iplookupop_t *));
+static int ipf_dstlist_table_del __P((ipf_main_softc_t *, void *, iplookupop_t *));
+static int ipf_dstlist_table_deref __P((ipf_main_softc_t *, void *, void *));
+static void *ipf_dstlist_table_find __P((void *, int, char *));
+static void ipf_dstlist_table_flush __P((ipf_main_softc_t *, ippool_dst_t *));
 static void ipf_dstlist_table_clearnodes __P((ippool_dst_t *));
 static ipf_dstnode_t *ipf_dstlist_select __P((ippool_dst_t *));
-void *ipf_dstlist_select_ref __P((int, char *));
+void *ipf_dstlist_select_ref __P((void *, int, char *));
 void ipf_dstlist_unselect_deref __P((ipf_dstnode_t *));
 static void ipf_dstlist_node_free __P((ipf_dstnode_t *));
-static void *ipf_dstlist_table_find __P((int, char *));
 static int ipf_dstlist_node_deref __P((ipf_dstnode_t *));
 
 ipf_lookup_t ipf_dstlist_backend = {
 	IPLT_DSTLIST,
-	ipf_dstlist_init,
-	ipf_dstlist_fini,
+	ipf_dstlist_soft_create,
+	ipf_dstlist_soft_destroy,
+	ipf_dstlist_soft_init,
+	ipf_dstlist_soft_fini,
 	ipf_dstlist_addr_find,
 	ipf_dstlist_flush,
 	ipf_dstlist_iter_deref,
@@ -109,39 +107,70 @@ ipf_lookup_t ipf_dstlist_backend = {
 	ipf_dstlist_table_add,
 	ipf_dstlist_table_del,
 	ipf_dstlist_table_deref,
-	ipf_dstlist_table_find
+	ipf_dstlist_table_find,
+	ipf_dstlist_select_ref
 };
 
 
-static ippool_dst_t *dstlist[IPL_LOGSIZE];
+typedef struct ipf_dstl_softc_s {
+	ippool_dst_t *dstlist[IPL_LOGSIZE];
+} ipf_dstl_softc_t;
+
+
+static void *
+ipf_dstlist_soft_create(softc)
+	ipf_main_softc_t *softc;
+{
+	ipf_dstl_softc_t *softd;
+
+	KMALLOC(softd, ipf_dstl_softc_t *);
+	if (softd == NULL)
+		return NULL;
+
+	bzero((char *)softd, sizeof(*softd));
+
+	return softd;
+}
+
+
+static void
+ipf_dstlist_soft_destroy(softc, arg)
+	ipf_main_softc_t *softc;
+	void *arg;
+{
+	ipf_dstl_softc_t *softd = arg;
+
+	KFREE(softd);
+}
 
 
 static int
-ipf_dstlist_init()
+ipf_dstlist_soft_init(softc, arg)
+	ipf_main_softc_t *softc;
+	void *arg;
 {
-	int i;
-
-	for (i = 0; i < IPL_LOGSIZE; i++)
-		dstlist[i] = NULL;
-
 	return 0;
 }
 
 
 static void
-ipf_dstlist_fini()
+ipf_dstlist_soft_fini(softc, arg)
+	ipf_main_softc_t *softc;
+	void *arg;
 {
+	ipf_dstl_softc_t *softd = arg;
 	int i;
 
 	for (i = 0; i < IPL_LOGSIZE; i++)
-		while (dstlist[i] != NULL)
-			ipf_dstlist_table_flush(dstlist[i]);
+		while (softd->dstlist[i] != NULL)
+			ipf_dstlist_table_flush(softc, softd->dstlist[i]);
 }
 
 
 /*ARGSUSED*/
 static int
-ipf_dstlist_addr_find(arg1, arg2, arg3)
+ipf_dstlist_addr_find(softc, arg1, arg2, arg3)
+	ipf_main_softc_t *softc;
 	void *arg1, *arg3;
 	int arg2;
 {
@@ -153,16 +182,19 @@ ipf_dstlist_addr_find(arg1, arg2, arg3)
 
 
 static size_t
-ipf_dstlist_flush(fop)
+ipf_dstlist_flush(softc, arg, fop)
+	ipf_main_softc_t *softc;
+	void *arg;
 	iplookupflush_t *fop;
 {
+	ipf_dstl_softc_t *softd = arg;
 	ippool_dst_t *node, *next;
 	int n, i;
 
 	for (n = 0, i = 0; i < IPL_LOGSIZE; i++) {
 		if (fop->iplf_unit != IPLT_ALL && fop->iplf_unit != i)
 			continue;
-		for (node = dstlist[i]; node != NULL; node = next) {
+		for (node = softd->dstlist[i]; node != NULL; node = next) {
 			next = node->ipld_next;
 
 			if ((*fop->iplf_name != '\0') &&
@@ -170,7 +202,7 @@ ipf_dstlist_flush(fop)
 				    FR_GROUPLEN))
 				continue;
 
-			ipf_dstlist_table_flush(node);
+			ipf_dstlist_table_flush(softc, node);
 			n++;
 		}
 	}
@@ -179,7 +211,9 @@ ipf_dstlist_flush(fop)
 
 
 static int
-ipf_dstlist_iter_deref(otype, unit, data)
+ipf_dstlist_iter_deref(softc, arg, otype, unit, data)
+	ipf_main_softc_t *softc;
+	void *arg;
 	int otype, unit;
 	void *data;
 {
@@ -192,7 +226,7 @@ ipf_dstlist_iter_deref(otype, unit, data)
 	switch (otype)
 	{
 	case IPFLOOKUPITER_LIST :
-		ipf_dstlist_table_deref((ippool_dst_t *)data);
+		ipf_dstlist_table_deref(softc, arg, (ippool_dst_t *)data);
 		break;
 
 	case IPFLOOKUPITER_NODE :
@@ -205,12 +239,15 @@ ipf_dstlist_iter_deref(otype, unit, data)
 
 
 static int
-ipf_dstlist_iter_next(token, iter)
+ipf_dstlist_iter_next(softc, arg, token, iter)
+	ipf_main_softc_t *softc;
+	void *arg;
 	ipftoken_t *token;
 	ipflookupiter_t *iter;
 {
 	ipf_dstnode_t zn, *nextnode = NULL, *node = NULL;
 	ippool_dst_t zero, *next = NULL, *list = NULL;
+	ipf_dstl_softc_t *softd = arg;
 	int err = 0;
 
 	switch (iter->ili_otype)
@@ -218,13 +255,13 @@ ipf_dstlist_iter_next(token, iter)
 	case IPFLOOKUPITER_LIST :
 		list = token->ipt_data;
 		if (list == NULL) {
-			next = dstlist[(int)iter->ili_unit];
+			next = softd->dstlist[(int)iter->ili_unit];
 		} else {
 			next = list->ipld_next;
 		}
 
 		if (next != NULL) {
-			ATOMIC_INC(list->ipld_ref);
+			ATOMIC_INC32(list->ipld_ref);
 			token->ipt_data = next;
 		} else {
 			bzero((char *)&zero, sizeof(zero));
@@ -236,7 +273,7 @@ ipf_dstlist_iter_next(token, iter)
 	case IPFLOOKUPITER_NODE :
 		node = token->ipt_data;
 		if (node == NULL) {
-			list = ipf_dstlist_table_find(iter->ili_unit,
+			list = ipf_dstlist_table_find(arg, iter->ili_unit,
 						      iter->ili_name);
 			if (list == NULL) {
 				err = ESRCH;
@@ -250,7 +287,7 @@ ipf_dstlist_iter_next(token, iter)
 		}
 
 		if (nextnode != NULL) {
-			ATOMIC_INC(nextnode->ipfd_ref);
+			ATOMIC_INC32(nextnode->ipfd_ref);
 			token->ipt_data = nextnode;
 		} else {
 			bzero((char *)&zn, sizeof(zn));
@@ -270,7 +307,7 @@ ipf_dstlist_iter_next(token, iter)
 	{
 	case IPFLOOKUPITER_LIST :
 		if (node != NULL) {
-			ipf_dstlist_table_deref(node);
+			ipf_dstlist_table_deref(softc, arg, node);
 		}
 		token->ipt_data = next;
 		err = COPYOUT(next, iter->ili_data, sizeof(*next));
@@ -296,7 +333,9 @@ ipf_dstlist_iter_next(token, iter)
 
 
 static int
-ipf_dstlist_node_add(op)
+ipf_dstlist_node_add(softc, arg, op)
+	ipf_main_softc_t *softc;
+	void *arg;
 	iplookupop_t *op;
 {
 	ipf_dstnode_t *node;
@@ -318,7 +357,7 @@ ipf_dstlist_node_add(op)
 		return EFAULT;
 	}
 
-	d = ipf_dstlist_table_find(op->iplo_unit, op->iplo_name);
+	d = ipf_dstlist_table_find(arg, op->iplo_unit, op->iplo_name);
 	if (d == NULL) {
 		KFREE(node);
 		return ESRCH;
@@ -367,7 +406,9 @@ ipf_dstlist_node_deref(node)
 
 
 static int
-ipf_dstlist_node_del(op)
+ipf_dstlist_node_del(softc, arg, op)
+	ipf_main_softc_t *softc;
+	void *arg;
 	iplookupop_t *op;
 {
 	ipf_dstnode_t *node;
@@ -380,7 +421,7 @@ ipf_dstlist_node_del(op)
 		return EFAULT;
 	}
 
-	d = ipf_dstlist_table_find(op->iplo_unit, op->iplo_name);
+	d = ipf_dstlist_table_find(arg, op->iplo_unit, op->iplo_name);
 	if (d == NULL) {
 		return ESRCH;
 	}
@@ -433,7 +474,9 @@ ipf_dstlist_node_free(node)
 
 
 static int
-ipf_dstlist_stats_get(op)
+ipf_dstlist_stats_get(softc, arg, op)
+	ipf_main_softc_t *softc;
+	void *arg;
 	iplookupop_t *op;
 {
 
@@ -442,16 +485,18 @@ ipf_dstlist_stats_get(op)
 
 
 static int
-ipf_dstlist_table_add(op)
+ipf_dstlist_table_add(softc, arg, op)
+	ipf_main_softc_t *softc;
+	void *arg;
 	iplookupop_t *op;
 {
-
+	ipf_dstl_softc_t *softd = arg;
 	ippool_dst_t *d, *new;
 	int unit;
 
 	KMALLOC(new, ippool_dst_t *);
 
-	d = ipf_dstlist_table_find(op->iplo_unit, op->iplo_name);
+	d = ipf_dstlist_table_find(arg, op->iplo_unit, op->iplo_name);
 	if (d != NULL) {
 		if (new != NULL) {
 			KFREE(new);
@@ -471,23 +516,25 @@ ipf_dstlist_table_add(op)
 	/*
 	 * put the new destination list at the top of the list
 	 */
-	new->ipld_pnext = &dstlist[unit];
-	new->ipld_next = dstlist[unit];
-	if (dstlist[unit] != NULL)
-		dstlist[unit]->ipld_pnext = &new->ipld_next;
-	dstlist[unit] = new;
+	new->ipld_pnext = &softd->dstlist[unit];
+	new->ipld_next = softd->dstlist[unit];
+	if (softd->dstlist[unit] != NULL)
+		softd->dstlist[unit]->ipld_pnext = &new->ipld_next;
+	softd->dstlist[unit] = new;
 
 	return 0;
 }
 
 
 static int
-ipf_dstlist_table_del(op)
+ipf_dstlist_table_del(softc, arg, op)
+	ipf_main_softc_t *softc;
+	void *arg;
 	iplookupop_t *op;
 {
 	ippool_dst_t *d;
 
-	d = ipf_dstlist_table_find(op->iplo_unit, op->iplo_name);
+	d = ipf_dstlist_table_find(arg, op->iplo_unit, op->iplo_name);
 	if (d == NULL) {
 		return ESRCH;
 	}
@@ -496,14 +543,15 @@ ipf_dstlist_table_del(op)
 		return EBUSY;
 	}
 
-	ipf_dstlist_table_deref(d);
+	ipf_dstlist_table_deref(softc, arg, d);
 
 	return 0;
 }
 
 
 static void
-ipf_dstlist_table_flush(dst)
+ipf_dstlist_table_flush(softc, dst)
+	ipf_main_softc_t *softc;
 	ippool_dst_t *dst;
 {
 
@@ -517,10 +565,12 @@ ipf_dstlist_table_flush(dst)
 
 
 static int
-ipf_dstlist_table_deref(arg)
+ipf_dstlist_table_deref(softc, arg, table)
+	ipf_main_softc_t *softc;
 	void *arg;
+	void *table;
 {
-	ippool_dst_t *d = arg;
+	ippool_dst_t *d = table;
 
 	ipf_dstlist_table_clearnodes(d);
 
@@ -549,13 +599,15 @@ ipf_dstlist_table_clearnodes(dst)
 
 
 static void *
-ipf_dstlist_table_find(unit, name)
+ipf_dstlist_table_find(arg, unit, name)
+	void *arg;
 	int unit;
 	char *name;
 {
+	ipf_dstl_softc_t *softd = arg;
 	ippool_dst_t *d;
 
-	for (d = dstlist[unit]; d != NULL; d = d->ipld_next) {
+	for (d = softd->dstlist[unit]; d != NULL; d = d->ipld_next) {
 		if ((d->ipld_unit == unit) &&
 		    !strncmp(d->ipld_name, name, FR_GROUPLEN)) {
 			return d;
@@ -643,14 +695,15 @@ ipf_dstlist_select(d)
 
 
 void *
-ipf_dstlist_select_ref(unit, name)
+ipf_dstlist_select_ref(arg, unit, name)
+	void *arg;
 	int unit;
 	char *name;
 {
 	ipf_dstnode_t *node;
 	ippool_dst_t *d;
 
-	d = ipf_dstlist_table_find(unit, name);
+	d = ipf_dstlist_table_find(arg, unit, name);
 	if (d == NULL) {
 		return (void *)-1;
 	}

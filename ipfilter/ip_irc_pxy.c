@@ -11,12 +11,12 @@
 #define	IPF_IRCBUFSZ	96	/* This *MUST* be >= 64! */
 
 
-int ippr_irc_init __P((void));
-void ippr_irc_fini __P((void));
-int ippr_irc_new __P((fr_info_t *, ap_session_t *, nat_t *));
-int ippr_irc_out __P((fr_info_t *, ap_session_t *, nat_t *));
-int ippr_irc_send __P((fr_info_t *, nat_t *));
-int ippr_irc_complete __P((ircinfo_t *, char *, size_t));
+void ipf_p_irc_main_load __P((void));
+void ipf_p_irc_main_unload __P((void));
+int ipf_p_irc_new __P((void *, fr_info_t *, ap_session_t *, nat_t *));
+int ipf_p_irc_out __P((void *, fr_info_t *, ap_session_t *, nat_t *));
+int ipf_p_irc_send __P((fr_info_t *, nat_t *));
+int ipf_p_irc_complete __P((ircinfo_t *, char *, size_t));
 u_short ipf_irc_atoi __P((char **));
 
 static	frentry_t	ircnatfr;
@@ -27,21 +27,19 @@ int	irc_proxy_init = 0;
 /*
  * Initialize local structures.
  */
-int
-ippr_irc_init()
+void
+ipf_p_irc_main_load()
 {
 	bzero((char *)&ircnatfr, sizeof(ircnatfr));
 	ircnatfr.fr_ref = 1;
 	ircnatfr.fr_flags = FR_INQUE|FR_PASS|FR_QUICK|FR_KEEPSTATE;
 	MUTEX_INIT(&ircnatfr.fr_lock, "IRC proxy rule lock");
 	irc_proxy_init = 1;
-
-	return 0;
 }
 
 
 void
-ippr_irc_fini()
+ipf_p_irc_main_unload()
 {
 	if (irc_proxy_init == 1) {
 		MUTEX_DESTROY(&ircnatfr.fr_lock);
@@ -50,7 +48,7 @@ ippr_irc_fini()
 }
 
 
-const char *ippr_irc_dcctypes[] = {
+const char *ipf_p_irc_dcctypes[] = {
 	"CHAT ",	/* CHAT chat ipnumber portnumber */
 	"SEND ",	/* SEND filename ipnumber portnumber */
 	"MOVE ",
@@ -67,7 +65,7 @@ const char *ippr_irc_dcctypes[] = {
 
 
 int
-ippr_irc_complete(ircp, buf, len)
+ipf_p_irc_complete(ircp, buf, len)
 	ircinfo_t *ircp;
 	char *buf;
 	size_t len;
@@ -148,12 +146,12 @@ ippr_irc_complete(ircp, buf, len)
 	/*
 	 * Check for a recognised DCC command
 	 */
-	for (j = 0, k = 0; ippr_irc_dcctypes[j]; j++) {
-		k = MIN(strlen(ippr_irc_dcctypes[j]), i);
-		if (!strncmp(ippr_irc_dcctypes[j], s, k))
+	for (j = 0, k = 0; ipf_p_irc_dcctypes[j]; j++) {
+		k = MIN(strlen(ipf_p_irc_dcctypes[j]), i);
+		if (!strncmp(ipf_p_irc_dcctypes[j], s, k))
 			break;
 	}
-	if (!ippr_irc_dcctypes[j])
+	if (!ipf_p_irc_dcctypes[j])
 		return 0;
 
 	ircp->irc_type = s;
@@ -226,7 +224,8 @@ ippr_irc_complete(ircp, buf, len)
 
 
 int
-ippr_irc_new(fin, aps, nat)
+ipf_p_irc_new(arg, fin, aps, nat)
+	void *arg;
 	fr_info_t *fin;
 	ap_session_t *aps;
 	nat_t *nat;
@@ -249,13 +248,14 @@ ippr_irc_new(fin, aps, nat)
 
 
 int
-ippr_irc_send(fin, nat)
+ipf_p_irc_send(fin, nat)
 	fr_info_t *fin;
 	nat_t *nat;
 {
 	char ctcpbuf[IPF_IRCBUFSZ], newbuf[IPF_IRCBUFSZ];
 	tcphdr_t *tcp, tcph, *tcp2 = &tcph;
 	int off, inc = 0, i, dlen;
+	ipf_main_softc_t *softc;
 	size_t nlen = 0, olen;
 	struct in_addr swip;
 	u_short a5, sp;
@@ -268,6 +268,7 @@ ippr_irc_send(fin, nat)
 #ifdef	MENTAT
 	mb_t *m1;
 #endif
+	softc = fin->fin_main_soft;
 
 	m = fin->fin_m;
 	ip = fin->fin_ip;
@@ -290,7 +291,7 @@ ippr_irc_send(fin, nat)
 	*newbuf = '\0';
 
 	irc = nat->nat_aps->aps_data;
-	if (ippr_irc_complete(irc, ctcpbuf, dlen) == 0)
+	if (ipf_p_irc_complete(irc, ctcpbuf, dlen) == 0)
 		return 0;
 
 	/*
@@ -331,14 +332,14 @@ ippr_irc_send(fin, nat)
 
 		/* alloc enough to keep same trailer space for lower driver */
 		nm = allocb(nlen, BPRI_MED);
-		PANIC((!nm),("ippr_irc_out: allocb failed"));
+		PANIC((!nm),("ipf_p_irc_out: allocb failed"));
 
 		nm->b_band = m1->b_band;
 		nm->b_wptr += nlen;
 
 		m1->b_wptr -= olen;
 		PANIC((m1->b_wptr < m1->b_rptr),
-		      ("ippr_irc_out: cannot handle fragmented data block"));
+		      ("ipf_p_irc_out: cannot handle fragmented data block"));
 
 		linkb(m1, nm);
 	} else {
@@ -399,6 +400,8 @@ ippr_irc_send(fin, nat)
 	nat2 = ipf_nat_outlookup(fin, IPN_TCP, nat->nat_pr[1], nat->nat_nsrcip,
 			     ip->ip_dst);
 	if (nat2 == NULL) {
+		ipf_nat_softc_t *softn = softc->ipf_nat_soft;
+
 		bcopy((caddr_t)fin, (caddr_t)&fi, sizeof(fi));
 		bzero((char *)tcp2, sizeof(*tcp2));
 		tcp2->th_win = htons(8192);
@@ -414,18 +417,20 @@ ippr_irc_send(fin, nat)
 		fi.fin_plen = fi.fin_hlen + sizeof(*tcp2);
 		swip = ip->ip_src;
 		ip->ip_src = nat->nat_nsrcip;
-		MUTEX_ENTER(&ipf_nat_new);
+		MUTEX_ENTER(&softn->ipf_nat_new);
 		nat2 = ipf_nat_add(&fi, nat->nat_ptr, NULL,
 			       NAT_SLAVE|IPN_TCP|SI_W_DPORT, NAT_OUTBOUND);
-		MUTEX_EXIT(&ipf_nat_new);
+		MUTEX_EXIT(&softn->ipf_nat_new);
 		if (nat2 != NULL) {
 			(void) ipf_nat_proto(&fi, nat2, 0);
 			MUTEX_ENTER(&nat2->nat_lock);
 			ipf_nat_update(&fi, nat2);
 			MUTEX_EXIT(&nat2->nat_lock);
 
-			if (ipf_state_add(&fi, NULL, SI_W_DPORT) == 0)
-				ipf_state_deref((ipstate_t **)&fi.fin_state);
+			if (ipf_state_add(softc, &fi, &fi.fin_state,
+					  SI_W_DPORT) == 0)
+				ipf_state_deref(softc,
+						(ipstate_t **)&fi.fin_state);
 		}
 		ip->ip_src = swip;
 	}
@@ -434,11 +439,12 @@ ippr_irc_send(fin, nat)
 
 
 int
-ippr_irc_out(fin, aps, nat)
+ipf_p_irc_out(arg, fin, aps, nat)
+	void *arg;
 	fr_info_t *fin;
 	ap_session_t *aps;
 	nat_t *nat;
 {
 	aps = aps;	/* LINT */
-	return ippr_irc_send(fin, nat);
+	return ipf_p_irc_send(fin, nat);
 }

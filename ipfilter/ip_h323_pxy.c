@@ -30,16 +30,14 @@
 
 #define IPF_H323_PROXY
 
-int  ippr_h323_init __P((void));
-void  ippr_h323_fini __P((void));
-int  ippr_h323_new __P((fr_info_t *, ap_session_t *, nat_t *));
-void ippr_h323_del __P((ap_session_t *));
-int  ippr_h323_out __P((fr_info_t *, ap_session_t *, nat_t *));
-int  ippr_h323_in __P((fr_info_t *, ap_session_t *, nat_t *));
+void  ipf_p_h323_main_load __P((void));
+void  ipf_p_h323_main_unload __P((void));
+int  ipf_p_h323_new __P((void *, fr_info_t *, ap_session_t *, nat_t *));
+void ipf_p_h323_del __P((ipf_main_softc_t *, ap_session_t *));
+int  ipf_p_h323_in __P((void *, fr_info_t *, ap_session_t *, nat_t *));
 
-int  ippr_h245_new __P((fr_info_t *, ap_session_t *, nat_t *));
-int  ippr_h245_out __P((fr_info_t *, ap_session_t *, nat_t *));
-int  ippr_h245_in __P((fr_info_t *, ap_session_t *, nat_t *));
+int  ipf_p_h245_new __P((void *, fr_info_t *, ap_session_t *, nat_t *));
+int  ipf_p_h245_out __P((void *, fr_info_t *, ap_session_t *, nat_t *));
 
 static	frentry_t	h323_fr;
 
@@ -82,21 +80,19 @@ find_port(ipaddr, data, datlen, off, port)
 /*
  * Initialize local structures.
  */
-int
-ippr_h323_init()
+void
+ipf_p_h323_main_load()
 {
 	bzero((char *)&h323_fr, sizeof(h323_fr));
 	h323_fr.fr_ref = 1;
 	h323_fr.fr_flags = FR_INQUE|FR_PASS|FR_QUICK|FR_KEEPSTATE;
 	MUTEX_INIT(&h323_fr.fr_lock, "H323 proxy rule lock");
 	h323_proxy_init = 1;
-
-	return 0;
 }
 
 
 void
-ippr_h323_fini()
+ipf_p_h323_main_unload()
 {
 	if (h323_proxy_init == 1) {
 		MUTEX_DESTROY(&h323_fr.fr_lock);
@@ -106,7 +102,8 @@ ippr_h323_fini()
 
 
 int
-ippr_h323_new(fin, aps, nat)
+ipf_p_h323_new(arg, fin, aps, nat)
+	void *arg;
 	fr_info_t *fin;
 	ap_session_t *aps;
 	nat_t *nat;
@@ -122,7 +119,8 @@ ippr_h323_new(fin, aps, nat)
 
 
 void
-ippr_h323_del(aps)
+ipf_p_h323_del(softc, aps)
+	ipf_main_softc_t *softc;
 	ap_session_t *aps;
 {
 	int i;
@@ -134,12 +132,12 @@ ippr_h323_del(aps)
 		     i++, ipn = (ipnat_t *)((char *)ipn + sizeof(*ipn)))
 		{
 			/*
-			 * Check the comment in ippr_h323_in() function,
+			 * Check the comment in ipf_p_h323_in() function,
 			 * just above ipf_nat_ioctl() call.
 			 * We are lucky here because this function is not
 			 * called with ipf_nat locked.
 			 */
-			if (ipf_nat_ioctl((caddr_t)ipn, SIOCRMNAT, NAT_SYSSPACE|
+			if (ipf_nat_ioctl(softc, (caddr_t)ipn, SIOCRMNAT, NAT_SYSSPACE|
 				         NAT_LOCKHELD|FWRITE, 0, NULL) == -1) {
 				/*EMPTY*/;
 				/* log the error */
@@ -155,11 +153,13 @@ ippr_h323_del(aps)
 
 
 int
-ippr_h323_in(fin, aps, nat)
+ipf_p_h323_in(arg, fin, aps, nat)
+	void *arg;
 	fr_info_t *fin;
 	ap_session_t *aps;
 	nat_t *nat;
 {
+	ipf_main_softc_t *softc = fin->fin_main_soft;
 	int ipaddr, off, datlen;
 	unsigned short port;
 	caddr_t data;
@@ -206,13 +206,13 @@ ippr_h323_in(fin, aps, nat)
 		 * A (maybe better) solution is do a UPGRADE(), and instead
 		 * of calling ipf_nat_ioctl(), we add the nat rule ourself.
 		 */
-		RWLOCK_EXIT(&ipf_nat);
-		if (ipf_nat_ioctl((caddr_t)ipn, SIOCADNAT,
+		RWLOCK_EXIT(&softc->ipf_nat);
+		if (ipf_nat_ioctl(softc, (caddr_t)ipn, SIOCADNAT,
 				 NAT_SYSSPACE|FWRITE, 0, NULL) == -1) {
-			READ_ENTER(&ipf_nat);
+			READ_ENTER(&softc->ipf_nat);
 			return -1;
 		}
-		READ_ENTER(&ipf_nat);
+		READ_ENTER(&softc->ipf_nat);
 		if (aps->aps_data != NULL && aps->aps_psiz > 0) {
 			bcopy(aps->aps_data, newarray, aps->aps_psiz);
 			KFREES(aps->aps_data, aps->aps_psiz);
@@ -225,7 +225,8 @@ ippr_h323_in(fin, aps, nat)
 
 
 int
-ippr_h245_new(fin, aps, nat)
+ipf_p_h245_new(arg, fin, aps, nat)
+	void *arg;
 	fr_info_t *fin;
 	ap_session_t *aps;
 	nat_t *nat;
@@ -240,11 +241,14 @@ ippr_h245_new(fin, aps, nat)
 
 
 int
-ippr_h245_out(fin, aps, nat)
+ipf_p_h245_out(arg, fin, aps, nat)
+	void *arg;
 	fr_info_t *fin;
 	ap_session_t *aps;
 	nat_t *nat;
 {
+	ipf_main_softc_t *softc = fin->fin_main_soft;
+	ipf_nat_softc_t *softn = softc->ipf_nat_soft;
 	int ipaddr, off, datlen;
 	tcphdr_t *tcp;
 	caddr_t data;
@@ -285,11 +289,11 @@ ippr_h245_out(fin, aps, nat)
 			fi.fin_data[1] = 0;
 			fi.fin_dp = (char *)&udp;
 
-			MUTEX_ENTER(&ipf_nat_new);
+			MUTEX_ENTER(&softn->ipf_nat_new);
 			nat2 = ipf_nat_add(&fi, nat->nat_ptr, NULL,
 				       NAT_SLAVE|IPN_UDP|SI_W_DPORT,
 				       NAT_OUTBOUND);
-			MUTEX_EXIT(&ipf_nat_new);
+			MUTEX_EXIT(&softn->ipf_nat_new);
 			if (nat2 != NULL) {
 				(void) ipf_nat_proto(&fi, nat2, IPN_UDP);
 				MUTEX_ENTER(&nat2->nat_lock);
@@ -298,7 +302,7 @@ ippr_h245_out(fin, aps, nat)
 
 				nat2->nat_ptr->in_hits++;
 #ifdef	IPFILTER_LOG
-				ipf_nat_log(nat2, (u_int)(nat->nat_ptr->in_redir));
+				ipf_nat_log(softc, softc->ipf_nat_soft, nat2, (u_int)(nat->nat_ptr->in_redir));
 #endif
 				bcopy((caddr_t)&ip->ip_src.s_addr,
 				      data + off, 4);

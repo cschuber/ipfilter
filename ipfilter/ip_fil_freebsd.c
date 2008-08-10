@@ -120,20 +120,11 @@ MALLOC_DEFINE(M_IPFILTER, "IP Filter", "IP Filter packet filter data structures"
 extern	struct	protosw	inetsw[];
 #endif
 
-static	int	(*ipf_savep) __P((ip_t *, int, void *, int, struct mbuf **));
+static	int	(*ipf_savep) __P((void *, ip_t *, int, void *, int, struct mbuf **));
 static	int	ipf_send_ip __P((fr_info_t *, mb_t *, mb_t **));
-# ifdef USE_MUTEXES
-ipfmutex_t	ipl_mutex, ipf_auth_mx, ipf_rw, ipf_stinsert;
-ipfmutex_t	ipf_nat_new, ipf_natio, ipf_timeoutlock;
-ipfrwlock_t	ipf_mutex, ipf_global, ipf_ipidfrag, ipf_frcache, ipf_tokens;
-ipfrwlock_t	ipf_frag, ipf_state, ipf_nat, ipf_natfrag, ipf_authlk;
-# endif
 int		ipf_locks_done = 0;
 
-#if (__FreeBSD_version >= 300000)
-struct callout_handle ipf_slowtimer_ch;
-#endif
-struct	selinfo	ipfselwait[IPL_LOGSIZE];
+extern ipf_main_softc_t ipfmain;
 
 #if (__FreeBSD_version >= 500011)
 # include <sys/conf.h>
@@ -145,7 +136,7 @@ struct	selinfo	ipfselwait[IPL_LOGSIZE];
 /*
  * We provide the ipf_checkp name just to minimize changes later.
  */
-int (*ipf_checkp) __P((ip_t *ip, int hlen, void *ifp, int out, mb_t **mp));
+int (*ipf_checkp) __P((void *, ip_t *ip, int hlen, void *ifp, int out, mb_t **mp));
 
 
 #if (__FreeBSD_version >= 502103)
@@ -156,7 +147,7 @@ static void ipf_ifevent(void *arg);
 static void ipf_ifevent(arg)
 	void *arg;
 {
-        ipf_sync(NULL);
+        ipf_sync(arg, NULL);
 }
 #endif
 
@@ -171,7 +162,7 @@ ipf_check_wrapper(void *arg, struct mbuf **mp, struct ifnet *ifp, int dir)
 
 	ip->ip_len = ntohs(ip->ip_len);
 	ip->ip_off = ntohs(ip->ip_off);
-	rv = ipf_check(ip, ip->ip_hl << 2, ifp, (dir == PFIL_OUT), mp);
+	rv = ipf_check(&ipfmain, ip, ip->ip_hl << 2, ifp, (dir == PFIL_OUT), mp);
 	if ((rv == 0) && (*mp != NULL)) {
 		ip = mtod(*mp, struct ip *);
 		ip->ip_len = htons(ip->ip_len);
@@ -186,7 +177,7 @@ ipf_check_wrapper(void *arg, struct mbuf **mp, struct ifnet *ifp, int dir)
 static int
 ipf_check_wrapper6(void *arg, struct mbuf **mp, struct ifnet *ifp, int dir)
 {
-	return (ipf_check(mtod(*mp, struct ip *), sizeof(struct ip6_hdr),
+	return (ipf_check(&ipfmain, mtod(*mp, struct ip *), sizeof(struct ip6_hdr),
 	    ifp, (dir == PFIL_OUT), mp));
 }
 # endif
@@ -203,25 +194,26 @@ int ipf_identify(s)
 
 
 int
-ipfattach()
+ipfattach(softc)
+	ipf_main_softc_t *softc;
 {
 #ifdef USE_SPL
 	int s;
 #endif
 
+	if (ipf_load_all() != 0)
+		return EIO;
+
+	if (ipf_create_all(softc) == NULL)
+		return EIO;
+
 	SPL_NET(s);
-	if (ipf_running > 0) {
+	if (softc->ipf_running > 0) {
 		SPL_X(s);
 		return EBUSY;
 	}
 
-	MUTEX_INIT(&ipf_rw, "ipf rw mutex");
-	MUTEX_INIT(&ipf_timeoutlock, "ipf timeout queue mutex");
-	RWLOCK_INIT(&ipf_ipidfrag, "ipf IP NAT-Frag rwlock");
-	RWLOCK_INIT(&ipf_tokens, "ipf token rwlock");
-	ipf_locks_done = 1;
-
-	if (ipf_initialise() < 0) {
+	if (ipf_init_all(softc) < 0) {
 		SPL_X(s);
 		return EIO;
 	}
@@ -232,17 +224,16 @@ ipfattach()
 		ipf_checkp = ipf_check;
 	}
 
-	bzero((char *)ipfselwait, sizeof(ipfselwait));
-	bzero((char *)ipf_cache, sizeof(ipf_cache));
-	ipf_running = 1;
+	bzero((char *)ipfmain.ipf_selwait, sizeof(ipfmain.ipf_selwait));
+	softc->ipf_running = 1;
 
-	if (ipf_control_forwarding & 1)
+	if (softc->ipf_control_forwarding & 1)
 		ipforwarding = 1;
 
 	SPL_X(s);
 #if (__FreeBSD_version >= 300000)
-	ipf_slowtimer_ch = timeout(ipf_slowtimer, NULL,
-				    (hz / IPF_HZ_DIVIDE) * IPF_HZ_MULT);
+	softc->ipf_slow_ch = timeout(ipf_slowtimer, NULL,
+				     (hz / IPF_HZ_DIVIDE) * IPF_HZ_MULT);
 #else
 	timeout(ipf_slowtimer, NULL, (hz / IPF_HZ_DIVIDE) * IPF_HZ_MULT);
 #endif
@@ -255,21 +246,22 @@ ipfattach()
  * stream.
  */
 int
-ipfdetach()
+ipfdetach(softc)
+	ipf_main_softc_t *softc;
 {
 #ifdef USE_SPL
 	int s;
 #endif
 
-	if (ipf_control_forwarding & 2)
+	if (softc->ipf_control_forwarding & 2)
 		ipforwarding = 0;
 
 	SPL_NET(s);
 
 #if (__FreeBSD_version >= 300000)
-	if (ipf_slowtimer_ch.callout != NULL)
-		untimeout(ipf_slowtimer, NULL, ipf_slowtimer_ch);
-	bzero(&ipf_slowtimer_ch, sizeof(ipf_slowtimer_ch));
+	if (softc->ipf_slow_ch.callout != NULL)
+		untimeout(ipf_slowtimer, NULL, softc->ipf_slow_ch);
+	bzero(&softc->ipf_slow, sizeof(softc->ipf_slow));
 #else
 	untimeout(ipf_slowtimer, NULL);
 #endif /* FreeBSD */
@@ -280,22 +272,13 @@ ipfdetach()
 	ipf_savep = NULL;
 #endif
 
-	ipf_deinitialise();
+	ipf_fini_all(softc);
 
-	ipf_running = -2;
-
-	(void) ipf_flush(IPL_LOGIPF, FR_INQUE|FR_OUTQUE|FR_INACTIVE);
-	(void) ipf_flush(IPL_LOGIPF, FR_INQUE|FR_OUTQUE);
-
-	if (ipf_locks_done == 1) {
-		MUTEX_DESTROY(&ipf_timeoutlock);
-		MUTEX_DESTROY(&ipf_rw);
-		RW_DESTROY(&ipf_ipidfrag);
-		RW_DESTROY(&ipf_tokens);
-		ipf_locks_done = 0;
-	}
+	softc->ipf_running = -2;
 
 	SPL_X(s);
+
+	ipf_destroy_all(softc);
 
 	return 0;
 }
@@ -343,7 +326,7 @@ ipfioctl(dev, cmd, data, mode
 	if ((IPL_LOGMAX < unit) || (unit < 0))
 		return ENXIO;
 
-	if (ipf_running <= 0) {
+	if (ipfmain.ipf_running <= 0) {
 		if (unit != IPL_LOGIPF)
 			return EIO;
 		if (cmd != SIOCIPFGETNEXT && cmd != SIOCIPFGET &&
@@ -354,7 +337,7 @@ ipfioctl(dev, cmd, data, mode
 
 	SPL_NET(s);
 
-	error = ipf_ioctlswitch(unit, data, cmd, mode, p->p_uid, p);
+	error = ipf_ioctlswitch(&ipfmain, unit, data, cmd, mode, p->p_uid, p);
 	if (error != -1) {
 		SPL_X(s);
 		return error;
@@ -854,7 +837,8 @@ ipf_fastroute(m0, mpp, fin, fdp)
 			u_32_t pass;
 
 			if (ipf_state_check(fin, &pass) != NULL)
-				ipf_state_deref((ipstate_t **)&fin->fin_state);
+				ipf_state_deref(fin->fin_main_soft,
+						(ipstate_t **)&fin->fin_state);
 		}
 
 		switch (ipf_nat_checkout(fin, NULL))
@@ -862,7 +846,8 @@ ipf_fastroute(m0, mpp, fin, fdp)
 		case 0 :
 			break;
 		case 1 :
-			ipf_nat_deref((nat_t **)&fin->fin_nat);
+			ipf_nat_deref(fin->fin_main_soft,
+				      (nat_t **)&fin->fin_nat);
 			ip->ip_sum = 0;
 			break;
 		case -1 :
@@ -971,9 +956,9 @@ sendorfree:
     }
 done:
 	if (!error)
-		ipf_frouteok[0]++;
+		ipfmain.ipf_frouteok[0]++;
 	else
-		ipf_frouteok[1]++;
+		ipfmain.ipf_frouteok[1]++;
 
 	if ((ro != NULL) && (ro->ro_rt != NULL)) {
 		RTFREE(ro->ro_rt);
@@ -1155,9 +1140,9 @@ ipf_nextipid(fin)
 	static u_short ipid = 0;
 	u_short id;
 
-	MUTEX_ENTER(&ipf_rw);
+	MUTEX_ENTER(&ipfmain.ipf_rw);
 	id = ipid++;
-	MUTEX_EXIT(&ipf_rw);
+	MUTEX_EXIT(&ipfmain.ipf_rw);
 #else
 	u_short id;
 
@@ -1278,7 +1263,7 @@ ipf_pullup(xmin, fin, len)
 	fr_info_t *fin;
 	int len;
 {
-	int out = fin->fin_out, dpoff, ipoff;
+	int dpoff, ipoff;
 	mb_t *m = xmin;
 	char *ip;
 
@@ -1346,7 +1331,6 @@ ipf_pullup(xmin, fin, len)
 
 			*fin->fin_mp = NULL;
 			fin->fin_m = NULL;
-			ATOMIC_INCL(ipf_stats[out].fr_pull[1]);
 			return NULL;
 		}
 
@@ -1359,7 +1343,6 @@ ipf_pullup(xmin, fin, len)
 		fin->fin_m = m;
 		ip = MTOD(m, char *) + ipoff;
 
-		ATOMIC_INCL(ipf_stats[out].fr_pull[0]);
 		fin->fin_ip = (ip_t *)ip;
 		if (fin->fin_dp != NULL)
 			fin->fin_dp = (char *)fin->fin_ip + dpoff;
@@ -1509,10 +1492,10 @@ ipf_event_reg(void)
 {
 #if (__FreeBSD_version >= 502103)
 	ipf_arrivetag =  EVENTHANDLER_REGISTER(ifnet_arrival_event, \
-					       ipf_ifevent, NULL, \
+					       ipf_ifevent, &ipfmain, \
 					       EVENTHANDLER_PRI_ANY);
 	ipf_departtag =  EVENTHANDLER_REGISTER(ifnet_departure_event, \
-					       ipf_ifevent, NULL, \
+					       ipf_ifevent, &ipfmain, \
 					       EVENTHANDLER_PRI_ANY);
 	ipf_clonetag =  EVENTHANDLER_REGISTER(if_clone_event, ipf_ifevent, \
 					      NULL, EVENTHANDLER_PRI_ANY);

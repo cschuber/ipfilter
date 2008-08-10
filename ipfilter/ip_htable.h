@@ -60,9 +60,11 @@ typedef	struct	iphtstat_s	{
 } iphtstat_t;
 
 
-extern iphtable_t *ipf_htables[IPL_LOGSIZE];
-extern void *ipf_iphmfindgroup __P((void *, void *));
-extern iphtable_t *ipf_htable_find __P((int, char *));
+extern void *ipf_iphmfindgroup __P((ipf_main_softc_t *, void *, void *));
+extern iphtable_t *ipf_htable_find __P((void *, int, char *));
 extern ipf_lookup_t ipf_htable_backend;
+#ifndef _KERNEL
+extern	void	ipf_htable_dump __P((ipf_main_softc_t *, void *));
+#endif
 
 #endif /* __IP_HTABLE_H__ */

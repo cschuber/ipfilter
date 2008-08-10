@@ -256,61 +256,41 @@ typedef	struct	ips_stat {
 } ips_stat_t;
 
 
-extern	u_int	ipf_tcpclosed;
-extern	u_int	ipf_tcpclosewait;
-extern	u_int	ipf_tcphalfclosed;
-extern	u_int	ipf_tcpidletimeout;
-extern	u_int	ipf_tcplastack;
-extern	u_int	ipf_tcpsynsent;
-extern	u_int	ipf_tcpsynrecv;
-extern	u_int	ipf_tcptimeout;
-extern	u_int	ipf_tcptimewait;
-extern	u_int	ipf_udptimeout;
-extern	u_int	ipf_udpacktimeout;
-extern	u_int	ipf_icmptimeout;
-extern	u_int	ipf_icmpacktimeout;
-extern	u_int	ipf_iptimeout;
-extern	u_int	ipf_state_wm_freq;
-extern	u_int	ipf_state_max;
-extern	u_int	ipf_state_size;
-extern	int	ipf_state_lock;
-extern	u_int	ipf_state_maxbucket;
-extern	int	ipf_state_maxbucket_reset;
-extern	u_int	ipf_state_wm_high;
-extern	u_int	ipf_state_wm_low;
-extern	ipstate_t	*ipf_state_list;
-extern	ipftq_t	*ipf_state_usertq;
-extern	ipftq_t	ipf_state_iptq;
-extern	ipftq_t	ipf_state_udptq;
-extern	ipftq_t	ipf_state_udpacktq;
-extern	ipftq_t	ipf_state_icmptq;
-extern	ipftq_t	ipf_state_icmpacktq;
-extern	ipftq_t	ipf_state_tcptq[IPF_TCP_NSTATES];
-
+#ifndef _KERNEL
+extern	void	ipf_state_dump __P((ipf_main_softc_t *, void *));
+#endif
 extern	int	ipf_tcp_age __P((struct ipftqent *, struct fr_info *,
 				struct ipftq *, int, int));
 extern	int	ipf_tcpinwindow __P((struct fr_info *, struct tcpdata *,
 				    struct tcpdata *, tcphdr_t *, int));
 
-extern	int	ipf_state_add __P((fr_info_t *, void **, u_int));
+extern	int	ipf_state_add __P((ipf_main_softc_t *, fr_info_t *, void **, u_int));
 extern	frentry_t *ipf_state_check __P((struct fr_info *, u_32_t *));
-extern	void	ipf_state_deref __P((ipstate_t **));
-extern	void	ipf_state_expire __P((void));
+extern	void	ipf_state_deref __P((ipf_main_softc_t *, ipstate_t **));
+extern	void	ipf_state_expire __P((ipf_main_softc_t *));
 extern	ipstate_t *ipf_state_lookup __P((fr_info_t *, tcphdr_t *, ipftq_t **));
 extern	int	ipf_state_init __P((void));
-extern	void	ipf_state_insert __P((struct ipstate *, int));
-extern	int	ipf_state_ioctl __P((caddr_t, ioctlcmd_t, int, int, void *));
-extern	void	ipf_state_log __P((struct ipstate *, u_int));
-extern	int	ipf_state_matchflush __P((caddr_t));
-extern	int	ipf_state_rehash __P((ipftuneable_t *, ipftuneval_t *));
-extern	void	ipf_state_setqueue __P((ipstate_t *, int));
-extern	void	ipf_state_setpending __P((ipstate_t *));
-extern	int	ipf_state_settimeout __P((ipftuneable_t *, ipftuneval_t *));
-extern	void	ipf_state_sync __P((void *));
-extern	void	ipf_state_unload __P((void));
+extern	void	ipf_state_insert __P((ipf_main_softc_t *, struct ipstate *, int));
+extern	int	ipf_state_ioctl __P((ipf_main_softc_t *, caddr_t, ioctlcmd_t, int, int, void *));
+extern	void	ipf_state_log __P((ipf_main_softc_t *, struct ipstate *, u_int));
+extern	int	ipf_state_matchflush __P((ipf_main_softc_t *, caddr_t));
+extern	int	ipf_state_rehash __P((ipf_main_softc_t *, ipftuneable_t *, ipftuneval_t *));
+extern	void	ipf_state_setqueue __P((ipf_main_softc_t *, ipstate_t *, int));
+extern	void	ipf_state_setpending __P((ipf_main_softc_t *, ipstate_t *));
+extern	int	ipf_state_settimeout __P((struct ipf_main_softc_s *, ipftuneable_t *, ipftuneval_t *));
+extern	void	ipf_state_sync __P((ipf_main_softc_t *, void *));
 extern	void	ipf_state_update __P((fr_info_t *, ipstate_t *));
 
-extern	void	ipf_sttab_init __P((struct ipftq *));
+extern	void	ipf_sttab_init __P((ipf_main_softc_t *, struct ipftq *));
 extern	void	ipf_sttab_destroy __P((struct ipftq *));
+extern	void	ipf_state_setlock __P((void *, int));
+extern	int	ipf_state_main_load __P((void));
+extern	int	ipf_state_main_unload __P((void));
+extern	void	*ipf_state_soft_create __P((ipf_main_softc_t *));
+extern	void	ipf_state_soft_destroy __P((ipf_main_softc_t *, void *));
+extern	int	ipf_state_soft_init __P((ipf_main_softc_t *, void *));
+extern	int	ipf_state_soft_fini __P((ipf_main_softc_t *, void *));
+extern	int	ipf_state_main_load __P((void));
+extern	ipftq_t	*ipf_state_add_tq __P((ipf_main_softc_t *, int));
 
 #endif /* __IP_STATE_H__ */

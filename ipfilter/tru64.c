@@ -49,9 +49,9 @@ static const char rcsid[] = "@(#)$Id$";
 
 /* #undef	IPFDEBUG	*/
 
-static int iplopen(dev_t dev, int flags);
-static int iplclose(dev_t dev, int flags);
-static int iplread(dev_t dev, struct uio *);
+static int ipfopen(dev_t dev, int flags);
+static int ipfclose(dev_t dev, int flags);
+static int ipfread(dev_t dev, struct uio *);
 
 /* function prototypes */
 int	ipfilter_attach(void);
@@ -106,6 +106,8 @@ struct	dsent	ipfilter_devsw_entry = {
 	0,		/* d_bflags */
 	0		/* d_cflags */
 };
+
+ipf_main_softc_t	ipfmain;
 
 struct controller *ipfilter_info[IPL_LOGSIZE];
 static char ipfilter_name[] = "ipfilter";
@@ -213,27 +215,35 @@ cfg_subsys_attr_t ipfilter_attributes[] = {
 				(caddr_t)ipfilter_version, 0, 5, 0 },
 { "ipf_chksrc",		CFG_ATTR_INTTYPE, CFG_OP_QUERY |
 				CFG_OP_CONFIGURE | CFG_OP_RECONFIGURE,
-				(caddr_t)&ipf_chksrc, 0, 1, 0 },
+				(caddr_t)&ipfmain.ipf_chksrc,
+				0, 1, 0 },
 { "ipf_minttl",		CFG_ATTR_INTTYPE, CFG_OP_QUERY |
 				CFG_OP_CONFIGURE | CFG_OP_RECONFIGURE,
-				(caddr_t)&ipf_minttl, 0, 255, 0 },
+				(caddr_t)&ipfmain.ipf_minttl,
+				0, 255, 0 },
 { "ipf_pass",		CFG_ATTR_INTTYPE, CFG_OP_QUERY |
 				CFG_OP_CONFIGURE | CFG_OP_RECONFIGURE,
-				(caddr_t)&ipf_minttl, 0, 0xffffffff, 0 },
+				(caddr_t)&ipfmain.ipf_minttl,
+				0, 0xffffffff, 0 },
 { "ipf_flags",		CFG_ATTR_INTTYPE, CFG_OP_QUERY |
 				CFG_OP_CONFIGURE | CFG_OP_RECONFIGURE,
-				(caddr_t)&ipf_flags, 0, 0xffffffff, 0 },
+				(caddr_t)&ipfmain.ipf_flags,
+				0, 0xffffffff, 0 },
 { "ipf_active",		CFG_ATTR_INTTYPE, CFG_OP_QUERY,
-				(caddr_t)&ipf_minttl, 0, 1, 0 },
-{ "ipf_running",		CFG_ATTR_INTTYPE, CFG_OP_QUERY,
-				(caddr_t)&ipf_minttl, 0, 1, 0 },
+				(caddr_t)&ipfmain.ipf_minttl,
+				0, 1, 0 },
+{ "ipf_running",	CFG_ATTR_INTTYPE, CFG_OP_QUERY,
+				(caddr_t)&ipfmain.ipf_minttl,
+				0, 1, 0 },
 { "ipf_control_forwarding",
 			CFG_ATTR_INTTYPE, CFG_OP_QUERY |
 				CFG_OP_CONFIGURE | CFG_OP_RECONFIGURE,
-				(caddr_t) &ipf_control_forwarding, 0, 1, 0 },
+				(caddr_t) &ipfmain.ipf_control_forwarding,
+				0, 1, 0 },
 { "ipf_update_ipid",	CFG_ATTR_INTTYPE, CFG_OP_QUERY |
 				CFG_OP_CONFIGURE | CFG_OP_RECONFIGURE,
-				(caddr_t) &ipf_update_ipid, 0, 1, 0 },
+				(caddr_t) &ipfmain.ipf_update_ipid,
+				0, 1, 0 },
 { "",			0, 0, 0, 0, 0, 0 }
 };
 
@@ -502,7 +512,7 @@ void ipfilter_ip_input(m)
 			m_adj(m, len - m->m_pkthdr.len);
 	}
 
-	if (ipf_check(ip, hlen, m->m_pkthdr.rcvif, 0, &m) == 0) {
+	if (ipf_check(&ipfmain, ip, hlen, m->m_pkthdr.rcvif, 0, &m) == 0) {
 		if (m != NULL) {
 			m->m_flags &= ~M_PROTOCOL_SUM|M_NOCHECKSUM|M_CHECKSUM;
 
@@ -557,7 +567,7 @@ int ipfilter_ip_output(ifp, m, in_ro, flags, imo)
 	hlen = IP_HL(ip);
 	hlen <<= 2;
 
-	if (ipf_check(ip, hlen, ifp, 1, &m) == 0) {
+	if (ipf_check(&ipfmain, ip, hlen, ifp, 1, &m) == 0) {
 		if (m != NULL) {
 			m->m_flags |= M_OUTPUT_PROCESSING_DONE;
 			RWLOCK_EXIT(&ipf_tru64);
@@ -615,22 +625,18 @@ ipfilter_attach(void)
 	struct firewall ipf;
 	int status;
 
+	bzero((char *)&ipfmain, sizeof(ipfmain));
+
 #ifdef	IPFDEBUG
 	printf("ipfilter_attach(void)\n");
 #endif
 
-	RWLOCK_INIT(&ipf_tru64, 1);
-	RWLOCK_INIT(&ipf_global, 1);
-	RWLOCK_INIT(&ipf_mutex, 1);
-	RWLOCK_INIT(&ipf_frcache, 1);
-	ipftru64_inited = 1;
-
-	status = ipfattach();
+	status = ipfattach(&ipfmain);
 #ifdef	IPFDEBUG
 	printf("ipfattach() = %d\n", status);
 #endif
 	if (status != ESUCCESS) {
-		(void) ipfdetach();
+		(void) ipfdetach(&ipfmain);
 		return status;
 	}
 
@@ -681,19 +687,19 @@ ipfilter_attach(void)
 
 		ipfilter_registered = 2;
 		ipfilter_ifattach();
-		ipf_running = 1;
+		ipfmain.ipf_running = 1;
 
 		/*
 		 * Start timeout thread
 		 */
 		ipf_timeout = kernel_thread_w_arg(first_task, ipfilter_timer,
-						  NULL);
-		timeout(ipfilter_clock, NULL,
+						  &ipfmain);
+		timeout(ipfilter_clock, &ipfmain,
 			(hz / IPF_HZ_DIVIDE) * IPF_HZ_MULT);
 
-		if (FR_ISPASS(ipf_pass))
+		if (FR_ISPASS(ipfmain.ipf_pass))
 			defpass = "pass";
-		else if (FR_ISBLOCK(ipf_pass))
+		else if (FR_ISBLOCK(ipfmain.ipf_pass))
 			defpass = "block";
 		else
 			defpass = "no-match -> block";
@@ -775,7 +781,7 @@ ipfilter_detach(void)
 	}
 
 	if ((status == ESUCCESS) && (ipfilter_registered > 0)) {
-		status = ipfdetach();
+		status = ipfdetach(&ipfmain);
 #ifdef	IPFDEBUG
 		printf("ipfdetach() = %d\n", status);
 #endif
@@ -783,15 +789,7 @@ ipfilter_detach(void)
 	}
 
 	if (status == ESUCCESS) {
-		ipf_running = 0;
-		RWLOCK_EXIT(&ipf_tru64);
-		if (ipftru64_inited == 1) {
-			RW_DESTROY(&ipf_tru64);
-			RW_DESTROY(&ipf_global);
-			RW_DESTROY(&ipf_frcache);
-			RW_DESTROY(&ipf_mutex);
-			ipftru64_inited = 0;
-		}
+		ipfmain.ipf_running = 0;
 #if 0
 		if (ipf_timeout != 0) {
 			thread_terminate(ipf_timeout);
@@ -802,7 +800,7 @@ ipfilter_detach(void)
 		 * Deschedule the timeout, kill the thread that is wiating on
 		 * it and then wait one second for that thread to die.
 		 */
-		untimeout(ipfilter_clock, NULL);
+		untimeout(ipfilter_clock, &ipfmain);
 		thread_wakeup_one((vm_offset_t)&ipf_timeout);
 
 		while (ipf_timeout != 0) {
@@ -1098,7 +1096,7 @@ int ipfilterread(dev_t dev, struct uio *uio, int flag)
 # ifdef  IPFDEBUG
 	printf("ipfread(%x,%lx,%x)\n", dev, uio, flag);
 # endif
-	status = ipflog_read(unit, uio);
+	status = ipflog_read(&ipfmain, unit, uio);
 
 	return status;
 #else
@@ -1123,7 +1121,7 @@ ipfilterwrite(dev_t dev, struct uio *uio)
 # endif
         if (getminor(dev) != IPL_LOGSYNC)
                 return ENXIO;
-        return ipfsync_write(uio);
+        return ipfsync_write(&ipfmain, uio);
 
 }
 #endif
@@ -1151,7 +1149,7 @@ int ipfilterioctl(dev_t dev, unsigned int cmd, caddr_t data, int flag)
 #endif
 		return EIO;
 	}
-	err = iplioctl(dev, cmd, data, flag);
+	err = ipfioctl(dev, cmd, data, flag);
 	RWLOCK_EXIT(&ipf_tru64);
 	return err;
 }
@@ -1160,8 +1158,8 @@ int ipfilterioctl(dev_t dev, unsigned int cmd, caddr_t data, int flag)
 void ipfilter_clock(void *arg)
 {
 	thread_wakeup_one((vm_offset_t)&ipf_timeout);
-	if (ipf_running != 0) {
-		timeout(ipfilter_clock, NULL,
+	if (ipfmain.ipf_running != 0) {
+		timeout(ipfilter_clock, &ipfmain,
 			(hz / IPF_HZ_DIVIDE) * IPF_HZ_MULT);
 	}
 }
@@ -1190,17 +1188,17 @@ void ipfilter_timer()
 
 		thread_block();
 #else
-		if (ipf_running == 0)
+		if (ipfmain.ipf_running == 0)
 			break;
 		mpsleep((vm_offset_t)&ipf_timeout, PCATCH,
 			"ipftimer", 0, &ipfdelaylock,
 			MS_LOCK_SIMPLE | MS_LOCK_ON_ERROR);
 #endif
 
-		if (ipf_running == 0)
+		if (ipfmain.ipf_running == 0)
 			break;
 		simple_unlock(&ipfdelaylock);
-		fr_slowtimer(NULL);
+		ipf_slowtimer(&ipfmain);
 		simple_lock(&ipfdelaylock);
 	}
 
@@ -1218,7 +1216,7 @@ void ipfilter_timer()
 /*
  * routines below for saving IP headers to buffer
  */
-static int iplopen(dev, flags)
+static int ipfopen(dev, flags)
 	dev_t dev;
 	int flags;
 {
@@ -1232,7 +1230,7 @@ static int iplopen(dev, flags)
 }
 
 
-static int iplclose(dev, flags)
+static int ipfclose(dev, flags)
 	dev_t dev;
 	int flags;
 {
@@ -1246,17 +1244,17 @@ static int iplclose(dev, flags)
 }
 
 /*
- * iplread/ipllog
+ * ipfread/ipllog
  * both of these must operate with at least splnet() lest they be
  * called during packet processing and cause an inconsistancy to appear in
  * the filter lists.
  */
-static int iplread(dev, uio)
+static int ipfread(dev, uio)
 	dev_t dev;
 	register struct uio *uio;
 {
 
-	if (ipf_running < 1)
+	if (ipfmain.ipf_running < 1)
 		return EIO;
 
 #ifdef IPFILTER_LOG

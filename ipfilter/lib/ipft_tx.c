@@ -15,12 +15,6 @@ static const char rcsid[] = "@(#)$Id$";
 #include "ipf.h"
 #include "ipt.h"
 
-#ifndef linux
-#include <netinet/ip_var.h>
-#endif
-#include <netinet/tcpip.h>
-
-
 extern	int	opts;
 
 static	char	*tx_proto = "";

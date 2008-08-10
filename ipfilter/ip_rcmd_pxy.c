@@ -11,38 +11,38 @@
 
 #define	IPF_RCMD_PROXY
 
+void ipf_p_rcmd_main_load __P((void));
+void ipf_p_rcmd_main_unload __P((void));
 
-int ippr_rcmd_init __P((void));
-void ippr_rcmd_fini __P((void));
-int ippr_rcmd_new __P((fr_info_t *, ap_session_t *, nat_t *));
-int ippr_rcmd_out __P((fr_info_t *, ap_session_t *, nat_t *));
-int ippr_rcmd_in __P((fr_info_t *, ap_session_t *, nat_t *));
+int ipf_p_rcmd_init __P((void));
+void ipf_p_rcmd_fini __P((void));
+int ipf_p_rcmd_new __P((void *, fr_info_t *, ap_session_t *, nat_t *));
+int ipf_p_rcmd_out __P((void *, fr_info_t *, ap_session_t *, nat_t *));
+int ipf_p_rcmd_in __P((void *, fr_info_t *, ap_session_t *, nat_t *));
 u_short ipf_rcmd_atoi __P((char *));
-int ippr_rcmd_portmsg __P((fr_info_t *, ap_session_t *, nat_t *));
+int ipf_p_rcmd_portmsg __P((fr_info_t *, ap_session_t *, nat_t *));
 
 static	frentry_t	rcmdfr;
 
-int	rcmd_proxy_init = 0;
+static	int		rcmd_proxy_init = 0;
 
 
 /*
  * RCMD application proxy initialization.
  */
-int
-ippr_rcmd_init()
+void
+ipf_p_rcmd_main_load()
 {
 	bzero((char *)&rcmdfr, sizeof(rcmdfr));
 	rcmdfr.fr_ref = 1;
 	rcmdfr.fr_flags = FR_INQUE|FR_PASS|FR_QUICK|FR_KEEPSTATE;
 	MUTEX_INIT(&rcmdfr.fr_lock, "RCMD proxy rule lock");
 	rcmd_proxy_init = 1;
-
-	return 0;
 }
 
 
 void
-ippr_rcmd_fini()
+ipf_p_rcmd_main_unload()
 {
 	if (rcmd_proxy_init == 1) {
 		MUTEX_DESTROY(&rcmdfr.fr_lock);
@@ -55,7 +55,8 @@ ippr_rcmd_fini()
  * Setup for a new RCMD proxy.
  */
 int
-ippr_rcmd_new(fin, aps, nat)
+ipf_p_rcmd_new(arg, fin, aps, nat)
+	void *arg;
 	fr_info_t *fin;
 	ap_session_t *aps;
 	nat_t *nat;
@@ -71,7 +72,7 @@ ippr_rcmd_new(fin, aps, nat)
 	KMALLOCS(rc, rcmdinfo_t *, sizeof(rcmdinfo_t));
 	if (rc == NULL) {
 #ifdef IP_RCMD_PROXY_DEBUG
-		printf("ippr_rcmd_new:KMALLOCS(%d) failed\n", sizeof(*rc));
+		printf("ipf_p_rcmd_new:KMALLOCS(%d) failed\n", sizeof(*rc));
 #endif
 		return -1;
 	}
@@ -143,13 +144,14 @@ ipf_rcmd_atoi(ptr)
 
 
 int
-ippr_rcmd_portmsg(fin, aps, nat)
+ipf_p_rcmd_portmsg(fin, aps, nat)
 	fr_info_t *fin;
 	ap_session_t *aps;
 	nat_t *nat;
 {
 	tcphdr_t *tcp, tcph, *tcp2 = &tcph;
 	int off, dlen, nflags, direction;
+	ipf_main_softc_t *softc;
 	char portbuf[8], *s;
 	rcmdinfo_t *rc;
 	fr_info_t fi;
@@ -159,6 +161,7 @@ ippr_rcmd_portmsg(fin, aps, nat)
 	mb_t *m;
 
 	tcp = (tcphdr_t *)fin->fin_dp;
+	softc = fin->fin_main_soft;
 
 	if (tcp->th_flags & TH_SYN) {
 		*(u_32_t *)aps->aps_data = htonl(ntohl(tcp->th_seq) + 1);
@@ -190,7 +193,7 @@ ippr_rcmd_portmsg(fin, aps, nat)
 	sp = ipf_rcmd_atoi(s);
 	if (sp == 0) {
 #ifdef IP_RCMD_PROXY_DEBUG
-		printf("ippr_rcmd_portmsg:sp == 0 dlen %d [%s]\n",
+		printf("ipf_p_rcmd_portmsg:sp == 0 dlen %d [%s]\n",
 		       dlen, portbuf);
 #endif
 		return 0;
@@ -198,7 +201,7 @@ ippr_rcmd_portmsg(fin, aps, nat)
 
 	if (rc->rcmd_port != 0 && sp != rc->rcmd_port) {
 #ifdef IP_RCMD_PROXY_DEBUG
-		printf("ippr_rcmd_portmsg:sp(%d) != rcmd_port(%d)\n",
+		printf("ipf_p_rcmd_portmsg:sp(%d) != rcmd_port(%d)\n",
 		       sp, rc->rcmd_port);
 #endif
 		return 0;
@@ -222,14 +225,18 @@ ippr_rcmd_portmsg(fin, aps, nat)
 	fi.fin_fi.fi_daddr = nat->nat_nsrcaddr;
 
 	if (nat->nat_dir == NAT_OUTBOUND) {
-		nat2 = ipf_nat_outlookup(&fi, NAT_SEARCH|IPN_TCP, nat->nat_pr[1],
-				     nat->nat_osrcip, nat->nat_odstip);
+		nat2 = ipf_nat_outlookup(&fi, NAT_SEARCH|IPN_TCP,
+					 nat->nat_pr[1],
+					 nat->nat_osrcip, nat->nat_odstip);
 	} else {
-		nat2 = ipf_nat_inlookup(&fi, NAT_SEARCH|IPN_TCP, nat->nat_pr[0],
-				    nat->nat_osrcip, nat->nat_odstip);
+		nat2 = ipf_nat_inlookup(&fi, NAT_SEARCH|IPN_TCP,
+					nat->nat_pr[0],
+					nat->nat_osrcip, nat->nat_odstip);
 	}
 
 	if (nat2 == NULL) {
+		ipf_nat_softc_t *softn = softc->ipf_nat_soft;
+
 		/*
 		 * Add skeleton NAT entry for connection which will come
 		 * back the other way.
@@ -265,10 +272,10 @@ ippr_rcmd_portmsg(fin, aps, nat)
 		fi.fin_flx &= FI_LOWTTL|FI_FRAG|FI_TCPUDP|FI_OPTIONS|FI_IGNORE;
 
 		nflags |= NAT_SLAVE|IPN_TCP;
-		MUTEX_ENTER(&ipf_nat_new);
+		MUTEX_ENTER(&softn->ipf_nat_new);
 		nat2 = ipf_nat_add(&fi, &rc->rcmd_rule, NULL, nflags,
 				   direction);
-		MUTEX_EXIT(&ipf_nat_new);
+		MUTEX_EXIT(&softn->ipf_nat_new);
 
 		if (nat2 != NULL) {
 			(void) ipf_nat_proto(&fi, nat2, IPN_TCP);
@@ -278,8 +285,10 @@ ippr_rcmd_portmsg(fin, aps, nat)
 			fi.fin_ifp = NULL;
 			if (nat2->nat_dir == NAT_INBOUND)
 				fi.fin_fi.fi_daddr = nat->nat_osrcaddr;
-			if (ipf_state_add(&fi, &fi.fin_state, SI_W_SPORT) == 0)
-				ipf_state_deref((ipstate_t **)&fi.fin_state);
+			if (ipf_state_add(softc, &fi, &fi.fin_state,
+					  SI_W_SPORT) == 0)
+				ipf_state_deref(softc,
+						(ipstate_t **)&fi.fin_state);
 		}
 		ip->ip_len = slen;
 	}
@@ -288,24 +297,26 @@ ippr_rcmd_portmsg(fin, aps, nat)
 
 
 int
-ippr_rcmd_out(fin, aps, nat)
+ipf_p_rcmd_out(arg, fin, aps, nat)
+	void *arg;
 	fr_info_t *fin;
 	ap_session_t *aps;
 	nat_t *nat;
 {
 	if (nat->nat_dir == NAT_OUTBOUND)
-		return ippr_rcmd_portmsg(fin, aps, nat);
+		return ipf_p_rcmd_portmsg(fin, aps, nat);
 	return 0;
 }
 
 
 int
-ippr_rcmd_in(fin, aps, nat)
+ipf_p_rcmd_in(arg, fin, aps, nat)
+	void *arg;
 	fr_info_t *fin;
 	ap_session_t *aps;
 	nat_t *nat;
 {
 	if (nat->nat_dir == NAT_INBOUND)
-		return ippr_rcmd_portmsg(fin, aps, nat);
+		return ipf_p_rcmd_portmsg(fin, aps, nat);
 	return 0;
 }

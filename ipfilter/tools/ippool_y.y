@@ -525,16 +525,16 @@ ip_pool_node_t *node;
 {
 #ifdef AF_INET6
 	  if (use_inet6) {
-		  node->ipn_addr.adf_len = 20;
+		  node->ipn_addr.adf_len = offsetof(addrfamily_t, adf_addr) + 16;
 		  node->ipn_addr.adf_family = AF_INET6;
-		  node->ipn_mask.adf_len = 20;
+		  node->ipn_mask.adf_len = offsetof(addrfamily_t, adf_addr) + 16;
 		  node->ipn_mask.adf_family = AF_INET6;
 	  } else
 #endif
 	  {
-		  node->ipn_addr.adf_len = 8;
+		  node->ipn_addr.adf_len = offsetof(addrfamily_t, adf_addr) + 4;
 		  node->ipn_addr.adf_family = AF_INET;
-		  node->ipn_mask.adf_len = 8;
+		  node->ipn_mask.adf_len = offsetof(addrfamily_t, adf_addr) + 4;
 		  node->ipn_mask.adf_family = AF_INET;
 	  }
 }

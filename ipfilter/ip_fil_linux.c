@@ -967,13 +967,11 @@ ipf_pullup(mb_t *xmin, fr_info_t *fin, int len)
 		*fin->fin_mp = m;
 		fin->fin_m = m;
 		if (m == NULL) {
-			ATOMIC_INCL(ipf_stats[out].fr_pull[1]);
 			return NULL;
 		}
 		ip = MTOD(m, char *) + ipoff;
 	}
 
-	ATOMIC_INCL(ipf_stats[out].fr_pull[0]);
 	fin->fin_ip = (ip_t *)ip;
 	if (fin->fin_dp != NULL)
 		fin->fin_dp = (char *)fin->fin_ip + dpoff;

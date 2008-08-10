@@ -82,7 +82,7 @@ MODOBJS=$(OBJ)/ip_fil.o $(OBJ)/fil.o $(OBJ)/solaris.o $(OBJ)/ip_state.o \
     $(OBJ)/ip_frag.o $(OBJ)/ip_nat.o $(OBJ)/ip_proxy.o $(OBJ)/ip_auth.o \
     $(OBJ)/ip_pool.o $(OBJ)/ip_htable.o $(OBJ)/ip_lookup.o $(OBJ)/ip_log.o \
     $(OBJ)/ip_scan.o $(OBJ)/ip_sync.o $(OBJ)/radix.o $(OBJ)/md5.o \
-    $(OBJ)/ip_nat6.o $(BPFILTER)
+    $(OBJ)/ip_nat6.o $(OBJ)/arc4random.o $(BPFILTER)
 #	$(OBJ)/ip_trafcon.o
 IPF=$(OBJ)/ipf.o $(OBJ)/ipfcomp.o $(OBJ)/ipf_y.o $(OBJ)/ipf_l.o
 IPT=$(OBJ)/ipftest.o $(OBJ)/ip_fil_u.o $(OBJ)/ip_state_u.o \
@@ -275,6 +275,9 @@ $(OBJ)/ip_htable.o: $(TOP)/ip_htable.c $(TOP)/ip_compat.h $(TOP)/ip_fil.h \
 $(OBJ)/ip_lookup.o: $(TOP)/ip_lookup.c $(TOP)/ip_compat.h $(TOP)/ip_fil.h \
 	$(TOP)/ip_pool.h $(TOP)/ip_htable.h $(TOP)/ip_lookup.h
 	$(CC) $(CCARGS) $(DFLAGS) -c $(TOP)/ip_lookup.c -o $@
+
+$(OBJ)/arc4random.o: $(TOP)/arc4random.c
+	$(CC) $(CCARGS) $(DFLAGS) -c $(TOP)/arc4random.c -o $@
 
 $(OBJ)/ip_trafcon.o: $(TOP)/ip_trafcon.c $(TOP)/ip_compat.h $(TOP)/ip_fil.h \
 	$(TOP)/ip_trafcon.h

@@ -90,18 +90,13 @@ MALLOC_DEFINE(M_IPFILTER, "IP Filter", "IP Filter packet filter data structures"
 #if __NetBSD_Version__ < 200000000
 extern	struct	protosw	inetsw[];
 #endif
-extern	struct	selinfo	ipfselwait[IPL_LOGSIZE];
+extern	ipf_main_softc_t	ipfmain;
 
-static	int	(*ipf_savep) __P((ip_t *, int, void *, int, struct mbuf **));
+static	int	(*ipf_savep) __P((void *, ip_t *, int, void *, int, struct mbuf **));
 static	int	ipf_send_ip __P((fr_info_t *, mb_t *, mb_t **));
 #ifdef USE_INET6
 static int ipf_fastroute6 __P((struct mbuf *, struct mbuf **,
 			      fr_info_t *, frdest_t *));
-#endif
-
-#if (__NetBSD_Version__ >= 104040000)
-# include <sys/callout.h>
-struct callout ipf_slowtimer_ch;
 #endif
 
 #include <sys/conf.h>
@@ -110,7 +105,7 @@ struct callout ipf_slowtimer_ch;
 /*
  * We provide the ipf_checkp name just to minimize changes later.
  */
-int (*ipf_checkp) __P((ip_t *ip, int hlen, void *ifp, int out, mb_t **mp));
+int (*ipf_checkp) __P((void *, ip_t *ip, int hlen, void *ifp, int out, mb_t **mp));
 #endif /* NETBSD_PF */
 
 #if defined(__NetBSD_Version__) && (__NetBSD_Version__ >= 105110000)
@@ -166,7 +161,7 @@ ipf_check_wrapper(arg, mp, ifp, dir)
 	 * Note, we don't need to update the checksum, because
 	 * it has already been verified.
 	 */
-	rv = ipf_check(ip, hlen, ifp, (dir == PFIL_OUT), mp);
+	rv = ipf_check(&ipfmain, ip, hlen, ifp, (dir == PFIL_OUT), mp);
 
 	return (rv);
 }
@@ -200,7 +195,7 @@ ipf_check_wrapper6(arg, mp, ifp, dir)
 	}
 #  endif
 
-	return (ipf_check(mtod(*mp, struct ip *), sizeof(struct ip6_hdr),
+	return (ipf_check(&ipfmain, mtod(*mp, struct ip *), sizeof(struct ip6_hdr),
 	    ifp, (dir == PFIL_OUT), mp));
 }
 # endif
@@ -223,7 +218,7 @@ ipf_pfilsync(hdr, mp, ifp, dir)
 	 * indicator) and doing ifunit() on the name will still return the
 	 * pointer, so it's not much use then, either.
 	 */
-	ipf_sync(NULL);
+	ipf_sync(&ipfmain, NULL);
 	return 0;
 }
 # endif
@@ -260,7 +255,8 @@ ipfilterattach(count)
 
 
 int
-ipfattach()
+ipfattach(softc)
+	ipf_main_softc_t *softc;
 {
 	int s;
 #if (__NetBSD_Version__ >= 499005500)
@@ -279,14 +275,20 @@ ipfattach()
 # endif
 #endif
 
+	if (ipf_load_all() != 0)
+		return EIO;
+
+	if (ipf_create_all(softc) == NULL)
+		return EIO;
+
 	SPL_NET(s);
-	if ((ipf_running > 0) || (ipf_checkp == ipf_check)) {
+	if ((softc->ipf_running > 0) || (ipf_checkp == ipf_check)) {
 		printf("IP Filter: already initialized\n");
 		SPL_X(s);
 		return EBUSY;
 	}
 
-	if (ipf_initialise() < 0) {
+	if (ipf_init_all(softc) < 0) {
 		SPL_X(s);
 		return EIO;
 	}
@@ -361,16 +363,15 @@ ipfattach()
 
 #if (__NetBSD_Version__ >= 499005500)
 	for (i = 0; i < IPL_LOGSIZE; i++)
-		selinit(&ipfselwait[i]);
+		selinit(&ipfmain.ipf_selwait[i]);
 #else
-	bzero((char *)ipfselwait, sizeof(ipfselwait));
+	bzero((char *)ipfmain.ipf_selwait, sizeof(ipfmain.ipf_selwait));
 #endif
-	bzero((char *)ipf_cache, sizeof(ipf_cache));
 	ipf_savep = ipf_checkp;
 	ipf_checkp = ipf_check;
 
 #ifdef INET
-	if (ipf_control_forwarding & 1)
+	if (softc->ipf_control_forwarding & 1)
 		ipforwarding = 1;
 #endif
 
@@ -378,11 +379,11 @@ ipfattach()
 
 #if (__NetBSD_Version__ >= 104010000)
 # if (__NetBSD_Version__ >= 499002000)
-	callout_init(&ipf_slowtimer_ch, 0);
+	callout_init(&softc->ipf_slow_ch, 0);
 # else
-	callout_init(&ipf_slowtimer_ch);
+	callout_init(&softc->ipf_slow_ch);
 # endif
-	callout_reset(&ipf_slowtimer_ch, (hz / IPF_HZ_DIVIDE) * IPF_HZ_MULT,
+	callout_reset(&softc->ipf_slow_ch, (hz / IPF_HZ_DIVIDE) * IPF_HZ_MULT,
 		     ipf_slowtimer, NULL);
 #else
 	timeout(ipf_slowtimer, NULL, (hz / IPF_HZ_DIVIDE) * IPF_HZ_MULT);
@@ -391,8 +392,10 @@ ipfattach()
 
 #if __NetBSD_Version__ >= 105110000
 pfil_error:
-	ipf_deinitialise();
 	SPL_X(s);
+	ipf_fini_all(softc);
+	ipf_destroy_all(softc);
+	ipf_unload_all();
 	return error;
 #endif
 }
@@ -403,7 +406,8 @@ pfil_error:
  * stream.
  */
 int
-ipfdetach()
+ipfdetach(softc)
+	ipf_main_softc_t *softc;
 {
 	int s;
 #if (__NetBSD_Version__ >= 499005500)
@@ -425,17 +429,17 @@ ipfdetach()
 	SPL_NET(s);
 
 #if (__NetBSD_Version__ >= 104010000)
-	callout_stop(&ipf_slowtimer_ch);
+	callout_stop(&softc->ipf_slow_ch);
 #else
 	untimeout(ipf_slowtimer, NULL);
 #endif /* NetBSD */
 
 	ipf_checkp = ipf_savep;
-	(void) ipf_flush(IPL_LOGIPF, FR_INQUE|FR_OUTQUE|FR_INACTIVE);
-	(void) ipf_flush(IPL_LOGIPF, FR_INQUE|FR_OUTQUE);
+	(void) ipf_flush(softc, IPL_LOGIPF, FR_INQUE|FR_OUTQUE|FR_INACTIVE);
+	(void) ipf_flush(softc, IPL_LOGIPF, FR_INQUE|FR_OUTQUE);
 
 #ifdef INET
-	if (ipf_control_forwarding & 2)
+	if (softc->ipf_control_forwarding & 2)
 		ipforwarding = 0;
 #endif
 
@@ -476,14 +480,19 @@ ipfdetach()
 		return error;
 # endif
 #endif
-	ipf_deinitialise();
-
 	SPL_X(s);
 
 #if (__NetBSD_Version__ >= 499005500)
 	for (i = 0; i < IPL_LOGSIZE; i++)
-		seldestroy(&ipfselwait[i]);
+		seldestroy(&ipfmain.ipf_selwait[i]);
 #endif
+
+	ipf_fini_all(softc);
+
+	ipf_destroy_all(softc);
+
+	ipf_unload_all();
+
 	return 0;
 }
 
@@ -538,7 +547,7 @@ ipfioctl(dev, cmd, data, mode
   	if ((IPL_LOGMAX < unit) || (unit < 0))
 		return ENXIO;
 
-	if (ipf_running <= 0) {
+	if (ipfmain.ipf_running <= 0) {
 		if (unit != IPL_LOGIPF)
 			return EIO;
 		if (cmd != SIOCIPFGETNEXT && cmd != SIOCIPFGET &&
@@ -549,7 +558,7 @@ ipfioctl(dev, cmd, data, mode
 
 	SPL_NET(s);
 
-	error = ipf_ioctlswitch(unit, data, cmd, mode, UID(p), p);
+	error = ipf_ioctlswitch(&ipfmain, unit, data, cmd, mode, UID(p), p);
 	if (error != -1) {
 		SPL_X(s);
 		return error;
@@ -937,6 +946,7 @@ ipf_fastroute(m0, mpp, fin, fdp)
 	register struct route *ro;
 	int len, off, error = 0, hlen, code;
 	struct ifnet *ifp, *sifp;
+	ipf_main_softc_t *softc;
 #if __NetBSD_Version__ >= 499001100
 	union {
 		struct sockaddr         dst;
@@ -969,6 +979,7 @@ ipf_fastroute(m0, mpp, fin, fdp)
 
 	hlen = fin->fin_hlen;
 	ip = mtod(m0, struct ip *);
+	softc = fin->fin_main_soft;
 	rt = NULL;
 
 # if defined(M_CSUM_IPv4)
@@ -1049,7 +1060,7 @@ ipf_fastroute(m0, mpp, fin, fdp)
 			u_32_t pass;
 
 			if (ipf_state_check(fin, &pass) != NULL)
-				ipf_state_deref((ipstate_t **)&fin->fin_state);
+				ipf_state_deref(softc, (ipstate_t **)&fin->fin_state);
 		}
 
 		switch (ipf_nat_checkout(fin, NULL))
@@ -1057,7 +1068,7 @@ ipf_fastroute(m0, mpp, fin, fdp)
 		case 0 :
 			break;
 		case 1 :
-			ipf_nat_deref((nat_t **)&fin->fin_nat);
+			ipf_nat_deref(softc, (nat_t **)&fin->fin_nat);
 			ip->ip_sum = 0;
 			break;
 		case -1 :
@@ -1181,9 +1192,9 @@ sendorfree:
     }
 done:
 	if (!error)
-		ipf_frouteok[0]++;
+		softc->ipf_frouteok[0]++;
 	else
-		ipf_frouteok[1]++;
+		softc->ipf_frouteok[1]++;
 
 # if __NetBSD_Version__ >= 499001100
 	rtcache_free(ro);

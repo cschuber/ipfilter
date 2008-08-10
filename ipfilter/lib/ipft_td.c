@@ -32,11 +32,6 @@ tcpdump -nqte
 #include "ipf.h"
 #include "ipt.h"
 
-#ifndef linux
-#include <netinet/ip_var.h>
-#endif
-#include <netinet/tcpip.h>
-
 
 #if !defined(lint)
 static const char sccsid[] = "@(#)ipft_td.c	1.8 2/4/96 (C)1995 Darren Reed";
@@ -95,13 +90,17 @@ static	int	tcpd_readip(mb, ifn, dir)
 	char	**ifn;
 	int	*dir;
 {
-	struct	tcpiphdr pkt;
-	ip_t	*ip = (ip_t *)&pkt;
+	u_char	pkt[40];
+	tcphdr_t *tcp;
+	ip_t	*ip;
 	char	src[32], dst[32], misc[256], time[32], link1[32], link2[32];
 	char	lbuf[160], *s;
 	int	n, slen, extra = 0;
 	char	*buf;
 	int	cnt;
+
+	ip = (ip_t *)&pkt;
+	tcp = (tcphdr_t *)(ip + 1);
 
 	buf = (char *)mb->mb_buf;
 	cnt = sizeof(mb->mb_buf);
@@ -131,13 +130,13 @@ static	int	tcpd_readip(mb, ifn, dir)
 		s = strrchr(src, '.');
 		*s++ = '\0';
 		(void) inet_aton(src, &ip->ip_src);
-		pkt.ti_sport = htons(atoi(s));
+		tcp->th_sport = htons(atoi(s));
 		*--s = '.';
 		s = strrchr(dst, '.');
 
 		*s++ = '\0';
 		(void) inet_aton(src, &ip->ip_dst);
-		pkt.ti_dport = htons(atoi(s));
+		tcp->th_dport = htons(atoi(s));
 		*--s = '.';
 
 	} else {

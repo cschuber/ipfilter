@@ -60,39 +60,45 @@ static const char rcsid[] = "@(#)$Id$";
 static iphtent_t *ipf_iphmfind6 __P((iphtable_t *, i6addr_t *));
 # endif
 static iphtent_t *ipf_iphmfind __P((iphtable_t *, struct in_addr *));
-static int ipf_iphmfindip __P((void *, int, void *));
-static int ipf_htable_clear __P((iphtable_t *));
-static int ipf_htable_create __P((iplookupop_t *));
-static int ipf_htable_deref __P((void *));
-static int ipf_htable_destroy __P((int, char *));
-static void *ipf_htable_exists __P((int, char *));
-static void ipf_htable_fini __P((void));
-static size_t ipf_htable_flush __P((iplookupflush_t *));
-static void ipf_htable_free(iphtable_t *);
-static int ipf_htable_init __P((void));
-static int ipf_htable_iter_deref __P((int, int, void *));
-static int ipf_htable_iter_next __P((ipftoken_t *, ipflookupiter_t *));
-static int ipf_htable_remove __P((iphtable_t *));
-static int ipf_htable_node_add __P((iplookupop_t *));
-static int ipf_htable_node_del __P((iplookupop_t *));
-static int ipf_htable_stats_get __P((iplookupop_t *));
-static int ipf_htable_table_add __P((iplookupop_t *));
-static int ipf_htable_table_del __P((iplookupop_t *));
-static int ipf_htent_deref __P((iphtent_t *));
-static int ipf_htent_insert __P((iphtable_t *, iphtent_t *));
-static int ipf_htent_remove __P((iphtable_t *, iphtent_t *));
-static void *ipf_htable_select_add_ref __P((int, char *));
+static int ipf_iphmfindip __P((ipf_main_softc_t *, void *, int, void *));
+static int ipf_htable_clear __P((ipf_main_softc_t *, void *, iphtable_t *));
+static int ipf_htable_create __P((ipf_main_softc_t *, void *, iplookupop_t *));
+static int ipf_htable_deref __P((ipf_main_softc_t *, void *, void *));
+static int ipf_htable_destroy __P((ipf_main_softc_t *, void *, int, char *));
+static void *ipf_htable_exists __P((void *, int, char *));
+static size_t ipf_htable_flush __P((ipf_main_softc_t *, void *, iplookupflush_t *));
+static void ipf_htable_free __P((void *, iphtable_t *));
+static int ipf_htable_iter_deref __P((ipf_main_softc_t *, void *, int, int, void *));
+static int ipf_htable_iter_next __P((ipf_main_softc_t *, void *, ipftoken_t *, ipflookupiter_t *));
+static int ipf_htable_node_add __P((ipf_main_softc_t *, void *, iplookupop_t *));
+static int ipf_htable_node_del __P((ipf_main_softc_t *, void *, iplookupop_t *));
+static int ipf_htable_remove __P((ipf_main_softc_t *, void *, iphtable_t *));
+static void *ipf_htable_soft_create __P((ipf_main_softc_t *));
+static void ipf_htable_soft_destroy __P((ipf_main_softc_t *, void *));
+static int ipf_htable_soft_init __P((ipf_main_softc_t *, void *));
+static void ipf_htable_soft_fini __P((ipf_main_softc_t *, void *));
+static int ipf_htable_stats_get __P((ipf_main_softc_t *, void *, iplookupop_t *));
+static int ipf_htable_table_add __P((ipf_main_softc_t *, void *, iplookupop_t *));
+static int ipf_htable_table_del __P((ipf_main_softc_t *, void *, iplookupop_t *));
+static int ipf_htent_deref __P((void *, iphtent_t *));
+static int ipf_htent_insert __P((ipf_main_softc_t *, void *, iphtable_t *, iphtent_t *));
+static int ipf_htent_remove __P((ipf_main_softc_t *, void *, iphtable_t *, iphtent_t *));
+static void *ipf_htable_select_add_ref __P((void *, int, char *));
 
-static	u_long	ipht_nomem[IPL_LOGSIZE];
-static	u_long	ipf_nhtables[IPL_LOGSIZE];
-static	u_long	ipf_nhtnodes[IPL_LOGSIZE];
 
-iphtable_t *ipf_htables[IPL_LOGSIZE];
+typedef struct ipf_htable_softc_s {
+	u_long		ipht_nomem[IPL_LOGSIZE];
+	u_long		ipf_nhtables[IPL_LOGSIZE];
+	u_long		ipf_nhtnodes[IPL_LOGSIZE];
+	iphtable_t	*ipf_htables[IPL_LOGSIZE];
+} ipf_htable_softc_t;
 
 ipf_lookup_t ipf_htable_backend = {
 	IPLT_HASH,
-	ipf_htable_init,
-	ipf_htable_fini,
+	ipf_htable_soft_create,
+	ipf_htable_soft_destroy,
+	ipf_htable_soft_init,
+	ipf_htable_soft_fini,
 	ipf_iphmfindip,
 	ipf_htable_flush,
 	ipf_htable_iter_deref,
@@ -108,24 +114,85 @@ ipf_lookup_t ipf_htable_backend = {
 };
 
 
-static int
-ipf_htable_init()
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_htable_soft_create                                      */
+/* Returns:     void *   - NULL = failure, else pointer to local context    */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*                                                                          */
+/* Initialise the routing table data structures where required.             */
+/* ------------------------------------------------------------------------ */
+static void *
+ipf_htable_soft_create(softc)
+	ipf_main_softc_t *softc;
 {
-	int i;
+	ipf_htable_softc_t *softh;
 
-	for (i = 0; i < IPL_LOGSIZE; i++) {
-		ipht_nomem[i] = 0;
-		ipf_nhtables[i] = 0;
-		ipf_nhtnodes[i] = 0;
-		ipf_htables[i] = NULL;
-	}
+	KMALLOC(softh, ipf_htable_softc_t *);
+	if (softh == NULL)
+		return NULL;
+
+	bzero((char *)softh, sizeof(*softh));
+
+	return softh;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_htable_soft_destroy                                     */
+/* Returns:     Nil                                                         */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              arg(I)   - pointer to local context to use                  */
+/*                                                                          */
+/* Clean up the pool by free'ing the radix tree associated with it and free */
+/* up the pool context too.                                                 */
+/* ------------------------------------------------------------------------ */
+static void
+ipf_htable_soft_destroy(softc, arg)
+	ipf_main_softc_t *softc;
+	void *arg;
+{
+	ipf_htable_softc_t *softh = arg;
+
+	KFREE(softh);
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_htable_soft_init                                        */
+/* Returns:     int     - 0 = success, else error                           */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              arg(I)   - pointer to local context to use                  */
+/*                                                                          */
+/* Initialise the hash table ready for use.                                 */
+/* ------------------------------------------------------------------------ */
+static int
+ipf_htable_soft_init(softc, arg)
+	ipf_main_softc_t *softc;
+	void *arg;
+{
+	ipf_htable_softc_t *softh = arg;
+
+	bzero((char *)softh, sizeof(*softh));
 
 	return 0;
 }
 
 
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_htable_soft_fini                                        */
+/* Returns:     Nil                                                         */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              arg(I)   - pointer to local context to use                  */
+/* Locks:       WRITE(ipf_global)                                           */
+/*                                                                          */
+/* Clean up all the pool data structures allocated and call the cleanup     */
+/* function for the radix tree that supports the pools. ipf_pool_destroy is */
+/* used to delete the pools one by one to ensure they're properly freed up. */
+/* ------------------------------------------------------------------------ */
 static void
-ipf_htable_fini()
+ipf_htable_soft_fini(softc, arg)
+	ipf_main_softc_t *softc;
+	void *arg;
 {
 	iplookupflush_t fop;
 
@@ -134,28 +201,41 @@ ipf_htable_fini()
 	fop.iplf_arg = 0;
 	fop.iplf_count = 0;
 	*fop.iplf_name = '\0';
-	ipf_htable_flush(&fop);
+	ipf_htable_flush(softc, arg, &fop);
 }
 
 
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_htable_stats_get                                        */
+/* Returns:     int - 0 = success, else error                               */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              arg(I)   - pointer to local context to use                  */
+/*              op(I)    - pointer to lookup operation data                 */
+/*                                                                          */
+/* Copy the relevant statistics out of internal structures and into the     */
+/* structure used to export statistics.                                     */
+/* ------------------------------------------------------------------------ */
 static int
-ipf_htable_stats_get(op)
+ipf_htable_stats_get(softc, arg, op)
+	ipf_main_softc_t *softc;
+	void *arg;
 	iplookupop_t *op;
 {
+	ipf_htable_softc_t *softh = arg;
 	iphtstat_t stats;
 
 	if (op->iplo_size != sizeof(stats)) {
-		ipf_interror = 30001;
+		softc->ipf_interror = 30001;
 		return EINVAL;
 	}
 
-	stats.iphs_tables = ipf_htables[op->iplo_unit];
-	stats.iphs_numtables = ipf_nhtables[op->iplo_unit];
-	stats.iphs_numnodes = ipf_nhtnodes[op->iplo_unit];
-	stats.iphs_nomem = ipht_nomem[op->iplo_unit];
+	stats.iphs_tables = softh->ipf_htables[op->iplo_unit];
+	stats.iphs_numtables = softh->ipf_nhtables[op->iplo_unit];
+	stats.iphs_numnodes = softh->ipf_nhtnodes[op->iplo_unit];
+	stats.iphs_nomem = softh->ipht_nomem[op->iplo_unit];
 
 	if (COPYOUT(&stats, op->iplo_struct, sizeof(stats)) != 0) {
-		ipf_interror = 30013;
+		softc->ipf_interror = 30013;
 		return EFAULT;
 	}
 	return 0;
@@ -163,23 +243,32 @@ ipf_htable_stats_get(op)
 }
 
 
-/*
- * Create a new hash table using the template passed.
- */
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_htable_create                                           */
+/* Returns:     int - 0 = success, else error                               */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              arg(I)   - pointer to local context to use                  */
+/*              op(I)    - pointer to lookup operation data                 */
+/*                                                                          */
+/* Create a new hash table using the template passed.                       */
+/* ------------------------------------------------------------------------ */
 static int
-ipf_htable_create(op)
+ipf_htable_create(softc, arg, op)
+	ipf_main_softc_t *softc;
+	void *arg;
 	iplookupop_t *op;
 {
+	ipf_htable_softc_t *softh = arg;
 	iphtable_t *iph, *oiph;
 	char name[FR_GROUPLEN];
 	int err, i, unit;
 
 	unit = op->iplo_unit;
 	if ((op->iplo_arg & IPHASH_ANON) == 0) {
-		iph = ipf_htable_exists(unit, op->iplo_name);
+		iph = ipf_htable_exists(softh, unit, op->iplo_name);
 		if (iph != NULL) {
 			if ((iph->iph_flags & IPHASH_DELETE) == 0) {
-				ipf_interror = 30004;
+				softc->ipf_interror = 30004;
 				return EEXIST;
 			}
 			iph->iph_flags &= ~IPHASH_DELETE;
@@ -189,19 +278,19 @@ ipf_htable_create(op)
 
 	KMALLOC(iph, iphtable_t *);
 	if (iph == NULL) {
-		ipht_nomem[op->iplo_unit]++;
-		ipf_interror = 30002;
+		softh->ipht_nomem[op->iplo_unit]++;
+		softc->ipf_interror = 30002;
 		return ENOMEM;
 	}
 	err = COPYIN(op->iplo_struct, iph, sizeof(*iph));
 	if (err != 0) {
 		KFREE(iph);
-		ipf_interror = 30003;
+		softc->ipf_interror = 30003;
 		return EFAULT;
 	}
 
 	if (iph->iph_unit != unit) {
-		ipf_interror = 30005;
+		softc->ipf_interror = 30005;
 		return EINVAL;
 	}
 
@@ -214,7 +303,7 @@ ipf_htable_create(op)
 #else
 			(void)sprintf(name, "%u", i);
 #endif
-			for (oiph = ipf_htables[unit]; oiph != NULL;
+			for (oiph = softh->ipf_htables[unit]; oiph != NULL;
 			     oiph = oiph->iph_next)
 				if (strncmp(oiph->iph_name, name,
 					    sizeof(oiph->iph_name)) == 0)
@@ -230,8 +319,8 @@ ipf_htable_create(op)
 		 iph->iph_size * sizeof(*iph->iph_table));
 	if (iph->iph_table == NULL) {
 		KFREE(iph);
-		ipht_nomem[unit]++;
-		ipf_interror = 30006;
+		softh->ipht_nomem[unit]++;
+		softc->ipf_interror = 30006;
 		return ENOMEM;
 	}
 
@@ -243,101 +332,165 @@ ipf_htable_create(op)
 	iph->iph_list = NULL;
 
 	iph->iph_ref = 1;
-	iph->iph_next = ipf_htables[unit];
-	iph->iph_pnext = &ipf_htables[unit];
-	if (ipf_htables[unit] != NULL)
-		ipf_htables[unit]->iph_pnext = &iph->iph_next;
-	ipf_htables[unit] = iph;
+	iph->iph_next = softh->ipf_htables[unit];
+	iph->iph_pnext = &softh->ipf_htables[unit];
+	if (softh->ipf_htables[unit] != NULL)
+		softh->ipf_htables[unit]->iph_pnext = &iph->iph_next;
+	softh->ipf_htables[unit] = iph;
 
-	ipf_nhtables[unit]++;
+	softh->ipf_nhtables[unit]++;
 
 	return 0;
 }
 
 
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_htable_table_del                                        */
+/* Returns:     int      - 0 = success, else error                          */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              arg(I)   - pointer to local context to use                  */
+/*              op(I)    - pointer to lookup operation data                 */
+/*                                                                          */
+/* ------------------------------------------------------------------------ */
 static int
-ipf_htable_table_del(op)
+ipf_htable_table_del(softc, arg, op)
+	ipf_main_softc_t *softc;
+	void *arg;
 	iplookupop_t *op;
 {
-	return ipf_htable_destroy(op->iplo_unit, op->iplo_name);
+	return ipf_htable_destroy(softc, arg, op->iplo_unit, op->iplo_name);
 }
 
 
-/*
- */
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_htable_destroy                                          */
+/* Returns:     int      - 0 = success, else error                          */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              arg(I)   - pointer to local context to use                  */
+/*              op(I)    - pointer to lookup operation data                 */
+/*                                                                          */
+/* Find the hash table that belongs to the relevant part of ipfilter with a */
+/* matching name and attempt to destroy it.  If it is in use, empty it out  */
+/* and mark it for deletion so that when all the references disappear, it   */
+/* can be removed.                                                          */
+/* ------------------------------------------------------------------------ */
 static int
-ipf_htable_destroy(unit, name)
+ipf_htable_destroy(softc, arg, unit, name)
+	ipf_main_softc_t *softc;
+	void *arg;
 	int unit;
 	char *name;
 {
 	iphtable_t *iph;
 
-	iph = ipf_htable_find(unit, name);
+	iph = ipf_htable_find(arg, unit, name);
 	if (iph == NULL) {
-		ipf_interror = 30007;
+		softc->ipf_interror = 30007;
 		return ESRCH;
 	}
 
 	if (iph->iph_unit != unit) {
-		ipf_interror = 30008;
+		softc->ipf_interror = 30008;
 		return EINVAL;
 	}
 
 	if (iph->iph_ref != 0) {
-		ipf_htable_clear(iph);
+		ipf_htable_clear(softc, arg, iph);
 		iph->iph_flags |= IPHASH_DELETE;
 		return 0;
 	}
 
-	ipf_htable_remove(iph);
+	ipf_htable_remove(softc, arg, iph);
 
 	return 0;
 }
 
 
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_htable_clear                                            */
+/* Returns:     int      - 0 = success, else error                          */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              arg(I)   - pointer to local context to use                  */
+/*              iph(I)   - pointer to hash table to destroy                 */
+/*                                                                          */
+/* Clean out the hash table by walking the list of entries and removing     */
+/* each one, one by one.                                                    */
+/* ------------------------------------------------------------------------ */
 static int
-ipf_htable_clear(iph)
+ipf_htable_clear(softc, arg, iph)
+	ipf_main_softc_t *softc;
+	void *arg;
 	iphtable_t *iph;
 {
 	iphtent_t *ipe;
 
 	while ((ipe = iph->iph_list) != NULL)
-		if (ipf_htent_remove(iph, ipe) != 0)
+		if (ipf_htent_remove(softc, arg, iph, ipe) != 0)
 			return 1;
 	return 0;
 }
 
 
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_htable_free                                             */
+/* Returns:     Nil                                                         */
+/* Parameters:  arg(I) - pointer to local context to use                    */
+/*              iph(I) - pointer to hash table to destroy                   */
+/*                                                                          */
+/* ------------------------------------------------------------------------ */
 static void
-ipf_htable_free(iph)
+ipf_htable_free(arg, iph)
+	void *arg;
 	iphtable_t *iph;
 {
+	ipf_htable_softc_t *softh = arg;
+
 	if (iph->iph_pnext != NULL)
 		*iph->iph_pnext = iph->iph_next;
 	if (iph->iph_next != NULL)
 		iph->iph_next->iph_pnext = iph->iph_pnext;
 
-	ipf_nhtables[iph->iph_unit]--;
+	softh->ipf_nhtables[iph->iph_unit]--;
 
 	KFREES(iph->iph_table, iph->iph_size * sizeof(*iph->iph_table));
 	KFREE(iph);
 }
 
 
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_htable_remove                                           */
+/* Returns:     int      - 0 = success, else error                          */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              arg(I)   - pointer to local context to use                  */
+/*              iph(I)   - pointer to hash table to destroy                 */
+/*                                                                          */
+/* ------------------------------------------------------------------------ */
 static int
-ipf_htable_remove(iph)
+ipf_htable_remove(softc, arg, iph)
+	ipf_main_softc_t *softc;
+	void *arg;
 	iphtable_t *iph;
 {
 
-	if (ipf_htable_clear(iph) != 0)
+	if (ipf_htable_clear(softc, arg, iph) != 0)
 		return 1;
 
-	return ipf_htable_deref(iph);
+	return ipf_htable_deref(softc, arg, iph);
 }
 
 
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_htable_node_del                                         */
+/* Returns:     int      - 0 = success, else error                          */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              arg(I)   - pointer to local context to use                  */
+/*              op(I)    - pointer to lookup operation data                 */
+/*                                                                          */
+/* ------------------------------------------------------------------------ */
 static int
-ipf_htable_node_del(op)
+ipf_htable_node_del(softc, arg, op)
+	ipf_main_softc_t *softc;
+	void *arg;
 	iplookupop_t *op;
 {
         iphtable_t *iph;
@@ -345,49 +498,68 @@ ipf_htable_node_del(op)
 	int err;
 
 	if (op->iplo_size != sizeof(hte)) {
-		ipf_interror = 30014;
+		softc->ipf_interror = 30014;
 		return EINVAL;
 	}
 
 	err = COPYIN(op->iplo_struct, &hte, sizeof(hte));
 	if (err != 0) {
-		ipf_interror = 30015;
+		softc->ipf_interror = 30015;
 		return EFAULT;
 	}
 
-	iph = ipf_htable_find(op->iplo_unit, op->iplo_name);
+	iph = ipf_htable_find(arg, op->iplo_unit, op->iplo_name);
 	if (iph == NULL) {
-		ipf_interror = 30016;
+		softc->ipf_interror = 30016;
 		return ESRCH;
 	}
-	err = ipf_htent_remove(iph, &hte);
+	err = ipf_htent_remove(softc, arg, iph, &hte);
 
 	return err;
 }
 
 
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_htable_node_del                                         */
+/* Returns:     int      - 0 = success, else error                          */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              arg(I)   - pointer to local context to use                  */
+/*              op(I)    - pointer to lookup operation data                 */
+/*                                                                          */
+/* ------------------------------------------------------------------------ */
 static int
-ipf_htable_table_add(op)
+ipf_htable_table_add(softc, arg, op)
+	ipf_main_softc_t *softc;
+	void *arg;
         iplookupop_t *op;
 {
 	int err;
 
-	if (ipf_htable_find(op->iplo_unit, op->iplo_name) != NULL) {
-		ipf_interror = 30017;
+	if (ipf_htable_find(arg, op->iplo_unit, op->iplo_name) != NULL) {
+		softc->ipf_interror = 30017;
 		err = EEXIST;
 	} else {
-		err = ipf_htable_create(op);
+		err = ipf_htable_create(softc, arg, op);
 	}
 
 	return err;
 }
 
 
-/*
- * Delete an entry from a hash table.
- */
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_htable_node_del                                         */
+/* Returns:     int      - 0 = success, else error                          */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              arg(I)   - pointer to local context to use                  */
+/*              iph(I)   - pointer to hash table                            */
+/*              ipe(I)   - pointer to hash table entry to remove            */
+/*                                                                          */
+/* Delete an entry from a hash table.                                       */
+/* ------------------------------------------------------------------------ */
 static int
-ipf_htent_remove(iph, ipe)
+ipf_htent_remove(softc, arg, iph, ipe)
+	ipf_main_softc_t *softc;
+	void *arg;
 	iphtable_t *iph;
 	iphtent_t *ipe;
 {
@@ -406,7 +578,8 @@ ipf_htent_remove(iph, ipe)
 	{
 	case IPHASH_GROUPMAP :
 		if (ipe->ipe_group != NULL)
-			ipf_group_del(ipe->ipe_group, IPL_LOGIPF, ipf_active);
+			ipf_group_del(softc, ipe->ipe_group, IPL_LOGIPF,
+				      softc->ipf_active);
 		break;
 
 	default :
@@ -415,36 +588,54 @@ ipf_htent_remove(iph, ipe)
 		break;
 	}
 
-	return ipf_htent_deref(ipe);
+	return ipf_htent_deref(arg, ipe);
 }
 
 
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_htable_deref                                            */
+/* Returns:     int       - 0 = success, else error                         */
+/* Parameters:  softc(I)  - pointer to soft context main structure          */
+/*              arg(I)    - pointer to local context to use                 */
+/*              object(I) - pointer to hash table                           */
+/*                                                                          */
+/* ------------------------------------------------------------------------ */
 static int
-ipf_htable_deref(arg)
-	void *arg;
+ipf_htable_deref(softc, arg, object)
+	ipf_main_softc_t *softc;
+	void *arg, *object;
 {
-	iphtable_t *iph = arg;
+	ipf_htable_softc_t *softh = arg;
+	iphtable_t *iph = object;
 	int refs;
 
 	iph->iph_ref--;
 	refs = iph->iph_ref;
 
 	if (iph->iph_ref == 0) {
-		ipf_htable_free(iph);
+		ipf_htable_free(softh, iph);
 	}
 
 	return refs;
 }
 
 
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_htent_deref                                             */
+/* Parameters:  arg(I) - pointer to local context to use                    */
+/*              ipe(I) -                                                    */
+/*                                                                          */
+/* ------------------------------------------------------------------------ */
 static int
-ipf_htent_deref(ipe)
+ipf_htent_deref(arg, ipe)
+	void *arg;
 	iphtent_t *ipe;
 {
+	ipf_htable_softc_t *softh = arg;
 
 	ipe->ipe_ref--;
 	if (ipe->ipe_ref == 0) {
-		ipf_nhtnodes[ipe->ipe_unit]--;
+		softh->ipf_nhtnodes[ipe->ipe_unit]--;
 
 		KFREE(ipe);
 
@@ -455,28 +646,44 @@ ipf_htent_deref(ipe)
 }
 
 
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_htable_exists                                           */
+/* Parameters:  arg(I) - pointer to local context to use                    */
+/*                                                                          */
+/* ------------------------------------------------------------------------ */
 static void *
-ipf_htable_exists(unit, name)
+ipf_htable_exists(arg, unit, name)
+	void *arg;
 	int unit;
 	char *name;
 {
+	ipf_htable_softc_t *softh = arg;
 	iphtable_t *iph;
 
-	for (iph = ipf_htables[unit]; iph != NULL; iph = iph->iph_next)
+	for (iph = softh->ipf_htables[unit]; iph != NULL; iph = iph->iph_next)
 		if (strncmp(iph->iph_name, name, sizeof(iph->iph_name)) == 0)
 			break;
 	return iph;
 }
 
 
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_htable_select_add_ref                                   */
+/* Returns:     void *  - NULL = failure, else pointer to the hash table    */
+/* Parameters:  arg(I)  - pointer to local context to use                   */
+/*              unit(I) - ipfilter device to which we are working on        */
+/*              name(I) - name of the hash table                            */
+/*                                                                          */
+/* ------------------------------------------------------------------------ */
 static void *
-ipf_htable_select_add_ref(unit, name)
+ipf_htable_select_add_ref(arg, unit, name)
+	void *arg;
 	int unit;
 	char *name;
 {
 	iphtable_t *iph;
 
-	iph = ipf_htable_exists(unit, name);
+	iph = ipf_htable_exists(arg, unit, name);
 	if (iph != NULL) {
 		ATOMIC_INC32(iph->iph_ref);
 	}
@@ -484,29 +691,46 @@ ipf_htable_select_add_ref(unit, name)
 }
 
 
-/*
- * This function is exposed becaues it is used in the group-map feature.
- */
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_htable_find                                             */
+/* Returns:     void *  - NULL = failure, else pointer to the hash table    */
+/* Parameters:  arg(I)  - pointer to local context to use                   */
+/*              unit(I) - ipfilter device to which we are working on        */
+/*              name(I) - name of the hash table                            */
+/*                                                                          */
+/* This function is exposed becaues it is used in the group-map feature.    */
+/* ------------------------------------------------------------------------ */
 iphtable_t *
-ipf_htable_find(unit, name)
+ipf_htable_find(arg, unit, name)
+	void *arg;
 	int unit;
 	char *name;
 {
 	iphtable_t *iph;
 
-	iph = ipf_htable_exists(unit, name);
+	iph = ipf_htable_exists(arg, unit, name);
 	if ((iph != NULL) && (iph->iph_flags & IPHASH_DELETE) == 0)
 		return iph;
 
 	return NULL;
 }
 
-extern iphtable_t *printhash(iphtable_t *, void *, char *, int);
 
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_htable_flush                                            */
+/* Returns:     size_t   - number of entries flushed                        */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              arg(I)   - pointer to local context to use                  */
+/*              op(I)    - pointer to lookup operation data                 */
+/*                                                                          */
+/* ------------------------------------------------------------------------ */
 static size_t
-ipf_htable_flush(op)
+ipf_htable_flush(softc, arg, op)
+	ipf_main_softc_t *softc;
+	void *arg;
 	iplookupflush_t *op;
 {
+	ipf_htable_softc_t *softh = arg;
 	iphtable_t *iph;
 	size_t freed;
 	int i;
@@ -515,8 +739,8 @@ ipf_htable_flush(op)
 
 	for (i = 0; i <= IPL_LOGMAX; i++) {
 		if (op->iplf_unit == i || op->iplf_unit == IPL_LOGALL) {
-			while ((iph = ipf_htables[i]) != NULL) {
-				if (ipf_htable_remove(iph) == 0) {
+			while ((iph = softh->ipf_htables[i]) != NULL) {
+				if (ipf_htable_remove(softc, arg, iph) == 0) {
 					freed++;
 				} else {
 					iph->iph_flags |= IPHASH_DELETE;
@@ -529,8 +753,18 @@ ipf_htable_flush(op)
 }
 
 
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_htable_node_add                                         */
+/* Returns:     int      - 0 = success, else error                          */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              arg(I)   - pointer to local context to use                  */
+/*              op(I)    - pointer to lookup operation data                 */
+/*                                                                          */
+/* ------------------------------------------------------------------------ */
 static int
-ipf_htable_node_add(op)
+ipf_htable_node_add(softc, arg, op)
+	ipf_main_softc_t *softc;
+	void *arg;
 	iplookupop_t *op;
 
 {
@@ -539,35 +773,45 @@ ipf_htable_node_add(op)
 	int err;
 
 	if (op->iplo_size != sizeof(hte)) {
-		ipf_interror = 30018;
+		softc->ipf_interror = 30018;
 		return EINVAL;
 	}       
 
 	err = COPYIN(op->iplo_struct, &hte, sizeof(hte));
 	if (err != 0) {
-		ipf_interror = 30019;
+		softc->ipf_interror = 30019;
 		return EFAULT;
 	}
 
-	iph = ipf_htable_find(op->iplo_unit, op->iplo_name);
+	iph = ipf_htable_find(arg, op->iplo_unit, op->iplo_name);
 	if (iph == NULL) {
-		ipf_interror = 30020;
+		softc->ipf_interror = 30020;
 		return ESRCH;
 	}
-	err = ipf_htent_insert(iph, &hte);
+	err = ipf_htent_insert(softc, arg, iph, &hte);
 
 	return err;
 }
 
 
-/*
- * Add an entry to a hash table.
- */
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_htent_insert                                            */
+/* Returns:     int      - 0 = success, -1 =  error                         */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              arg(I)   - pointer to local context to use                  */
+/*              op(I)    - pointer to lookup operation data                 */
+/*              ipeo(I)  -                                                  */
+/*                                                                          */
+/* Add an entry to a hash table.                                            */
+/* ------------------------------------------------------------------------ */
 static int
-ipf_htent_insert(iph, ipeo)
+ipf_htent_insert(softc, arg, iph, ipeo)
+	ipf_main_softc_t *softc;
+	void *arg;
 	iphtable_t *iph;
 	iphtent_t *ipeo;
 {
+	ipf_htable_softc_t *softh = arg;
 	iphtent_t *ipe;
 	u_int hv;
 	int bits;
@@ -641,9 +885,9 @@ ipf_htent_insert(iph, ipeo)
 	switch (iph->iph_type & ~IPHASH_ANON)
 	{
 	case IPHASH_GROUPMAP :
-		ipe->ipe_ptr = ipf_group_add(ipe->ipe_group, NULL,
+		ipe->ipe_ptr = ipf_group_add(softc, ipe->ipe_group, NULL,
 					   iph->iph_flags, IPL_LOGIPF,
-					   ipf_active);
+					   softc->ipf_active);
 		break;
 
 	default :
@@ -653,20 +897,27 @@ ipf_htent_insert(iph, ipeo)
 	}
 
 	ipe->ipe_unit = iph->iph_unit;
-	ipf_nhtnodes[ipe->ipe_unit]++;
+	softh->ipf_nhtnodes[ipe->ipe_unit]++;
 
 	return 0;
 }
 
 
-/*
- * Search a hash table for a matching entry and return the pointer stored in
- * it for use as the next group of rules to search.
- *
- * This function is exposed becaues it is used in the group-map feature.
- */
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_htable_node_add                                         */
+/* Returns:     int      - 0 = success, else error                          */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              tptr(I)  -                                                  */
+/*              aptr(I)  -                                                  */
+/*                                                                          */
+/* Search a hash table for a matching entry and return the pointer stored   */
+/* in it for use as the next group of rules to search.                      */
+/*                                                                          */
+/* This function is exposed becaues it is used in the group-map feature.    */
+/* ------------------------------------------------------------------------ */
 void *
-ipf_iphmfindgroup(tptr, aptr)
+ipf_iphmfindgroup(softc, tptr, aptr)
+	ipf_main_softc_t *softc;
 	void *tptr, *aptr;
 {
 	struct in_addr *addr;
@@ -674,7 +925,7 @@ ipf_iphmfindgroup(tptr, aptr)
 	iphtent_t *ipe;
 	void *rval;
 
-	READ_ENTER(&ipf_poolrw);
+	READ_ENTER(&softc->ipf_poolrw);
 	iph = tptr;
 	addr = aptr;
 
@@ -683,7 +934,7 @@ ipf_iphmfindgroup(tptr, aptr)
 		rval = ipe->ipe_ptr;
 	else
 		rval = NULL;
-	RWLOCK_EXIT(&ipf_poolrw);
+	RWLOCK_EXIT(&softc->ipf_poolrw);
 	return rval;
 }
 
@@ -698,7 +949,8 @@ ipf_iphmfindgroup(tptr, aptr)
 /* Search the hash table for a given address and return a search result.    */
 /* ------------------------------------------------------------------------ */
 static int
-ipf_iphmfindip(tptr, ipversion, aptr)
+ipf_iphmfindip(softc, tptr, ipversion, aptr)
+	ipf_main_softc_t *softc;
 	void *tptr, *aptr;
 	int ipversion;
 {
@@ -713,7 +965,7 @@ ipf_iphmfindip(tptr, ipversion, aptr)
 	iph = tptr;
 	addr = aptr;
 
-	READ_ENTER(&ipf_poolrw);
+	READ_ENTER(&softc->ipf_poolrw);
 	if (ipversion == 4) {
 		ipe = ipf_iphmfind(iph, addr);
 #ifdef USE_INET6
@@ -728,12 +980,18 @@ ipf_iphmfindip(tptr, ipversion, aptr)
 		rval = 0;
 	else
 		rval = 1;
-	RWLOCK_EXIT(&ipf_poolrw);
+	RWLOCK_EXIT(&softc->ipf_poolrw);
 	return rval;
 }
 
 
-/* Locks:  ipf_poolrw */
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_iphmfindip                                              */
+/* Parameters:  iph(I)  - pointer to hash table                             */
+/*              addr(I) - pointer to IPv4 address                           */
+/* Locks:  ipf_poolrw                                                       */
+/*                                                                          */
+/* ------------------------------------------------------------------------ */
 static iphtent_t *
 ipf_iphmfind(iph, addr)
 	iphtable_t *iph;
@@ -773,11 +1031,23 @@ maskloop:
 }
 
 
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_htable_iter_next                                        */
+/* Returns:     int      - 0 = success, else error                          */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              arg(I)   - pointer to local context to use                  */
+/*              token(I) -                                                  */
+/*              ilp(I)   -                                                  */
+/*                                                                          */
+/* ------------------------------------------------------------------------ */
 static int
-ipf_htable_iter_next(token, ilp)
+ipf_htable_iter_next(softc, arg, token, ilp)
+	ipf_main_softc_t *softc;
+	void *arg;
 	ipftoken_t *token;
 	ipflookupiter_t *ilp;
 {
+	ipf_htable_softc_t *softh = arg;
 	iphtent_t *node, zn, *nextnode;
 	iphtable_t *iph, zp, *nextiph;
 	int err;
@@ -788,7 +1058,7 @@ ipf_htable_iter_next(token, ilp)
 	nextiph = NULL;
 	nextnode = NULL;
 
-	READ_ENTER(&ipf_poolrw);
+	READ_ENTER(&softc->ipf_poolrw);
 
 	/*
 	 * Get "previous" entry from the token and find the next entry.
@@ -801,7 +1071,7 @@ ipf_htable_iter_next(token, ilp)
 	case IPFLOOKUPITER_LIST :
 		iph = token->ipt_data;
 		if (iph == NULL) {
-			nextiph = ipf_htables[(int)ilp->ili_unit];
+			nextiph = softh->ipf_htables[(int)ilp->ili_unit];
 		} else {
 			nextiph = iph->iph_next;
 		}
@@ -819,9 +1089,10 @@ ipf_htable_iter_next(token, ilp)
 	case IPFLOOKUPITER_NODE :
 		node = token->ipt_data;
 		if (node == NULL) {
-			iph = ipf_htable_find(ilp->ili_unit, ilp->ili_name);
+			iph = ipf_htable_find(arg, ilp->ili_unit,
+					      ilp->ili_name);
 			if (iph == NULL) {
-				ipf_interror = 30009;
+				softc->ipf_interror = 30009;
 				err = ESRCH;
 			} else {
 				nextnode = iph->iph_list;
@@ -841,7 +1112,7 @@ ipf_htable_iter_next(token, ilp)
 		break;
 
 	default :
-		ipf_interror = 30010;
+		softc->ipf_interror = 30010;
 		err = EINVAL;
 		break;
 	}
@@ -849,7 +1120,7 @@ ipf_htable_iter_next(token, ilp)
 	/*
 	 * Now that we have ref, it's save to give up lock.
 	 */
-	RWLOCK_EXIT(&ipf_poolrw);
+	RWLOCK_EXIT(&softc->ipf_poolrw);
 	if (err != 0)
 		return err;
 
@@ -861,38 +1132,38 @@ ipf_htable_iter_next(token, ilp)
 	case IPFLOOKUPITER_LIST :
 		err = COPYOUT(nextiph, ilp->ili_data, sizeof(*nextiph));
 		if (err != 0) {
-			ipf_interror = 30011;
+			softc->ipf_interror = 30011;
 			err = EFAULT;
 		}
 		if (token->ipt_data == NULL) {
-			ipf_freetoken(token);
+			ipf_freetoken(softc, token);
 		} else {
 			if (iph != NULL) {
-				WRITE_ENTER(&ipf_poolrw);
-				ipf_htable_deref(iph);
-				RWLOCK_EXIT(&ipf_poolrw);
+				WRITE_ENTER(&softc->ipf_poolrw);
+				ipf_htable_deref(softc, softh, iph);
+				RWLOCK_EXIT(&softc->ipf_poolrw);
 			}
 			if (nextiph->iph_next == NULL)
-				ipf_freetoken(token);
+				ipf_freetoken(softc, token);
 		}
 		break;
 
 	case IPFLOOKUPITER_NODE :
 		err = COPYOUT(nextnode, ilp->ili_data, sizeof(*nextnode));
 		if (err != 0) {
-			ipf_interror = 30012;
+			softc->ipf_interror = 30012;
 			err = EFAULT;
 		}
 		if (token->ipt_data == NULL) {
-			ipf_freetoken(token);
+			ipf_freetoken(softc, token);
 		} else {
 			if (node != NULL) {
-				WRITE_ENTER(&ipf_poolrw);
-				ipf_htent_deref(node);
-				RWLOCK_EXIT(&ipf_poolrw);
+				WRITE_ENTER(&softc->ipf_poolrw);
+				ipf_htent_deref(softc, node);
+				RWLOCK_EXIT(&softc->ipf_poolrw);
 			}
 			if (nextnode->ipe_next == NULL)
-				ipf_freetoken(token);
+				ipf_freetoken(softc, token);
 		}
 		break;
 	}
@@ -901,8 +1172,20 @@ ipf_htable_iter_next(token, ilp)
 }
 
 
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_htable_iter_deref                                       */
+/* Returns:     int      - 0 = success, else  error                         */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              arg(I)   - pointer to local context to use                  */
+/*              otype(I) - which data structure type is being walked        */
+/*              unit(I)  - ipfilter device to which we are working on       */
+/*              data(I)  - pointer to old data structure                    */
+/*                                                                          */
+/* ------------------------------------------------------------------------ */
 static int
-ipf_htable_iter_deref(otype, unit, data)
+ipf_htable_iter_deref(softc, arg, otype, unit, data)
+	ipf_main_softc_t *softc;
+	void *arg;
 	int otype;
 	int unit;
 	void *data;
@@ -917,11 +1200,11 @@ ipf_htable_iter_deref(otype, unit, data)
 	switch (otype)
 	{
 	case IPFLOOKUPITER_LIST :
-		ipf_htable_deref((iphtable_t *)data);
+		ipf_htable_deref(softc, arg, (iphtable_t *)data);
 		break;
 
 	case IPFLOOKUPITER_NODE :
-		ipf_htent_deref((iphtent_t *)data);
+		ipf_htent_deref(arg, (iphtent_t *)data);
 		break;
 	default :
 		break;
@@ -932,7 +1215,13 @@ ipf_htable_iter_deref(otype, unit, data)
 
 
 #ifdef USE_INET6
-/* Locks:  ipf_poolrw */
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_iphmfind6                                               */
+/* Parameters:  iph(I)  - pointer to hash table                             */
+/*              addr(I) - pointer to IPv6 address                           */
+/* Locks:  ipf_poolrw                                                       */
+/*                                                                          */
+/* ------------------------------------------------------------------------ */
 static iphtent_t *
 ipf_iphmfind6(iph, addr)
 	iphtable_t *iph;
@@ -990,5 +1279,29 @@ nextmask:
 		}
 	}
 	return ipe;
+}
+#endif
+
+
+#ifndef _KERNEL
+# include "ipf.h"
+
+/* ------------------------------------------------------------------------ */
+/*                                                                          */
+/* ------------------------------------------------------------------------ */
+void
+ipf_htable_dump(softc, arg)
+	ipf_main_softc_t *softc;
+	void *arg;
+{
+	ipf_htable_softc_t *softh = arg;
+	iphtable_t *iph;
+	int i;
+
+	printf("List of configured hash tables\n");
+	for (i = 0; i < IPL_LOGSIZE; i++)
+		for (iph = softh->ipf_htables[i]; iph != NULL; iph = iph->iph_next)
+			printhash(iph, bcopywrap, NULL, opts);
+
 }
 #endif

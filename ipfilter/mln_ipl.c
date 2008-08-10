@@ -98,8 +98,6 @@ static	int	ipfread(dev_t, struct uio *, int ioflag);
 static	int	ipfwrite(dev_t, struct uio *, int ioflag);
 static	int	ipfpoll(dev_t, int events, PROC_T *);
 
-struct selinfo	ipfselwait[IPL_LOGSIZE];
-
 #if (defined(NetBSD1_0) && (NetBSD1_0 > 1)) || \
     (defined(NetBSD) && (NetBSD <= 1991011) && (NetBSD >= 199511))
 # if defined(__NetBSD__) && (__NetBSD_Version__ >= 106080000)
@@ -152,7 +150,8 @@ struct	cdevsw	ipfdevsw =
 	NULL			/* strategy */
 };
 #endif
-int	ipf_major = 0;
+int			ipf_major = 0;
+ipf_main_softc_t	ipfmain;
 
 #if defined(__NetBSD__) && (__NetBSD_Version__ >= 106080000)
 MOD_DEV(IPL_VERSION, "ipf", NULL, -1, &ipf_cdevsw, -1);
@@ -302,13 +301,13 @@ static int ipf_unload()
 	 * Unloading - remove the filter rule check from the IP
 	 * input/output stream.
 	 */
-	if (ipf_refcnt)
+	if (ipfmain.ipf_refcnt)
 		error = EBUSY;
-	else if (ipf_running >= 0)
-		error = ipfdetach();
+	else if (ipfmain.ipf_running >= 0)
+		error = ipfdetach(&ipfmain);
 
 	if (error == 0) {
-		ipf_running = -2;
+		ipfmain.ipf_running = -2;
 		error = ipf_remove();
 		printf("%s unloaded\n", ipfilter_version);
 	}
@@ -330,7 +329,8 @@ static int ipf_load()
 	 */
 	(void)ipf_remove();
 
-	error = ipfattach();
+	bzero((char *)&ipfmain, sizeof(ipfmain));
+	error = ipfattach(&ipfmain);
 
 	for (i = 0; (error == 0) && (name = ipf_devfiles[i]); i++) {
 #if (__NetBSD_Version__ > 399001400)
@@ -377,9 +377,9 @@ static int ipf_load()
 	if (error == 0) {
 		char *defpass;
 
-		if (FR_ISPASS(ipf_pass))
+		if (FR_ISPASS(ipfmain.ipf_pass))
 			defpass = "pass";
-		else if (FR_ISBLOCK(ipf_pass))
+		else if (FR_ISBLOCK(ipfmain.ipf_pass))
 			defpass = "block";
 		else
 			defpass = "no-match -> block";
@@ -397,7 +397,7 @@ static int ipf_load()
 			""
 #endif
 			);
-		ipf_running = 1;
+		ipfmain.ipf_running = 1;
 	}
 	return error;
 }
@@ -479,16 +479,16 @@ static int ipfread(dev, uio, ioflag)
 	register struct uio *uio;
 {
 
-	if (ipf_running < 1)
+	if (ipfmain.ipf_running < 1)
 		return EIO;
 
 # ifdef	IPFILTER_SYNC
 	if (GET_MINOR(dev) == IPL_LOGSYNC)
-		return ipf_sync_read(uio);
+		return ipf_sync_read(&ipfmain, uio);
 # endif
 
 #ifdef IPFILTER_LOG
-	return ipf_log_read(GET_MINOR(dev), uio);
+	return ipf_log_read(&ipfmain, GET_MINOR(dev), uio);
 #else
 	return ENXIO;
 #endif
@@ -507,12 +507,12 @@ static int ipfwrite(dev, uio, ioflag)
 	register struct uio *uio;
 {
 
-	if (ipf_running < 1)
+	if (ipfmain.ipf_running < 1)
 		return EIO;
 
 #ifdef	IPFILTER_SYNC
 	if (GET_MINOR(dev) == IPL_LOGSYNC)
-		return ipf_sync_write(uio);
+		return ipf_sync_write(&ipfmain, uio);
 #endif
 	return ENXIO;
 }
@@ -535,19 +535,23 @@ static int ipfpoll(dev, events, p)
 	case IPL_LOGNAT :
 	case IPL_LOGSTATE :
 #ifdef IPFILTER_LOG
-		if ((events & (POLLIN | POLLRDNORM)) && ipf_log_canread(unit))
+		if ((events & (POLLIN | POLLRDNORM)) &&
+		    ipf_log_canread(&ipfmain, unit))
 			revents |= events & (POLLIN | POLLRDNORM);
 #endif
 		break;
 	case IPL_LOGAUTH :
-		if ((events & (POLLIN | POLLRDNORM)) && ipf_auth_waiting())
+		if ((events & (POLLIN | POLLRDNORM)) &&
+		    ipf_auth_waiting(&ipfmain))
 			revents |= events & (POLLIN | POLLRDNORM);
 		break;
 	case IPL_LOGSYNC :
 #ifdef IPFILTER_SYNC
-		if ((events & (POLLIN | POLLRDNORM)) && ipf_sync_canread())
+		if ((events & (POLLIN | POLLRDNORM)) &&
+		    ipf_sync_canread(&ipfmain))
 			revents |= events & (POLLIN | POLLRDNORM);
-		if ((events & (POLLOUT | POLLWRNORM)) && ipf_sync_canwrite())
+		if ((events & (POLLOUT | POLLWRNORM)) &&
+		    ipf_sync_canwrite(&ipfmain))
 			revents |= events & (POLLOUT | POLLWRNORM);
 #endif
 		break;
@@ -558,6 +562,6 @@ static int ipfpoll(dev, events, p)
 	}
 
 	if ((revents == 0) && (((events & (POLLIN|POLLRDNORM)) != 0)))
-		selrecord(p, &ipfselwait[unit]);
+		selrecord(p, &ipfmain.ipf_selwait[unit]);
 	return revents;
 }

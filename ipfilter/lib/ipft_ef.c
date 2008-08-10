@@ -23,11 +23,6 @@ etherfind -n -t
 #include "ipf.h"
 #include "ipt.h"
 
-#ifndef linux
-#include <netinet/ip_var.h>
-#endif
-#include <netinet/tcpip.h>
-
 
 #if !defined(lint)
 static const char sccsid[] = "@(#)ipft_ef.c	1.6 2/4/96 (C)1995 Darren Reed";
@@ -72,14 +67,17 @@ static	int	etherf_readip(mb, ifn, dir)
 	char	**ifn;
 	int	*dir;
 {
-	struct	tcpiphdr pkt;
-	ip_t	*ip = (ip_t *)&pkt;
+	u_char	pkt[40];
+	tcphdr_t *tcp;
+	ip_t	*ip;
 	char	src[16], dst[16], sprt[16], dprt[16];
 	char	lbuf[128], len[8], prot[8], time[8], *s;
 	int	slen, extra = 0, i;
 	char	*buf;
 	int	cnt;
 
+	ip = (ip_t *)pkt;
+	tcp = (tcphdr_t *)(ip + 1);
 	buf = (char *)mb->mb_buf;
 	cnt = sizeof(mb->mb_buf);
 
@@ -103,16 +101,16 @@ static	int	etherf_readip(mb, ifn, dir)
 	switch (ip->ip_p) {
 	case IPPROTO_TCP :
 		if (isdigit(*sprt))
-			pkt.ti_sport = htons(atoi(sprt) & 65535);
+			tcp->th_sport = htons(atoi(sprt) & 65535);
 		if (isdigit(*dprt))
-			pkt.ti_dport = htons(atoi(dprt) & 65535);
+			tcp->th_dport = htons(atoi(dprt) & 65535);
 		extra = sizeof(struct tcphdr);
 		break;
 	case IPPROTO_UDP :
 		if (isdigit(*sprt))
-			pkt.ti_sport = htons(atoi(sprt) & 65535);
+			tcp->th_sport = htons(atoi(sprt) & 65535);
 		if (isdigit(*dprt))
-			pkt.ti_dport = htons(atoi(dprt) & 65535);
+			tcp->th_dport = htons(atoi(dprt) & 65535);
 		extra = sizeof(struct udphdr);
 		break;
 #ifdef	IGMP

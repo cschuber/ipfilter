@@ -1608,7 +1608,6 @@ ipf_pullup(xmin, fin, len)
 			}
 			*fin->fin_mp = NULL;
 			fin->fin_m = NULL;
-			ATOMIC_INCL(frstats[out].fr_pull[1]);
 			return NULL;
 		}
 
@@ -1620,7 +1619,6 @@ ipf_pullup(xmin, fin, len)
 		fin->fin_m = m;
 		ip = MTOD(m, char *) + ipoff;
 
-		ATOMIC_INCL(frstats[out].fr_pull[0]);
 		fin->fin_ip = (ip_t *)ip;
 		if (fin->fin_dp != NULL)
 			fin->fin_dp = (char *)fin->fin_ip + dpoff;

@@ -81,12 +81,6 @@ struct file;
 #include <sys/hashing.h>
 # endif
 #endif
-#if defined(__FreeBSD__)
-# include "radix_ipf.h"
-#endif
-#ifndef __osf__
-# include <net/route.h>
-#endif
 #include <netinet/in.h>
 #if !(defined(__sgi) && !defined(IFF_DRVRLOCK)) /* IRIX < 6 */ && \
     !defined(__hpux) && !defined(linux)
@@ -94,9 +88,6 @@ struct file;
 #endif
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
-#if !defined(linux)
-# include <netinet/ip_var.h>
-#endif
 #include <netinet/tcp.h>
 #if defined(__osf__)
 # include <netinet/tcp_timer.h>
@@ -106,7 +97,6 @@ struct file;
 # define _RADIX_H_
 #endif
 #include <netinet/udp.h>
-#include <netinet/tcpip.h>
 #include <netinet/ip_icmp.h>
 #include <unistd.h>
 #include <syslog.h>
@@ -134,7 +124,7 @@ struct file;
 #if defined(__FreeBSD_version) && (__FreeBSD_version >= 300000)
 # include <sys/malloc.h>
 #endif
-#ifdef __hpux
+#if defined(__hpux) || SOLARIS
 struct rtentry;
 #endif
 #include "md5.h"
@@ -170,27 +160,28 @@ static int	write_output __P((struct ifnet *, struct mbuf *,
 #endif
 
 
-int
-ipfattach()
+int   
+ipfattach(softc)
+	ipf_main_softc_t *softc;
 {
-	ipf_running = 1;
 	return 0;
 }
 
 
 int
-ipfdetach()
+ipfdetach(softc)
+	ipf_main_softc_t *softc;
 {
-	ipf_running = -1;
 	return 0;
-}
+}     
 
 
 /*
  * Filter ioctl interface.
  */
 int
-ipfioctl(dev, cmd, data, mode)
+ipfioctl(softc, dev, cmd, data, mode)
+	ipf_main_softc_t *softc;
 	int dev;
 	ioctlcmd_t cmd;
 	caddr_t data;
@@ -203,7 +194,7 @@ ipfioctl(dev, cmd, data, mode)
 
 	SPL_NET(s);
 
-	error = ipf_ioctlswitch(unit, data, cmd, mode, uid, NULL);
+	error = ipf_ioctlswitch(softc, unit, data, cmd, mode, uid, NULL);
 	if (error != -1) {
 		SPL_X(s);
 		return error;
@@ -214,26 +205,31 @@ ipfioctl(dev, cmd, data, mode)
 
 
 void
-ipf_forgetifp(ifp)
+ipf_forgetifp(softc, ifp)
+	ipf_main_softc_t *softc;
 	void *ifp;
 {
 	register frentry_t *f;
 
-	WRITE_ENTER(&ipf_mutex);
-	for (f = ipf_acct[0][ipf_active]; (f != NULL); f = f->fr_next)
+	WRITE_ENTER(&softc->ipf_mutex);
+	for (f = softc->ipf_acct[0][softc->ipf_active]; (f != NULL);
+	     f = f->fr_next)
 		if (f->fr_ifa == ifp)
 			f->fr_ifa = (void *)-1;
-	for (f = ipf_acct[1][ipf_active]; (f != NULL); f = f->fr_next)
+	for (f = softc->ipf_acct[1][softc->ipf_active]; (f != NULL);
+	     f = f->fr_next)
 		if (f->fr_ifa == ifp)
 			f->fr_ifa = (void *)-1;
-	for (f = ipf_rules[0][ipf_active]; (f != NULL); f = f->fr_next)
+	for (f = softc->ipf_rules[0][softc->ipf_active]; (f != NULL);
+	     f = f->fr_next)
 		if (f->fr_ifa == ifp)
 			f->fr_ifa = (void *)-1;
-	for (f = ipf_rules[1][ipf_active]; (f != NULL); f = f->fr_next)
+	for (f = softc->ipf_rules[1][softc->ipf_active]; (f != NULL);
+	     f = f->fr_next)
 		if (f->fr_ifa == ifp)
 			f->fr_ifa = (void *)-1;
-	RWLOCK_EXIT(&ipf_mutex);
-	ipf_nat_sync(ifp);
+	RWLOCK_EXIT(&softc->ipf_mutex);
+	ipf_nat_sync(softc, ifp);
 }
 
 
@@ -594,14 +590,6 @@ ipf_send_icmp_err(type, fin, dst)
 }
 
 
-int
-ipf_sync(ptr)
-	void *ptr;
-{
-	return 0;
-}
-
-
 void
 m_freem(m)
 	mb_t *m;
@@ -713,11 +701,12 @@ ipf_nextipid(fin)
 	fr_info_t *fin;
 {
 	static u_short ipid = 0;
+	ipf_main_softc_t *softc = fin->fin_main_soft;
 	u_short id;
 
-	MUTEX_ENTER(&ipf_rw);
+	MUTEX_ENTER(&softc->ipf_rw);
 	id = ipid++;
-	MUTEX_EXIT(&ipf_rw);
+	MUTEX_EXIT(&softc->ipf_rw);
 
 	return id;
 }
@@ -743,11 +732,12 @@ ipf_checkv6sum(fin)
 #endif
 
 
+#if 0
 /*
  * See above for description, except that all addressing is in user space.
  */
 int
-copyoutptr(src, dst, size)
+copyoutptr(softc, src, dst, size)
 	void *src, *dst;
 	size_t size;
 {
@@ -773,6 +763,7 @@ copyinptr(src, dst, size)
 	bcopy(ca, dst, size);
 	return 0;
 }
+#endif
 
 
 /*
@@ -878,4 +869,12 @@ ipf_random()
 		break;
 	}
 	return number;
+}
+
+
+int
+ipf_verifysrc(fin)
+	fr_info_t *fin;
+{
+	return 1;
 }

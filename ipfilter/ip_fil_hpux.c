@@ -519,7 +519,7 @@ iplselect(unit, flag)
 	switch (flag)
 	{
 	case FREAD:
-		if (iplused[unit]) {
+		if (softc->ipf_iplused[unit]) {
 			MUTEX_EXIT(&ipl_mutex);
 			return 1;
 		}
@@ -683,7 +683,6 @@ ipf_pullup(xmin, fin, len)
 		}
 		m = msgpullup(xmin, len + ipoff + inc);
 		if (m == NULL) {
-			ATOMIC_INCL(frstats[out].fr_pull[1]);
 			FREE_MB_T(*fin->fin_mp);
 			*fin->fin_mp = NULL;
 			fin->fin_m = NULL;
@@ -704,7 +703,6 @@ ipf_pullup(xmin, fin, len)
 				if (m2->b_next == xmin)
 					break;
 			if (m2 == NULL) {
-				ATOMIC_INCL(frstats[out].fr_pull[1]);
 				FREE_MB_T(*fin->fin_mp);
 				FREE_MB_T(m);
 				return NULL;
@@ -718,7 +716,6 @@ ipf_pullup(xmin, fin, len)
 		ip = MTOD(m, char *) + ipoff;
 		qpi->qpi_data = ip;
 
-		ATOMIC_INCL(frstats[out].fr_pull[0]);
 		fin->fin_ip = (ip_t *)ip;
 		if (fin->fin_dp != NULL)
 			fin->fin_dp = (char *)fin->fin_ip + dpoff;

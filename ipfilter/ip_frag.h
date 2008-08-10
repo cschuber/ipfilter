@@ -67,35 +67,32 @@ typedef	struct	ipfrstat {
 #define	IPFR_CMPSZ	(offsetof(ipfr_t, ipfr_pass) - \
 			 offsetof(ipfr_t, ipfr_ifp))
 
-extern	ipfr_t	*ipfr_list, **ipfr_tail;
-extern	ipfr_t	*ipfr_natlist, **ipfr_nattail;
-extern	int	ipfr_size;
-extern	int	ipf_ipfrttl;
-extern	int	ipf_frag_lock;
-
-extern	void	ipf_frag_clear __P((void));
-extern	void	ipf_frag_expire __P((void));
+extern	void	*ipf_frag_soft_create __P((ipf_main_softc_t *));
+extern	int	ipf_frag_soft_init __P((ipf_main_softc_t *, void *));
+extern	int	ipf_frag_soft_fini __P((ipf_main_softc_t *, void *));
+extern	void	ipf_frag_soft_destroy __P((ipf_main_softc_t *, void *));
+extern	int	ipf_frag_main_load __P((void));
+extern	int	ipf_frag_main_unload __P((void));
+extern	int	ipf_frag_load __P((void));
+extern	void	ipf_frag_clear __P((ipf_main_softc_t *));
+extern	void	ipf_frag_expire __P((ipf_main_softc_t *));
 extern	void	ipf_frag_forget __P((void *));
 extern	int	ipf_frag_init __P((void));
 extern	u_32_t	ipf_frag_ipidknown __P((fr_info_t *));
 extern	int	ipf_frag_ipidnew __P((fr_info_t *, u_32_t));
 extern	frentry_t *ipf_frag_known __P((fr_info_t *, u_32_t *));
-extern	void	ipf_frag_natforget __P((void *));
-extern	int	ipf_frag_natnew __P((fr_info_t *, u_32_t, struct nat *));
+extern	void	ipf_frag_natforget __P((ipf_main_softc_t *, void *));
+extern	int	ipf_frag_natnew __P((ipf_main_softc_t *, fr_info_t *, u_32_t, struct nat *));
 extern	nat_t	*ipf_frag_natknown __P((fr_info_t *));
-extern	int	ipf_frag_new __P((fr_info_t *, u_32_t));
-extern	ipfrstat_t	*ipf_frag_stats __P((void));
-extern	void	ipf_frag_unload __P((void));
-
-#ifdef USE_MUTEXES
-extern	void	ipf_frag_deref __P((ipfr_t **, ipfrwlock_t *));
-extern	int	ipf_frag_next __P((ipftoken_t *, ipfgeniter_t *, ipfr_t **, \
-				 ipfr_t ***, ipfrwlock_t *));
-#else
-extern	void	ipf_frag_deref __P((ipfr_t **));
-extern	int	ipf_frag_next __P((ipftoken_t *, ipfgeniter_t *, ipfr_t **, \
-				 ipfr_t ***));
-#endif
+extern	int	ipf_frag_new __P((ipf_main_softc_t *, fr_info_t *, u_32_t));
+extern	ipfrstat_t	*ipf_frag_stats __P((void *));
+extern	void	ipf_frag_setlock __P((void *, int));
+extern	void	ipf_frag_pkt_deref __P((ipf_main_softc_t *, void *));
+extern	int	ipf_frag_pkt_next __P((ipf_main_softc_t *, ipftoken_t *,
+				       ipfgeniter_t *));
+extern	void	ipf_frag_nat_deref __P((ipf_main_softc_t *, void *));
+extern	int	ipf_frag_nat_next __P((ipf_main_softc_t *, ipftoken_t *,
+				       ipfgeniter_t *));
 
 #if     defined(_KERNEL) && ((BSD >= 199306) || SOLARIS || defined(__sgi) \
 	        || defined(__osf__) || (defined(__sgi) && (IRIX >= 60500)))
@@ -105,7 +102,7 @@ extern	void	ipf_slowtimer __P((void));
 extern	void	ipf_slowtimer __P((void *));
 # endif
 #else
-extern	int	ipf_slowtimer __P((void));
+extern	int	ipf_slowtimer __P((void *));
 #endif
 
 #endif	/* __IP_FRAG_H__ */

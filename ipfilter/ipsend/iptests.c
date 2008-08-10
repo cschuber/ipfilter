@@ -65,17 +65,11 @@ typedef	int	boolean_t;
 #ifdef __hpux
 # define _NET_ROUTE_INCLUDED
 #endif
-#ifdef __osf__
-# include "radix_ipf_local.h"
-#endif
 #include <net/if.h>
 #if defined(linux) && (LINUX >= 0200)
 # include <asm/atomic.h>
 #endif
 #if !defined(linux)
-# if defined(__FreeBSD__)
-#  include "radix_ipf.h"
-# endif
 # include <net/route.h>
 #else
 # define __KERNEL__	/* because there's a macro not wrapped by this */

@@ -53,11 +53,7 @@
 #include "netinet/ip_auth.h"
 #include "netinet/ip_state.h"
 
-struct pollhead ipf_poll_head[IPL_LOGSIZE];
-
-extern	int	ipf_running;
-
-extern ipnat_t *nat_list;
+ipf_main_softc_t	ipfmain;
 
 static	int	ipf_getinfo __P((dev_info_t *, ddi_info_cmd_t,
 				 void *, void **));
@@ -68,36 +64,29 @@ static	int	ipf_attach __P((dev_info_t *, ddi_attach_cmd_t));
 static	int	ipf_detach __P((dev_info_t *, ddi_detach_cmd_t));
 static	int	ipf_qifsync __P((ip_t *, int, void *, int, void *, mblk_t **));
 static	int	ipf_property_update __P((dev_info_t *));
-static 	int	iplpoll __P((dev_t, short, int, short *, struct pollhead **));
+static 	int	ipfpoll __P((dev_t, short, int, short *, struct pollhead **));
 static	char	*ipf_devfiles[] = { IPL_NAME, IPNAT_NAME, IPSTATE_NAME,
 				    IPAUTH_NAME, IPSYNC_NAME, IPSCAN_NAME,
 				    IPLOOKUP_NAME, NULL };
-static	int	iplclose __P((dev_t, int, int, cred_t *));
-static	int	iplopen __P((dev_t *, int, int, cred_t *));
-static	int	iplread __P((dev_t, struct uio *, cred_t *));
-static	int	iplwrite __P((dev_t, struct uio *, cred_t *));
-
-
-#if SOLARIS2 >= 7
-extern	timeout_id_t	ipf_timer_id;
-#else
-extern	int		ipf_timer_id;
-#endif
+static	int	ipfclose __P((dev_t, int, int, cred_t *));
+static	int	ipfopen __P((dev_t *, int, int, cred_t *));
+static	int	ipfread __P((dev_t, struct uio *, cred_t *));
+static	int	ipfwrite __P((dev_t, struct uio *, cred_t *));
 
 
 static struct cb_ops ipf_cb_ops = {
-	iplopen,
-	iplclose,
+	ipfopen,
+	ipfclose,
 	nodev,		/* strategy */
 	nodev,		/* print */
 	nodev,		/* dump */
-	iplread,
-	iplwrite,	/* write */
+	ipfread,
+	ipfwrite,	/* write */
 	ipfioctl,	/* ioctl */
 	nodev,		/* devmap */
 	nodev,		/* mmap */
 	nodev,		/* segmap */
-	iplpoll,	/* poll */
+	ipfpoll,	/* poll */
 	ddi_prop_op,
 	NULL,
 	D_MTSAFE,
@@ -270,7 +259,7 @@ ipf_attach(dip, cmd)
 	switch (cmd)
 	{
 	case DDI_ATTACH:
-		if (ipf_running != 0)
+		if (ipfmain.ipf_running != 0)
 			break;
 #ifdef	IPFDEBUG
 		instance = ddi_get_instance(dip);
@@ -297,9 +286,6 @@ ipf_attach(dip, cmd)
 		/*
 		 * Initialize mutex's
 		 */
-		RWLOCK_INIT(&ipf_global, "ipf filter load/unload mutex");
-		RWLOCK_INIT(&ipf_mutex, "ipf filter rwlock");
-		RWLOCK_INIT(&ipf_frcache, "ipf cache rwlock");
 
 		cmn_err(CE_CONT, "!%s, loaded.\n", ipfilter_version);
 
@@ -332,27 +318,27 @@ ipf_detach(dip, cmd)
 #endif
 	switch (cmd) {
 	case DDI_DETACH:
-		if (ipf_refcnt != 0)
+		if (ipfmain.ipf_refcnt != 0)
 			return DDI_FAILURE;
 
-		if (ipf_running == -2 || ipf_running == 0)
+		if (ipfmain.ipf_running == -2 || ipfmain.ipf_running == 0)
 			break;
 		/*
 		 * Make sure we're the only one's modifying things.  With
 		 * this lock others should just fall out of the loop.
 		 */
-		WRITE_ENTER(&ipf_global);
-		if (ipf_running == -2) {
-			RWLOCK_EXIT(&ipf_global);
+		WRITE_ENTER(&ipfmain.ipf_global);
+		if (ipfmain.ipf_running == -2) {
+			RWLOCK_EXIT(&ipfmain.ipf_global);
 			return DDI_FAILURE;
 		}
-		ipf_running = -2;
+		ipfmain.ipf_running = -2;
 
-		RWLOCK_EXIT(&ipf_global);
+		RWLOCK_EXIT(&ipfmain.ipf_global);
 
-		if (ipf_timer_id != 0) {
-			(void) untimeout(ipf_timer_id);
-			ipf_timer_id = 0;
+		if (ipfmain.ipf_slow_ch != 0) {
+			(void) untimeout(ipfmain.ipf_slow_ch);
+			ipfmain.ipf_slow_ch = 0;
 		}
 
 		/*
@@ -369,16 +355,12 @@ ipf_detach(dip, cmd)
 			return DDI_FAILURE;
 		}
 
-		WRITE_ENTER(&ipf_global);
-		if (!ipfdetach()) {
-			RWLOCK_EXIT(&ipf_global);
-			RW_DESTROY(&ipf_mutex);
-			RW_DESTROY(&ipf_frcache);
-			RW_DESTROY(&ipf_global);
+		WRITE_ENTER(&ipfmain.ipf_global);
+		if (!ipfdetach(&ipfmain)) {
 			cmn_err(CE_CONT, "!%s detached.\n", ipfilter_version);
 			return (DDI_SUCCESS);
 		}
-		RWLOCK_EXIT(&ipf_global);
+		RWLOCK_EXIT(&ipfmain.ipf_global);
 		break;
 	default:
 		break;
@@ -397,7 +379,7 @@ ipf_getinfo(dip, infocmd, arg, result)
 {
 	int error;
 
-	if (ipf_running <= 0)
+	if (ipfmain.ipf_running <= 0)
 		return DDI_FAILURE;
 	error = DDI_FAILURE;
 #ifdef	IPFDEBUG
@@ -434,12 +416,12 @@ ipf_qifsync(ip, hlen, il, out, qif, mp)
 	mblk_t **mp;
 {
 
-	frsync(qif);
+	frsync(&ipfmain, qif);
 	/*
 	 * Resync. any NAT `connections' using this interface and its IP #.
 	 */
-	ipf_nat_sync(qif);
-	ipf_state_sync(qif);
+	ipf_nat_sync(&ipfmain, qif);
+	ipf_state_sync(&ipfmain, qif);
 	return 0;
 }
 
@@ -486,7 +468,9 @@ ipf_property_update(dip)
 #endif
 
 	err = DDI_SUCCESS;
-	for (ipft = ipf_tuneables; (name = ipft->ipft_name) != NULL; ipft++) {
+	ipft = ipfmain.ipf_tuners;
+	for (; (name = (char *)ipft->ipft_name) != NULL;
+	     ipft = ipft->ipft_next) {
 		one = 1;
 		i32p = NULL;
 		err = ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip,
@@ -508,7 +492,7 @@ ipf_property_update(dip)
 
 
 static int
-iplpoll(dev, events, anyyet, reventsp, phpp)
+ipfpoll(dev, events, anyyet, reventsp, phpp)
 	dev_t dev;
 	short events;
 	int anyyet;
@@ -532,18 +516,17 @@ iplpoll(dev, events, anyyet, reventsp, phpp)
 #endif
 		break;
 	case IPL_LOGAUTH :
-		if ((events & (POLLIN | POLLRDNORM)) && ipf_auth_waiting())
+		if ((events & (POLLIN | POLLRDNORM)) && ipf_auth_waiting(&ipfmain))
 			revents |= events & (POLLIN | POLLRDNORM);
 		break;
 	case IPL_LOGSYNC :
 #ifdef IPFILTER_SYNC
-		if ((events & (POLLIN | POLLRDNORM)) && ipf_sync_canread())
+		if ((events & (POLLIN | POLLRDNORM)) && ipf_sync_canread(&ipfmain))
 			revents |= events & (POLLIN | POLLRDNORM);
-		if ((events & (POLLOUT | POLLWRNORM)) && ipf_sync_canwrite())
+		if ((events & (POLLOUT | POLLWRNORM)) && ipf_sync_canwrite(&ipfmain))
+			revents |= events & POLLOUT;
 # ifdef POLLOUTNORM
-			revents |= events & (POLLOUT | POLLOUTNORM);
-# else
-			revents |= events & (POLLOUT);
+			revents |= events & POLLOUTNORM;
 # endif
 #endif
 		break;
@@ -558,7 +541,7 @@ iplpoll(dev, events, anyyet, reventsp, phpp)
 	} else {
 		*reventsp = 0;
 		if (!anyyet)
-			*phpp = &ipf_poll_head[xmin];
+			*phpp = &ipfmain.ipf_poll_head[xmin];
 	}
 	return 0;
 }
@@ -569,7 +552,7 @@ iplpoll(dev, events, anyyet, reventsp, phpp)
  */
 /*ARGSUSED*/
 static int
-iplopen(devp, flags, otype, cred)
+ipfopen(devp, flags, otype, cred)
 	dev_t *devp;
 	int flags, otype;
 	cred_t *cred;
@@ -578,7 +561,7 @@ iplopen(devp, flags, otype, cred)
 	int error;
 
 #ifdef	IPFDEBUG
-	cmn_err(CE_CONT, "iplopen(%x,%x,%x,%x)\n", devp, flags, otype, cred);
+	cmn_err(CE_CONT, "ipfopen(%x,%x,%x,%x)\n", devp, flags, otype, cred);
 #endif
 	if (!(otype & OTYP_CHR))
 		return ENXIO;
@@ -612,7 +595,7 @@ iplopen(devp, flags, otype, cred)
 
 /*ARGSUSED*/
 static int
-iplclose(dev, flags, otype, cred)
+ipfclose(dev, flags, otype, cred)
 	dev_t dev;
 	int flags, otype;
 	cred_t *cred;
@@ -629,23 +612,23 @@ iplclose(dev, flags, otype, cred)
 
 
 /*
- * iplread/ipllog
+ * ipfread/ipllog
  * both of these must operate with at least splnet() lest they be
  * called during packet processing and cause an inconsistancy to appear in
  * the filter lists.
  */
 /*ARGSUSED*/
 static int
-iplread(dev, uio, cp)
+ipfread(dev, uio, cp)
 	dev_t dev;
 	register struct uio *uio;
 	cred_t *cp;
 {
 #ifdef	IPFDEBUG
-	cmn_err(CE_CONT, "iplread(%x,%x,%x)\n", dev, uio, cp);
+	cmn_err(CE_CONT, "ipfread(%x,%x,%x)\n", dev, uio, cp);
 #endif
 
-	if (ipf_running < 1)
+	if (ipfmain.ipf_running < 1)
 		return EIO;
 
 #ifdef	IPFILTER_SYNC
@@ -662,22 +645,22 @@ iplread(dev, uio, cp)
 
 
 /*
- * iplread/ipllog
+ * ipfread/ipllog
  * both of these must operate with at least splnet() lest they be
  * called during packet processing and cause an inconsistancy to appear in
  * the filter lists.
  */
 static int
-iplwrite(dev, uio, cp)
+ipfwrite(dev, uio, cp)
 	dev_t dev;
 	register struct uio *uio;
 	cred_t *cp;
 {
 #ifdef	IPFDEBUG
-	cmn_err(CE_CONT, "iplwrite(%x,%x,%x)\n", dev, uio, cp);
+	cmn_err(CE_CONT, "ipfwrite(%x,%x,%x)\n", dev, uio, cp);
 #endif
 
-	if (ipf_running < 1)
+	if (ipfmain.ipf_running < 1)
 		return EIO;
 
 #ifdef	IPFILTER_SYNC

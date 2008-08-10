@@ -91,26 +91,34 @@ void panic __P((char *str));
 # define	max	MAX
 #endif
 
-int	max_keylen = 16;
-static struct radix_mask *rn_mkfreelist;
-static struct radix_node_head *mask_rnhead;
-static char *addmask_key;
+typedef struct radix_softc_s {
+	int			max_keylen;
+	struct ipf_radix_mask	*rn_mkfreelist;
+	struct ipf_radix_node_head	*mask_rnhead;
+	u_char			*addmask_key;
+	u_char			*rn_zeros;
+	u_char			*rn_ones;
+#ifdef RN_DEBUG
+	int			rn_nodenum;
+	struct ipf_radix_node	*rn_clist;
+	int			rn_saveinfo;
+	int			rn_debug;
+#endif
+} radix_softc_t;
+
 static u_char normal_chars[] = {0, 0x80, 0xc0, 0xe0, 0xf0, 0xf8, 0xfc, 0xfe, 0xff};
-static char *rn_zeros = NULL, *rn_ones = NULL;
 
-#define rn_masktop (mask_rnhead->rnh_treetop)
-#undef Bcmp
-#define Bcmp(a, b, l) (l == 0 ? 0 : bcmp((caddr_t)(a), (caddr_t)(b), (u_long)l))
+#undef bcmp
+#define bcmp(a, b, l) (l == 0 ? 0 : bcmp((void *)(a), (void *)(b), (u_long)l))
 
-static int rn_satisfies_leaf __P((char *, struct radix_node *, int));
-static int rn_lexobetter __P((void *, void *));
-static struct radix_mask *rn_new_radix_mask __P((struct radix_node *,
-    struct radix_mask *));
-static int rn_freenode __P((struct radix_node *, void *));
+static int ipf_rn_satisfies_leaf __P((radix_softc_t *, u_char *, struct ipf_radix_node *, int));
+static int ipf_rn_lexobetter __P((void *, void *));
+static struct ipf_radix_mask *ipf_rn_new_ipf_radix_mask __P((radix_softc_t *, struct ipf_radix_node *,
+    struct ipf_radix_mask *));
+static int ipf_rn_freenode __P((void *, struct ipf_radix_node *, void *));
 #if defined(AIX) && !defined(_KERNEL)
-struct radix_node *rn_match __P((void *, struct radix_node_head *));
-struct radix_node *rn_addmask __P((int, int, void *));
-#define	FreeS(x, y)	KFREES(x, y)
+struct ipf_radix_node *ipf_rn_match __P((void *, struct ipf_radix_node_head *));
+struct ipf_radix_node *ipf_rn_addmask __P((radix_softc_t *, void *, int, int));
 #define	Bcopy(x, y, z)	bcopy(x, y, z)
 #endif
 
@@ -148,13 +156,13 @@ struct radix_node *rn_addmask __P((int, int, void *));
  * that governs a subtree.
  */
 
-struct radix_node *
-rn_search(v_arg, head)
+struct ipf_radix_node *
+ipf_rn_search(v_arg, head)
 	void *v_arg;
-	struct radix_node *head;
+	struct ipf_radix_node *head;
 {
-	struct radix_node *x;
-	caddr_t v;
+	struct ipf_radix_node *x;
+	u_char *v;
 
 	for (x = head, v = v_arg; x->rn_b >= 0;) {
 		if (x->rn_bmask & v[x->rn_off])
@@ -165,13 +173,13 @@ rn_search(v_arg, head)
 	return (x);
 }
 
-struct radix_node *
-rn_search_m(v_arg, head, m_arg)
-	struct radix_node *head;
+struct ipf_radix_node *
+ipf_rn_search_m(v_arg, head, m_arg)
+	struct ipf_radix_node *head;
 	void *v_arg, *m_arg;
 {
-	struct radix_node *x;
-	caddr_t v = v_arg, m = m_arg;
+	struct ipf_radix_node *x;
+	u_char *v = v_arg, *m = m_arg;
 
 	for (x = head; x->rn_b >= 0;) {
 		if ((x->rn_bmask & m[x->rn_off]) &&
@@ -184,11 +192,11 @@ rn_search_m(v_arg, head, m_arg)
 }
 
 int
-rn_refines(m_arg, n_arg)
+ipf_rn_refines(m_arg, n_arg)
 	void *m_arg, *n_arg;
 {
-	caddr_t m = m_arg, n = n_arg;
-	caddr_t lim, lim2 = lim = n + *(u_char *)n;
+	u_char *m = m_arg, *n = n_arg;
+	u_char *lim, *lim2 = lim = n + *(u_char *)n;
 	int longer = (*(u_char *)n++) - (int)(*(u_char *)m++);
 	int masks_are_equal = 1;
 
@@ -210,20 +218,22 @@ rn_refines(m_arg, n_arg)
 	return (!masks_are_equal);
 }
 
-struct radix_node *
-rn_lookup(v_arg, m_arg, head)
-	void *v_arg, *m_arg;
-	struct radix_node_head *head;
+struct ipf_radix_node *
+ipf_rn_lookup(soft, v_arg, m_arg, head)
+	void *soft, *v_arg, *m_arg;
+	struct ipf_radix_node_head *head;
 {
-	struct radix_node *x;
-	caddr_t netmask = 0;
+	radix_softc_t *softr = soft;
+	struct ipf_radix_node *x;
+	u_char *netmask = 0;
 
 	if (m_arg) {
-		if ((x = rn_addmask(m_arg, 1, head->rnh_treetop->rn_off)) == 0)
+		if ((x = ipf_rn_addmask(softr, m_arg, 1,
+					head->rnh_treetop->rn_off)) == 0)
 			return (0);
 		netmask = x->rn_key;
 	}
-	x = rn_match(v_arg, head);
+	x = ipf_rn_match(soft, v_arg, head);
 	if (x && netmask) {
 		while (x && x->rn_mask != netmask)
 			x = x->rn_dupedkey;
@@ -232,17 +242,18 @@ rn_lookup(v_arg, m_arg, head)
 }
 
 static int
-rn_satisfies_leaf(trial, leaf, skip)
-	char *trial;
-	struct radix_node *leaf;
+ipf_rn_satisfies_leaf(softr, trial, leaf, skip)
+	radix_softc_t *softr;
+	u_char *trial;
+	struct ipf_radix_node *leaf;
 	int skip;
 {
-	char *cp = trial, *cp2 = leaf->rn_key, *cp3 = leaf->rn_mask;
-	char *cplim;
+	u_char *cp = trial, *cp2 = leaf->rn_key, *cp3 = leaf->rn_mask;
+	u_char *cplim;
 	int length = min(*(u_char *)cp, *(u_char *)cp2);
 
 	if (cp3 == 0)
-		cp3 = rn_ones;
+		cp3 = softr->rn_ones;
 	else
 		length = min(length, *(u_char *)cp3);
 	cplim = cp + length;
@@ -254,16 +265,17 @@ rn_satisfies_leaf(trial, leaf, skip)
 	return 1;
 }
 
-struct radix_node *
-rn_match(v_arg, head)
-	void *v_arg;
-	struct radix_node_head *head;
+struct ipf_radix_node *
+ipf_rn_match(soft, v_arg, head)
+	void *soft, *v_arg;
+	struct ipf_radix_node_head *head;
 {
-	caddr_t v = v_arg;
-	struct radix_node *t = head->rnh_treetop, *x;
-	caddr_t cp = v, cp2;
-	caddr_t cplim;
-	struct radix_node *saved_t, *top = t;
+	radix_softc_t *softr = soft;
+	u_char *v = v_arg;
+	struct ipf_radix_node *t = head->rnh_treetop, *x;
+	u_char *cp = v, *cp2;
+	u_char *cplim;
+	struct ipf_radix_node *saved_t, *top = t;
 	int off = t->rn_off, vlen = *(u_char *)cp, matched_off;
 	int test, b, rn_b;
 
@@ -324,12 +336,12 @@ on1:
 		if (t->rn_flags & RNF_NORMAL) {
 			if (rn_b <= t->rn_b)
 				return t;
-		} else if (rn_satisfies_leaf(v, t, matched_off))
+		} else if (ipf_rn_satisfies_leaf(softr, v, t, matched_off))
 				return t;
 	t = saved_t;
 	/* start searching up the tree */
 	do {
-		struct radix_mask *m;
+		struct ipf_radix_mask *m;
 		t = t->rn_p;
 		m = t->rn_mklist;
 		if (m) {
@@ -345,10 +357,10 @@ on1:
 						return (m->rm_leaf);
 				} else {
 					off = min(t->rn_off, matched_off);
-					x = rn_search_m(v, t, m->rm_mask);
+					x = ipf_rn_search_m(v, t, m->rm_mask);
 					while (x && x->rn_mask != m->rm_mask)
 						x = x->rn_dupedkey;
-					if (x && rn_satisfies_leaf(v, x, off))
+					if (x && ipf_rn_satisfies_leaf(softr, v, x, off))
 						return x;
 				}
 				m = m->rm_mklist;
@@ -358,26 +370,20 @@ on1:
 	return 0;
 }
 
-#ifdef RN_DEBUG
-int	rn_nodenum;
-struct	radix_node *rn_clist;
-int	rn_saveinfo;
-int	rn_debug =  1;
-#endif
 
-struct radix_node *
-rn_newpair(v, b, nodes)
+struct ipf_radix_node *
+ipf_rn_newpair(v, b, nodes)
 	void *v;
 	int b;
-	struct radix_node nodes[2];
+	struct ipf_radix_node nodes[2];
 {
-	struct radix_node *tt = nodes, *t = tt + 1;
+	struct ipf_radix_node *tt = nodes, *t = tt + 1;
 	t->rn_b = b;
 	t->rn_bmask = 0x80 >> (b & 7);
 	t->rn_l = tt;
 	t->rn_off = b >> 3;
 	tt->rn_b = -1;
-	tt->rn_key = (caddr_t)v;
+	tt->rn_key = (void *)v;
 	tt->rn_p = t;
 	tt->rn_flags = t->rn_flags = RNF_ACTIVE;
 #ifdef RN_DEBUG
@@ -390,32 +396,32 @@ rn_newpair(v, b, nodes)
 	return t;
 }
 
-struct radix_node *
-rn_insert(v_arg, head, dupentry, nodes)
-	void *v_arg;
-	struct radix_node_head *head;
+struct ipf_radix_node *
+ipf_rn_insert(soft, v_arg, head, dupentry, nodes)
+	void *soft, *v_arg;
+	struct ipf_radix_node_head *head;
 	int *dupentry;
-	struct radix_node nodes[2];
+	struct ipf_radix_node nodes[2];
 {
-	caddr_t v = v_arg;
-	struct radix_node *top = head->rnh_treetop;
+	u_char *v = v_arg;
+	struct ipf_radix_node *top = head->rnh_treetop;
 	int head_off = top->rn_off, vlen = (int)*((u_char *)v);
-	struct radix_node *t = rn_search(v_arg, top);
-	caddr_t cp = v + head_off;
+	struct ipf_radix_node *t = ipf_rn_search(v_arg, top);
+	u_char *cp = v + head_off;
 	int b;
-	struct radix_node *tt;
+	struct ipf_radix_node *tt;
 
 #ifdef	RN_DEBUG
-	if (rn_debug)
+	if (softr->rn_debug)
 		log(LOG_DEBUG, "rn_insert(%p,%p,%p,%p)\n", v_arg, head, dupentry, nodes);
 #endif
     	/*
 	 * Find first bit at which v and t->rn_key differ
 	 */
     {
-	caddr_t cp2 = t->rn_key + head_off;
+	u_char *cp2 = t->rn_key + head_off;
 	int cmp_res;
-	caddr_t cplim = v + vlen;
+	u_char *cplim = v + vlen;
 
 	while (cp < cplim)
 		if (*cp2++ != *cp++)
@@ -429,7 +435,7 @@ on1:
 		cmp_res >>= 1;
     }
     {
-	struct radix_node *p, *x = top;
+	struct ipf_radix_node *p, *x = top;
 	cp = v;
 	do {
 		p = x;
@@ -439,10 +445,10 @@ on1:
 			x = x->rn_l;
 	} while (b > (unsigned) x->rn_b); /* x->rn_b < b && x->rn_b >= 0 */
 #ifdef RN_DEBUG
-	if (rn_debug)
+	if (softr->rn_debug)
 		log(LOG_DEBUG, "rn_insert: Going In:\n"); // traverse(p);
 #endif
-	t = rn_newpair(v_arg, b, nodes);
+	t = ipf_rn_newpair(v_arg, b, nodes);
 	tt = t->rn_l;
 	if ((cp[p->rn_off] & p->rn_bmask) == 0)
 		p->rn_l = t;
@@ -457,72 +463,73 @@ on1:
 		t->rn_l = x;
 	}
 #ifdef RN_DEBUG
-	if (rn_debug)
+	if (softr->rn_debug)
 		log(LOG_DEBUG, "rn_insert: Coming Out:\n"); // traverse(p);
 #endif
     }
 	return (tt);
 }
 
-struct radix_node *
-rn_addmask(n_arg, search, skip)
+struct ipf_radix_node *
+ipf_rn_addmask(soft, n_arg, search, skip)
 	int search, skip;
-	void *n_arg;
+	void *soft, *n_arg;
 {
-	caddr_t netmask = (caddr_t)n_arg;
-	struct radix_node *x;
-	caddr_t cp, cplim;
+	radix_softc_t *softr = soft;
+	u_char  *netmask = (u_char *)n_arg;
+	struct ipf_radix_node *x;
+	u_char *cp, *cplim;
 	int b = 0, mlen, j;
 	int maskduplicated, m0, isnormal;
-	struct radix_node *saved_x;
+	struct ipf_radix_node *saved_x;
 	static int last_zeroed = 0;
 
 #ifdef	RN_DEBUG
-	if (rn_debug)
+	if (softr->rn_debug)
 		log(LOG_DEBUG, "rn_addmask(%p,%d,%d)\n", n_arg, search, skip);
 #endif
 	mlen = *(u_char *)netmask;
-	if ((mlen = *(u_char *)netmask) > max_keylen)
-		mlen = max_keylen;
+	if ((mlen = *(u_char *)netmask) > softr->max_keylen)
+		mlen = softr->max_keylen;
 	if (skip == 0)
 		skip = 1;
 	if (mlen <= skip)
-		return (mask_rnhead->rnh_nodes);
+		return (softr->mask_rnhead->rnh_nodes);
 	if (skip > 1)
-		Bcopy(rn_ones + 1, addmask_key + 1, skip - 1);
+		Bcopy(softr->rn_ones + 1, softr->addmask_key + 1, skip - 1);
 	if ((m0 = mlen) > skip)
-		Bcopy(netmask + skip, addmask_key + skip, mlen - skip);
+		Bcopy(netmask + skip, softr->addmask_key + skip, mlen - skip);
 	/*
 	 * Trim trailing zeroes.
 	 */
-	for (cp = addmask_key + mlen; (cp > addmask_key) && cp[-1] == 0;)
+	for (cp = softr->addmask_key + mlen; (cp > softr->addmask_key) && cp[-1] == 0;)
 		cp--;
-	mlen = cp - addmask_key;
+	mlen = cp - softr->addmask_key;
 	if (mlen <= skip) {
 		if (m0 >= last_zeroed)
 			last_zeroed = mlen;
-		return (mask_rnhead->rnh_nodes);
+		return (softr->mask_rnhead->rnh_nodes);
 	}
 	if (m0 < last_zeroed)
-		Bzero(addmask_key + m0, last_zeroed - m0);
-	*addmask_key = last_zeroed = mlen;
-	x = rn_search(addmask_key, rn_masktop);
-	if (Bcmp(addmask_key, x->rn_key, mlen) != 0)
+		bzero(softr->addmask_key + m0, last_zeroed - m0);
+	*softr->addmask_key = last_zeroed = mlen;
+	x = ipf_rn_search(softr->addmask_key, softr->mask_rnhead->rnh_treetop);
+	if (bcmp(softr->addmask_key, x->rn_key, mlen) != 0)
 		x = 0;
 	if (x || search)
 		return (x);
-	R_Malloc(x, struct radix_node *, max_keylen + 2 * sizeof (*x));
+	KMALLOCS(x, struct ipf_radix_node *, softr->max_keylen + 2 * sizeof (*x));
 	if ((saved_x = x) == 0)
 		return (0);
-	Bzero(x, max_keylen + 2 * sizeof (*x));
-	netmask = cp = (caddr_t)(x + 2);
-	Bcopy(addmask_key, cp, mlen);
-	x = rn_insert(cp, mask_rnhead, &maskduplicated, x);
+	bzero(x, softr->max_keylen + 2 * sizeof (*x));
+	netmask = cp = (u_char *)(x + 2);
+	Bcopy(softr->addmask_key, cp, mlen);
+	x = ipf_rn_insert(soft, cp, softr->mask_rnhead, &maskduplicated, x);
 	if (maskduplicated) {
 #if 0
 		log(LOG_ERR, "rn_addmask: mask impossibly already in tree\n");
 #endif
-		Free(saved_x);
+		KFREE(saved_x);
 		return (x);
 	}
 	/*
@@ -546,7 +553,7 @@ rn_addmask(n_arg, search, skip)
 }
 
 static int	/* XXX: arbitrary ordering for non-contiguous masks */
-rn_lexobetter(m_arg, n_arg)
+ipf_rn_lexobetter(m_arg, n_arg)
 	void *m_arg, *n_arg;
 {
 	u_char *mp = m_arg, *np = n_arg, *lim;
@@ -560,21 +567,22 @@ rn_lexobetter(m_arg, n_arg)
 	return 0;
 }
 
-static struct radix_mask *
-rn_new_radix_mask(tt, next)
-	struct radix_node *tt;
-	struct radix_mask *next;
+static struct ipf_radix_mask *
+ipf_rn_new_ipf_radix_mask(softr, tt, next)
+	radix_softc_t *softr;
+	struct ipf_radix_node *tt;
+	struct ipf_radix_mask *next;
 {
-	struct radix_mask *m;
+	struct ipf_radix_mask *m;
 
-	MKGet(m);
+	MKGet(softr, m);
 	if (m == 0) {
 #if 0
 		log(LOG_ERR, "Mask for route not entered\n");
 #endif
 		return (0);
 	}
-	Bzero(m, sizeof *m);
+	bzero(m, sizeof *m);
 	m->rm_b = tt->rn_b;
 	m->rm_flags = tt->rn_flags;
 	if (tt->rn_flags & RNF_NORMAL)
@@ -586,22 +594,23 @@ rn_new_radix_mask(tt, next)
 	return m;
 }
 
-struct radix_node *
-rn_addroute(v_arg, n_arg, head, treenodes)
-	void *v_arg, *n_arg;
-	struct radix_node_head *head;
-	struct radix_node treenodes[2];
+struct ipf_radix_node *
+ipf_rn_addroute(soft, v_arg, n_arg, head, treenodes)
+	void *soft, *v_arg, *n_arg;
+	struct ipf_radix_node_head *head;
+	struct ipf_radix_node treenodes[2];
 {
-	caddr_t v = (caddr_t)v_arg, netmask = (caddr_t)n_arg;
-	struct radix_node *t, *x = NULL, *tt;
-	struct radix_node *saved_tt, *top = head->rnh_treetop;
+	radix_softc_t *softr = soft;
+	u_char *v = (u_char *)v_arg, *netmask = (u_char *)n_arg;
+	struct ipf_radix_node *t, *x = NULL, *tt;
+	struct ipf_radix_node *saved_tt, *top = head->rnh_treetop;
 	short b = 0, b_leaf = 0;
 	int keyduplicated;
-	caddr_t mmask;
-	struct radix_mask *m, **mp;
+	u_char *mmask;
+	struct ipf_radix_mask *m, **mp;
 
 #ifdef	RN_DEBUG
-	if (rn_debug)
+	if (softr->rn_debug)
 		log(LOG_DEBUG, "rn_addroute(%p,%p,%p,%p)\n", v_arg, n_arg, head, treenodes);
 #endif
 	/*
@@ -612,7 +621,7 @@ rn_addroute(v_arg, n_arg, head, treenodes)
 	 * nodes and possibly save time in calculating indices.
 	 */
 	if (netmask) {
-		if ((x = rn_addmask(netmask, 0, top->rn_off)) == 0)
+		if ((x = ipf_rn_addmask(softr, netmask, 0, top->rn_off)) == 0)
 			return (0);
 		b_leaf = x->rn_b;
 		b = -1 - x->rn_b;
@@ -621,7 +630,7 @@ rn_addroute(v_arg, n_arg, head, treenodes)
 	/*
 	 * Deal with duplicated keys: attach node to previous instance
 	 */
-	saved_tt = tt = rn_insert(v, head, &keyduplicated, treenodes);
+	saved_tt = tt = ipf_rn_insert(soft, v, head, &keyduplicated, treenodes);
 	if (keyduplicated) {
 		for (t = tt; tt; t = tt, tt = tt->rn_dupedkey) {
 			if (tt->rn_mask == netmask)
@@ -629,8 +638,8 @@ rn_addroute(v_arg, n_arg, head, treenodes)
 			if (netmask == 0 ||
 			    (tt->rn_mask &&
 			     ((b_leaf < tt->rn_b) || /* index(netmask) > node */
-			       rn_refines(netmask, tt->rn_mask) ||
-			       rn_lexobetter(netmask, tt->rn_mask))))
+			       ipf_rn_refines(netmask, tt->rn_mask) ||
+			       ipf_rn_lexobetter(netmask, tt->rn_mask))))
 				break;
 		}
 		/*
@@ -647,7 +656,7 @@ rn_addroute(v_arg, n_arg, head, treenodes)
 		 * parent pointer.
 		 */
 		if (tt == saved_tt) {
-			struct	radix_node *xx = x;
+			struct	ipf_radix_node *xx = x;
 			/* link in at head of list */
 			(tt = treenodes)->rn_dupedkey = t;
 			tt->rn_flags = t->rn_flags;
@@ -674,7 +683,7 @@ rn_addroute(v_arg, n_arg, head, treenodes)
 		tt->rn_ybro = rn_clist;
 		rn_clist = tt;
 #endif
-		tt->rn_key = (caddr_t) v;
+		tt->rn_key = (u_char *) v;
 		tt->rn_b = -1;
 		tt->rn_flags = RNF_ACTIVE;
 	}
@@ -698,7 +707,7 @@ rn_addroute(v_arg, n_arg, head, treenodes)
 	if (x->rn_b < 0) {
 	    for (mp = &t->rn_mklist; x; x = x->rn_dupedkey)
 		if (x->rn_mask && (x->rn_b >= b_leaf) && x->rn_mklist == 0) {
-			*mp = m = rn_new_radix_mask(x, 0);
+			*mp = m = ipf_rn_new_ipf_radix_mask(softr, x, 0);
 			if (m)
 				mp = &m->rm_mklist;
 		}
@@ -748,41 +757,42 @@ on2:
 			tt->rn_mklist = m;
 			return tt;
 		}
-		if (rn_refines(netmask, mmask)
-		    || rn_lexobetter(netmask, mmask))
+		if (ipf_rn_refines(netmask, mmask)
+		    || ipf_rn_lexobetter(netmask, mmask))
 			break;
 	}
-	*mp = rn_new_radix_mask(tt, *mp);
+	*mp = ipf_rn_new_ipf_radix_mask(softr, tt, *mp);
 	return tt;
 }
 
-struct radix_node *
-rn_delete(v_arg, netmask_arg, head)
-	void *v_arg, *netmask_arg;
-	struct radix_node_head *head;
+struct ipf_radix_node *
+ipf_rn_delete(soft, v_arg, netmask_arg, head)
+	void *soft, *v_arg, *netmask_arg;
+	struct ipf_radix_node_head *head;
 {
-	struct radix_node *t, *p, *x, *tt;
-	struct radix_mask *m, *saved_m, **mp;
-	struct radix_node *dupedkey, *saved_tt, *top;
-	caddr_t v, netmask;
+	radix_softc_t *softr = soft;
+	struct ipf_radix_node *t, *p, *x, *tt;
+	struct ipf_radix_mask *m, *saved_m, **mp;
+	struct ipf_radix_node *dupedkey, *saved_tt, *top;
+	u_char *v, *netmask;
 	int b, head_off, vlen;
 
 	v = v_arg;
 	netmask = netmask_arg;
 	x = head->rnh_treetop;
-	tt = rn_search(v, x);
+	tt = ipf_rn_search(v, x);
 	head_off = x->rn_off;
 	vlen =  *(u_char *)v;
 	saved_tt = tt;
 	top = x;
 	if (tt == 0 ||
-	    Bcmp(v + head_off, tt->rn_key + head_off, vlen - head_off))
+	    bcmp(v + head_off, tt->rn_key + head_off, vlen - head_off))
 		return (0);
 	/*
 	 * Delete our route from mask lists.
 	 */
 	if (netmask) {
-		if ((x = rn_addmask(netmask, 1, head_off)) == 0)
+		if ((x = ipf_rn_addmask(softr, netmask, 1, head_off)) == 0)
 			return (0);
 		netmask = x->rn_key;
 		while (tt->rn_mask != netmask)
@@ -819,7 +829,7 @@ rn_delete(v_arg, netmask_arg, head)
 	for (mp = &x->rn_mklist; (m = *mp) != NULL; mp = &m->rm_mklist)
 		if (m == saved_m) {
 			*mp = m->rm_mklist;
-			MKFree(m);
+			MKFree(softr, m);
 			break;
 		}
 	if (m == 0) {
@@ -913,10 +923,10 @@ on1:
 			   in the same order attached to our mklist */
 			for (m = t->rn_mklist; m && x; x = x->rn_dupedkey)
 				if (m == x->rn_mklist) {
-					struct radix_mask *mm = m->rm_mklist;
+					struct ipf_radix_mask *mm = m->rm_mklist;
 					x->rn_mklist = 0;
 					if (--(m->rm_refs) < 0)
-						MKFree(m);
+						MKFree(softr, m);
 					m = mm;
 				}
 #if 0
@@ -953,14 +963,15 @@ out:
 }
 
 int
-rn_walktree(h, f, w)
-	struct radix_node_head *h;
-	int (*f) __P((struct radix_node *, void *));
-	void *w;
+ipf_rn_walktree(soft, h, f, w)
+	struct ipf_radix_node_head *h;
+	int (*f) __P((void *, struct ipf_radix_node *, void *));
+	void *soft, *w;
 {
+	radix_softc_t *softr = soft;
 	int error;
-	struct radix_node *base, *next;
-	struct radix_node *rn = h->rnh_treetop;
+	struct ipf_radix_node *base, *next;
+	struct ipf_radix_node *rn = h->rnh_treetop;
 	/*
 	 * This gets complicated because we may delete the node
 	 * while applying the function f to it, so we need to calculate
@@ -982,7 +993,7 @@ rn_walktree(h, f, w)
 		while ((rn = base) != NULL) {
 			base = rn->rn_dupedkey;
 			if (!(rn->rn_flags & RNF_ROOT)
-			    && (error = (*f)(rn, w)))
+			    && (error = (*f)(softr, rn, w)))
 				return (error);
 		}
 		rn = next;
@@ -993,30 +1004,32 @@ rn_walktree(h, f, w)
 }
 
 int
-rn_inithead(head, off)
-	void **head;
+ipf_rn_inithead(soft, head, off)
+	void *soft, **head;
 	int off;
 {
-	struct radix_node_head *rnh;
+	struct ipf_radix_node_head *rnh;
 
 	if (*head)
 		return (1);
-	R_Malloc(rnh, struct radix_node_head *, sizeof (*rnh));
+	KMALLOCS(rnh, struct ipf_radix_node_head *, sizeof (*rnh));
 	if (rnh == 0)
 		return (0);
 	*head = rnh;
-	return rn_inithead0(rnh, off);
+	return ipf_rn_inithead0(soft, rnh, off);
 }
 
 int
-rn_inithead0(rnh, off)
-	struct radix_node_head *rnh;
+ipf_rn_inithead0(soft, rnh, off)
+	void *soft;
+	struct ipf_radix_node_head *rnh;
 	int off;
 {
-	struct radix_node *t, *tt, *ttt;
+	radix_softc_t *softr = soft;
+	struct ipf_radix_node *t, *tt, *ttt;
 
-	Bzero(rnh, sizeof (*rnh));
-	t = rn_newpair(rn_zeros, off, rnh->rnh_nodes);
+	bzero(rnh, sizeof (*rnh));
+	t = ipf_rn_newpair(softr->rn_zeros, off, rnh->rnh_nodes);
 	ttt = rnh->rnh_nodes + 2;
 	t->rn_r = ttt;
 	t->rn_p = t;
@@ -1024,63 +1037,81 @@ rn_inithead0(rnh, off)
 	tt->rn_flags = t->rn_flags = RNF_ROOT | RNF_ACTIVE;
 	tt->rn_b = -1 - off;
 	*ttt = *tt;
-	ttt->rn_key = rn_ones;
-	rnh->rnh_addaddr = rn_addroute;
-	rnh->rnh_deladdr = rn_delete;
-	rnh->rnh_matchaddr = rn_match;
-	rnh->rnh_lookup = rn_lookup;
-	rnh->rnh_walktree = rn_walktree;
+	ttt->rn_key = softr->rn_ones;
+	rnh->rnh_addaddr = ipf_rn_addroute;
+	rnh->rnh_deladdr = ipf_rn_delete;
+	rnh->rnh_matchaddr = ipf_rn_match;
+	rnh->rnh_lookup = ipf_rn_lookup;
+	rnh->rnh_walktree = ipf_rn_walktree;
 	rnh->rnh_treetop = t;
 	return (1);
 }
 
-void
-rn_init()
+void *
+ipf_rn_create()
 {
-	char *cp, *cplim;
+	radix_softc_t *softr;
 
-	if (max_keylen == 0) {
-#if 0
-		log(LOG_ERR,
-		    "rn_init: radix functions require max_keylen be set\n");
+	KMALLOC(softr, radix_softc_t *);
+	if (softr == NULL)
+		return NULL;
+
+	bzero((char *)softr, sizeof(*softr));
+
+	softr->max_keylen = sizeof(addrfamily_t);
+#ifdef RN_DEBUG
+	softr->rn_debug = 1;
 #endif
-		return;
+
+	return softr;
+}
+
+
+void
+ipf_rn_init(soft)
+	void *soft;
+{
+	radix_softc_t *softr = soft;
+	u_char *cp, *cplim;
+
+	if (softr->rn_zeros == NULL) {
+		KMALLOCS(softr->rn_zeros, u_char *, 3 * softr->max_keylen);
 	}
-	if (rn_zeros == NULL) {
-		R_Malloc(rn_zeros, char *, 3 * max_keylen);
-	}
-	if (rn_zeros == NULL)
+	if (softr->rn_zeros == NULL)
 		panic("rn_init");
-	Bzero(rn_zeros, 3 * max_keylen);
-	rn_ones = cp = rn_zeros + max_keylen;
-	addmask_key = cplim = rn_ones + max_keylen;
+
+	bzero(softr->rn_zeros, 3 * softr->max_keylen);
+
+	softr->rn_ones = cp = softr->rn_zeros + softr->max_keylen;
+	softr->addmask_key = cplim = softr->rn_ones + softr->max_keylen;
 	while (cp < cplim)
 		*cp++ = -1;
-	if (rn_inithead((void *)&mask_rnhead, 0) == 0)
+
+	if (ipf_rn_inithead(softr, (void *)&softr->mask_rnhead, 0) == 0)
 		panic("rn_init 2");
 }
 
 
 static int
-rn_freenode(struct radix_node *n, void *p)
+ipf_rn_freenode(void *soft, struct ipf_radix_node *n, void *p)
 {
-	struct radix_node_head *rnh = p;
-	struct radix_node *d;
+	radix_softc_t *softr = soft;
+	struct ipf_radix_node_head *rnh = p;
+	struct ipf_radix_node *d;
 
-	d = rnh->rnh_deladdr(n->rn_key, NULL, rnh);
+	d = rnh->rnh_deladdr(softr, n->rn_key, NULL, rnh);
 	if (d != NULL) {
-		FreeS(d, max_keylen + 2 * sizeof (*d));
+		KFREES(d, softr->max_keylen + 2 * sizeof (*d));
 	}
 	return 0;
 }
 
 
 void
-rn_freehead(rnh)
-      struct radix_node_head *rnh;
+ipf_rn_freehead(void *soft, struct ipf_radix_node_head *rnh)
 {
 
-	(void)rn_walktree(rnh, rn_freenode, rnh);
+	(void)ipf_rn_walktree(soft, rnh, ipf_rn_freenode, rnh);
 
 	rnh->rnh_addaddr = NULL;
 	rnh->rnh_deladdr = NULL;
@@ -1088,29 +1119,34 @@ rn_freehead(rnh)
 	rnh->rnh_lookup = NULL;
 	rnh->rnh_walktree = NULL;
 
-	Free(rnh);
+        KFREE(rnh);
+
 }
 
 
 void
-rn_fini()
+ipf_rn_destroy(soft)
+	void *soft;
 {
-	struct radix_mask *m;
+	radix_softc_t *softr = soft;
+	struct ipf_radix_mask *m;
 
-	if (rn_zeros != NULL) {
-		FreeS(rn_zeros, 3 * max_keylen);
-		rn_zeros = NULL;
+	if (softr->rn_zeros != NULL) {
+		KFREES(softr->rn_zeros, 3 * softr->max_keylen);
+		softr->rn_zeros = NULL;
 	}
 
-	if (mask_rnhead != NULL) {
-		rn_freehead(mask_rnhead);
-		mask_rnhead = NULL;
+	if (softr->mask_rnhead != NULL) {
+		ipf_rn_freehead(softr, softr->mask_rnhead);
+		softr->mask_rnhead = NULL;
 	}
 
-	while ((m = rn_mkfreelist) != NULL) {
-		rn_mkfreelist = m->rm_mklist;
+	while ((m = softr->rn_mkfreelist) != NULL) {
+		softr->rn_mkfreelist = m->rm_mklist;
 		KFREE(m);
 	}
+
+	KFREE(softr);
 }
 
 
@@ -1119,14 +1155,14 @@ rn_fini()
 typedef struct myst {
 	addrfamily_t	dst;
 	addrfamily_t	mask;
-	struct radix_node nodes[2];
+	struct ipf_radix_node nodes[2];
 } myst_t;
 
 int
 main(int argc, char *argv[])
 {
-	struct radix_node_head *rnh;
-	struct radix_node *rn;
+	struct ipf_radix_node_head *rnh;
+	struct ipf_radix_node *rn;
 	addrfamily_t af, mf;
 	myst_t st1, st2, *stp;
 
@@ -1134,10 +1170,10 @@ main(int argc, char *argv[])
 	memset(&st2, 0, sizeof(st2));
 	memset(&af, 0, sizeof(af));
 
-	rn_init();
+	ipf_rn_init();
 
 	rnh = NULL;
-	rn_inithead(&rnh, offsetof(addrfamily_t, adf_addr) << 3);
+	ipf_rn_inithead(&rnh, offsetof(addrfamily_t, adf_addr) << 3);
 
 	st1.dst.adf_len = sizeof(st1);
 	st1.mask.adf_len = sizeof(st1);

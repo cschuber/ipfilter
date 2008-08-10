@@ -103,86 +103,382 @@ struct file;
 static const char rcsid[] = "@(#)$Id$";
 #endif
 
-static int appr_fixseqack __P((fr_info_t *, ip_t *, ap_session_t *, int ));
-
 #define	AP_SESS_SIZE	53
 
-#if defined(_KERNEL)
-int		ipf_proxy_debug = 0;
-#else
-int		ipf_proxy_debug = 2;
-#endif
-ap_session_t	*ap_sess_tab[AP_SESS_SIZE];
-ap_session_t	*ap_sess_list = NULL;
-aproxy_t	*ap_proxylist = NULL;
-aproxy_t	ap_proxies[] = {
+static int ipf_proxy_fixseqack __P((fr_info_t *, ip_t *, ap_session_t *, int ));
+static aproxy_t *ipf_proxy_create_clone __P((ipf_main_softc_t *, aproxy_t *));
+
+typedef struct ipf_proxy_softc_s {
+	int		ips_proxy_debug;
+	int		ips_proxy_session_size;
+	ap_session_t	**ips_sess_tab;
+	ap_session_t	*ips_sess_list;
+	aproxy_t	*ips_proxies;
+	int		ips_init_run;
+	ipftuneable_t	*ipf_proxy_tune;
+} ipf_proxy_softc_t;
+
+static ipftuneable_t ipf_proxy_tuneables[] = {
+	{ { (void *)offsetof(ipf_proxy_softc_t, ips_proxy_debug) },
+		"ips_proxy_debug",	0,	10,
+		stsizeof(ipf_proxy_softc_t, ips_proxy_debug),	0,	NULL },
+	{ { NULL },		NULL,			0,	0,
+		0,				0,	NULL }
+};
+
+static	aproxy_t	*ap_proxylist = NULL;
+static	aproxy_t	ips_proxies[] = {
 #ifdef	IPF_FTP_PROXY
-	{ NULL, "ftp", (char)IPPROTO_TCP, 0, 0, ippr_ftp_init, ippr_ftp_fini,
-	  ippr_ftp_new, ippr_ftp_del, ippr_ftp_in, ippr_ftp_out, NULL,
+	{ NULL, NULL, "ftp", (char)IPPROTO_TCP, 0, 0, 0,
+	  ipf_p_ftp_main_load, ipf_p_ftp_main_unload,
+	  ipf_p_ftp_soft_create, ipf_p_ftp_soft_destroy,
+	  NULL, NULL,
+	  ipf_p_ftp_new, ipf_p_ftp_del, ipf_p_ftp_in, ipf_p_ftp_out, NULL,
 	  NULL, NULL },
 #endif
 #ifdef	IPF_IRC_PROXY
-	{ NULL, "irc", (char)IPPROTO_TCP, 0, 0, ippr_irc_init, ippr_irc_fini,
-	  ippr_irc_new, NULL, NULL, ippr_irc_out, NULL, NULL, NULL, NULL },
+	{ NULL, NULL, "irc", (char)IPPROTO_TCP, 0, 0, 0,
+	  ipf_p_irc_main_load, ipf_p_irc_main_unload,
+	  NULL, NULL,
+	  NULL, NULL,
+	  ipf_p_irc_new, NULL, NULL, ipf_p_irc_out, NULL, NULL, NULL, NULL },
 #endif
 #ifdef	IPF_RCMD_PROXY
-	{ NULL, "rcmd", (char)IPPROTO_TCP, 0, 0, ippr_rcmd_init, ippr_rcmd_fini,
-	  ippr_rcmd_new, NULL, ippr_rcmd_in, ippr_rcmd_out, NULL, NULL,
+	{ NULL, NULL, "rcmd", (char)IPPROTO_TCP, 0, 0, 0,
+	  ipf_p_rcmd_main_load, ipf_p_rcmd_main_unload,
+	  NULL, NULL,
+	  NULL, NULL,
+	  ipf_p_rcmd_new, NULL, ipf_p_rcmd_in, ipf_p_rcmd_out, NULL, NULL,
 	  NULL, NULL },
 #endif
 #ifdef	IPF_RAUDIO_PROXY
-	{ NULL, "raudio", (char)IPPROTO_TCP, 0, 0, ippr_raudio_init, ippr_raudio_fini,
-	  ippr_raudio_new, NULL, ippr_raudio_in, ippr_raudio_out, NULL, NULL,
+	{ NULL, NULL, "raudio", (char)IPPROTO_TCP, 0, 0, 0,
+	  ipf_p_raudio_main_load, ipf_p_raudio_main_unload,
+	  NULL, NULL,
+	  NULL, NULL,
+	  ipf_p_raudio_new, NULL, ipf_p_raudio_in, ipf_p_raudio_out, NULL, NULL,
 	  NULL, NULL },
 #endif
 #ifdef	IPF_MSNRPC_PROXY
-	{ NULL, "msnrpc", (char)IPPROTO_TCP, 0, 0, ippr_msnrpc_init, ippr_msnrpc_fini,
-	  ippr_msnrpc_new, NULL, ippr_msnrpc_in, ippr_msnrpc_out, NULL, NULL,
+	{ NULL, NULL, "msnrpc", (char)IPPROTO_TCP, 0, 0, 0,
+	  ipf_p_msnrpc_init, ipf_p_msnrpc_fini,
+	  NULL, NULL,
+	  NULL, NULL,
+	  ipf_p_msnrpc_new, NULL, ipf_p_msnrpc_in, ipf_p_msnrpc_out, NULL, NULL,
 	  NULL, NULL },
 #endif
 #ifdef	IPF_NETBIOS_PROXY
-	{ NULL, "netbios", (char)IPPROTO_UDP, 0, 0, ippr_netbios_init, ippr_netbios_fini,
-	  NULL, NULL, NULL, ippr_netbios_out, NULL, NULL, NULL, NULL },
+	{ NULL, NULL, "netbios", (char)IPPROTO_UDP, 0, 0, 0,
+	  ipf_p_netbios_main_load, ipf_p_netbios_main_unload,
+	  NULL, NULL,
+	  NULL, NULL,
+	  NULL, NULL, NULL, ipf_p_netbios_out, NULL, NULL, NULL, NULL },
 #endif
 #ifdef	IPF_IPSEC_PROXY
-	{ NULL, "ipsec", (char)IPPROTO_UDP, 0, 0,
-	  ippr_ipsec_init, ippr_ipsec_fini, ippr_ipsec_new, ippr_ipsec_del,
-	  ippr_ipsec_inout, ippr_ipsec_inout, ippr_ipsec_match, NULL,
+	{ NULL, NULL, "ipsec", (char)IPPROTO_UDP, 0, 0, 0,
+	  NULL, NULL,
+	  ipf_p_ipsec_soft_create, ipf_p_ipsec_soft_destroy,
+	  ipf_p_ipsec_soft_init, ipf_p_ipsec_soft_fini,
+	  ipf_p_ipsec_new, ipf_p_ipsec_del,
+	  ipf_p_ipsec_inout, ipf_p_ipsec_inout, ipf_p_ipsec_match, NULL,
 	  NULL, NULL },
 #endif
 #ifdef	IPF_DNS_PROXY
-	{ NULL, "dns", (char)IPPROTO_UDP, 0, 0,
-	  ippr_dns_init, ippr_dns_fini, ippr_dns_new, ippr_ipsec_del,
-	  ippr_dns_inout, ippr_dns_inout, ippr_dns_match, NULL,
+	{ NULL, NULL, "dns", (char)IPPROTO_UDP, 0, 0, 0,
+	  ipf_p_dns_init, ipf_p_dns_fini, ipf_p_dns_new, ipf_p_ipsec_del,
+	  ipf_p_dns_inout, ipf_p_dns_inout, ipf_p_dns_match, NULL,
 	  NULL, NULL },
 #endif
 #ifdef	IPF_PPTP_PROXY
-	{ NULL, "pptp", (char)IPPROTO_TCP, 0, 0,
-	  ippr_pptp_init, ippr_pptp_fini, ippr_pptp_new, ippr_pptp_del,
-	  ippr_pptp_inout, ippr_pptp_inout, NULL, NULL, NULL, NULL },
+	{ NULL, NULL, "pptp", (char)IPPROTO_TCP, 0, 0, 0,
+	  ipf_p_pptp_main_load, ipf_p_pptp_main_unload,
+	  NULL, NULL,
+	  NULL, NULL,
+	  ipf_p_pptp_new, ipf_p_pptp_del,
+	  ipf_p_pptp_inout, ipf_p_pptp_inout, NULL, NULL, NULL, NULL },
 #endif
 #ifdef  IPF_H323_PROXY
-	{ NULL, "h323", (char)IPPROTO_TCP, 0, 0, ippr_h323_init, ippr_h323_fini,
-	  ippr_h323_new, ippr_h323_del, ippr_h323_in, NULL, NULL, NULL, NULL },
-	{ NULL, "h245", (char)IPPROTO_TCP, 0, 0, NULL, NULL,
-	  ippr_h245_new, NULL, NULL, ippr_h245_out, NULL, NULL, NULL },
+	{ NULL, NULL, "h323", (char)IPPROTO_TCP, 0, 0, 0,
+	  ipf_p_h323_main_load, ipf_p_h323_main_unload,
+	  NULL, NULL,
+	  NULL, NULL,
+	  ipf_p_h323_new, ipf_p_h323_del, ipf_p_h323_in, NULL, NULL, NULL, NULL },
+	{ NULL, NULL, "h245", (char)IPPROTO_TCP, 0, 0, 0, NULL, NULL,
+	  NULL, NULL,
+	  NULL, NULL,
+	  ipf_p_h245_new, NULL, NULL, ipf_p_h245_out, NULL, NULL, NULL },
 #endif
 #ifdef	IPF_RPCB_PROXY
 # ifndef _KERNEL
-	{ NULL, "rpcbt", (char)IPPROTO_TCP, 0, 0,
-	  ippr_rpcb_init, ippr_rpcb_fini, ippr_rpcb_new, ippr_rpcb_del,
-	  ippr_rpcb_in, ippr_rpcb_out, NULL, NULL, NULL, NULL },
+	{ NULL, NULL, "rpcbt", (char)IPPROTO_TCP, 0, 0, 0,
+	  ipf_p_rpcb_main_load, ipf_p_rpcb_main_unload,
+	  NULL, NULL,
+	  NULL, NULL,
+	  ipf_p_rpcb_new, ipf_p_rpcb_del,
+	  ipf_p_rpcb_in, ipf_p_rpcb_out, NULL, NULL, NULL, NULL },
 # endif
-	{ NULL, "rpcbu", (char)IPPROTO_UDP, 0, 0,
-	  ippr_rpcb_init, ippr_rpcb_fini, ippr_rpcb_new, ippr_rpcb_del,
-	  ippr_rpcb_in, ippr_rpcb_out, NULL, NULL, NULL, NULL },
+	{ NULL, NULL, "rpcbu", (char)IPPROTO_UDP, 0, 0, 0,
+	  ipf_p_rpcb_main_load, ipf_p_rpcb_main_unload,
+	  NULL, NULL,
+	  NULL, NULL,
+	  ipf_p_rpcb_new, ipf_p_rpcb_del,
+	  ipf_p_rpcb_in, ipf_p_rpcb_out, NULL, NULL, NULL, NULL },
 #endif
-	{ NULL, "", '\0', 0, 0, NULL, NULL, NULL, NULL, NULL, NULL }
+	{ NULL, NULL, "", '\0', 0, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL }
 };
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    appr_add                                                    */
+/* Function:    ipf_proxy_init                                              */
+/* Returns:     int - -1 == error, 0 == success                             */
+/* Parameters:  fin(I) - pointer to packet information                      */
+/*              nat(I) - pointer to current NAT session                     */
+/*                                                                          */
+/* Initialise hook for kernel application proxies.                          */
+/* Call the initialise routine for all the compiled in kernel proxies.      */
+/* ------------------------------------------------------------------------ */
+int
+ipf_proxy_main_load()
+{
+	aproxy_t *ap;
+
+	for (ap = ips_proxies; ap->apr_p; ap++) {
+		if (ap->apr_load != NULL)
+			(*ap->apr_load)();
+	}
+	return 0;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_proxy_unload                                            */
+/* Returns:     Nil                                                         */
+/* Parameters:  Nil                                                         */
+/*                                                                          */
+/* Unload hook for kernel application proxies.                              */
+/* Call the finialise routine for all the compiled in kernel proxies.       */
+/* ------------------------------------------------------------------------ */
+int
+ipf_proxy_main_unload()
+{
+	aproxy_t *ap;
+
+	for (ap = ips_proxies; ap->apr_p; ap++)
+		if (ap->apr_unload != NULL)
+			(*ap->apr_unload)();
+	for (ap = ap_proxylist; ap; ap = ap->apr_next)
+		if (ap->apr_unload != NULL)
+			(*ap->apr_unload)();
+
+	return 0;
+}
+
+
+void *
+ipf_proxy_soft_create(softc)
+	ipf_main_softc_t *softc;
+{
+	ipf_proxy_softc_t *softp;
+	aproxy_t *last;
+	aproxy_t *apn;
+	aproxy_t *ap;
+
+	KMALLOC(softp, ipf_proxy_softc_t *);
+	if (softp == NULL)
+		return softp;
+
+	bzero((char *)softp, sizeof(*softp));
+
+#if defined(_KERNEL)
+	softp->ips_proxy_debug = 0;
+#else
+	softp->ips_proxy_debug = 2;
+#endif
+	softp->ips_proxy_session_size = AP_SESS_SIZE;
+
+	softp->ipf_proxy_tune = ipf_tune_array_copy(softp,
+						    sizeof(ipf_proxy_tuneables),
+						    ipf_proxy_tuneables);
+	if (softp->ipf_proxy_tune == NULL) {
+		ipf_proxy_soft_destroy(softc, softp);
+		return NULL;
+	}
+	if (ipf_tune_array_link(softc, softp->ipf_proxy_tune) == -1) {
+		ipf_proxy_soft_destroy(softc, softp);
+		return NULL;
+	}
+
+	last = NULL;
+	for (ap = ips_proxies; ap->apr_p; ap++) {
+		apn = ipf_proxy_create_clone(softc, ap);
+		if (apn == NULL)
+			goto failed;
+		if (last != NULL)
+			last->apr_next = apn;
+		else
+			softp->ips_proxies = apn;
+		last = apn;
+	}
+	for (ap = ips_proxies; ap != NULL; ap = ap->apr_next) {
+		apn = ipf_proxy_create_clone(softc, ap);
+		if (apn == NULL)
+			goto failed;
+		if (last != NULL)
+			last->apr_next = apn;
+		else
+			softp->ips_proxies = apn;
+		last = apn;
+	}
+
+	return softp;
+failed:
+	ipf_proxy_soft_destroy(softc, softp);
+	return NULL;
+}
+
+
+static aproxy_t *
+ipf_proxy_create_clone(softc, orig)
+	ipf_main_softc_t *softc;
+	aproxy_t *orig;
+{
+	aproxy_t *apn;
+
+	KMALLOC(apn, aproxy_t *);
+	if (apn == NULL)
+		return NULL;
+
+	bcopy((char *)orig, (char *)apn, sizeof(*apn));
+	apn->apr_next = NULL;
+
+	if (apn->apr_create != NULL) {
+		apn->apr_soft = (*apn->apr_create)(softc);
+		if (apn->apr_soft == NULL) {
+			KFREE(apn);
+			return NULL;
+		}
+	}
+
+	apn->apr_parent = orig;
+	orig->apr_clones++;
+
+	return apn;
+}
+
+
+int
+ipf_proxy_soft_init(softc, arg)
+	ipf_main_softc_t *softc;
+	void *arg;
+{
+	ipf_proxy_softc_t *softp;
+	aproxy_t *ap;
+	u_int size;
+	int err;
+
+	softp = arg;
+	size = softp->ips_proxy_session_size * sizeof(ap_session_t *);
+
+	KMALLOCS(softp->ips_sess_tab, ap_session_t **, size);
+
+	if (softp->ips_sess_tab == NULL)
+		return -1;
+
+	bzero(softp->ips_sess_tab, size);
+
+	for (ap = softp->ips_proxies; ap != NULL; ap = ap->apr_next) {
+		if (ap->apr_init != NULL) {
+			err = (*ap->apr_init)(softc, ap->apr_soft);
+			if (err != 0)
+				return -2;
+		}
+	}
+	softp->ips_init_run = 1;
+
+	return 0;
+}
+
+
+int
+ipf_proxy_soft_fini(softc, arg)
+	ipf_main_softc_t *softc;
+	void *arg;
+{
+	ipf_proxy_softc_t *softp = arg;
+	aproxy_t *ap;
+
+	for (ap = softp->ips_proxies; ap != NULL; ap = ap->apr_next) {
+		if (ap->apr_fini != NULL) {
+			(*ap->apr_fini)(softc, ap->apr_soft);
+		}
+	}
+
+	if (softp->ips_sess_tab != NULL) {
+		KFREES(softp->ips_sess_tab,
+		       softp->ips_proxy_session_size * sizeof(ap_session_t *));
+		softp->ips_sess_tab = NULL;
+	}
+	softp->ips_init_run = 0;
+
+	return 0;
+}
+
+
+void
+ipf_proxy_soft_destroy(softc, arg)
+	ipf_main_softc_t *softc;
+	void *arg;
+{
+	ipf_proxy_softc_t *softp = arg;
+	aproxy_t *ap;
+
+	while ((ap = softp->ips_proxies) != NULL) {
+		softp->ips_proxies = ap->apr_next;
+		if (ap->apr_destroy != NULL)
+			(*ap->apr_destroy)(softc, ap->apr_soft);
+		ap->apr_parent->apr_clones--;
+		KFREE(ap);
+	}
+
+	KFREE(softp);
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_proxy_flush                                             */
+/* Returns:     Nil                                                         */
+/* Parameters:  fin(I) - pointer to packet information                      */
+/*              nat(I) - pointer to current NAT session                     */
+/*                                                                          */
+/* ------------------------------------------------------------------------ */
+void
+ipf_proxy_flush(arg, how)
+	void *arg;
+	int how;
+{
+	ipf_proxy_softc_t *softp = arg;
+	aproxy_t *ap;
+
+	switch (how)
+	{
+	case 0 :
+		for (ap = softp->ips_proxies; ap; ap = ap->apr_next)
+			if (ap->apr_flush != NULL)
+				(*ap->apr_flush)(ap, how);
+		break;
+	case 1 :
+		for (ap = softp->ips_proxies; ap; ap = ap->apr_next)
+			if (ap->apr_clear != NULL)
+				(*ap->apr_clear)(ap);
+		break;
+	default :
+		break;
+	}
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_proxy_add                                               */
 /* Returns:     int - -1 == error, 0 == success                             */
 /* Parameters:  ap(I) - pointer to proxy structure                          */
 /*                                                                          */
@@ -190,17 +486,20 @@ aproxy_t	ap_proxies[] = {
 /* collection compiled in and dynamically added.                            */
 /* ------------------------------------------------------------------------ */
 int
-appr_add(ap)
+ipf_proxy_add(arg, ap)
+	void *arg;
 	aproxy_t *ap;
 {
+	ipf_proxy_softc_t *softp = arg;
+
 	aproxy_t *a;
 
-	for (a = ap_proxies; a->apr_p; a++)
+	for (a = ips_proxies; a->apr_p; a++)
 		if ((a->apr_p == ap->apr_p) &&
 		    !strncmp(a->apr_label, ap->apr_label,
 			     sizeof(ap->apr_label))) {
-			if (ipf_proxy_debug > 1)
-				printf("appr_add: %s/%d already present (B)\n",
+			if (softp->ips_proxy_debug > 1)
+				printf("ipf_proxy_add: %s/%d present (B)\n",
 				       a->apr_label, a->apr_p);
 			return -1;
 		}
@@ -209,21 +508,21 @@ appr_add(ap)
 		if ((a->apr_p == ap->apr_p) &&
 		    !strncmp(a->apr_label, ap->apr_label,
 			     sizeof(ap->apr_label))) {
-			if (ipf_proxy_debug > 1)
-				printf("appr_add: %s/%d already present (D)\n",
+			if (softp->ips_proxy_debug > 1)
+				printf("ipf_proxy_add: %s/%d present (D)\n",
 				       a->apr_label, a->apr_p);
 			return -1;
 		}
 	ap->apr_next = ap_proxylist;
 	ap_proxylist = ap;
-	if (ap->apr_init != NULL)
-		return (*ap->apr_init)();
+	if (ap->apr_load != NULL)
+		(*ap->apr_load)();
 	return 0;
 }
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    appr_ctl                                                    */
+/* Function:    ipf_proxy_ctl                                               */
 /* Returns:     int - 0 == success, else error                              */
 /* Parameters:  ctl(I) - pointer to proxy control structure                 */
 /*                                                                          */
@@ -232,29 +531,32 @@ appr_add(ap)
 /* control function.                                                        */
 /* ------------------------------------------------------------------------ */
 int
-appr_ctl(ctl)
+ipf_proxy_ctl(softc, arg, ctl)
+	ipf_main_softc_t *softc;
+	void *arg;
 	ap_ctl_t *ctl;
 {
+	ipf_proxy_softc_t *softp = arg;
 	aproxy_t *a;
 	int error;
 
-	a = appr_lookup(ctl->apc_p, ctl->apc_label);
+	a = ipf_proxy_lookup(arg, ctl->apc_p, ctl->apc_label);
 	if (a == NULL) {
-		if (ipf_proxy_debug > 1)
-			printf("appr_ctl: can't find %s/%d\n",
+		if (softp->ips_proxy_debug > 1)
+			printf("ipf_proxy_ctl: can't find %s/%d\n",
 				ctl->apc_label, ctl->apc_p);
-		ipf_interror = 80001;
+		softc->ipf_interror = 80001;
 		error = ESRCH;
 	} else if (a->apr_ctl == NULL) {
-		if (ipf_proxy_debug > 1)
-			printf("appr_ctl: no ctl function for %s/%d\n",
+		if (softp->ips_proxy_debug > 1)
+			printf("ipf_proxy_ctl: no ctl function for %s/%d\n",
 				ctl->apc_label, ctl->apc_p);
-		ipf_interror = 80002;
+		softc->ipf_interror = 80002;
 		error = ENXIO;
 	} else {
-		error = (*a->apr_ctl)(a, ctl);
-		if ((error != 0) && (ipf_proxy_debug > 1))
-			printf("appr_ctl: %s/%d ctl error %d\n",
+		error = (*a->apr_ctl)(a->apr_soft, a, ctl);
+		if ((error != 0) && (softp->ips_proxy_debug > 1))
+			printf("ipf_proxy_ctl: %s/%d ctl error %d\n",
 				a->apr_label, a->apr_p, error);
 	}
 	return error;
@@ -262,7 +564,7 @@ appr_ctl(ctl)
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    appr_del                                                    */
+/* Function:    ipf_proxy_del                                               */
 /* Returns:     int - -1 == error, 0 == success                             */
 /* Parameters:  ap(I) - pointer to proxy structure                          */
 /*                                                                          */
@@ -271,38 +573,35 @@ appr_ctl(ctl)
 /* if it cannot be matched.                                                 */
 /* ------------------------------------------------------------------------ */
 int
-appr_del(ap)
+ipf_proxy_del(ap)
 	aproxy_t *ap;
 {
 	aproxy_t *a, **app;
 
-	for (app = &ap_proxylist; ((a = *app) != NULL); app = &a->apr_next)
+	for (app = &ap_proxylist; ((a = *app) != NULL); app = &a->apr_next) {
 		if (a == ap) {
 			a->apr_flags |= APR_DELETE;
-			*app = a->apr_next;
-			if (ap->apr_ref != 0) {
-				if (ipf_proxy_debug > 2)
-					printf("appr_del: orphaning %s/%d\n",
-						ap->apr_label, ap->apr_p);
-				return 1;
+			if (ap->apr_ref == 0 && ap->apr_clones == 0) {
+				*app = a->apr_next;
+				return 0;
 			}
-			return 0;
+			return 1;
 		}
-	if (ipf_proxy_debug > 1)
-		printf("appr_del: proxy %lx not found\n", (u_long)ap);
+	}
+
 	return -1;
 }
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    appr_ok                                                     */
+/* Function:    ipf_proxy_ok                                                */
 /* Returns:     int - 1 == good match else not.                             */
 /* Parameters:  fin(I) - pointer to packet information                      */
 /*              nat(I) - pointer to current NAT session                     */
 /*                                                                          */
 /* ------------------------------------------------------------------------ */
 int
-appr_ok(fin, tcp, nat)
+ipf_proxy_ok(fin, tcp, nat)
 	fr_info_t *fin;
 	tcphdr_t *tcp;
 	ipnat_t *nat;
@@ -320,14 +619,15 @@ appr_ok(fin, tcp, nat)
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    appr_ioctl                                                  */
+/* Function:    ipf_proxy_ioctl                                             */
 /* Returns:     int - 0 == success, else error                              */
 /* Parameters:  fin(I) - pointer to packet information                      */
 /*              nat(I) - pointer to current NAT session                     */
 /*                                                                          */
 /* ------------------------------------------------------------------------ */
 int
-appr_ioctl(data, cmd, mode, ctx)
+ipf_proxy_ioctl(softc, data, cmd, mode, ctx)
+	ipf_main_softc_t *softc;
 	caddr_t data;
 	ioctlcmd_t cmd;
 	int mode;
@@ -342,7 +642,7 @@ appr_ioctl(data, cmd, mode, ctx)
 	switch (cmd)
 	{
 	case SIOCPROXY :
-		error = ipf_inobj(data, &ctl, IPFOBJ_PROXYCTL);
+		error = ipf_inobj(softc, data, &ctl, IPFOBJ_PROXYCTL);
 		if (error != 0) {
 			return error;
 		}
@@ -351,10 +651,10 @@ appr_ioctl(data, cmd, mode, ctx)
 		if (ctl.apc_dsize > 0) {
 			KMALLOCS(ptr, caddr_t, ctl.apc_dsize);
 			if (ptr == NULL) {
-				ipf_interror = 80003;
+				softc->ipf_interror = 80003;
 				error = ENOMEM;
 			} else {
-				error = copyinptr(ctl.apc_data, ptr,
+				error = copyinptr(softc, ctl.apc_data, ptr,
 						  ctl.apc_dsize);
 				if (error == 0)
 					ctl.apc_data = ptr;
@@ -365,7 +665,7 @@ appr_ioctl(data, cmd, mode, ctx)
 		}
 
 		if (error == 0)
-			error = appr_ctl(&ctl);
+			error = ipf_proxy_ctl(softc, softc->ipf_proxy_soft, &ctl);
 
 		if ((error != 0) && (ptr != NULL)) {
 			KFREES(ptr, ctl.apc_dsize);
@@ -373,7 +673,7 @@ appr_ioctl(data, cmd, mode, ctx)
 		break;
 
 	default :
-		ipf_interror = 80004;
+		softc->ipf_interror = 80004;
 		error = EINVAL;
 	}
 	return error;
@@ -381,7 +681,7 @@ appr_ioctl(data, cmd, mode, ctx)
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    appr_match                                                  */
+/* Function:    ipf_proxy_match                                             */
 /* Returns:     int - -1 == error, 0 == success                             */
 /* Parameters:  fin(I) - pointer to packet information                      */
 /*              nat(I) - pointer to current NAT session                     */
@@ -390,31 +690,33 @@ appr_ioctl(data, cmd, mode, ctx)
 /* matching.                                                                */
 /* ------------------------------------------------------------------------ */
 int
-appr_match(fin, nat)
+ipf_proxy_match(fin, nat)
 	fr_info_t *fin;
 	nat_t *nat;
 {
+	ipf_main_softc_t *softc = fin->fin_main_soft;
+	ipf_proxy_softc_t *softp = softc->ipf_proxy_soft;
 	aproxy_t *apr;
 	ipnat_t *ipn;
 	int result;
 
 	ipn = nat->nat_ptr;
-	if (ipf_proxy_debug > 8)
-		printf("appr_match(%lx,%lx) aps %lx ptr %lx\n",
+	if (softp->ips_proxy_debug > 8)
+		printf("ipf_proxy_match(%lx,%lx) aps %lx ptr %lx\n",
 			(u_long)fin, (u_long)nat, (u_long)nat->nat_aps,
 			(u_long)ipn);
 
 	if ((fin->fin_flx & (FI_SHORT|FI_BAD)) != 0) {
-		if (ipf_proxy_debug > 0)
-			printf("appr_match: flx 0x%x (BAD|SHORT)\n",
+		if (softp->ips_proxy_debug > 0)
+			printf("ipf_proxy_match: flx 0x%x (BAD|SHORT)\n",
 				fin->fin_flx);
 		return -1;
 	}
 
 	apr = ipn->in_apr;
 	if ((apr == NULL) || (apr->apr_flags & APR_DELETE)) {
-		if (ipf_proxy_debug > 0)
-			printf("appr_match:apr %lx apr_flags 0x%x\n",
+		if (softp->ips_proxy_debug > 0)
+			printf("ipf_proxy_match:apr %lx apr_flags 0x%x\n",
 				(u_long)apr, apr ? apr->apr_flags : 0);
 		return -1;
 	}
@@ -422,8 +724,8 @@ appr_match(fin, nat)
 	if (apr->apr_match != NULL) {
 		result = (*apr->apr_match)(fin, nat->nat_aps, nat);
 		if (result != 0) {
-			if (ipf_proxy_debug > 4)
-				printf("appr_match: result %d\n", result);
+			if (softp->ips_proxy_debug > 4)
+				printf("ipf_proxy_match: result %d\n", result);
 			return -1;
 		}
 	}
@@ -432,7 +734,7 @@ appr_match(fin, nat)
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    appr_new                                                    */
+/* Function:    ipf_proxy_new                                               */
 /* Returns:     int - -1 == error, 0 == success                             */
 /* Parameters:  fin(I) - pointer to packet information                      */
 /*              nat(I) - pointer to current NAT session                     */
@@ -442,19 +744,21 @@ appr_match(fin, nat)
 /* returning.                                                               */
 /* ------------------------------------------------------------------------ */
 int
-appr_new(fin, nat)
+ipf_proxy_new(fin, nat)
 	fr_info_t *fin;
 	nat_t *nat;
 {
+	ipf_main_softc_t *softc = fin->fin_main_soft;
+	ipf_proxy_softc_t *softp = softc->ipf_proxy_soft;
 	register ap_session_t *aps;
 	aproxy_t *apr;
 
-	if (ipf_proxy_debug > 8)
-		printf("appr_new(%lx,%lx) \n", (u_long)fin, (u_long)nat);
+	if (softp->ips_proxy_debug > 8)
+		printf("ipf_proxy_new(%lx,%lx) \n", (u_long)fin, (u_long)nat);
 
 	if ((nat->nat_ptr == NULL) || (nat->nat_aps != NULL)) {
-		if (ipf_proxy_debug > 0)
-			printf("appr_new: nat_ptr %lx nat_aps %lx\n",
+		if (softp->ips_proxy_debug > 0)
+			printf("ipf_proxy_new: nat_ptr %lx nat_aps %lx\n",
 				(u_long)nat->nat_ptr, (u_long)nat->nat_aps);
 		return -1;
 	}
@@ -463,16 +767,16 @@ appr_new(fin, nat)
 
 	if ((apr->apr_flags & APR_DELETE) ||
 	    (fin->fin_p != apr->apr_p)) {
-		if (ipf_proxy_debug > 2)
-			printf("appr_new: apr_flags 0x%x p %d/%d\n",
+		if (softp->ips_proxy_debug > 2)
+			printf("ipf_proxy_new: apr_flags 0x%x p %d/%d\n",
 				apr->apr_flags, fin->fin_p, apr->apr_p);
 		return -1;
 	}
 
 	KMALLOC(aps, ap_session_t *);
 	if (!aps) {
-		if (ipf_proxy_debug > 0)
-			printf("appr_new: malloc failed (%lu)\n",
+		if (softp->ips_proxy_debug > 0)
+			printf("ipf_proxy_new: malloc failed (%lu)\n",
 				(u_long)sizeof(ap_session_t));
 		return -1;
 	}
@@ -483,19 +787,19 @@ appr_new(fin, nat)
 	aps->aps_apr = apr;
 	aps->aps_psiz = 0;
 	if (apr->apr_new != NULL)
-		if ((*apr->apr_new)(fin, aps, nat) == -1) {
+		if ((*apr->apr_new)(apr->apr_soft, fin, aps, nat) == -1) {
 			if ((aps->aps_data != NULL) && (aps->aps_psiz != 0)) {
 				KFREES(aps->aps_data, aps->aps_psiz);
 			}
 			KFREE(aps);
-			if (ipf_proxy_debug > 2)
-				printf("appr_new: new(%lx) failed\n",
+			if (softp->ips_proxy_debug > 2)
+				printf("ipf_proxy_new: new(%lx) failed\n",
 					(u_long)apr->apr_new);
 			return -1;
 		}
 	aps->aps_nat = nat;
-	aps->aps_next = ap_sess_list;
-	ap_sess_list = aps;
+	aps->aps_next = softp->ips_sess_list;
+	softp->ips_sess_list = aps;
 	nat->nat_aps = aps;
 
 	return 0;
@@ -503,7 +807,7 @@ appr_new(fin, nat)
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    appr_check                                                  */
+/* Function:    ipf_proxy_check                                             */
 /* Returns:     int - -1 == error, 0 == success                             */
 /* Parameters:  fin(I) - pointer to packet information                      */
 /*              nat(I) - pointer to current NAT session                     */
@@ -514,10 +818,12 @@ appr_new(fin, nat)
 /* check causes FI_BAD to be set.                                           */
 /* ------------------------------------------------------------------------ */
 int
-appr_check(fin, nat)
+ipf_proxy_check(fin, nat)
 	fr_info_t *fin;
 	nat_t *nat;
 {
+	ipf_main_softc_t *softc = fin->fin_main_soft;
+	ipf_proxy_softc_t *softp = softc->ipf_proxy_soft;
 #if SOLARIS && defined(_KERNEL) && (SOLARIS2 >= 6)
 # if defined(ICK_VALID)
 	mb_t *m;
@@ -536,18 +842,18 @@ appr_check(fin, nat)
 #endif
 
 	if (fin->fin_flx & FI_BAD) {
-		if (ipf_proxy_debug > 0)
-			printf("appr_check: flx 0x%x (BAD)\n", fin->fin_flx);
+		if (softp->ips_proxy_debug > 0)
+			printf("ipf_proxy_check: flx 0x%x (BAD)\n", fin->fin_flx);
 		return -1;
 	}
 
 #ifndef IPFILTER_CKSUM
 	if ((fin->fin_out == 0) && (ipf_checkl4sum(fin) == -1)) {
-		if (ipf_proxy_debug > 0)
-			printf("appr_check: l4 checksum failure %d\n",
+		if (softp->ips_proxy_debug > 0)
+			printf("ipf_proxy_check: l4 checksum failure %d\n",
 				fin->fin_p);
 		if (fin->fin_p == IPPROTO_TCP)
-			ipf_stats[fin->fin_out].fr_tcpbad++;
+			softc->ipf_stats[fin->fin_out].fr_tcpbad++;
 		return -1;
 	}
 #endif
@@ -561,8 +867,8 @@ appr_check(fin, nat)
 #if defined(MENTAT) || defined(HAVE_M_PULLDOWN)
 		if ((fin->fin_dlen > 0) && !(fin->fin_flx & FI_COALESCE))
 			if (ipf_coalesce(fin) == -1) {
-				if (ipf_proxy_debug > 0)
-					printf("appr_check: coalesce failed %x\n", fin->fin_flx);
+				if (softp->ips_proxy_debug > 0)
+					printf("ipf_proxy_check: coalesce failed %x\n", fin->fin_flx);
 				return -1;
 			}
 #endif
@@ -596,22 +902,22 @@ appr_check(fin, nat)
 		err = 0;
 		if (fin->fin_out != 0) {
 			if (apr->apr_outpkt != NULL)
-				err = (*apr->apr_outpkt)(fin, aps, nat);
+				err = (*apr->apr_outpkt)(apr->apr_soft, fin, aps, nat);
 		} else {
 			if (apr->apr_inpkt != NULL)
-				err = (*apr->apr_inpkt)(fin, aps, nat);
+				err = (*apr->apr_inpkt)(apr->apr_soft, fin, aps, nat);
 		}
 
 		rv = APR_EXIT(err);
-		if (((ipf_proxy_debug > 0) && (rv != 0)) ||
-		    (ipf_proxy_debug > 8))
-			printf("appr_check: out %d err %x rv %d\n",
+		if (((softp->ips_proxy_debug > 0) && (rv != 0)) ||
+		    (softp->ips_proxy_debug > 8))
+			printf("ipf_proxy_check: out %d err %x rv %d\n",
 				fin->fin_out, err, rv);
 		if (rv == 1)
 			return -1;
 
 		if (rv == 2) {
-			appr_free(apr);
+			ipf_proxy_free(apr);
 			nat->nat_aps = NULL;
 			return -1;
 		}
@@ -642,7 +948,7 @@ appr_check(fin, nat)
 		 * changed or not.
 		 */
 		if (tcp != NULL) {
-			err = appr_fixseqack(fin, ip, aps, APR_INC(err));
+			err = ipf_proxy_fixseqack(fin, ip, aps, APR_INC(err));
 #if SOLARIS && defined(_KERNEL) && (SOLARIS2 >= 6)
 			if (dosum)
 				tcp->th_sum = fr_cksum(fin->fin_qfm, ip,
@@ -674,7 +980,7 @@ appr_check(fin, nat)
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    appr_lookup                                                 */
+/* Function:    ipf_proxy_lookup                                            */
 /* Returns:     int - -1 == error, 0 == success                             */
 /* Parameters:  fin(I) - pointer to packet information                      */
 /*              nat(I) - pointer to current NAT session                     */
@@ -682,42 +988,38 @@ appr_check(fin, nat)
 /* Search for an proxy by the protocol it is being used with and its name.  */
 /* ------------------------------------------------------------------------ */
 aproxy_t *
-appr_lookup(pr, name)
+ipf_proxy_lookup(arg, pr, name)
+	void *arg;
 	u_int pr;
 	char *name;
 {
+	ipf_proxy_softc_t *softp = arg;
 	aproxy_t *ap;
 
-	if (ipf_proxy_debug > 8)
-		printf("appr_lookup(%d,%s)\n", pr, name);
+	if (softp->ips_proxy_debug > 8)
+		printf("ipf_proxy_lookup(%d,%s)\n", pr, name);
 
-	for (ap = ap_proxies; ap->apr_p; ap++)
+	for (ap = softp->ips_proxies; ap != NULL; ap = ap->apr_next)
 		if ((ap->apr_p == pr) &&
 		    !strncmp(name, ap->apr_label, sizeof(ap->apr_label))) {
 			ap->apr_ref++;
 			return ap;
 		}
 
-	for (ap = ap_proxylist; ap; ap = ap->apr_next)
-		if ((ap->apr_p == pr) &&
-		    !strncmp(name, ap->apr_label, sizeof(ap->apr_label))) {
-			ap->apr_ref++;
-			return ap;
-		}
-	if (ipf_proxy_debug > 2)
-		printf("appr_lookup: failed for %d/%s\n", pr, name);
+	if (softp->ips_proxy_debug > 2)
+		printf("ipf_proxy_lookup: failed for %d/%s\n", pr, name);
 	return NULL;
 }
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    appr_free                                                   */
+/* Function:    ipf_proxy_free                                              */
 /* Returns:     Nil                                                         */
 /* Parameters:  ap(I) - pointer to proxy structure                          */
 /*                                                                          */
 /* ------------------------------------------------------------------------ */
 void
-appr_free(ap)
+ipf_proxy_free(ap)
 	aproxy_t *ap;
 {
 	ap->apr_ref--;
@@ -733,16 +1035,19 @@ appr_free(ap)
 /* Locks Held:  ipf_nat_new, ipf_nat(W)                                     */
 /* ------------------------------------------------------------------------ */
 void
-aps_free(aps)
+aps_free(softc, arg, aps)
+	ipf_main_softc_t *softc;
+	void *arg;
 	ap_session_t *aps;
 {
+	ipf_proxy_softc_t *softp = arg;
 	ap_session_t *a, **ap;
 	aproxy_t *apr;
 
 	if (!aps)
 		return;
 
-	for (ap = &ap_sess_list; ((a = *ap) != NULL); ap = &a->aps_next)
+	for (ap = &softp->ips_sess_list; ((a = *ap) != NULL); ap = &a->aps_next)
 		if (a == aps) {
 			*ap = a->aps_next;
 			break;
@@ -750,7 +1055,7 @@ aps_free(aps)
 
 	apr = aps->aps_apr;
 	if ((apr != NULL) && (apr->apr_del != NULL))
-		(*apr->apr_del)(aps);
+		(*apr->apr_del)(softc, aps);
 
 	if ((aps->aps_data != NULL) && (aps->aps_psiz != 0))
 		KFREES(aps->aps_data, aps->aps_psiz);
@@ -759,19 +1064,21 @@ aps_free(aps)
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    appr_fixseqack                                              */
+/* Function:    ipf_proxy_fixseqack                                         */
 /* Returns:     int -  2 if TCP ack/seq is changed, else 0                  */
 /* Parameters:  fin(I) - pointer to packet information                      */
 /*              nat(I) - pointer to current NAT session                     */
 /*                                                                          */
 /* ------------------------------------------------------------------------ */
 static int
-appr_fixseqack(fin, ip, aps, inc)
+ipf_proxy_fixseqack(fin, ip, aps, inc)
 	fr_info_t *fin;
 	ip_t *ip;
 	ap_session_t *aps;
 	int inc;
 {
+	ipf_main_softc_t *softc = fin->fin_main_soft;
+	ipf_proxy_softc_t *softp = softc->ipf_proxy_soft;
 	int sel, ch = 0, out, nlen;
 	u_32_t seq1, seq2;
 	tcphdr_t *tcp;
@@ -795,7 +1102,7 @@ appr_fixseqack(fin, ip, aps, inc)
 		/* switch to other set ? */
 		if ((aps->aps_seqmin[!sel] > aps->aps_seqmin[sel]) &&
 		    (seq1 > aps->aps_seqmin[!sel])) {
-			if (ipf_proxy_debug > 7)
+			if (softp->ips_proxy_debug > 7)
 				printf("proxy out switch set seq %d -> %d %x > %x\n",
 					sel, !sel, seq1,
 					aps->aps_seqmin[!sel]);
@@ -815,7 +1122,7 @@ appr_fixseqack(fin, ip, aps, inc)
 		if (inc && (seq1 > aps->aps_seqmin[!sel])) {
 			aps->aps_seqmin[sel] = seq1 + nlen - 1;
 			aps->aps_seqoff[sel] = aps->aps_seqoff[sel] + inc;
-			if (ipf_proxy_debug > 7)
+			if (softp->ips_proxy_debug > 7)
 				printf("proxy seq set %d at %x to %d + %d\n",
 					sel, aps->aps_seqmin[sel],
 					aps->aps_seqoff[sel], inc);
@@ -829,7 +1136,7 @@ appr_fixseqack(fin, ip, aps, inc)
 		/* switch to other set ? */
 		if ((aps->aps_ackmin[!sel] > aps->aps_ackmin[sel]) &&
 		    (seq1 > aps->aps_ackmin[!sel])) {
-			if (ipf_proxy_debug > 7)
+			if (softp->ips_proxy_debug > 7)
 				printf("proxy out switch set ack %d -> %d %x > %x\n",
 					sel, !sel, seq1,
 					aps->aps_ackmin[!sel]);
@@ -848,7 +1155,7 @@ appr_fixseqack(fin, ip, aps, inc)
 		/* switch to other set ? */
 		if ((aps->aps_ackmin[!sel] > aps->aps_ackmin[sel]) &&
 		    (seq1 > aps->aps_ackmin[!sel])) {
-			if (ipf_proxy_debug > 7)
+			if (softp->ips_proxy_debug > 7)
 				printf("proxy in switch set ack %d -> %d %x > %x\n",
 					sel, !sel, seq1, aps->aps_ackmin[!sel]);
 			sel = aps->aps_sel[out] = !sel;
@@ -868,7 +1175,7 @@ appr_fixseqack(fin, ip, aps, inc)
 			aps->aps_ackmin[!sel] = seq1 + nlen - 1;
 			aps->aps_ackoff[!sel] = aps->aps_ackoff[sel] + inc;
 
-			if (ipf_proxy_debug > 7)
+			if (softp->ips_proxy_debug > 7)
 				printf("proxy ack set %d at %x to %d + %d\n",
 					!sel, aps->aps_seqmin[!sel],
 					aps->aps_seqoff[sel], inc);
@@ -882,14 +1189,14 @@ appr_fixseqack(fin, ip, aps, inc)
 		/* switch to other set ? */
 		if ((aps->aps_seqmin[!sel] > aps->aps_seqmin[sel]) &&
 		    (seq1 > aps->aps_seqmin[!sel])) {
-			if (ipf_proxy_debug > 7)
+			if (softp->ips_proxy_debug > 7)
 				printf("proxy in switch set seq %d -> %d %x > %x\n",
 					sel, !sel, seq1, aps->aps_seqmin[!sel]);
 			sel = aps->aps_sel[1 - out] = !sel;
 		}
 
 		if (aps->aps_seqoff[sel] != 0) {
-			if (ipf_proxy_debug > 7)
+			if (softp->ips_proxy_debug > 7)
 				printf("sel %d seqoff %d seq1 %x seqmin %x\n",
 					sel, aps->aps_seqoff[sel], seq1,
 					aps->aps_seqmin[sel]);
@@ -901,95 +1208,8 @@ appr_fixseqack(fin, ip, aps, inc)
 		}
 	}
 
-	if (ipf_proxy_debug > 8)
-		printf("appr_fixseqack: seq %x ack %x\n",
+	if (softp->ips_proxy_debug > 8)
+		printf("ipf_proxy_fixseqack: seq %x ack %x\n",
 			(u_32_t)ntohl(tcp->th_seq), (u_32_t)ntohl(tcp->th_ack));
 	return ch ? 2 : 0;
-}
-
-
-/* ------------------------------------------------------------------------ */
-/* Function:    appr_init                                                   */
-/* Returns:     int - -1 == error, 0 == success                             */
-/* Parameters:  fin(I) - pointer to packet information                      */
-/*              nat(I) - pointer to current NAT session                     */
-/*                                                                          */
-/* ------------------------------------------------------------------------ */
-/*
- * Initialise hook for kernel application proxies.
- * Call the initialise routine for all the compiled in kernel proxies.
- */
-int
-appr_init()
-{
-	aproxy_t *ap;
-	int err = 0;
-
-	for (ap = ap_proxies; ap->apr_p; ap++) {
-		if (ap->apr_init != NULL) {
-			err = (*ap->apr_init)();
-			if (err != 0)
-				break;
-		}
-	}
-	return err;
-}
-
-
-/* ------------------------------------------------------------------------ */
-/* Function:    appr_unload                                                 */
-/* Returns:     Nil                                                         */
-/* Parameters:  Nil                                                         */
-/*                                                                          */
-/* Unload hook for kernel application proxies.                              */
-/* Call the finialise routine for all the compiled in kernel proxies.       */
-/* ------------------------------------------------------------------------ */
-void
-appr_unload()
-{
-	aproxy_t *ap;
-
-	for (ap = ap_proxies; ap->apr_p; ap++)
-		if (ap->apr_fini != NULL)
-			(*ap->apr_fini)();
-	for (ap = ap_proxylist; ap; ap = ap->apr_next)
-		if (ap->apr_fini != NULL)
-			(*ap->apr_fini)();
-}
-
-
-/* ------------------------------------------------------------------------ */
-/* Function:    appr_flush                                                  */
-/* Returns:     Nil                                                         */
-/* Parameters:  fin(I) - pointer to packet information                      */
-/*              nat(I) - pointer to current NAT session                     */
-/*                                                                          */
-/* ------------------------------------------------------------------------ */
-void
-appr_flush(how)
-	int how;
-{
-	aproxy_t *ap;
-
-	switch (how)
-	{
-	case 0 :
-		for (ap = ap_proxies; ap->apr_p; ap++)
-			if (ap->apr_flush != NULL)
-				(*ap->apr_flush)(ap, how);
-		for (ap = ap_proxylist; ap; ap = ap->apr_next)
-			if (ap->apr_flush != NULL)
-				(*ap->apr_flush)(ap, how);
-		break;
-	case 1 :
-		for (ap = ap_proxies; ap->apr_p; ap++)
-			if (ap->apr_clear != NULL)
-				(*ap->apr_clear)(ap);
-		for (ap = ap_proxylist; ap; ap = ap->apr_next)
-			if (ap->apr_clear != NULL)
-				(*ap->apr_clear)(ap);
-		break;
-	default :
-		break;
-	}
 }
