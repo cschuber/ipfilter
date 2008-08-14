@@ -139,7 +139,6 @@ typedef	struct ipf_auth_softc_s {
 	int		ipf_auth_replies;
 	int		ipf_auth_defaultage;
 	int		ipf_auth_lock;
-	int		ipf_auth_inited;
 	ipf_authstat_t	ipf_auth_stats;
 	frauth_t	*ipf_auth;
 	mb_t		**ipf_auth_pkts;
@@ -213,6 +212,12 @@ ipf_auth_soft_create(softc)
 	softa->ipf_auth_size = FR_NUMAUTH;
 	softa->ipf_auth_defaultage = 600;
 
+	RWLOCK_INIT(&softa->ipf_authlk, "ipf IP User-Auth rwlock");
+	MUTEX_INIT(&softa->ipf_auth_mx, "ipf auth log mutex");
+#if SOLARIS && defined(_KERNEL)
+	cv_init(&softa->ipf_auth_wait, "ipf auth condvar", CV_DRIVER, NULL);
+#endif
+
 	return softa;
 }
 
@@ -246,16 +251,9 @@ ipf_auth_soft_init(softc, arg)
 	bzero((char *)softa->ipf_auth_pkts,
 	      softa->ipf_auth_size * sizeof(*softa->ipf_auth_pkts));
 
-	RWLOCK_INIT(&softa->ipf_authlk, "ipf IP User-Auth rwlock");
-	MUTEX_INIT(&softa->ipf_auth_mx, "ipf auth log mutex");
-#if SOLARIS && defined(_KERNEL)
-	cv_init(&softa->ipf_auth_wait, "ipf auth condvar", CV_DRIVER, NULL);
-#endif
 #if defined(linux) && defined(_KERNEL)
 	init_waitqueue_head(&softa->ipf_auth_next_linux);
 #endif
-
-	softa->ipf_auth_inited = 1;
 
 	return 0;
 }
@@ -318,16 +316,6 @@ ipf_auth_soft_fini(softc, arg)
 		}
 	}
 
-	if (softa->ipf_auth_inited == 1) {
-# if SOLARIS && defined(_KERNEL)
-		cv_destroy(&softa->ipf_auth_wait);
-# endif
-		MUTEX_DESTROY(&softa->ipf_auth_mx);
-		RW_DESTROY(&softa->ipf_authlk);
-
-		softa->ipf_auth_inited = 0;
-	}
-
 	return 0;
 }
 
@@ -346,6 +334,12 @@ ipf_auth_soft_destroy(softc, arg)
 	void *arg;
 {
 	ipf_auth_softc_t *softa = arg;
+
+# if SOLARIS && defined(_KERNEL)
+	cv_destroy(&softa->ipf_auth_wait);
+# endif
+	MUTEX_DESTROY(&softa->ipf_auth_mx);
+	RW_DESTROY(&softa->ipf_authlk);
 
 	KFREE(softa);
 }
@@ -706,7 +700,6 @@ ipf_auth_expire(softc)
 
 	if (softa->ipf_auth_lock)
 		return;
-
 	SPL_NET(s);
 	WRITE_ENTER(&softa->ipf_authlk);
 	for (i = 0, fra = softa->ipf_auth; i < softa->ipf_auth_size;

@@ -110,7 +110,7 @@ static drv_ops_t ipf_drv_ops = {
 	NULL,		/* mount */
 	iplread,
 	ipf_write,	/* write */
-	iplioctl,	/* ioctl */
+	ipfioctl,	/* ioctl */
 #ifdef	IPL_SELECT
 	iplselect,	/* select */
 #else
@@ -482,7 +482,7 @@ static int ipf_qifsync(ip, hlen, il, out, qif, mp)
 	register struct frentry *f;
 	register ipnat_t *np;
 
-	frsync(NULL);
+	ipfsync(&ipfmain, NULL);
 	return 0;
 }
 

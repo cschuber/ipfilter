@@ -56,31 +56,32 @@ static const char rcsid[] = "@(#)$Id$";
 
 #include "md5.h"
 
-extern	ipf_main_softc_t	ipfmain;
-
 static	int	ipf_send_ip __P((fr_info_t *fin, mblk_t *m, mblk_t **mp));
 static	void	ipf_fixl4sum __P((fr_info_t *));
+static	void	*ipf_routeto __P((fr_info_t *, int, void *));
+static	int	ipf_sendpkt __P((ipf_main_softc_t *, int, qif_t *, mblk_t *,
+				 struct ip *, void *));
 
-ipfmutex_t	ipl_mutex, ipf_auth_mx, ipf_rw, ipf_stinsert;
-ipfmutex_t	ipf_nat_new, ipf_natio, ipf_timeoutlock;
-ipfrwlock_t	ipf_mutex, ipf_global, ipf_ipidfrag, ipf_frcache, ipf_tokens;
-ipfrwlock_t	ipf_frag, ipf_state, ipf_nat, ipf_natfrag, ipf_authlk;
-kcondvar_t	iplwait, ipfauthwait;
-#if SOLARIS2 >= 7
+#if !defined(FW_HOOKS)
+# if SOLARIS2 >= 7
 u_int		*ip_ttl_ptr = NULL;
 u_int		*ip_mtudisc = NULL;
-# if SOLARIS2 >= 8
+#  if SOLARIS2 >= 8
 int		*ip_forwarding = NULL;
 u_int		*ip6_forwarding = NULL;
-# else
+#  else
 u_int		*ip_forwarding = NULL;
 # endif
-#else
+# else
 u_long		*ip_ttl_ptr = NULL;
 u_long		*ip_mtudisc = NULL;
 u_long		*ip_forwarding = NULL;
+# endif
+extern	ipf_main_softc_t	ipfmain;
+#else
+extern	void	ipf_attach_hooks __P((ipf_main_softc_t *));
+extern	void	ipf_detach_hooks __P((ipf_main_softc_t *));
 #endif
-int		ipf_locks_done = 0;
 
 
 /* ------------------------------------------------------------------------ */
@@ -99,18 +100,20 @@ ipfdetach(softc)
 	ipf_main_softc_t *softc;
 {
 
-	ASSERT(rw_read_locked(&ipf_global.ipf_lk) == 0);
-
+#if !defined(FW_HOOKS)
 	if (softc->ipf_control_forwarding & 2) {
 		if (ip_forwarding != NULL)
 			*ip_forwarding = 0;
-#if SOLARIS2 >= 8
+# if SOLARIS2 >= 8
 		if (ip6_forwarding != NULL)
 			*ip6_forwarding = 0;
-#endif
+# endif
 	}
 
 	ipf_pfil_hooks_remove();
+#else
+	ipf_detach_hooks(softc);
+#endif
 
 	if (softc->ipf_slow_ch != 0) {
 		(void) untimeout(softc->ipf_slow_ch);
@@ -127,12 +130,6 @@ ipfdetach(softc)
         if (ipf_fini_all(softc) < 0)
 		return EIO;
 
-	if (ipf_destroye_all(softc) == NULL)
-		return EIO;
-
-        if (ipf_unload_all() != 0)
-		return EIO;
-
 	return 0;
 }
 
@@ -147,25 +144,17 @@ ipfattach(softc)
 	cmn_err(CE_CONT, "ipfattach()\n");
 #endif
 
-        if (ipf_load_all() != 0)
-		return EIO;
-
-	if (ipf_create_all(softc) == NULL)
-		return EIO;
-
-        if (ipf_init_all(softc) < 0)
-		return EIO;
-
-#if SOLARIS2 >= 8
+#if !defined(FW_HOOKS)
+# if SOLARIS2 >= 8
 	ip_forwarding = &ip_g_forward;
-#endif
+# endif
 	/*
 	 * XXX - There is no terminator for this array, so it is not possible
 	 * to tell if what we are looking for is missing and go off the end
 	 * of the array.
 	 */
 
-#if SOLARIS2 <= 8
+# if SOLARIS2 <= 8
 	for (i = 0; ; i++) {
 		if (!strcmp(ip_param_arr[i].ip_param_name, "ip_def_ttl")) {
 			ip_ttl_ptr = &ip_param_arr[i].ip_param_value;
@@ -173,40 +162,48 @@ ipfattach(softc)
 			    "ip_path_mtu_discovery")) {
 			ip_mtudisc = &ip_param_arr[i].ip_param_value;
 		}
-#if SOLARIS2 < 8
+#  if SOLARIS2 < 8
 		else if (!strcmp(ip_param_arr[i].ip_param_name,
 			    "ip_forwarding")) {
 			ip_forwarding = &ip_param_arr[i].ip_param_value;
 		}
-#else
+#  else
 		else if (!strcmp(ip_param_arr[i].ip_param_name,
 			    "ip6_forwarding")) {
 			ip6_forwarding = &ip_param_arr[i].ip_param_value;
 		}
-#endif
+#  endif
 
 		if (ip_mtudisc != NULL && ip_ttl_ptr != NULL &&
-#if SOLARIS2 >= 8
+#  if SOLARIS2 >= 8
 		    ip6_forwarding != NULL &&
-#endif
+#  endif
 		    ip_forwarding != NULL)
 			break;
 	}
-#endif
+# endif
 
 	if (softc->ipf_control_forwarding & 1) {
 		if (ip_forwarding != NULL)
 			*ip_forwarding = 1;
-#if SOLARIS2 >= 8
+# if SOLARIS2 >= 8
 		if (ip6_forwarding != NULL)
 			*ip6_forwarding = 1;
-#endif
+# endif
 	}
+#endif
 
 	softc->ipf_slow_ch = timeout(ipf_slowtimer, softc,
 				     drv_usectohz(500000));
 
+        if (ipf_init_all(softc) < 0)
+		return EIO;
+
+#if !defined(FW_HOOKS)
 	ipf_set_pfil_hooks();
+#else
+	ipf_attach_hooks(softc);
+#endif
 
 	return 0;
 }
@@ -217,7 +214,7 @@ ipfattach(softc)
  */
 /*ARGSUSED*/
 int
-iplioctl(dev, cmd, data, mode, cp, rp)
+ipfioctl(dev, cmd, data, mode, cp, rp)
 	dev_t dev;
 	int cmd;
 #if SOLARIS2 >= 7
@@ -229,19 +226,21 @@ iplioctl(dev, cmd, data, mode, cp, rp)
 	cred_t *cp;
 	int *rp;
 {
-	void *softc;
+	ipf_main_softc_t *softc;
 	int error = 0;
 	minor_t unit;
 
 #ifdef	IPFDEBUG
-	cmn_err(CE_CONT, "iplioctl(%x,%x,%x,%d,%x,%d)\n",
+	cmn_err(CE_CONT, "ipfioctl(%x,%x,%x,%d,%x,%d)\n",
 		dev, cmd, data, mode, cp, rp);
 #endif
 	unit = getminor(dev);
 	if (IPL_LOGMAX < unit)
 		return ENXIO;
 
-	if (ipfmain.ipf_running <= 0) {
+	softc = GET_SOFTC(crgetzoneid(cp));
+
+	if (softc->ipf_running <= 0) {
 		if (unit != IPL_LOGIPF)
 			return EIO;
 		if (cmd != SIOCIPFGETNEXT && cmd != SIOCIPFGET &&
@@ -250,7 +249,7 @@ iplioctl(dev, cmd, data, mode, cp, rp)
 			return EIO;
 	}
 
-	error = ipf_ioctlswitch(&ipfmain, unit, (caddr_t)data, cmd, mode,
+	error = ipf_ioctlswitch(softc, unit, (caddr_t)data, cmd, mode,
 			       cp->cr_uid, curproc);
 	if (error != -1) {
 		return error;
@@ -261,8 +260,12 @@ iplioctl(dev, cmd, data, mode, cp, rp)
 
 
 void *
-get_unit(char *name, int family)
+get_unit(soft, name, family)
+	void *soft;
+	char *name;
+	int family;
 {
+#if !defined(FW_HOOKS)
 	void *ifp;
 	qif_t *qf;
 	int sap;
@@ -277,7 +280,20 @@ get_unit(char *name, int family)
 	qf = qif_iflookup(name, sap);
 	rw_exit(&pfil_rw);
 	return qf;
+#else
+	ipf_main_softc_t *softc = soft;
+	net_data_t proto;
+
+	if (family == AF_INET)
+		proto = softc->ipf_nd_v4;
+	else if (family == AF_INET6)
+		proto = softc->ipf_nd_v6;
+	else
+		return NULL;
+	return (void *)net_phylookup(proto, name);
+#endif
 }
+
 
 /*
  * ipf_send_reset - this could conceivably be a call to tcp_respond(), but
@@ -383,13 +399,17 @@ ipf_send_ip(fr_info_t *fin, mblk_t *m, mb_t **mpp)
 #endif
 	{
 		fnew.fin_v = 4;
+#if !defined(FW_HOOKS)
 		if (ip_ttl_ptr != NULL)
 			ip->ip_ttl = (u_char)(*ip_ttl_ptr);
 		else
+#endif
 			ip->ip_ttl = 63;
+#if !defined(FW_HOOKS)
 		if (ip_mtudisc != NULL)
 			ip->ip_off = htons(*ip_mtudisc ? IP_DF : 0);
 		else
+#endif
 			ip->ip_off = htons(IP_DF);
 		ip->ip_sum = ipf_cksum((u_short *)ip, sizeof(*ip));
 		hlen = sizeof(*ip);
@@ -398,15 +418,10 @@ ipf_send_ip(fr_info_t *fin, mblk_t *m, mb_t **mpp)
 	qpip = fin->fin_qpi;
 	qpi.qpi_q = qpip->qpi_q;
 	qpi.qpi_off = 0;
-	qpi.qpi_name = qpip->qpi_name;
 	qif = qpip->qpi_real;
 	qpi.qpi_real = qif;
 	qpi.qpi_ill = qif->qf_ill;
-	qpi.qpi_hl = qif->qf_hl;
-	qpi.qpi_ppa = qif->qf_ppa;
-	qpi.qpi_num = qif->qf_num;
 	qpi.qpi_flags = qif->qf_flags;
-	qpi.qpi_max_frag = qif->qf_max_frag;
 	qpi.qpi_m = m;
 	qpi.qpi_data = ip;
 	fnew.fin_qpi = &qpi;
@@ -427,6 +442,11 @@ ipf_send_ip(fr_info_t *fin, mblk_t *m, mb_t **mpp)
 int
 ipf_send_icmp_err(int type, fr_info_t *fin, int dst)
 {
+# ifdef FW_HOOKS
+	ipf_main_softc_t *softc = fin->fin_main_soft;
+# else
+	ipf_main_softc_t *softc = &ipfmain;
+# endif
 	struct in_addr dst4;
 	struct icmp *icmp;
 	qpktinfo_t *qpi;
@@ -503,8 +523,8 @@ ipf_send_icmp_err(int type, fr_info_t *fin, int dst)
 		if (fin->fin_mtu != 0) {
 			icmp->icmp_nextmtu = htons(fin->fin_mtu);
 
-		} else if (qpi->qpi_max_frag != 0) {
-			icmp->icmp_nextmtu = htons(qpi->qpi_max_frag);
+		} else if (GETIFMTU_4(qpi->qpi_real) != 0) {
+			icmp->icmp_nextmtu = GETIFMTU_4(qpi->qpi_real);
 
 		} else {	/* Make up a number */
 			icmp->icmp_nextmtu = htons(fin->fin_plen - 20);
@@ -517,7 +537,7 @@ ipf_send_icmp_err(int type, fr_info_t *fin, int dst)
 		int csz;
 
 		if (dst == 0) {
-			if (ipf_ifpaddr(6, FRI_NORMAL, qpi->qpi_real,
+			if (ipf_ifpaddr(softc, 6, FRI_NORMAL, qpi->qpi_real,
 					&dst6, NULL) == -1) {
 				FREE_MB_T(m);
 				return -1;
@@ -545,7 +565,7 @@ ipf_send_icmp_err(int type, fr_info_t *fin, int dst)
 		ip->ip_tos = fin->fin_ip->ip_tos;
 		ip->ip_len = (u_short)sz;
 		if (dst == 0) {
-			if (ipf_ifpaddr(4, FRI_NORMAL, qpi->qpi_real,
+			if (ipf_ifpaddr(softc, 4, FRI_NORMAL, qpi->qpi_real,
 					&dst6, NULL) == -1) {
 				FREE_MB_T(m);
 				return -1;
@@ -571,16 +591,22 @@ ipf_send_icmp_err(int type, fr_info_t *fin, int dst)
 }
 
 
+#if !defined(FW_HOOKS)
 /*
  * return the first IP Address associated with an interface
  */
 /*ARGSUSED*/
 int
-ipf_ifpaddr(int v, int atype, void *qifptr, i6addr_t *inp, i6addr_t *inpmask)
+ipf_ifpaddr(softc, v, atype, qifptr, inp, inpmask)
+	ipf_main_softc_t *softc;
+	int v;
+	int atype;
+	void *qifptr;
+	i6addr_t *inp, *inpmask;
 {
-#ifdef	USE_INET6
+# ifdef	USE_INET6
 	struct sockaddr_in6 sin6, mask6;
-#endif
+# endif
 	struct sockaddr_in sin, mask;
 	qif_t *qif;
 
@@ -591,7 +617,7 @@ ipf_ifpaddr(int v, int atype, void *qifptr, i6addr_t *inp, i6addr_t *inpmask)
 	if (qif->qf_ill == NULL)
 		return -1;
 
-#ifdef	USE_INET6
+# ifdef	USE_INET6
 	if (v == 6) {
 		in6_addr_t *inp6;
 		ipif_t *ipif;
@@ -620,7 +646,7 @@ ipf_ifpaddr(int v, int atype, void *qifptr, i6addr_t *inp, i6addr_t *inpmask)
 			sin6.sin6_addr = *inp6;
 		return ipf_ifpfillv6addr(atype, &sin6, &mask6, inp, inpmask);
 	}
-#endif
+# endif
 
 	if (((ill_t *)qif->qf_ill)->ill_ipif == NULL)
 		return -1;
@@ -641,12 +667,63 @@ ipf_ifpaddr(int v, int atype, void *qifptr, i6addr_t *inp, i6addr_t *inpmask)
 
 	return ipf_ifpfillv4addr(atype, &sin, &mask, &inp->in4, &inpmask->in4);
 }
+#else
+/*ARGSUSED*/
+int
+ipf_ifpaddr(softc, v, atype, qifptr, inp, inpmask)
+	ipf_main_softc_t *softc;
+	int v;
+	int atype;
+	void *qifptr;
+	i6addr_t *inp, *inpmask;
+{
+	struct sockaddr_in6 sin6[2];
+	struct sockaddr_in sin[2];
+	net_ifaddr_t types[2];
+	void *array;
+
+	if ((qifptr == NULL) || (qifptr == (void *)-1))
+		return -1;
+
+	switch (atype)
+	{
+	case FRI_BROADCAST :
+		types[0] = NA_BROADCAST;
+		break;
+	case FRI_PEERADDR :
+		types[0] = NA_PEER;
+		break;
+	default :
+		types[0] = NA_ADDRESS;
+		break;
+	}
+	types[1] = NA_NETMASK;
+
+	if (v == 4) {
+		array = sin;
+		net_getlifaddr(softc->ipf_nd_v4, (phy_if_t)qifptr, 0,
+			       2, types, sin);
+	} else {
+		array = sin6;
+		net_getlifaddr(softc->ipf_nd_v6, (phy_if_t)qifptr, 0,
+			       2, types, sin6);
+	}
+
+	if (v == 6)
+		return ipf_ifpfillv6addr(atype, &sin6[0], &sin6[1],
+					 inp, inpmask);
+
+	return ipf_ifpfillv4addr(atype, &sin[0], &sin[1],
+				 &inp->in4, &inpmask->in4);
+}
+#endif
 
 
 u_32_t
 ipf_newisn(fr_info_t *fin)
 {
 	static int iss_seq_off = 0;
+	ipf_main_softc_t *softc = fin->fin_main_soft;
 	u_char hash[16];
 	u_32_t newiss;
 	MD5_CTX ctx;
@@ -663,7 +740,7 @@ ipf_newisn(fr_info_t *fin)
 		  sizeof(fin->fin_fi.fi_dst));
 	MD5Update(&ctx, (u_char *) &fin->fin_dat, sizeof(fin->fin_dat));
 
-	MD5Update(&ctx, ipfmain.ipf_iss_secret, sizeof(ipfmain.ipf_iss_secret));
+	MD5Update(&ctx, softc->ipf_iss_secret, sizeof(softc->ipf_iss_secret));
 
 	MD5Final(hash, &ctx);
 
@@ -693,11 +770,12 @@ u_short
 ipf_nextipid(fr_info_t *fin)
 {
 	static u_short ipid = 0;
+	ipf_main_softc_t *softc = fin->fin_main_soft;
 	ipstate_t *is;
 	nat_t *nat;
 	u_short id;
 
-	MUTEX_ENTER(&ipf_rw);
+	MUTEX_ENTER(&softc->ipf_rw);
 	if (fin->fin_state != NULL) {
 		is = fin->fin_state;
 		id = (u_short)(is->is_pkts[(fin->fin_rev << 1) + 1] & 0xffff);
@@ -706,7 +784,7 @@ ipf_nextipid(fr_info_t *fin)
 		id = (u_short)(nat->nat_pkts[fin->fin_out] & 0xffff);
 	} else
 		id = ipid++;
-	MUTEX_EXIT(&ipf_rw);
+	MUTEX_EXIT(&softc->ipf_rw);
 
 	return id;
 }
@@ -740,6 +818,7 @@ ipf_checkv6sum(fr_info_t *fin)
 #endif /* USE_INET6 */
 
 
+#if !defined(FW_HOOKS)
 /*
  * Function:    ipf_verifysrc
  * Returns:     int (really boolean)
@@ -779,6 +858,17 @@ ipf_verifysrc(fin)
 #endif
 	return result;
 }
+#else
+int
+ipf_verifysrc(fin)
+	fr_info_t *fin;
+{
+	int result;
+
+	result = (ipf_routeto(fin, fin->fin_v, &fin->fin_src) == fin->fin_ifp);
+	return result;
+}
+#endif
 
 
 void
@@ -804,7 +894,7 @@ ipf_slowtimer __P((void *ptr))
 	ipf_auth_expire(softc);
 	softc->ipf_ticks++;
 	if (softc->ipf_running == -1 || softc->ipf_running == 1)
-		softc->ipf_slow_ch = timeout(ipf_slowtimer, NULL,
+		softc->ipf_slow_ch = timeout(ipf_slowtimer, ptr,
 				       drv_usectohz(500000));
 	else
 		softc->ipf_slow_ch = NULL;
@@ -890,12 +980,12 @@ ipf_fastroute(mb, mpp, fin, fdp)
 		{
 		case 4 :
 			fd.fd_ip = ip->ip_dst;
-			ifp = qif_illrouteto(4, &ip->ip_dst);
+			ifp = ipf_routeto(fin, 4, &ip->ip_dst);
 			break;
 #ifdef USE_INET6
 		case 6 :
 			fd.fd_ip6.in6 = ip6->ip6_dst;
-			ifp = qif_illrouteto(6, &ip6->ip6_dst);
+			ifp = ipf_routeto(fin, 6, &ip6->ip6_dst);
 			break;
 #endif
 		}
@@ -1001,7 +1091,7 @@ ipf_fastroute(mb, mpp, fin, fdp)
 		ip->ip_off = htons(__ipoff);
 	}
 #endif
-	if (pfil_sendbuf(ifp, mb, ip, dstp) == 0) {
+	if (ipf_sendpkt(softc, 4, ifp, mb, ip, dstp) == 0) {
 		ATOMIC_INCL(softc->ipf_frouteok[0]);
 	} else {
 		ATOMIC_INCL(softc->ipf_frouteok[1]);
@@ -1088,6 +1178,7 @@ ipf_pullup(mb_t *xmin, fr_info_t *fin, int len)
 int
 ipf_inject(fr_info_t *fin, mb_t *m)
 {
+#if !defined(FW_HOOKS)
 	qifpkt_t *qp;
 
 	qp = kmem_alloc(sizeof(*qp), KM_NOSLEEP);
@@ -1104,7 +1195,66 @@ ipf_inject(fr_info_t *fin, mb_t *m)
 	qp->qp_inout = fin->fin_out;
 	strncpy(qp->qp_ifname, fin->fin_ifname, LIFNAMSIZ);
 	qif_addinject(qp);
+#else
+	ipf_main_softc_t *softc = fin->fin_main_soft;
+	struct sockaddr_in6 *sin6;
+	struct sockaddr_in *sin;
+	net_inject_t inject;
+
+	inject.ni_physical = (phy_if_t)fin->fin_ifp;
+	inject.ni_packet = *fin->fin_mp;
+	if (fin->fin_v == 4) {
+		sin = (struct sockaddr_in *)&inject.ni_addr;
+		sin->sin_family = AF_INET;
+		sin->sin_addr = fin->fin_dst;
+		if (fin->fin_out == 0)
+			return net_inject(softc->ipf_nd_v4, NI_QUEUE_IN,
+					  &inject);
+		return net_inject(softc->ipf_nd_v4, NI_QUEUE_OUT, &inject);
+	}
+
+	sin6 = (struct sockaddr_in6 *)&inject.ni_addr;
+	sin6->sin6_family = AF_INET6;
+	memcpy(&sin6->sin6_addr, &fin->fin_dst6, sizeof(fin->fin_dst6));
+	if (fin->fin_out == 0)
+		return net_inject(softc->ipf_nd_v6, NI_QUEUE_IN, &inject);
+	return net_inject(softc->ipf_nd_v6, NI_QUEUE_OUT, &inject);
+#endif
 	return 0;
+}
+
+
+static int
+ipf_sendpkt(softc, v, ifp, mb, ip, dstp)
+	ipf_main_softc_t *softc;
+	int v;
+	qif_t *ifp;
+	mblk_t *mb;
+	struct ip *ip;
+	void *dstp;
+{
+#if !defined(FW_HOOKS)
+        return pfil_sendbuf(ifp, mb, ip, dstp);
+#else
+	struct sockaddr_in6 *sin6;
+	struct sockaddr_in *sin;
+	net_inject_t inject;
+
+	inject.ni_physical = (phy_if_t)ifp;
+	inject.ni_packet = mb;
+
+	if (v == 4) {
+		sin = (struct sockaddr_in *)&inject.ni_addr;
+		sin->sin_family = AF_INET;
+		memcpy(&sin->sin_addr, dstp, sizeof(sin->sin_addr));
+		return net_inject(softc->ipf_nd_v4, NI_DIRECT_OUT, &inject);
+	}
+
+	sin6 = (struct sockaddr_in6 *)&inject.ni_addr;
+	sin6->sin6_family = AF_INET6;
+	memcpy(&sin6->sin6_addr, dstp, sizeof(sin6->sin6_addr));
+	return net_inject(softc->ipf_nd_v6, NI_DIRECT_OUT, &inject);
+#endif
 }
 
 
@@ -1212,4 +1362,44 @@ ipf_prependmbt(fr_info_t *fin, mblk_t *m)
 	linkb(o, m);
 
 	fin->fin_m = m;
+}
+
+
+static void *
+ipf_routeto(fin, v, dstip)
+	fr_info_t *fin;
+	int v;
+	void *dstip;
+{
+#if defined(FW_HOOKS)
+	ipf_main_softc_t *softc = fin->fin_main_soft;
+	struct sockaddr_in6 sin6;
+	struct sockaddr_in sin;
+	struct sockaddr *sock;
+	net_data_t proto;
+	int result;
+
+	switch (fin->fin_v)
+	{
+	case 4 :
+		bzero((char *)&sin, sizeof(sin));
+		sin.sin_family = AF_INET;
+		sin.sin_addr = fin->fin_src;
+		sock = (struct sockaddr *)&sin;
+		proto = softc->ipf_nd_v4;
+		break;
+
+	case 6 :
+		bzero((char *)&sin6, sizeof(sin6));
+		sin6.sin6_family = AF_INET;
+		sin6.sin6_addr = fin->fin_srcip6;
+		proto = softc->ipf_nd_v6;
+		break;
+	default :
+		return NULL;
+	}
+	return (void *)net_routeto(proto, sock);
+#else
+	return qif_illrouteto(v, dstip);
+#endif
 }

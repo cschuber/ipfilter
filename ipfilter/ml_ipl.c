@@ -29,13 +29,13 @@
 #define	IPL_NAME	"/dev/ipl"
 #endif
 
-extern	int	ipfattach(), iplopen(), iplclose(), iplioctl(), iplread();
+extern	int	ipfattach(), iplopen(), iplclose(), ipfioctl(), iplread();
 extern	int	nulldev(), iplidentify(), errno;
 
 struct	cdevsw	ipldevsw =
 {
 	iplopen, iplclose, iplread, nulldev,
-	iplioctl, nulldev, nulldev, nulldev,
+	ipfioctl, nulldev, nulldev, nulldev,
 	0, nulldev,
 };
 
@@ -52,7 +52,7 @@ struct	dev_ops	ipl_ops =
 	NULL,		/* strategy */
 	NULL,		/* dump */
 	0,		/* psize */
-        iplioctl,
+        ipfioctl,
 	NULL,		/* reset */
 	NULL		/* mmap */
 };

@@ -139,7 +139,7 @@ ipfattach __P((void))
  * Filter ioctl interface.
  */
 int
-iplioctl(dev, cmd, data, flags)
+ipfioctl(dev, cmd, data, flags)
 	dev_t dev;
 	int cmd;
 	caddr_t data;
@@ -149,7 +149,7 @@ iplioctl(dev, cmd, data, flags)
 	minor_t unit;
 
 #ifdef	IPFDEBUG
-	cmn_err(CE_CONT, "iplioctl(%x,%x,%x,%x)\n",
+	cmn_err(CE_CONT, "ipfioctl(%x,%x,%x,%x)\n",
 		dev, cmd, data, flags);
 #endif
 
@@ -392,7 +392,7 @@ ipf_send_icmp_err(type, fin, dst)
 		int csz;
 
 		if (dst == 0) {
-			if (ipf_ifpaddr(6, FRI_NORMAL, qpi->qpi_real,
+			if (ipf_ifpaddr(softc, 6, FRI_NORMAL, qpi->qpi_real,
 					&dst6, NULL) == -1) {
 				FREE_MB_T(m);
 				return -1;
@@ -420,7 +420,7 @@ ipf_send_icmp_err(type, fin, dst)
 		ip->ip_tos = fin->fin_ip->ip_tos;
 		ip->ip_len = (u_short)sz;
 		if (dst == 0) {
-			if (ipf_ifpaddr(4, FRI_NORMAL, qpi->qpi_real,
+			if (ipf_ifpaddr(softc, 4, FRI_NORMAL, qpi->qpi_real,
 					&dst6, NULL) == -1) {
 				FREE_MB_T(m);
 				return -1;
@@ -450,7 +450,8 @@ ipf_send_icmp_err(type, fin, dst)
  * return the first IP Address associated with an interface
  */
 int
-ipf_ifpaddr(v, atype, qifptr, inp, inpmask)
+ipf_ifpaddr(softc, v, atype, qifptr, inp, inpmask)
+	ipf_main_softc_t *softc;
 	int v, atype;
 	void *qifptr;
 	i6addr_t *inp, *inpmask;

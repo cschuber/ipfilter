@@ -375,7 +375,7 @@ ipf_send_icmp_err(int type, fr_info_t *fin, int isdst)
 		int csz;
 
 		if (isdst == 0) {
-			if (ipf_ifpaddr(6, FRI_NORMAL, qif->qf_ill,
+			if (ipf_ifpaddr(&ipfmain, 6, FRI_NORMAL, qif->qf_ill,
 					&dst6, NULL) == -1) {
 				FREE_MB_T(m);
 				return -1;
@@ -401,7 +401,7 @@ ipf_send_icmp_err(int type, fr_info_t *fin, int isdst)
 		ip->ip_p = IPPROTO_ICMP;
 		ip->ip_len = (u_short)sz;
 		if (isdst == 0) {
-			if (ipf_ifpaddr(4, FRI_NORMAL, fin->fin_ifp,
+			if (ipf_ifpaddr(&ipfmain, 4, FRI_NORMAL, fin->fin_ifp,
 					&dst6, NULL) == -1) {
 				FREE_MB_T(m);
 				return -1;
@@ -597,7 +597,8 @@ bad:
 
 
 int
-ipf_ifpaddr(int v, int atype, void *ifptr, i6addr_t *inp, i6addr_t *inpmask)
+ipf_ifpaddr(ipf_main_softc_t *softc, int v, int atype, void *ifptr,
+	    i6addr_t *inp, i6addr_t *inpmask)
 {
 	struct sockaddr_in sin, sinmask;
 	struct net_device *dev;
@@ -987,7 +988,7 @@ ipf_pullup(mb_t *xmin, fr_info_t *fin, int len)
  * not meant to be random, just a fill in.
  */
 int
-ipf_random(int range)
+ipf_random()
 {
 	static int last = 0;
 	static int calls = 0;
@@ -998,7 +999,6 @@ ipf_random(int range)
 	last *= tv.tv_usec + calls++;
 	last += (int)&range * ipf_ticks;
 	number = last + tv.tv_sec;
-	number %= range;
 	return number;
 }
 

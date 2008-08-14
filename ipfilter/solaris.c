@@ -45,6 +45,9 @@
 #include <netinet/ip_icmp.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
+#ifdef INSTANCES
+# include <sys/netstack.h>
+#endif
 #include "netinet/ip_compat.h"
 #include "netinet/ipl.h"
 #include "netinet/ip_fil.h"
@@ -52,8 +55,10 @@
 #include "netinet/ip_frag.h"
 #include "netinet/ip_auth.h"
 #include "netinet/ip_state.h"
+#ifdef INSTANCES
+# include <sys/hook_event.h>
+#endif
 
-ipf_main_softc_t	ipfmain;
 
 static	int	ipf_getinfo __P((dev_info_t *, ddi_info_cmd_t,
 				 void *, void **));
@@ -62,8 +67,6 @@ static	int	ipf_identify __P((dev_info_t *));
 #endif
 static	int	ipf_attach __P((dev_info_t *, ddi_attach_cmd_t));
 static	int	ipf_detach __P((dev_info_t *, ddi_detach_cmd_t));
-static	int	ipf_qifsync __P((ip_t *, int, void *, int, void *, mblk_t **));
-static	int	ipf_property_update __P((dev_info_t *));
 static 	int	ipfpoll __P((dev_t, short, int, short *, struct pollhead **));
 static	char	*ipf_devfiles[] = { IPL_NAME, IPNAT_NAME, IPSTATE_NAME,
 				    IPAUTH_NAME, IPSYNC_NAME, IPSCAN_NAME,
@@ -72,6 +75,12 @@ static	int	ipfclose __P((dev_t, int, int, cred_t *));
 static	int	ipfopen __P((dev_t *, int, int, cred_t *));
 static	int	ipfread __P((dev_t, struct uio *, cred_t *));
 static	int	ipfwrite __P((dev_t, struct uio *, cred_t *));
+static	int	ipf_property_update __P((dev_info_t *));
+static	void	ipf_stack_init __P((void));
+static	void	ipf_stack_fini __P((void));
+#if !defined(INSTANCES)
+static	int	ipf_qifsync __P((ip_t *, int, void *, int, void *, mblk_t **));
+#endif
 
 
 static struct cb_ops ipf_cb_ops = {
@@ -179,7 +188,13 @@ static	size_t	hdrsizes[57][2] = {
 };
 #endif /* SOLARIS2 >= 6 */
 
-static dev_info_t *ipf_dev_info = NULL;
+static dev_info_t	*ipf_dev_info = NULL;
+#if defined(FW_HOOKS)
+ipf_main_softc_t	*ipf_instances = NULL;
+#else
+ipf_main_softc_t	ipfmain;
+ipf_main_softc_t	*ipf_instances = &ipfmain;
+#endif
 
 
 int
@@ -191,6 +206,18 @@ _init()
 #ifdef	IPFDEBUG
 	cmn_err(CE_NOTE, "IP Filter: _init() = %d", ipfinst);
 #endif
+	if (ipf_load_all() != 0) {
+		(void) mod_remove(&modlink1);
+		ipfinst = DDI_FAILURE;
+	} else {
+#ifdef	IPFDEBUG
+	cmn_err(CE_NOTE, "IP Filter: ipf_load_all() done\n");
+#endif
+		ipf_stack_init();
+#ifdef	IPFDEBUG
+	cmn_err(CE_NOTE, "IP Filter: ipf_stack_init() done\n");
+#endif
+	}
 	return ipfinst;
 }
 
@@ -199,6 +226,10 @@ int
 _fini(void)
 {
 	int ipfinst;
+
+	ipf_unload_all();
+
+	ipf_stack_fini();
 
 	ipfinst = mod_remove(&modlink1);
 #ifdef	IPFDEBUG
@@ -242,6 +273,7 @@ ipf_attach(dip, cmd)
 	dev_info_t *dip;
 	ddi_attach_cmd_t cmd;
 {
+	ipf_main_softc_t *softc;
 	char *s;
 	int i;
 #ifdef	IPFDEBUG
@@ -250,22 +282,29 @@ ipf_attach(dip, cmd)
 	cmn_err(CE_NOTE, "IP Filter: ipf_attach(%x,%x)", dip, cmd);
 #endif
 
+#if !defined(INSTANCES)
 	if ((pfilinterface != PFIL_INTERFACE) || (PFIL_INTERFACE < 2000000)) {
 		cmn_err(CE_NOTE, "pfilinterface(%d) != %d\n", pfilinterface,
 			PFIL_INTERFACE);
 		return EINVAL;
 	}
+#endif
+	softc = GET_SOFTC(0);
+	if (softc == NULL)
+		return ENXIO;
 
 	switch (cmd)
 	{
 	case DDI_ATTACH:
-		if (ipfmain.ipf_running != 0)
+		if (softc->ipf_running != 0)
 			break;
 #ifdef	IPFDEBUG
 		instance = ddi_get_instance(dip);
 
 		cmn_err(CE_NOTE, "IP Filter: attach ipf instance %d", instance);
 #endif
+
+		softc->ipf_dip = dip;
 
 		(void) ipf_property_update(dip);
 
@@ -311,35 +350,52 @@ ipf_detach(dip, cmd)
 	dev_info_t *dip;
 	ddi_detach_cmd_t cmd;
 {
+	ipf_main_softc_t *tmp;
 	int i;
 
 #ifdef	IPFDEBUG
 	cmn_err(CE_NOTE, "IP Filter: ipf_detach(%x,%x)", dip, cmd);
 #endif
+
 	switch (cmd) {
 	case DDI_DETACH:
-		if (ipfmain.ipf_refcnt != 0)
-			return DDI_FAILURE;
+		for (tmp = ipf_instances; tmp != NULL; tmp = tmp->ipf_next) {
+cmn_err(CE_CONT,"tmp(%p) ref %d running %d\n", tmp, tmp->ipf_refcnt,tmp->ipf_running);
+			/*
+			 * And no proxy modules loaded.
+			 */
+			if (tmp->ipf_refcnt != 0)
+				break;
+			/*
+			 * If it didn't finish loading or is already
+			 * unloading, fail.
+			 */
+			if (tmp->ipf_running == -2)
+				break;
 
-		if (ipfmain.ipf_running == -2 || ipfmain.ipf_running == 0)
+			/*
+			 * Make sure we're the only one's modifying things.
+			 * With this lock others should just fall out of
+			 * the loop.
+			 */
+			WRITE_ENTER(&tmp->ipf_global);
+			if (tmp->ipf_running == -2) {
+				RWLOCK_EXIT(&tmp->ipf_global);
+				break;
+			}
+			if (tmp->ipf_running == 1)
+				(void) ipfdetach(tmp);
+			tmp->ipf_running = -2;
+
+			RWLOCK_EXIT(&tmp->ipf_global);
+
+			if (tmp->ipf_slow_ch != 0) {
+				(void) untimeout(tmp->ipf_slow_ch);
+				tmp->ipf_slow_ch = 0;
+			}
+		}
+		if (tmp != NULL)
 			break;
-		/*
-		 * Make sure we're the only one's modifying things.  With
-		 * this lock others should just fall out of the loop.
-		 */
-		WRITE_ENTER(&ipfmain.ipf_global);
-		if (ipfmain.ipf_running == -2) {
-			RWLOCK_EXIT(&ipfmain.ipf_global);
-			return DDI_FAILURE;
-		}
-		ipfmain.ipf_running = -2;
-
-		RWLOCK_EXIT(&ipfmain.ipf_global);
-
-		if (ipfmain.ipf_slow_ch != 0) {
-			(void) untimeout(ipfmain.ipf_slow_ch);
-			ipfmain.ipf_slow_ch = 0;
-		}
 
 		/*
 		 * Undo what we did in ipf_attach, freeing resources
@@ -349,18 +405,13 @@ ipf_detach(dip, cmd)
 		 */
 		ddi_prop_remove_all(dip);
 		i = ddi_get_instance(dip);
-		ddi_remove_minor_node(dip, NULL);
 		if (i > 0) {
 			cmn_err(CE_CONT, "IP Filter: still attached (%d)\n", i);
 			return DDI_FAILURE;
 		}
 
-		WRITE_ENTER(&ipfmain.ipf_global);
-		if (!ipfdetach(&ipfmain)) {
-			cmn_err(CE_CONT, "!%s detached.\n", ipfilter_version);
-			return (DDI_SUCCESS);
-		}
-		RWLOCK_EXIT(&ipfmain.ipf_global);
+		cmn_err(CE_CONT, "!%s detached.\n", ipfilter_version);
+		return (DDI_SUCCESS);
 		break;
 	default:
 		break;
@@ -377,9 +428,12 @@ ipf_getinfo(dip, infocmd, arg, result)
 	ddi_info_cmd_t infocmd;
 	void *arg, **result;
 {
+	ipf_main_softc_t *softc;
 	int error;
 
-	if (ipfmain.ipf_running <= 0)
+	softc = GET_SOFTC(0);
+
+	if (softc->ipf_running <= 0)
 		return DDI_FAILURE;
 	error = DDI_FAILURE;
 #ifdef	IPFDEBUG
@@ -401,6 +455,7 @@ ipf_getinfo(dip, infocmd, arg, result)
 }
 
 
+#if !defined(INSTANCES)
 /*
  * look for bad consistancies between the list of interfaces the filter knows
  * about and those which are currently configured.
@@ -415,13 +470,14 @@ ipf_qifsync(ip, hlen, il, out, qif, mp)
 	void *qif;
 	mblk_t **mp;
 {
+	ipf_main_softc_t *softc = &ipfmain;
 
-	frsync(&ipfmain, qif);
+	ipf_sync(softc, qif);
 	/*
 	 * Resync. any NAT `connections' using this interface and its IP #.
 	 */
-	ipf_nat_sync(&ipfmain, qif);
-	ipf_state_sync(&ipfmain, qif);
+	ipf_nat_sync(softc, qif);
+	ipf_state_sync(softc, qif);
 	return 0;
 }
 
@@ -433,22 +489,24 @@ ipf_qifsync(ip, hlen, il, out, qif, mp)
 int
 ipfsync()
 {
-	frsync(NULL);
+	ipf_sync(&ipfmain, NULL);
 	return 0;
 }
+#endif
 
 
 /*
  * Fetch configuration file values that have been entered into the ipf.conf
  * driver file.
  */
-static int
+int
 ipf_property_update(dip)
 	dev_info_t *dip;
 {
+	ipf_main_softc_t *softc;
 	ipftuneable_t *ipft;
-	const char *name;
 	int64_t i64;
+	char *name;
 	u_int one;
 	int *i32p;
 	int err;
@@ -467,15 +525,22 @@ ipf_property_update(dip)
 	}
 #endif
 
+	softc = GET_SOFTC(0);
+
+	ipft = softc->ipf_tuners;
+	if (ipft == NULL) {
+		cmn_err(CE_WARN, "!no tuners loaded");
+		return DDI_FAILURE;
+	}
+
 	err = DDI_SUCCESS;
-	ipft = ipfmain.ipf_tuners;
-	for (; (name = (char *)ipft->ipft_name) != NULL;
+	for (; (ipft != NULL) && ((name = (char *)ipft->ipft_name) != NULL);
 	     ipft = ipft->ipft_next) {
 		one = 1;
 		i32p = NULL;
 		err = ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip,
 						0, name, &i32p, &one);
-		if (err == DDI_PROP_NOT_FOUND)
+		if (err == DDI_PROP_NOT_FOUND || i32p == NULL)
 			continue;
 		if (*i32p >= ipft->ipft_min && *i32p <= ipft->ipft_max) {
 			if (ipft->ipft_sz == sizeof(int)) {
@@ -499,11 +564,14 @@ ipfpoll(dev, events, anyyet, reventsp, phpp)
 	short *reventsp;
 	struct pollhead **phpp;
 {
+	ipf_main_softc_t *softc;
 	u_int xmin = getminor(dev);
 	int revents = 0;
 
 	if (xmin < 0 || xmin > IPL_LOGMAX)
 		return ENXIO;
+
+	softc = GET_SOFTC(getzoneid());
 
 	switch (xmin)
 	{
@@ -511,19 +579,22 @@ ipfpoll(dev, events, anyyet, reventsp, phpp)
 	case IPL_LOGNAT :
 	case IPL_LOGSTATE :
 #ifdef IPFILTER_LOG
-		if ((events & (POLLIN | POLLRDNORM)) && ipflog_canread(xmin))
+		if ((events & (POLLIN | POLLRDNORM)) && ipf_log_canread(softc, xmin))
 			revents |= events & (POLLIN | POLLRDNORM);
 #endif
 		break;
 	case IPL_LOGAUTH :
-		if ((events & (POLLIN | POLLRDNORM)) && ipf_auth_waiting(&ipfmain))
+		if ((events & (POLLIN | POLLRDNORM)) &&
+		    ipf_auth_waiting(softc))
 			revents |= events & (POLLIN | POLLRDNORM);
 		break;
 	case IPL_LOGSYNC :
 #ifdef IPFILTER_SYNC
-		if ((events & (POLLIN | POLLRDNORM)) && ipf_sync_canread(&ipfmain))
+		if ((events & (POLLIN | POLLRDNORM)) &&
+		    ipf_sync_canread(softc))
 			revents |= events & (POLLIN | POLLRDNORM);
-		if ((events & (POLLOUT | POLLWRNORM)) && ipf_sync_canwrite(&ipfmain))
+		if ((events & (POLLOUT | POLLWRNORM)) &&
+		    ipf_sync_canwrite(softc))
 			revents |= events & POLLOUT;
 # ifdef POLLOUTNORM
 			revents |= events & POLLOUTNORM;
@@ -541,7 +612,7 @@ ipfpoll(dev, events, anyyet, reventsp, phpp)
 	} else {
 		*reventsp = 0;
 		if (!anyyet)
-			*phpp = &ipfmain.ipf_poll_head[xmin];
+			*phpp = &softc->ipf_poll_head[xmin];
 	}
 	return 0;
 }
@@ -624,20 +695,24 @@ ipfread(dev, uio, cp)
 	register struct uio *uio;
 	cred_t *cp;
 {
+	ipf_main_softc_t *softc;
+
 #ifdef	IPFDEBUG
 	cmn_err(CE_CONT, "ipfread(%x,%x,%x)\n", dev, uio, cp);
 #endif
 
-	if (ipfmain.ipf_running < 1)
+	softc = GET_SOFTC(crgetzoneid(cp));
+
+	if (softc->ipf_running < 1)
 		return EIO;
 
 #ifdef	IPFILTER_SYNC
 	if (getminor(dev) == IPL_LOGSYNC)
-		return ipf_sync_read(uio);
+		return ipf_sync_read(softc, uio);
 #endif
 
 #ifdef	IPFILTER_LOG
-	return ipflog_read(getminor(dev), uio);
+	return ipf_log_read(softc, getminor(dev), uio);
 #else
 	return ENXIO;
 #endif
@@ -656,31 +731,36 @@ ipfwrite(dev, uio, cp)
 	register struct uio *uio;
 	cred_t *cp;
 {
+	ipf_main_softc_t *softc;
+
 #ifdef	IPFDEBUG
 	cmn_err(CE_CONT, "ipfwrite(%x,%x,%x)\n", dev, uio, cp);
 #endif
 
-	if (ipfmain.ipf_running < 1)
+	softc = GET_SOFTC(crgetzoneid(cp));
+
+	if (softc->ipf_running < 1)
 		return EIO;
 
 #ifdef	IPFILTER_SYNC
 	if (getminor(dev) == IPL_LOGSYNC)
-		return ipf_sync_write(uio);
+		return ipf_sync_write(softc, uio);
 #endif /* IPFILTER_SYNC */
 	return ENXIO;
 }
 
+#if !defined(INSTANCES)
 void
 ipf_pfil_hooks_add()
 {
 	if (pfil_add_hook(ipf_check, PFIL_IN|PFIL_OUT, &pfh_inet4))
 		cmn_err(CE_WARN, "IP Filter: %s(pfh_inet4) failed",
 			"pfil_add_hook");
-#ifdef USE_INET6
+# ifdef USE_INET6
 	if (pfil_add_hook(ipf_check, PFIL_IN|PFIL_OUT, &pfh_inet6))
 		cmn_err(CE_WARN, "IP Filter: %s(pfh_inet6) failed",
 			"pfil_add_hook");
-#endif
+# endif
 	if (pfil_add_hook(ipf_qifsync, PFIL_IN|PFIL_OUT, &pfh_sync))
 		cmn_err(CE_WARN, "IP Filter: %s(pfh_sync) failed",
 			"pfil_add_hook");
@@ -692,13 +772,328 @@ ipf_pfil_hooks_remove()
 	if (pfil_remove_hook(ipf_check, PFIL_IN|PFIL_OUT, &pfh_inet4))
 		cmn_err(CE_WARN, "IP Filter: %s(pfh_inet4) failed",
 			"pfil_remove_hook");
-#ifdef USE_INET6
+# ifdef USE_INET6
 	if (pfil_remove_hook(ipf_check, PFIL_IN|PFIL_OUT, &pfh_inet6))
 		cmn_err(CE_WARN, "IP Filter: %s(pfh_inet6) failed",
 			"pfil_add_hook");
-#endif
+# endif
 	if (pfil_remove_hook(ipf_qifsync, PFIL_IN|PFIL_OUT, &pfh_sync))
 		cmn_err(CE_WARN, "IP Filter: %s(pfh_sync) failed",
 			"pfil_remove_hook");
 
 }
+
+
+static void
+ipf_stack_init()
+{
+	ipf_create_all(&ipfmain);
+}
+
+
+static void
+ipf_stack_fini()
+{
+	ipf_fini_all(&ipfmain);
+	ipf_destroy_all(&ipfmain);
+}
+#else
+
+
+int
+ipf_hk_v4_in(tok, data, stack)
+	hook_event_token_t tok;
+	hook_data_t data;
+	netstack_t *stack;
+{
+	hook_pkt_event_t *hpe = (hook_pkt_event_t *)data;
+	ipf_main_softc_t *softc = GET_SOFTC(stack->netstack_stackid);
+	ip_t *ip = hpe->hpe_hdr;
+	qpktinfo_t qpi;
+
+	qpi.qpi_real = (void *)hpe->hpe_ofp;
+	qpi.qpi_ill = qpi.qpi_real;
+	qpi.qpi_q = NULL;
+	qpi.qpi_m = hpe->hpe_mb;
+	qpi.qpi_data = hpe->hpe_hdr;
+	qpi.qpi_off = 0;
+	qpi.qpi_flags = 0;
+
+	return ipf_check(softc, hpe->hpe_hdr, ip->ip_hl << 2,
+			 (void *)hpe->hpe_ifp, 0, &qpi, hpe->hpe_mp);
+}
+
+
+int
+ipf_hk_v4_out(tok, data, stack)
+	hook_event_token_t tok;
+	hook_data_t data;
+	netstack_t *stack;
+{
+	hook_pkt_event_t *hpe = (hook_pkt_event_t *)data;
+	ipf_main_softc_t *softc = GET_SOFTC(stack->netstack_stackid);
+	ip_t *ip = hpe->hpe_hdr;
+	qpktinfo_t qpi;
+
+	qpi.qpi_real = (void *)hpe->hpe_ofp;
+	qpi.qpi_ill = qpi.qpi_real;
+	qpi.qpi_q = NULL;
+	qpi.qpi_m = hpe->hpe_mb;
+	qpi.qpi_data = hpe->hpe_hdr;
+	qpi.qpi_off = 0;
+	qpi.qpi_flags = 0;
+
+	return ipf_check(softc, hpe->hpe_hdr, ip->ip_hl << 2,
+			 (void *)hpe->hpe_ofp, 1, &qpi, hpe->hpe_mp);
+}
+
+
+int
+ipf_hk_v4_nic(tok, data, stack)
+	hook_event_token_t tok;
+	hook_data_t data;
+	netstack_t *stack;
+{
+	hook_nic_event_t *nic = (hook_nic_event_t *)data;
+	ipf_main_softc_t *softc = GET_SOFTC(stack->netstack_stackid);
+
+	/*
+	 * Should pass the family through...
+	 */
+	switch (nic->hne_event)
+	{
+	case NE_PLUMB :
+	case NE_UNPLUMB :
+		ipf_sync(softc, (void *)nic->hne_nic);
+		ipf_nat_sync(softc, (void *)nic->hne_nic);
+		ipf_state_sync(softc, (void *)nic->hne_nic);
+		break;
+	case NE_UP :
+	case NE_DOWN :
+		break;
+	case NE_ADDRESS_CHANGE :
+		if (nic->hne_lif == 0) {
+			ipf_sync(softc, (void *)nic->hne_nic);
+			ipf_nat_sync(softc, (void *)nic->hne_nic);
+		}
+		break;
+	}
+
+	return 0;
+}
+
+
+int
+ipf_hk_v6_in(tok, data, stack)
+	hook_event_token_t tok;
+	hook_data_t data;
+	netstack_t *stack;
+{
+	hook_pkt_event_t *hpe = (hook_pkt_event_t *)data;
+	ipf_main_softc_t *softc = GET_SOFTC(stack->netstack_stackid);
+	qpktinfo_t qpi;
+
+	qpi.qpi_real = (void *)hpe->hpe_ofp;
+	qpi.qpi_ill = qpi.qpi_real;
+	qpi.qpi_q = NULL;
+	qpi.qpi_m = hpe->hpe_mb;
+	qpi.qpi_data = hpe->hpe_hdr;
+	qpi.qpi_off = 0;
+	qpi.qpi_flags = 0;
+
+	return ipf_check(softc, hpe->hpe_hdr, sizeof(ip6_t),
+			 (void *)hpe->hpe_ifp, 0, &qpi, hpe->hpe_mp);
+}
+
+
+int
+ipf_hk_v6_out(tok, data, stack)
+	hook_event_token_t tok;
+	hook_data_t data;
+	netstack_t *stack;
+{
+	hook_pkt_event_t *hpe = (hook_pkt_event_t *)data;
+	ipf_main_softc_t *softc = GET_SOFTC(stack->netstack_stackid);
+	qpktinfo_t qpi;
+
+	qpi.qpi_real = (void *)hpe->hpe_ofp;
+	qpi.qpi_ill = qpi.qpi_real;
+	qpi.qpi_q = NULL;
+	qpi.qpi_m = hpe->hpe_mb;
+	qpi.qpi_data = hpe->hpe_hdr;
+	qpi.qpi_off = 0;
+	qpi.qpi_flags = 0;
+
+	return ipf_check(softc, hpe->hpe_hdr, sizeof(ip6_t),
+			 (void *)hpe->hpe_ofp, 1, &qpi, hpe->hpe_mp);
+}
+
+
+int
+ipf_hk_v6_nic(tok, data, stack)
+	hook_event_token_t tok;
+	hook_data_t data;
+	netstack_t *stack;
+{
+	hook_nic_event_t *nic = (hook_nic_event_t *)data;
+	ipf_main_softc_t *softc = GET_SOFTC(stack->netstack_stackid);
+
+	switch (nic->hne_event)
+	{
+	case NE_PLUMB :
+	case NE_UNPLUMB :
+		break;
+	case NE_UP :
+	case NE_DOWN :
+		break;
+	case NE_ADDRESS_CHANGE :
+		break;
+	}
+
+	return 0;
+}
+
+
+ipf_main_softc_t *
+ipf_find_softc(x)
+	u_long x;
+{
+	ipf_main_softc_t *softc;
+
+	for (softc = ipf_instances; softc != NULL; softc = softc->ipf_next)
+		if (softc->ipf_idnum == x)
+			break;
+	return softc;
+}
+
+
+static void *
+ipf_netstack_create(netstackid_t id, netstack_t *stack)
+{
+	ipf_main_softc_t *softc;
+
+	softc = ipf_create_all(NULL);
+	if (softc != NULL) {
+		softc->ipf_next = ipf_instances;
+		ipf_instances = softc;
+
+		softc->ipf_idnum = id;
+	}
+
+	return softc;
+}
+
+
+static void
+ipf_netstack_shutdown(netstackid_t id, void *arg)
+{
+	ipf_main_softc_t *softc = arg;
+
+	(void) ipf_fini_all(softc);
+}
+
+
+static void
+ipf_netstack_destroy(netstackid_t id, void *arg)
+{
+	ipf_main_softc_t *softc = arg;
+
+	ipf_fini_all(softc);
+
+	ipf_destroy_all(softc);
+}
+
+
+static void
+ipf_stack_init()
+{
+	netstack_register(NS_IPF, ipf_netstack_create, ipf_netstack_shutdown,
+	    ipf_netstack_destroy);
+}
+
+
+static void
+ipf_stack_fini()
+{
+	netstack_unregister(NS_IPF);
+}
+
+
+void
+ipf_attach_hooks(softc)
+	ipf_main_softc_t *softc;
+{
+	softc->ipf_nd_v4 = net_lookup(NHF_INET, softc->ipf_idnum);
+	softc->ipf_nd_v6 = net_lookup(NHF_INET6, softc->ipf_idnum);
+
+	HOOK_INIT(&softc->ipf_hk_v4_in, ipf_hk_v4_in, "ipf_v4_in");
+	if (net_register_hook(softc->ipf_nd_v4, NH_PHYSICAL_IN,
+			  &softc->ipf_hk_v4_in))
+		cmn_err(CE_WARN, "register-hook(v4-in) failed");
+
+	HOOK_INIT(&softc->ipf_hk_v4_out, ipf_hk_v4_out, "ipf_v4_out");
+	if (net_register_hook(softc->ipf_nd_v4, NH_PHYSICAL_OUT,
+			  &softc->ipf_hk_v4_out))
+		cmn_err(CE_WARN, "register-hook(v4-out) failed");
+
+	HOOK_INIT(&softc->ipf_hk_v4_nic, ipf_hk_v4_nic, "ipf_v4_event");
+	if (net_register_hook(softc->ipf_nd_v4, NH_NIC_EVENTS,
+			  &softc->ipf_hk_v4_nic))
+		cmn_err(CE_WARN, "register-hook(v4-nic) failed");
+
+	HOOK_INIT(&softc->ipf_hk_v6_in, ipf_hk_v6_in, "ipf_v6_in");
+	if (net_register_hook(softc->ipf_nd_v6, NH_PHYSICAL_IN,
+			  &softc->ipf_hk_v6_in))
+		cmn_err(CE_WARN, "register-hook(v6-in) failed");
+
+	HOOK_INIT(&softc->ipf_hk_v6_out, ipf_hk_v6_out, "ipf_v6_out");
+	if (net_register_hook(softc->ipf_nd_v6, NH_PHYSICAL_OUT,
+			  &softc->ipf_hk_v6_out))
+		cmn_err(CE_WARN, "register-hook(v6-out) failed");
+
+	HOOK_INIT(&softc->ipf_hk_v6_nic, ipf_hk_v6_nic, "ipf_v6_event");
+	if (net_register_hook(softc->ipf_nd_v6, NH_NIC_EVENTS,
+			  &softc->ipf_hk_v6_nic))
+		cmn_err(CE_WARN, "register-hook(v6-nic) failed");
+}
+
+
+void
+ipf_detach_hooks(softc)
+	ipf_main_softc_t *softc;
+{
+	if (softc->ipf_nd_v4 != NULL) {
+		if (net_unregister_hook(softc->ipf_nd_v4, NH_PHYSICAL_IN,
+				    &softc->ipf_hk_v4_in))
+			cmn_err(CE_WARN, "unregister-hook(v4-in) failed");
+
+		if (net_unregister_hook(softc->ipf_nd_v4, NH_PHYSICAL_OUT,
+				    &softc->ipf_hk_v4_out))
+			cmn_err(CE_WARN, "unregister-hook(v4-out) failed");
+
+		if (net_unregister_hook(softc->ipf_nd_v4, NH_NIC_EVENTS,
+				    &softc->ipf_hk_v4_nic))
+			cmn_err(CE_WARN, "unregister-hook(v4-nic) failed");
+
+		net_release(softc->ipf_nd_v4);
+		softc->ipf_nd_v4 = NULL;
+	}
+
+	if (softc->ipf_nd_v6 != NULL) {
+		if (net_unregister_hook(softc->ipf_nd_v6, NH_PHYSICAL_IN,
+				    &softc->ipf_hk_v6_in))
+			cmn_err(CE_WARN, "unregister-hook(v6-in) failed");
+
+		if (net_unregister_hook(softc->ipf_nd_v6, NH_PHYSICAL_OUT,
+				    &softc->ipf_hk_v6_out))
+			cmn_err(CE_WARN, "unregister-hook(v6-out) failed");
+
+		if (net_unregister_hook(softc->ipf_nd_v6, NH_NIC_EVENTS,
+				    &softc->ipf_hk_v6_nic))
+			cmn_err(CE_WARN, "unregister-hook(v6-nic) failed");
+
+		net_release(softc->ipf_nd_v6);
+		softc->ipf_nd_v6 = NULL;
+	}
+}
+#endif

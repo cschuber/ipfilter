@@ -138,7 +138,8 @@ static void ipf_frag_deref __P((void *, ipfr_t **, ipfrwlock_t *));
 static int ipf_frag_next __P((ipf_main_softc_t *, ipftoken_t *, ipfgeniter_t *,
 			      ipfr_t **, ipfr_t ***, ipfrwlock_t *));
 #else
-static ipfr_t *ipfr_frag_new __P((fr_info_t *, u_32_t, ipfr_t **));
+static ipfr_t *ipfr_frag_new __P((ipf_main_softc_t *, ipf_frag_softc_t *,
+				  fr_info_t *, u_32_t, ipfr_t **));
 static ipfr_t *ipf_frag_lookup __P((ipf_main_softc_t *, ipf_frag_softc_t *, fr_info_t *, ipfr_t **));
 static void ipf_frag_deref __P((void *, ipfr_t **));
 static int ipf_frag_next __P((ipf_main_softc_t *, ipftoken_t *, ipfgeniter_t *,

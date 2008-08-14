@@ -146,7 +146,8 @@ static	u_32_t		ipf_checkripso __P((u_char *));
 static	void		ipf_checkrulefunc __P((ipf_main_softc_t *, void *,
 					       int, int));
 static	u_32_t		ipf_decaps __P((fr_info_t *, u_32_t, int));
-static	int		ipf_deliverlocal __P((int, void *, void *));
+static	int		ipf_deliverlocal __P((ipf_main_softc_t *, int, void *,
+					      void *));
 static	frentry_t	*ipf_dolog __P((fr_info_t *, u_32_t *));
 static	int		ipf_flushlist __P((ipf_main_softc_t *, int, minor_t,
 					   int *, frentry_t **));
@@ -2481,7 +2482,6 @@ ipf_scanlist(fin, pass)
 				LBUMP(ipf_stats[fin->fin_out].fr_skip);
 			}
 			LBUMP(ipf_stats[fin->fin_out].fr_pkl);
-			fin->fin_flx |= FI_DONTCACHE;
 		}
 #endif /* IPFILTER_LOG */
 
@@ -2773,8 +2773,10 @@ ipf_check(ctx, ip, hlen, ifp, out
 # ifdef MENTAT
 	qpktinfo_t *qpi = qif;
 
+#  ifdef __sparc
 	if ((u_int)ip & 0x3)
 		return 2;
+#  endif
 # else
 	SPL_INT(s);
 # endif
@@ -4164,13 +4166,13 @@ ipf_synclist(softc, fr, ifp)
 		if (fr->fr_type == FR_T_IPF) {
 			if (fr->fr_satype != FRI_NORMAL &&
 			    fr->fr_satype != FRI_LOOKUP) {
-				ipf_ifpaddr(v, fr->fr_satype,
+				ipf_ifpaddr(softc, v, fr->fr_satype,
 					    fr->fr_ifas[fr->fr_sifpidx],
 					    &fr->fr_src6, &fr->fr_smsk6);
 			}
 			if (fr->fr_datype != FRI_NORMAL &&
 			    fr->fr_datype != FRI_LOOKUP) {
-				ipf_ifpaddr(v, fr->fr_datype,
+				ipf_ifpaddr(softc, v, fr->fr_datype,
 					    fr->fr_ifas[fr->fr_difpidx],
 					    &fr->fr_dst6, &fr->fr_dmsk6);
 			}
@@ -4215,11 +4217,11 @@ ipf_synclist(softc, fr, ifp)
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    frsync                                                      */
+/* Function:    ipf_sync                                                    */
 /* Returns:     void                                                        */
 /* Parameters:  Nil                                                         */
 /*                                                                          */
-/* frsync() is called when we suspect that the interface list or            */
+/* ipf_sync() is called when we suspect that the interface list or          */
 /* information about interfaces (like IP#) has changed.  Go through all     */
 /* filter rules, NAT entries and the state table and check if anything      */
 /* needs to be changed/updated.                                             */
@@ -5008,7 +5010,7 @@ frrequest(softc, unit, req, data, set, makecopy)
 			ipf_fixskip(ftail, f, -1);
 			*ftail = f->fr_next;
 			f->fr_next = NULL;
-			ipf_checkrulefunc(softc, f->fr_func, addrem, set);
+			ipf_checkrulefunc(softc, (void *)f->fr_func, addrem, set);
 			(void) ipf_derefrule(softc, &f);
 		}
 	} else {
@@ -5065,7 +5067,7 @@ frrequest(softc, unit, req, data, set, makecopy)
 						f->fr_grp = &fg->fg_start;
 				}
 
-				ipf_checkrulefunc(softc, f->fr_func,
+				ipf_checkrulefunc(softc, (void *)f->fr_func,
 						  addrem, set);
 			} else {
 				softc->ipf_interror = 33;
@@ -7200,7 +7202,7 @@ ipf_resolvedest(softc, fdp, v)
 	fdp->fd_ptr = ifp;
 
 	if ((ifp != NULL) && (ifp != (void *)-1)) {
-		fdp->fd_local = ipf_deliverlocal(v, ifp, &fdp->fd_ip);
+		fdp->fd_local = ipf_deliverlocal(softc, v, ifp, &fdp->fd_ip);
 	}
 
 }
@@ -7944,7 +7946,7 @@ ipf_ipf_ioctl(softc, data, cmd, mode, uid, ctx)
 			error = EPERM;
 		} else {
 			WRITE_ENTER(&softc->ipf_global);
-#if defined(MENTAT) && defined(_KERNEL)
+#if (defined(MENTAT) && defined(_KERNEL)) && !defined(INSTANCES)
 			error = ipfsync();
 #else
 			ipf_sync(softc, NULL);
@@ -8212,7 +8214,7 @@ ipf_checkrulefunc(softc, funcptr, addrem, set)
 	ipfunc_resolve_t *ft;
 
 	for (ft = ipf_availfuncs; ft->ipfu_addr != NULL; ft++)
-		if (ft->ipfu_addr == funcptr)
+		if ((void *)ft->ipfu_addr == funcptr)
 			break;
 
 	if (ft->ipfu_addr == NULL || ft->ipfu_ref == NULL)
@@ -8658,7 +8660,8 @@ ipf_queueflush(softc, deletefn, ipfqs, userqs, activep, size, low)
 /* This fucntion is used to determine in the address "sinaddr" belongs to   */
 /* the network interface represented by ifp.                                */
 /* ------------------------------------------------------------------------ */
-static int ipf_deliverlocal(ipversion, ifp, sinaddr)
+static int ipf_deliverlocal(softc, ipversion, ifp, sinaddr)
+	ipf_main_softc_t *softc;
 	int ipversion;
 	void *ifp;
 	void *sinaddr;
@@ -8669,7 +8672,7 @@ static int ipf_deliverlocal(ipversion, ifp, sinaddr)
 	if (ipversion == 4) {
 		struct sockaddr_in *sin = sinaddr;
 
-		if (ipf_ifpaddr(4, FRI_NORMAL, ifp, &addr, NULL) == 0) {
+		if (ipf_ifpaddr(softc, 4, FRI_NORMAL, ifp, &addr, NULL) == 0) {
 			if (addr.in4.s_addr == sin->sin_addr.s_addr)
 				islocal = 1;
 		}
@@ -8678,7 +8681,7 @@ static int ipf_deliverlocal(ipversion, ifp, sinaddr)
 	} else if (ipversion == 6) {
 		struct sockaddr_in6 *sin = sinaddr;
 
-		if (ipf_ifpaddr(6, FRI_NORMAL, ifp, &addr, NULL) == 0) {
+		if (ipf_ifpaddr(softc, 6, FRI_NORMAL, ifp, &addr, NULL) == 0) {
 			if (IP6_EQ(&addr, &sin->sin6_addr))
 				islocal = 1;
 		}

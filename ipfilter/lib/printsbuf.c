@@ -26,5 +26,4 @@ void printsbuf(buf)
 			printf("\\%o", *s);
 	}
 }
-
 #endif

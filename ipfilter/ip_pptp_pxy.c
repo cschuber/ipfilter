@@ -200,7 +200,9 @@ ipf_p_pptp_donatstate(fin, nat, pptp)
 	if (nat2 != NULL)
 		ipf_queueback(softc->ipf_ticks, &nat2->nat_tqe);
 	else {
+#ifdef USE_MUTEXES
 		ipf_nat_softc_t *softn = softc->ipf_nat_soft;
+#endif
 
 		MUTEX_ENTER(&softn->ipf_nat_new);
 		nat2 = ipf_nat_add(&fi, &pptp->pptp_rule, &pptp->pptp_nat,

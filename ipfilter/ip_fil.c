@@ -770,7 +770,8 @@ copyinptr(src, dst, size)
  * return the first IP Address associated with an interface
  */
 int
-ipf_ifpaddr(v, atype, ifptr, inp, inpmask)
+ipf_ifpaddr(softc, v, atype, ifptr, inp, inpmask)
+	ipf_main_softc_t *softc;
 	int v, atype;
 	void *ifptr;
 	i6addr_t *inp, *inpmask;
@@ -831,7 +832,7 @@ ipf_ifpaddr(v, atype, ifptr, inp, inpmask)
 u_32_t
 ipf_random() 
 {
-	static int last = 0xa5a5a5a5;
+	static unsigned int last = 0xa5a5a5a5;
 	static int calls = 0;
 	int number;
 

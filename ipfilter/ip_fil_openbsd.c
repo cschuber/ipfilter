@@ -163,7 +163,7 @@ ipfdetach()
  * Filter ioctl interface.
  */
 int
-iplioctl(dev, cmd, data, mode , p)
+ipfioctl(dev, cmd, data, mode , p)
 	struct proc *p;
 	dev_t dev;
 	u_long cmd;
@@ -420,7 +420,7 @@ ipf_send_icmp_err(type, fin, dst)
 			}
 
 		if (dst == 0) {
-			if (ipf_ifpaddr(4, FRI_NORMAL, ifp,
+			if (ipf_ifpaddr(&ipfmain, 4, FRI_NORMAL, ifp,
 					&dst6, NULL) == -1) {
 				FREE_MB_T(m);
 				return -1;
@@ -457,7 +457,7 @@ ipf_send_icmp_err(type, fin, dst)
 		xtra = MIN(fin->fin_plen,
 			   avail - hlen - sizeof(*icmp) - max_linkhdr);
 		if (dst == 0) {
-			if (ipf_ifpaddr(6, FRI_NORMAL, ifp,
+			if (ipf_ifpaddr(&ipfmain, 6, FRI_NORMAL, ifp,
 					&dst6, NULL) == -1) {
 				FREE_MB_T(m);
 				return -1;
@@ -498,7 +498,7 @@ ipf_send_icmp_err(type, fin, dst)
 			icmp->icmp_nextmtu = htons(fin->fin_mtu);
 
 		} else if (ifp != NULL) {
-			icmp->icmp_nextmtu = htons(GETIFMTU(ifp));
+			icmp->icmp_nextmtu = htons(GETIFMTU_4(ifp));
 
 		} else {	/* make up a number... */
 			icmp->icmp_nextmtu = htons(fin->fin_plen - 20);
@@ -907,7 +907,8 @@ ipf_verifysrc(fin)
  * return the first IP Address associated with an interface
  */
 int
-ipf_ifpaddr(v, atype, ifptr, inp, inpmask)
+ipf_ifpaddr(softc, v, atype, ifptr, inp, inpmask)
+	ipf_main_softc_t *softc;
 	int v, atype;
 	void *ifptr;
 	i6addr_t *inp, *inpmask;
@@ -1272,12 +1273,10 @@ ipf_inject(fin, m)
 
 
 int
-ipf_random(range)
-	int range;
+ipf_random()
 {
 	int number;
 
 	number = arc4random();
-	number %= range;
 	return number;
 }

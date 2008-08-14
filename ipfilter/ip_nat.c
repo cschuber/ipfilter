@@ -196,7 +196,7 @@ static ipftuneable_t ipf_nat_tuneables[] = {
 /* ======================================================================== */
 
 
-#if SOLARIS
+#if SOLARIS && !defined(INSTANCES)
 extern	int		pfil_delayed_copy;
 #endif
 
@@ -1551,7 +1551,7 @@ ipf_nat_siocaddnat(softc, softn, n, np, getlock)
 
 	n = NULL;
 	ATOMIC_INC32(softn->ipf_nat_stats.ns_rules);
-#if SOLARIS
+#if SOLARIS && !defined(INSTANCES)
 	pfil_delayed_copy = 0;
 #endif
 	if (getlock) {
@@ -1735,7 +1735,7 @@ ipf_nat_free_rule(softn, n)
 
 	KFREE(n);
 
-#if SOLARIS
+#if SOLARIS && !defined(INSTANCES)
 	if (softn->ipf_nat_stats.ns_rules == 0)
 		pfil_delayed_copy = 1;
 #endif
@@ -2547,7 +2547,7 @@ ipf_nat_clearlist(softn)
 		ipf_nat_delrule(softn, n);
 		i++;
 	}
-#if SOLARIS
+#if SOLARIS && !defined(INSTANCES)
 	pfil_delayed_copy = 1;
 #endif
 	softn->ipf_nat_map_masks = 0;
@@ -2715,7 +2715,7 @@ ipf_nat_newmap(fin, nat, ni)
 			 * 0/32 - use the interface's IP address.
 			 */
 			if ((l > 0) ||
-			    ipf_ifpaddr(4, FRI_NORMAL, fin->fin_ifp,
+			    ipf_ifpaddr(softc, 4, FRI_NORMAL, fin->fin_ifp,
 				       &in6, NULL) == -1) {
 				NBUMPSIDE(1, ns_new_ifpaddr);
 				return -1;
@@ -2951,7 +2951,7 @@ ipf_nat_newrdr(fin, nat, ni)
 		/*
 		 * 0/32 - use the interface's IP address.
 		 */
-		if (ipf_ifpaddr(4, FRI_NORMAL, fin->fin_ifp,
+		if (ipf_ifpaddr(softc, 4, FRI_NORMAL, fin->fin_ifp,
 			       &in6, NULL) == -1) {
 			NBUMPSIDE(0, ns_new_ifpaddr);
 			return -1;
@@ -3331,11 +3331,11 @@ ipf_nat_finalise(fin, nat)
 	nat->nat_v[1] = 4;
 
 	if ((nat->nat_ifps[0] != NULL) && (nat->nat_ifps[0] != (void *)-1)) {
-		nat->nat_mtu[0] = GETIFMTU(nat->nat_ifps[0]);
+		nat->nat_mtu[0] = GETIFMTU_4(nat->nat_ifps[0]);
 	}
 
 	if ((nat->nat_ifps[1] != NULL) && (nat->nat_ifps[1] != (void *)-1)) {
-		nat->nat_mtu[1] = GETIFMTU(nat->nat_ifps[1]);
+		nat->nat_mtu[1] = GETIFMTU_4(nat->nat_ifps[1]);
 	}
 
 #ifdef	IPFILTER_SYNC
@@ -3464,10 +3464,10 @@ ipf_nat_insert(softc, softn, nat)
 		}
 	}
 	if ((nat->nat_ifps[0] != NULL) && (nat->nat_ifps[0] != (void *)-1)) {
-		nat->nat_mtu[0] = GETIFMTU(nat->nat_ifps[0]);
+		nat->nat_mtu[0] = GETIFMTU_4(nat->nat_ifps[0]);
 	}
 	if ((nat->nat_ifps[1] != NULL) && (nat->nat_ifps[1] != (void *)-1)) {
-		nat->nat_mtu[1] = GETIFMTU(nat->nat_ifps[1]);
+		nat->nat_mtu[1] = GETIFMTU_4(nat->nat_ifps[1]);
 	}
 
 	/*
@@ -4135,7 +4135,7 @@ ipf_nat_inlookup(fin, flags, p, src, mapdst)
 		}
 		if (ifp != NULL) {
 			nat->nat_ifps[0] = ifp;
-			nat->nat_mtu[0] = GETIFMTU(ifp);
+			nat->nat_mtu[0] = GETIFMTU_4(ifp);
 		}
 		return nat;
 	}
@@ -4231,7 +4231,7 @@ find_in_wild_ports:
 			}
 			if (ifp != NULL) {
 				nat->nat_ifps[0] = ifp;
-				nat->nat_mtu[0] = GETIFMTU(ifp);
+				nat->nat_mtu[0] = GETIFMTU_4(ifp);
 			}
 			nat->nat_flags &= ~(SI_W_DPORT|SI_W_SPORT);
 			ipf_nat_tabmove(softn, nat);
@@ -4458,7 +4458,7 @@ ipf_nat_outlookup(fin, flags, p, src, dst)
 
 		if (ifp != NULL) {
 			nat->nat_ifps[1] = ifp;
-			nat->nat_mtu[1] = GETIFMTU(ifp);
+			nat->nat_mtu[1] = GETIFMTU_4(ifp);
 		}
 		return nat;
 	}
@@ -4553,7 +4553,7 @@ find_out_wild_ports:
 			}
 			if (ifp != NULL) {
 				nat->nat_ifps[1] = ifp;
-				nat->nat_mtu[1] = GETIFMTU(ifp);
+				nat->nat_mtu[1] = GETIFMTU_4(ifp);
 			}
 			nat->nat_flags &= ~(SI_W_DPORT|SI_W_SPORT);
 			ipf_nat_tabmove(softn, nat);
@@ -6165,7 +6165,7 @@ ipf_nat_sync(softc, ifp)
 						  nat->nat_v[0]);
 			if ((nat->nat_ifps[0] != NULL) &&
 			    (nat->nat_ifps[0] != (void *)-1)) {
-				nat->nat_mtu[0] = GETIFMTU(nat->nat_ifps[0]);
+				nat->nat_mtu[0] = GETIFMTU_4(nat->nat_ifps[0]);
 			}
 			if (nat->nat_ifnames[1][0] != '\0') {
 				nat->nat_ifps[1] = GETIFP(nat->nat_ifnames[1],
@@ -6175,7 +6175,7 @@ ipf_nat_sync(softc, ifp)
 			}
 			if ((nat->nat_ifps[1] != NULL) &&
 			    (nat->nat_ifps[1] != (void *)-1)) {
-				nat->nat_mtu[1] = GETIFMTU(nat->nat_ifps[1]);
+				nat->nat_mtu[1] = GETIFMTU_4(nat->nat_ifps[1]);
 			}
 			ifp2 = nat->nat_ifps[0];
 			if (ifp2 == NULL)
@@ -6186,7 +6186,7 @@ ipf_nat_sync(softc, ifp)
 			 * new one.
 			 */
 			sum1 = NATFSUM(nat, nat->nat_v[1], nat_nsrc6);
-			if (ipf_ifpaddr(nat->nat_v[0], FRI_NORMAL, ifp2,
+			if (ipf_ifpaddr(softc, nat->nat_v[0], FRI_NORMAL, ifp2,
 				       &in, NULL) != -1) {
 				if (nat->nat_v[0] == 4)
 					nat->nat_nsrcip = in.in4;
@@ -7888,7 +7888,7 @@ ipf_nat_nextaddr(fin, na, old, dst)
 		 */
 		} else if (na->na_addr[0].in4.s_addr == 0 &&
 			   na->na_addr[1].in4.s_addr == 0xffffffff) {
-			if (ipf_ifpaddr(4, na->na_atype,
+			if (ipf_ifpaddr(softc, 4, na->na_atype,
 					fin->fin_ifp, &newip, NULL) == -1) {
 				NINCLSIDE(fin->fin_out, ns_ifpaddrfail);
 				return -1;
@@ -7986,7 +7986,7 @@ ipf_nat_nextaddrinit(softc, na, initial, ifp)
 	case FRI_NETMASKED :
 	case FRI_PEERADDR :
 		if (ifp != NULL)
-			(void )ipf_ifpaddr(4, na->na_atype, ifp,
+			(void )ipf_ifpaddr(softc, 4, na->na_atype, ifp,
 					  &na->na_addr[0], &na->na_addr[1]);
 		break;
 
@@ -8050,6 +8050,9 @@ ipf_nat_encapok(fin, nat)
 	fr_info_t *fin;
 	nat_t *nat;
 {
+#ifdef INSTANCES
+	ipf_main_softc_t *softc = fin->fin_main_soft;	/* For GETIFMTU_4 */
+#endif
 	void *sifp;
 	ipnat_t *n;
 	int extra;
@@ -8067,7 +8070,7 @@ ipf_nat_encapok(fin, nat)
 		return 0;
 	}
 
-	mtu = GETIFMTU(nat->nat_ifps[1]);
+	mtu = GETIFMTU_4(nat->nat_ifps[1]);
 
 	if (fin->fin_plen + extra < mtu)
 		return 0;

@@ -324,7 +324,6 @@ typedef	struct	fr_ip	{
 #define	FI_ENCAP	0x100000	/* encap/decap with NAT */
 #define	FI_AH		0x200000	/* AH header present */
 #define	FI_NOCKSUM	0x20000000	/* don't do a L4 checksum validation */
-#define	FI_DONTCACHE	0x40000000	/* don't cache the result */
 #define	FI_IGNORE	0x80000000
 
 #define	fi_saddr	fi_src.in4.s_addr
@@ -1470,6 +1469,7 @@ typedef struct ipfexp {
 #define	FIVE_DAYS		(5 * ONE_DAY)
 
 typedef struct ipf_main_softc_s {
+	struct ipf_main_softc_s *ipf_next;
 	ipfmutex_t	ipf_rw;
 	ipfmutex_t      ipf_timeoutlock;
 	ipfrwlock_t     ipf_mutex;
@@ -1541,6 +1541,18 @@ typedef struct ipf_main_softc_s {
 #if defined(_KERNEL)
 # if SOLARIS
 	struct pollhead	ipf_poll_head[IPL_LOGMAX];
+	void		*ipf_dip;
+#  if defined(INSTANCES)
+	u_long		ipf_idnum;
+	net_data_t	ipf_nd_v4;
+	net_data_t	ipf_nd_v6;
+	hook_t		ipf_hk_v4_in;
+	hook_t		ipf_hk_v4_out;
+	hook_t		ipf_hk_v4_nic;
+	hook_t		ipf_hk_v6_in;
+	hook_t		ipf_hk_v6_out;
+	hook_t		ipf_hk_v6_nic;
+#  endif
 # else
 	struct selinfo	ipf_selwait[IPL_LOGMAX];
 # endif
@@ -1637,6 +1649,10 @@ extern	int	ipf_pfil_hook __P((void));
 extern	int	ipf_pfil_unhook __P((void));
 extern	void	ipf_event_reg __P((void));
 extern	void	ipf_event_dereg __P((void));
+# endif
+
+# if defined(INSTANCES)
+extern	ipf_main_softc_t	*ipf_find_softc __P((u_long));
 # endif
 
 #endif /* #ifndef _KERNEL */
@@ -1745,7 +1761,7 @@ extern	frentry_t 	*ipf_getrulen __P((ipf_main_softc_t *, int, char *,
 					   u_32_t));
 extern	void		ipf_getstat __P((ipf_main_softc_t *,
 					 struct friostat *));
-extern	int		ipf_ifpaddr __P((int, int, void *,
+extern	int		ipf_ifpaddr __P((ipf_main_softc_t *, int, int, void *,
 					i6addr_t *, i6addr_t *));
 extern	int		ipf_initialise __P((void));
 extern	int		ipf_lock __P((caddr_t, int *));

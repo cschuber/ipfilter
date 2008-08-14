@@ -370,7 +370,7 @@ ipf_p_irc_send(fin, nat)
 		sum2 -= sum1;
 		sum2 = (sum2 & 0xffff) + (sum2 >> 16);
 
-		fix_outcksum(fin, &ip->ip_sum, sum2);
+		ipf_fix_outcksum(fin, &ip->ip_sum, sum2);
 #endif
 		fin->fin_plen += inc;
 		ip->ip_len = htons(fin->fin_plen);
@@ -400,7 +400,9 @@ ipf_p_irc_send(fin, nat)
 	nat2 = ipf_nat_outlookup(fin, IPN_TCP, nat->nat_pr[1], nat->nat_nsrcip,
 			     ip->ip_dst);
 	if (nat2 == NULL) {
+#ifdef USE_MUTEXES
 		ipf_nat_softc_t *softn = softc->ipf_nat_soft;
+#endif
 
 		bcopy((caddr_t)fin, (caddr_t)&fi, sizeof(fi));
 		bzero((char *)tcp2, sizeof(*tcp2));

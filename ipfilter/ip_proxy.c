@@ -350,6 +350,7 @@ ipf_proxy_create_clone(softc, orig)
 
 	bcopy((char *)orig, (char *)apn, sizeof(*apn));
 	apn->apr_next = NULL;
+	apn->apr_soft = NULL;
 
 	if (apn->apr_create != NULL) {
 		apn->apr_soft = (*apn->apr_create)(softc);

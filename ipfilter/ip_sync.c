@@ -603,7 +603,7 @@ ipf_sync_read(softc, uio)
 	while ((softs->sl_tail == softs->sl_idx) && (softs->su_tail == softs->su_idx)) {
 #  if defined(_KERNEL)
 #   if SOLARIS
-		if (!cv_wait_sig(&softs->ipslwait, &softs->ipsl_mutex)) {
+		if (!cv_wait_sig(&softs->ipslwait, &softs->ipsl_mutex.ipf_lk)) {
 			MUTEX_EXIT(&softs->ipsl_mutex);
 			softc->ipf_interror = 110009;
 			return EINTR;

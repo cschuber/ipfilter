@@ -19,6 +19,8 @@ ROOT=$(CPUDIR)/root
 PKGDIR=$(ROOT)/opt/ipf
 PKGMAN=$(PKGDIR)/man
 PKGBIN=$(PKGDIR)/bin/$(OBJ)
+#CTFCONVERT=ctfconvert -i -L VERSION
+CTFCONVERT=echo
 #
 DEST=$(OBJ)
 TOOL=$(TOP)/tools
@@ -49,7 +51,7 @@ PROTO64=$(PROTO64_$(ARCH))
 CC=gcc -Wall
 DEBUG=-g
 LIBS=-lsocket -lnsl -lelf -L$(OBJ) -lipf $(LIBBPF)
-DEF=-I$(TOP)/../pfil -D_KERNEL -DSUNDDI $(IPFBPF)
+DEF=-I$(TOP)/../pfil -D_KERNEL -DSUNDDI $(IPFBPF) $(INSTANCE)
 OBJ=.
 PKG=ipf
 PROTO=prototype
@@ -173,6 +175,7 @@ $(OBJ)/fil_u.o: $(TOP)/fil.c $(TOP)/ip_fil.h $(TOP)/ipf.h
 
 $(OBJ)/fil.o: $(TOP)/fil.c $(TOP)/ip_fil.h $(TOP)/ipf.h
 	$(CC) -I$(TOP) $(POLICY) $(DFLAGS) $(IPFBPF) -c $(TOP)/fil.c -o $@
+	$(CTFCONVERT) $@
 
 $(OBJ)/ipf.o: $(TOOL)/ipf.c $(TOP)/ip_fil.h $(TOP)/ipf.h
 	$(CC) $(CCARGS) -c $(TOOL)/ipf.c -o $@
@@ -221,6 +224,7 @@ $(OBJ)/mlso_rule.o: $(TOP)/mlso_rule.c
 
 $(OBJ)/ip_rules.o: $(OBJ)/ip_rules.c $(TOP)/ip_rules.h
 	$(CC) -I$(TOP) $(DFLAGS) -c $(OBJ)/ip_rules.c -o $@
+	$(CTFCONVERT) $@
 
 $(OBJ)/ip_rulesx.o: $(OBJ)/ip_rules.c $(TOP)/ip_rules.h
 	$(CC) -I$(TOP) -DIPFILTER_COMPILED $(DFLAGS) -c $(OBJ)/ip_rules.c -o $@
@@ -285,6 +289,7 @@ $(OBJ)/ip_trafcon.o: $(TOP)/ip_trafcon.c $(TOP)/ip_compat.h $(TOP)/ip_fil.h \
 
 $(OBJ)/bpf_filter.o: $(TOP)/bpf_filter.c $(TOP)/bpf-ipf.h $(TOP)/pcap-ipf.h
 	$(CC) -I$(TOP) $(DFLAGS) -c $(TOP)/bpf_filter.c -o $@
+	$(CTFCONVERT) $@
 
 $(OBJ)/bpf_filter_u.o: $(TOP)/bpf_filter.c
 	$(CC) -I$(TOP) $(DFLAGS) -c $(TOP)/bpf_filter.c -o $@
@@ -355,15 +360,18 @@ $(OBJ)/ip_fil_u.o: $(TOP)/ip_fil.c $(TOP)/ip_fil.h
 
 $(OBJ)/ip_fil.o: $(TOP)/ip_fil_solaris.c $(TOP)/ip_fil.h
 	$(CC) -I$(TOP) $(DFLAGS) $(COMPIPF) -c $(TOP)/ip_fil_solaris.c -o $@
+	$(CTFCONVERT) $@
 
 $(OBJ)/ip_log_u.o: $(TOP)/ip_log.c $(TOP)/ip_fil.h
 	$(CC) $(CCARGS) $(EXTRA) -c $(TOP)/ip_log.c -o $@
 
 $(OBJ)/ip_log.o: $(TOP)/ip_log.c $(TOP)/ip_fil.h
 	$(CC) -I$(TOP) $(DFLAGS) -c $(TOP)/ip_log.c -o $@
+	$(CTFCONVERT) $@
 
 $(OBJ)/solaris.o: $(TOP)/solaris.c $(TOP)/ipl.h
 	$(CC) -I$(TOP) $(DFLAGS) -c $(TOP)/solaris.c -o $@
+	$(CTFCONVERT) $@
 
 $(OBJ)/ipmon: $(IPMON) $(OBJ)/libipf.a
 	$(CC) $(CCARGS) $(LOGFAC) $(IPMON) -o $@ $(LIBS) -ll

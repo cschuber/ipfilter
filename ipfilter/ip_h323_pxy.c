@@ -248,7 +248,9 @@ ipf_p_h245_out(arg, fin, aps, nat)
 	nat_t *nat;
 {
 	ipf_main_softc_t *softc = fin->fin_main_soft;
+#ifdef USE_MUTEXES
 	ipf_nat_softc_t *softn = softc->ipf_nat_soft;
+#endif
 	int ipaddr, off, datlen;
 	tcphdr_t *tcp;
 	caddr_t data;

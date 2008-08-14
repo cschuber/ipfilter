@@ -46,7 +46,7 @@ ipf_p_ipsec_soft_create(softc)
 	if (softi == NULL)
 		return NULL;
 
-	bzero((char *)softi, sizeof(softi));
+	bzero((char *)softi, sizeof(*softi));
 	softi->ipsec_fr.fr_ref = 1;
 	softi->ipsec_fr.fr_flags = FR_OUTQUE|FR_PASS|FR_QUICK|FR_KEEPSTATE;
 	MUTEX_INIT(&softi->ipsec_fr.fr_lock, "IPsec proxy rule lock");
@@ -90,6 +90,9 @@ ipf_p_ipsec_soft_fini(softc, arg)
 {
 	ipf_ipsec_softc_t *softi = arg;
 
+	if (arg == NULL)
+		return;
+
 	if (softi->ipsec_nat_tqe != NULL) {
 		if (ipf_deletetimeoutqueue(softi->ipsec_nat_tqe) == 0)
 			ipf_freetimeoutqueue(softc, softi->ipsec_nat_tqe);
@@ -131,7 +134,9 @@ ipf_p_ipsec_new(arg, fin, aps, nat)
 {
 	ipf_ipsec_softc_t *softi = arg;
 	ipf_main_softc_t *softc = fin->fin_main_soft;
+#ifdef USE_MUTEXES
 	ipf_nat_softc_t *softn = softc->ipf_nat_soft;
+#endif
 	ipsec_pxy_t *ipsec;
 	fr_info_t fi;
 	ipnat_t *ipn;
@@ -288,7 +293,9 @@ ipf_p_ipsec_inout(arg, fin, aps, nat)
 			ipf_queueback(softc->ipf_ticks,
 				      &ipsec->ipsc_nat->nat_tqe);
 		else {
+#ifdef USE_MUTEXES
 			ipf_nat_softc_t *softn = softc->ipf_nat_soft;
+#endif
 
 			MUTEX_ENTER(&softn->ipf_nat_new);
 			ipsec->ipsc_nat = ipf_nat_add(&fi, &ipsec->ipsc_rule,

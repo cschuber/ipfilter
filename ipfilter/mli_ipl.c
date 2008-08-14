@@ -544,7 +544,7 @@ ipl_ipfilter_intfsync(void)
 	if (nif_interfaces != in_interfaces) {
 		/* if the number of interfaces has changed, resync */
 		MUTEX_EXIT(&ipfi_mutex);
-		frsync(NULL);
+		ipf_sync(&ipfmain, NULL);
 	} else
 		MUTEX_EXIT(&ipfi_mutex);
 }

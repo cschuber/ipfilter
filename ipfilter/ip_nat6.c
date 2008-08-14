@@ -558,7 +558,7 @@ ipf_nat6_newmap(fin, nat, ni)
 			 * 0/32 - use the interface's IP address.
 			 */
 			if ((l > 0) ||
-			    ipf_ifpaddr(6, FRI_NORMAL, fin->fin_ifp,
+			    ipf_ifpaddr(softc, 6, FRI_NORMAL, fin->fin_ifp,
 				       &in, NULL) == -1) {
 				NINCLSIDE6(1, ns_new_ifpaddr);
 				return -1;
@@ -801,7 +801,7 @@ ipf_nat6_newrdr(fin, nat, ni)
 		/*
 		 * 0/32 - use the interface's IP address.
 		 */
-		if (ipf_ifpaddr(6, FRI_NORMAL, fin->fin_ifp,
+		if (ipf_ifpaddr(softc, 6, FRI_NORMAL, fin->fin_ifp,
 			       &in, NULL) == -1) {
 			NINCLSIDE6(0, ns_new_ifpaddr);
 			return -1;
@@ -1175,11 +1175,11 @@ ipf_nat6_finalise(fin, nat)
 #endif
 
 	if ((nat->nat_ifps[0] != NULL) && (nat->nat_ifps[0] != (void *)-1)) {
-		nat->nat_mtu[0] = GETIFMTU(nat->nat_ifps[0]);
+		nat->nat_mtu[0] = GETIFMTU_6(nat->nat_ifps[0]);
 	}
 
 	if ((nat->nat_ifps[1] != NULL) && (nat->nat_ifps[1] != (void *)-1)) {
-		nat->nat_mtu[1] = GETIFMTU(nat->nat_ifps[1]);
+		nat->nat_mtu[1] = GETIFMTU_6(nat->nat_ifps[1]);
 	}
 
 	nat->nat_v[0] = 6;
@@ -1310,10 +1310,10 @@ ipf_nat6_insert(softc, softn, nat)
 		}
 	}
 	if ((nat->nat_ifps[0] != NULL) && (nat->nat_ifps[0] != (void *)-1)) {
-		nat->nat_mtu[0] = GETIFMTU(nat->nat_ifps[0]);
+		nat->nat_mtu[0] = GETIFMTU_6(nat->nat_ifps[0]);
 	}
 	if ((nat->nat_ifps[1] != NULL) && (nat->nat_ifps[1] != (void *)-1)) {
-		nat->nat_mtu[1] = GETIFMTU(nat->nat_ifps[1]);
+		nat->nat_mtu[1] = GETIFMTU_6(nat->nat_ifps[1]);
 	}
 
 	nat->nat_next = softn->ipf_nat_instances;
@@ -2001,7 +2001,7 @@ ipf_nat6_inlookup(fin, flags, p, src, mapdst)
 		}
 		if (ifp != NULL) {
 			nat->nat_ifps[0] = ifp;
-			nat->nat_mtu[0] = GETIFMTU(ifp);
+			nat->nat_mtu[0] = GETIFMTU_6(ifp);
 		}
 		return nat;
 	}
@@ -2097,7 +2097,7 @@ find_in_wild_ports:
 			}
 			if (ifp != NULL) {
 				nat->nat_ifps[0] = ifp;
-				nat->nat_mtu[0] = GETIFMTU(ifp);
+				nat->nat_mtu[0] = GETIFMTU_6(ifp);
 			}
 			nat->nat_flags &= ~(SI_W_DPORT|SI_W_SPORT);
 			ipf_nat6_tabmove(softn, nat);
@@ -2319,7 +2319,7 @@ ipf_nat6_outlookup(fin, flags, p, src, dst)
 
 		if (ifp != NULL) {
 			nat->nat_ifps[1] = ifp;
-			nat->nat_mtu[1] = GETIFMTU(ifp);
+			nat->nat_mtu[1] = GETIFMTU_6(ifp);
 		}
 		return nat;
 	}
@@ -2414,7 +2414,7 @@ find_out_wild_ports:
 			}
 			if (ifp != NULL) {
 				nat->nat_ifps[1] = ifp;
-				nat->nat_mtu[1] = GETIFMTU(ifp);
+				nat->nat_mtu[1] = GETIFMTU_6(ifp);
 			}
 			nat->nat_flags &= ~(SI_W_DPORT|SI_W_SPORT);
 			ipf_nat6_tabmove(softn, nat);
@@ -4233,7 +4233,7 @@ ipf_nat6_nextaddr(fin, na, old, dst)
 	case NA_RANDOM :
 #ifdef NEED_128BIT_MATH
 		range = ntohl(max) - ntohl(min);
-		new = ipf_random(range);
+		new = ipf_random() % range;
 		new += ntohl(min);
 		new = htonl(new);
 #endif
@@ -4252,7 +4252,7 @@ ipf_nat6_nextaddr(fin, na, old, dst)
 		 */
 		} else if (IP6_ISZERO(&na->na_addr[0].in6) &&
 			   IP6_ISONES(&na->na_addr[1].in6)) {
-			if (ipf_ifpaddr(6, na->na_atype,
+			if (ipf_ifpaddr(softc, 6, na->na_atype,
 				       fin->fin_ifp, &newip, NULL) == -1) {
 				NBUMPSIDE6(fin->fin_out, ns_ifpaddrfail);
 				return -1;
@@ -4348,7 +4348,7 @@ ipf_nat6_nextaddrinit(softc, na, initial, ifp)
 	case FRI_NETMASKED :
 	case FRI_PEERADDR :
 		if (ifp != NULL)
-			(void )ipf_ifpaddr(6, na->na_atype, ifp,
+			(void )ipf_ifpaddr(softc, 6, na->na_atype, ifp,
 					   &na->na_addr[0],
 					   &na->na_addr[1]);
 		break;
@@ -4412,6 +4412,9 @@ ipf_nat6_encapok(fin, nat)
 	fr_info_t *fin;
 	nat_t *nat;
 {
+#ifdef INSTANCES
+	ipf_main_softc_t *softc = fin->fin_main_soft;   /* For GETIFMTU_6 */
+#endif
 	void *sifp;
 	ipnat_t *n;
 	int extra;
@@ -4426,7 +4429,7 @@ ipf_nat6_encapok(fin, nat)
 		return 0;
 	}
 
-	mtu = GETIFMTU(nat->nat_ifps[1]);
+	mtu = GETIFMTU_6(nat->nat_ifps[1]);
 
 	if (fin->fin_plen + extra < mtu)
 		return 0;

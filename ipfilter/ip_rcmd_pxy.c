@@ -235,7 +235,9 @@ ipf_p_rcmd_portmsg(fin, aps, nat)
 	}
 
 	if (nat2 == NULL) {
+#ifdef USE_MUTEXES
 		ipf_nat_softc_t *softn = softc->ipf_nat_soft;
+#endif
 
 		/*
 		 * Add skeleton NAT entry for connection which will come

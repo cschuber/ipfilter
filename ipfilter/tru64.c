@@ -603,7 +603,7 @@ void ipfilter_in_control(so, cmd, data, ifp)
 	}
 
 	if (cmd == (ioctlcmd_t)SIOCAIFADDR)
-		frsync(NULL);
+		ipf_sync(&ipfmain, NULL);
 
 	RWLOCK_EXIT(&ipf_tru64);
 }

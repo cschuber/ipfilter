@@ -147,7 +147,7 @@ static struct   cdevsw  ipldevsw =
 	iplclose,		/* close */
 	iplread,		/* read */
 	(void *)nullop,		/* write */
-	iplioctl,		/* ioctl */
+	ipfioctl,		/* ioctl */
 	(void *)nullop,		/* stop */
 	(void *)nullop,		/* reset */
 	(void *)NULL,		/* tty */
@@ -165,7 +165,7 @@ extern int nchrdev;
 
 static struct cdevsw ipl_cdevsw = {
 	iplopen,	iplclose,	iplread,	nowrite, /* 79 */
-	iplioctl,	nostop,		noreset,	nodevtotty,
+	ipfioctl,	nostop,		noreset,	nodevtotty,
 #if (__FreeBSD_version >= 300000)
 	seltrue,	nommap,		nostrategy,	"ipl",
 #else

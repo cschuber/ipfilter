@@ -1224,7 +1224,9 @@ ipf_p_rpcb_getnat(fin, nat, proto, port)
 	nflags &= ~NAT_SEARCH;
 
 	if (natl == NULL) {
+#ifdef USE_MUTEXES
 		ipf_nat_softc_t *softn = softc->ipf_nat_soft;
+#endif
 
 		/* XXX Since we're just copying the original ipn contents
 		 * back, would we be better off just sending a pointer to

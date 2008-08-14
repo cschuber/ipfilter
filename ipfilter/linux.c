@@ -211,17 +211,17 @@ static u_int ipf_poll(struct file *fp, poll_table *wait)
 	case IPL_LOGNAT :
 	case IPL_LOGSTATE :
 # ifdef IPFILTER_LOG
-		if (ipf_log_canread(unit))
+		if (ipf_log_canread(&ipfmain, unit))
 			revents = (POLLIN | POLLRDNORM);
 # endif
 		break;
 	case IPL_LOGAUTH :
-		if (ipf_auth_waiting())
+		if (ipf_auth_waiting(&ipfmain))
 			revents = (POLLIN | POLLRDNORM);
 		break;
 	case IPL_LOGSYNC :
 # ifdef IPFILTER_SYNC
-		if (ipf_sync_canread())
+		if (ipf_sync_canread(&ipfmain))
 			revents = (POLLIN | POLLRDNORM);
 # endif
 		break;

@@ -201,10 +201,13 @@ typedef unsigned int	u_32_t;
 # define	U_32_T	1
 
 # ifdef _KERNEL
+#  define	NEED_LOCAL_RAND		1
 #  define	KRWLOCK_T		krwlock_t
 #  define	KMUTEX_T		kmutex_t
-#  include "qif.h"
-#  include "pfil.h"
+#  if !defined(FW_HOOKS)
+#   include "qif.h"
+#   include "pfil.h"
+#  endif
 #  if SOLARIS2 >= 6
 #   if SOLARIS2 == 6
 #    define	ATOMIC_INCL(x)		atomic_add_long((uint32_t*)&(x), 1)
@@ -260,13 +263,53 @@ typedef unsigned int	u_32_t;
 #  define	KMALLOC(a,b)	(a) = (b)kmem_alloc(sizeof(*(a)), KM_NOSLEEP)
 #  define	KMALLOCS(a,b,c)	(a) = (b)kmem_alloc((c), KM_NOSLEEP)
 #  define	GET_MINOR(x)	getminor(x)
-extern	void	*get_unit __P((char *, int));
-#  define	GETIFP(n, v)	get_unit(n, v)
-#  define	GETIFMTU(x)	((qif_t *)x)->qf_max_frag
-#  define	IFNAME(x)	((qif_t *)x)->qf_name
-#  define	COPYIFNAME(x, b) \
+extern	void	*get_unit __P((void *, char *, int));
+#  define	GETIFP(n, v)	get_unit(softc, n, v)
+#  if defined(INSTANCES)
+#   include	<sys/hook.h>
+#   include	<sys/neti.h>
+typedef struct  qif     {
+	void		*qf_ill;
+	size_t		qf_hl;		/* header length */
+	u_int		qf_num;
+	u_int		qf_ppa;		/* Physical Point of Attachment */
+	int		qf_sap;		/* Service Access Point */
+	int		qf_bound;
+	int		qf_flags;
+} qif_t;
+
+typedef struct	qpktinfo	{
+	qif_t		*qpi_real;	/* the real one on the STREAM */
+	void		*qpi_ill;	/* COPIED */
+	mblk_t		*qpi_m;
+	queue_t		*qpi_q;
+	void		*qpi_data;	/* where layer 3 header starts */
+	size_t		qpi_off;
+	int		qpi_flags;	/* COPIED */
+} qpktinfo_t;
+
+#define	QF_GROUP	0x0001
+
+typedef struct qifpkt {
+	struct qifpkt	*qp_next;
+	char		qp_ifname[LIFNAMSIZ];
+	int		qp_sap;
+	mblk_t		*qp_mb;
+	int		qp_inout;
+} qifpkt_t;
+
+#   define	GETIFMTU_4(x)	net_getmtu(softc->ipf_nd_v4, (phy_if_t)x, 0)
+#   define	GETIFMTU_6(x)	net_getmtu(softc->ipf_nd_v6, (phy_if_t)x, 0)
+#   define	GET_SOFTC(x)	ipf_find_softc(x)
+#  else
+#   define	GET_SOFTC(x)	&ipfmain
+#   define	GETIFMTU_4(x)	((qif_t *)x)->qf_max_frag
+#   define	GETIFMTU_6(x)	((qif_t *)x)->qf_max_frag
+#   define	IFNAME(x)	((qif_t *)x)->qf_name
+#   define	COPYIFNAME(x, b) \
 				(void) strncpy(b, ((qif_t *)x)->qf_name, \
 					       LIFNAMSIZ)
+#  endif
 #  define	GETKTIME(x)	uniqtime((struct timeval *)x)
 #  define	MSGDSIZE(x)	msgdsize(x)
 #  define	M_LEN(x)	((x)->b_wptr - (x)->b_rptr)
@@ -278,7 +321,6 @@ extern	void	*get_unit __P((char *, int));
 #  define	PREP_MB_T(m,n)	ipf_prependmbt(fin, m)
 #  define	DUP_MB_T(m)	dupmsg(m)
 #  define	m_next		b_cont
-#  define	CACHE_HASH(x)	(((qpktinfo_t *)(x)->fin_qpi)->qpi_num & 7)
 #  define	IPF_PANIC(x,y)	if (x) { printf y; cmn_err(CE_PANIC, "ipf_panic"); }
 typedef mblk_t mb_t;
 # endif /* _KERNEL */
@@ -430,7 +472,8 @@ typedef	struct	iplog_select_s {
 #  define	SPL_X(x)	;
 extern	void	*get_unit __P((char *, int));
 #  define	GETIFP(n, v)	get_unit(n, v)
-#  define	GETIFMTU(x)	((ill_t *)x)->ill_mtu
+#  define	GETIFMTU_4(x)	((ill_t *)x)->ill_mtu
+#  define	GETIFMTU_6(x)	((ill_t *)x)->ill_mtu
 #  define	IFNAME(x, b)	((ill_t *)x)->ill_name
 #  define	COPYIFNAME(x, b) \
 				(void) strncpy(b, ((qif_t *)x)->qf_name, \
@@ -447,8 +490,8 @@ extern	void	*get_unit __P((char *, int));
 #  define	POLLWAKEUP(x)	;
 #  define	KMALLOC(a, b)	MALLOC((a), b, sizeof(*(a)), M_IOSYS, M_NOWAIT)
 #  define	KMALLOCS(a, b, c)	MALLOC((a), b, (c), M_IOSYS, M_NOWAIT)
-#  define	KFREE(x)	kmem_free((char *)(x), sizeof(*(x)))
-#  define	KFREES(x,s)	kmem_free((char *)(x), (s))
+#  define	KFREE(x)	do { kmem_free((char *)(x), sizeof(*(x))); cmn_err(CE_CONT, "!kmem_free(%p,%d)\n", x, sizeof(*(x)));}while (0)
+#  define	KFREES(x,s)	do { kmem_free((char *)(x), (s)); cmn_err(CE_CONT, "!kmem_free(%p,%d)\n", x, s);}while (0)
 #  define	MSGDSIZE(x)	msgdsize(x)
 #  define	M_LEN(x)	((x)->b_wptr - (x)->b_rptr)
 #  define	M_DUPLICATE(x)	dupmsg((x))
@@ -458,8 +501,6 @@ extern	void	*get_unit __P((char *, int));
 #  define	m_next		b_cont
 #  define	IPF_PANIC(x,y)	if (x) { printf y; panic("ipf_panic"); }
 typedef mblk_t mb_t;
-
-#  define	CACHE_HASH(x)	(((qpktinfo_t *)(x)->fin_qpi)->qpi_num & 7)
 
 #  include "qif.h"
 #  include "pfil.h"
@@ -529,6 +570,7 @@ typedef struct {
 # endif
 
 # ifdef _KERNEL
+#  define	NEED_LOCAL_RAND		1
 #  define	ATOMIC_INC(x)		{ MUTEX_ENTER(&softc->ipf_rw); \
 					  (x)++; MUTEX_EXIT(&softc->ipf_rw); }
 #  define	ATOMIC_DEC(x)		{ MUTEX_ENTER(&softc->ipf_rw); \
@@ -584,7 +626,8 @@ typedef struct {
 #  define	KFREE(x)	kmem_free((char *)(x), sizeof(*(x)))
 #  define	KFREES(x,s)	kmem_free((char *)(x), (s))
 #  define	GETIFP(n,v)	ifunit(n)
-#  define	GETIFMTU(x)	((struct ifnet *)x)->if_mtu
+#  define	GETIFMTU_4(x)	((struct ifnet *)x)->if_mtu
+#  define	GETIFMTU_6(x)	((struct ifnet *)x)->if_mtu
 #  include <sys/kmem.h>
 #  include <sys/ddi.h>
 #  define	KMALLOC(a,b)	(a) = (b)kmem_alloc(sizeof(*(a)), KM_NOSLEEP)
@@ -602,8 +645,6 @@ extern	void	m_copyback __P((struct mbuf *, int, int, caddr_t));
 #  define	M_DUPLICATE(x)	m_copy((x), 0, M_COPYALL)
 #  define	GETKTIME(x)	microtime((struct timeval *)x)
 #  define	IFNAME(x)	((struct ifnet *)x)->if_name
-#  define	CACHE_HASH(x)	((IFNAME(fin->fin_ifp)[0] + \
-				  ((struct ifnet *)fin->fin_ifp)->if_unit) & 7)
 #  define	IPF_PANIC(x,y)	if (x) { printf y; panic("ipf_panic"); }
 typedef struct mbuf mb_t;
 # else
@@ -626,6 +667,7 @@ typedef struct mbuf mb_t;
 # include <sys/sysmacros.h>
 
 # ifdef _KERNEL
+#  define	NEED_LOCAL_RAND		1
 #  define	KMUTEX_T		simple_lock_data_t
 #  define	KRWLOCK_T		lock_data_t
 #  include <net/net_globals.h>
@@ -664,7 +706,8 @@ typedef struct mbuf mb_t;
 #  define	FREE_MB_T(m)		m_freem(m)
 #  define	MTOD(m,t)		mtod(m,t)
 #  define	GETIFP(n, v)		ifunit(n)
-#  define	GETIFMTU(x)		((struct ifnet *)x)->if_mtu
+#  define	GETIFMTU_4(x)		((struct ifnet *)x)->if_mtu
+#  define	GETIFMTU_6(x)		((struct ifnet *)x)->if_mtu
 #  define	GET_MINOR		getminor
 #  define	WAKEUP(id,x)		wakeup(id + x)
 #  define	POLLWAKEUP(x)		;
@@ -680,8 +723,6 @@ typedef struct mbuf mb_t;
 #  define	M_DUPLICATE(x)	m_copy((x), 0, M_COPYALL)
 #  define	GETKTIME(x)	microtime((struct timeval *)x)
 #  define	IFNAME(x)	((struct ifnet *)x)->if_name
-#  define	CACHE_HASH(x)	((IFNAME(fin->fin_ifp)[0] + \
-				  ((struct ifnet *)fin->fin_ifp)->if_unit) & 7)
 #  define	IPF_PANIC(x,y)	if (x) { printf y; panic("ipf_panic"); }
 typedef struct mbuf mb_t;
 # endif /* _KERNEL */
@@ -780,11 +821,8 @@ typedef struct mbuf mb_t;
 				(void) strncpy(b, \
 					       ((struct ifnet *)x)->if_xname, \
 					       LIFNAMSIZ)
-#  define	CACHE_HASH(x)	((((struct ifnet *)fin->fin_ifp)->if_index)&7)
 # else
 #  define	IFNAME(x)	((struct ifnet *)x)->if_name
-#  define	CACHE_HASH(x)	((IFNAME(fin->fin_ifp)[0] + \
-				  ((struct ifnet *)fin->fin_ifp)->if_unit) & 7)
 # endif
 typedef	struct uio	uio_t;
 typedef	u_long		ioctlcmd_t;
@@ -800,6 +838,9 @@ typedef	u_int32_t	u_32_t;
 /*                                F R E E B S D                            */
 /* ----------------------------------------------------------------------- */
 #ifdef __FreeBSD__
+# if  (__FreeBSD_version < 400000)
+#  define	NEED_LOCAL_RAND	1
+# endif
 # if defined(_KERNEL)
 #  if (__FreeBSD_version >= 500000)
 #   include "opt_bpf.h"
@@ -906,11 +947,8 @@ typedef	u_int32_t	u_32_t;
 					       LIFNAMSIZ)
 # endif
 # if (__FreeBSD_version >= 500043)
-#  define	CACHE_HASH(x)	((((struct ifnet *)fin->fin_ifp)->if_index) & 7)
 # else
 #  define	IFNAME(x)	((struct ifnet *)x)->if_name
-#  define	CACHE_HASH(x)	((IFNAME(fin->fin_ifp)[0] + \
-				  ((struct ifnet *)fin->fin_ifp)->if_unit) & 7)
 # endif
 
 # ifdef _KERNEL
@@ -1024,11 +1062,8 @@ typedef struct mbuf mb_t;
 				(void) strncpy(b, \
 					       ((struct ifnet *)x)->if_xname, \
 					       LIFNAMSIZ)
-#  define	CACHE_HASH(x)	((((struct ifnet *)fin->fin_ifp)->if_index)&7)
 # else
 #  define	IFNAME(x)	((struct ifnet *)x)->if_name
-#  define	CACHE_HASH(x)	((IFNAME(fin->fin_ifp)[0] + \
-				  ((struct ifnet *)fin->fin_ifp)->if_unit) & 7)
 # endif
 typedef	struct uio	uio_t;
 typedef	u_long		ioctlcmd_t;
@@ -1054,8 +1089,6 @@ typedef	u_int32_t	u_32_t;
 #  define	M_LEN(x)	(x)->m_len
 #  define	M_DUPLICATE(x)	m_copy((x), 0, M_COPYALL)
 #  define	IFNAME(x)	((struct ifnet *)x)->if_name
-#  define	CACHE_HASH(x)	((IFNAME(fin->fin_ifp)[0] + \
-				  ((struct ifnet *)fin->fin_ifp)->if_unit) & 7)
 typedef struct mbuf mb_t;
 # endif /* _KERNEL */
 
@@ -1081,10 +1114,8 @@ typedef	u_int32_t	u_32_t;
 #  define	M_LEN(x)	(x)->m_len
 #  define	M_DUPLICATE(x)	m_copy((x), 0, M_COPYALL)
 #  define	IFNAME(x)	((struct ifnet *)x)->if_name
-#  define	CACHE_HASH(x)	((IFNAME(fin->fin_ifp)[0] + \
-				  ((struct ifnet *)fin->fin_ifp)->if_unit) & 7)
 #  define	GETIFP(n, v)	ifunit(n, IFNAMSIZ)
-#  define	GETIFMTU(x)	((struct ifnet *)x)->if_mtu
+#  define	GETIFMTU_4(x)	((struct ifnet *)x)->if_mtu
 #  define	KFREE(x)	kmem_free((char *)(x), sizeof(*(x)))
 #  define	KFREES(x,s)	kmem_free((char *)(x), (s))
 #  define	SLEEP(id, n)	sleep((id), PZERO+1)
@@ -1175,8 +1206,6 @@ struct ip6_ext {
 #  define	SPL_NET(x)		do { } while (0)
 #  define	SPL_X(x)		do { } while (0)
 #  define	IFNAME(x)		((struct net_device*)x)->name
-#  define	CACHE_HASH(x)	((IFNAME(fin->fin_ifp)[0] + \
-			  ((struct net_device *)fin->fin_ifp)->ifindex) & 7)
 typedef	struct	sk_buff	mb_t;
 extern	void	m_copydata __P((mb_t *, int, int, caddr_t));
 extern	void	m_copyback __P((mb_t *, int, int, caddr_t));
@@ -1211,7 +1240,8 @@ extern	mb_t	*m_pullup __P((mb_t *, int));
 #  define	KFREES(x,s)	kfree(x)
 
 #  define GETIFP(n,v)	dev_get_by_name(n)
-#  define GETIFMTU(x)	((struct net_device *)x)->mtu
+#  define GETIFMTU_4(x)	((struct net_device *)x)->mtu
+#  define GETIFMTU_6(x)	((struct net_device *)x)->mtu
 
 # else
 #  include <net/ethernet.h>
@@ -1329,7 +1359,8 @@ typedef u_int32_t 	u_32_t;
 #  define	UIOMOVE(a,b,c,d)	uiomove((caddr_t)a,b,c,d)
 extern void* getifp __P((char *, int));
 #  define	GETIFP(n, v)		getifp(n, v)
-#  define	GETIFMTU(x)		((struct ifnet *)x)->if_mtu
+#  define	GETIFMTU_4(x)		((struct ifnet *)x)->if_mtu
+#  define	GETIFMTU_6(x)		((struct ifnet *)x)->if_mtu
 #  define	GET_MINOR		minor
 #  define	SLEEP(id, n)	sleepx((id), PZERO+1, 0)
 #  define	WAKEUP(id,x)	wakeup(id)
@@ -1345,8 +1376,6 @@ extern void* getifp __P((char *, int));
 #  define	M_LEN(x)	(x)->m_len
 #  define	M_DUPLICATE(x)	m_copy((x), 0, M_COPYALL)
 #  define	GETKTIME(x)
-#  define	CACHE_HASH(x)	((IFNAME(fin->fin_ifp)[0] + \
-				  ((struct ifnet *)fin->fin_ifp)->if_unit) & 7)
 #  define	IPF_PANIC(x,y)
 typedef struct mbuf mb_t;
 # endif /* _KERNEL */
@@ -1528,7 +1557,8 @@ typedef	struct	mb_s	{
 # define	KFREE(x)	free(x)
 # define	KFREES(x,s)	free(x)
 # define	GETIFP(x, v)	get_unit(x,v)
-# define	GETIFMTU(x)	2048
+# define	GETIFMTU_4(x)	2048
+# define	GETIFMTU_6(x)	2048
 # define	COPYIN(a,b,c)	bcopywrap((a), (b), (c))
 # define	COPYOUT(a,b,c)	bcopywrap((a), (b), (c))
 # define	COPYDATA(m, o, l, b)	bcopy(MTOD((mb_t *)m, char *) + (o), \
@@ -1543,10 +1573,6 @@ extern	int	bcopywrap __P((void *, void *, size_t));
 extern	mb_t	*allocmbt __P((size_t));
 extern	mb_t	*dupmbt __P((mb_t *));
 extern	void	freembt __P((mb_t *));
-# ifndef CACHE_HASH
-#  define	CACHE_HASH(x)	((IFNAME(fin->fin_ifp)[0] + \
-				  ((struct ifnet *)fin->fin_ifp)->if_unit) & 7)
-# endif
 
 # define	MUTEX_DESTROY(x)	eMmutex_destroy(&(x)->ipf_emu)
 # define	MUTEX_ENTER(x)		eMmutex_enter(&(x)->ipf_emu, \
@@ -1621,7 +1647,7 @@ typedef	struct ip6_hdr	ip6_t;
 #endif
 
 #if defined(_KERNEL)
-# ifdef MENTAT
+# if defined(MENTAT) && !defined(INSTANCES)
 #  define	COPYDATA	mb_copydata
 #  define	COPYBACK	mb_copyback
 # else
@@ -1676,7 +1702,8 @@ MALLOC_DECLARE(M_IPFILTER);
 #   define	POLLWAKEUP(x)	selwakeup(softc->ipf_selwait+x)
 #  endif
 #  define	GETIFP(n, v)	ifunit(n)
-#  define	GETIFMTU(x)	((struct ifnet *)x)->if_mtu
+#  define	GETIFMTU_4(x)	((struct ifnet *)x)->if_mtu
+#  define	GETIFMTU_6(x)	((struct ifnet *)x)->if_mtu
 # endif /* (Free)BSD */
 
 # if !defined(USE_MUTEXES) && !defined(SPL_NET)
@@ -2475,6 +2502,19 @@ typedef	struct	tcpiphdr	tcpiphdr_t;
 #endif
 #ifndef	ICMP6_NI_SUBJ_IPV4
 # define	ICMP6_NI_SUBJ_IPV4	2
+#endif
+
+#ifndef	MLD_MTRACE_RESP
+# define	MLD_MTRACE_RESP		200
+#endif
+#ifndef	MLD_MTRACE
+# define	MLD_MTRACE		201
+#endif
+#ifndef	MLD6_MTRACE_RESP
+# define	MLD6_MTRACE_RESP	MLD_MTRACE_RESP
+#endif
+#ifndef	MLD6_MTRACE
+# define	MLD6_MTRACE		MLD_MTRACE
 #endif
 
 /*
