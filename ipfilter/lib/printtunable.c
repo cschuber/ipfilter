@@ -11,7 +11,7 @@
 void printtunable(tup)
 	ipftune_t *tup;
 {
-	printf("%s\tmin %#lx\tmax %#lx\tcurrent ",
+	printf("%s\tmin %lu\tmax %lu\tcurrent ",
 		tup->ipft_name, tup->ipft_min, tup->ipft_max);
 	if (tup->ipft_sz == sizeof(u_long))
 		printf("%lu\n", tup->ipft_vlong);

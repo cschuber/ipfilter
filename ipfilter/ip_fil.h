@@ -1543,6 +1543,7 @@ typedef struct ipf_main_softc_s {
 	struct pollhead	ipf_poll_head[IPL_LOGMAX];
 	void		*ipf_dip;
 #  if defined(INSTANCES)
+	int		ipf_get_loopback;
 	u_long		ipf_idnum;
 	net_data_t	ipf_nd_v4;
 	net_data_t	ipf_nd_v6;
@@ -1552,6 +1553,10 @@ typedef struct ipf_main_softc_s {
 	hook_t		ipf_hk_v6_in;
 	hook_t		ipf_hk_v6_out;
 	hook_t		ipf_hk_v6_nic;
+	hook_t		ipf_hk_loop_v4_in;
+	hook_t		ipf_hk_loop_v4_out;
+	hook_t		ipf_hk_loop_v6_in;
+	hook_t		ipf_hk_loop_v6_out;
 #  endif
 # else
 	struct selinfo	ipf_selwait[IPL_LOGMAX];
@@ -1653,6 +1658,8 @@ extern	void	ipf_event_dereg __P((void));
 
 # if defined(INSTANCES)
 extern	ipf_main_softc_t	*ipf_find_softc __P((u_long));
+extern	int	ipf_set_loopback __P((ipf_main_softc_t *, ipftuneable_t *,
+				      ipftuneval_t *));
 # endif
 
 #endif /* #ifndef _KERNEL */

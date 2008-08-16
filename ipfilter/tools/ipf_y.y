@@ -42,6 +42,7 @@ static	void	setsyslog __P((void));
 static	void	unsetsyslog __P((void));
 static	void	fillgroup __P((frentry_t *));
 static	void	do_tuneint __P((char *, int));
+static	void	do_tunestr __P((char *, char *));
 
 frentry_t	*fr = NULL, *frc = NULL, *frtop = NULL, *frold = NULL;
 
@@ -191,6 +192,7 @@ rules:	line
 setting:
 	IPFY_SET YY_STR YY_NUMBER ';'	{ do_tuneint($2, $3); }
 	| IPFY_SET YY_STR YY_HEX ';'	{ do_tuneint($2, $3); }
+	| IPFY_SET YY_STR YY_STR ';'	{ do_tunestr($2, $3); }
 	;
 
 line:	rule		{ while ((fr = frtop) != NULL) {
@@ -2412,4 +2414,18 @@ int value;
 	strcat(buffer, "=");
 	sprintf(buffer, "%u", value);
 	ipf_dotuning(ipffd, buffer, ioctl);
+}
+
+
+static void do_tunestr(varname, value)
+char *varname, *value;
+{
+
+	if (!strcasecmp(value, "true"))
+		do_tuneint(varname, 1);
+	else if (!strcasecmp(value, "false"))
+		do_tuneint(varname, 0);
+	else {
+		yyerror("did not find true/false where expected");
+	}
 }

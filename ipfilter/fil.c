@@ -289,7 +289,7 @@ static ipfunc_resolve_t ipf_availfuncs[] = {
 	{ "", NULL }
 };
 
-static ipftuneable_t ipf_main_tuneables[23] = {
+static ipftuneable_t ipf_main_tuneables[] = {
 	{ { (void *)offsetof(struct ipf_main_softc_s, ipf_flags) },
 		"ipf_flags",		0,	0xffffffff,
 		stsizeof(ipf_main_softc_t, ipf_flags),
@@ -327,7 +327,7 @@ static ipftuneable_t ipf_main_tuneables[23] = {
 		stsizeof(ipf_main_softc_t, ipf_tcpidletimeout),
 		0,			NULL,	ipf_settimeout },
 	{ { (void *)offsetof(ipf_main_softc_t, ipf_tcpclosewait) },
-		"tcp_clos_ewait",	1,	0x7fffffff,
+		"tcp_close_wait",	1,	0x7fffffff,
 		stsizeof(ipf_main_softc_t, ipf_tcpclosewait),
 		0,			NULL,	ipf_settimeout },
 	{ { (void *)offsetof(ipf_main_softc_t, ipf_tcplastack) },
@@ -378,6 +378,12 @@ static ipftuneable_t ipf_main_tuneables[23] = {
 		"ip_timeout",		1,	0x7fffffff,
 		stsizeof(ipf_main_softc_t, ipf_iptimeout),
 		0,			NULL,	ipf_settimeout },
+#if defined(INSTANCES) && defined(_KERNEL)
+	{ { (void *)offsetof(ipf_main_softc_t, ipf_get_loopback) },
+		"intercept_loopback",	0,	1,
+		stsizeof(ipf_main_softc_t, ipf_get_loopback),
+		0,			NULL,	ipf_set_loopback },
+#endif
 	{ { 0 },
 		NULL,			0,	0,
 		0,
