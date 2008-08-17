@@ -329,7 +329,7 @@ typedef struct qifpkt {
 #  define	MTOD(m,t)	((t)((m)->b_rptr))
 #  define	MTYPE(m)	((m)->b_datap->db_type)
 #  define	FREE_MB_T(m)	freemsg(m)
-#  define	ALLOC_MB_T(l,m)	(m) = ipf_allocmbt(l)
+#  define	ALLOC_MB_T(m,l)	(m) = ipf_allocmbt(l)
 #  define	PREP_MB_T(m,n)	ipf_prependmbt(fin, m)
 #  define	DUP_MB_T(m)	dupmsg(m)
 #  define	m_next		b_cont
