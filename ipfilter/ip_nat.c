@@ -1487,6 +1487,16 @@ ipf_nat_siocaddnat(softc, softn, n, np, getlock)
 		break;
 	}
 
+	if (n->in_redir == (NAT_DIVERTUDP|NAT_MAP)) {
+		/*
+		 * Prerecord whether or not the destination of the divert
+		 * is local or not to the interface the packet is going
+		 * to be sent out.
+		 */
+		n->in_dlocal = ipf_deliverlocal(softc, n->in_v[1],
+						n->in_ifps[1], &n->in_ndstip6);
+	}
+
 	if (getlock) {
 		WRITE_ENTER(&softc->ipf_nat);
 	}
@@ -3202,6 +3212,7 @@ ipf_nat_add(fin, np, natsave, flags, direction)
 	nat->nat_fr = fin->fin_fr;
 	nat->nat_rev = fin->fin_rev;
 	nat->nat_ptr = np;
+	nat->nat_dlocal = np->in_dlocal;
 
 	if ((np->in_apr != NULL) && ((nat->nat_flags & NAT_SLAVE) == 0))
 		if (ipf_proxy_new(fin, nat) == -1)
@@ -5301,8 +5312,8 @@ ipf_nat_out(fin, nat, natadd, nflags)
 		PREP_MB_T(fin, m);
 
 		fin->fin_ip = ip;
-		fin->fin_plen += sizeof(ip_t) + 8;	/* UDP + new IPv4 hdr */
-		fin->fin_dlen += sizeof(ip_t) + 8;	/* UDP + old IPv4 hdr */
+		fin->fin_plen += sizeof(ip_t) + 8;	/* UDP + IPv4 hdr */
+		fin->fin_dlen += sizeof(ip_t) + 8;	/* UDP + IPv4 hdr */
 
 		nflags &= ~IPN_TCPUDPICMP;
 

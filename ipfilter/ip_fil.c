@@ -879,3 +879,14 @@ ipf_verifysrc(fin)
 {
 	return 1;
 }
+
+
+int
+ipf_inject(fin, m)   
+	fr_info_t *fin; 
+	mb_t *m;
+{
+	FREE_MB_T(m);
+
+	return 0;
+}     

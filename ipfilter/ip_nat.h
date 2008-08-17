@@ -126,6 +126,7 @@ typedef	struct	nat	{
 	u_int		nat_hv[2];
 	char		nat_ifnames[2][LIFNAMSIZ];
 	int		nat_rev;		/* 0 = forward, 1 = reverse */
+	int		nat_dlocal;
 	int		nat_v[2];		/* 0 = old, 1 = new */
 	u_int		nat_redir;		/* copy of in_redir */
 } nat_t;
@@ -230,6 +231,7 @@ typedef	struct	ipnat	{
 	u_int		in_hv[2];
 	int		in_flineno;		/* conf. file line number */
 	int		in_stepnext;
+	int		in_dlocal;
 	u_short		in_dpnext;
 	u_short		in_spnext;
 	/* From here to the end is covered by IPN_CMPSIZ */

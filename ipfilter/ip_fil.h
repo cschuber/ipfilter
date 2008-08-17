@@ -1585,7 +1585,6 @@ extern	void	ipfilterattach __P((int));
 # endif
 extern	int	ipl_enable __P((void));
 extern	int	ipl_disable __P((void));
-extern	int	ipf_inject __P((fr_info_t *, mb_t *));
 # ifdef MENTAT
 extern	int	ipf_check __P((void *, struct ip *, int, void *, int, void *,
 			       mblk_t **));
@@ -1678,6 +1677,7 @@ extern	u_short	ipf_cksum __P((u_short *, int));
 extern	int	copyinptr __P((ipf_main_softc_t *, void *, void *, size_t));
 extern	int	copyoutptr __P((ipf_main_softc_t *, void *, void *, size_t));
 extern	int	ipf_fastroute __P((mb_t *, mb_t **, fr_info_t *, frdest_t *));
+extern	int	ipf_inject __P((fr_info_t *, mb_t *));
 extern	int	ipf_inobj __P((ipf_main_softc_t *, void *, void *, int));
 extern	int	ipf_inobjsz __P((ipf_main_softc_t *, void *, void *, int, int));
 extern	int	ipf_ioctlswitch __P((ipf_main_softc_t *, int, void *,
@@ -1761,6 +1761,8 @@ extern	int 	ipf_log_pkt __P((fr_info_t *, u_int));
 extern	frentry_t	*ipf_acctpkt __P((fr_info_t *, u_32_t *));
 extern	u_short		fr_cksum __P((mb_t *, ip_t *, int, void *, int));
 extern	void		ipf_deinitialise __P((ipf_main_softc_t *));
+extern	int		ipf_deliverlocal __P((ipf_main_softc_t *, int, void *,
+					      i6addr_t *));
 extern	frentry_t 	*ipf_dstgrpmap __P((fr_info_t *, u_32_t *));
 extern	void		ipf_fixskip __P((frentry_t **, frentry_t *, int));
 extern	void		ipf_forgetifp __P((ipf_main_softc_t *, void *));
