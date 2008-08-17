@@ -810,7 +810,7 @@ ipf_hk_v4_in(tok, data, stack)
 	netstack_t *stack;
 {
 	hook_pkt_event_t *hpe = (hook_pkt_event_t *)data;
-	ipf_main_softc_t *softc = GET_SOFTC(stack->netstack_stackid);
+	ipf_main_softc_t *softc = (ipf_main_softc_t *)stack->netstack_ipf;
 	ip_t *ip = hpe->hpe_hdr;
 	qpktinfo_t qpi;
 
@@ -834,7 +834,7 @@ ipf_hk_v4_out(tok, data, stack)
 	netstack_t *stack;
 {
 	hook_pkt_event_t *hpe = (hook_pkt_event_t *)data;
-	ipf_main_softc_t *softc = GET_SOFTC(stack->netstack_stackid);
+	ipf_main_softc_t *softc = (ipf_main_softc_t *)stack->netstack_ipf;
 	ip_t *ip = hpe->hpe_hdr;
 	qpktinfo_t qpi;
 
@@ -858,7 +858,7 @@ ipf_hk_v4_nic(tok, data, stack)
 	netstack_t *stack;
 {
 	hook_nic_event_t *nic = (hook_nic_event_t *)data;
-	ipf_main_softc_t *softc = GET_SOFTC(stack->netstack_stackid);
+	ipf_main_softc_t *softc = (ipf_main_softc_t *)stack->netstack_ipf;
 
 	/*
 	 * Should pass the family through...
@@ -893,7 +893,7 @@ ipf_hk_v6_in(tok, data, stack)
 	netstack_t *stack;
 {
 	hook_pkt_event_t *hpe = (hook_pkt_event_t *)data;
-	ipf_main_softc_t *softc = GET_SOFTC(stack->netstack_stackid);
+	ipf_main_softc_t *softc = (ipf_main_softc_t *)stack->netstack_ipf;
 	qpktinfo_t qpi;
 
 	qpi.qpi_real = (void *)hpe->hpe_ofp;
@@ -916,7 +916,7 @@ ipf_hk_v6_out(tok, data, stack)
 	netstack_t *stack;
 {
 	hook_pkt_event_t *hpe = (hook_pkt_event_t *)data;
-	ipf_main_softc_t *softc = GET_SOFTC(stack->netstack_stackid);
+	ipf_main_softc_t *softc = (ipf_main_softc_t *)stack->netstack_ipf;
 	qpktinfo_t qpi;
 
 	qpi.qpi_real = (void *)hpe->hpe_ofp;
@@ -939,7 +939,7 @@ ipf_hk_v6_nic(tok, data, stack)
 	netstack_t *stack;
 {
 	hook_nic_event_t *nic = (hook_nic_event_t *)data;
-	ipf_main_softc_t *softc = GET_SOFTC(stack->netstack_stackid);
+	ipf_main_softc_t *softc = (ipf_main_softc_t *)stack->netstack_ipf;
 
 	switch (nic->hne_event)
 	{
