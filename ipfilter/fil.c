@@ -146,8 +146,6 @@ static	u_32_t		ipf_checkripso __P((u_char *));
 static	void		ipf_checkrulefunc __P((ipf_main_softc_t *, void *,
 					       int, int));
 static	u_32_t		ipf_decaps __P((fr_info_t *, u_32_t, int));
-static	int		ipf_deliverlocal __P((ipf_main_softc_t *, int, void *,
-					      void *));
 static	frentry_t	*ipf_dolog __P((fr_info_t *, u_32_t *));
 static	int		ipf_flushlist __P((ipf_main_softc_t *, int, minor_t,
 					   int *, frentry_t **));
@@ -2967,7 +2965,8 @@ ipf_check(ctx, ip, hlen, ifp, out
 			if (fr != NULL)
 				pass &= ~FR_KEEPSTATE;
 		}
-		if ((fr == NULL) && (softc->ipf_specfuncref[0][softc->ipf_active] == 0))
+		if ((fr == NULL) && (softc->ipf_specfuncref[0]
+					    [softc->ipf_active] == 0))
 			fr = ipf_state_check(fin, &pass);
 	}
 
@@ -3055,6 +3054,12 @@ filterdone:
 				       NL_DESTROY);
 			RWLOCK_EXIT(&softc->ipf_nat);
 		} else {
+			nat_t *nat = fin->fin_nat;
+			if ((nat->nat_dlocal != 0) && (m != NULL)) {
+				ipf_inject(fin, m);
+				m = *mp = NULL;
+				fin->fin_m = NULL;
+			}
 			ipf_nat_deref(softc, (nat_t **)&fin->fin_nat);
 		}
 	}
@@ -3108,6 +3113,7 @@ filterdone:
 			 */
 			if (FR_ISAUTH(pass) && (fin->fin_m != NULL)) {
 				fin->fin_m = *fin->fin_mp = NULL;
+				m = NULL;
 			}
 		} else {
 			if (pass & FR_RETRST) {
@@ -3126,6 +3132,16 @@ filterdone:
 	if (fr != NULL) {
 		frdest_t *fdp;
 
+		/*
+		 * Generate a duplicated packet first because ipf_fastroute
+		 * can lead to fin_m being free'd... not good.
+		 */
+		if ((pass & FR_DUP) != 0) {
+			mc = M_DUPLICATE(fin->fin_m);
+			if (mc != NULL)
+				ipf_fastroute(mc, &mc, fin, &fr->fr_dif);
+		}
+
 		fdp = &fr->fr_tifs[fin->fin_rev];
 
 		if (!out && (pass & FR_FASTROUTE)) {
@@ -3140,15 +3156,6 @@ filterdone:
 			/* this is for to rules: */
 			ipf_fastroute(fin->fin_m, mp, fin, fdp);
 			m = *mp = NULL;
-		}
-
-		/*
-		 * Generate a duplicated packet.
-		 */
-		if ((pass & FR_DUP) != 0) {
-			mc = M_DUPLICATE(fin->fin_m);
-			if (mc != NULL)
-				ipf_fastroute(mc, &mc, fin, &fr->fr_dif);
 		}
 
 		(void) ipf_derefrule(softc, &fr);
@@ -7208,7 +7215,7 @@ ipf_resolvedest(softc, fdp, v)
 	fdp->fd_ptr = ifp;
 
 	if ((ifp != NULL) && (ifp != (void *)-1)) {
-		fdp->fd_local = ipf_deliverlocal(softc, v, ifp, &fdp->fd_ip);
+		fdp->fd_local = ipf_deliverlocal(softc, v, ifp, &fdp->fd_ip6);
 	}
 
 }
@@ -8661,34 +8668,31 @@ ipf_queueflush(softc, deletefn, ipfqs, userqs, activep, size, low)
 /* Returns:     int - 1 = local address, 0 = non-local address              */
 /* Parameters:  ipversion(I) - IP protocol version (4 or 6)                 */
 /*              ifp(I)       - network interface pointer                    */
-/*              sinaddr(I)   - sockaddr structure with original address     */
+/*              ipaddr(I)    - IPv4/6 destination address                   */
 /*                                                                          */
-/* This fucntion is used to determine in the address "sinaddr" belongs to   */
+/* This fucntion is used to determine in the address "ipaddr" belongs to    */
 /* the network interface represented by ifp.                                */
 /* ------------------------------------------------------------------------ */
-static int ipf_deliverlocal(softc, ipversion, ifp, sinaddr)
+int
+ipf_deliverlocal(softc, ipversion, ifp, ipaddr)
 	ipf_main_softc_t *softc;
 	int ipversion;
 	void *ifp;
-	void *sinaddr;
+	i6addr_t *ipaddr;
 {
 	i6addr_t addr;
 	int islocal = 0;
 
 	if (ipversion == 4) {
-		struct sockaddr_in *sin = sinaddr;
-
 		if (ipf_ifpaddr(softc, 4, FRI_NORMAL, ifp, &addr, NULL) == 0) {
-			if (addr.in4.s_addr == sin->sin_addr.s_addr)
+			if (addr.in4.s_addr == ipaddr->in4.s_addr)
 				islocal = 1;
 		}
 
 #ifdef USE_INET6
 	} else if (ipversion == 6) {
-		struct sockaddr_in6 *sin = sinaddr;
-
 		if (ipf_ifpaddr(softc, 6, FRI_NORMAL, ifp, &addr, NULL) == 0) {
-			if (IP6_EQ(&addr, &sin->sin6_addr))
+			if (IP6_EQ(&addr, ipaddr))
 				islocal = 1;
 		}
 #endif
