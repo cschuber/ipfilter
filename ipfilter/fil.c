@@ -2705,6 +2705,7 @@ filterdone:
 			 */
 			if (FR_ISAUTH(pass) && (fin->fin_m != NULL)) {
 				fin->fin_m = *fin->fin_mp = NULL;
+				m = NULL;
 			}
 		} else {
 			if (pass & FR_RETRST)
@@ -2722,6 +2723,16 @@ filterdone:
 	if (fr != NULL) {
 		frdest_t *fdp;
 
+		/*
+		 * Generate a duplicated packet first because ipf_fastroute
+		 * can lead to fin_m being free'd... not good.
+		 */
+		if ((pass & FR_DUP) != 0) {
+			mc = M_DUPLICATE(fin->fin_m);
+			if (mc != NULL)
+				(void) fr_fastroute(mc, &mc, fin, &fr->fr_dif);
+		}
+
 		fdp = &fr->fr_tifs[fin->fin_rev];
 
 		if (!out && (pass & FR_FASTROUTE)) {
@@ -2736,15 +2747,6 @@ filterdone:
 			/* this is for to rules: */
 			(void) fr_fastroute(fin->fin_m, mp, fin, fdp);
 			m = *mp = NULL;
-		}
-
-		/*
-		 * Generate a duplicated packet.
-		 */
-		if ((pass & FR_DUP) != 0) {
-			mc = M_DUPLICATE(fin->fin_m);
-			if (mc != NULL)
-				(void) fr_fastroute(mc, &mc, fin, &fr->fr_dif);
 		}
 
 		(void) fr_derefrule(&fr);
