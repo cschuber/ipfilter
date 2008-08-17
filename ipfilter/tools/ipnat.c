@@ -400,11 +400,16 @@ void dotable(nsp, fd, alive, which, side)
 {
 	int sz, i, used, maxlen, minlen, totallen;
 	ipftable_t table;
-	u_long *buckets;
+	u_int *buckets;
 	ipfobj_t obj;
 
 	sz = sizeof(*buckets) * nsp->ns_nattab_sz;
-	buckets = (u_long *)malloc(sz);
+	buckets = (u_int *)malloc(sz);
+	if (buckets == NULL) {
+		fprintf(stderr,
+			"cannot allocate memory (%d) for buckets\n", sz);
+		return;
+	}
 
 	obj.ipfo_rev = IPFILTER_VERSION;
 	obj.ipfo_type = IPFOBJ_GTABLE;
@@ -420,6 +425,7 @@ void dotable(nsp, fd, alive, which, side)
 
 	if (alive) {
 		if (ioctl(fd, SIOCGTABL, &obj) != 0) {
+			perror("SIOCFTABL");
 			free(buckets);
 			return;
 		}
@@ -452,7 +458,9 @@ void dotable(nsp, fd, alive, which, side)
 	printf("%d\tminimal length %s\n", minlen, side);
 	printf("%d\tmaximal length %s\n", maxlen, side);
 	printf("%.3f\taverage length %s\n",
-	       used ? (float)totallen / used : 0.0, side);
+	       used ? ((float)totallen / used) : 0.0, side);
+
+	free(buckets);
 }
 
 
