@@ -7,7 +7,11 @@ IPFILCONF=${IPFBASE}/ipf.conf
 IP6FILCONF=${IPFBASE}/ipf6.conf
 IPNATCONF=${IPFBASE}/ipnat.conf
 IPPOOLCONF=${IPFBASE}/ippool.conf
-PFILCHECKED=no
+if [ -f /kernel/misc/neti -o -f /kernel/misc/sparcv9/neti ] ; then
+	PFILCHECKED=yes
+else
+	PFILCHECKED=no
+fi
 if [ -d /var/run ] ; then
 	PIDFILE=/var/run/ipmon.pid
 else
