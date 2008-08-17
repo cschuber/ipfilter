@@ -101,7 +101,7 @@ void printactivenat(nat, opts, alive, now)
 		printf("\n\tttl %lu use %hu sumd %s/",
 			nat->nat_age - now, nat->nat_use,
 			getsumd(nat->nat_sumd[0]));
-		printf("%s pr %u/%u bkt %d/%d flags %x\n",
+		printf("%s pr %u/%u hash %u/%u flags %x\n",
 			getsumd(nat->nat_sumd[1]),
 			nat->nat_pr[0], nat->nat_pr[1],
 			nat->nat_hv[0], nat->nat_hv[1], nat->nat_flags);
