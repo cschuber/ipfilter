@@ -1686,7 +1686,8 @@ ipf_state_add(softc, fin, stsave, flags)
 				sizeof(fr->fr_ifnames[0]));
 		} else {
 			is->is_ifp[out << 1] = fin->fin_ifp;
-			COPYIFNAME(fin->fin_ifp, is->is_ifname[out << 1]);
+			COPYIFNAME(fin->fin_v, fin->fin_ifp,
+				   is->is_ifname[out << 1]);
 		}
 
 		is->is_ifp[(out << 1) + 1] = fr->fr_ifas[1];
@@ -1703,7 +1704,8 @@ ipf_state_add(softc, fin, stsave, flags)
 	} else {
 		if (fin->fin_ifp != NULL) {
 			is->is_ifp[out << 1] = fin->fin_ifp;
-			COPYIFNAME(fin->fin_ifp, is->is_ifname[out << 1]);
+			COPYIFNAME(fin->fin_v, fin->fin_ifp,
+				   is->is_ifname[out << 1]);
 		}
 	}
 
@@ -2551,7 +2553,7 @@ ipf_matchsrcdst(fin, is, src, dst, tcp, cmask)
 	if (is->is_ifp[idx] == NULL &&
 	    (*is->is_ifname[idx] == '\0' || *is->is_ifname[idx] == '*')) {
 		is->is_ifp[idx] = ifp;
-		COPYIFNAME(ifp, is->is_ifname[idx]);
+		COPYIFNAME(fin->fin_v, ifp, is->is_ifname[idx]);
 	}
 	fin->fin_rev = rev;
 	return is;

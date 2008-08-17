@@ -390,7 +390,7 @@ get_unit(name, family)
 		*addr++ = '\0';
 
 	for (ifpp = ifneta; ifpp && (ifp = *ifpp); ifpp++) {
-		COPYIFNAME(ifp, ifname);
+		COPYIFNAME(family, ifp, ifname);
 		if (!strcmp(name, ifname)) {
 			if (addr != NULL)
 				ipf_setifpaddr(ifp, addr);

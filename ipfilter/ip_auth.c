@@ -556,7 +556,7 @@ ipf_auth_new(m, fin)
 	}
 #endif
 #if SOLARIS && defined(_KERNEL)
-	COPYIFNAME(fin->fin_ifp, fra->fra_info.fin_ifname);
+	COPYIFNAME(fin->fin_v, fin->fin_ifp, fra->fra_info.fin_ifname);
 	m->b_rptr -= qpi->qpi_off;
 	fra->fra_q = qpi->qpi_q;	/* The queue can disappear! */
 	fra->fra_m = *fin->fin_mp;

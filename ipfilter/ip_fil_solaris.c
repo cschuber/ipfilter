@@ -270,9 +270,9 @@ get_unit(soft, name, family)
 	qif_t *qf;
 	int sap;
 
-	if (family == AF_INET)
+	if (family == 4)
 		sap = 0x0800;
-	else if (family == AF_INET6)
+	else if (family == 6)
 		sap = 0x86dd;
 	else
 		return NULL;
@@ -284,9 +284,9 @@ get_unit(soft, name, family)
 	ipf_main_softc_t *softc = soft;
 	net_data_t proto;
 
-	if (family == AF_INET)
+	if (family == 4)
 		proto = softc->ipf_nd_v4;
-	else if (family == AF_INET6)
+	else if (family == 6)
 		proto = softc->ipf_nd_v6;
 	else
 		return NULL;

@@ -429,12 +429,12 @@ ipf_log_pkt(fin, flags)
 	 */
 # if (SOLARIS || defined(__hpux)) && defined(_KERNEL)
 	ipfl.fl_unit = (u_int)ifp->qf_ppa;
-	COPYIFNAME(ifp, ipfl.fl_ifname);
+	COPYIFNAME(fin->fin_v, ifp, ipfl.fl_ifname);
 # else
 #  if (defined(NetBSD) && (NetBSD <= 1991011) && (NetBSD >= 199603)) || \
       (defined(OpenBSD) && (OpenBSD >= 199603)) || defined(linux) || \
       (defined(__FreeBSD__) && (__FreeBSD_version >= 501113))
-	COPYIFNAME(ifp, ipfl.fl_ifname);
+	COPYIFNAME(fin->fin_v, ifp, ipfl.fl_ifname);
 #  else
 	ipfl.fl_unit = (u_int)ifp->if_unit;
 #   if defined(_KERNEL)

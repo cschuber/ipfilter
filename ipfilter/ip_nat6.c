@@ -1073,12 +1073,12 @@ ipf_nat6_add(fin, np, natsave, flags, direction)
 
 	nat->nat_ifps[0] = np->in_ifps[0];
 	if (np->in_ifps[0] != NULL) {
-		COPYIFNAME(np->in_ifps[0], nat->nat_ifnames[0]);
+		COPYIFNAME(np->in_v[0], np->in_ifps[0], nat->nat_ifnames[0]);
 	}
 
 	nat->nat_ifps[1] = np->in_ifps[1];
 	if (np->in_ifps[1] != NULL) {
-		COPYIFNAME(np->in_ifps[1], nat->nat_ifnames[1]);
+		COPYIFNAME(np->in_v[1], np->in_ifps[1], nat->nat_ifnames[1]);
 	}
 
 	if (ipf_nat6_finalise(fin, nat) == -1) {

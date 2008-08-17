@@ -298,6 +298,18 @@ typedef struct qifpkt {
 	int		qp_inout;
 } qifpkt_t;
 
+#   define	COPYIFNAME(v, x,b)					\
+			do {						\
+				if ((v) == 4) {				\
+					net_getifname(softc->ipf_nd_v4,	\
+						      (phy_if_t)x, b,	\
+						      sizeof(b));	\
+				} else {				\
+					net_getifname(softc->ipf_nd_v6,	\
+						      (phy_if_t)x, b,	\
+						      sizeof(b));	\
+				}					\
+			} while (0)
 #   define	GETIFMTU_4(x)	net_getmtu(softc->ipf_nd_v4, (phy_if_t)x, 0)
 #   define	GETIFMTU_6(x)	net_getmtu(softc->ipf_nd_v6, (phy_if_t)x, 0)
 #   define	GET_SOFTC(x)	ipf_find_softc(x)
@@ -306,7 +318,7 @@ typedef struct qifpkt {
 #   define	GETIFMTU_4(x)	((qif_t *)x)->qf_max_frag
 #   define	GETIFMTU_6(x)	((qif_t *)x)->qf_max_frag
 #   define	IFNAME(x)	((qif_t *)x)->qf_name
-#   define	COPYIFNAME(x, b) \
+#   define	COPYIFNAME(v, x, b) \
 				(void) strncpy(b, ((qif_t *)x)->qf_name, \
 					       LIFNAMSIZ)
 #  endif
@@ -475,7 +487,7 @@ extern	void	*get_unit __P((char *, int));
 #  define	GETIFMTU_4(x)	((ill_t *)x)->ill_mtu
 #  define	GETIFMTU_6(x)	((ill_t *)x)->ill_mtu
 #  define	IFNAME(x, b)	((ill_t *)x)->ill_name
-#  define	COPYIFNAME(x, b) \
+#  define	COPYIFNAME(v, x, b) \
 				(void) strncpy(b, ((qif_t *)x)->qf_name, \
 					       LIFNAMSIZ)
 #  define	UIOMOVE(a,b,c,d)	uiomove((caddr_t)a,b,c,d)
@@ -817,7 +829,7 @@ typedef struct mbuf mb_t;
 # endif /* _KERNEL */
 # if (NetBSD <= 1991011) && (NetBSD >= 199606)
 #  define	IFNAME(x)	((struct ifnet *)x)->if_xname
-#  define	COPYIFNAME(x, b) \
+#  define	COPYIFNAME(v, x, b) \
 				(void) strncpy(b, \
 					       ((struct ifnet *)x)->if_xname, \
 					       LIFNAMSIZ)
@@ -941,7 +953,7 @@ typedef	u_int32_t	u_32_t;
 # if (__FreeBSD_version >= 501113)
 #  include <net/if_var.h>
 #  define	IFNAME(x)	((struct ifnet *)x)->if_xname
-#  define	COPYIFNAME(x, b) \
+#  define	COPYIFNAME(v, x, b) \
 				(void) strncpy(b, \
 					       ((struct ifnet *)x)->if_xname, \
 					       LIFNAMSIZ)
@@ -1058,7 +1070,7 @@ typedef struct mbuf mb_t;
 # endif /* _KERNEL */
 # if (OpenBSD >= 199603)
 #  define	IFNAME(x, b)	((struct ifnet *)x)->if_xname
-#  define	COPYIFNAME(x, b) \
+#  define	COPYIFNAME(v, x, b) \
 				(void) strncpy(b, \
 					       ((struct ifnet *)x)->if_xname, \
 					       LIFNAMSIZ)
@@ -1264,7 +1276,7 @@ struct ifnet {
 
 # endif	/* _KERNEL */
 
-# define	COPYIFNAME(x, b) \
+# define	COPYIFNAME(v, x, b) \
 				(void) strncpy(b, \
 					       ((struct ifnet *)x)->if_xname, \
 					       LIFNAMSIZ)
@@ -1790,7 +1802,7 @@ MALLOC_DECLARE(M_IPFILTER);
 #ifndef	COPYIFNAME
 # define	NEED_FRGETIFNAME
 extern	char	*ipf_getifname __P((struct ifnet *, char *));
-# define	COPYIFNAME(x, b) \
+# define	COPYIFNAME(v, x, b) \
 				ipf_getifname((struct ifnet *)x, b)
 #endif
 

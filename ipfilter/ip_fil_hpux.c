@@ -185,9 +185,9 @@ get_unit(name, family)
 	qif_t *qf;
 	int sap;
 
-	if (family == AF_INET)
+	if (family == 4)
 		sap = 0x0800;
-	else if (family == AF_INET6)
+	else if (family == 6)
 		return NULL;
 	spinlock(&pfil_rw);
 	qf = qif_iflookup(name, sap);
