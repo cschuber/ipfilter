@@ -1377,7 +1377,8 @@ int p;
 		break;
 	case IPPROTO_ICMP :
 		nat->in_flags &= ~IPN_TCPUDP;
-		if (!(nat->in_flags & IPN_ICMPQUERY)) {
+		if (!(nat->in_flags & IPN_ICMPQUERY) &&
+		    !(nat->in_redir & NAT_DIVERTUDP)) {
 			nat->in_dcmp = 0;
 			nat->in_scmp = 0;
 			nat->in_dpmin = 0;
