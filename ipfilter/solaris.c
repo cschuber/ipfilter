@@ -1148,7 +1148,6 @@ ipf_set_loopback(softc, t, p)
 		return 0;
 
 	*t->ipft_pint = p->ipftu_int;
-printf("%s=%d\n", t->ipft_name, *t->ipft_pint);
 	if (p->ipftu_int == 0) {
 		/*
 		 * Turning it off.
