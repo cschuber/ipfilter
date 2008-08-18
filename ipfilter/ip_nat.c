@@ -571,12 +571,12 @@ ipf_nat_soft_fini(softc, arg)
 	}
 	if (softn->ipf_nat_stats.ns_side[0].ns_bucketlen != NULL) {
 		KFREES(softn->ipf_nat_stats.ns_side[0].ns_bucketlen,
-		       sizeof(u_int *) * softn->ipf_nat_table_sz);
+		       sizeof(u_int) * softn->ipf_nat_table_sz);
 		softn->ipf_nat_stats.ns_side[0].ns_bucketlen = NULL;
 	}
 	if (softn->ipf_nat_stats.ns_side[1].ns_bucketlen != NULL) {
 		KFREES(softn->ipf_nat_stats.ns_side[1].ns_bucketlen,
-		       sizeof(u_int *) * softn->ipf_nat_table_sz);
+		       sizeof(u_int) * softn->ipf_nat_table_sz);
 		softn->ipf_nat_stats.ns_side[1].ns_bucketlen = NULL;
 	}
 
