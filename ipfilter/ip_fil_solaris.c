@@ -1313,8 +1313,14 @@ ipf_allocmbt(size_t len)
 void
 ipf_prependmbt(fr_info_t *fin, mblk_t *m)
 {
-	mblk_t *o = NULL;
+	mblk_t *o = NULL, *top;
 	mblk_t *n = *fin->fin_mp;
+	qpktinfo_t *qpi;
+	int x;
+
+	qpi = fin->fin_qpi;
+	qpi->qpi_m = m;
+	qpi->qpi_data = m->b_rptr;
 
 	if (MTYPE(n) == M_DATA) {
 		/*
@@ -1324,8 +1330,6 @@ ipf_prependmbt(fr_info_t *fin, mblk_t *m)
 		 * original packet is moved so that we don't transmit data
 		 * that has been moved.
 		 */
-		int x;
-
 		x = min(fin->fin_ipoff, m->b_rptr - m->b_datap->db_base);
 
 		if (x > 0) {
@@ -1333,34 +1337,22 @@ ipf_prependmbt(fr_info_t *fin, mblk_t *m)
 			bcopy(n->b_rptr, m->b_rptr, x);
 			n->b_rptr += fin->fin_ipoff;
 		}
-		linkb(m, n);
-		fin->fin_m = m;
-		*fin->fin_mp = m;
-		return;
+	} else {
+		/*
+		 * If there are special mblk's at the start of the current
+		 * message, free them so we can put our own there.  It doesn't
+		 * matter what they were as we're completely changing the
+		 * nature of this packet.
+		 */
+		for (; n != fin->fin_m; n = o) {
+			o = n->b_cont;
+			n->b_cont = NULL;
+			freemsg(n);
+		}
 	}
 
-	/*
-	 * If there are special mblk's at the ststart of the current message,
-	 * pull them off the front and move them...good or bad?
-	 */
-	while ((n != NULL) && (MTYPE(n) != M_DATA)) {
-		if (o == NULL)
-			o = n;
-		else
-			linkb(o, n);
-		n = unlinkb(n);
-	}
-
-	if (n != NULL)
-		linkb(m, n);
-
-	/*
-	 * We know that o != NULL because to get here, the first mblk of n
-	 * _must_ have not been an M_DATA..
-	 */
-	*fin->fin_mp = o;
-	linkb(o, m);
-
+	m->b_cont = n;
+	*fin->fin_mp = m;
 	fin->fin_m = m;
 }
 
