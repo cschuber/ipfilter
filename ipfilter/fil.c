@@ -3056,6 +3056,7 @@ filterdone:
 		} else {
 			nat_t *nat = fin->fin_nat;
 			if ((nat->nat_dlocal != 0) && (m != NULL)) {
+				fin->fin_out = 0;
 				ipf_inject(fin, m);
 				m = *mp = NULL;
 				fin->fin_m = NULL;
