@@ -4129,6 +4129,8 @@ ipf_nat_inlookup(fin, flags, p, src, mapdst)
 			}
 			break;
 		case NAT_OUTBOUND :
+			if (nat->nat_dlocal)
+				continue;
 			if (nat->nat_v[1] != 4)
 				continue;
 			if (nat->nat_dlocal)
@@ -5306,19 +5308,18 @@ ipf_nat_out(fin, nat, natadd, nflags)
 
 		ip = MTOD(m, ip_t *);
 		ip->ip_id = htons(ipf_nextipid(fin));
+		s2 = ntohs(ip->ip_id);
 
 		s1 = ip->ip_len;
 		ip->ip_len = ntohs(ip->ip_len);
 		ip->ip_len += fin->fin_plen;
 		ip->ip_len = htons(ip->ip_len);
+		s2 += ntohs(ip->ip_len);
+		CALC_SUMD(s1, s2, sumd);
 
 		uh = (udphdr_t *)(ip + 1);
 		uh->uh_ulen += fin->fin_plen;
 		uh->uh_ulen = htons(uh->uh_ulen);
-
-		s2 = ntohs(ip->ip_id) + ntohs(ip->ip_len);
-		CALC_SUMD(s1, s2, sumd);
-
 #if !defined(_KERNEL) || defined(MENTAT) || defined(__sgi) || \
     defined(linux) || defined(BRIDGE_IPF)
 		ipf_fix_outcksum(fin, &ip->ip_sum, sumd);
