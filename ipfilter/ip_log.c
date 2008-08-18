@@ -353,7 +353,7 @@ ipf_log_pkt(fin, flags)
 	ipflog_t ipfl;
 	u_char p;
 	mb_t *m;
-# if (SOLARIS || defined(__hpux)) && defined(_KERNEL)
+# if (SOLARIS || defined(__hpux)) && defined(_KERNEL) && !defined(FW_HOOKS)
 	qif_t *ifp;
 # else
 	struct ifnet *ifp;
@@ -428,7 +428,9 @@ ipf_log_pkt(fin, flags)
 	 * currently associated.
 	 */
 # if (SOLARIS || defined(__hpux)) && defined(_KERNEL)
+#  if !defined(FW_HOOKS)
 	ipfl.fl_unit = (u_int)ifp->qf_ppa;
+#  endif
 	COPYIFNAME(fin->fin_v, ifp, ipfl.fl_ifname);
 # else
 #  if (defined(NetBSD) && (NetBSD <= 1991011) && (NetBSD >= 199603)) || \
