@@ -268,18 +268,8 @@ extern	void	*get_unit __P((void *, char *, int));
 #  if defined(INSTANCES)
 #   include	<sys/hook.h>
 #   include	<sys/neti.h>
-typedef struct  qif     {
-	void		*qf_ill;
-	size_t		qf_hl;		/* header length */
-	u_int		qf_num;
-	u_int		qf_ppa;		/* Physical Point of Attachment */
-	int		qf_sap;		/* Service Access Point */
-	int		qf_bound;
-	int		qf_flags;
-} qif_t;
-
 typedef struct	qpktinfo	{
-	qif_t		*qpi_real;	/* the real one on the STREAM */
+	void		*qpi_real;	/* the real one on the STREAM */
 	void		*qpi_ill;	/* COPIED */
 	mblk_t		*qpi_m;
 	queue_t		*qpi_q;
