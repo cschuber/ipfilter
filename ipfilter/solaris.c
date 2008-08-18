@@ -363,7 +363,6 @@ ipf_detach(dip, cmd)
 	switch (cmd) {
 	case DDI_DETACH:
 		for (tmp = ipf_instances; tmp != NULL; tmp = tmp->ipf_next) {
-cmn_err(CE_CONT,"tmp(%p) ref %d running %d\n", tmp, tmp->ipf_refcnt,tmp->ipf_running);
 			/*
 			 * And no proxy modules loaded.
 			 */
@@ -813,6 +812,7 @@ ipf_hk_v4_in(tok, data, stack)
 	ipf_main_softc_t *softc = (ipf_main_softc_t *)stack->netstack_ipf;
 	ip_t *ip = hpe->hpe_hdr;
 	qpktinfo_t qpi;
+	int rval;
 
 	qpi.qpi_real = (void *)hpe->hpe_ofp;
 	qpi.qpi_ill = qpi.qpi_real;
@@ -822,8 +822,15 @@ ipf_hk_v4_in(tok, data, stack)
 	qpi.qpi_off = 0;
 	qpi.qpi_flags = 0;
 
-	return ipf_check(softc, hpe->hpe_hdr, ip->ip_hl << 2,
+	rval = ipf_check(softc, hpe->hpe_hdr, ip->ip_hl << 2,
 			 (void *)hpe->hpe_ifp, 0, &qpi, hpe->hpe_mp);
+	if (rval == 0 && *hpe->hpe_mp == NULL)
+		rval = 1;
+
+	hpe->hpe_hdr = qpi.qpi_data;
+	hpe->hpe_mb = qpi.qpi_m;
+
+	return rval;
 }
 
 
@@ -837,6 +844,7 @@ ipf_hk_v4_out(tok, data, stack)
 	ipf_main_softc_t *softc = (ipf_main_softc_t *)stack->netstack_ipf;
 	ip_t *ip = hpe->hpe_hdr;
 	qpktinfo_t qpi;
+	int rval;
 
 	qpi.qpi_real = (void *)hpe->hpe_ofp;
 	qpi.qpi_ill = qpi.qpi_real;
@@ -846,8 +854,15 @@ ipf_hk_v4_out(tok, data, stack)
 	qpi.qpi_off = 0;
 	qpi.qpi_flags = 0;
 
-	return ipf_check(softc, hpe->hpe_hdr, ip->ip_hl << 2,
+	rval = ipf_check(softc, hpe->hpe_hdr, ip->ip_hl << 2,
 			 (void *)hpe->hpe_ofp, 1, &qpi, hpe->hpe_mp);
+	if (rval == 0 && *hpe->hpe_mp == NULL)
+		rval = 1;
+
+	hpe->hpe_hdr = qpi.qpi_data;
+	hpe->hpe_mb = qpi.qpi_m;
+
+	return rval;
 }
 
 
@@ -895,6 +910,7 @@ ipf_hk_v6_in(tok, data, stack)
 	hook_pkt_event_t *hpe = (hook_pkt_event_t *)data;
 	ipf_main_softc_t *softc = (ipf_main_softc_t *)stack->netstack_ipf;
 	qpktinfo_t qpi;
+	int rval;
 
 	qpi.qpi_real = (void *)hpe->hpe_ofp;
 	qpi.qpi_ill = qpi.qpi_real;
@@ -904,8 +920,15 @@ ipf_hk_v6_in(tok, data, stack)
 	qpi.qpi_off = 0;
 	qpi.qpi_flags = 0;
 
-	return ipf_check(softc, hpe->hpe_hdr, sizeof(ip6_t),
+	rval = ipf_check(softc, hpe->hpe_hdr, sizeof(ip6_t),
 			 (void *)hpe->hpe_ifp, 0, &qpi, hpe->hpe_mp);
+	if (rval == 0 && *hpe->hpe_mp == NULL)
+		rval = 1;
+
+	hpe->hpe_hdr = qpi.qpi_data;
+	hpe->hpe_mb = qpi.qpi_m;
+
+	return rval;
 }
 
 
@@ -918,6 +941,7 @@ ipf_hk_v6_out(tok, data, stack)
 	hook_pkt_event_t *hpe = (hook_pkt_event_t *)data;
 	ipf_main_softc_t *softc = (ipf_main_softc_t *)stack->netstack_ipf;
 	qpktinfo_t qpi;
+	int rval;
 
 	qpi.qpi_real = (void *)hpe->hpe_ofp;
 	qpi.qpi_ill = qpi.qpi_real;
@@ -927,8 +951,15 @@ ipf_hk_v6_out(tok, data, stack)
 	qpi.qpi_off = 0;
 	qpi.qpi_flags = 0;
 
-	return ipf_check(softc, hpe->hpe_hdr, sizeof(ip6_t),
+	rval = ipf_check(softc, hpe->hpe_hdr, sizeof(ip6_t),
 			 (void *)hpe->hpe_ofp, 1, &qpi, hpe->hpe_mp);
+	if (rval == 0 && *hpe->hpe_mp == NULL)
+		rval = 1;
+
+	hpe->hpe_hdr = qpi.qpi_data;
+	hpe->hpe_mb = qpi.qpi_m;
+
+	return rval;
 }
 
 
