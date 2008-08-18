@@ -3057,7 +3057,7 @@ filterdone:
 			nat_t *nat = fin->fin_nat;
 			if ((nat->nat_dlocal != 0) && (m != NULL)) {
 				fin->fin_out = 0;
-				ipf_inject(fin, m);
+				ipf_inject(fin, fin->fin_m);
 				m = *mp = NULL;
 				fin->fin_m = NULL;
 			}
@@ -3138,7 +3138,7 @@ filterdone:
 		 * can lead to fin_m being free'd... not good.
 		 */
 		if ((pass & FR_DUP) != 0) {
-			mc = M_DUPLICATE(fin->fin_m);
+			mc = M_COPY(fin->fin_m);
 			if (mc != NULL)
 				ipf_fastroute(mc, &mc, fin, &fr->fr_dif);
 		}
