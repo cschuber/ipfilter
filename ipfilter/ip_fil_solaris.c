@@ -59,7 +59,7 @@ static const char rcsid[] = "@(#)$Id$";
 static	int	ipf_send_ip __P((fr_info_t *fin, mblk_t *m, mblk_t **mp));
 static	void	ipf_fixl4sum __P((fr_info_t *));
 static	void	*ipf_routeto __P((fr_info_t *, int, void *));
-static	int	ipf_sendpkt __P((ipf_main_softc_t *, int, qif_t *, mblk_t *,
+static	int	ipf_sendpkt __P((ipf_main_softc_t *, int, void *, mblk_t *,
 				 struct ip *, void *));
 
 #if !defined(FW_HOOKS)
@@ -377,9 +377,11 @@ ipf_send_reset(fr_info_t *fin)
 static int
 ipf_send_ip(fr_info_t *fin, mblk_t *m, mb_t **mpp)
 {
+#if !defined(FW_HOOKS)
+	qif_t *qif;
+#endif
 	qpktinfo_t qpi, *qpip;
 	fr_info_t fnew;
-	qif_t *qif;
 	ip_t *ip;
 	int i, hlen;
 
@@ -418,10 +420,15 @@ ipf_send_ip(fr_info_t *fin, mblk_t *m, mb_t **mpp)
 	qpip = fin->fin_qpi;
 	qpi.qpi_q = qpip->qpi_q;
 	qpi.qpi_off = 0;
+#if defined(FW_HOOKS)
+	qpi.qpi_real = qpip->qpi_real;
+	qpi.qpi_ill = qpip->qpi_real;
+#else
 	qif = qpip->qpi_real;
 	qpi.qpi_real = qif;
 	qpi.qpi_ill = qif->qf_ill;
 	qpi.qpi_flags = qif->qf_flags;
+#endif
 	qpi.qpi_m = m;
 	qpi.qpi_data = ip;
 	fnew.fin_qpi = &qpi;
@@ -935,9 +942,9 @@ ipf_fastroute(mb, mpp, fin, fdp)
 	qpktinfo_t *qpi;
 	frentry_t *fr;
 	frdest_t fd;
-	qif_t *ifp;
 	void *dstp;
 	void *sifp;
+	void *ifp;
 	ip_t *ip;
 #ifndef	sparc
 	u_short __iplen, __ipoff;
@@ -1200,7 +1207,6 @@ ipf_inject(fr_info_t *fin, mb_t *m)
 	struct sockaddr_in6 *sin6;
 	struct sockaddr_in *sin;
 	net_inject_t inject;
-
 	inject.ni_physical = (phy_if_t)fin->fin_ifp;
 	inject.ni_packet = *fin->fin_mp;
 	if (fin->fin_v == 4) {
@@ -1228,7 +1234,7 @@ static int
 ipf_sendpkt(softc, v, ifp, mb, ip, dstp)
 	ipf_main_softc_t *softc;
 	int v;
-	qif_t *ifp;
+	void *ifp;
 	mblk_t *mb;
 	struct ip *ip;
 	void *dstp;
@@ -1317,6 +1323,7 @@ ipf_prependmbt(fr_info_t *fin, mblk_t *m)
 	mblk_t *n = *fin->fin_mp;
 	qpktinfo_t *qpi;
 	int x;
+/*ip_t *ip;*/
 
 	qpi = fin->fin_qpi;
 	qpi->qpi_m = m;
@@ -1335,7 +1342,7 @@ ipf_prependmbt(fr_info_t *fin, mblk_t *m)
 		if (x > 0) {
 			m->b_rptr -= x;
 			bcopy(n->b_rptr, m->b_rptr, x);
-			n->b_rptr += fin->fin_ipoff;
+			n->b_rptr += x;
 		}
 	} else {
 		/*
