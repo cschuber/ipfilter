@@ -2124,7 +2124,11 @@ ipf_nat_putent(softc, data, getlock)
 	fin.fin_data[0] = ntohs(nat->nat_ndport);
 	fin.fin_data[1] = ntohs(nat->nat_nsport);
 
-	if (nat->nat_dir == NAT_OUTBOUND) {
+	switch (nat->nat_dir)
+	{
+	case NAT_OUTBOUND :
+	case NAT_ENCAPOUT :
+	case NAT_DIVERTOUT :
 		if (getlock) {
 			READ_ENTER(&softc->ipf_nat);
 		}
@@ -2149,7 +2153,11 @@ ipf_nat_putent(softc, data, getlock)
 			error = EEXIST;
 			goto junkput;
 		}
-	} else if (nat->nat_dir == NAT_INBOUND) {
+		break;
+
+	case NAT_INBOUND :
+	case NAT_ENCAPIN :
+	case NAT_DIVERTIN :
 		if (getlock) {
 			READ_ENTER(&softc->ipf_nat);
 		}
@@ -2174,10 +2182,13 @@ ipf_nat_putent(softc, data, getlock)
 			error = EEXIST;
 			goto junkput;
 		}
-	} else {
+		break;
+
+	default :
 		softc->ipf_interror = 60042;
 		error = EINVAL;
 		goto junkput;
+		break;
 	}
 
 	/*
@@ -4097,7 +4108,7 @@ ipf_nat_inlookup(fin, flags, p, src, mapdst)
 		if (nat->nat_pr[0] != p)
 			continue;
 
-		switch (nat->nat_dir)
+		switch (nat->nat_dir & (NAT_INBOUND|NAT_OUTBOUND))
 		{
 		case NAT_INBOUND :
 			if (nat->nat_v[0] != 4)
@@ -4119,6 +4130,8 @@ ipf_nat_inlookup(fin, flags, p, src, mapdst)
 			break;
 		case NAT_OUTBOUND :
 			if (nat->nat_v[1] != 4)
+				continue;
+			if (nat->nat_dlocal)
 				continue;
 			if (nat->nat_ndstaddr != src.s_addr ||
 			    nat->nat_nsrcaddr != dst)
@@ -4185,7 +4198,7 @@ find_in_wild_ports:
 		if (nat->nat_pr[0] != fin->fin_p)
 			continue;
 
-		switch (nat->nat_dir)
+		switch (nat->nat_dir & (NAT_INBOUND|NAT_OUTBOUND))
 		{
 		case NAT_INBOUND :
 			if (nat->nat_v[0] != 4)
@@ -4208,7 +4221,7 @@ find_in_wild_ports:
 			continue;
 
 		if (ipf_nat_wildok(nat, (int)sport, (int)dport, nflags,
-			       NAT_INBOUND) == 1) {
+				   NAT_INBOUND) == 1) {
 			if ((fin->fin_flx & FI_IGNORE) != 0)
 				break;
 			if ((nflags & SI_CLONE) != 0) {
@@ -4230,7 +4243,7 @@ find_in_wild_ports:
 					nat->nat_odport = dport;
 					nat->nat_ndport = dport;
 				}
-			} else {
+			} else if (nat->nat_dir == NAT_OUTBOUND) {
 				if (nat->nat_osport == 0) {
 					nat->nat_osport = dport;
 					nat->nat_nsport = dport;
@@ -4420,7 +4433,7 @@ ipf_nat_outlookup(fin, flags, p, src, dst)
 		if (nat->nat_pr[1] != p)
 			continue;
 
-		switch (nat->nat_dir)
+		switch (nat->nat_dir & (NAT_INBOUND|NAT_OUTBOUND))
 		{
 		case NAT_INBOUND :
 			if (nat->nat_v[1] != 4)
@@ -4508,7 +4521,7 @@ find_out_wild_ports:
 		if (nat->nat_pr[1] != fin->fin_p)
 			continue;
 
-		switch (nat->nat_dir)
+		switch (nat->nat_dir & (NAT_INBOUND|NAT_OUTBOUND))
 		{
 		case NAT_INBOUND :
 			if (nat->nat_v[1] != 4)
@@ -4552,7 +4565,7 @@ find_out_wild_ports:
 					nat->nat_odport = dport;
 					nat->nat_ndport = dport;
 				}
-			} else {
+			} else if (nat->nat_dir == NAT_INBOUND) {
 				if (nat->nat_osport == 0) {
 					nat->nat_osport = dport;
 					nat->nat_nsport = dport;
@@ -5237,7 +5250,7 @@ ipf_nat_out(fin, nat, natadd, nflags)
 		if (ipf_nat_encapok(fin, nat) == -1)
 			return -1;
 
-		m = M_DUPLICATE(np->in_divmp);
+		m = M_DUP(np->in_divmp);
 		if (m == NULL) {
 			NINCLSIDE(1, ns_encap_dup);
 			return -1;
@@ -5283,7 +5296,7 @@ ipf_nat_out(fin, nat, natadd, nflags)
 		ip_t *ip;
 		mb_t *m;
 
-		m = M_DUPLICATE(np->in_divmp);
+		m = M_DUP(np->in_divmp);
 		if (m == NULL) {
 			NINCLSIDE(1, ns_divert_dup);
 			return -1;
@@ -5306,11 +5319,13 @@ ipf_nat_out(fin, nat, natadd, nflags)
 
 #if !defined(_KERNEL) || defined(MENTAT) || defined(__sgi) || \
     defined(linux) || defined(BRIDGE_IPF)
-		ipf_fix_incksum(fin, &ip->ip_sum, sumd);
+		ipf_fix_outcksum(fin, &ip->ip_sum, sumd);
 #endif
 
 		PREP_MB_T(fin, m);
 
+		fin->fin_src = ip->ip_src;
+		fin->fin_dst = ip->ip_dst;
 		fin->fin_ip = ip;
 		fin->fin_plen += sizeof(ip_t) + 8;	/* UDP + IPv4 hdr */
 		fin->fin_dlen += sizeof(ip_t) + 8;	/* UDP + IPv4 hdr */
@@ -5810,7 +5825,7 @@ ipf_nat_in(fin, nat, natadd, nflags)
 		if (ipf_nat_encapok(fin, nat) == -1)
 			return -1;
 
-		m = M_DUPLICATE(np->in_divmp);
+		m = M_DUP(np->in_divmp);
 		if (m == NULL) {
 			NINCLSIDE(0, ns_encap_dup);
 			return -1;
@@ -5846,7 +5861,7 @@ ipf_nat_in(fin, nat, natadd, nflags)
 		ip_t *ip;
 		mb_t *m;
 
-		m = M_DUPLICATE(np->in_divmp);
+		m = M_DUP(np->in_divmp);
 		if (m == NULL) {
 			NINCLSIDE(0, ns_divert_dup);
 			return -1;
@@ -6571,7 +6586,7 @@ ipf_nat_wildok(nat, sport, dport, flags, dir)
 	 * "intended" direction of that NAT entry in nat->nat_dir to decide
 	 * which combination of wildcard flags to allow.
 	 */
-	switch ((dir << 1) | nat->nat_dir)
+	switch ((dir << 1) | (nat->nat_dir & (NAT_INBOUND|NAT_OUTBOUND)))
 	{
 	case 3: /* outbound packet / outbound entry */
 		if (((nat->nat_osport == sport) ||
