@@ -4133,6 +4133,8 @@ ipf_nat_inlookup(fin, flags, p, src, mapdst)
 				continue;
 			if (nat->nat_dlocal)
 				continue;
+			if (nat->nat_dlocal)
+				continue;
 			if (nat->nat_ndstaddr != src.s_addr ||
 			    nat->nat_nsrcaddr != dst)
 				continue;
