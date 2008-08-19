@@ -194,7 +194,8 @@ ipfattach(softc)
 #endif
 
 	softc->ipf_slow_ch = timeout(ipf_slowtimer, softc,
-				     drv_usectohz(500000));
+				     drv_usectohz(1000000 * IPF_HZ_MULT /
+						  IPF_HZ_DIVIDE));
 
         if (ipf_init_all(softc) < 0)
 		return EIO;
@@ -902,7 +903,9 @@ ipf_slowtimer __P((void *ptr))
 	softc->ipf_ticks++;
 	if (softc->ipf_running == -1 || softc->ipf_running == 1)
 		softc->ipf_slow_ch = timeout(ipf_slowtimer, ptr,
-				       drv_usectohz(500000));
+					     drv_usectohz(1000000 *
+							  IPF_HZ_MULT /
+							  IPF_HZ_DIVIDE));
 	else
 		softc->ipf_slow_ch = NULL;
 	RWLOCK_EXIT(&softc->ipf_global);
