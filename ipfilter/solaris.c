@@ -345,7 +345,9 @@ ddi_attach_cmd_t cmd;
 #endif
 
 		fr_timer_id = timeout(fr_slowtimer, NULL,
-				      drv_usectohz(500000));
+				      drv_usectohz(1000000 * IPF_HZ_MULT /
+						   IPF_HZ_DIVIDE));
+
 
 		fr_running = 1;
 
