@@ -745,7 +745,6 @@ typedef	struct	frentry {
 #define	FR_PREAUTH	0x00004	/* require preauthentication */
 #define	FR_ACCOUNT	0x00005	/* Accounting rule */
 #define	FR_SKIP		0x00006	/* skip rule */
-#define	FR_DIVERT	0x00007	/* divert rule */
 #define	FR_DECAPSULATE	0x00008	/* decapsulate rule */
 #define	FR_CMDMASK	0x0000f
 #define	FR_LOG		0x00010	/* Log */
