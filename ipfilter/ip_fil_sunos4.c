@@ -101,7 +101,7 @@ ipfattach()
 		ip_forwarding = 1;
 
 	SPL_X(s);
-	timeout(ipf_slowtimer, NULL, (hz / IPF_HZ_DIVIDE) * IPF_HZ_MULT);
+	timeout(ipf_slowtimer, &ipfmain, (hz / IPF_HZ_DIVIDE) * IPF_HZ_MULT);
 	return 0;
 }
 
@@ -117,7 +117,7 @@ ipfdetach()
 
 	SPL_NET(s);
 
-	untimeout(ipf_slowtimer, NULL);
+	untimeout(ipf_slowtimer, &ipfmain);
 
 	if (ipf_control_forwarding & 2)
 		ip_forwarding = 0;

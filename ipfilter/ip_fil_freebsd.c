@@ -160,13 +160,14 @@ ipf_check_wrapper(void *arg, struct mbuf **mp, struct ifnet *ifp, int dir)
 	struct ip *ip = mtod(*mp, struct ip *);
 	int rv;
 
-	ip->ip_len = ntohs(ip->ip_len);
-	ip->ip_off = ntohs(ip->ip_off);
-	rv = ipf_check(&ipfmain, ip, ip->ip_hl << 2, ifp, (dir == PFIL_OUT), mp);
+	ip->ip_len = htons(ip->ip_len);
+	ip->ip_off = htons(ip->ip_off);
+	rv = ipf_check(&ipfmain, ip, ip->ip_hl << 2, ifp, (dir == PFIL_OUT),
+		       mp);
 	if ((rv == 0) && (*mp != NULL)) {
 		ip = mtod(*mp, struct ip *);
-		ip->ip_len = htons(ip->ip_len);
-		ip->ip_off = htons(ip->ip_off);
+		ip->ip_len = ntohs(ip->ip_len);
+		ip->ip_off = ntohs(ip->ip_off);
 	}
 	return rv;
 }
@@ -177,8 +178,8 @@ ipf_check_wrapper(void *arg, struct mbuf **mp, struct ifnet *ifp, int dir)
 static int
 ipf_check_wrapper6(void *arg, struct mbuf **mp, struct ifnet *ifp, int dir)
 {
-	return (ipf_check(&ipfmain, mtod(*mp, struct ip *), sizeof(struct ip6_hdr),
-	    ifp, (dir == PFIL_OUT), mp));
+	return (ipf_check(&ipfmain, mtod(*mp, struct ip *),
+			  sizeof(struct ip6_hdr), ifp, (dir == PFIL_OUT), mp));
 }
 # endif
 #endif /* __FreeBSD_version >= 501108 */
@@ -232,10 +233,10 @@ ipfattach(softc)
 
 	SPL_X(s);
 #if (__FreeBSD_version >= 300000)
-	softc->ipf_slow_ch = timeout(ipf_slowtimer, NULL,
+	softc->ipf_slow_ch = timeout(ipf_slowtimer, softc,
 				     (hz / IPF_HZ_DIVIDE) * IPF_HZ_MULT);
 #else
-	timeout(ipf_slowtimer, NULL, (hz / IPF_HZ_DIVIDE) * IPF_HZ_MULT);
+	timeout(ipf_slowtimer, softc, (hz / IPF_HZ_DIVIDE) * IPF_HZ_MULT);
 #endif
 	return 0;
 }
@@ -260,10 +261,10 @@ ipfdetach(softc)
 
 #if (__FreeBSD_version >= 300000)
 	if (softc->ipf_slow_ch.callout != NULL)
-		untimeout(ipf_slowtimer, NULL, softc->ipf_slow_ch);
+		untimeout(ipf_slowtimer, softc, softc->ipf_slow_ch);
 	bzero(&softc->ipf_slow, sizeof(softc->ipf_slow));
 #else
-	untimeout(ipf_slowtimer, NULL);
+	untimeout(ipf_slowtimer, softc);
 #endif /* FreeBSD */
 
 #ifndef NETBSD_PF

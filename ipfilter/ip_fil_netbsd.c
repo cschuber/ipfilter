@@ -384,9 +384,9 @@ ipfattach(softc)
 	callout_init(&softc->ipf_slow_ch);
 # endif
 	callout_reset(&softc->ipf_slow_ch, (hz / IPF_HZ_DIVIDE) * IPF_HZ_MULT,
-		     ipf_slowtimer, NULL);
+		     ipf_slowtimer, softc);
 #else
-	timeout(ipf_slowtimer, NULL, (hz / IPF_HZ_DIVIDE) * IPF_HZ_MULT);
+	timeout(ipf_slowtimer, softc, (hz / IPF_HZ_DIVIDE) * IPF_HZ_MULT);
 #endif
 	return 0;
 

@@ -708,7 +708,7 @@ int ipfattach()
 	/* timeout(ipf_slowtimer, NULL, (hz / IPF_HZ_DIVIDE) * IPF_HZ_MULT); */
 	init_timer(&ipf_timer);
 	ipf_timer.function = ipf_slowtimer;
-	ipf_timer.data = NULL;
+	ipf_timer.data = &ipfmain;
 	ipf_timer.expires = (HZ / IPF_HZ_DIVIDE) * IPF_HZ_MULT;
 	add_timer(&ipf_timer);
 	mod_timer(&ipf_timer, HZ/2 + jiffies);

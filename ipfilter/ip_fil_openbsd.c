@@ -126,7 +126,7 @@ ipfattach()
 		ipforwarding = 1;
 
 	SPL_X(s);
-	timeout_set(&ipf_slowtimer_ch, ipf_slowtimer, NULL);
+	timeout_set(&ipf_slowtimer_ch, ipf_slowtimer, &ipfmain);
 	timeout_add(&ipf_slowtimer_ch, (hz / IPF_HZ_DIVIDE) * IPF_HZ_MULT);
 	return 0;
 }

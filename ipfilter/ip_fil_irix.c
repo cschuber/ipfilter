@@ -113,9 +113,9 @@ ipl_attach()
 	SPL_X(s);
 
 #if IRIX >= 60500
-	ipf_timer_id = timeout(ipf_slowtimer, NULL, hz/2);
+	ipf_timer_id = timeout(ipf_slowtimer, &ipfmain, hz/2);
 #else
-	timeout(ipf_slowtimer, NULL, hz/2);
+	timeout(ipf_slowtimer, &ipfmain, hz/2);
 #endif
 	return 0;
 }
