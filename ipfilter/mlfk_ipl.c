@@ -260,6 +260,10 @@ ipf_modunload()
 	if (ipfmain.ipf_refcnt)
 		return EBUSY;
 
+	error = ipf_pfil_unhook();
+	if (error != 0)
+		return error;
+
 	if (ipfmain.ipf_running >= 0) {
 		error = ipfdetach(&ipfmain);
 		if (error != 0)
