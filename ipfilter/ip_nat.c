@@ -592,6 +592,7 @@ ipf_nat_soft_fini(softc, arg)
 		MUTEX_DESTROY(&softn->ipf_nat_icmptq.ifq_lock);
 		MUTEX_DESTROY(&softn->ipf_nat_icmpacktq.ifq_lock);
 		MUTEX_DESTROY(&softn->ipf_nat_iptq.ifq_lock);
+		MUTEX_DESTROY(&softn->ipf_nat_pending.ifq_lock);
 	}
 
 	return 0;
@@ -4108,9 +4109,11 @@ ipf_nat_inlookup(fin, flags, p, src, mapdst)
 		if (nat->nat_pr[0] != p)
 			continue;
 
-		switch (nat->nat_dir & (NAT_INBOUND|NAT_OUTBOUND))
+		switch (nat->nat_dir)
 		{
 		case NAT_INBOUND :
+		case NAT_ENCAPIN :
+		case NAT_DIVERTIN :
 			if (nat->nat_v[0] != 4)
 				continue;
 			if (nat->nat_osrcaddr != src.s_addr ||
@@ -4128,9 +4131,11 @@ ipf_nat_inlookup(fin, flags, p, src, mapdst)
 				}
 			}
 			break;
-		case NAT_OUTBOUND :
+		case NAT_DIVERTOUT :
 			if (nat->nat_dlocal)
 				continue;
+		case NAT_OUTBOUND :
+		case NAT_ENCAPOUT :
 			if (nat->nat_v[1] != 4)
 				continue;
 			if (nat->nat_dlocal)
@@ -4437,9 +4442,11 @@ ipf_nat_outlookup(fin, flags, p, src, dst)
 		if (nat->nat_pr[1] != p)
 			continue;
 
-		switch (nat->nat_dir & (NAT_INBOUND|NAT_OUTBOUND))
+		switch (nat->nat_dir)
 		{
 		case NAT_INBOUND :
+		case NAT_ENCAPIN :
+		case NAT_DIVERTIN :
 			if (nat->nat_v[1] != 4)
 				continue;
 			if (nat->nat_ndstaddr != src.s_addr ||
@@ -4459,6 +4466,8 @@ ipf_nat_outlookup(fin, flags, p, src, dst)
 			}
 			break;
 		case NAT_OUTBOUND :
+		case NAT_ENCAPOUT :
+		case NAT_DIVERTOUT :
 			if (nat->nat_v[0] != 4)
 				continue;
 			if (nat->nat_osrcaddr != src.s_addr ||
