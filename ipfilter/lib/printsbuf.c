@@ -27,6 +27,8 @@ void printsbuf(buf)
 	}
 }
 #else
+void printsbuf(char *buf);
+
 void printsbuf(buf)
 	char *buf;
 {
