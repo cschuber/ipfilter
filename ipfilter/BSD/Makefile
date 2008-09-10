@@ -43,7 +43,7 @@ INSTALL=install
 #
 MODOBJS=ip_fil.o fil.o ml_ipl.o ip_nat.o ip_frag.o ip_state.o ip_proxy.o \
 	ip_auth.o ip_log.o ip_pool.o ip_htable.o ip_lookup.o ip_rules.o \
-	ip_scan.o ip_sync.o ip_nat6.o ip_dstlist.o
+	ip_scan.o ip_sync.o ip_nat6.o ip_dstlist.o radix.o
 #	ip_trafcon.o
 DFLAGS=$(IPFLKM) $(IPFLOG) $(LOOKUP) $(SYNC) $(DEF) $(DLKM) $(IPFBPF)
 IPF=ipf.o ipfcomp.o ipf_y.o ipf_l.o bpf_filter_u.o
@@ -332,6 +332,9 @@ ip_lookup.o: $(TOP)/ip_lookup.c $(TOP)/ip_compat.h $(TOP)/ip_fil.h \
 	$(TOP)/ip_pool.h $(TOP)/ip_htable.h $(TOP)/ip_lookup.h \
 	$(TOP)/ip_dstlist.h
 	$(CC) $(KCARGS) $(DFLAGS) -c $(TOP)/ip_lookup.c -o $@
+
+radix.o: $(TOP)/md5.c $(TOP)/radix_ipf.h
+	$(CC) $(KCARGS) $(DFLAGS) -c $(TOP)/radix.c -o $@
 
 ip_trafcon.o: $(TOP)/ip_trafcon.c $(TOP)/ip_compat.h $(TOP)/ip_fil.h \
 	      $(TOP)/ip_trafcon.h
