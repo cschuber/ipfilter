@@ -99,6 +99,8 @@ void eMrwlock_exit(rw)
 }
 
 
+static int initcount = 0;
+
 void eMrwlock_init(rw, who)
 	eMrwlock_t *rw;
 	char *who;
@@ -116,6 +118,7 @@ void eMrwlock_init(rw, who)
 		rw->eMrw_owner = strdup(who);
 	else
 		rw->eMrw_owner = NULL;
+	initcount++;
 }
 
 
@@ -128,4 +131,11 @@ void eMrwlock_destroy(rw)
 		abort();
 	}
 	memset(rw, 0xa5, sizeof(*rw));
+	initcount--;
+}
+
+void ipf_rwlock_clean()
+{
+	if (initcount != 0)
+		abort();
 }

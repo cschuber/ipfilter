@@ -50,6 +50,9 @@ void eMmutex_exit(mtx)
 }
 
 
+static int initcount = 0;
+
+
 void eMmutex_init(mtx, who)
 	eMmutex_t *mtx;
 	char *who;
@@ -66,6 +69,7 @@ void eMmutex_init(mtx, who)
 		mtx->eMm_owner = strdup(who);
 	else
 		mtx->eMm_owner = NULL;
+	initcount++;
 }
 
 
@@ -82,5 +86,15 @@ void eMmutex_destroy(mtx)
 			mtx->eMm_owner, mtx, mtx->eMm_held);
 		abort();
 	}
+	if (mtx->eMm_owner != NULL)
+		free(mtx->eMm_owner);
 	memset(mtx, 0xa5, sizeof(*mtx));
+	initcount--;
+}
+
+
+void ipf_mutex_clean()
+{
+	if (initcount != 0)
+		abort();
 }
