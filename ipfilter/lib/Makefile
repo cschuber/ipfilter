@@ -124,6 +124,8 @@ LIBOBJS=$(DEST)/addicmp.o \
      $(DEST)/tcp_flags.o \
      $(DEST)/var.o \
      $(DEST)/verbose.o \
+     $(DEST)/v1trap.o \
+     $(DEST)/v2trap.o \
      $(DEST)/v6ionames.o \
      $(DEST)/v6optvalue.o
 
@@ -377,6 +379,10 @@ $(DEST)/var.o: $(LIBSRC)/var.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/var.c -o $@
 $(DEST)/verbose.o: $(LIBSRC)/verbose.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/verbose.c -o $@
+$(DEST)/v1trap.o: $(LIBSRC)/v1trap.c $(TOP)/ipl.h
+	$(CC) $(CCARGS) -c $(LIBSRC)/v1trap.c -o $@
+$(DEST)/v2trap.o: $(LIBSRC)/v2trap.c $(TOP)/ipl.h
+	$(CC) $(CCARGS) -c $(LIBSRC)/v2trap.c -o $@
 $(DEST)/v6ionames.o: $(LIBSRC)/v6ionames.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/v6ionames.c -o $@
 $(DEST)/v6optvalue.o: $(LIBSRC)/v6optvalue.c $(INCDEP)

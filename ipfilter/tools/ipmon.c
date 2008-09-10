@@ -155,7 +155,6 @@ static	char	*pidfile = "/etc/ipmon.pid";
 #endif
 
 static	char	line[2048];
-static	int	opts = 0;
 static	int	donehup = 0;
 static	void	usage __P((char *));
 static	void	handlehup __P((int));
@@ -192,25 +191,13 @@ static	char	**udp_ports = NULL;
 static	char	**tcp_ports = NULL;
 
 
-#define	OPT_SYSLOG	0x001
-#define	OPT_RESOLVE	0x002
-#define	OPT_HEXBODY	0x004
-#define	OPT_VERBOSE	0x008
-#define	OPT_HEXHDR	0x010
-#define	OPT_TAIL	0x020
-#define	OPT_NAT		0x080
-#define	OPT_STATE	0x100
-#define	OPT_FILTER	0x200
-#define	OPT_PORTNUM	0x400
-#define	OPT_LOGALL	(OPT_NAT|OPT_STATE|OPT_FILTER)
-#define	OPT_LOGBODY	0x800
-
 #define	HOSTNAME_V4(a,b)	hostname((a), 4, (u_32_t *)&(b))
 
 #ifndef	LOGFAC
 #define	LOGFAC	LOG_LOCAL0
 #endif
 int	logfac = LOGFAC;
+int	opts = 0;
 
 
 static icmp_subtype_t icmpunreachnames[] = {

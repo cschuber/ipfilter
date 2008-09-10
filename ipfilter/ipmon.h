@@ -8,6 +8,12 @@
  */
 
 
+typedef	struct	ipmon_snmp_s	{
+	int			is_fd;
+	char			*is_community;
+	struct sockaddr_in	is_sin;
+} ipmon_snmp_t;
+
 typedef	struct	ipmon_action	{
 	struct	ipmon_action	*ac_next;
 	int	ac_mflag;	/* collection of things to compare */
@@ -36,6 +42,8 @@ typedef	struct	ipmon_action	{
 	char	*ac_exec;	/* execute argument */
 	char	*ac_run;	/* actual command that gets run */
 	char	*ac_iface;
+	ipmon_snmp_t	ac_v1;
+	ipmon_snmp_t	ac_v2;
 	/*
 	 * used with ac_packet/ac_second
 	 */
@@ -75,14 +83,15 @@ typedef	struct	ipmon_action	{
 #define	OPT_SYSLOG	0x001
 #define	OPT_RESOLVE	0x002
 #define	OPT_HEXBODY	0x004
-#define	OPT_VERBOSE	0x008
 #define	OPT_HEXHDR	0x010
+#define	OPT_VERBOSE	0x040
 #define	OPT_TAIL	0x020
 #define	OPT_NAT		0x080
 #define	OPT_STATE	0x100
 #define	OPT_FILTER	0x200
 #define	OPT_PORTNUM	0x400
 #define	OPT_LOGALL	(OPT_NAT|OPT_STATE|OPT_FILTER)
+#define	OPT_LOGBODY	0x800
 
 #define	HOSTNAME_V4(a,b)	hostname((a), 4, (u_32_t *)&(b))
 

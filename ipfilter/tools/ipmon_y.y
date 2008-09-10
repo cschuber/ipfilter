@@ -34,6 +34,7 @@ typedef	struct	opt	{
 static	void	build_action __P((struct opt *));
 static	opt_t	*new_opt __P((int));
 static	void	free_action __P((ipmon_action_t *));
+static	void	apply_snmp __P((ipmon_snmp_t *, opt_t *));
 
 static	ipmon_action_t	*alist = NULL;
 %}
@@ -59,11 +60,13 @@ static	ipmon_action_t	*alist = NULL;
 %token	IPM_SECOND IPM_SECONDS IPM_SRCIP IPM_SRCPORT IPM_LOGTAG IPM_WITH
 %token	IPM_DO IPM_SAVE IPM_SYSLOG IPM_NOTHING IPM_RAW IPM_TYPE IPM_NAT
 %token	IPM_STATE IPM_NATTAG IPM_IPF IPM_FACILITY IPM_PRIORITY
+%token	IPM_SENDTRAP IPM_V1 IPM_COMMUNITY IPM_V2
 %type	<addr> ipv4
 %type	<opt> direction dstip dstport every execute group interface
 %type	<opt> protocol result rule srcip srcport logtag matching
-%type	<opt> matchopt nattag type doopt doing save syslog nothing
+%type	<opt> matchopt nattag type doopt doing save syslog nothing trap
 %type	<num> saveopts saveopt typeopt syslogopts
+%type	<str> community
 
 %%
 file:	line
@@ -73,7 +76,10 @@ file:	line
 	;
 
 line:	IPM_MATCH '{' matching '}' IPM_DO '{' doing '}' ';'
-					{ build_action($3); resetlexer(); }
+					{ $3->o_next = $7;
+					  build_action($3);
+					  resetlexer();
+					}
 	| IPM_COMMENT
 	| YY_COMMENT
 	;
@@ -121,6 +127,7 @@ doopt:
 	execute					{ $$ = $1; }
 	| save					{ $$ = $1; }
 	| syslog				{ $$ = $1; }
+	| trap					{ $$ = $1; }
 	| nothing				{ $$ = $1; }
 	;
 
@@ -230,6 +237,18 @@ saveopt:
 	IPM_RAW					{ $$ = IPMDO_SAVERAW; }
 	;
 
+trap:	IPM_SENDTRAP IPM_V1 community ipv4	{ $$ = new_opt(IPM_SENDTRAP);
+						  $$->o_num = 1;
+						  $$->o_str = $3;
+						  $$->o_ip = $4;
+						}
+	| IPM_SENDTRAP IPM_V2 community ipv4	{ $$ = new_opt(IPM_SENDTRAP);
+						  $$->o_num = 2;
+						  $$->o_str = $3;
+						  $$->o_ip = $4;
+						}
+	;
+
 syslog:	IPM_SYSLOG syslogopts	{ $$ = new_opt(IPM_SYSLOG);
 				  $$->o_logfac = $2 & 0xff;
 				  if ($2 >= 0) {
@@ -269,6 +288,10 @@ syslogopts:			{ $$ = -1; }
 				}
 	;
 
+community:			{ $$ = strdup(""); }
+	| IPM_COMMUNITY YY_STR	{ $$ = $2; }
+	;
+
 ipv4:   YY_NUMBER '.' YY_NUMBER '.' YY_NUMBER '.' YY_NUMBER
 		{ if ($1 > 255 || $3 > 255 || $5 > 255 || $7 > 255) {
 			yyerror("Invalid octet string for IP address");
@@ -284,6 +307,7 @@ nothing:
 %%
 static	struct	wordtab	yywords[] = {
 	{ "body",	IPM_BODY },
+	{ "community",	IPM_COMMUNITY },
 	{ "direction",	IPM_DIRECTION },
 	{ "do",		IPM_DO },
 	{ "dstip",	IPM_DSTIP },
@@ -311,10 +335,13 @@ static	struct	wordtab	yywords[] = {
 	{ "save",	IPM_SAVE },
 	{ "second",	IPM_SECOND },
 	{ "seconds",	IPM_SECONDS },
+	{ "send-trap",	IPM_SENDTRAP },
 	{ "srcip",	IPM_SRCIP },
 	{ "srcport",	IPM_SRCPORT },
 	{ "state",	IPM_STATE },
 	{ "syslog",	IPM_SYSLOG },
+	{ "v1",		IPM_V1 },
+	{ "v2",		IPM_V2 },
 	{ "with",	IPM_WITH },
 	{ NULL,		0 }
 };
@@ -344,12 +371,9 @@ int type;
 {
 	opt_t *o;
 
-	o = (opt_t *)malloc(sizeof(*o));
+	o = (opt_t *)calloc(1, sizeof(*o));
 	o->o_type = type;
 	o->o_line = yylineNum;
-	o->o_num = 0;
-	o->o_str = (char *)0;
-	o->o_next = NULL;
 	o->o_logfac = -1;
 	o->o_logpri = -1;
 	return o;
@@ -366,6 +390,10 @@ opt_t *olist;
 	a = (ipmon_action_t *)calloc(1, sizeof(*a));
 	if (a == NULL)
 		return;
+
+	a->ac_v1.is_fd = -1;
+	a->ac_v2.is_fd = -1;
+
 	while ((o = olist) != NULL) {
 		/*
 		 * Check to see if the same comparator is being used more than
@@ -476,6 +504,13 @@ opt_t *olist;
 			a->ac_logfac = o->o_logfac;
 			a->ac_logpri = o->o_logpri;
 			break;
+		case IPM_SENDTRAP :
+			if (o->o_num == 1) {
+				apply_snmp(&a->ac_v1, o);
+			} else if (o->o_num == 2) {
+				apply_snmp(&a->ac_v2, o);
+			}
+			break;
 		case IPM_TYPE :
 			a->ac_type = o->o_num;
 			break;
@@ -515,18 +550,25 @@ int opts, lvl;
 	tcp = (tcphdr_t *)((char *)ip + (IP_HL(ip) << 2));
 
 	for (a = alist; a != NULL; a = a->ac_next) {
+		verbose(0, "== checking config rule\n");
 		if ((a->ac_mflag & IPMAC_DIRECTION) != 0) {
 			if (a->ac_direction == IPM_IN) {
-				if ((ipf->fl_flags & FR_INQUE) == 0)
+				if ((ipf->fl_flags & FR_INQUE) == 0) {
+					verbose(8, "-- direction not in\n");
 					continue;
+				}
 			} else if (a->ac_direction == IPM_OUT) {
-				if ((ipf->fl_flags & FR_OUTQUE) == 0)
+				if ((ipf->fl_flags & FR_OUTQUE) == 0) {
+					verbose(8, "-- direction not out\n");
 					continue;
+				}
 			}
 		}
 
-		if ((a->ac_type != 0) && (a->ac_type != ipl->ipl_magic))
+		if ((a->ac_type != 0) && (a->ac_type != ipl->ipl_magic)) {
+			verbose(8, "-- type mismatch\n");
 			continue;
+		}
 
 		if ((a->ac_mflag & IPMAC_EVERY) != 0) {
 			gettimeofday(&tv, NULL);
@@ -534,8 +576,10 @@ int opts, lvl;
 			if (tv.tv_usec <= a->ac_lastusec)
 				t1--;
 			if (a->ac_second != 0) {
-				if (t1 < a->ac_second)
+				if (t1 < a->ac_second) {
+					verbose(8, "-- too soon\n");
 					continue;
+				}
 				a->ac_lastsec = tv.tv_sec;
 				a->ac_lastusec = tv.tv_usec;
 			}
@@ -545,87 +589,125 @@ int opts, lvl;
 					a->ac_pktcnt++;
 				else if (a->ac_pktcnt == a->ac_packet) {
 					a->ac_pktcnt = 0;
+					verbose(8, "-- packet count\n");
 					continue;
 				} else {
 					a->ac_pktcnt++;
+					verbose(8, "-- packet count\n");
 					continue;
 				}
 			}
 		}
 
 		if ((a->ac_mflag & IPMAC_DSTIP) != 0) {
-			if ((ip->ip_dst.s_addr & a->ac_dmsk) != a->ac_dip)
+			if ((ip->ip_dst.s_addr & a->ac_dmsk) != a->ac_dip) {
+				verbose(8, "-- dstip wrong\n");
 				continue;
+			}
 		}
 
 		if ((a->ac_mflag & IPMAC_DSTPORT) != 0) {
-			if (ip->ip_p != IPPROTO_UDP && ip->ip_p != IPPROTO_TCP)
+			if (ip->ip_p != IPPROTO_UDP &&
+			    ip->ip_p != IPPROTO_TCP) {
+				verbose(8, "-- not port protocol\n");
 				continue;
-			if (tcp->th_dport != a->ac_dport)
+			}
+			if (tcp->th_dport != a->ac_dport) {
+				verbose(8, "-- dport mismatch\n");
 				continue;
+			}
 		}
 
 		if ((a->ac_mflag & IPMAC_GROUP) != 0) {
 			if (strncmp(a->ac_group, ipf->fl_group,
-				    FR_GROUPLEN) != 0)
+				    FR_GROUPLEN) != 0) {
+				verbose(8, "-- group mismatch\n");
 				continue;
+			}
 		}
 
 		if ((a->ac_mflag & IPMAC_INTERFACE) != 0) {
-			if (strcmp(a->ac_iface, ipf->fl_ifname))
+			if (strcmp(a->ac_iface, ipf->fl_ifname)) {
+				verbose(8, "-- ifname mismatch\n");
 				continue;
+			}
 		}
 
 		if ((a->ac_mflag & IPMAC_PROTOCOL) != 0) {
-			if (a->ac_proto != ip->ip_p)
+			if (a->ac_proto != ip->ip_p) {
+				verbose(8, "-- protocol mismatch\n");
 				continue;
+			}
 		}
 
 		if ((a->ac_mflag & IPMAC_RESULT) != 0) {
 			if ((ipf->fl_flags & FF_LOGNOMATCH) != 0) {
-				if (a->ac_result != IPMR_NOMATCH)
+				if (a->ac_result != IPMR_NOMATCH) {
+					verbose(8, "-- ff-flags mismatch\n");
 					continue;
+				}
 			} else if (FR_ISPASS(ipf->fl_flags)) {
-				if (a->ac_result != IPMR_PASS)
+				if (a->ac_result != IPMR_PASS) {
+					verbose(8, "-- pass mismatch\n");
 					continue;
+				}
 			} else if (FR_ISBLOCK(ipf->fl_flags)) {
-				if (a->ac_result != IPMR_BLOCK)
+				if (a->ac_result != IPMR_BLOCK) {
+					verbose(8, "-- block mismatch\n");
 					continue;
+				}
 			} else {	/* Log only */
-				if (a->ac_result != IPMR_LOG)
+				if (a->ac_result != IPMR_LOG) {
+					verbose(8, "-- log mismatch\n");
 					continue;
+				}
 			}
 		}
 
 		if ((a->ac_mflag & IPMAC_RULE) != 0) {
-			if (a->ac_rule != ipf->fl_rule)
+			if (a->ac_rule != ipf->fl_rule) {
+				verbose(8, "-- rule mismatch\n");
 				continue;
+			}
 		}
 
 		if ((a->ac_mflag & IPMAC_SRCIP) != 0) {
-			if ((ip->ip_src.s_addr & a->ac_smsk) != a->ac_sip)
+			if ((ip->ip_src.s_addr & a->ac_smsk) != a->ac_sip) {
+				verbose(8, "-- srcip mismatch\n");
 				continue;
+			}
 		}
 
 		if ((a->ac_mflag & IPMAC_SRCPORT) != 0) {
-			if (ip->ip_p != IPPROTO_UDP && ip->ip_p != IPPROTO_TCP)
+			if (ip->ip_p != IPPROTO_UDP &&
+			    ip->ip_p != IPPROTO_TCP) {
+				verbose(8, "-- port protocol mismatch\n");
 				continue;
-			if (tcp->th_sport != a->ac_sport)
+			}
+			if (tcp->th_sport != a->ac_sport) {
+				verbose(8, "-- sport mismatch\n");
 				continue;
+			}
 		}
 
 		if ((a->ac_mflag & IPMAC_LOGTAG) != 0) {
-			if (a->ac_logtag != ipf->fl_logtag)
+			if (a->ac_logtag != ipf->fl_logtag) {
+				verbose(8, "-- logtag %d != %d\n",
+					a->ac_logtag, ipf->fl_logtag);
 				continue;
+			}
 		}
 
 		if ((a->ac_mflag & IPMAC_NATTAG) != 0) {
 			if (strncmp(a->ac_nattag, ipf->fl_nattag.ipt_tag,
-				    IPFTAG_LEN) != 0)
+				    IPFTAG_LEN) != 0) {
+				verbose(8, "-- nattag mismatch\n");
 				continue;
+			}
 		}
 
 		matched = 1;
+		verbose(8, "++ matched\n");
 
 		/*
 		 * It matched so now execute the command
@@ -682,6 +764,15 @@ int opts, lvl;
 			default :
 				break;
 			}
+		}
+
+		if (a->ac_v1.is_fd >= 0) {
+			sendtrap_v1_0(a->ac_v1.is_fd, a->ac_v1.is_community,
+				      log, strlen(log), ipl->ipl_time.tv_sec);
+		}
+		if (a->ac_v2.is_fd >= 0) {
+			sendtrap_v2_0(a->ac_v2.is_fd, a->ac_v2.is_community,
+				      log, strlen(log), ipl->ipl_time.tv_sec);
 		}
 	}
 
@@ -751,4 +842,36 @@ char *file;
 		yyparse();
 	fclose(fp);
 	return 0;
+}
+
+
+static void
+apply_snmp(is, o)
+	ipmon_snmp_t *is;
+	opt_t *o;
+{
+	if (is->is_fd > 0) {
+		fprintf(stderr, "%s redfined on line %d\n",
+			yykeytostr(o->o_type), yylineNum);
+		return;
+	}
+	is->is_fd = socket(AF_INET, SOCK_DGRAM, 0);
+	if (is->is_fd == -1) {
+		perror("socket");
+		return;
+	}
+	is->is_sin.sin_family = AF_INET;
+	is->is_sin.sin_port = htons(162);
+	is->is_sin.sin_addr = o->o_ip;
+
+	if (connect(is->is_fd, (struct sockaddr *)&is->is_sin,
+		    sizeof(is->is_sin)) == -1) {
+		close(is->is_fd);
+		is->is_fd = -1;
+	}
+
+	if (o->o_str != NULL && *o->o_str != '\0') {
+		is->is_community = o->o_str;
+		o->o_str = NULL;
+	}
 }
