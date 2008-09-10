@@ -337,6 +337,11 @@ main(argc,argv)
 
 	ipf_destroy_all(softc);
 
+	ipf_unload_all();
+
+	ipf_mutex_clean();
+	ipf_rwlock_clean();
+
 	return 0;
 }
 
