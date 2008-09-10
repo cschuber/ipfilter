@@ -211,7 +211,7 @@ static	aproxy_t	ips_proxies[] = {
 #ifdef	IPF_RPCB_PROXY
 # ifndef _KERNEL
 	{ NULL, NULL, "rpcbt", (char)IPPROTO_TCP, 0, 0, 0,
-	  ipf_p_rpcb_main_load, ipf_p_rpcb_main_unload,
+	  NULL, NULL,
 	  NULL, NULL,
 	  NULL, NULL,
 	  ipf_p_rpcb_new, ipf_p_rpcb_del,
