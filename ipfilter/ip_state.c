@@ -471,6 +471,7 @@ ipf_state_soft_fini(softc, arg)
 	softs->ipf_state_stats.iss_active = 0;
 
 	if (softs->ipf_state_inited == 1) {
+		softs->ipf_state_inited = 0;
 		ipf_sttab_destroy(softs->ipf_state_tcptq);
 		MUTEX_DESTROY(&softs->ipf_state_udptq.ifq_lock);
 		MUTEX_DESTROY(&softs->ipf_state_icmptq.ifq_lock);
@@ -478,6 +479,8 @@ ipf_state_soft_fini(softc, arg)
 		MUTEX_DESTROY(&softs->ipf_state_icmpacktq.ifq_lock);
 		MUTEX_DESTROY(&softs->ipf_state_iptq.ifq_lock);
 		MUTEX_DESTROY(&softs->ipf_state_deletetq.ifq_lock);
+		MUTEX_DESTROY(&softs->ipf_state_pending.ifq_lock);
+		MUTEX_DESTROY(&softs->ipf_stinsert);
 	}
 
 	if (softs->ipf_state_table != NULL) {
@@ -496,11 +499,6 @@ ipf_state_soft_fini(softc, arg)
 		KFREES(softs->ipf_state_stats.iss_bucketlen,
 		       softs->ipf_state_size * sizeof(u_int));
 		softs->ipf_state_stats.iss_bucketlen = NULL;
-	}
-
-	if (softs->ipf_state_inited == 1) {
-		softs->ipf_state_inited = 0;
-		MUTEX_DESTROY(&softs->ipf_stinsert);
 	}
 
 	return 0;
