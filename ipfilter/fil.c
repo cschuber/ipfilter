@@ -309,7 +309,7 @@ static ipftuneable_t ipf_main_tuneables[] = {
 		stsizeof(ipf_main_softc_t, ipf_chksrc),
 		0,			NULL },
 	{ { (void *)offsetof(ipf_main_softc_t, ipf_minttl) },
-		"min_ttl",		0,	1,
+		"min_ttl",		0,	4,
 		stsizeof(ipf_main_softc_t, ipf_minttl),
 		0,			NULL },
 	{ { (void *)offsetof(ipf_main_softc_t, ipf_icmpminfragmtu) },
@@ -3138,7 +3138,9 @@ filterdone:
 		 * can lead to fin_m being free'd... not good.
 		 */
 		if ((pass & FR_DUP) != 0) {
+#ifdef STES
 			mc = M_COPY(fin->fin_m);
+#endif
 			if (mc != NULL)
 				ipf_fastroute(mc, &mc, fin, &fr->fr_dif);
 		}
@@ -3582,9 +3584,9 @@ nodata:
 	return sum2;
 }
 
-
 #if defined(_KERNEL) && ( ((BSD < 199103) && !defined(MENTAT)) || \
     defined(__sgi) ) && !defined(linux) && !defined(_AIX51)
+
 /*
  * Copyright (c) 1982, 1986, 1988, 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -3708,6 +3710,7 @@ out:
 #endif
 	return;
 }
+
 #endif /* (_KERNEL) && ( ((BSD < 199103) && !MENTAT) || __sgi) */
 
 
