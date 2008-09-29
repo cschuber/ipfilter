@@ -56,7 +56,7 @@ MFLAGS="BINDEST=$(BINDEST)" "SBINDEST=$(SBINDEST)" "MANDIR=$(MANDIR)" \
 	'CFLAGS=$(CFLAGS) $(SOLARIS2)' "IPFLKM=$(IPFLKM)" \
 	"IPFLOG=$(IPFLOG)" "LOGFAC=$(LOGFAC)" "POLICY=$(POLICY)" \
 	"SOLARIS2=$(SOLARIS2)" "DEBUG=$(DEBUG)" "DCPU=$(CPU)" \
-	"CPUDIR=$(CPUDIR)" "LOOKUP=$(LOOKUP)"
+	"CPUDIR=$(CPUDIR)" "LOOKUP=$(LOOKUP)" "XID=$(XID)"
 CCARGS=$(DEBUG) $(CFLAGS) -D_KMEMUSER -DIPFILTER_LOG
 #
 ########## ########## ########## ########## ########## ########## ##########
@@ -68,7 +68,7 @@ INSTALL=/sbin/install
 LIBSRC=$(TOP)/lib
 #
 DFLAGS=$(WOFF) $(IPFLKM) $(IPFLOG) $(KFLAGS) $(MLFLAGS) -jalr $(SGIREV) \
-	$(LOOKUP) #-D_MP_NETLOCKS -DMP
+	$(LOOKUP) $(XID) #-D_MP_NETLOCKS -DMP
 
 include $(TOP)/lib/Makefile
 

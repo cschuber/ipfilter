@@ -124,8 +124,6 @@ LIBOBJS=$(DEST)/addicmp.o \
      $(DEST)/tcp_flags.o \
      $(DEST)/var.o \
      $(DEST)/verbose.o \
-     $(DEST)/v1trap.o \
-     $(DEST)/v2trap.o \
      $(DEST)/v6ionames.o \
      $(DEST)/v6optvalue.o
 

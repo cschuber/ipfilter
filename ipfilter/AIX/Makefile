@@ -26,7 +26,7 @@ MFLAGS="BINDEST=$(BINDEST)" "SBINDEST=$(SBINDEST)" "MANDIR=$(MANDIR)" \
 	'CFLAGS=$(CFLAGS)' "IPFLKM=$(IPFLKM)" \
 	"IPFLOG=$(IPFLOG)" "LOGFAC=$(LOGFAC)" "POLICY=$(POLICY)" \
 	"DEBUG=$(DEBUG)" "DCPU=$(CPU)" "CPUDIR=$(CPUDIR)" \
-	"LOOKUP=$(LOOKUP)" "SCAN=$(SCAN)" "ALLOPTS=$(ALLOPTS)"
+	"LOOKUP=$(LOOKUP)" "XID=$(XID)" "SCAN=$(SCAN)" "ALLOPTS=$(ALLOPTS)"
 LIBS=-q$(BITS) -L. -lipf
 CCARGS=$(DEBUG) $(CFLAGS) -I. -DAIX=$(AIX) -q$(BITS)
 EXTRA=$(ALLOPTS)
@@ -54,7 +54,7 @@ MODOBJS=ip_fil.o fil.o md5.o ip_nat.o ip_frag.o ip_state.o ip_nat6.o \
 	ip_sync.o ip_scan.o ip_rules.o
 #radix.o
 DFLAGS=$(DEBUG) -DAIX=$(AIX) $(IPFLKM) $(IPFLOG) $(DEF) $(CFLAGS) $(DLKM) \
-	$(FIXMILLI) $(IPFBPF) $(LOOKUP) -I.
+	$(FIXMILLI) $(IPFBPF) $(LOOKUP) $(XID) -I.
 IPF=ipf.o ipfcomp.o ipf_y.o ipf_l.o
 IPT=ipftest.o fil_u.o ip_frag_u.o ip_state_u.o ip_nat_u.o ip_nat6_u.o \
 	ip_proxy_u.o ip_auth_u.o ip_fil_u.o ip_sync_u.o ip_scan_u.o \

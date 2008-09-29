@@ -320,6 +320,12 @@ static ipftuneable_t ipf_main_tuneables[] = {
 		"default_pass",		0,	0xffffffff,
 		stsizeof(ipf_main_softc_t, ipf_pass),
 		0,			NULL },
+#ifdef IPFILTER_XID
+	{ { (void *)offsetof(ipf_main_softc_t, ipf_xid_debug) },
+		"xid_debug",	0,	10,
+		stsizeof(ipf_main_softc_t, ipf_xid_debug),
+		0,			NULL },
+#endif
 	{ { (void *)offsetof(ipf_main_softc_t, ipf_tcpidletimeout) },
 		"tcp_idle_timeout",	1,	0x7fffffff,
 		stsizeof(ipf_main_softc_t, ipf_tcpidletimeout),
@@ -1273,6 +1279,64 @@ ipf_pr_icmp(fin)
 	ipf_checkv4sum(fin);
 }
 
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_pr_tcpxid                                            */
+/* Returns:     int    - 0 = header ok, 1 = bad packet, -1 = buffer error   */
+/* Parameters:  fin(I) - pointer to packet information                      */
+/*                                                                          */
+/* Obtain for a TCP packet that is containing a RPC (call/response) header  */
+/* the RPC program number or XID (transaction ID) of the response           */
+/*                                                                          */
+/* Theoretically what we should do is collect bytes of the RPC header in a  */
+/* buffer and then obtain the XID from that buffer, because it is incorrect */
+/* to assume that the RPC header fits in a TCP packet in all cases          */
+/*                                                                          */
+/* However, because in most cases the RPC header fits in a IP packet        */
+/* the approach that we currently use works in 'most' cases (for now)       */
+/* ------------------------------------------------------------------------ */
+
+#ifdef IPFILTER_XID
+int ipf_pr_tcpxid(fin)
+	fr_info_t *fin;
+{
+	char *s;
+	int tlen;
+	uint32_t xid;
+	uint32_t prog;
+	tcphdr_t *tcp;
+	fr_xdr_callhdr_t *rpc;
+	ipf_main_softc_t *softc = fin->fin_main_soft;
+
+	tcp = fin->fin_dp;
+	tlen = TCP_OFF(tcp) << 2;
+
+	/* need TCP header + TCP optionss (if any) + RPC header */
+	if (ipf_pr_pullup(fin,sizeof(*tcp) + sizeof(*rpc) == -1)) {
+		return -1;
+	}
+
+	if (tlen < sizeof(tcphdr_t)) {
+		return -1;
+	}
+
+	s = (char *)tcp + tlen + 4;
+	rpc = (fr_xdr_callhdr_t *)s;
+
+	xid = ntohl(rpc->xid);
+	prog = ntohl(rpc->prog);
+
+	if (softc->ipf_xid_debug==8) {
+		char *sen = (fin->fin_out)?"in":"out";
+		printf("tcp %s xid %u rpc prog %u\n",sen,xid,prog);
+	}
+
+	fin->fin_xid = xid;
+	fin->fin_prog = prog;
+
+	return 0;
+}
+
+#endif /* IPFILTER_XID */
 
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_pr_tcpcommon                                            */
@@ -1458,6 +1522,10 @@ ipf_pr_udpcommon(fin)
 	fr_info_t *fin;
 {
 	udphdr_t *udp;
+#ifdef IPFILTER_XID
+	int is_rpc = 1;
+	fr_xdr_callhdr_t *rpc;
+#endif
 
 	fin->fin_flx |= FI_TCPUDP;
 
@@ -1470,10 +1538,39 @@ ipf_pr_udpcommon(fin)
 			return 1;
 		}
 
+#ifdef IPFILTER_XID
+		if (ipf_pr_pullup(fin, sizeof(*rpc)) == -1) {
+			is_rpc = 0;  /* it is a not the size of an RPC packet */
+		}
+#endif
+
 		udp = fin->fin_dp;
 
 		fin->fin_sport = ntohs(udp->uh_sport);
 		fin->fin_dport = ntohs(udp->uh_dport);
+
+#ifdef IPFILTER_XID
+		if (is_rpc) {
+			u_char *s;
+			uint32_t xid;
+			uint32_t prog;
+			ipf_main_softc_t *softc = fin->fin_main_soft;
+
+			s = (u_char *)fin->fin_dp + sizeof(*udp);
+			rpc = (fr_xdr_callhdr_t *)s;
+
+			xid = ntohl(rpc->xid);
+			prog = ntohl(rpc->prog);
+
+			if (softc->ipf_xid_debug==9) {
+				char *intf = (fin->fin_out)?"out":"in";
+				printf("udp %s xid %u rpc prog %u\n",intf,xid,prog);
+			}
+
+			fin->fin_xid = xid;
+			fin->fin_prog = prog;
+		}
+#endif /* IPFILTER_XID */
 	}
 
 	return 0;
@@ -8909,6 +9006,10 @@ ipf_main_soft_create(arg)
 	softc->ipf_minttl = 4;
 	softc->ipf_icmpminfragmtu = 68;
 	softc->ipf_flags = IPF_LOGGING;
+
+#ifdef IPFILTER_XID
+	softc->ipf_xid_debug = 0;
+#endif
 
 	return softc;
 }

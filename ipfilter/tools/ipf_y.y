@@ -58,7 +58,7 @@ static	int		ipffd = -1;
 static	int		*yycont = NULL;
 static	ioctlfunc_t	ipfioctls[IPL_LOGSIZE];
 static	addfunc_t	ipfaddfunc = NULL;
-static	struct	wordtab ipfwords[100];
+static	struct	wordtab ipfwords[101];
 static	struct	wordtab	addrwords[4];
 static	struct	wordtab	maskwords[5];
 static	struct	wordtab icmpcodewords[17];
@@ -131,7 +131,7 @@ static	struct	wordtab logwords[33];
 %token	IPFY_TCPUDP IPFY_TCP IPFY_UDP
 %token	IPFY_FLAGS IPFY_MULTICAST
 %token	IPFY_MASK IPFY_BROADCAST IPFY_NETWORK IPFY_NETMASKED IPFY_PEER
-%token	IPFY_PORT
+%token	IPFY_RPC IPFY_PORT
 %token	IPFY_NOW
 %token	IPFY_ICMP IPFY_ICMPTYPE IPFY_ICMPCODE
 %token	IPFY_IPOPTS IPFY_SHORT IPFY_NAT IPFY_BADSRC IPFY_LOWTTL IPFY_FRAG
@@ -1332,6 +1332,10 @@ stateopt:
 				}
 	| IPFY_NOLOG
 				{ DOALL(fr->fr_nostatelog = 1;) }
+	| IPFY_RPC
+				{ DOALL(fr->fr_rpc = 1;) }
+	| IPFY_RPC IPFY_IN YY_STR
+				{ DOALL(fr->fr_rpc = 1;) }
 	;
 
 portnum:
@@ -1634,7 +1638,7 @@ ipv4:	ipv4_24 '.' YY_NUMBER
 %%
 
 
-static	struct	wordtab ipfwords[100] = {
+static	struct	wordtab ipfwords[101] = {
 	{ "age",			IPFY_AGE },
 	{ "ah",				IPFY_AH },
 	{ "all",			IPFY_ALL },
@@ -1720,6 +1724,7 @@ static	struct	wordtab ipfwords[100] = {
 	{ "return-icmp-as-dest",	IPFY_RETICMPASDST },
 	{ "return-rst",			IPFY_RETRST },
 	{ "route-to",			IPFY_ROUTETO },
+	{ "rpc",			IPFY_RPC },
 	{ "sec-class",			IPFY_SECCLASS },
 	{ "set-tag",			IPFY_SETTAG },
 	{ "skip",			IPFY_SKIP },

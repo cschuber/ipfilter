@@ -29,7 +29,7 @@ MFLAGS="BINDEST=$(BINDEST)" "SBINDEST=$(SBINDEST)" "MANDIR=$(MANDIR)" \
 	'CFLAGS=$(CFLAGS) $(SOLARIS2)' "IPFLKM=$(IPFLKM)" "IPFLOG=$(IPFLOG)" \
 	"LOGFAC=$(LOGFAC)" "POLICY=$(POLICY)" "SOLARIS2=$(SOLARIS2)" \
 	"DEBUG=$(DEBUG)" "DCPU=$(CPU)" "CPUDIR=$(CPUDIR)" \
-	"LOOKUP=$(LOOKUP)" "SYNC=$(SYNC)" "ALLOPTS=$(ALLOPTS)"
+	"LOOKUP=$(LOOKUP)" "XID=$(XID)" "SYNC=$(SYNC)" "ALLOPTS=$(ALLOPTS)"
 LIBS=-L. -lipf
 #
 ########## ########## ########## ########## ########## ########## ##########
@@ -44,7 +44,7 @@ MODOBJS=ip_fil.o fil.o mls_ipl.o ip_nat.o ip_state.o ip_frag.o ip_proxy.o \
 	ip_sync.o ip_rules.o \
 	radix.o md5.o
 #	ip_trafcon.o
-DFLAGS=$(IPFLKM) $(IPFLOG) $(DEF) $(LOOKUP) $(SYNC)
+DFLAGS=$(IPFLKM) $(IPFLOG) $(DEF) $(LOOKUP) $(XID) $(SYNC)
 IPF=ipf.o ipfcomp.o ipf_y.o ipf_l.o
 IPFTEST=ipftest.o fil_u.o ip_nat_u.o ip_frag_u.o ip_state_u.o ip_fil_u.o \
 	ip_proxy_u.o ip_auth_u.o ip_pool_u.o ip_htable_u.o ip_lookup_u.o \

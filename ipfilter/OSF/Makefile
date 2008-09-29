@@ -31,7 +31,7 @@ MFLAGS="BINDEST=$(BINDEST)" "SBINDEST=$(SBINDEST)" "MANDIR=$(MANDIR)" \
 	'CFLAGS=$(CFLAGS)' "IPFLKM=$(IPFLKM)" \
 	"IPFLOG=$(IPFLOG)" "LOGFAC=$(LOGFAC)" "POLICY=$(POLICY)" \
 	"DEBUG=$(DEBUG)" "DCPU=$(CPU)" "CPUDIR=$(CPUDIR)" \
-	"LOOKUP=$(LOOKUP)" "SCAN=$(SCAN)" "ALLOPTS=$(ALLOPTS)"
+	"LOOKUP=$(LOOKUP)" "XID=$(XID)" "SCAN=$(SCAN)" "ALLOPTS=$(ALLOPTS)"
 LIBS=-L. -lipf
 CCARGS=$(DEBUG) $(CFLAGS) -I. -DTRU64=$(TRU64)
 EXTRA=$(ALLOPTS)
@@ -49,7 +49,7 @@ MODOBJS=ip_fil.o fil.o md5.o ip_nat.o ip_frag.o ip_state.o ip_nat6.o \
 	ip_proxy.o ip_auth.o ip_log.o ip_pool.o ip_htable.o ip_lookup.o \
 	ip_dstlist.o ip_sync.o ip_scan.o ip_rules.o radix.o tru64.o
 DFLAGS=$(DEBUG) -DTRU64=$(TRU64) $(IPFLKM) $(IPFLOG) $(DEF) $(CFLAGS) $(DLKM) \
-	$(IPFBPF) $(LOOKUP) -I.
+	$(IPFBPF) $(LOOKUP) $(XID) -I.
 IPF=ipf.o ipfcomp.o ipf_y.o ipf_l.o
 IPT=ipftest.o fil_u.o ip_frag_u.o ip_state_u.o ip_nat_u.o ip_nat6_u.o \
 	ip_proxy_u.o ip_auth_u.o ip_fil_u.o ip_sync_u.o ip_scan_u.o \

@@ -40,7 +40,7 @@ KCFLAGS=-Wall -Wstrict-prototypes -O2 -fomit-frame-pointer  -Wno-trigraphs \
 	-fno-strict-aliasing -fno-common -DLINUX=$(LINUX) -I/usr/src/linux/asm/${mcore}
 IPDEF=$(DEF) -DGATEWAY -DDIRECTED_BROADCAST
 IPFILC=ip_lfil.c
-XCFLAGS=-DLINUX=$(LINUX) -I.. -I`pwd`/.. -I`pwd`/../..  $(LOOKUP) $(IPFLOG) -O2
+XCFLAGS=-DLINUX=$(LINUX) -I.. -I`pwd`/.. -I`pwd`/../..  $(LOOKUP) $(XID) $(IPFLOG) -O2
 EXTRA_CFLAGS += $(XCFLAGS)
 #
 MFLAGS="BINDEST=$(BINDEST)" "SBINDEST=$(SBINDEST)" "MANDIR=$(MANDIR)" \
@@ -65,7 +65,7 @@ MODOBJS=$(OBJ)/linux.o $(OBJ)/ip_fil.o $(OBJ)/fil.o $(OBJ)/ip_nat.o \
 	$(OBJ)/ip_lookup.o $(OBJ)/ip_pool.o $(OBJ)/ip_htable.o \
 	$(OBJ)/ip_log.o $(OBJ)/radix.o
 KCCARGS=$(KCFLAGS) -D_BSD_SOURCE=1 $(IPFLKM) $(DEF) $(DLKM) -march=$(ARCH) \
-	$(INC) -iwithprefix include -I. $(LOOKUP) $(IPFLOG)
+	$(INC) -iwithprefix include -I. $(LOOKUP) $(XID) $(IPFLOG)
 IPF=$(OBJ)/ipf.o $(OBJ)/ipfcomp.o $(OBJ)/ipf_y.o $(OBJ)/ipf_l.o
 IPT=$(OBJ)/ipftest.o $(OBJ)/ip_fil_u.o $(OBJ)/ip_state_u.o \
     $(OBJ)/ip_frag_u.o $(OBJ)/ip_nat_u.o $(OBJ)/fil_u.o $(OBJ)/ip_nat6_u.o \
@@ -81,7 +81,7 @@ IPPOOL=$(OBJ)/ippool_y.o $(OBJ)/ippool_l.o $(OBJ)/kmem.o $(OBJ)/ippool.o
 IPTRAFCON=$(OBJ)/iptrafcon.o
 FILS=$(OBJ)/ipfstat.o
 #
-CCARGS=-I. -I$(CPUDIR) $(DEBUG) $(CFLAGS) $(LOOKUP) $(IPFLOG) -DLINUX=$(LINUX)
+CCARGS=-I. -I$(CPUDIR) $(DEBUG) $(CFLAGS) $(LOOKUP) $(XID) $(IPFLOG) -DLINUX=$(LINUX)
 EXTRA=-DIPFILTER_LOG -DIPFILTER_LOOKUP
 
 include $(TOP)/lib/Makefile

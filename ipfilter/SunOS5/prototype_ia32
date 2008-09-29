@@ -80,7 +80,6 @@ f none /usr/include/ipfilter/ip_auth.h=root/usr/include/ipfilter/ip_auth.h
 f none /usr/include/ipfilter/ip_compat.h=root/usr/include/ipfilter/ip_compat.h
 f none /usr/include/ipfilter/ip_frag.h=root/usr/include/ipfilter/ip_frag.h
 f none /usr/include/ipfilter/ip_htable.h=root/usr/include/ipfilter/ip_htable.h
-f none /usr/include/ipfilter/ip_dstlist.h=root/usr/include/ipfilter/ip_dstlist.h
 f none /usr/include/ipfilter/ip_lookup.h=root/usr/include/ipfilter/ip_lookup.h
 f none /usr/include/ipfilter/ip_nat.h=root/usr/include/ipfilter/ip_nat.h
 f none /usr/include/ipfilter/ip_pool.h=root/usr/include/ipfilter/ip_pool.h

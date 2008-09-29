@@ -12,7 +12,7 @@ BINDEST=/usr/local/bin
 SBINDEST=/sbin
 MANDIR=/usr/local/man
 #To test prototyping
-CC=gcc -Wstrict-prototypes -Wmissing-prototypes -Wunused -Wuninitialized
+#CC=gcc -Wstrict-prototypes -Wmissing-prototypes -Wunused -Wuninitialized
 #CC=gcc
 #CC=cc -Dconst=
 DEBUG=-g
@@ -29,6 +29,13 @@ IPFLKM=-DIPFILTER_LKM
 # To enable logging of blocked/passed packets...
 #
 IPFLOG=-DIPFILTER_LOG
+
+#
+# To enable XID (transaction ID) filtering of RPC calls
+# Experimental extension by stes@pandora.be
+# Recommended value: disabled
+#
+# XID=-DIPFILTER_XID
 
 # To enable lookup
 
@@ -77,7 +84,7 @@ ALLOPTS=-DIPFILTER_LOG -DIPFILTER_LOOKUP \
 #
 # Uncomment the next 3 lines if you want to view the state table a la top(1)
 # (requires that you have installed ncurses).
-STATETOP_CFLAGS=-DSTATETOP
+# STATETOP_CFLAGS=-DSTATETOP
 #
 # Where to find the ncurses include files (if not in default path),
 #
@@ -86,7 +93,7 @@ STATETOP_CFLAGS=-DSTATETOP
 #
 # How to link the ncurses library
 #
-STATETOP_LIB=-lncurses
+# STATETOP_LIB=-L/opt/sfw/lib -lncurses
 #STATETOP_LIB=-L/usr/local/lib -lncurses
 
 #
@@ -109,7 +116,7 @@ MFLAGS1='CFLAGS=$(CFLAGS) $(ARCHINC) $(SOLARIS2) $(SGIREV) $(INET6)' \
         'STATETOP_CFLAGS=$(STATETOP_CFLAGS)' "BPFILTER=$(BPFILTER)" \
         'STATETOP_INC=$(STATETOP_INC)' 'STATETOP_LIB=$(STATETOP_LIB)' \
 	"BITS=$(BITS)" "OBJ=$(OBJ)" "LOOKUP=$(LOOKUP)" "COMPIPF=$(COMPIPF)" \
-	'SYNC=$(SYNC)' 'ALLOPTS=$(ALLOPTS)' 'LIBBPF=$(LIBBPF)'
+	"XID=$(XID)" 'SYNC=$(SYNC)' 'ALLOPTS=$(ALLOPTS)' 'LIBBPF=$(LIBBPF)'
 MFLAGS=$(MFLAGS1) "IPFLKM=$(IPFLKM)"
 MACHASSERT=`/bin/ls -1 /usr/sys/*/mach_assert.h | head -1`
 #

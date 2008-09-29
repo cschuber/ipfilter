@@ -31,7 +31,7 @@ MFLAGS="BINDEST=$(BINDEST)" "SBINDEST=$(SBINDEST)" "MANDIR=$(MANDIR)" \
 	'CFLAGS=$(CFLAGS) $(SOLARIS2)' "IPFLKM=$(IPFLKM)" \
 	"IPFLOG=$(IPFLOG)" "LOGFAC=$(LOGFAC)" "POLICY=$(POLICY)" \
 	"SOLARIS2=$(SOLARIS2)" "DEBUG=$(DEBUG)" "DCPU=$(CPU)" \
-	"CPUDIR=$(CPUDIR)" "LOOKUP=$(LOOKUP)" "SYNC=$(SYNC)"
+	"CPUDIR=$(CPUDIR)" "LOOKUP=$(LOOKUP)" "XID=$(XID)" "SYNC=$(SYNC)"
 LIBS=-L. -lipf $(LIBBPF)
 #
 ########## ########## ########## ########## ########## ########## ##########
@@ -45,7 +45,7 @@ MODOBJS=ip_fil.o fil.o ml_ipl.o ip_nat.o ip_frag.o ip_state.o ip_proxy.o \
 	ip_auth.o ip_log.o ip_pool.o ip_htable.o ip_lookup.o ip_rules.o \
 	ip_scan.o ip_sync.o ip_nat6.o ip_dstlist.o radix.o
 #	ip_trafcon.o
-DFLAGS=$(IPFLKM) $(IPFLOG) $(LOOKUP) $(SYNC) $(DEF) $(DLKM) $(IPFBPF)
+DFLAGS=$(IPFLKM) $(IPFLOG) $(LOOKUP) $(XID) $(SYNC) $(DEF) $(DLKM) $(IPFBPF)
 IPF=ipf.o ipfcomp.o ipf_y.o ipf_l.o bpf_filter_u.o
 IPT=ipftest.o fil_u.o ip_frag_u.o ip_state_u.o ip_nat_u.o ip_nat6_u.o \
     ip_proxy_u.o ip_auth_u.o ip_htable_u.o ip_lookup_u.o ip_pool_u.o \

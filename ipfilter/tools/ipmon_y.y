@@ -766,6 +766,7 @@ int opts, lvl;
 			}
 		}
 
+#ifdef STES
 		if (a->ac_v1.is_fd >= 0) {
 			sendtrap_v1_0(a->ac_v1.is_fd, a->ac_v1.is_community,
 				      log, strlen(log), ipl->ipl_time.tv_sec);
@@ -774,6 +775,7 @@ int opts, lvl;
 			sendtrap_v2_0(a->ac_v2.is_fd, a->ac_v2.is_community,
 				      log, strlen(log), ipl->ipl_time.tv_sec);
 		}
+#endif
 	}
 
 	return matched;

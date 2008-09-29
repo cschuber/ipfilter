@@ -66,7 +66,7 @@ MFLAGS="BINDEST=$(BINDEST)" "SBINDEST=$(SBINDEST)" "MANDIR=$(MANDIR)" \
         "IPFLOG=$(IPFLOG)" "LOGFAC=$(LOGFAC)" "POLICY=$(POLICY)" \
         "SOLARIS2=$(SOLARIS2)" "DEBUG=$(DEBUG)" "CPUDIR=$(CPUDIR)" \
 	"BITS=$(BITS)" "OBJ=$(OBJ)" "LOOKUP=$(LOOKUP)" "SYNC=$(SYNC)" \
-	"ALLOPTS=$(ALLOPTS)"
+	"XID=$(XID)" "ALLOPTS=$(ALLOPTS)"
 #
 ########## ########## ########## ########## ########## ########## ##########
 #
@@ -78,7 +78,7 @@ LIBSRC=$(TOP)/lib
 RANLIB=echo
 AROPTS=crs
 #
-DFLAGS=$(IPFLKM) $(DEF) $(SOLARIS2) $(IPFLOG) $(LOOKUP) $(SYNC)
+DFLAGS=$(IPFLKM) $(DEF) $(SOLARIS2) $(IPFLOG) $(LOOKUP) $(SYNC) $(XID)
 #-DIPFDEBUG
 MODOBJS=$(OBJ)/ip_fil.o $(OBJ)/fil.o $(OBJ)/solaris.o $(OBJ)/ip_state.o \
     $(OBJ)/ip_frag.o $(OBJ)/ip_nat.o $(OBJ)/ip_proxy.o $(OBJ)/ip_auth.o \
@@ -233,7 +233,7 @@ $(OBJ)/ipfrule: $(OBJ)/ip_rulesx.o $(OBJ)/mlso_rule.o
 	ld -r $(OBJ)/ip_rulesx.o $(OBJ)/mlso_rule.o -o $@
 
 $(OBJ)/ipf: $(MODOBJS)
-	ld -dy -Ndrv/ip -Ndrv/pfil -Nmisc/md5 -r $(MODOBJS) -o $@
+	ld -dy -Ndrv/ip -Nmisc/neti -Nmisc/md5 -r $(MODOBJS) -o $@
 
 $(OBJ)/md5.o: $(TOP)/md5.c $(TOP)/md5.h
 	$(CC) -I$(TOP) $(DFLAGS) -c $(TOP)/md5.c -o $@
@@ -564,6 +564,6 @@ package install: $(CPUDIR)/ipf.pkg
 		echo "Can only install if root"; \
 		exit 1; \
 	fi
-	# Must add ipfx before ipf or driver attach fails.
+# Must add ipfx before ipf or driver attach fails.
 	-[ -d $(CPUDIR)/$(OBJ64) ] && pkgadd -d ipf.pkg ipfx
 	-pkgadd -d ipf.pkg ipf

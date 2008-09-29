@@ -408,6 +408,10 @@ typedef	struct	fr_info	{
 	void	*fin_hbuf;
 #endif
 	void	*fin_fraghdr;		/* pointer to start of ipv6 frag hdr */
+#ifdef IPFILTER_XID
+	uint32_t	fin_prog;	/* RPC program number */
+	uint32_t	fin_xid;	/* RPC XID transaction ID */
+#endif
 } fr_info_t;
 
 #define	fin_ip		fin_ipu.fip_ip
@@ -514,6 +518,19 @@ typedef	struct	frpcmp	{
 	u_32_t		frp_top;	/* top port for <> and >< */
 } frpcmp_t;
 
+#ifdef IPFILTER_XID
+
+extern int ipf_pr_tcpxid __P((fr_info_t *));
+
+typedef struct fr_xdr_callhdr {
+	uint32_t	xid;
+	uint32_t	direction;
+	uint32_t	rpc_version;
+	uint32_t	prog;
+	uint32_t	prog_version;
+} fr_xdr_callhdr_t;
+
+#endif /* IPFILTER_XID */
 
 /*
  * Structure containing all the relevant TCP things that can be checked in
@@ -642,6 +659,7 @@ typedef	struct	frentry {
 	u_int	fr_loglevel;	/* syslog log facility + priority */
 	u_int	fr_age[2];	/* non-TCP state timeouts */
 	int	fr_nostatelog;
+	int	fr_rpc;
 	u_char	fr_family;
 	u_char	fr_icode;	/* return ICMP code */
 	char	fr_group[FR_GROUPLEN];	/* group to which this rule belongs */
@@ -1492,6 +1510,9 @@ typedef struct ipf_main_softc_s {
 	int		ipf_icmpminfragmtu;
 	int		ipf_interror;
 	int		ipf_specfuncref[3][2];
+#ifdef IPFILTER_XID
+	int		ipf_xid_debug;
+#endif
         u_int		ipf_tcpidletimeout;
         u_int		ipf_tcpclosewait;
         u_int		ipf_tcplastack;

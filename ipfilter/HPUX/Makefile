@@ -42,7 +42,7 @@ MFLAGS="BINDEST=$(BINDEST)" "SBINDEST=$(SBINDEST)" "MANDIR=$(MANDIR)" \
 	'CFLAGS=$(CFLAGS) $(ARCHINC)' "IPFLKM=$(IPFLKM)" \
 	"IPFLOG=$(IPFLOG)" "LOGFAC=$(LOGFAC)" "POLICY=$(POLICY)" \
 	"DEBUG=$(DEBUG)" "CPUDIR=$(CPUDIR)" "HPUXREV=$(HPUXREV)" \
-	"LOOKUP=$(LOOKUP)"
+	"LOOKUP=$(LOOKUP)" "XID=$(XID)"
 #
 O2=+O2
 #O2=-g
@@ -56,7 +56,7 @@ RM=/bin/rm
 CHMOD=/bin/chmod
 INSTALL=$(TOP)/bsdinstall
 #
-DFLAGS=$(IPFLKM) $(IPFLOG) $(DEF) $(IPFBPF) $(LOOKUP)
+DFLAGS=$(IPFLKM) $(IPFLOG) $(DEF) $(IPFBPF) $(LOOKUP) $(XID)
 #-DIPFDEBUG
 MODOBJS=ip_fil.o fil.o ip_state.o ip_frag.o \
 	ip_nat.o ip_proxy.o ip_auth.o ip_log.o \

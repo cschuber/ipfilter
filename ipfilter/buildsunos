@@ -100,7 +100,8 @@ __EOF__
 		XARCH32_i386="-Xa -xildoff"
 		XARCH32_sparc="-g -Xa -xildoff -xarch=v8 -xmemalign=8s"
 		XARCH64_sparc="-g -Xa -xildoff -xarch=v9 -xchip=ultra -xmemalign=8s -xcode=abs32 -Wc,-Qiselect-regsym=0 -xO3 -D_ASM_INLINES -Xa -xspace -W0,-Lt -errtags=yes -g -Wc,-Qiselect-T1 -xc99=%all -W0,-noglobal -xdebugformat=stabs -xc99=%all -Wd,-xsafe=unboundsym -Wc,-Qassembler-ounrefsym=0 -W2,-xwrap_int -W0,-xglobalstatic -xregs=no%float -xstrconst"
-		XARCH64_i386="$XARCH32 -xarch=amd64 -xcode=abs32"
+#		XARCH64_i386="$XARCH32 -xarch=amd64 -xcode=abs32"
+		XARCH64_i386="$XARCH32 -m64 -xmodel=kernel"
 		;;
 	esac
 	XARCH32="`eval echo '$XARCH32_'$cpu`"

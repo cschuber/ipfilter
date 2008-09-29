@@ -54,7 +54,11 @@ static MD5_CTX md5ctx;
 static u_int8_t arc4_randbyte(void);
 static int ipf_read_random(void *dest, int length);
 
+#ifdef STES
 static __inline void
+#else
+static void
+#endif
 arc4_swap(u_int8_t *a, u_int8_t *b)
 {
 	u_int8_t c;

@@ -1317,6 +1317,148 @@ ipf_state_match(is1, is2)
 }
 
 /* ------------------------------------------------------------------------ */
+/* Function:    ipf_rpc_match                                               */
+/* Returns:     - 1 = program number matches                                */
+/*                                                                          */
+/* Currently hardcoded match function (proof of concept for NetWorker)      */
+/* Portmapper 100000 + EMC NetWorker program numbers                        */
+/* There's a list at http://www.nfsv4-editor.org/rpc-numbers-1831bis.txt    */
+/* Legato had the 390100-390199 and 390400-390499 ranges                    */
+/*                                                                          */
+/* Instead of a hardcoded list  (as we have here) we could allow users to   */
+/* specify which RPC's they are interested in.                              */
+/* For example for ClearCase : 390512, for ACSLS , for other RPC based sw.  */
+/*                                                                          */
+/* ------------------------------------------------------------------------ */
+
+#ifdef IPFILTER_XID
+
+int ipf_rpc_match(p)
+	uint32_t p;
+{
+	/* hardcoded match for EMC NetWorker */
+	return (p==100000||(p>=390100 && p<390199)||(p>=390400 && p<390499));
+}
+
+static char *rpcstates[5] = {
+	"none","wait-rpc","wait-response","accept","reject"
+};
+
+int
+ipf_state_new_rpc(is,softc, fin, stsave, flags, rpc)
+	ipstate_t *is;
+	ipf_main_softc_t *softc;
+	fr_info_t *fin;
+	void **stsave;
+	u_int flags;
+	int rpc;
+{
+	/* in TCP case, can't do anything yet - wait for first data packet */
+
+	is->is_rpcstate = RPC_WAITRPC;
+
+	/* in UDP case, we immediately know whether this is a good RPC pkt */
+
+	if (is->is_p == IPPROTO_UDP) {
+		if (ipf_rpc_match(fin->fin_prog)) {
+			is->is_prog = fin->fin_prog;
+			is->is_xid = fin->fin_xid;
+			is->is_rpcstate = RPC_WAITRESPONSE;
+		} else {
+			is->is_rpcstate = RPC_REJECT;
+		}
+	}
+
+	if (softc->ipf_xid_debug>0) {
+		switch(is->is_p) {
+			case IPPROTO_UDP:
+				printf("udp new state %x rpc %u xid %u state %s\n",is,is->is_prog,is->is_xid,rpcstates[is->is_rpcstate]);
+				break;
+			case IPPROTO_TCP:
+				printf("tcp new state %x state %s\n",is,rpcstates[is->is_rpcstate]);
+				break;
+			case IPPROTO_ICMP:
+				printf("icmp new state %x state %s\n",is,rpcstates[is->is_rpcstate]);
+				break;
+		}
+	}
+
+	return 0;
+}
+
+int
+ipf_state_lookup_rpc(is,softc, fin,tcp,ifqp)
+	ipstate_t *is;
+	ipf_main_softc_t *softc;
+	fr_info_t *fin;
+	tcphdr_t *tcp;
+	ipftq_t **ifqp;
+{
+	if (is->is_p == IPPROTO_UDP) {
+		if (is->is_rpcstate == RPC_WAITRESPONSE) {
+			if (fin->fin_xid == is->is_xid) {
+				is->is_rpcstate = RPC_ACCEPT;
+			} else {
+				is->is_rpcstate = RPC_REJECT;
+			}
+
+			/* new RPC call using same UDP ports (same state) */
+	
+		} else if (is->is_rpcstate == RPC_ACCEPT) {
+			if (ipf_rpc_match(fin->fin_prog)) {
+				is->is_prog = fin->fin_prog;
+				is->is_xid = fin->fin_xid;
+				is->is_rpcstate = RPC_WAITRESPONSE;
+			} else {
+				is->is_rpcstate = RPC_REJECT;
+			}
+		}
+	}
+
+	/* in TCP case, we should collect data in a buffer and once we have */
+	/* the entire RPC header, check it */
+	/* what we currently (incorrectly) do is check the first data packet */
+
+	if (is->is_p == IPPROTO_TCP) {
+		int rev = fin->fin_rev;
+		if (is->is_rpcstate == RPC_WAITRPC && rev == 0 && (tcp->th_flags & TH_PUSH)) {
+			if (ipf_pr_tcpxid(fin)==0&&ipf_rpc_match(fin->fin_prog)) {
+				is->is_prog = fin->fin_prog;
+				is->is_xid = fin->fin_xid;
+				is->is_rpcstate = RPC_WAITRESPONSE;
+			} else {
+				is->is_rpcstate = RPC_REJECT;
+			}
+		}
+		if (is->is_rpcstate == RPC_WAITRESPONSE && rev == 1 && (tcp->th_flags & TH_PUSH)) {
+			if (ipf_pr_tcpxid(fin)==0&&fin->fin_xid == is->is_xid) {
+				is->is_rpcstate = RPC_ACCEPT;
+			} else {
+				is->is_rpcstate = RPC_REJECT;
+			}
+		}
+	}
+
+	if (softc->ipf_xid_debug>0) {
+		switch(is->is_p) {
+			case IPPROTO_UDP:
+				printf("udp lookup state %x rpc %u xid %u state %s\n",is,is->is_prog,is->is_xid,rpcstates[is->is_rpcstate]);
+				break;
+			case IPPROTO_TCP:
+				printf("tcp lookup state %x rpc %u xid %u state %s\n",is,is->is_prog,is->is_xid,rpcstates[is->is_rpcstate]);
+				break;
+			case IPPROTO_ICMP:
+				printf("icmp lookup state %x rpc %u xid %u state %s\n",is,is->is_prog,is->is_xid,rpcstates[is->is_rpcstate]);
+				break;
+		}
+	}
+	
+  	return 0;
+}
+
+#endif /* IPFILTER_XID */
+
+/* ------------------------------------------------------------------------ */
 /* Function:    ipf_state_add                                               */
 /* Returns:     ipstate_t - 0 = success                                     */
 /* Parameters:  fin(I)    - pointer to packet information                   */
@@ -1724,6 +1866,14 @@ ipf_state_add(softc, fin, stsave, flags)
 		is->is_flx[out][0] &= ~FI_OOW;
 	}
 
+#ifdef IPFILTER_XID
+	if (fr->fr_rpc) {
+		ipf_state_new_rpc(is,softc,fin,stsave,flags,fr->fr_rpc);
+	} else {
+		is->is_rpcstate = RPC_NONE;
+	}
+#endif /* IPFILTER_XID */
+
 	if (pass & FR_STSTRICT)
 		is->is_flags |= IS_STRICT;
 
@@ -1832,7 +1982,9 @@ ipf_tcpoptions(softs, fin, tcp, td)
 		retval = 1;
 	}
 
+#ifdef STES
 	COPYDATA(m, off, len, buf);
+#endif
 
 	for (s = buf; len > 0; ) {
 		opt = *s;
@@ -3187,6 +3339,13 @@ retry_tcpudp:
 	}
 
 	if (is != NULL) {
+
+#ifdef IPFILTER_XID
+		if (is->is_rpcstate != RPC_NONE) {
+			ipf_state_lookup_rpc(is,softc,fin,tcp,ifqp);
+		}
+#endif /* IPFILTER_XID */
+
 		if (((is->is_sti.tqe_flags & TQE_RULEBASED) != 0) &&
 		    (is->is_tqehead[fin->fin_rev] != NULL))
 			ifq = is->is_tqehead[fin->fin_rev];
@@ -3197,7 +3356,6 @@ retry_tcpudp:
 	}
 	return is;
 }
-
 
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_state_check                                             */

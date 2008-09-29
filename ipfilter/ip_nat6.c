@@ -2946,7 +2946,9 @@ ipf_nat6_out(fin, nat, natadd, nflags)
 		if (ipf_nat6_encapok(fin, nat) == -1)
 			return -1;
 
+#ifdef STES
 		m = M_DUP(np->in_divmp);
+#endif
 		if (m == NULL) {
 			NINCLSIDE6(1, ns_encap_dup);
 			return -1;
@@ -2975,7 +2977,9 @@ ipf_nat6_out(fin, nat, natadd, nflags)
 		ip6_t *ip6;
 		mb_t *m;
 
+#ifdef STES
 		m = M_DUP(np->in_divmp);
+#endif
 		if (m == NULL) {
 			NINCLSIDE6(1, ns_divert_dup);
 			return -1;
@@ -3447,7 +3451,9 @@ ipf_nat6_in(fin, nat, natadd, nflags)
 		if (ipf_nat6_encapok(fin, nat) == -1)
 			return -1;
 
+#ifdef STES
 		m = M_DUP(np->in_divmp);
+#endif
 		if (m == NULL) {
 			NINCLSIDE6(0, ns_encap_dup);
 			return -1;
@@ -3474,7 +3480,9 @@ ipf_nat6_in(fin, nat, natadd, nflags)
 		ip6_t *ip6;
 		mb_t *m;
 
+#ifdef STES
 		m = M_DUP(np->in_divmp);
+#endif
 		if (m == NULL) {
 			NINCLSIDE6(0, ns_divert_dup);
 			return -1;

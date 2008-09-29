@@ -77,7 +77,20 @@ typedef struct ipstate {
 	char	is_group[FR_GROUPLEN];
 	char	is_sbuf[2][16];
 	char	is_ifname[4][LIFNAMSIZ];
+#ifdef IPFILTER_XID
+	char	is_rpcstate;
+	uint32_t is_xid; /* RPC XID */
+	uint32_t is_prog; /* RPC program number */
+#endif
 } ipstate_t;
+
+#ifdef IPFILTER_XID
+#define	RPC_NONE	0
+#define RPC_WAITRPC	1
+#define RPC_WAITRESPONSE 2
+#define RPC_ACCEPT	3
+#define RPC_REJECT	4
+#endif
 
 #define	is_die		is_sti.tqe_die
 #define	is_state	is_sti.tqe_state
