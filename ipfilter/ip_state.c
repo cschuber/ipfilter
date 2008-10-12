@@ -1982,9 +1982,7 @@ ipf_tcpoptions(softs, fin, tcp, td)
 		retval = 1;
 	}
 
-#ifdef STES
 	COPYDATA(m, off, len, buf);
-#endif
 
 	for (s = buf; len > 0; ) {
 		opt = *s;
@@ -3356,6 +3354,7 @@ retry_tcpudp:
 	}
 	return is;
 }
+
 
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_state_check                                             */
