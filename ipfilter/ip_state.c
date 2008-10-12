@@ -1092,6 +1092,9 @@ ipf_state_insert(softc, is, rev)
 	MUTEX_ENTER(&is->is_lock);
 	MUTEX_ENTER(&softs->ipf_stinsert);
 
+	SINCL(ipf_state_stats.iss_proto[is->is_p]);
+	SINCL(ipf_state_stats.iss_active_proto[is->is_p]);
+
 	/*
 	 * add into list table.
 	 */
@@ -1934,9 +1937,6 @@ ipf_state_add(softc, fin, stsave, flags)
 		fdp->fd_ptr = ipf_lookup_res_name(softc, IPLT_DSTLIST,
 						  IPL_LOGIPF, fdp->fd_name,
 						  NULL);
-
-	SINCL(ipf_state_stats.iss_proto[is->is_p]);
-	ATOMIC_INC32(softs->ipf_state_stats.iss_active_proto[is->is_p]);
 
 	return 0;
 }
