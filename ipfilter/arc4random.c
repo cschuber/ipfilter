@@ -29,6 +29,10 @@
 #include "netinet/ip_compat.h"
 #include "md5.h"
 
+#if !defined(__GNUC__)
+# define __inline
+#endif
+
 #define	ARC4_RESEED_BYTES 65536
 #define	ARC4_RESEED_SECONDS 300
 #define	ARC4_KEYBYTES (256 / 8)
