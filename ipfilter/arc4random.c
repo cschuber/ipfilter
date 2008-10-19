@@ -40,6 +40,10 @@ typedef uint8_t u_int8_t;
 #  endif
 # endif
 
+#if !defined(__GNUC__)
+# define __inline
+#endif
+
 #define	ARC4_RESEED_BYTES 65536
 #define	ARC4_RESEED_SECONDS 300
 #define	ARC4_KEYBYTES (256 / 8)
