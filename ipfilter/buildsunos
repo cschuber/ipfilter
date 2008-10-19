@@ -92,8 +92,14 @@ __EOF__
 	*)	# Sun C
 		XARCH32_i386="-Xa -xildoff"
 		XARCH32_sparc="-Xa -xildoff -xarch=v8 -xmemalign=8s"
-		XARCH64_sparc="-Xa -xildoff -xarch=v9 -xchip=ultra -xmemalign=8s -xcode=abs32"
-		XARCH64_i386="$XARCH32 -xarch=amd64 -xcode=abs32"
+		dep=`cc -xarch=amd64 2>&1 | grep -c deprecated`
+		if [ $dep -eq 1 ] ; then
+			XARCH64_sparc="-Xa -xildoff -m64 -xmemalign=8s"
+			XARCH64_i386="$XARCH32 -m64"
+		else
+			XARCH64_sparc="-Xa -xildoff -xarch=v9 -xchip=ultra -xmemalign=8s -xcode=abs32"
+			XARCH64_i386="$XARCH32 -xarch=amd64 -xcode=abs32"
+		fi
 		;;
 	esac
 	XARCH32="`eval echo '$XARCH32_'$cpu`"
