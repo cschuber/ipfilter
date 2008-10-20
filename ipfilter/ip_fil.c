@@ -160,7 +160,7 @@ static int	write_output __P((struct ifnet *, struct mbuf *,
 #endif
 
 
-int   
+int
 ipfattach(softc)
 	ipf_main_softc_t *softc;
 {
@@ -173,7 +173,7 @@ ipfdetach(softc)
 	ipf_main_softc_t *softc;
 {
 	return 0;
-}     
+}
 
 
 /*
@@ -825,12 +825,12 @@ ipf_ifpaddr(softc, v, atype, ifptr, inp, inpmask)
 }
 
 
-/*    
+/*
  * This function is not meant to be random, rather just produce a
  * sequence of numbers that isn't linear to show "randomness".
  */
 u_32_t
-ipf_random() 
+ipf_random()
 {
 	static unsigned int last = 0xa5a5a5a5;
 	static int calls = 0;
@@ -882,11 +882,11 @@ ipf_verifysrc(fin)
 
 
 int
-ipf_inject(fin, m)   
-	fr_info_t *fin; 
+ipf_inject(fin, m)
+	fr_info_t *fin;
 	mb_t *m;
 {
 	FREE_MB_T(m);
 
 	return 0;
-}     
+}

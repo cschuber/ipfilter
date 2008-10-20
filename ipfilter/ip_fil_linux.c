@@ -467,10 +467,10 @@ ipf_nextipid(fr_info_t *fin)
 }
 
 
-/*  
- * xmin - pointer to mbuf where the IP packet starts  
- * mpp - pointer to the mbuf pointer that is the start of the mbuf chain  
- */  
+/*
+ * xmin - pointer to mbuf where the IP packet starts
+ * mpp - pointer to the mbuf pointer that is the start of the mbuf chain
+ */
 /*ARGSUSED*/
 int
 ipf_fastroute(mb_t *xmin, mb_t **mp, fr_info_t *fin, frdest_t *fdp)

@@ -304,7 +304,7 @@ extern void printip __P((int, u_32_t *));
 extern void printlog __P((struct frentry *));
 extern void printlookup __P((i6addr_t *addr, i6addr_t *mask));
 extern void printmask __P((int, u_32_t *));
-extern void printnataddr __P((int, nat_addr_t *, char *));           
+extern void printnataddr __P((int, nat_addr_t *, char *));
 extern void printnatfield __P((nat_t *, int));
 extern void printnatside __P((char *, natstat_t *, nat_stat_side_t *));
 extern void printpacket __P((int, mb_t *));

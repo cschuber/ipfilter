@@ -1040,7 +1040,7 @@ int ipfilteropen(dev_t dev, int flag, int format)
 		case IPL_LOGSTATE :
 		case IPL_LOGAUTH :
 		case IPL_LOGLOOKUP :
-#ifdef IPFILTER_SYNC  
+#ifdef IPFILTER_SYNC
 		case IPL_LOGSYNC :
 #endif
 #ifdef IPFILTER_SCAN
@@ -1048,7 +1048,7 @@ int ipfilteropen(dev_t dev, int flag, int format)
 #endif
 			error = ESUCCESS;
 			break;
-		default :  
+		default :
 			error = ENXIO;
 			break;
 		}

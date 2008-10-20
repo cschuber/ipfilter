@@ -376,32 +376,32 @@ ipf_pool_node_add(softc, arg, op)
 
 	if (op->iplo_size != sizeof(node)) {
 		softc->ipf_interror = 70014;
-		return EINVAL;       
+		return EINVAL;
 	}
-	      
+
 	err = COPYIN(op->iplo_struct, &node, sizeof(node));
-	if (err != 0) { 
+	if (err != 0) {
 		softc->ipf_interror = 70015;
 		return EFAULT;
-	}     
+	}
 
 	if (node.ipn_addr.adf_family != node.ipn_mask.adf_family) {
 		softc->ipf_interror = 70016;
 		return EINVAL;
-	}      
+	}
 
 	p = ipf_pool_find(arg, op->iplo_unit, op->iplo_name);
 	if (p == NULL) {
 		softc->ipf_interror = 70017;
 		return ESRCH;
-	}  
+	}
 
 	/*
 	 * add an entry to a pool - return an error if it already
 	 * exists remove an entry from a pool - if it exists
 	 * - in both cases, the pool *must* exist!
 	 */
-	m = ipf_pool_findeq(arg, p, &node.ipn_addr, &node.ipn_mask);       
+	m = ipf_pool_findeq(arg, p, &node.ipn_addr, &node.ipn_mask);
 	if (m != NULL) {
 		softc->ipf_interror = 70018;
 		return EEXIST;
@@ -1287,7 +1287,7 @@ ipf_pool_dump(softc, arg)
 	void *arg;
 {
 	ipf_pool_softc_t *softp = arg;
-	ip_pool_t *ipl;      
+	ip_pool_t *ipl;
 	int i;
 
 	printf("List of configured pools\n");

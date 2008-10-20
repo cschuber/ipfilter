@@ -254,14 +254,14 @@ static int ipl_load()
 }
 
 
-/*    
+/*
  * routines below for saving IP headers to buffer
  */
 int
 iplopen(dev, flags, devtype, p)
-	dev_t dev;    
-	int flags;   
-	int devtype;  
+	dev_t dev;
+	int flags;
+	int devtype;
 	struct proc *p;
 {
 	u_int min = GET_MINOR(dev);
@@ -277,7 +277,7 @@ iplopen(dev, flags, devtype, p)
 		case IPL_LOGSTATE :
 		case IPL_LOGAUTH :
 		case IPL_LOGLOOKUP :
-#ifdef IPFILTER_SYNC  
+#ifdef IPFILTER_SYNC
 		case IPL_LOGSYNC :
 #endif
 #ifdef IPFILTER_SCAN
@@ -285,7 +285,7 @@ iplopen(dev, flags, devtype, p)
 #endif
 			error = 0;
 			break;
-		default :  
+		default :
 			error = ENXIO;
 			break;
 		}
@@ -298,15 +298,15 @@ int
 iplclose(dev, flags, devtype, p)
 	dev_t dev;
 	int flags;
-	int devtype;    
-	struct proc *p;   
+	int devtype;
+	struct proc *p;
 {
 	u_int   min = GET_MINOR(dev);
 
 	if (IPL_LOGMAX < min)
 		min = ENXIO;
 	else
-		min = 0;   
+		min = 0;
 	return min;
 }
 

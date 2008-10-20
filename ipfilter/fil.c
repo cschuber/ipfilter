@@ -9000,7 +9000,7 @@ ipf_main_soft_create(arg)
 
 #if defined(IPFILTER_DEFAULT_BLOCK)
 	softc->ipf_pass = FR_BLOCK|FR_NOMATCH;
-#else   
+#else
 	softc->ipf_pass = (IPF_DEFAULT_PASS)|FR_NOMATCH;
 #endif
 	softc->ipf_minttl = 4;

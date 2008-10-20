@@ -104,7 +104,7 @@ static int ipf_open(struct inode *in, struct file *fp)
 		case IPL_LOGSTATE :
 		case IPL_LOGAUTH :
 		case IPL_LOGLOOKUP :
-#ifdef IPFILTER_SYNC  
+#ifdef IPFILTER_SYNC
 		case IPL_LOGSYNC :
 #endif
 #ifdef IPFILTER_SCAN
@@ -112,7 +112,7 @@ static int ipf_open(struct inode *in, struct file *fp)
 #endif
 			err = 0;
 			break;
-		default :  
+		default :
 			err = -ENXIO;
 			break;
 		}

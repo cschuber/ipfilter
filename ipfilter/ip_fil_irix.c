@@ -224,7 +224,7 @@ iplopen(pdev, flags, devtype, cp)
 		case IPL_LOGSTATE :
 		case IPL_LOGAUTH :
 		case IPL_LOGLOOKUP :
-#ifdef IPFILTER_SYNC  
+#ifdef IPFILTER_SYNC
 		case IPL_LOGSYNC :
 #endif
 #ifdef IPFILTER_SCAN
@@ -232,7 +232,7 @@ iplopen(pdev, flags, devtype, cp)
 #endif
 			error = 0;
 			break;
-		default :  
+		default :
 			error = ENXIO;
 			break;
 		}
@@ -667,10 +667,10 @@ mbufchainlen(m0)
 }
 
 
-/*  
- * m0 - pointer to mbuf where the IP packet starts  
- * mpp - pointer to the mbuf pointer that is the start of the mbuf chain  
- */  
+/*
+ * m0 - pointer to mbuf where the IP packet starts
+ * mpp - pointer to the mbuf pointer that is the start of the mbuf chain
+ */
 int
 ipf_fastroute(m0, mpp, fin, fdp)
 	struct mbuf *m0, **mpp;

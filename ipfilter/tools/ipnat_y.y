@@ -657,7 +657,7 @@ functype:
 	;
 
 dip:
-	hostname ',' { yyexpectaddr = 1; } hostname	
+	hostname ',' { yyexpectaddr = 1; } hostname
 					{ nat->in_flags |= IPN_SPLIT;
 					  if ($1.v != $4.v)
 						yyerror("10.address family "

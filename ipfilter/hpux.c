@@ -566,7 +566,7 @@ int iplopen(dev, flag, dummy, mode)
 		case IPL_LOGSTATE :
 		case IPL_LOGAUTH :
 		case IPL_LOGLOOKUP :
-#ifdef IPFILTER_SYNC  
+#ifdef IPFILTER_SYNC
 		case IPL_LOGSYNC :
 #endif
 #ifdef IPFILTER_SCAN
@@ -574,7 +574,7 @@ int iplopen(dev, flag, dummy, mode)
 #endif
 			error = 0;
 			break;
-		default :  
+		default :
 			error = ENXIO;
 			break;
 		}

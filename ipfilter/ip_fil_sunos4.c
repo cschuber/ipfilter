@@ -422,10 +422,10 @@ mbufchainlen(m0)
 }
 
 
-/*  
- * m0 - pointer to mbuf where the IP packet starts  
- * mpp - pointer to the mbuf pointer that is the start of the mbuf chain  
- */  
+/*
+ * m0 - pointer to mbuf where the IP packet starts
+ * mpp - pointer to the mbuf pointer that is the start of the mbuf chain
+ */
 int
 ipf_fastroute(m0, mpp, fin, fdp)
 	struct mbuf *m0, **mpp;

@@ -157,7 +157,7 @@ ipftuneable_t ipf_tuneables[] = {
 		IPFT_WRDISABLED,	NULL },
 	{ { (void *)offsetof(ipf_frag_softc_t, ipfr_ttl) },
 		"frag_ttl",		1,	0x7fffffff,
-		stsizeof(ipf_frag_softc_t, ipfr_ttl),	
+		stsizeof(ipf_frag_softc_t, ipfr_ttl),
 		0,			NULL },
 	{ { NULL },
 		NULL,			0,	0,

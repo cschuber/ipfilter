@@ -237,7 +237,7 @@ sendtrap_v2_0(fd, community, msg, msglen, when)
 	int msglen;
 	time_t when;
 {
-	
+
 	u_char buffer[1500];
 	int n;
 

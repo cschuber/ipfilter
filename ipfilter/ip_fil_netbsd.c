@@ -931,10 +931,10 @@ ipf_send_icmp_err(type, fin, dst)
 }
 
 
-/*  
- * m0 - pointer to mbuf where the IP packet starts  
- * mpp - pointer to the mbuf pointer that is the start of the mbuf chain  
- */  
+/*
+ * m0 - pointer to mbuf where the IP packet starts
+ * mpp - pointer to the mbuf pointer that is the start of the mbuf chain
+ */
 int
 ipf_fastroute(m0, mpp, fin, fdp)
 	mb_t *m0, **mpp;

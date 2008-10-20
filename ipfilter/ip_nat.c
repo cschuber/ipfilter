@@ -2787,7 +2787,7 @@ ipf_nat_newmap(fin, nat, ni)
 			/*
 			 * Standard port translation.  Select next port.
 			 */
-			if (np->in_flags & IPN_SEQUENTIAL) {       
+			if (np->in_flags & IPN_SEQUENTIAL) {
 				port = np->in_spnext;
 			} else {
 				port = ipf_random() % (np->in_spmax -
@@ -8549,7 +8549,7 @@ ipf_nat_settimeout(softc, t, p)
 {
 	ipf_nat_softc_t *softn = softc->ipf_nat_soft;
 
-	if (!strncmp(t->ipft_name, "tcp_", 4))  
+	if (!strncmp(t->ipft_name, "tcp_", 4))
 		return ipf_settimeout_tcp(t, p, softn->ipf_nat_tcptq);
 
 	if (!strcmp(t->ipft_name, "udp_timeout")) {
@@ -8899,6 +8899,6 @@ ipf_nat_add_tq(softc, ttl)
 	int ttl;
 {
 	ipf_nat_softc_t *softs = softc->ipf_nat_soft;
- 
+
 	return ipf_addtimeoutqueue(softc, &softs->ipf_nat_utqe, ttl);
 }

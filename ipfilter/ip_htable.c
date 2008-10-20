@@ -775,7 +775,7 @@ ipf_htable_node_add(softc, arg, op)
 	if (op->iplo_size != sizeof(hte)) {
 		softc->ipf_interror = 30018;
 		return EINVAL;
-	}       
+	}
 
 	err = COPYIN(op->iplo_struct, &hte, sizeof(hte));
 	if (err != 0) {

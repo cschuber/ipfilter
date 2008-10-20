@@ -139,7 +139,7 @@ static int ipf_nat6_insert __P((ipf_main_softc_t *, ipf_nat_softc_t *, nat_t *))
 /*                                                                          */
 /* For each of the source/destination address fields in a NAT rule, call    */
 /* ipf_nat6_nextaddrinit() to prepare the structure for active duty.  Other */
-/* IPv6 specific actions can also be taken care of here.                    */ 
+/* IPv6 specific actions can also be taken care of here.                    */
 /* ------------------------------------------------------------------------ */
 int
 ipf_nat6_ruleaddrinit(softc, softn, n)

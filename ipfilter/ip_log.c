@@ -183,7 +183,7 @@ static ipftuneable_t ipf_log_tuneables[] = {
 		0,			NULL },
 	{ { (void *)offsetof(ipf_log_softc_t, ipl_logsize) },
 		"log_size",		0,	0x80000,
-		stsizeof(ipf_log_softc_t, ipl_logsize),	
+		stsizeof(ipf_log_softc_t, ipl_logsize),
 		0,			NULL },
 	{ { NULL },		NULL,			0,	0,
 		0,				0,	NULL }
@@ -219,7 +219,7 @@ ipf_log_soft_create(softc)
 	softl->ipf_log_tune = ipf_tune_array_copy(softl,
 						  sizeof(ipf_log_tuneables),
 						  ipf_log_tuneables);
-	if (softl->ipf_log_tune == NULL) { 
+	if (softl->ipf_log_tune == NULL) {
 		ipf_log_soft_destroy(softc, softl);
 		return NULL;
 	}

@@ -1756,7 +1756,7 @@ extern	int	ipf_tune_array_link __P((ipf_main_softc_t *, ipftuneable_t *));
 extern	int	ipf_tune_array_unlink __P((ipf_main_softc_t *,
 					   ipftuneable_t *));
 extern	ipftuneable_t *ipf_tune_array_copy __P((void *, size_t,
-						ipftuneable_t *));    
+						ipftuneable_t *));
 
 extern int	ipf_pr_pullup __P((fr_info_t *, int));
 

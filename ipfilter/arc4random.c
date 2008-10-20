@@ -70,7 +70,7 @@ arc4_swap(u_int8_t *a, u_int8_t *b)
 	c = *a;
 	*a = *b;
 	*b = c;
-}	
+}
 
 /*
  * Stir our S-box.
@@ -160,7 +160,7 @@ arc4rand(void *ptr, u_int len, int reseed)
 	struct timeval tv;
 
 	GETKTIME(&tv);
-	if (reseed || 
+	if (reseed ||
 	   (arc4_numruns > ARC4_RESEED_BYTES) ||
 	   (tv.tv_sec > arc4_t_reseed))
 		arc4_randomstir();
@@ -226,7 +226,7 @@ ipf_rand_push(void *src, int length)
 			pottail = pot;
 			bcopy(md5ctx.buf + length - left, pottail, left);
 			pottail += left;
-			
+
 		} else {
 			bcopy(md5ctx.buf, pottail, sizeof(md5ctx.buf));
 			pottail += sizeof(md5ctx.buf);
