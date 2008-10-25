@@ -85,7 +85,11 @@ extern	int	ip_optcopy __P((struct ip *, struct ip *));
 #endif
 
 #ifdef IPFILTER_M_IPFILTER
+# ifdef MALLOC_DEFINE
 MALLOC_DEFINE(M_IPFILTER, "IP Filter", "IP Filter packet filter data structures");
+# else
+MALLOC_DECLARE(M_IPFILTER);
+# endif
 #endif
 
 #if __NetBSD_Version__ >= 105009999

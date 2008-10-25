@@ -157,7 +157,7 @@ nat_t *nat;
 	int ipaddr, off, datlen;
 	unsigned short port;
 	tcphdr_t *tcp;
-	void * data;
+	void *data;
 	ip_t *ip;
 
 	ip = fin->fin_ip;

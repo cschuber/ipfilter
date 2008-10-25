@@ -8,6 +8,9 @@
  *
  * Dan Moschuk
  */
+#if !defined(SOLARIS2)
+# include <sys/cdefs.h>
+#endif
 
 #include <sys/types.h>
 #include <sys/param.h>

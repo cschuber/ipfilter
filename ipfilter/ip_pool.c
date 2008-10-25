@@ -84,6 +84,7 @@ static const char rcsid[] = "@(#)$Id$";
 #endif
 
 #ifdef IPFILTER_LOOKUP
+
 # if !defined(RADIX_NODE_HEAD_LOCK) || !defined(RADIX_NODE_HEAD_UNLOCK) || \
      !defined(_KERNEL)
 #  undef RADIX_NODE_HEAD_LOCK

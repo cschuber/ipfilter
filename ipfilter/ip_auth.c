@@ -306,7 +306,7 @@ u_32_t *passp;
 
 /* ------------------------------------------------------------------------ */
 /* Function:    fr_newauth                                                  */
-/* Returns:     int - 0 == success, 0 = did not put packet on auth queue    */
+/* Returns:     int - 1 == success, 0 = did not put packet on auth queue    */
 /* Parameters:  m(I)   - pointer to mb_t with packet in it                  */
 /*              fin(I) - pointer to packet information                      */
 /*                                                                          */
@@ -857,10 +857,7 @@ char *data;
 	int error, len, i;
 	mb_t *m;
 	char *t;
-#if defined(_KERNEL) && !defined(MENTAT) && !defined(linux) && \
-    (!defined(__FreeBSD_version) || (__FreeBSD_version < 501000))
 	SPL_INT(s);
-#endif
 
 fr_authioctlloop:
 	error = fr_inobj(data, au, IPFOBJ_FRAUTH);
@@ -873,6 +870,7 @@ fr_authioctlloop:
 	 * we are trying to guard against here is an error in the copyout
 	 * steps should not cause the packet to "disappear" from the queue.
 	 */
+	SPL_NET(s);
 	READ_ENTER(&ipf_auth);
 
 	/*
