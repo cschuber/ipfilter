@@ -25,6 +25,9 @@
 #include <sys/mutex.h>
 #include <sys/time.h>
 
+#if defined(SOLARIS2) && (SOLARIS2 < 9)
+# include <netinet/in_systm.h>
+#endif
 #include <sys/socket.h>
 #include <net/if.h>
 #include <netinet/in.h>
