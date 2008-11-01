@@ -204,6 +204,10 @@ typedef	uint32_t	u_32_t;
 typedef unsigned int	u_32_t;
 # endif
 # define	U_32_T	1
+# if SOLARIS2 >= 7
+#  define	U_QUAD_T	uint64_t
+#  define	QUAD_T		int64_t
+# endif
 
 # ifdef _KERNEL
 #  define	NEED_LOCAL_RAND	1
@@ -1607,8 +1611,10 @@ extern void eMrwlock_downgrade __P((eMrwlock_t *, char *, int));
 # define	U_QUAD_T	u_quad_t
 # define	QUAD_T		quad_t
 #else /* BSD > 199306 */
-# define	U_QUAD_T	u_long
-# define	QUAD_T		long
+# if !defined(U_QUAD_T)
+#  define	U_QUAD_T	u_long
+#  define	QUAD_T		long
+# endif
 #endif /* BSD > 199306 */
 
 
