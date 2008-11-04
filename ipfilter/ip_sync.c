@@ -912,7 +912,7 @@ void *ptr;
 # else
 	MUTEX_EXIT(&ipsl_mutex);
 #  ifdef _KERNEL
-	wakeup(&sl_tail);
+	WAKEUP(&sl_tail);
 	POLLWAKEUP(IPL_LOGSYNC);
 #  endif
 # endif
@@ -1002,7 +1002,7 @@ synclist_t *sl;
 # else
 	MUTEX_EXIT(&ipsl_mutex);
 #  ifdef _KERNEL
-	wakeup(&sl_tail);
+	WAKEUP(&sl_tail);
 	POLLWAKEUP(IPL_LOGSYNC);
 #  endif
 # endif
