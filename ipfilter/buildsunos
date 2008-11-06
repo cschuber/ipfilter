@@ -1,4 +1,5 @@
 #! /bin/sh
+solrev=`uname -r | sh -c 'IFS=. read j n x; echo $n'`
 if [ ! -f netinet/done ] ; then
 	echo "Do NOT run this script directly, do 'make solaris'!"
 	exit 1
@@ -44,7 +45,6 @@ __EOF__
 
 	cpu=`uname -p`
 	cpudir=${cpu}-`uname -r`
-	solrev=`uname -r | sh -c 'IFS=. read j n x; echo $n'`
 	if [ ! -d SunOS5/${cpudir} -a ! -h  SunOS5/${cpudir} ] ; then
 		mkdir -p SunOS5/${cpudir}
 	fi
@@ -84,7 +84,7 @@ __EOF__
 			esac
 		fi
 	fi
-	v=`echo '__GNUC__' | 2>&1 ${CC} -E - | 2>&1 sed -ne '/^[0-9]* *$/p'`
+	v=`echo '__GNUC__' 2>&1 | ${CC} -E - 2>&1 | sed -ne '/^[0-9]* *$/p'`
 	if [ x$v != x ] ; then
 		CC=gcc
 	fi
