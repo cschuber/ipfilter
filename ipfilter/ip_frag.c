@@ -298,6 +298,7 @@ ipf_frag_soft_init(softc, arg)
 	      softf->ipfr_size * sizeof(ipfr_t *));
 
 	softf->ipfr_lock = 0;
+	softf->ipfr_inited = 1;
 
 	return 0;
 }
