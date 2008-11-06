@@ -328,8 +328,7 @@ typedef	struct	fr_info	{
 	int	fin_depth;		/* Group nesting depth */
 	int	fin_error;		/* Error code to return */
 	int	fin_cksum;		/* -1 bad, 1 good, 0 not done */
-	void	*fin_nat;
-	void	*fin_state;
+	u_int	fin_pktnum;
 	void	*fin_nattag;
 	void	*fin_exthdr;
 	ip_t	*fin_ip;

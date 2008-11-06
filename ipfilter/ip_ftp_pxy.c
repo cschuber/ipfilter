@@ -310,8 +310,6 @@ int dlen;
 	 * mapping.
 	 */
 	bcopy((char *)fin, (char *)&fi, sizeof(fi));
-	fi.fin_state = NULL;
-	fi.fin_nat = NULL;
 	fi.fin_flx |= FI_IGNORE;
 	fi.fin_data[0] = sp;
 	fi.fin_data[1] = fin->fin_data[1] - 1;
@@ -371,8 +369,6 @@ int dlen;
 				ip->ip_dst = nat->nat_inip;
 			}
 			(void) fr_addstate(&fi, NULL, SI_W_DPORT);
-			if (fi.fin_state != NULL)
-				fr_statederef((ipstate_t **)&fi.fin_state);
 		}
 		ip->ip_len = slen;
 		ip->ip_src = swip;
@@ -659,8 +655,6 @@ u_int data_ip;
 	 * other way.
 	 */
 	bcopy((char *)fin, (char *)&fi, sizeof(fi));
-	fi.fin_state = NULL;
-	fi.fin_nat = NULL;
 	fi.fin_flx |= FI_IGNORE;
 	fi.fin_data[0] = 0;
 	fi.fin_data[1] = port;
@@ -724,8 +718,6 @@ u_int data_ip;
 				ip->ip_dst = nat->nat_inip;
 			}
 			(void) fr_addstate(&fi, NULL, sflags);
-			if (fi.fin_state != NULL)
-				fr_statederef((ipstate_t **)&fi.fin_state);
 		}
 
 		ip->ip_len = slen;

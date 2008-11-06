@@ -883,14 +883,11 @@ fr_info_t *fin;
 	u_short id;
 
 	MUTEX_ENTER(&ipf_rw);
-	if (fin->fin_state != NULL) {
-		is = fin->fin_state;
-		id = (u_short)(is->is_pkts[(fin->fin_rev << 1) + 1] & 0xffff);
-	} else if (fin->fin_nat != NULL) {
-		nat = fin->fin_nat;
-		id = (u_short)(nat->nat_pkts[fin->fin_out] & 0xffff);
-	} else
+	if (fin->fin_pktnum != 0) {
+		id = fin->fin_pktnum & 0xffff;
+	} else {
 		id = ipid++;
+	}
 	MUTEX_EXIT(&ipf_rw);
 
 	return id;
@@ -1119,8 +1116,7 @@ frdest_t *fdp;
 		if (!fr || !(fr->fr_flags & FR_RETMASK)) {
 			u_32_t pass;
 
-			if (fr_checkstate(fin, &pass) != NULL)
-				fr_statederef((ipstate_t **)&fin->fin_state);
+			(void) fr_checkstate(fin, &pass);
 		}
 
 		switch (fr_checknatout(fin, NULL))
@@ -1128,7 +1124,6 @@ frdest_t *fdp;
 		case 0 :
 			break;
 		case 1 :
-			fr_natderef((nat_t **)&fin->fin_nat);
 			ip->ip_sum = 0;
 			break;
 		case -1 :

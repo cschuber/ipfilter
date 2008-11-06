@@ -1018,8 +1018,7 @@ frdest_t *fdp;
 		if (!fr || !(fr->fr_flags & FR_RETMASK)) {
 			u_32_t pass;
 
-			if (fr_checkstate(fin, &pass) != NULL)
-				fr_statederef((ipstate_t **)&fin->fin_state);
+			(void) fr_checkstate(fin, &pass);
 		}
 
 		switch (fr_checknatout(fin, NULL))
@@ -1027,7 +1026,6 @@ frdest_t *fdp;
 		case 0 :
 			break;
 		case 1 :
-			fr_natderef((nat_t **)&fin->fin_nat);
 			ip->ip_sum = 0;
 			break;
 		case -1 :

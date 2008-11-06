@@ -1604,8 +1604,6 @@ fr_info_t *fin;
 {
 	int v;
 
-	fin->fin_nat = NULL;
-	fin->fin_state = NULL;
 	fin->fin_depth = 0;
 	fin->fin_hlen = (u_short)hlen;
 	fin->fin_ip = ip;
@@ -2641,21 +2639,10 @@ filterdone:
 	 * there is a similar flag, FI_NATED, for NAT, it does have the same
 	 * impact on code execution.
 	 */
-	if (fin->fin_state != NULL) {
-		fr_statederef((ipstate_t **)&fin->fin_state);
-		fin->fin_flx ^= FI_STATE;
-	}
+	fin->fin_flx &= ~FI_STATE;
 
-	if (fin->fin_nat != NULL) {
-		if (FR_ISBLOCK(pass) && (fin->fin_flx & FI_NEWNAT)) {
-			WRITE_ENTER(&ipf_nat);
-			nat_delete((nat_t *)fin->fin_nat, NL_DESTROY);
-			RWLOCK_EXIT(&ipf_nat);
-			fin->fin_nat = NULL;
-		} else {
-			fr_natderef((nat_t **)&fin->fin_nat);
-		}
-	}
+	if (FR_ISBLOCK(pass) && (fin->fin_flx & FI_NEWNAT))
+		nat_uncreate(fin);
 
 	/*
 	 * Up the reference on fr_lock and exit ipf_mutex.  fr_fastroute

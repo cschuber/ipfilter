@@ -128,7 +128,6 @@ static ipstate_t *fr_checkicmp6matchingstate __P((fr_info_t *));
 static ipstate_t *fr_matchsrcdst __P((fr_info_t *, ipstate_t *, i6addr_t *,
 				      i6addr_t *, tcphdr_t *, u_32_t));
 static ipstate_t *fr_checkicmpmatchingstate __P((fr_info_t *));
-static int fr_state_flush __P((int, int));
 static int fr_state_flush_entry __P((void *));
 static ips_stat_t *fr_statetstats __P((void));
 static int fr_delstate __P((ipstate_t *, int));
@@ -1443,12 +1442,7 @@ u_int flags;
 		}
 	}
 
-	/*
-	 * It may seem strange to set is_ref to 2, but fr_check() will call
-	 * fr_statederef() after calling fr_addstate() and the idea is to
-	 * have it exist at the end of fr_check() with is_ref == 1.
-	 */
-	is->is_ref = 2;
+	is->is_ref = 1;
 	is->is_pass = pass;
 	is->is_pkts[0] = 0, is->is_bytes[0] = 0;
 	is->is_pkts[1] = 0, is->is_bytes[1] = 0;
@@ -1522,7 +1516,6 @@ u_int flags;
 		ipstate_log(is, ISL_NEW);
 
 	RWLOCK_EXIT(&ipf_state);
-	fin->fin_state = is;
 	fin->fin_rev = IP6_NEQ(&is->is_dst, &fin->fin_daddr);
 	fin->fin_flx |= FI_STATE;
 	if (fin->fin_flx & FI_FRAG)
@@ -2003,7 +1996,7 @@ ipstate_t *is;
 	clone->is_flags &= ~SI_CLONE;
 	clone->is_flags |= SI_CLONED;
 	fr_stinsert(clone, fin->fin_rev);
-	clone->is_ref = 2;
+	clone->is_ref = 1;
 	if (clone->is_p == IPPROTO_TCP) {
 		(void) fr_tcp_age(&clone->is_sti, fin, ips_tqtqb,
 				  clone->is_flags);
@@ -2867,6 +2860,7 @@ ipftq_t *ifq;
 		fr_movequeue(tqe, tqe->tqe_ifq, ifq);
 
 	is->is_pkts[i]++;
+	fin->fin_pktnum = is->is_pkts[i] + is->is_icmppkts[i];
 	is->is_bytes[i] += fin->fin_plen;
 	MUTEX_EXIT(&is->is_lock);
 
@@ -2927,9 +2921,7 @@ u_32_t *passp;
 	 * Search the hash table for matching packet header info.
 	 */
 	ifq = NULL;
-	is = fin->fin_state;
-	if (is == NULL)
-		is = fr_stlookup(fin, tcp, &ifq);
+	is = fr_stlookup(fin, tcp, &ifq);
 	switch (fin->fin_p)
 	{
 #ifdef	USE_INET6
@@ -2994,10 +2986,6 @@ matched:
 	pass = is->is_pass;
 	fr_updatestate(fin, is, ifq);
 
-	fin->fin_state = is;
-	MUTEX_ENTER(&is->is_lock);
-	is->is_ref++;
-	MUTEX_EXIT(&is->is_lock);
 	RWLOCK_EXIT(&ipf_state);
 	fin->fin_flx |= FI_STATE;
 	if ((pass & FR_LOGFIRST) != 0)
@@ -3325,7 +3313,7 @@ void fr_timeoutstate()
 /*            If that too fails, then work backwards in 30 second intervals */
 /*            for the last 30 minutes to at worst 30 seconds idle.          */
 /* ------------------------------------------------------------------------ */
-static int fr_state_flush(which, proto)
+int fr_state_flush(which, proto)
 int which, proto;
 {
 	ipftq_t *ifq, *ifqnext;
@@ -4214,12 +4202,6 @@ ipstate_t **isp;
 	if (is->is_ref > 1) {
 		is->is_ref--;
 		MUTEX_EXIT(&is->is_lock);
-#ifndef	_KERNEL
-		if ((is->is_sti.tqe_state[0] > IPF_TCPS_ESTABLISHED) ||
-		   (is->is_sti.tqe_state[1] > IPF_TCPS_ESTABLISHED)) {
-			fr_delstate(is, ISL_ORPHAN);
-		}
-#endif
 		return;
 	}
 	MUTEX_EXIT(&is->is_lock);

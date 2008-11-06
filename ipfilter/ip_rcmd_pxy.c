@@ -151,8 +151,6 @@ nat_t *nat;
 	 * other way.
 	 */
 	bcopy((char *)fin, (char *)&fi, sizeof(fi));
-	fi.fin_state = NULL;
-	fi.fin_nat = NULL;
 	fi.fin_flx |= FI_IGNORE;
 	fi.fin_data[0] = sp;
 	fi.fin_data[1] = 0;
@@ -207,8 +205,6 @@ nat_t *nat;
 				ip->ip_dst = nat->nat_inip;
 			}
 			(void) fr_addstate(&fi, NULL, SI_W_DPORT);
-			if (fi.fin_state != NULL)
-				fr_statederef((ipstate_t **)&fi.fin_state);
 		}
 		ip->ip_len = slen;
 		ip->ip_src = swip;

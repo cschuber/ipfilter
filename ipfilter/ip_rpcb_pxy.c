@@ -1159,8 +1159,6 @@ ippr_rpcb_getnat(fin, nat, proto, port)
 
 	/* Generate dummy fr_info */
 	bcopy((char *)fin, (char *)&fi, sizeof(fi));
-	fi.fin_state = NULL;
-	fi.fin_nat = NULL;
 	fi.fin_out = 0;
 	fi.fin_src = fin->fin_dst;
 	fi.fin_dst = nat->nat_outip;
@@ -1264,7 +1262,6 @@ ippr_rpcb_getnat(fin, nat, proto, port)
 	if (is == NULL) {
 		/* Create state entry.  Return NULL if this fails. */
 		fi.fin_dst = nat->nat_inip;
-		fi.fin_nat = (void *)natl;
 		fi.fin_flx |= FI_NATED;
 		fi.fin_flx &= ~FI_STATE;
 		nflags &= NAT_TCPUDP;
@@ -1280,8 +1277,6 @@ ippr_rpcb_getnat(fin, nat, proto, port)
 			 */
 			return(-1);
 		}
-		if (fi.fin_state != NULL)
-			fr_statederef((ipstate_t **)&fi.fin_state);
 	}
 
 	return(0);

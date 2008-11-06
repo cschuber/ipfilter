@@ -165,8 +165,6 @@ pptp_pxy_t *pptp;
 	if ((nat2 == NULL) || (pptp->pptp_state == NULL)) {
 		bcopy((char *)fin, (char *)&fi, sizeof(fi));
 		bzero((char *)&gre, sizeof(gre));
-		fi.fin_state = NULL;
-		fi.fin_nat = NULL;
 		fi.fin_fi.fi_p = IPPROTO_GRE;
 		fi.fin_fr = &pptpfr;
 		if ((nat->nat_dir == NAT_OUTBOUND && fin->fin_out) ||
@@ -226,8 +224,6 @@ pptp_pxy_t *pptp;
 		fi.fin_ifp = NULL;
 		pptp->pptp_state = fr_addstate(&fi, &pptp->pptp_state,
 					       0);
-		if (fi.fin_state != NULL)
-			fr_statederef((ipstate_t **)&fi.fin_state);
 	}
 	ip->ip_p = p;
 	return;

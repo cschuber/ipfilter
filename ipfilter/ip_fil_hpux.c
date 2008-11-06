@@ -895,8 +895,7 @@ frdest_t *fdp;
 				u_32_t pass;
 
 				fin->fin_flx &= ~FI_STATE;
-				if (fr_checkstate(fin, &pass) != NULL)
-					fr_statederef((ipstate_t **)&fin->fin_state);
+				(void) fr_checkstate(fin, &pass);
 			}
 
 			switch (fr_checknatout(fin, NULL))
@@ -904,7 +903,6 @@ frdest_t *fdp;
 			case 0 :
 				break;
 			case 1 :
-				fr_natderef((nat_t **)&fin->fin_nat);
 				break;
 			case -1 :
 				goto bad_fastroute;

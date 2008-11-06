@@ -3881,11 +3881,10 @@ nonatfrag:
 		if (rval == 1) {
 			MUTEX_ENTER(&nat->nat_lock);
 			nat_update(fin, nat);
-			nat->nat_ref++;
 			nat->nat_bytes[1] += fin->fin_plen;
 			nat->nat_pkts[1]++;
+			fin->fin_pktnum = nat->nat_pkts[1];
 			MUTEX_EXIT(&nat->nat_lock);
-			fin->fin_nat = nat;
 		}
 	} else
 		rval = natfailed;
@@ -4189,11 +4188,10 @@ nonatfrag:
 		if (rval == 1) {
 			MUTEX_ENTER(&nat->nat_lock);
 			nat_update(fin, nat);
-			nat->nat_ref++;
 			nat->nat_bytes[0] += fin->fin_plen;
 			nat->nat_pkts[0]++;
+			fin->fin_pktnum = nat->nat_pkts[0];
 			MUTEX_EXIT(&nat->nat_lock);
-			fin->fin_nat = nat;
 		}
 	} else
 		rval = natfailed;
@@ -5491,4 +5489,57 @@ char *data;
 		error = EFAULT;
 	}
 	return error;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    nat_uncreate                                                */
+/* Returns:     Nil                                                         */
+/* Parameters:  fin(I) - pointer to packet information                      */
+/*                                                                          */
+/* This function is used to remove a NAT entry from the NAT table when we   */
+/* decide that the create was actually in error. It is thus assumed that    */
+/* fin_flx will have both FI_NATED and FI_NATNEW set. Because we're dealing */
+/* with the translated packet (not the original), we have to reverse the    */
+/* lookup. Although doing the lookup is expensive (relatively speaking), it */
+/* is not anticipated that this will be a frequent occurance for normal     */
+/* traffic patterns.                                                        */
+/* ------------------------------------------------------------------------ */
+void nat_uncreate(fin)
+fr_info_t *fin;
+{
+	int nflags;
+	nat_t *nat;
+
+	switch (fin->fin_p)
+	{
+	case IPPROTO_TCP :
+		nflags = IPN_TCP;
+		break;
+	case IPPROTO_UDP :
+		nflags = IPN_UDP;
+		break;
+	default :
+		nflags = 0;
+		break;
+	}
+
+	WRITE_ENTER(&ipf_nat);
+
+	if (fin->fin_out == 0) {
+		nat = nat_outlookup(fin, nflags, (u_int)fin->fin_p,
+				    fin->fin_dst, fin->fin_src);
+	} else {
+		nat = nat_inlookup(fin, nflags, (u_int)fin->fin_p,
+				   fin->fin_src, fin->fin_dst);
+	}
+
+	if (nat != NULL) {
+		nat_stats.ns_uncreate[fin->fin_out][0]++;
+		nat_delete(nat, NL_DESTROY);
+	} else {
+		nat_stats.ns_uncreate[fin->fin_out][1]++;
+	}
+
+	RWLOCK_EXIT(&ipf_nat);
 }

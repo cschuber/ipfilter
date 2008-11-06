@@ -364,6 +364,7 @@ typedef	struct	natstat	{
 	u_long	*ns_bucketlen[2];
 	u_long	ns_ticks;
 	u_int	ns_orphans;
+	u_long	ns_uncreate[2][2];
 } natstat_t;
 
 typedef	struct	natlog {
@@ -451,6 +452,7 @@ extern	nat_t	*nat_icmperrorlookup __P((fr_info_t *, int));
 extern	nat_t	*nat_icmperror __P((fr_info_t *, u_int *, int));
 extern	void	nat_delete __P((struct nat *, int));
 extern	int	nat_insert __P((nat_t *, int));
+extern	void	nat_uncreate __P((fr_info_t *));
 
 extern	int	fr_checknatout __P((fr_info_t *, u_32_t *));
 extern	int	fr_natout __P((fr_info_t *, nat_t *, int, u_32_t));
