@@ -360,6 +360,10 @@ int fd, opts, alive;
 			nsp->ns_memfail, nsp->ns_badnat);
 		printf("inuse\t%lu\norphans\t%u\nrules\t%lu\n",
 			nsp->ns_inuse, nsp->ns_orphans, nsp->ns_rules);
+		printf("in-uncreates succeed\t%lu\tfailed\t%lu\n",
+			nsp->ns_uncreate[0][0], nsp->ns_uncreate[0][1]);
+		printf("out-uncreates succeed\t%lu\tfailed\t%lu\n",
+			nsp->ns_uncreate[1][0], nsp->ns_uncreate[1][1]);
 		printf("wilds\t%u\n", nsp->ns_wilds);
 		dotable(nsp, fd, alive);
 		if (opts & OPT_VERBOSE)
