@@ -2137,7 +2137,7 @@ ipf_nat_putent(softc, data, getlock)
 		fin.fin_v = nat->nat_v[1];
 		if (nat->nat_v[1] == 4) {
 			n = ipf_nat_inlookup(&fin, nat->nat_flags, fin.fin_p,
-					 nat->nat_ndstip, nat->nat_nsrcip);
+					     nat->nat_ndstip, nat->nat_nsrcip);
 #ifdef USE_INET6
 		} else if (nat->nat_v[1] == 6) {
 			n = ipf_nat6_inlookup(&fin, nat->nat_flags, fin.fin_p,
@@ -2833,7 +2833,7 @@ ipf_nat_newmap(fin, nat, ni)
 		fin->fin_data[0] = fin->fin_data[1];
 		fin->fin_data[1] = ntohs(port);
 		natl = ipf_nat_inlookup(fin, flags & ~(SI_WILDP|NAT_SEARCH),
-				    (u_int)fin->fin_p, fin->fin_dst, inb);
+					(u_int)fin->fin_p, fin->fin_dst, inb);
 		fin->fin_data[0] = sp;
 		fin->fin_data[1] = dp;
 
@@ -3205,7 +3205,7 @@ ipf_nat_add(fin, np, natsave, flags, direction)
 		 * NAT_INBOUND is used for redirects rules
 		 */
 		natl = ipf_nat_inlookup(fin, nflags, (u_int)fin->fin_p,
-				    fin->fin_src, fin->fin_dst);
+					fin->fin_src, fin->fin_dst);
 		if (natl != NULL) {
 			KFREE(nat);
 			nat = natl;
@@ -3686,7 +3686,7 @@ ipf_nat_icmperrorlookup(fin, dir)
 
 		if (dir == NAT_INBOUND) {
 			nat = ipf_nat_inlookup(fin, flags, p, oip->ip_dst,
-					   oip->ip_src);
+					       oip->ip_src);
 		} else {
 			nat = ipf_nat_outlookup(fin, flags, p, oip->ip_dst,
 					    oip->ip_src);
@@ -5072,11 +5072,10 @@ retry_roundrobin:
 		if (rval == 1) {
 			MUTEX_ENTER(&nat->nat_lock);
 			ipf_nat_update(fin, nat);
-			nat->nat_ref++;
 			nat->nat_bytes[1] += fin->fin_plen;
 			nat->nat_pkts[1]++;
+			fin->fin_pktnum = nat->nat_pkts[1];
 			MUTEX_EXIT(&nat->nat_lock);
-			fin->fin_nat = nat;
 		}
 	} else
 		rval = natfailed;
@@ -5682,11 +5681,10 @@ retry_roundrobin:
 		if (rval == 1) {
 			MUTEX_ENTER(&nat->nat_lock);
 			ipf_nat_update(fin, nat);
-			nat->nat_ref++;
 			nat->nat_bytes[0] += fin->fin_plen;
 			nat->nat_pkts[0]++;
+			fin->fin_pktnum = nat->nat_pkts[0];
 			MUTEX_EXIT(&nat->nat_lock);
-			fin->fin_nat = nat;
 		}
 	} else
 		rval = natfailed;
@@ -7274,7 +7272,6 @@ ipf_nat_newrewrite(fin, nat, nai)
 	np = nai->nai_np;
 	flags = nat->nat_flags;
 	bcopy((char *)fin, (char *)&frnat, sizeof(*fin));
-	frnat.fin_state = NULL;
 
 	nat->nat_hm = NULL;
 
@@ -7418,15 +7415,15 @@ ipf_nat_newrewrite(fin, nat, nai)
 		}
 		if (fin->fin_out == 1) {
 			natl = ipf_nat_inlookup(&frnat,
-					    flags & ~(SI_WILDP|NAT_SEARCH),
-					    (u_int)frnat.fin_p, frnat.fin_dst,
-					    frnat.fin_src);
+						flags & ~(SI_WILDP|NAT_SEARCH),
+						(u_int)frnat.fin_p,
+						frnat.fin_dst, frnat.fin_src);
 
 		} else {
 			natl = ipf_nat_outlookup(&frnat,
-					     flags & ~(SI_WILDP|NAT_SEARCH),
-					     (u_int)frnat.fin_p, frnat.fin_dst,
-					     frnat.fin_src);
+						 flags & ~(SI_WILDP|NAT_SEARCH),
+						 (u_int)frnat.fin_p,
+						 frnat.fin_dst, frnat.fin_src);
 		}
 		if (flags & IPN_TCPUDP) {
 			swap = frnat.fin_data[0];
@@ -7511,11 +7508,11 @@ ipf_nat_newdivert(fin, nat, nai)
 
 	if (fin->fin_out == 1) {
 		natl = ipf_nat_inlookup(&frnat, 0, p,
-				    frnat.fin_dst, frnat.fin_src);
+					frnat.fin_dst, frnat.fin_src);
 
 	} else {
 		natl = ipf_nat_outlookup(&frnat, 0, p,
-				     frnat.fin_dst, frnat.fin_src);
+					 frnat.fin_dst, frnat.fin_src);
 	}
 
 	if (natl != NULL) {
@@ -8901,4 +8898,59 @@ ipf_nat_add_tq(softc, ttl)
 	ipf_nat_softc_t *softs = softc->ipf_nat_soft;
 
 	return ipf_addtimeoutqueue(softc, &softs->ipf_nat_utqe, ttl);
+}
+
+/* ------------------------------------------------------------------------ */
+/* Function:    nat_uncreate                                                */
+/* Returns:     Nil                                                         */
+/* Parameters:  fin(I) - pointer to packet information                      */
+/*                                                                          */
+/* This function is used to remove a NAT entry from the NAT table when we   */
+/* decide that the create was actually in error. It is thus assumed that    */
+/* fin_flx will have both FI_NATED and FI_NATNEW set. Because we're dealing */
+/* with the translated packet (not the original), we have to reverse the    */
+/* lookup. Although doing the lookup is expensive (relatively speaking), it */
+/* is not anticipated that this will be a frequent occurance for normal     */
+/* traffic patterns.                                                        */
+/* ------------------------------------------------------------------------ */
+void
+ipf_nat_uncreate(fin)
+	fr_info_t *fin;
+{
+	ipf_main_softc_t *softc = fin->fin_main_soft;
+	ipf_nat_softc_t *softn = softc->ipf_nat_soft;
+	int nflags;
+	nat_t *nat;
+
+	switch (fin->fin_p)
+	{
+	case IPPROTO_TCP :
+		nflags = IPN_TCP;
+		break;
+	case IPPROTO_UDP :
+		nflags = IPN_UDP;
+		break;
+	default :
+		nflags = 0;
+		break;
+	}
+
+	WRITE_ENTER(&softc->ipf_nat);
+
+	if (fin->fin_out == 0) {
+		nat = ipf_nat_outlookup(fin, nflags, (u_int)fin->fin_p,
+					fin->fin_dst, fin->fin_src);
+	} else {
+		nat = ipf_nat_inlookup(fin, nflags, (u_int)fin->fin_p,
+				       fin->fin_src, fin->fin_dst);
+	}
+
+	if (nat != NULL) {
+		NBUMPSIDE(fin->fin_out, ns_uncreate[0]);
+		ipf_nat_delete(softc, nat, NL_DESTROY);
+	} else {
+		NBUMPSIDE(fin->fin_out, ns_uncreate[1]);
+	}
+
+	RWLOCK_EXIT(&softc->ipf_nat);
 }

@@ -1161,8 +1161,6 @@ ipf_p_rpcb_getnat(fin, nat, proto, port)
 
 	/* Generate dummy fr_info */
 	bcopy((char *)fin, (char *)&fi, sizeof(fi));
-	fi.fin_state = NULL;
-	fi.fin_nat = NULL;
 	fi.fin_out = 0;
 	fi.fin_src = fin->fin_dst;
 	fi.fin_dst = nat->nat_ndstip;
@@ -1273,13 +1271,12 @@ ipf_p_rpcb_getnat(fin, nat, proto, port)
 	if (is == NULL) {
 		/* Create state entry.  Return NULL if this fails. */
 		fi.fin_dst = nat->nat_odstip;
-		fi.fin_nat = (void *)natl;
 		fi.fin_flx |= FI_NATED;
 		fi.fin_flx &= ~FI_STATE;
 		nflags &= NAT_TCPUDP;
 		nflags |= SI_W_SPORT|SI_CLONE;
 
-		if (ipf_state_add(softc, &fi, &fin->fin_state, nflags) != 0) {
+		if (ipf_state_add(softc, &fi, NULL, nflags) != 0) {
 			/*
 			 * XXX nat_delete is private to ip_nat.c.  Should
 			 * check w/ Darren about this one.
@@ -1288,7 +1285,6 @@ ipf_p_rpcb_getnat(fin, nat, proto, port)
 			 */
 			return(-1);
 		}
-		ipf_state_deref(softc, (ipstate_t **)&fi.fin_state);
 	}
 
 	return(0);

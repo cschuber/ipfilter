@@ -2074,8 +2074,6 @@ ipf_makefrip(hlen, ip, fin)
 	ipf_main_softc_t *softc = fin->fin_main_soft;
 	int v;
 
-	fin->fin_nat = NULL;
-	fin->fin_state = NULL;
 	fin->fin_depth = 0;
 	fin->fin_hlen = (u_short)hlen;
 	fin->fin_ip = ip;
@@ -2640,8 +2638,7 @@ ipf_scanlist(fin, pass)
 				int out = fin->fin_out;
 
 				fin->fin_fr = fr;
-				if (ipf_state_add(softc, fin,
-						  &fin->fin_state, 0) == 0) {
+				if (ipf_state_add(softc, fin, NULL, 0) == 0) {
 					LBUMP(ipf_stats[out].fr_ads);
 				} else {
 					LBUMP(ipf_stats[out].fr_bads);
@@ -3077,7 +3074,7 @@ ipf_check(ctx, ip, hlen, ifp, out
 	 */
 	if ((pass & FR_KEEPSTATE) && (fin->fin_m != NULL) &&
 	    !(fin->fin_flx & FI_STATE)) {
-		if (ipf_state_add(softc, fin, &fin->fin_state, 0) == 0) {
+		if (ipf_state_add(softc, fin, NULL, 0) == 0) {
 			LBUMP(ipf_stats[out].fr_ads);
 		} else {
 			LBUMP(ipf_stats[out].fr_bads);
@@ -3139,28 +3136,10 @@ filterdone:
 	 * there is a similar flag, FI_NATED, for NAT, it does have the same
 	 * impact on code execution.
 	 */
-	if (fin->fin_state != NULL) {
-		ipf_state_deref(softc, (ipstate_t **)&fin->fin_state);
-		fin->fin_flx ^= FI_STATE;
-	}
+	fin->fin_flx &= ~FI_STATE;
 
-	if (fin->fin_nat != NULL) {
-		if (FR_ISBLOCK(pass) && (fin->fin_flx & FI_NEWNAT)) {
-			WRITE_ENTER(&softc->ipf_nat);
-			ipf_nat_delete(softc, (nat_t *)fin->fin_nat,
-				       NL_DESTROY);
-			RWLOCK_EXIT(&softc->ipf_nat);
-		} else {
-			nat_t *nat = fin->fin_nat;
-			if ((nat->nat_dlocal != 0) && (m != NULL)) {
-				fin->fin_out = 0;
-				ipf_inject(fin, fin->fin_m);
-				m = *mp = NULL;
-				fin->fin_m = NULL;
-			}
-			ipf_nat_deref(softc, (nat_t **)&fin->fin_nat);
-		}
-	}
+	if (FR_ISBLOCK(pass) && (fin->fin_flx & FI_NEWNAT))
+		ipf_nat_uncreate(fin);
 
 	/*
 	 * Up the reference on fr_lock and exit ipf_mutex.  fr_fastroute
@@ -8292,7 +8271,6 @@ cantdecaps:
 	(void) strncpy(fino->fin_group, fin->fin_group, FR_GROUPLEN);
 	fino->fin_fr = fin->fin_fr;
 	fino->fin_error = fin->fin_error;
-	fino->fin_state = fin->fin_state;
 	fino->fin_mp = fin->fin_mp;
 	fino->fin_m = fin->fin_m;
 	m = fin->fin_m;

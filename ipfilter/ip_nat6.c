@@ -2812,11 +2812,9 @@ maskloop:
 		if (rval == 1) {
 			MUTEX_ENTER(&nat->nat_lock);
 			ipf_nat_update(fin, nat);
-			nat->nat_ref++;
 			nat->nat_bytes[1] += fin->fin_plen;
 			nat->nat_pkts[1]++;
 			MUTEX_EXIT(&nat->nat_lock);
-			fin->fin_nat = nat;
 		}
 	} else
 		rval = natfailed;
@@ -3309,11 +3307,9 @@ maskloop:
 		if (rval == 1) {
 			MUTEX_ENTER(&nat->nat_lock);
 			ipf_nat_update(fin, nat);
-			nat->nat_ref++;
 			nat->nat_bytes[0] += fin->fin_plen;
 			nat->nat_pkts[0]++;
 			MUTEX_EXIT(&nat->nat_lock);
-			fin->fin_nat = nat;
 		}
 	} else
 		rval = natfailed;
@@ -3627,7 +3623,6 @@ ipf_nat6_newrewrite(fin, nat, nai)
 	np = nai->nai_np;
 	flags = nat->nat_flags;
 	bcopy((char *)fin, (char *)&frnat, sizeof(*fin));
-	frnat.fin_state = NULL;
 
 	nat->nat_hm = NULL;
 

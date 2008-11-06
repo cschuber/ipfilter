@@ -199,8 +199,6 @@ ipf_p_ipsec_new(arg, fin, aps, nat)
 	MUTEX_INIT(&ipn->in_lock, "IPSec proxy NAT rule");
 
 	bcopy((char *)fin, (char *)&fi, sizeof(fi));
-	fi.fin_state = NULL;
-	fi.fin_nat = NULL;
 	fi.fin_fi.fi_p = IPPROTO_ESP;
 	fi.fin_fr = &softi->ipsec_fr;
 	fi.fin_data[0] = 0;
@@ -234,9 +232,8 @@ ipf_p_ipsec_new(arg, fin, aps, nat)
 
 		fi.fin_data[0] = 0;
 		fi.fin_data[1] = 0;
-		if (ipf_state_add(softc, &fi,
-				  (void **)&ipsec->ipsc_state, SI_WILDP) == 0)
-			ipf_state_deref(softc, (ipstate_t **)&fi.fin_state);
+		(void) ipf_state_add(softc, &fi,
+				     (void **)&ipsec->ipsc_state, SI_WILDP);
 	}
 	ip->ip_p = p & 0xff;
 	return 0;
@@ -275,8 +272,6 @@ ipf_p_ipsec_inout(arg, fin, aps, nat)
 
 		if ((ipsec->ipsc_nat == NULL) || (ipsec->ipsc_state == NULL)) {
 			bcopy((char *)fin, (char *)&fi, sizeof(fi));
-			fi.fin_state = NULL;
-			fi.fin_nat = NULL;
 			fi.fin_fi.fi_p = IPPROTO_ESP;
 			fi.fin_fr = &softi->ipsec_fr;
 			fi.fin_data[0] = 0;
@@ -324,9 +319,9 @@ ipf_p_ipsec_inout(arg, fin, aps, nat)
 			RWLOCK_EXIT(&softc->ipf_state);
 			fi.fin_data[0] = 0;
 			fi.fin_data[1] = 0;
-			if (ipf_state_add(softc, &fi, (void **)&ipsec->ipsc_state,
-					  SI_WILDP) == 0)
-				ipf_state_deref(softc, (ipstate_t **)&fi.fin_state);
+			(void) ipf_state_add(softc, &fi,
+					     (void **)&ipsec->ipsc_state,
+					     SI_WILDP);
 		}
 		ip->ip_p = p;
 	}

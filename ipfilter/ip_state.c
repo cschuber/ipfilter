@@ -170,6 +170,7 @@ static ipftuneable_t ipf_state_tuneables[] = {
 };
 
 #define	SINCL(x)	ATOMIC_INCL(softs->x)
+#define	SBUMP(x)	(softs->x)++
 
 #ifdef	USE_INET6
 static ipstate_t *ipf_checkicmp6matchingstate __P((fr_info_t *));
@@ -1092,8 +1093,8 @@ ipf_state_insert(softc, is, rev)
 	MUTEX_ENTER(&is->is_lock);
 	MUTEX_ENTER(&softs->ipf_stinsert);
 
-	SINCL(ipf_state_stats.iss_proto[is->is_p]);
-	SINCL(ipf_state_stats.iss_active_proto[is->is_p]);
+	SBUMP(ipf_state_stats.iss_proto[is->is_p]);
+	SBUMP(ipf_state_stats.iss_active_proto[is->is_p]);
 
 	/*
 	 * add into list table.
@@ -1628,7 +1629,7 @@ ipf_state_add(softc, fin, stsave, flags)
 			is->is_icmp.ici_type = ic->icmp_type;
 			break;
 		default :
-			SINCL(ipf_state_stats.iss_icmp6_notquery);
+			SBUMP(ipf_state_stats.iss_icmp6_notquery);
 			return -2;
 		}
 		break;
@@ -1646,7 +1647,7 @@ ipf_state_add(softc, fin, stsave, flags)
 			hv += (is->is_icmp.ici_id = ic->icmp_id);
 			break;
 		default :
-			SINCL(ipf_state_stats.iss_icmp_notquery);
+			SBUMP(ipf_state_stats.iss_icmp_notquery);
 			return -3;
 		}
 		break;
@@ -1678,7 +1679,7 @@ ipf_state_add(softc, fin, stsave, flags)
 		tcp = fin->fin_dp;
 
 		if (tcp->th_flags & TH_RST) {
-			SINCL(ipf_state_stats.iss_tcp_rstadd);
+			SBUMP(ipf_state_stats.iss_tcp_rstadd);
 			return -4;
 		}
 
@@ -1857,13 +1858,14 @@ ipf_state_add(softc, fin, stsave, flags)
 	 * ipf_state_deref() after calling ipf_state_add() and the idea is to
 	 * have it exist at the end of ipf_check() with is_ref == 1.
 	 */
-	is->is_ref = 2;
+	is->is_ref = 1;
 	is->is_pkts[0] = 0, is->is_bytes[0] = 0;
 	is->is_pkts[1] = 0, is->is_bytes[1] = 0;
 	is->is_pkts[2] = 0, is->is_bytes[2] = 0;
 	is->is_pkts[3] = 0, is->is_bytes[3] = 0;
 	if ((fin->fin_flx & FI_IGNORE) == 0) {
 		is->is_pkts[out] = 1;
+		fin->fin_pktnum = 1;
 		is->is_bytes[out] = fin->fin_plen;
 		is->is_flx[out][0] = fin->fin_flx & FI_CMP;
 		is->is_flx[out][0] &= ~FI_OOW;
@@ -1917,7 +1919,6 @@ ipf_state_add(softc, fin, stsave, flags)
 
 	RWLOCK_EXIT(&softc->ipf_state);
 	*stsave = is;
-	fin->fin_state = is;
 	fin->fin_rev = IP6_NEQ(&is->is_dst, &fin->fin_daddr);
 	fin->fin_flx |= FI_STATE;
 	if (fin->fin_flx & FI_FRAG)
@@ -1966,7 +1967,7 @@ ipf_tcpoptions(softs, fin, tcp, td)
 
 	len = (TCP_OFF(tcp) << 2);
 	if (fin->fin_dlen < len) {
-		SINCL(ipf_state_stats.iss_tcp_toosmall);
+		SBUMP(ipf_state_stats.iss_tcp_toosmall);
 		return 0;
 	}
 	len -= sizeof(*tcp);
@@ -2041,7 +2042,7 @@ ipf_tcpoptions(softs, fin, tcp, td)
 		s += ol;
 	}
 	if (retval == -1) {
-		SINCL(ipf_state_stats.iss_tcp_badopt);
+		SBUMP(ipf_state_stats.iss_tcp_badopt);
 	}
 	return retval;
 }
@@ -2090,7 +2091,7 @@ ipf_state_tcp(softc, softs, fin, tcp, is)
 				      is->is_sti.tqe_ifq,
 				      &softs->ipf_state_deletetq);
 			MUTEX_EXIT(&is->is_lock);
-			SINCL(ipf_state_stats.iss_tcp_closing);
+			SBUMP(ipf_state_stats.iss_tcp_closing);
 			return 0;
 		}
 	}
@@ -2104,7 +2105,7 @@ ipf_state_tcp(softc, softs, fin, tcp, is)
 				  is->is_flags, ret);
 		if (ret == 0) {
 			MUTEX_EXIT(&is->is_lock);
-			SINCL(ipf_state_stats.iss_tcp_fsm);
+			SBUMP(ipf_state_stats.iss_tcp_fsm);
 			return 0;
 		}
 
@@ -2144,7 +2145,7 @@ ipf_state_tcp(softc, softs, fin, tcp, is)
 		}
 		ret = 1;
 	} else {
-		SINCL(ipf_state_stats.iss_tcp_oow);
+		SBUMP(ipf_state_stats.iss_tcp_oow);
 		fin->fin_flx |= FI_OOW;
 		ret = 0;
 	}
@@ -2281,7 +2282,7 @@ ipf_state_tcpinwindow(fin, fdata, tdata, tcp, flags)
 	 */
 	if ((flags & IS_STRICT) != 0) {
 		if (seq != fdata->td_end) {
-			SINCL(ipf_state_stats.iss_tcp_strict);
+			SBUMP(ipf_state_stats.iss_tcp_strict);
 			return 0;
 		}
 	}
@@ -2303,7 +2304,7 @@ ipf_state_tcpinwindow(fin, fdata, tdata, tcp, flags)
 	} else if ((seq == fdata->td_maxend) && (ackskew == 0) &&
 	    (fdata->td_winflags & TCP_SACK_PERMIT) &&
 	    (tdata->td_winflags & TCP_SACK_PERMIT)) {
-		SINCL(ipf_state_stats.iss_winsack);
+		SBUMP(ipf_state_stats.iss_winsack);
 		inseq = 1;
 	/*
 	 * Sometimes a TCP RST will be generated with only the ACK field
@@ -2369,7 +2370,7 @@ ipf_state_tcpinwindow(fin, fdata, tdata, tcp, flags)
 			tdata->td_maxend = ack + win;
 		return 1;
 	}
-	SINCL(ipf_state_stats.iss_oow);
+	SBUMP(ipf_state_stats.iss_oow);
 	fin->fin_flx |= FI_OOW;
 	return 0;
 }
@@ -2438,7 +2439,7 @@ ipf_state_clone(fin, tcp, is)
 	clone->is_flags &= ~SI_CLONE;
 	clone->is_flags |= SI_CLONED;
 	ipf_state_insert(softc, clone, fin->fin_rev);
-	clone->is_ref = 2;
+	clone->is_ref = 1;
 	if (clone->is_p == IPPROTO_TCP) {
 		(void) ipf_tcp_age(&clone->is_sti, fin, softs->ipf_state_tcptq,
 				   clone->is_flags, 2);
@@ -2448,7 +2449,7 @@ ipf_state_clone(fin, tcp, is)
 	if (is->is_flags & IS_STATESYNC)
 		clone->is_sync = ipf_sync_new(softc, SMC_STATE, fin, clone);
 #endif
-	SINCL(ipf_state_stats.iss_cloned);
+	SBUMP(ipf_state_stats.iss_cloned);
 	return clone;
 }
 
@@ -2513,7 +2514,7 @@ ipf_matchsrcdst(fin, is, src, dst, tcp, cmask)
 		ret = 1;
 
 	if (ret == 0) {
-		SINCL(ipf_state_stats.iss_lookup_badifp);
+		SBUMP(ipf_state_stats.iss_lookup_badifp);
 		/* TRACE is, out, rev, idx */
 		return NULL;
 	}
@@ -2549,7 +2550,7 @@ ipf_matchsrcdst(fin, is, src, dst, tcp, cmask)
 	}
 
 	if (ret == 0) {
-		SINCL(ipf_state_stats.iss_lookup_badport);
+		SBUMP(ipf_state_stats.iss_lookup_badport);
 		/* TRACE rev, is, sp, dp, src, dst */
 		return NULL;
 	}
@@ -2747,7 +2748,7 @@ ipf_checkicmpmatchingstate(fin)
 	if ((fin->fin_v != 4) || (fin->fin_hlen != sizeof(ip_t)) ||
 	    (fin->fin_plen < ICMPERR_MINPKTLEN) ||
 	    !(fin->fin_flx & FI_ICMPERR)) {
-		SINCL(ipf_state_stats.iss_icmp_bad);
+		SBUMP(ipf_state_stats.iss_icmp_bad);
 		return NULL;
 	}
 	ic = fin->fin_dp;
@@ -2768,7 +2769,7 @@ ipf_checkicmpmatchingstate(fin)
 	 */
 	len = fin->fin_dlen - ICMPERR_ICMPHLEN;
 	if ((len <= 0) || ((IP_HL(oip) << 2) > len)) {
-		SINCL(ipf_state_stats.iss_icmp_short);
+		SBUMP(ipf_state_stats.iss_icmp_short);
 		return NULL;
 	}
 
@@ -2788,12 +2789,12 @@ ipf_checkicmpmatchingstate(fin)
 	m = fin->fin_m;
 # if defined(MENTAT)
 	if ((char *)oip + len > (char *)m->b_wptr) {
-		SINCL(ipf_state_stats.iss_icmp_short);
+		SBUMP(ipf_state_stats.iss_icmp_short);
 		return NULL;
 	}
 # else
 	if ((char *)oip + len > (char *)fin->fin_ip + m->m_len) {
-		SINCL(ipf_state_stats.iss_icmp_short);
+		SBUMP(ipf_state_stats.iss_icmp_short);
 		return NULL;
 	}
 # endif
@@ -2863,7 +2864,7 @@ ipf_checkicmpmatchingstate(fin)
 		 * ICMP query's as well, but adding them here seems strange XXX
 		 */
 		if ((ofin.fin_flx & FI_ICMPERR) != 0) {
-			SINCL(ipf_state_stats.iss_icmp_icmperr);
+			SBUMP(ipf_state_stats.iss_icmp_icmperr);
 		    	return NULL;
 		}
 
@@ -2889,13 +2890,13 @@ ipf_checkicmpmatchingstate(fin)
 				return is;
 		}
 		RWLOCK_EXIT(&softc->ipf_state);
-		SINCL(ipf_state_stats.iss_icmp_miss);
+		SBUMP(ipf_state_stats.iss_icmp_miss);
 		return NULL;
 	case IPPROTO_TCP :
 	case IPPROTO_UDP :
 		break;
 	default :
-		SINCL(ipf_state_stats.iss_icmp_miss);
+		SBUMP(ipf_state_stats.iss_icmp_miss);
 		return NULL;
 	}
 
@@ -2927,7 +2928,7 @@ ipf_checkicmpmatchingstate(fin)
 		}
 	}
 	RWLOCK_EXIT(&softc->ipf_state);
-	SINCL(ipf_state_stats.iss_icmp_miss);
+	SBUMP(ipf_state_stats.iss_icmp_miss);
 	return NULL;
 }
 
@@ -2991,7 +2992,7 @@ ipf_allowstateicmp(fin, is, src)
 		return 1;
 	}
 
-	SINCL(ipf_state_stats.iss_icmp_hits);
+	SBUMP(ipf_state_stats.iss_icmp_hits);
 	is->is_icmppkts[i]++;
 
 	/*
@@ -3350,7 +3351,7 @@ retry_tcpudp:
 		if (ifq != NULL && ifqp != NULL)
 			*ifqp = ifq;
 	} else {
-		SINCL(ipf_state_stats.iss_lookup_miss);
+		SBUMP(ipf_state_stats.iss_lookup_miss);
 	}
 	return is;
 }
@@ -3386,14 +3387,6 @@ ipf_state_check(fin, passp)
 	if (fin->fin_flx & (FI_SHORT|FI_FRAGBODY|FI_BAD)) {
 		SINCL(ipf_state_stats.iss_check_bad);
 		return NULL;
-	}
-
-	is = fin->fin_state;
-	if (is != NULL) {
-		READ_ENTER(&softc->ipf_state);
-		fr = is->is_rule;
-		MUTEX_ENTER(&is->is_lock);
-		goto stateheld;
 	}
 
 	if ((fin->fin_flx & FI_TCPUDP) ||
@@ -3452,7 +3445,7 @@ ipf_state_check(fin, passp)
 		break;
 	}
 	if (is == NULL) {
-		SINCL(ipf_state_stats.iss_check_miss);
+		SBUMP(ipf_state_stats.iss_check_miss);
 		return NULL;
 	}
 
@@ -3461,12 +3454,12 @@ ipf_state_check(fin, passp)
 		if ((fin->fin_out == 0) && (fr->fr_nattag.ipt_num[0] != 0)) {
 			if (fin->fin_nattag == NULL) {
 				RWLOCK_EXIT(&softc->ipf_state);
-				SINCL(ipf_state_stats.iss_check_notag);
+				SBUMP(ipf_state_stats.iss_check_notag);
 				return NULL;
 			}
 			if (ipf_matchtag(&fr->fr_nattag, fin->fin_nattag)!=0) {
 				RWLOCK_EXIT(&softc->ipf_state);
-				SINCL(ipf_state_stats.iss_check_nattag);
+				SBUMP(ipf_state_stats.iss_check_nattag);
 				return NULL;
 			}
 		}
@@ -3476,7 +3469,6 @@ ipf_state_check(fin, passp)
 
 	fin->fin_rule = is->is_rulen;
 	fin->fin_fr = is->is_rule;
-	fin->fin_state = is;
 
 	/*
 	 * If this packet is a fragment and the rule says to track fragments,
@@ -3499,10 +3491,10 @@ ipf_state_check(fin, passp)
 	if (ifq != NULL)
 		ipf_movequeue(softc->ipf_ticks, tqe, tqe->tqe_ifq, ifq);
 
-stateheld:
 	inout = (fin->fin_rev << 1) + fin->fin_out;
 	is->is_pkts[inout]++;
 	is->is_bytes[inout] += fin->fin_plen;
+	fin->fin_pktnum = is->is_pkts[inout] + is->is_icmppkts[inout];
 
 	MUTEX_EXIT(&is->is_lock);
 
@@ -3515,7 +3507,7 @@ stateheld:
 
 	RWLOCK_EXIT(&softc->ipf_state);
 
-	SINCL(ipf_state_stats.iss_hits);
+	SBUMP(ipf_state_stats.iss_hits);
 
 	fin->fin_flx |= FI_STATE;
 	if ((pass & FR_LOGFIRST) != 0)
@@ -3898,7 +3890,7 @@ ipf_state_flush(softc, which, proto)
 	switch (which)
 	{
 	case 0 :
-		SINCL(ipf_state_stats.iss_flush_all);
+		SBUMP(ipf_state_stats.iss_flush_all);
 		/*
 		 * Style 0 flush removes everything...
 		 */
@@ -3915,7 +3907,7 @@ ipf_state_flush(softc, which, proto)
 		break;
 
 	case 1 :
-		SINCL(ipf_state_stats.iss_flush_closing);
+		SBUMP(ipf_state_stats.iss_flush_closing);
 		/*
 		 * Since we're only interested in things that are closing,
 		 * we can start with the appropriate timeout queue.
@@ -3968,7 +3960,7 @@ ipf_state_flush(softc, which, proto)
 	case IPF_TCPS_FIN_WAIT_2 :
 	case IPF_TCPS_TIME_WAIT :
 	case IPF_TCPS_CLOSED :
-		SINCL(ipf_state_stats.iss_flush_queue);
+		SBUMP(ipf_state_stats.iss_flush_queue);
 		tqn = softs->ipf_state_tcptq[which].ifq_head;
 		while (tqn != NULL) {
 			tqe = tqn;
@@ -3983,7 +3975,7 @@ ipf_state_flush(softc, which, proto)
 		if (which < 30)
 			break;
 
-		SINCL(ipf_state_stats.iss_flush_state);
+		SBUMP(ipf_state_stats.iss_flush_state);
 		/*
 		 * Take a large arbitrary number to mean the number of seconds
 		 * for which which consider to be the maximum value we'll allow
@@ -4010,7 +4002,7 @@ ipf_state_flush(softc, which, proto)
 		return removed;
 	}
 
-	SINCL(ipf_state_stats.iss_flush_timeout);
+	SBUMP(ipf_state_stats.iss_flush_timeout);
 	/*
 	 * Asked to remove inactive entries because the table is full, try
 	 * again, 3 times, if first attempt failed with a different criteria
@@ -4507,9 +4499,9 @@ ipf_state_log(softc, is, type)
 	types[0] = 0;
 
 	if (ipf_log_items(softc, IPL_LOGSTATE, NULL, items, sizes, types, 1)) {
-		SINCL(ipf_state_stats.iss_log_ok);
+		SBUMP(ipf_state_stats.iss_log_ok);
 	} else {
-		SINCL(ipf_state_stats.iss_log_fail);
+		SBUMP(ipf_state_stats.iss_log_fail);
 	}
 #endif
 }
@@ -4596,7 +4588,7 @@ ipf_checkicmp6matchingstate(fin)
 	 * an ICMP error can never generate an ICMP error in response.
 	 */
 	if (ofin.fin_flx & FI_ICMPERR) {
-		SINCL(ipf_state_stats.iss_icmp6_icmperr);
+		SBUMP(ipf_state_stats.iss_icmp6_icmperr);
 		return NULL;
 	}
 
@@ -4610,7 +4602,7 @@ ipf_checkicmp6matchingstate(fin)
 		 * ICMP query's as well, but adding them here seems strange XXX
 		 */
 		 if (!(oic->icmp6_type & ICMP6_INFOMSG_MASK)) {
-			SINCL(ipf_state_stats.iss_icmp6_notinfo);
+			SBUMP(ipf_state_stats.iss_icmp6_notinfo);
 			return NULL;
 		}
 
@@ -4651,7 +4643,7 @@ ipf_checkicmp6matchingstate(fin)
 			}
 		}
 		RWLOCK_EXIT(&softc->ipf_state);
-		SINCL(ipf_state_stats.iss_icmp6_miss);
+		SBUMP(ipf_state_stats.iss_icmp6_miss);
 		return NULL;
 	}
 
@@ -4710,7 +4702,7 @@ ipf_checkicmp6matchingstate(fin)
 			return is;
 	}
 	RWLOCK_EXIT(&softc->ipf_state);
-	SINCL(ipf_state_stats.iss_icmp_miss);
+	SBUMP(ipf_state_stats.iss_icmp_miss);
 	return NULL;
 }
 #endif

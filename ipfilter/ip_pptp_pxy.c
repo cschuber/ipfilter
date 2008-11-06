@@ -171,8 +171,6 @@ ipf_p_pptp_donatstate(fin, nat, pptp)
 	if ((nat2 == NULL) || (pptp->pptp_state == NULL)) {
 		bcopy((char *)fin, (char *)&fi, sizeof(fi));
 		bzero((char *)&gre, sizeof(gre));
-		fi.fin_state = NULL;
-		fi.fin_nat = NULL;
 		fi.fin_fi.fi_p = IPPROTO_GRE;
 		fi.fin_fr = &pptpfr;
 		if ((nat->nat_dir == NAT_OUTBOUND && fin->fin_out) ||
@@ -230,9 +228,8 @@ ipf_p_pptp_donatstate(fin, nat, pptp)
 				fi.fin_fi.fi_saddr = nat2->nat_osrcaddr;
 		}
 		fi.fin_ifp = NULL;
-		if (ipf_state_add(softc, &fi,
-				  (void **)&pptp->pptp_state, 0) == 0)
-			ipf_state_deref(softc, (ipstate_t **)&fi.fin_state);
+		(void) ipf_state_add(softc, &fi,
+				     (void **)&pptp->pptp_state, 0);
 	}
 	ip->ip_p = p;
 	return;

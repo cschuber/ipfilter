@@ -505,6 +505,7 @@ typedef	struct nat_stat_side {
 	u_long	ns_xlate_null;
 	u_long	ns_xlate_exists;
 	u_long	ns_ipf_proxy_fail;
+	u_long	ns_uncreate[2];
 	u_int	*ns_bucketlen;
 	nat_t	**ns_table;
 } nat_stat_side_t;
@@ -714,6 +715,7 @@ extern	int	ipf_nat_soft_fini __P((ipf_main_softc_t *, void *));
 extern	int	ipf_nat_main_load __P((void));
 extern	int	ipf_nat_main_unload __P((void));
 extern	ipftq_t	*ipf_nat_add_tq __P((ipf_main_softc_t *, int));
+extern	void	ipf_nat_uncreate __P((fr_info_t *));
 
 #ifdef USE_INET6
 extern	nat_t	*ipf_nat6_add __P((fr_info_t *, ipnat_t *, nat_t **,

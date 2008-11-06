@@ -806,8 +806,7 @@ ipf_fastroute(mb, mpp, fin, fdp)
 				u_32_t pass;
 
 				fin->fin_flx &= ~FI_STATE;
-				if (ipf_state_check(fin, &pass) != NULL)
-					ipf_state_deref((ipstate_t **)&fin->fin_state);
+				(void) ipf_state_check(fin, &pass);
 			}
 
 			switch (ipf_nat_checkout(fin, NULL))
@@ -815,7 +814,6 @@ ipf_fastroute(mb, mpp, fin, fdp)
 			case 0 :
 				break;
 			case 1 :
-				ipf_nat_deref((nat_t **)&fin->fin_nat);
 				break;
 			case -1 :
 				goto bad_fastroute;

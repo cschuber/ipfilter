@@ -409,8 +409,6 @@ ipf_p_irc_send(fin, nat)
 		tcp2->th_win = htons(8192);
 		tcp2->th_sport = sp;
 		tcp2->th_dport = 0; /* XXX - don't specify remote port */
-		fi.fin_state = NULL;
-		fi.fin_nat = NULL;
 		fi.fin_data[0] = ntohs(sp);
 		fi.fin_data[1] = 0;
 		fi.fin_dp = (char *)tcp2;
@@ -429,10 +427,7 @@ ipf_p_irc_send(fin, nat)
 			ipf_nat_update(&fi, nat2);
 			MUTEX_EXIT(&nat2->nat_lock);
 
-			if (ipf_state_add(softc, &fi, &fi.fin_state,
-					  SI_W_DPORT) == 0)
-				ipf_state_deref(softc,
-						(ipstate_t **)&fi.fin_state);
+			(void) ipf_state_add(softc, &fi, NULL, SI_W_DPORT);
 		}
 		ip->ip_src = swip;
 	}

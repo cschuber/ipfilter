@@ -710,8 +710,7 @@ ipf_fastroute(m0, mpp, fin, fdp)
 		if (!fr || !(fr->fr_flags & FR_RETMASK)) {
 			u_32_t pass;
 
-			if (ipf_state_check(fin, &pass) != NULL)
-				ipf_state_deref(softc, (ipstate_t **)&fin->fin_state);
+			(void) ipf_state_check(fin, &pass);
 		}
 
 		switch (ipf_nat_checkout(fin, NULL))
@@ -719,7 +718,6 @@ ipf_fastroute(m0, mpp, fin, fdp)
 		case 0 :
 			break;
 		case 1 :
-			ipf_nat_deref(softc, (nat_t **)&fin->fin_nat);
 			ip->ip_sum = 0;
 			break;
 		case -1 :

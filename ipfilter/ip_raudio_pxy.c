@@ -285,8 +285,6 @@ ipf_p_raudio_in(arg, fin, aps, nat)
 	bcopy((char *)fin, (char *)&fi, sizeof(fi));
 	bzero((char *)tcp2, sizeof(*tcp2));
 	TCP_OFF_A(tcp2, 5);
-	fi.fin_state = NULL;
-	fi.fin_nat = NULL;
 	fi.fin_flx |= FI_IGNORE;
 	fi.fin_dp = (char *)tcp2;
 	fi.fin_fr = &raudiofr;
@@ -316,10 +314,8 @@ ipf_p_raudio_in(arg, fin, aps, nat)
 			ipf_nat_update(&fi, nat2);
 			MUTEX_EXIT(&nat2->nat_lock);
 
-			if (ipf_state_add(softc, &fi, &fi.fin_state,
-					  (sp ? 0 : SI_W_SPORT)) == 0)
-				ipf_state_deref(softc,
-						(ipstate_t **)&fi.fin_state);
+			(void) ipf_state_add(softc, &fi, NULL,
+					     (sp ? 0 : SI_W_SPORT));
 		}
 	}
 
@@ -341,8 +337,7 @@ ipf_p_raudio_in(arg, fin, aps, nat)
 			ipf_nat_update(&fi, nat2);
 			MUTEX_EXIT(&nat2->nat_lock);
 
-			if (ipf_state_add(softc, &fi, &fi.fin_state, SI_W_DPORT) == 0)
-				ipf_state_deref(softc, (ipstate_t **)&fi.fin_state);
+			(void) ipf_state_add(softc, &fi, NULL, SI_W_DPORT);
 		}
 	}
 

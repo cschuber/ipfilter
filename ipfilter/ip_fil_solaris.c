@@ -784,14 +784,11 @@ ipf_nextipid(fr_info_t *fin)
 	u_short id;
 
 	MUTEX_ENTER(&softc->ipf_rw);
-	if (fin->fin_state != NULL) {
-		is = fin->fin_state;
-		id = (u_short)(is->is_pkts[(fin->fin_rev << 1) + 1] & 0xffff);
-	} else if (fin->fin_nat != NULL) {
-		nat = fin->fin_nat;
-		id = (u_short)(nat->nat_pkts[fin->fin_out] & 0xffff);
-	} else
+	if (fin->fin_pktnum != 0) {
+		id = fin->fin_pktnum & 0xffff;
+	} else {
 		id = ipid++;
+	}
 	MUTEX_EXIT(&softc->ipf_rw);
 
 	return id;
@@ -1050,9 +1047,7 @@ ipf_fastroute(mb, mpp, fin, fdp)
 		if (!fr || !(fr->fr_flags & FR_RETMASK)) {
 			u_32_t pass;
 
-			if (ipf_state_check(fin, &pass) != NULL)
-				ipf_state_deref(softc,
-						(ipstate_t **)&fin->fin_state);
+			(void) ipf_state_check(fin, &pass);
 		}
 
 		switch (ipf_nat_checkout(fin, NULL))
@@ -1060,7 +1055,6 @@ ipf_fastroute(mb, mpp, fin, fdp)
 		case 0 :
 			break;
 		case 1 :
-			ipf_nat_deref(softc, (nat_t **)&fin->fin_nat);
 			ip->ip_sum = 0;
 			break;
 		case -1 :

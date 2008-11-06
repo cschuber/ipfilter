@@ -218,8 +218,6 @@ ipf_p_rcmd_portmsg(fin, aps, nat)
 	 * up with what we want to add.
 	 */
 	bcopy((char *)fin, (char *)&fi, sizeof(fi));
-	fi.fin_state = NULL;
-	fi.fin_nat = NULL;
 	fi.fin_flx |= FI_IGNORE;
 	fi.fin_data[0] = 0;
 	fi.fin_data[1] = sp;
@@ -289,10 +287,7 @@ ipf_p_rcmd_portmsg(fin, aps, nat)
 			fi.fin_ifp = NULL;
 			if (nat2->nat_dir == NAT_INBOUND)
 				fi.fin_fi.fi_daddr = nat->nat_osrcaddr;
-			if (ipf_state_add(softc, &fi, &fi.fin_state,
-					  SI_W_SPORT) == 0)
-				ipf_state_deref(softc,
-						(ipstate_t **)&fi.fin_state);
+			(void) ipf_state_add(softc, &fi, NULL, SI_W_SPORT);
 		}
 		ip->ip_len = slen;
 	}

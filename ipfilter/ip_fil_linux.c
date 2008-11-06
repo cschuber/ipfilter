@@ -534,8 +534,7 @@ ipf_fastroute(mb_t *xmin, mb_t **mp, fr_info_t *fin, frdest_t *fdp)
 		if (!fr || !(fr->fr_flags & FR_RETMASK)) {
 			u_32_t pass;
 
-			if (ipf_state_check(fin, &pass) != NULL)
-				ipf_state_deref((ipstate_t **)&fin->fin_state);
+			(void) ipf_state_check(fin, &pass);
 		}
 
 		switch (ipf_nat_checkout(fin, NULL))
@@ -543,7 +542,6 @@ ipf_fastroute(mb_t *xmin, mb_t **mp, fr_info_t *fin, frdest_t *fdp)
 		case 0 :
 			break;
 		case 1 :
-			ipf_nat_deref((nat_t **)&fin->fin_nat);
 			ip->ip_sum = 0;
 			break;
 		case -1 :
