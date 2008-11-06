@@ -796,6 +796,28 @@ typedef unsigned int    u_32_t;
 
 # if (__NetBSD_Version__ >= 499000000)
 typedef	char *	caddr_t;
+#  ifdef _KERNEL
+#   include <sys/rwlock.h>
+#   define	USE_MUTEXES		1
+#   define	KMUTEX_T		kmutex_t
+#   define	KRWLOCK_T		krwlock_t
+#   define	MUTEX_DESTROY(x)	mutex_destroy(&(x)->ipf_lk)
+#   define	MUTEX_DOWNGRADE(x)	rw_downgrade(&(x)->ipf_lk)
+#   define	MUTEX_ENTER(x)		mutex_enter(&(x)->ipf_lk)
+#   define	MUTEX_EXIT(x)		mutex_exit(&(x)->ipf_lk)
+#   define	MUTEX_INIT(x,y)		mutex_init(&(x)->ipf_lk, MUTEX_DRIVER,\
+						  IPL_SOFTNET)
+#   define	MUTEX_NUKE(x)		bzero((x), sizeof(*(x)))
+#   define	READ_ENTER(x)		rw_enter(&(x)->ipf_lk, RW_READER)
+#   define	RWLOCK_INIT(x, y)	rw_init(&(x)->ipf_lk)
+#   define	RWLOCK_EXIT(x)		rw_exit(&(x)->ipf_lk)
+#   define	RW_DESTROY(x)		rw_destroy(&(x)->ipf_lk)
+#   define	WRITE_ENTER(x)		rw_enter(&(x)->ipf_lk, RW_WRITER)
+#   define	SPL_SCHED(x)		;
+#   define	SPL_NET(x)		;
+#   define	SPL_IMP(x)		;
+#   define	SPL_X(x)		;
+#  endif
 # endif
 
 # ifdef _KERNEL
@@ -1470,7 +1492,7 @@ typedef union {
 #ifdef KMUTEX_T
 	struct	{
 		KMUTEX_T	ipf_slk;
-		char		*ipf_lname;
+		const char	*ipf_lname;
 	} ipf_lkun_s;
 #endif
 	eMmutex_t	ipf_emu;
@@ -1480,7 +1502,7 @@ typedef union {
 #ifdef KRWLOCK_T
 	struct	{
 		KRWLOCK_T	ipf_slk;
-		char		*ipf_lname;
+		const char	*ipf_lname;
 		int		ipf_sr;
 		int		ipf_sw;
 		u_int		ipf_magic;
