@@ -246,9 +246,10 @@ void
 ipfilterattach(count)
 	int count;
 {
-# if 0
-	if (iplattach() != 0)
-		printf("IP Filter failed to attach\n");
+# ifdef USE_MUTEXES
+	RWLOCK_INIT(&ipfmain.ipf_global, "ipf filter load/unload mutex");
+	RWLOCK_INIT(&ipfmain.ipf_mutex, "ipf filter rwlock");
+	RWLOCK_INIT(&ipfmain.ipf_frcache, "ipf cache rwlock");
 # endif
 }
 #endif
