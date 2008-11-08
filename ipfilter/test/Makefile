@@ -97,3 +97,6 @@ clean:
 
 diffs:
 	-cd expected; for i in *; do if [ -f $$i -a ! -f ../$$i -a -f ../results/$$i ] ; then  diff -c $$i ../results/$$i >> ../diff.out; fi done
+
+errors:
+	make -k 2>&1 | awk '/differ:/ { print "diff -u "$$1,$$2; } ' - | sh > erd
