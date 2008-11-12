@@ -31,12 +31,18 @@ ipstate_t *printstate(sp, opts, now)
 
 	PRINTF(" src:%s", hostname(sp->is_v, &sp->is_src.in4));
 	if (sp->is_p == IPPROTO_UDP || sp->is_p == IPPROTO_TCP) {
-		PRINTF(",%d", ntohs(sp->is_sport));
+		if (sp->is_flags & IS_WSPORT)
+			PRINTF(",*");
+		else
+			PRINTF(",%d", ntohs(sp->is_sport));
 	}
 
 	PRINTF(" dst:%s", hostname(sp->is_v, &sp->is_dst.in4));
 	if (sp->is_p == IPPROTO_UDP || sp->is_p == IPPROTO_TCP) {
-		PRINTF(",%d", ntohs(sp->is_dport));
+		if (sp->is_flags & IS_WDPORT)
+			PRINTF(",*");
+		else
+			PRINTF(",%d", ntohs(sp->is_dport));
 	}
 
 	if (sp->is_p == IPPROTO_TCP) {
@@ -46,6 +52,8 @@ ipstate_t *printstate(sp, opts, now)
 	PRINTF(" %lu", sp->is_die - now);
 	if (sp->is_phnext == NULL)
 		PRINTF(" ORPHAN");
+	if (sp->is_flags & IS_CLONE)
+		PRINTF(" CLONE");
 	putchar('\n');
 
 	if (sp->is_p == IPPROTO_TCP) {
