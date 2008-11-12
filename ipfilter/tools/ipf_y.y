@@ -460,8 +460,9 @@ head:	| IPFY_HEAD groupname		{ DOALL(strncpy(fr->fr_grhead, $2, \
 	;
 
 groupname:
-	YY_STR				{ $1[FR_GROUPLEN - 1] = '\0';
-					  $$ = $1;
+	YY_STR				{ $$ = $1;
+					  if (strlen($$) >= FR_GROUPLEN)
+						$$[FR_GROUPLEN - 1] = '\0';
 					}
 	| YY_NUMBER			{ $$ = malloc(16);
 					  sprintf($$, "%d", $1);
