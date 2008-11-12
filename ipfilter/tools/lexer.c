@@ -478,9 +478,9 @@ buildipv6:
 				;
 			if (!*s && *yystr) {
 				isbuilding = 0;
+				c = *yystr;
 				free(yystr);
 				triedv6 = 1;
-				c = *yystr;
 				yypos = 1;
 				goto buildipv6;
 			}
