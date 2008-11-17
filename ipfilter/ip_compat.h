@@ -1604,11 +1604,14 @@ extern	mb_t	*allocmbt __P((size_t));
 extern	mb_t	*dupmbt __P((mb_t *));
 extern	void	freembt __P((mb_t *));
 
-# define	MUTEX_DESTROY(x)	eMmutex_destroy(&(x)->ipf_emu)
+# define	MUTEX_DESTROY(x)	eMmutex_destroy(&(x)->ipf_emu, \
+							__FILE__, __LINE__)
 # define	MUTEX_ENTER(x)		eMmutex_enter(&(x)->ipf_emu, \
 						      __FILE__, __LINE__)
-# define	MUTEX_EXIT(x)		eMmutex_exit(&(x)->ipf_emu)
-# define	MUTEX_INIT(x,y)		eMmutex_init(&(x)->ipf_emu, y)
+# define	MUTEX_EXIT(x)		eMmutex_exit(&(x)->ipf_emu, \
+						     __FILE__, __LINE__)
+# define	MUTEX_INIT(x,y)		eMmutex_init(&(x)->ipf_emu, y, \
+						     __FILE__, __LINE__)
 # define	MUTEX_NUKE(x)		bzero((x), sizeof(*(x)))
 
 # define	MUTEX_DOWNGRADE(x)	eMrwlock_downgrade(&(x)->ipf_emu, \
@@ -1624,10 +1627,10 @@ extern	void	freembt __P((mb_t *));
 
 # define	USE_MUTEXES		1
 
-extern void eMmutex_destroy __P((eMmutex_t *));
+extern void eMmutex_destroy __P((eMmutex_t *, char *, int));
 extern void eMmutex_enter __P((eMmutex_t *, char *, int));
-extern void eMmutex_exit __P((eMmutex_t *));
-extern void eMmutex_init __P((eMmutex_t *, char *));
+extern void eMmutex_exit __P((eMmutex_t *, char *, int));
+extern void eMmutex_init __P((eMmutex_t *, char *, char *, int));
 extern void eMrwlock_destroy __P((eMrwlock_t *));
 extern void eMrwlock_exit __P((eMrwlock_t *));
 extern void eMrwlock_init __P((eMrwlock_t *, char *));

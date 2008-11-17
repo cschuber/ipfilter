@@ -151,8 +151,8 @@ static	aproxy_t	ips_proxies[] = {
 	  ipf_p_rcmd_main_load, ipf_p_rcmd_main_unload,
 	  NULL, NULL,
 	  NULL, NULL,
-	  ipf_p_rcmd_new, NULL, ipf_p_rcmd_in, ipf_p_rcmd_out, NULL, NULL,
-	  NULL, NULL },
+	  ipf_p_rcmd_new, ipf_p_rcmd_del,
+	  ipf_p_rcmd_in, ipf_p_rcmd_out, NULL, NULL, NULL, NULL },
 #endif
 #ifdef	IPF_RAUDIO_PROXY
 	{ NULL, NULL, "raudio", (char)IPPROTO_TCP, 0, 0, 0,

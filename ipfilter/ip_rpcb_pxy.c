@@ -1162,8 +1162,6 @@ ipf_p_rpcb_getnat(fin, nat, proto, port)
 	/* Generate dummy fr_info */
 	bcopy((char *)fin, (char *)&fi, sizeof(fi));
 	fi.fin_out = 0;
-	fi.fin_src = fin->fin_dst;
-	fi.fin_dst = nat->nat_ndstip;
 	fi.fin_p = proto;
 	fi.fin_sport = 0;
 	fi.fin_dport = port & 0xffff;
@@ -1260,6 +1258,8 @@ ipf_p_rpcb_getnat(fin, nat, proto, port)
 			return(-1);
 		}
 
+		fi.fin_saddr = natl->nat_nsrcaddr;
+		fi.fin_daddr = natl->nat_ndstaddr;
 		ipn->in_use++;
 		(void) ipf_nat_proto(&fi, natl, nflags);
 		MUTEX_ENTER(&natl->nat_lock);
@@ -1270,7 +1270,6 @@ ipf_p_rpcb_getnat(fin, nat, proto, port)
 
 	if (is == NULL) {
 		/* Create state entry.  Return NULL if this fails. */
-		fi.fin_dst = nat->nat_odstip;
 		fi.fin_flx |= FI_NATED;
 		fi.fin_flx &= ~FI_STATE;
 		nflags &= NAT_TCPUDP;

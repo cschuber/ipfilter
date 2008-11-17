@@ -232,8 +232,7 @@ ipf_p_ipsec_new(arg, fin, aps, nat)
 
 		fi.fin_data[0] = 0;
 		fi.fin_data[1] = 0;
-		(void) ipf_state_add(softc, &fi,
-				     (void **)&ipsec->ipsc_state, SI_WILDP);
+		(void) ipf_state_add(softc, &fi, &ipsec->ipsc_state, SI_WILDP);
 	}
 	ip->ip_p = p & 0xff;
 	return 0;
@@ -319,8 +318,7 @@ ipf_p_ipsec_inout(arg, fin, aps, nat)
 			RWLOCK_EXIT(&softc->ipf_state);
 			fi.fin_data[0] = 0;
 			fi.fin_data[1] = 0;
-			(void) ipf_state_add(softc, &fi,
-					     (void **)&ipsec->ipsc_state,
+			(void) ipf_state_add(softc, &fi, &ipsec->ipsc_state,
 					     SI_WILDP);
 		}
 		ip->ip_p = p;

@@ -179,7 +179,6 @@ static int ipf_allowstateicmp __P((fr_info_t *, ipstate_t *, i6addr_t *));
 static ipstate_t *ipf_matchsrcdst __P((fr_info_t *, ipstate_t *, i6addr_t *,
 				      i6addr_t *, tcphdr_t *, u_32_t));
 static ipstate_t *ipf_checkicmpmatchingstate __P((fr_info_t *));
-static int ipf_state_flush __P((ipf_main_softc_t *, int, int));
 static int ipf_state_flush_entry __P((ipf_main_softc_t *, void *));
 static ips_stat_t *ipf_state_stats __P((ipf_main_softc_t *));
 static int ipf_state_del __P((ipf_main_softc_t *, ipstate_t *, int));
@@ -417,7 +416,7 @@ ipf_state_soft_init(softc, arg)
 		   "ipftq iptimeout tab");
 	softs->ipf_state_iptq.ifq_next = &softs->ipf_state_pending;
 
-	IPFTQ_INIT(&softs->ipf_state_pending, 1, "ipftq pending");
+	IPFTQ_INIT(&softs->ipf_state_pending, IPF_HZ_DIVIDE, "ipftq pending");
 	softs->ipf_state_pending.ifq_next = &softs->ipf_state_deletetq;
 
 	IPFTQ_INIT(&softs->ipf_state_deletetq, 1, "ipftq delete");
@@ -463,8 +462,8 @@ ipf_state_soft_fini(softc, arg)
 	 */
 	for (ifq = softs->ipf_state_usertq; ifq != NULL; ifq = ifqnext) {
 		ifqnext = ifq->ifq_next;
-		if (((ifq->ifq_flags & IFQF_PROXY) == 0) &&
-		    (ipf_deletetimeoutqueue(ifq) == 0))
+
+		if (ipf_deletetimeoutqueue(ifq) == 0)
 			ipf_freetimeoutqueue(softc, ifq);
 	}
 
@@ -1484,7 +1483,7 @@ int
 ipf_state_add(softc, fin, stsave, flags)
 	ipf_main_softc_t *softc;
 	fr_info_t *fin;
-	void **stsave;
+	ipstate_t **stsave;
 	u_int flags;
 {
 	ipf_state_softc_t *softs = softc->ipf_state_soft;
@@ -1854,11 +1853,11 @@ ipf_state_add(softc, fin, stsave, flags)
 	}
 
 	/*
-	 * It may seem strange to set is_ref to 2, but ipf_check() will call
-	 * ipf_state_deref() after calling ipf_state_add() and the idea is to
-	 * have it exist at the end of ipf_check() with is_ref == 1.
+	 * It may seem strange to set is_ref to 2, but if stsave is not NULL
+	 * then a copy of the pointer is being stored somewhere else and in
+	 * the end, it * will expect to be able to do osmething with it.
 	 */
-	is->is_ref = 1;
+	is->is_ref = stsave ? 2 : 1;
 	is->is_pkts[0] = 0, is->is_bytes[0] = 0;
 	is->is_pkts[1] = 0, is->is_bytes[1] = 0;
 	is->is_pkts[2] = 0, is->is_bytes[2] = 0;
@@ -1918,7 +1917,9 @@ ipf_state_add(softc, fin, stsave, flags)
 		ipf_state_log(softc, is, ISL_NEW);
 
 	RWLOCK_EXIT(&softc->ipf_state);
-	*stsave = is;
+	if (stsave != NULL)
+		*stsave = is;
+	is->is_me = stsave;
 	fin->fin_rev = IP6_NEQ(&is->is_dst, &fin->fin_daddr);
 	fin->fin_flx |= FI_STATE;
 	if (fin->fin_flx & FI_FRAG)
@@ -2410,6 +2411,14 @@ ipf_state_clone(fin, tcp, is)
 	bcopy((char *)is, (char *)clone, sizeof(*clone));
 
 	MUTEX_NUKE(&clone->is_lock);
+	/*
+	 * It has not yet been placed on any timeout queue, so make sure
+	 * all of that data is zero'd out.
+	 */
+	clone->is_sti.tqe_pnext = NULL;
+	clone->is_sti.tqe_next = NULL;
+	clone->is_sti.tqe_ifq = NULL;
+	clone->is_sti.tqe_parent = clone;
 
 	clone->is_die = ONE_DAY + softc->ipf_ticks;
 	clone->is_state[0] = 0;
@@ -3468,7 +3477,7 @@ ipf_state_check(fin, passp)
 	}
 
 	fin->fin_rule = is->is_rulen;
-	fin->fin_fr = is->is_rule;
+	fin->fin_fr = fr;
 
 	/*
 	 * If this packet is a fragment and the rule says to track fragments,
@@ -3486,7 +3495,6 @@ ipf_state_check(fin, passp)
 		ifq = is->is_tqehead[fin->fin_rev];
 
 	MUTEX_ENTER(&is->is_lock);
-	is->is_ref++;
 
 	if (ifq != NULL)
 		ipf_movequeue(softc->ipf_ticks, tqe, tqe->tqe_ifq, ifq);
@@ -3683,6 +3691,7 @@ ipf_state_del(softc, is, why)
 	if (is->is_me != NULL) {
 		*is->is_me = NULL;
 		is->is_me = NULL;
+		is->is_ref--;
 	}
 
 	/*
@@ -3703,11 +3712,6 @@ ipf_state_del(softc, is, why)
 	if (is->is_sti.tqe_ifq != NULL)
 		ipf_deletequeueentry(&is->is_sti);
 
-	if (is->is_me != NULL) {
-		*is->is_me = NULL;
-		is->is_me = NULL;
-	}
-
 	/*
 	 * If it is still in use by something else, do not go any further,
 	 * but note that at this point it is now an orphan.  How can this
@@ -3727,6 +3731,7 @@ ipf_state_del(softc, is, why)
 	MUTEX_EXIT(&is->is_lock);
 
 	fr = is->is_rule;
+	is->is_rule = NULL;
 	if (fr != NULL) {
 		fdp = &fr->fr_tifs[0];
 		if (fdp->fd_type == FRD_POOL)
@@ -3742,10 +3747,12 @@ ipf_state_del(softc, is, why)
 	is->is_ref = 0;
 
 	if (is->is_tqehead[0] != NULL) {
-		(void) ipf_deletetimeoutqueue(is->is_tqehead[0]);
+		if (ipf_deletetimeoutqueue(is->is_tqehead[0]) == 0)
+			ipf_freetimeoutqueue(softc, is->is_tqehead[0]);
 	}
 	if (is->is_tqehead[1] != NULL) {
-		(void) ipf_deletetimeoutqueue(is->is_tqehead[1]);
+		if (ipf_deletetimeoutqueue(is->is_tqehead[1]) == 0)
+			ipf_freetimeoutqueue(softc, is->is_tqehead[1]);
 	}
 
 #ifdef	IPFILTER_SYNC
@@ -3776,9 +3783,9 @@ ipf_state_del(softc, is, why)
 	if (orphan)
 		softs->ipf_state_stats.iss_orphan--;
 
-	if (is->is_rule != NULL) {
-		is->is_rule->fr_statecnt--;
-		(void) ipf_derefrule(softc, &is->is_rule);
+	if (fr != NULL) {
+		fr->fr_statecnt--;
+		(void) ipf_derefrule(softc, &fr);
 	}
 
 	softs->ipf_state_stats.iss_active_proto[is->is_p]--;
@@ -3871,7 +3878,7 @@ ipf_state_expire(softc)
 /*            If that too fails, then work backwards in 30 second intervals */
 /*            for the last 30 minutes to at worst 30 seconds idle.          */
 /* ------------------------------------------------------------------------ */
-static int
+int
 ipf_state_flush(softc, which, proto)
 	ipf_main_softc_t *softc;
 	int which, proto;
@@ -5069,6 +5076,7 @@ ipf_state_setpending(softc, is)
 	if (is->is_me != NULL) {
 		*is->is_me = NULL;
 		is->is_me = NULL;
+		is->is_ref--;
 	}
 }
 

@@ -310,6 +310,7 @@ ipf_auth_soft_fini(softc, arg)
 		for (frp = &softa->ipf_auth_rules; ((fr = *frp) != NULL); ) {
 			if (fr->fr_ref == 1) {
 				*frp = fr->fr_next;
+				MUTEX_DESTROY(&fr->fr_lock);
 				KFREE(fr);
 			} else
 				frp = &fr->fr_next;
@@ -429,6 +430,8 @@ ipf_auth_check(fin, passp)
 					fr->fr_ifas[1] = NULL;
 					fr->fr_ifas[2] = NULL;
 					fr->fr_ifas[3] = NULL;
+					MUTEX_INIT(&fr->fr_lock,
+						   "ipf auth rule");
 				}
 			} else
 				fr = fra->fra_info.fin_fr;
@@ -738,6 +741,7 @@ ipf_auth_expire(softc)
 	for (frp = &softa->ipf_auth_rules; ((fr = *frp) != NULL); ) {
 		if (fr->fr_ref == 1) {
 			*frp = fr->fr_next;
+			MUTEX_DESTROY(&fr->fr_lock);
 			KFREE(fr);
 		} else
 			frp = &fr->fr_next;

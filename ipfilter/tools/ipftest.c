@@ -290,6 +290,8 @@ main(argc,argv)
 				printpacket(dir, &mb);
 		}
 
+		ipf_state_flush(softc, 1, 0);
+
 		if (dir && (ifp != NULL) && IP_V(ip) && (m != NULL))
 #if  defined(__sgi) && (IRIX < 60500)
 			(*ifp->if_output)(ifp, (void *)m, NULL);
@@ -691,7 +693,8 @@ void dumpgroups(softc)
 
 	printf("List of groups configured (set 0)\n");
 	for (i = 0; i < IPL_LOGSIZE; i++)
-		for (fg =  softc->ipf_groups[i][0]; fg != NULL; fg = fg->fg_next) {
+		for (fg =  softc->ipf_groups[i][0]; fg != NULL;
+		     fg = fg->fg_next) {
 			printf("Dev.%d. Group %s Ref %d Flags %#x\n",
 				i, fg->fg_name, fg->fg_ref, fg->fg_flags);
 			dumprules(fg->fg_start);
@@ -699,7 +702,8 @@ void dumpgroups(softc)
 
 	printf("List of groups configured (set 1)\n");
 	for (i = 0; i < IPL_LOGSIZE; i++)
-		for (fg =  softc->ipf_groups[i][1]; fg != NULL; fg = fg->fg_next) {
+		for (fg =  softc->ipf_groups[i][1]; fg != NULL;
+		     fg = fg->fg_next) {
 			printf("Dev.%d. Group %s Ref %d Flags %#x\n",
 				i, fg->fg_name, fg->fg_ref, fg->fg_flags);
 			dumprules(fg->fg_start);

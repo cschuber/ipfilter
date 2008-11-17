@@ -149,6 +149,8 @@ static	u_32_t		ipf_decaps __P((fr_info_t *, u_32_t, int));
 static	frentry_t	*ipf_dolog __P((fr_info_t *, u_32_t *));
 static	int		ipf_flushlist __P((ipf_main_softc_t *, int, minor_t,
 					   int *, frentry_t **));
+static	int		ipf_flush_groups __P((ipf_main_softc_t *,
+					      int, int, int));
 static	ipfunc_t	ipf_findfunc __P((ipfunc_t));
 static	frentry_t	*ipf_firewall __P((fr_info_t *, u_32_t *));
 static	int		ipf_fr_matcharray __P((fr_info_t *, int *));
@@ -3891,7 +3893,7 @@ ipf_group_add(softc, group, head, flags, unit, set)
 
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_group_del                                               */
-/* Returns:     Nil                                                         */
+/* Returns:     int      - number of rules deleted                          */
 /* Parameters:  group(I) - group name to delete                             */
 /*              unit(I)  - device to which this group belongs               */
 /*              set(I)   - which set of rules (inactive/inactive) this is   */
@@ -3900,7 +3902,7 @@ ipf_group_add(softc, group, head, flags, unit, set)
 /* Attempt to delete a group head.                                          */
 /* Only do this when its reference count reaches 0.                         */
 /* ------------------------------------------------------------------------ */
-void
+int
 ipf_group_del(softc, group, unit, set)
 	ipf_main_softc_t *softc;
 	char *group;
@@ -3908,6 +3910,7 @@ ipf_group_del(softc, group, unit, set)
 	int set;
 {
 	frgroup_t *fg, **fgp;
+	int gone = 0;
 
 	fg = ipf_findgroup(softc, group, unit, set, &fgp);
 	if (fg == NULL)
@@ -3915,9 +3918,13 @@ ipf_group_del(softc, group, unit, set)
 
 	fg->fg_ref--;
 	if (fg->fg_ref == 0) {
+
+		(void) ipf_flushlist(softc, set, unit, &gone, &fg->fg_start);
 		*fgp = fg->fg_next;
 		KFREE(fg);
 	}
+
+	return gone;
 }
 
 
@@ -4025,14 +4032,20 @@ ipf_flushlist(softc, set, unit, nfreedp, listp)
 		if (fp->fr_grp != NULL) {
 			ipf_flushlist(softc, set, unit, nfreedp, fp->fr_grp);
 		}
+		if (fp->fr_icmpgrp != NULL) {
+			ipf_flushlist(softc, set, unit, nfreedp,
+				      fp->fr_icmpgrp);
+		}
 
 		if (fp->fr_grhead != NULL) {
-			ipf_group_del(softc, fp->fr_grhead, unit, set);
+			freed += ipf_group_del(softc, fp->fr_grhead,
+					       unit, set);
 			*fp->fr_grhead = '\0';
 		}
 
 		if (fp->fr_icmphead != NULL) {
-			ipf_group_del(softc, fp->fr_icmphead, unit, set);
+			freed += ipf_group_del(softc, fp->fr_icmphead,
+					       unit, set);
 			*fp->fr_icmphead = '\0';
 		}
 
@@ -4081,6 +4094,10 @@ ipf_flush(softc, unit, flags)
 		ipf_flushlist(softc, set, unit, &flushed,
 			      &softc->ipf_acct[0][set]);
 	}
+
+	flushed += ipf_flush_groups(softc, unit, set,
+				    flags & (FR_INQUE|FR_OUTQUE));
+
 	RWLOCK_EXIT(&softc->ipf_mutex);
 
 	if (unit == IPL_LOGIPF) {
@@ -4089,6 +4106,54 @@ ipf_flush(softc, unit, flags)
 		tmp = ipf_flush(softc, IPL_LOGCOUNT, flags);
 		if (tmp >= 0)
 			flushed += tmp;
+	}
+	return flushed;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_flush_groups                                            */
+/* Returns:     int - >= 0 - number of flushed rules                        */
+/* Parameters:  softc(I) - soft context pointerto work with                 */
+/*              unit(I)  - device for which to flush rules                  */
+/*              set(I)   - 1 or 0 (filter set)                              */
+/*              flags(I) - which set of rules to flush                      */
+/*                                                                          */
+/* Walk through all of the groups for the given unit and remove those that  */
+/* match the flags passed in the correct set. Which set (either 1 or 0) is  */
+/* determined from a combination of softc->ipf_active and whether or not    */
+/* we are flushing active/inactive.                                         */
+/* ------------------------------------------------------------------------ */
+static int
+ipf_flush_groups(softc, unit, set, flags)
+	ipf_main_softc_t *softc;
+	int unit, set, flags;
+{
+	frgroup_t *fg, **fgp;
+	frentry_t *fr, **frp;
+	int flushed = 0;
+
+	fgp = &softc->ipf_groups[unit][set];
+	while ((fg = *fgp) != NULL) {
+		frp = &fg->fg_start;
+		while ((fr = *frp) != NULL) {
+			if ((fr->fr_flags & flags) == 0) {
+				frp = &fr->fr_next;
+				continue;
+			}
+			*frp = fr->fr_next;
+			(void) ipf_derefrule(softc, &fr);
+			flushed++;
+		}
+
+		if (fg->fg_head != NULL) {
+			if (fg->fg_head->fr_grp == &fg->fg_start)
+				fg->fg_head->fr_grp = NULL;
+			if (fg->fg_head->fr_icmpgrp == &fg->fg_start)
+				fg->fg_head->fr_icmpgrp = NULL;
+		}
+		*fgp = fg->fg_next;
+		KFREE(fg);
 	}
 	return flushed;
 }
@@ -5103,7 +5168,8 @@ frrequest(softc, unit, req, data, set, makecopy)
 			ipf_fixskip(ftail, f, -1);
 			*ftail = f->fr_next;
 			f->fr_next = NULL;
-			ipf_checkrulefunc(softc, (void *)f->fr_func, addrem, set);
+			ipf_checkrulefunc(softc, (void *)f->fr_func,
+					  addrem, set);
 			(void) ipf_derefrule(softc, &f);
 		}
 	} else {
@@ -5408,6 +5474,7 @@ ipf_grpmapinit(softc, fr)
 		softc->ipf_interror = 39;
 		return ESRCH;
 	}
+	iph->iph_ref++;
 	fr->fr_ptr = iph;
 	return 0;
 }
@@ -5536,6 +5603,7 @@ ipf_addtimeoutqueue(softc, parent, seconds)
 		ifq->ifq_next = *parent;
 		ifq->ifq_pnext = parent;
 		ifq->ifq_flags = IFQF_USER;
+		ifq->ifq_ref++;
 		*parent = ifq;
 		softc->ipf_userifqs++;
 	}
@@ -5583,7 +5651,7 @@ ipf_deletetimeoutqueue(ifq)
 /* held (exclusively) in the domain that encompases the callers "domain".   */
 /* The ifq_lock for this structure should not be held.                      */
 /*                                                                          */
-/* Remove a user definde timeout queue from the list of queues it is in and */
+/* Remove a user defined timeout queue from the list of queues it is in and */
 /* tidy up after this is done.                                              */
 /* ------------------------------------------------------------------------ */
 void
@@ -5591,7 +5659,6 @@ ipf_freetimeoutqueue(softc, ifq)
 	ipf_main_softc_t *softc;
 	ipftq_t *ifq;
 {
-
 
 	if (((ifq->ifq_flags & IFQF_DELETE) == 0) || (ifq->ifq_ref != 0) ||
 	    ((ifq->ifq_flags & IFQF_USER) == 0)) {
@@ -5607,6 +5674,8 @@ ipf_freetimeoutqueue(softc, ifq)
 	*ifq->ifq_pnext = ifq->ifq_next;
 	if (ifq->ifq_next != NULL)
 		ifq->ifq_next->ifq_pnext = ifq->ifq_pnext;
+	ifq->ifq_next = NULL;
+	ifq->ifq_pnext = NULL;
 
 	MUTEX_DESTROY(&ifq->ifq_lock);
 	ATOMIC_DEC(softc->ipf_userifqs);
@@ -5646,6 +5715,7 @@ ipf_deletequeueentry(tqe)
 	}
 
 	(void) ipf_deletetimeoutqueue(ifq);
+	ASSERT(ifq->ifq_ref > 0);
 
 	MUTEX_EXIT(&ifq->ifq_lock);
 }
@@ -6771,8 +6841,8 @@ ipf_tune_add_array(softc, newtune)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_tune_array_link                                         */
 /* Returns:     0 == success, -1 == failure                                 */
-/* Parameters: softc(I) - soft context pointerto work with                  */
-/*             array(I) - pointer to an array of tuneables                  */
+/* Parameters:  softc(I) - soft context pointerto work with                 */
+/*              array(I) - pointer to an array of tuneables                 */
 /*                                                                          */
 /* Given an array of tunables (array), append them to the current list of   */
 /* tuneables for this context (softc->ipf_tuners.) To properly prepare the  */
@@ -6813,8 +6883,8 @@ ipf_tune_array_link(softc, array)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_tune_array_unlink                                       */
 /* Returns:     0 == success, -1 == failure                                 */
-/* Parameters: softc(I) - soft context pointerto work with                  */
-/*             array(I) - pointer to an array of tuneables                  */
+/* Parameters:  softc(I) - soft context pointerto work with                 */
+/*              array(I) - pointer to an array of tuneables                 */
 /*                                                                          */
 /* ------------------------------------------------------------------------ */
 int

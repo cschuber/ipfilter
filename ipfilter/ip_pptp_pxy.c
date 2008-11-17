@@ -204,7 +204,7 @@ ipf_p_pptp_donatstate(fin, nat, pptp)
 
 		MUTEX_ENTER(&softn->ipf_nat_new);
 		nat2 = ipf_nat_add(&fi, &pptp->pptp_rule, &pptp->pptp_nat,
-			       NAT_SLAVE, nat->nat_dir);
+				   NAT_SLAVE, nat->nat_dir);
 		MUTEX_EXIT(&softn->ipf_nat_new);
 		pptp->pptp_nat = nat2;
 		if (nat2 != NULL) {
@@ -228,8 +228,7 @@ ipf_p_pptp_donatstate(fin, nat, pptp)
 				fi.fin_fi.fi_saddr = nat2->nat_osrcaddr;
 		}
 		fi.fin_ifp = NULL;
-		(void) ipf_state_add(softc, &fi,
-				     (void **)&pptp->pptp_state, 0);
+		(void) ipf_state_add(softc, &fi, &pptp->pptp_state, 0);
 	}
 	ip->ip_p = p;
 	return;
@@ -531,13 +530,12 @@ ipf_p_pptp_del(softc, aps)
 
 		READ_ENTER(&softc->ipf_state);
 		if (pptp->pptp_state != NULL) {
-			pptp->pptp_state->is_die = softc->ipf_ticks + 1;
-			pptp->pptp_state->is_me = NULL;
-			ipf_queuefront(&pptp->pptp_state->is_sti);
+			ipf_state_setpending(softc, pptp->pptp_state);
 		}
 		RWLOCK_EXIT(&softc->ipf_state);
 
-		pptp->pptp_state = NULL;
-		pptp->pptp_nat = NULL;
+		if (pptp->pptp_nat != NULL)
+			ipf_nat_setpending(softc, pptp->pptp_nat);
+		MUTEX_DESTROY(&pptp->pptp_rule.in_lock);
 	}
 }

@@ -93,6 +93,7 @@ int ipf_p_ftp_eprt4 __P((ipf_ftp_softc_t *, fr_info_t *, ip_t *, nat_t *,
 			 ftpinfo_t *, int));
 int ipf_p_ftp_addport __P((ipf_ftp_softc_t *, fr_info_t *, ip_t *, nat_t *,
 			   ftpinfo_t *, int, int, int));
+void ipf_p_ftp_setpending __P((ipf_main_softc_t *, ftpinfo_t *));
 
 /*
  * Debug levels:
@@ -236,6 +237,20 @@ ipf_p_ftp_new(arg, fin, aps, nat)
 
 
 void
+ipf_p_ftp_setpending(ipf_main_softc_t *softc, ftpinfo_t *ftp)
+{
+	if (ftp->ftp_pendnat != NULL)
+		ipf_nat_setpending(softc, ftp->ftp_pendnat);
+
+	if (ftp->ftp_pendstate != NULL) {
+		READ_ENTER(&softc->ipf_state);
+		ipf_state_setpending(softc, ftp->ftp_pendstate);
+		RWLOCK_EXIT(&softc->ipf_state);
+	}
+}
+
+
+void
 ipf_p_ftp_del(softc, aps)
 	ipf_main_softc_t *softc;
 	ap_session_t *aps;
@@ -243,14 +258,8 @@ ipf_p_ftp_del(softc, aps)
 	ftpinfo_t *ftp;
 
 	ftp = aps->aps_data;
-	if (ftp != NULL) {
-		if (ftp->ftp_pendnat != NULL)
-			ipf_nat_setpending(softc, ftp->ftp_pendnat);
-		READ_ENTER(&softc->ipf_state);
-		if (ftp->ftp_pendstate != NULL)
-			ipf_state_setpending(softc, ftp->ftp_pendstate);
-		RWLOCK_EXIT(&softc->ipf_state);
-	}
+	if (ftp != NULL)
+		ipf_p_ftp_setpending(softc, ftp);
 }
 
 
@@ -437,14 +446,11 @@ ipf_p_ftp_addport(softf, fin, ip, nat, ftp, dlen, nport, inc)
 	u_short sp;
 	int flags;
 
-	if ((ftp->ftp_pendnat != NULL) || (ftp->ftp_pendstate != NULL)) {
-		printf("ipf_p_ftp_addport:connection outstanding %lx/%lx\n",
-		       (u_long)ftp->ftp_pendnat, (u_long)ftp->ftp_pendstate);
-		return -1;
-	}
-
 	softc = fin->fin_main_soft;
 	softn = softc->ipf_nat_soft;
+
+	if ((ftp->ftp_pendnat != NULL)  || (ftp->ftp_pendstate != NULL))
+		ipf_p_ftp_setpending(softc, ftp);
 
 	/*
 	 * Add skeleton NAT entry for connection which will come back the
@@ -519,7 +525,7 @@ ipf_p_ftp_addport(softf, fin, ip, nat, ftp, dlen, nport, inc)
 			MUTEX_EXIT(&nat2->nat_lock);
 			fi.fin_ifp = NULL;
 			if (ipf_state_add(softc, &fi,
-					  (void **)&ftp->ftp_pendstate,
+					  (ipstate_t **)&ftp->ftp_pendstate,
 					  SI_W_DPORT) != 0) {
 				ipf_nat_setpending(softc, nat2);
 			}
@@ -778,14 +784,11 @@ ipf_p_ftp_pasvreply(softf, fin, ip, nat, ftp, port, newmsg, s, data_ip)
 	nat_t *nat2;
 	mb_t *m;
 
-	if (ftp->ftp_pendnat != NULL || ftp->ftp_pendstate != NULL) {
-		printf("ipf_p_ftp_pasvreply:connection outstanding %lx/%lx\n",
-		       (u_long)ftp->ftp_pendnat, (u_long)ftp->ftp_pendstate);
-		return -1;
-	}
-
 	softc = fin->fin_main_soft;
 	softn = softc->ipf_nat_soft;
+
+	if ((ftp->ftp_pendnat != NULL) || (ftp->ftp_pendstate != NULL))
+		ipf_p_ftp_setpending(softc, ftp);
 
 	m = fin->fin_m;
 	tcp = (tcphdr_t *)fin->fin_dp;
@@ -904,7 +907,7 @@ ipf_p_ftp_pasvreply(softf, fin, ip, nat, ftp, port, newmsg, s, data_ip)
 				ip->ip_dst = nat->nat_ndstip;
 			}
 			if (ipf_state_add(softc, &fi,
-					  (void **)&ftp->ftp_pendstate,
+					  (ipstate_t **)&ftp->ftp_pendstate,
 					  sflags) != 0) {
 				ipf_nat_setpending(softc, nat2);
 			}

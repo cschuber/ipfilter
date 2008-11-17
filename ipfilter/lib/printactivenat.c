@@ -24,6 +24,8 @@ void printactivenat(nat, opts, alive, now)
 
 	if (nat->nat_flags & SI_CLONE)
 		printf(" CLONE");
+	if (nat->nat_phnext[0] == NULL && nat->nat_phnext[1] == NULL)
+		printf(" ORPHAN");
 
 	putchar(' ');
 	if (nat->nat_redir & NAT_REWRITE) {

@@ -78,14 +78,14 @@ ipstate_t *printstate(sp, opts, now)
 #endif
 		}
 	} else if (sp->is_p == IPPROTO_GRE) {
-		PRINTF(" call %hx/%hx\n", ntohs(sp->is_gre.gs_call[0]),
+		PRINTF("\tcall %hx/%hx\n", ntohs(sp->is_gre.gs_call[0]),
 		       ntohs(sp->is_gre.gs_call[1]));
 	} else if (sp->is_p == IPPROTO_ICMP
 #ifdef	USE_INET6
 		 || sp->is_p == IPPROTO_ICMPV6
 #endif
 		)
-		PRINTF(" id %hu seq %hu type %d\n", sp->is_icmp.ici_id,
+		PRINTF("\tid %hu seq %hu type %d\n", sp->is_icmp.ici_id,
 			sp->is_icmp.ici_seq, sp->is_icmp.ici_type);
 
 #ifdef        USE_QUAD_T

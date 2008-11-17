@@ -644,7 +644,8 @@ ipf_sync_read(softc, uio)
 #  endif /* _KERNEL */
 	}
 
-	while ((softs->sl_tail < softs->sl_idx)  && (uio->uio_resid > sizeof(*sl))) {
+	while ((softs->sl_tail < softs->sl_idx) &&
+	       (uio->uio_resid > sizeof(*sl))) {
 		sl = softs->synclog + softs->sl_tail++;
 		MUTEX_EXIT(&softs->ipsl_mutex);
 		err = UIOMOVE(sl, sizeof(*sl), UIO_READ, uio);
@@ -653,7 +654,8 @@ ipf_sync_read(softc, uio)
 		MUTEX_ENTER(&softs->ipsl_mutex);
 	}
 
-	while ((softs->su_tail < softs->su_idx)  && (uio->uio_resid > sizeof(*su))) {
+	while ((softs->su_tail < softs->su_idx) &&
+	       (uio->uio_resid > sizeof(*su))) {
 		su = softs->syncupd + softs->su_tail;
 		softs->su_tail++;
 		MUTEX_EXIT(&softs->ipsl_mutex);
@@ -780,7 +782,8 @@ ipf_sync_state(softc, sp, data)
 				su.stu_state[1]);
 
 		READ_ENTER(&softs->ipf_syncstate);
-		for (sl = softs->syncstatetab[hv]; (sl != NULL); sl = sl->sl_next)
+		for (sl = softs->syncstatetab[hv]; (sl != NULL);
+		     sl = sl->sl_next)
 			if (sl->sl_hdr.sm_num == sp->sm_num)
 				break;
 		if (sl == NULL) {
@@ -980,7 +983,8 @@ ipf_sync_nat(softc, sp, data)
 	case SMC_UPDATE :
 		bcopy(data, &su, sizeof(su));
 
-		for (sl = softs->syncnattab[hv]; (sl != NULL); sl = sl->sl_next)
+		for (sl = softs->syncnattab[hv]; (sl != NULL);
+		     sl = sl->sl_next)
 			if (sl->sl_hdr.sm_num == sp->sm_num)
 				break;
 		if (sl == NULL) {
@@ -1072,7 +1076,8 @@ ipf_sync_new(softc, tab, fin, ptr)
 			if (ss == NULL)
 				break;
 			softs->ipf_sync_num++;
-			hv = softs->ipf_sync_num & (softs->ipf_sync_state_tab_sz - 1);
+			hv = softs->ipf_sync_num &
+			     (softs->ipf_sync_state_tab_sz - 1);
 		}
 		sl->sl_pnext = softs->syncstatetab + hv;
 		sl->sl_next = softs->syncstatetab[hv];
@@ -1088,7 +1093,8 @@ ipf_sync_new(softc, tab, fin, ptr)
 			if (ss == NULL)
 				break;
 			softs->ipf_sync_num++;
-			hv = softs->ipf_sync_num & (softs->ipf_sync_nat_tab_sz - 1);
+			hv = softs->ipf_sync_num &
+			     (softs->ipf_sync_nat_tab_sz - 1);
 		}
 		sl->sl_pnext = softs->syncnattab + hv;
 		sl->sl_next = softs->syncnattab[hv];
@@ -1306,7 +1312,8 @@ ipf_sync_ioctl(softc, data, cmd, mode, uid, ctx)
 		case SMC_RLOG :
 			SPL_NET(s);
 			MUTEX_ENTER(&softs->ipsl_mutex);
-			i = (softs->sl_tail - softs->sl_idx) + (softs->su_tail - softs->su_idx);
+			i = (softs->sl_tail - softs->sl_idx) +
+			    (softs->su_tail - softs->su_idx);
 			softs->sl_idx = 0;
 			softs->su_idx = 0;
 			softs->sl_tail = 0;
@@ -1318,7 +1325,8 @@ ipf_sync_ioctl(softc, data, cmd, mode, uid, ctx)
 		case SMC_NAT :
 			SPL_NET(s);
 			WRITE_ENTER(&softs->ipf_syncnat);
-			i = ipf_sync_flush_table(softs, SYNC_NATTABSZ, softs->syncnattab);
+			i = ipf_sync_flush_table(softs, SYNC_NATTABSZ,
+						 softs->syncnattab);
 			RWLOCK_EXIT(&softs->ipf_syncnat);
 			SPL_X(s);
 			break;
@@ -1326,7 +1334,8 @@ ipf_sync_ioctl(softc, data, cmd, mode, uid, ctx)
 		case SMC_STATE :
 			SPL_NET(s);
 			WRITE_ENTER(&softs->ipf_syncstate);
-			i = ipf_sync_flush_table(softs, SYNC_STATETABSZ, softs->syncstatetab);
+			i = ipf_sync_flush_table(softs, SYNC_STATETABSZ,
+						 softs->syncstatetab);
 			RWLOCK_EXIT(&softs->ipf_syncstate);
 			SPL_X(s);
 			break;
@@ -1362,7 +1371,8 @@ ipf_sync_canread(arg)
 	void *arg;
 {
 	ipf_sync_softc_t *softs = arg;
-	return !((softs->sl_tail == softs->sl_idx) && (softs->su_tail == softs->su_idx));
+	return !((softs->sl_tail == softs->sl_idx) &&
+		 (softs->su_tail == softs->su_idx));
 }
 
 
@@ -1408,10 +1418,13 @@ ipf_sync_wakeup(softc)
 	ipf_sync_softc_t *softs = softc->ipf_sync_soft;
 
 	softs->ipf_sync_events++;
-	if ((softc->ipf_ticks > softs->ipf_sync_lastwakeup + softs->ipf_sync_wake_interval) ||
+	if ((softc->ipf_ticks >
+	    softs->ipf_sync_lastwakeup + softs->ipf_sync_wake_interval) ||
 	    (softs->ipf_sync_events > softs->ipf_sync_event_high_wm) ||
-	    ((softs->sl_tail - softs->sl_idx) > softs->ipf_sync_queue_high_wm) ||
-	    ((softs->su_tail - softs->su_idx) > softs->ipf_sync_queue_high_wm)) {
+	    ((softs->sl_tail - softs->sl_idx) >
+	     softs->ipf_sync_queue_high_wm) ||
+	    ((softs->su_tail - softs->su_idx) >
+	     softs->ipf_sync_queue_high_wm)) {
 
 		ipf_sync_poll_wakeup(softc);
 	}
@@ -1463,7 +1476,8 @@ ipf_sync_expire(softc)
 	ipf_sync_softc_t *softs = softc->ipf_sync_soft;
 
 	if ((softs->ipf_sync_events > 0) &&
-	    (softc->ipf_ticks > softs->ipf_sync_lastwakeup + softs->ipf_sync_wake_interval)) {
+	    (softc->ipf_ticks >
+	     softs->ipf_sync_lastwakeup + softs->ipf_sync_wake_interval)) {
 		ipf_sync_poll_wakeup(softc);
 	}
 }

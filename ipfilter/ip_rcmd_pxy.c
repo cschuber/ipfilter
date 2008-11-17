@@ -16,6 +16,7 @@ void ipf_p_rcmd_main_unload __P((void));
 
 int ipf_p_rcmd_init __P((void));
 void ipf_p_rcmd_fini __P((void));
+void ipf_p_rcmd_del __P((ipf_main_softc_t *, ap_session_t *));
 int ipf_p_rcmd_new __P((void *, fr_info_t *, ap_session_t *, nat_t *));
 int ipf_p_rcmd_out __P((void *, fr_info_t *, ap_session_t *, nat_t *));
 int ipf_p_rcmd_in __P((void *, fr_info_t *, ap_session_t *, nat_t *));
@@ -125,6 +126,20 @@ ipf_p_rcmd_new(arg, fin, aps, nat)
 }
 
 
+void
+ipf_p_rcmd_del(softc, aps)
+	ipf_main_softc_t *softc;
+	ap_session_t *aps;
+{
+	rcmdinfo_t *rci;
+
+	rci = aps->aps_data;
+	if (rci != NULL) {
+		MUTEX_DESTROY(&rci->rcmd_rule.in_lock);
+	}
+}
+
+
 /*
  * ipf_rcmd_atoi - implement a simple version of atoi
  */
@@ -161,17 +176,6 @@ ipf_p_rcmd_portmsg(fin, aps, nat)
 	mb_t *m;
 
 	tcp = (tcphdr_t *)fin->fin_dp;
-	softc = fin->fin_main_soft;
-
-	if (tcp->th_flags & TH_SYN) {
-		*(u_32_t *)aps->aps_data = htonl(ntohl(tcp->th_seq) + 1);
-		return 0;
-	}
-
-	rc = (rcmdinfo_t *)aps->aps_data;
-	if ((rc->rcmd_portseq != 0) &&
-	    (tcp->th_seq != rc->rcmd_portseq))
-		return 0;
 
 	m = fin->fin_m;
 	ip = fin->fin_ip;
@@ -183,6 +187,11 @@ ipf_p_rcmd_portmsg(fin, aps, nat)
 	dlen = MSGDSIZE(m) - off;
 #endif
 	if (dlen <= 0)
+		return 0;
+
+	rc = (rcmdinfo_t *)aps->aps_data;
+	if ((rc->rcmd_portseq != 0) &&
+	    (tcp->th_seq != rc->rcmd_portseq))
 		return 0;
 
 	bzero(portbuf, sizeof(portbuf));
@@ -234,6 +243,7 @@ ipf_p_rcmd_portmsg(fin, aps, nat)
 					nat->nat_osrcip, nat->nat_odstip);
 	}
 
+	softc = fin->fin_main_soft;
 	if (nat2 == NULL) {
 #ifdef USE_MUTEXES
 		ipf_nat_softc_t *softn = softc->ipf_nat_soft;

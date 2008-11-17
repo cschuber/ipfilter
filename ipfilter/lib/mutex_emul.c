@@ -10,11 +10,16 @@
 
 #define	EMM_MAGIC	0x9d7adba3
 
+static int mutex_debug = 0;
+
 void eMmutex_enter(mtx, file, line)
 	eMmutex_t *mtx;
 	char *file;
 	int line;
 {
+	if (mutex_debug)
+		fprintf(stderr, "%s:%d:eMmutex_enter(%s)\n", file, line,
+		       mtx->eMm_owner);
 	if (mtx->eMm_magic != EMM_MAGIC) {
 		fprintf(stderr, "%s:eMmutex_enter(%p): bad magic: %#x\n",
 			mtx->eMm_owner, mtx, mtx->eMm_magic);
@@ -31,9 +36,14 @@ void eMmutex_enter(mtx, file, line)
 }
 
 
-void eMmutex_exit(mtx)
+void eMmutex_exit(mtx, file, line)
 	eMmutex_t *mtx;
+	char *file;
+	int line;
 {
+	if (mutex_debug)
+		fprintf(stderr, "%s:%d:eMmutex_exit(%s)\n", file, line,
+		       mtx->eMm_owner);
 	if (mtx->eMm_magic != EMM_MAGIC) {
 		fprintf(stderr, "%s:eMmutex_exit(%p): bad magic: %#x\n",
 			mtx->eMm_owner, mtx, mtx->eMm_magic);
@@ -53,10 +63,15 @@ void eMmutex_exit(mtx)
 static int initcount = 0;
 
 
-void eMmutex_init(mtx, who)
+void eMmutex_init(mtx, who, file, line)
 	eMmutex_t *mtx;
 	char *who;
+	char *file;
+	int line;
 {
+	if (mutex_debug)
+		fprintf(stderr, "%s:%d:eMmutex_init(%p,%s)\n",
+			file, line, mtx, who);
 	if (mtx->eMm_magic == EMM_MAGIC) {	/* safe bet ? */
 		fprintf(stderr,
 			"%s:eMmutex_init(%p): already initialised?: %#x\n",
@@ -73,9 +88,14 @@ void eMmutex_init(mtx, who)
 }
 
 
-void eMmutex_destroy(mtx)
+void eMmutex_destroy(mtx, file, line)
 	eMmutex_t *mtx;
+	char *file;
+	int line;
 {
+	if (mutex_debug)
+		fprintf(stderr, "%s:%d:eMmutex_destroy(%p,%s)\n", file, line,
+		       mtx, mtx->eMm_owner);
 	if (mtx->eMm_magic != EMM_MAGIC) {
 		fprintf(stderr, "%s:eMmutex_destroy(%p): bad magic: %#x\n",
 			mtx->eMm_owner, mtx, mtx->eMm_magic);

@@ -539,8 +539,7 @@ ipf_nat_soft_fini(softc, arg)
 	 */
 	for (ifq = softn->ipf_nat_utqe; ifq != NULL; ifq = ifqnext) {
 		ifqnext = ifq->ifq_next;
-		if (((ifq->ifq_flags & IFQF_PROXY) == 0) &&
-		    (ipf_deletetimeoutqueue(ifq) == 0))
+		if (ipf_deletetimeoutqueue(ifq) == 0)
 			ipf_freetimeoutqueue(softc, ifq);
 	}
 
@@ -1744,6 +1743,8 @@ ipf_nat_free_rule(softn, n)
 	}
 	ATOMIC_DEC32(softn->ipf_nat_stats.ns_rules);
 
+	MUTEX_DESTROY(&n->in_lock);
+
 	KFREE(n);
 
 #if SOLARIS && !defined(INSTANCES)
@@ -2405,6 +2406,7 @@ ipf_nat_delete(softc, nat, logtype)
 	if (nat->nat_me != NULL) {
 		*nat->nat_me = NULL;
 		nat->nat_me = NULL;
+		nat->nat_ref--;
 	}
 
 	if (nat->nat_tqe.tqe_ifq != NULL) {
@@ -3221,6 +3223,8 @@ ipf_nat_add(fin, np, natsave, flags, direction)
 
 	nat->nat_mssclamp = np->in_mssclamp;
 	nat->nat_me = natsave;
+	if (natsave != NULL)
+		*natsave = nat;
 	nat->nat_fr = fin->fin_fr;
 	nat->nat_rev = fin->fin_rev;
 	nat->nat_ptr = np;
@@ -3465,7 +3469,7 @@ ipf_nat_insert(softc, softn, nat)
 
 	MUTEX_INIT(&nat->nat_lock, "nat entry lock");
 
-	nat->nat_ref = 1;
+	nat->nat_ref = nat->nat_me ? 2 : 1;
 
 	nat->nat_ifnames[0][LIFNAMSIZ - 1] = '\0';
 	nat->nat_ifps[0] = ipf_resolvenic(softc, nat->nat_ifnames[0], 4);
@@ -3520,7 +3524,7 @@ ipf_nat_insert(softc, softn, nat)
 		NBUMPSIDE(0, ns_inuse);
 	}
 	*natp = nat;
-	NBUMPSIDE(0, ns_bucketlen[hv1]);
+	NBUMPSIDE(0, ns_bucketlen[hv0]);
 
 	/*
 	 * Outbound hash table.
@@ -7229,6 +7233,7 @@ ipf_nat_setpending(softc, nat)
 	if (nat->nat_me != NULL) {
 		*nat->nat_me = NULL;
 		nat->nat_me = NULL;
+		nat->nat_ref--;
 	}
 }
 

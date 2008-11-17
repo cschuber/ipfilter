@@ -272,6 +272,7 @@ ipf_htable_create(softc, arg, op)
 				return EEXIST;
 			}
 			iph->iph_flags &= ~IPHASH_DELETE;
+			iph->iph_ref++;
 			return 0;
 		}
 	}
@@ -464,6 +465,8 @@ ipf_htable_free(arg, iph)
 /*              arg(I)   - pointer to local context to use                  */
 /*              iph(I)   - pointer to hash table to destroy                 */
 /*                                                                          */
+/* It is necessary to unlink here as well as free (called by deref) so that */
+/* the while loop in ipf_htable_flush() functions properly.                 */
 /* ------------------------------------------------------------------------ */
 static int
 ipf_htable_remove(softc, arg, iph)
@@ -474,6 +477,16 @@ ipf_htable_remove(softc, arg, iph)
 
 	if (ipf_htable_clear(softc, arg, iph) != 0)
 		return 1;
+
+	if (iph->iph_pnext != NULL) {
+		*iph->iph_pnext = iph->iph_next;
+		iph->iph_pnext = NULL;
+	}
+
+	if (iph->iph_next != NULL) {
+		iph->iph_next->iph_pnext = iph->iph_pnext;
+		iph->iph_next = NULL;
+	}
 
 	return ipf_htable_deref(softc, arg, iph);
 }
@@ -564,15 +577,23 @@ ipf_htent_remove(softc, arg, iph, ipe)
 	iphtent_t *ipe;
 {
 
-	if (ipe->ipe_phnext != NULL)
+	if (ipe->ipe_phnext != NULL) {
 		*ipe->ipe_phnext = ipe->ipe_hnext;
-	if (ipe->ipe_hnext != NULL)
+		iph->iph_phnext = NULL;
+	}
+	if (ipe->ipe_hnext != NULL) {
 		ipe->ipe_hnext->ipe_phnext = ipe->ipe_phnext;
+		iph->iph_hnext = NULL;
+	}
 
-	if (ipe->ipe_pnext != NULL)
+	if (ipe->ipe_pnext != NULL) {
 		*ipe->ipe_pnext = ipe->ipe_next;
-	if (ipe->ipe_next != NULL)
+		iph->iph_pnext = NULL;
+	}
+	if (ipe->ipe_next != NULL) {
 		ipe->ipe_next->ipe_pnext = ipe->ipe_pnext;
+		iph->iph_next = NULL;
+	}
 
 	switch (iph->iph_type & ~IPHASH_ANON)
 	{
