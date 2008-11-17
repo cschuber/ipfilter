@@ -532,28 +532,6 @@ ipf_log_items(softc, unit, fin, items, itemsz, types, cnt)
 	SPL_INT(s);
 
 	/*
-	 * Check to see if this log record has a CRC which matches the last
-	 * record logged.  If it does, just up the count on the previous one
-	 * rather than create a new one.
-	 */
-	if (softl->ipl_suppress) {
-		MUTEX_ENTER(&softl->ipl_mutex[unit]);
-		if ((fin != NULL) && (fin->fin_off == 0)) {
-			if ((softl->ipll[unit] != NULL) &&
-			    bcmp((char *)fin, (char *)&softl->ipl_crc[unit],
-				 FI_LCSIZE) == 0) {
-				softl->ipll[unit]->ipl_count++;
-				MUTEX_EXIT(&softl->ipl_mutex[unit]);
-				return 0;
-			}
-			bcopy((char *)fin, (char *)&softl->ipl_crc[unit],
-			      FI_LCSIZE);
-		} else
-			bzero((char *)&softl->ipl_crc[unit], FI_CSIZE);
-		MUTEX_EXIT(&softl->ipl_mutex[unit]);
-	}
-
-	/*
 	 * Get the total amount of data to be logged.
 	 */
 	for (i = 0, len = sizeof(iplog_t); i < cnt; i++)
@@ -561,27 +539,16 @@ ipf_log_items(softc, unit, fin, items, itemsz, types, cnt)
 
 	/*
 	 * check that we have space to record this information and can
-	 * allocate that much.
+	 * allocate that much. While ipl_used is being accessed without
+	 * the lock, this makes it possible for the size to be exceeded
+	 * by a small amount (a log record or two.)
 	 */
+	if ((softl->ipl_used[unit] + len) > softl->ipl_logsize)
+		return -1;
+
 	KMALLOCS(buf, caddr_t, len);
 	if (buf == NULL)
 		return -1;
-	SPL_NET(s);
-	MUTEX_ENTER(&softl->ipl_mutex[unit]);
-	if ((softl->ipl_used[unit] + len) > softl->ipl_logsize) {
-		MUTEX_EXIT(&softl->ipl_mutex[unit]);
-		SPL_X(s);
-		KFREES(buf, len);
-		return -1;
-	}
-	softl->ipl_used[unit] += len;
-	MUTEX_EXIT(&softl->ipl_mutex[unit]);
-	SPL_X(s);
-
-	/*
-	 * advance the log pointer to the next empty record and deduct the
-	 * amount of space we're going to use.
-	 */
 	ipl = (iplog_t *)buf;
 	ipl->ipl_magic = softl->ipl_magic[unit];
 	ipl->ipl_count = 1;
@@ -608,11 +575,37 @@ ipf_log_items(softc, unit, fin, items, itemsz, types, cnt)
 		}
 		ptr += itemsz[i];
 	}
+
 	SPL_NET(s);
 	MUTEX_ENTER(&softl->ipl_mutex[unit]);
+	/*
+	 * Check to see if this log record has a CRC which matches the last
+	 * record logged.  If it does, just up the count on the previous one
+	 * rather than create a new one.
+	 */
+	if (softl->ipl_suppress) {
+		if ((fin != NULL) && (fin->fin_off == 0)) {
+			if ((softl->ipll[unit] != NULL) &&
+			    bcmp((char *)fin, (char *)&softl->ipl_crc[unit],
+				 FI_LCSIZE) == 0) {
+				softl->ipll[unit]->ipl_count++;
+				MUTEX_EXIT(&softl->ipl_mutex[unit]);
+				return 0;
+			}
+			bcopy((char *)fin, (char *)&softl->ipl_crc[unit],
+			      FI_LCSIZE);
+		} else
+			bzero((char *)&softl->ipl_crc[unit], FI_CSIZE);
+	}
+
+	/*
+	 * advance the log pointer to the next empty record and deduct the
+	 * amount of space we're going to use.
+	 */
 	softl->ipll[unit] = ipl;
 	*softl->iplh[unit] = ipl;
 	softl->iplh[unit] = &ipl->ipl_next;
+	softl->ipl_used[unit] += len;
 
 	/*
 	 * Now that the log record has been completed and added to the queue,
