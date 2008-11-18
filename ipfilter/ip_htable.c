@@ -579,11 +579,11 @@ ipf_htent_remove(softc, arg, iph, ipe)
 
 	if (ipe->ipe_phnext != NULL) {
 		*ipe->ipe_phnext = ipe->ipe_hnext;
-		iph->iph_phnext = NULL;
+		ipe->ipe_phnext = NULL;
 	}
 	if (ipe->ipe_hnext != NULL) {
 		ipe->ipe_hnext->ipe_phnext = ipe->ipe_phnext;
-		iph->iph_hnext = NULL;
+		ipe->ipe_hnext = NULL;
 	}
 
 	if (ipe->ipe_pnext != NULL) {

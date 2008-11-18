@@ -1762,7 +1762,7 @@ extern int	ipf_pr_pullup __P((fr_info_t *, int));
 extern	int	ipf_flush __P((ipf_main_softc_t *, minor_t, int));
 extern	frgroup_t *ipf_group_add __P((ipf_main_softc_t *, char *, void *,
 				      u_32_t, minor_t, int));
-extern	void	ipf_group_del __P((ipf_main_softc_t *, char *, minor_t, int));
+extern	int	ipf_group_del __P((ipf_main_softc_t *, char *, minor_t, int));
 extern	int	ipf_derefrule __P((ipf_main_softc_t *, frentry_t **));
 extern	frgroup_t *ipf_findgroup __P((ipf_main_softc_t *, char *, minor_t,
 				      int, frgroup_t ***));
