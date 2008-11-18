@@ -3914,7 +3914,7 @@ ipf_group_del(softc, group, unit, set)
 
 	fg = ipf_findgroup(softc, group, unit, set, &fgp);
 	if (fg == NULL)
-		return;
+		return 0;
 
 	fg->fg_ref--;
 	if (fg->fg_ref == 0) {
