@@ -951,7 +951,7 @@ typedef	struct	ipflog	{
 	u_char		fl_hlen;	/* length of IP headers saved */
 	u_char		fl_dir;
 	u_char		fl_breason;	/* from fin_reason */
-	u_char		fl_xxx[1];	/* pad */
+	u_char		fl_family;	/* address family of packet logged */
 	char		fl_ifname[LIFNAMSIZ];
 } ipflog_t;
 
@@ -1300,6 +1300,26 @@ typedef	union	ipftuneval	{
 
 struct ipftuneable;
 typedef	int (* ipftunefunc_t) __P((struct ipf_main_softc_s *, struct ipftuneable *, ipftuneval_t *));
+
+typedef	union	ipftuneval	{
+	u_long		ipftu_long;
+	u_int		ipftu_int;
+	u_short		ipftu_short;
+	u_char		ipftu_char;
+} ipftuneval_t;
+
+struct ipftuneable;
+typedef	int (* ipftunefunc_t) __P((struct ipftuneable *, ipftuneval_t *));
+
+typedef	union	ipftuneval	{
+	u_long		ipftu_long;
+	u_int		ipftu_int;
+	u_short		ipftu_short;
+	u_char		ipftu_char;
+} ipftuneval_t;
+
+struct ipftuneable;
+typedef	int (* ipftunefunc_t) __P((struct ipftuneable *, ipftuneval_t *));
 
 typedef	struct	ipftuneable	{
 	ipftunevalptr_t	ipft_una;
@@ -1748,6 +1768,8 @@ extern	int	ipf_ifpfillv6addr __P((int, struct sockaddr_in6 *,
 #endif
 
 extern	int	ipf_tune_add __P((ipf_main_softc_t *, ipftuneable_t *));
+
+
 extern	int	ipf_tune_add_array __P((ipf_main_softc_t *, ipftuneable_t *));
 extern	int	ipf_tune_del __P((ipf_main_softc_t *, ipftuneable_t *));
 extern	int	ipf_tune_del_array __P((ipf_main_softc_t *, ipftuneable_t *));

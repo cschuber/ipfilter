@@ -476,6 +476,7 @@ ipf_log_pkt(fin, flags)
 	ipfl.fl_breason = (fin->fin_reason & 0xff);
 	ipfl.fl_dir = fin->fin_out;
 	ipfl.fl_lflags = fin->fin_flx;
+	ipfl.fl_family = fin->fin_family;
 	ptrs[0] = (void *)&ipfl;
 	sizes[0] = sizeof(ipfl);
 	types[0] = 0;

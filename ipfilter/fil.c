@@ -2972,8 +2972,12 @@ ipf_check(ctx, ip, hlen, ifp, out
 			fin->fin_reason = 3;
 			goto finished;
 		}
-	}
+		fin->fin_family = AF_INET6;
+	} else
 #endif
+	{
+		fin->fin_family = AF_INET;
+	}
 
 	if (ipf_makefrip(hlen, ip, fin) == -1) {
 		pass = FR_BLOCK|FR_NOMATCH;

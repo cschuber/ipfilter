@@ -1116,7 +1116,15 @@ static void print_ipflog(conf, buf, blen)
 	ipl = (iplog_t *)buf;
 	ipf = (ipflog_t *)((char *)buf + sizeof(*ipl));
 	ip = (ip_t *)((char *)ipf + sizeof(*ipf));
-	v = IP_V(ip);
+	if (ipf->fl_family == AF_INET) {
+		v = 4;
+#ifdef	USE_INET6
+	} else if (ipf->fl_family == AF_INET6) {
+		v = 6;
+#endif
+	} else {
+		v = 0;
+	}
 	res = (opts & OPT_RESOLVE) ? 1 : 0;
 	t = line;
 	*t = '\0';
