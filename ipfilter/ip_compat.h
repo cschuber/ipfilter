@@ -48,7 +48,8 @@
 # define	USE_INET6
 #endif
 #if defined(__NetBSD_Version__) && (__NetBSD_Version__ >= 106140000) && \
-    defined(_KERNEL) && !defined(IPFILTER_LKM)
+    defined(_KERNEL) && \
+    (!defined(IPFILTER_LKM) || (__NetBSD_Version__ >= 399000100))
 # define	IPFILTER_M_IPFILTER
 #endif
 #if defined(OpenBSD) && (OpenBSD >= 200206) && \
@@ -319,13 +320,13 @@ typedef struct qifpkt {
 #  define	GETKTIME(x)	uniqtime((struct timeval *)x)
 #  define	MSGDSIZE(x)	msgdsize(x)
 #  define	M_LEN(x)	((x)->b_wptr - (x)->b_rptr)
-#  define	M_DUPLICATE(x)	dupmsg((x))
+#  define	M_COPY(x)	dupmsg((x))
 #  define	MTOD(m,t)	((t)((m)->b_rptr))
 #  define	MTYPE(m)	((m)->b_datap->db_type)
 #  define	FREE_MB_T(m)	freemsg(m)
 #  define	ALLOC_MB_T(m,l)	(m) = ipf_allocmbt(l)
 #  define	PREP_MB_T(f,m)	ipf_prependmbt(f, m)
-#  define	DUP_MB_T(m)	dupmsg(m)
+#  define	M_DUP(m)	copymsg(m)
 #  define	m_next		b_cont
 #  define	IPF_PANIC(x,y)	if (x) { printf y; cmn_err(CE_PANIC, "ipf_panic"); }
 typedef mblk_t mb_t;
@@ -500,8 +501,8 @@ extern	void	*get_unit __P((char *, int));
 #  define	KFREES(x,s)	kmem_free((char *)(x), (s))
 #  define	MSGDSIZE(x)	msgdsize(x)
 #  define	M_LEN(x)	((x)->b_wptr - (x)->b_rptr)
-#  define	M_DUPLICATE(x)	copymsg((x))
-#  define	DUP_MB_T(m)	dupmsg(m)
+#  define	M_COPY(x)	dupmsg((x))
+#  define	M_DUP(m)	copymsg(m)
 #  define	MTOD(m,t)	((t)((m)->b_rptr))
 #  define	MTYPE(m)	((m)->b_datap->db_type)
 #  define	FREE_MB_T(m)	freemsg(m)
@@ -1563,7 +1564,8 @@ typedef	struct	mb_s	{
 # define	M_MBCAST	0x04
 # define	MSGDSIZE(x)	msgdsize(x)
 # define	M_LEN(x)	(x)->mb_len
-# define	M_DUPLICATE(x)	dupmbt(x)
+# define	M_COPY(x)	dupmbt(x)
+# define	M_DUP(x)	dupmbt(x)
 # define	GETKTIME(x)	gettimeofday((struct timeval *)(x), NULL)
 # define	MTOD(m, t)	((t)(m)->mb_data)
 # define	FREE_MB_T(x)
