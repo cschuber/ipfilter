@@ -344,10 +344,11 @@ ipaddr:	ipv4			{ use_inet6 = 0; $$.in4 = $1; }
 	;
 
 mask:	YY_NUMBER	{ if (use_inet6) {
-				if (ntomask(6, $1, (u_32_t *)&$$) == -1)
+				if (ntomask(AF_INET6, $1, (u_32_t *)&$$) == -1)
 					yyerror("bad bitmask");
 			  } else {
-				if (ntomask(4, $1, (u_32_t *)&$$.in4) == -1)
+				if (ntomask(AF_INET, $1,
+					    (u_32_t *)&$$.in4) == -1)
 					yyerror("bad bitmask");
 			  }
 			}

@@ -1080,7 +1080,7 @@ maskspace:
 ipv4mask:
 	ipv4				{ $$ = $1; }
 	| YY_HEX			{ $$.s_addr = htonl($1); }
-	| YY_NUMBER			{ ntomask(4, $1, (u_32_t *)&$$); }
+	| YY_NUMBER			{ ntomask(AF_INET, $1, (u_32_t *)&$$);}
 	| IPFY_BROADCAST		{ if (ifpflag == FRI_DYNAMIC) {
 						$$.s_addr = 0;
 						ifpflag = FRI_BROADCAST;
@@ -1112,7 +1112,7 @@ ipv4mask:
 	;
 
 ipv6mask:
-	YY_NUMBER			{ ntomask(6, $1, $$.i6); }
+	YY_NUMBER			{ ntomask(AF_INET6, $1, $$.i6); }
 	| IPFY_BROADCAST		{ if (ifpflag == FRI_DYNAMIC) {
 						bzero(&$$, sizeof($$));
 						ifpflag = FRI_BROADCAST;

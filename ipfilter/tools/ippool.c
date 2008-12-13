@@ -862,7 +862,7 @@ int setnodeaddr(ip_pool_node_t *node, char *arg)
 	if (s == NULL)
 		mask.s_addr = 0xffffffff;
 	else if (strchr(s, '.') == NULL) {
-		if (ntomask(4, atoi(s + 1), &mask.s_addr) != 0)
+		if (ntomask(AF_INET, atoi(s + 1), &mask.s_addr) != 0)
 			return -1;
 	} else {
 		mask.s_addr = inet_addr(s + 1);

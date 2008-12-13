@@ -956,7 +956,12 @@ addr:	IPNY_ANY			{ yyexpectaddr = 0;
 					{ $$.a = $1.a;
 					  $$.t = FRI_NORMAL;
 					  $$.f = NA_NORMAL;
-					  ntomask($1.v, $3, (u_32_t *)&$$.m);
+					  if ($1.v == 4)
+						  ntomask(AF_INET, $3,
+							  (u_32_t *)&$$.m);
+					  else
+						  ntomask(AF_INET6, $3,
+							  (u_32_t *)&$$.m);
 					  $$.a.i6[0] &= $$.m.i6[0];
 					  $$.a.i6[1] &= $$.m.i6[1];
 					  $$.a.i6[2] &= $$.m.i6[2];

@@ -8,8 +8,8 @@
 
 #include "ipf.h"
 
-int ntomask(v, nbits, ap)
-	int v, nbits;
+int ntomask(family, nbits, ap)
+	int family, nbits;
 	u_32_t *ap;
 {
 	u_32_t mask;
@@ -17,9 +17,9 @@ int ntomask(v, nbits, ap)
 	if (nbits < 0)
 		return -1;
 
-	switch (v)
+	switch (family)
 	{
-	case 4 :
+	case AF_INET :
 		if (nbits > 32 || use_inet6 == 1)
 			return -1;
 		if (nbits == 0) {
@@ -32,7 +32,7 @@ int ntomask(v, nbits, ap)
 		break;
 
 	case 0 :
-	case 6 :
+	case AF_INET6 :
 		if ((nbits > 128) || (use_inet6 == -1))
 			return -1;
 		fill6bits(nbits, ap);
