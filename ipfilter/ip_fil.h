@@ -1301,26 +1301,6 @@ typedef	union	ipftuneval	{
 struct ipftuneable;
 typedef	int (* ipftunefunc_t) __P((struct ipf_main_softc_s *, struct ipftuneable *, ipftuneval_t *));
 
-typedef	union	ipftuneval	{
-	u_long		ipftu_long;
-	u_int		ipftu_int;
-	u_short		ipftu_short;
-	u_char		ipftu_char;
-} ipftuneval_t;
-
-struct ipftuneable;
-typedef	int (* ipftunefunc_t) __P((struct ipftuneable *, ipftuneval_t *));
-
-typedef	union	ipftuneval	{
-	u_long		ipftu_long;
-	u_int		ipftu_int;
-	u_short		ipftu_short;
-	u_char		ipftu_char;
-} ipftuneval_t;
-
-struct ipftuneable;
-typedef	int (* ipftunefunc_t) __P((struct ipftuneable *, ipftuneval_t *));
-
 typedef	struct	ipftuneable	{
 	ipftunevalptr_t	ipft_una;
 	const char	*ipft_name;
