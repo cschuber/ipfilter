@@ -71,9 +71,9 @@ void panic __P((char *str));
 #include <sys/syslog.h>
 #endif
 #include <sys/time.h>
-#include <netinet/in.h>
 #include <sys/socket.h>
 #include <net/if.h>
+#include <netinet/in.h>
 #ifdef SOLARIS2
 # define _RADIX_H_
 #endif
