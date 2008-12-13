@@ -437,27 +437,6 @@ int *types, cnt;
 	SPL_INT(s);
 
 	/*
-	 * Check to see if this log record has a CRC which matches the last
-	 * record logged.  If it does, just up the count on the previous one
-	 * rather than create a new one.
-	 */
-	if (ipl_suppress) {
-		MUTEX_ENTER(&ipl_mutex);
-		if ((fin != NULL) && (fin->fin_off == 0)) {
-			if ((ipll[dev] != NULL) &&
-			    bcmp((char *)fin, (char *)&iplcrc[dev],
-				 FI_LCSIZE) == 0) {
-				ipll[dev]->ipl_count++;
-				MUTEX_EXIT(&ipl_mutex);
-				return 0;
-			}
-			bcopy((char *)fin, (char *)&iplcrc[dev], FI_LCSIZE);
-		} else
-			bzero((char *)&iplcrc[dev], FI_CSIZE);
-		MUTEX_EXIT(&ipl_mutex);
-	}
-
-	/*
 	 * Get the total amount of data to be logged.
 	 */
 	for (i = 0, len = sizeof(iplog_t); i < cnt; i++)
@@ -467,25 +446,12 @@ int *types, cnt;
 	 * check that we have space to record this information and can
 	 * allocate that much.
 	 */
+	if ((iplused[dev] + len) > ipl_logsize)
+		return -1;
+
 	KMALLOCS(buf, u_char *, len);
 	if (buf == NULL)
 		return -1;
-	SPL_NET(s);
-	MUTEX_ENTER(&ipl_mutex);
-	if ((iplused[dev] + len) > ipl_logsize) {
-		MUTEX_EXIT(&ipl_mutex);
-		SPL_X(s);
-		KFREES(buf, len);
-		return -1;
-	}
-	iplused[dev] += len;
-	MUTEX_EXIT(&ipl_mutex);
-	SPL_X(s);
-
-	/*
-	 * advance the log pointer to the next empty record and deduct the
-	 * amount of space we're going to use.
-	 */
 	ipl = (iplog_t *)buf;
 	ipl->ipl_magic = ipl_magic[dev];
 	ipl->ipl_count = 1;
@@ -510,11 +476,38 @@ int *types, cnt;
 		}
 		ptr += itemsz[i];
 	}
+
 	SPL_NET(s);
 	MUTEX_ENTER(&ipl_mutex);
+	/*
+	 * Check to see if this log record has a CRC which matches the last
+	 * record logged.  If it does, just up the count on the previous one
+	 * rather than create a new one.
+	 */
+	if (ipl_suppress) {
+		if ((fin != NULL) && (fin->fin_off == 0)) {
+			if ((ipll[dev] != NULL) &&
+			    bcmp((char *)fin, (char *)&iplcrc[dev],
+				 FI_LCSIZE) == 0) {
+				ipll[dev]->ipl_count++;
+				MUTEX_EXIT(&ipl_mutex);
+				SPL_X(s);
+				KFREES(buf, len);
+				return 0;
+			}
+			bcopy((char *)fin, (char *)&iplcrc[dev], FI_LCSIZE);
+		} else
+			bzero((char *)&iplcrc[dev], FI_CSIZE);
+	}
+
+	/*
+	 * advance the log pointer to the next empty record and deduct the
+	 * amount of space we're going to use.
+	 */
 	ipll[dev] = ipl;
 	*iplh[dev] = ipl;
 	iplh[dev] = &ipl->ipl_next;
+	iplused[dev] += len;
 
 	/*
 	 * Now that the log record has been completed and added to the queue,
