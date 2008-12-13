@@ -17,6 +17,7 @@ LIBOBJS=$(DEST)/addicmp.o \
      $(DEST)/binprint.o \
      $(DEST)/buildopts.o \
      $(DEST)/checkrev.o \
+     $(DEST)/connecttcp.o \
      $(DEST)/count6bits.o \
      $(DEST)/count4bits.o \
      $(DEST)/debug.o \
@@ -152,6 +153,8 @@ $(DEST)/binprint.o: $(LIBSRC)/binprint.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/binprint.c -o $@
 $(DEST)/buildopts.o: $(LIBSRC)/buildopts.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/buildopts.c -o $@
+$(DEST)/connecttcp.o: $(LIBSRC)/connecttcp.c $(INCDEP)
+	$(CC) $(CCARGS) -c $(LIBSRC)/connecttcp.c -o $@
 $(DEST)/count6bits.o: $(LIBSRC)/count6bits.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/count6bits.c -o $@
 $(DEST)/checkrev.o: $(LIBSRC)/checkrev.c $(INCDEP) $(TOP)/ipl.h

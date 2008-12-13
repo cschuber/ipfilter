@@ -17,8 +17,6 @@ load_http(char *url)
 	int fd, len, left, port, endhdr, removed;
 	char *s, *t, *u, buffer[1024], *myurl;
 	alist_t *a, *rtop, *rbot;
-	struct sockaddr_in sin;
-	struct hostent *host;
 
 	/*
 	 * More than this would just be absurd.
@@ -63,30 +61,11 @@ load_http(char *url)
 		port = 80;
 	}
 
-	memset(&sin, 0, sizeof(sin));
-	sin.sin_family = AF_INET;
-	sin.sin_port = htons(port);
 
-	if (isdigit(*s)) {
-		if (inet_aton(s, &sin.sin_addr) == -1) {
-			goto done;
-		}
-	} else {
-		host = gethostbyname(s);
-		if (host == NULL)
-			goto done;
-		memcpy(&sin.sin_addr, host->h_addr_list[0],
-		       sizeof(sin.sin_addr));
-	}
-
-	fd = socket(AF_INET, SOCK_STREAM, 0);
+	fd = connecttcp(s, port);
 	if (fd == -1)
 		goto done;
 
-	if (connect(fd, (struct sockaddr *)&sin, sizeof(sin)) == -1) {
-		close(fd);
-		goto done;
-	}
 
 	len = strlen(buffer);
 	if (write(fd, buffer, len) != len) {

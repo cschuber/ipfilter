@@ -230,6 +230,7 @@ extern void assigndefined __P((char *));
 extern void binprint __P((void *, size_t));
 extern u_32_t buildopts __P((char *, char *, int));
 extern int checkrev __P((char *));
+extern int connecttcp __P((char *, int));
 extern int count6bits __P((u_32_t *));
 extern int count4bits __P((u_32_t));
 extern char *fac_toname __P((int));
