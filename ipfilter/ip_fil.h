@@ -1748,8 +1748,6 @@ extern	int	ipf_ifpfillv6addr __P((int, struct sockaddr_in6 *,
 #endif
 
 extern	int	ipf_tune_add __P((ipf_main_softc_t *, ipftuneable_t *));
-
-
 extern	int	ipf_tune_add_array __P((ipf_main_softc_t *, ipftuneable_t *));
 extern	int	ipf_tune_del __P((ipf_main_softc_t *, ipftuneable_t *));
 extern	int	ipf_tune_del_array __P((ipf_main_softc_t *, ipftuneable_t *));
