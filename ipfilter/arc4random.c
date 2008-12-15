@@ -1,3 +1,4 @@
+#ifdef NEED_LOCAL_RAND
 /*-
  * THE BEER-WARE LICENSE
  *
@@ -24,21 +25,15 @@
 #include <sys/mutex.h>
 #include <sys/time.h>
 
+#if defined(SOLARIS2) && (SOLARIS2 < 9)
+# include <netinet/in_systm.h>
+#endif
 #include <sys/socket.h>
 #include <net/if.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include "netinet/ip_compat.h"
 #include "md5.h"
-
-#ifdef NEED_LOCAL_RAND
-
-# if SOLARIS
-typedef uint8_t u_int8_t;
-#  ifdef _SYS_MD5_H
-#   define	buf	buf_un.buf8
-#  endif
-# endif
 
 #if !defined(__GNUC__)
 # define __inline
@@ -58,11 +53,7 @@ static MD5_CTX md5ctx;
 static u_int8_t arc4_randbyte(void);
 static int ipf_read_random(void *dest, int length);
 
-#ifdef STES
 static __inline void
-#else
-static void
-#endif
 arc4_swap(u_int8_t *a, u_int8_t *b)
 {
 	u_int8_t c;
@@ -70,7 +61,7 @@ arc4_swap(u_int8_t *a, u_int8_t *b)
 	c = *a;
 	*a = *b;
 	*b = c;
-}
+}	
 
 /*
  * Stir our S-box.
@@ -160,7 +151,7 @@ arc4rand(void *ptr, u_int len, int reseed)
 	struct timeval tv;
 
 	GETKTIME(&tv);
-	if (reseed ||
+	if (reseed || 
 	   (arc4_numruns > ARC4_RESEED_BYTES) ||
 	   (tv.tv_sec > arc4_t_reseed))
 		arc4_randomstir();
@@ -212,28 +203,34 @@ ipf_rand_push(void *src, int length)
 	nsrc = src;
 	mylen = length;
 
+#if defined(_SYS_MD5_H) && defined(SOLARIS2)
+# define	buf	buf_un.buf8
+#endif
+	MUTEX_ENTER(&arc4_mtx);
 	while ((mylen > 64)  && (sizeof(pot) - inpot > sizeof(md5ctx.buf))) {
 		MD5Update(&md5ctx, nsrc, 64);
 		mylen -= 64;
 		nsrc += 64;
-		MUTEX_ENTER(&arc4_mtx);
 		if (pottail + sizeof(md5ctx.buf) > pot + sizeof(pot)) {
 			int left, numbytes;
 
 			numbytes = pot + sizeof(pot) - pottail;
 			bcopy(md5ctx.buf, pottail, numbytes);
-			left -= numbytes;
+			left = sizeof(md5ctx.buf) - numbytes;
 			pottail = pot;
-			bcopy(md5ctx.buf + length - left, pottail, left);
+			bcopy(md5ctx.buf + sizeof(md5ctx.buf) - left,
+			      pottail, left);
 			pottail += left;
-
 		} else {
 			bcopy(md5ctx.buf, pottail, sizeof(md5ctx.buf));
 			pottail += sizeof(md5ctx.buf);
 		}
 		inpot += 64;
-		MUTEX_EXIT(&arc4_mtx);
 	}
+	MUTEX_EXIT(&arc4_mtx);
+#if defined(_SYS_MD5_H) && defined(SOLARIS2)
+# undef buf
+#endif
 }
 
 
