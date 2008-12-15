@@ -206,28 +206,28 @@ ipf_rand_push(void *src, int length)
 #if defined(_SYS_MD5_H) && defined(SOLARIS2)
 # define	buf	buf_un.buf8
 #endif
+	MUTEX_ENTER(&arc4_mtx);
 	while ((mylen > 64)  && (sizeof(pot) - inpot > sizeof(md5ctx.buf))) {
 		MD5Update(&md5ctx, nsrc, 64);
 		mylen -= 64;
 		nsrc += 64;
-		MUTEX_ENTER(&arc4_mtx);
 		if (pottail + sizeof(md5ctx.buf) > pot + sizeof(pot)) {
 			int left, numbytes;
 
 			numbytes = pot + sizeof(pot) - pottail;
 			bcopy(md5ctx.buf, pottail, numbytes);
-			left -= numbytes;
+			left = sizeof(md5ctx.buf) - numbytes;
 			pottail = pot;
-			bcopy(md5ctx.buf + length - left, pottail, left);
+			bcopy(md5ctx.buf + sizeof(md5ctx.buf) - left,
+			      pottail, left);
 			pottail += left;
-			
 		} else {
 			bcopy(md5ctx.buf, pottail, sizeof(md5ctx.buf));
 			pottail += sizeof(md5ctx.buf);
 		}
 		inpot += 64;
-		MUTEX_EXIT(&arc4_mtx);
 	}
+	MUTEX_EXIT(&arc4_mtx);
 #if defined(_SYS_MD5_H) && defined(SOLARIS2)
 # undef buf
 #endif
