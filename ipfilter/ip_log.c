@@ -591,6 +591,8 @@ ipf_log_items(softc, unit, fin, items, itemsz, types, cnt)
 				 FI_LCSIZE) == 0) {
 				softl->ipll[unit]->ipl_count++;
 				MUTEX_EXIT(&softl->ipl_mutex[unit]);
+				SPL_X(s);
+				KFREES(buf, len);
 				return 0;
 			}
 			bcopy((char *)fin, (char *)&softl->ipl_crc[unit],
