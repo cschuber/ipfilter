@@ -34,6 +34,7 @@ int load_hash(iphp, list, iocfunc)
 	for (n = 0, a = list; a != NULL; a = a->ipe_next)
 		n++;
 
+	bzero((char *)&iph, sizeof(iph));
 	op.iplo_arg = 0;
 	op.iplo_type = IPLT_HASH;
 	op.iplo_unit = iphp->iph_unit;
