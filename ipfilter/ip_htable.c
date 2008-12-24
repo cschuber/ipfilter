@@ -446,10 +446,12 @@ ipf_htable_free(arg, iph)
 {
 	ipf_htable_softc_t *softh = arg;
 
-	if (iph->iph_pnext != NULL)
-		*iph->iph_pnext = iph->iph_next;
 	if (iph->iph_next != NULL)
 		iph->iph_next->iph_pnext = iph->iph_pnext;
+	if (iph->iph_pnext != NULL)
+		*iph->iph_pnext = iph->iph_next;
+	iph->iph_pnext = NULL;
+	iph->iph_next = NULL;
 
 	softh->ipf_nhtables[iph->iph_unit]--;
 
@@ -478,15 +480,12 @@ ipf_htable_remove(softc, arg, iph)
 	if (ipf_htable_clear(softc, arg, iph) != 0)
 		return 1;
 
-	if (iph->iph_pnext != NULL) {
+	if (iph->iph_pnext != NULL)
 		*iph->iph_pnext = iph->iph_next;
-		iph->iph_pnext = NULL;
-	}
-
-	if (iph->iph_next != NULL) {
+	if (iph->iph_next != NULL)
 		iph->iph_next->iph_pnext = iph->iph_pnext;
-		iph->iph_next = NULL;
-	}
+	iph->iph_pnext = NULL;
+	iph->iph_next = NULL;
 
 	return ipf_htable_deref(softc, arg, iph);
 }
@@ -576,24 +575,21 @@ ipf_htent_remove(softc, arg, iph, ipe)
 	iphtable_t *iph;
 	iphtent_t *ipe;
 {
+	int rval;
 
-	if (ipe->ipe_phnext != NULL) {
-		*ipe->ipe_phnext = ipe->ipe_hnext;
-		ipe->ipe_phnext = NULL;
-	}
-	if (ipe->ipe_hnext != NULL) {
+	if (ipe->ipe_hnext != NULL)
 		ipe->ipe_hnext->ipe_phnext = ipe->ipe_phnext;
-		ipe->ipe_hnext = NULL;
-	}
+	if (ipe->ipe_phnext != NULL)
+		*ipe->ipe_phnext = ipe->ipe_hnext;
+	ipe->ipe_phnext = NULL;
+	ipe->ipe_hnext = NULL;
 
-	if (ipe->ipe_pnext != NULL) {
-		*ipe->ipe_pnext = ipe->ipe_next;
-		iph->iph_pnext = NULL;
-	}
-	if (ipe->ipe_next != NULL) {
+	if (ipe->ipe_next != NULL)
 		ipe->ipe_next->ipe_pnext = ipe->ipe_pnext;
-		iph->iph_next = NULL;
-	}
+	if (ipe->ipe_pnext != NULL)
+		*ipe->ipe_pnext = ipe->ipe_next;
+	ipe->ipe_pnext = NULL;
+	ipe->ipe_next = NULL;
 
 	switch (iph->iph_type & ~IPHASH_ANON)
 	{
@@ -876,6 +872,7 @@ ipf_htent_insert(softc, arg, iph, ipeo)
 
 	if (iph->iph_table[hv] != NULL)
 		iph->iph_table[hv]->ipe_phnext = &ipe->ipe_hnext;
+	iph->iph_table[hv] = ipe;
 
 	ipe->ipe_next = iph->iph_list;
 	ipe->ipe_pnext = &iph->iph_list;
@@ -883,7 +880,6 @@ ipf_htent_insert(softc, arg, iph, ipeo)
 		ipe->ipe_next->ipe_pnext = &ipe->ipe_next;
 	iph->iph_list = ipe;
 
-	iph->iph_table[hv] = ipe;
 	if (ipe->ipe_family == AF_INET) {
 		if ((bits >= 0) && (bits != 32))
 			iph->iph_maskset[0] |= 1 << bits;
@@ -1321,7 +1317,8 @@ ipf_htable_dump(softc, arg)
 
 	printf("List of configured hash tables\n");
 	for (i = 0; i < IPL_LOGSIZE; i++)
-		for (iph = softh->ipf_htables[i]; iph != NULL; iph = iph->iph_next)
+		for (iph = softh->ipf_htables[i]; iph != NULL;
+		     iph = iph->iph_next)
 			printhash(iph, bcopywrap, NULL, opts);
 
 }
