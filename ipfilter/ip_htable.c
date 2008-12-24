@@ -575,7 +575,6 @@ ipf_htent_remove(softc, arg, iph, ipe)
 	iphtable_t *iph;
 	iphtent_t *ipe;
 {
-	int rval;
 
 	if (ipe->ipe_hnext != NULL)
 		ipe->ipe_hnext->ipe_phnext = ipe->ipe_phnext;
