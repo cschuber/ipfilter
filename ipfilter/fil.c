@@ -2641,9 +2641,6 @@ filterdone:
 	 */
 	fin->fin_flx &= ~FI_STATE;
 
-	if (FR_ISBLOCK(pass) && (fin->fin_flx & FI_NEWNAT))
-		nat_uncreate(fin);
-
 	/*
 	 * Up the reference on fr_lock and exit ipf_mutex.  fr_fastroute
 	 * only frees up the lock on ipf_global and the generation of a
@@ -2699,6 +2696,9 @@ filterdone:
 				fin->fin_error = ECONNRESET;
 		}
 	}
+
+	if (FR_ISBLOCK(pass) && (fin->fin_flx & FI_NEWNAT))
+		nat_uncreate(fin);
 
 	/*
 	 * If we didn't drop off the bottom of the list of rules (and thus
