@@ -59,7 +59,7 @@ int	poolflush __P((int, char *[]));
 int	poolstats __P((int, char *[]));
 int	gettype __P((char *, u_int *));
 int	getrole __P((char *));
-int	setnodeaddr __P((ip_pool_node_t *node, char *arg));
+int	setnodeaddr __P((int, int, void *ptr, char *arg));
 void	showpools_live __P((int, int, ipf_pool_stat_t *, char *));
 void	showhashs_live __P((int, int, iphtstat_t *, char *));
 
@@ -135,13 +135,16 @@ int poolnodecommand(remove, argc, argv)
 	int remove, argc;
 	char *argv[];
 {
-	int err, c, ipset, role;
+	int err = 0, c, ipset, role, type = IPLT_POOL;
 	char *poolname = NULL;
-	ip_pool_node_t node;
+	ip_pool_node_t pnode;
+	iphtent_t hnode;
+	void *ptr = &pnode;
 
 	ipset = 0;
 	role = IPL_LOGIPF;
-	bzero((char *)&node, sizeof(node));
+	bzero((char *)&pnode, sizeof(pnode));
+	bzero((char *)&hnode, sizeof(hnode));
 
 	while ((c = getopt(argc, argv, "di:m:no:Rv")) != -1)
 		switch (c)
@@ -151,7 +154,7 @@ int poolnodecommand(remove, argc, argv)
 			ippool_yydebug++;
 			break;
 		case 'i' :
-			if (setnodeaddr(&node, optarg) == 0)
+			if (setnodeaddr(type, role, ptr, optarg) == 0)
 				ipset = 1;
 			break;
 		case 'm' :
@@ -161,6 +164,11 @@ int poolnodecommand(remove, argc, argv)
 			opts |= OPT_DONOTHING;
 			break;
 		case 'o' :
+			if (ipset == 1) {
+				fprintf(stderr,
+					"cannot set role after ip address\n");
+				return -1;
+			}
 			role = getrole(optarg);
 			if (role == IPL_LOGNONE)
 				return -1;
@@ -168,13 +176,32 @@ int poolnodecommand(remove, argc, argv)
 		case 'R' :
 			opts |= OPT_NORESOLVE;
 			break;
+		case 't' :
+			if (ipset == 1) {
+				fprintf(stderr,
+					"cannot set type after ip address\n");
+				return -1;
+			}
+			type = gettype(optarg, NULL);
+			switch (type) {
+			case IPLT_NONE :
+				fprintf(stderr, "unknown type '%s'\n", optarg);
+				return -1;
+			case IPLT_HASH :
+				ptr = &hnode;
+				break;
+			case IPLT_POOL :
+			default :
+				break;
+			}
+			break;
 		case 'v' :
 			opts |= OPT_VERBOSE;
 			break;
 		}
 
 	if (argv[optind] != NULL && ipset == 0) {
-		if (setnodeaddr(&node, argv[optind]) == 0)
+		if (setnodeaddr(type, role, ptr, argv[optind]) == 0)
 			ipset = 1;
 	}
 
@@ -191,10 +218,22 @@ int poolnodecommand(remove, argc, argv)
 		return -1;
 	}
 
-	if (remove == 0)
-		err = load_poolnode(0, poolname, &node, ioctl);
-	else
-		err = remove_poolnode(0, poolname, &node, ioctl);
+	switch (type) {
+	case IPLT_POOL :
+		if (remove == 0)
+			err = load_poolnode(role, poolname, &pnode, ioctl);
+		else
+			err = remove_poolnode(role, poolname, &pnode, ioctl);
+		break;
+	case IPLT_HASH :
+		if (remove == 0)
+			err = load_hashnode(role, poolname, &hnode, ioctl);
+		else
+			err = remove_hashnode(role, poolname, &hnode, ioctl);
+		break;
+	default :
+		break;
+	}
 	return err;
 }
 
@@ -853,7 +892,7 @@ void showhashs_live(fd, role, htstp, poolname)
 }
 
 
-int setnodeaddr(ip_pool_node_t *node, char *arg)
+int setnodeaddr(int type, int role, void *ptr, char *arg)
 {
 	struct in_addr mask;
 	char *s;
@@ -869,10 +908,22 @@ int setnodeaddr(ip_pool_node_t *node, char *arg)
 	}
 	if (s != NULL)
 		*s = '\0';
-	node->ipn_addr.adf_len = sizeof(node->ipn_addr);
-	node->ipn_addr.adf_addr.in4.s_addr = inet_addr(arg);
-	node->ipn_mask.adf_len = sizeof(node->ipn_mask);
-	node->ipn_mask.adf_addr.in4.s_addr = mask.s_addr;
+
+	if (type == IPLT_POOL) {
+		ip_pool_node_t *node = ptr;
+
+		node->ipn_addr.adf_len = sizeof(node->ipn_addr);
+		node->ipn_addr.adf_addr.in4.s_addr = inet_addr(arg);
+		node->ipn_mask.adf_len = sizeof(node->ipn_mask);
+		node->ipn_mask.adf_addr.in4.s_addr = mask.s_addr;
+	} else if (type == IPLT_HASH) {
+		iphtent_t *node = ptr;
+
+		node->ipe_addr.in4.s_addr = inet_addr(arg);
+		node->ipe_mask.in4.s_addr = mask.s_addr;
+        	node->ipe_family = AF_INET;
+        	node->ipe_unit = role;
+	}
 
 	return 0;
 }
