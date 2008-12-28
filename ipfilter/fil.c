@@ -3058,8 +3058,8 @@ ipf_check(ctx, ip, hlen, ifp, out
 
 	if (fr == NULL) {
 		if ((fin->fin_flx & FI_FRAG) != 0)
-
 			fr = ipf_frag_known(fin, &pass);
+
 		if ((fr == NULL) && (softc->ipf_specfuncref[0]
 					    [softc->ipf_active] == 0))
 			fr = ipf_state_check(fin, &pass);
