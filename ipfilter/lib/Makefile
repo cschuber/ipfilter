@@ -74,6 +74,7 @@ LIBOBJS=$(DEST)/addicmp.o \
      $(DEST)/optvalue.o \
      $(DEST)/parsefields.o \
      $(DEST)/parseipfexpr.o \
+     $(DEST)/parsewhoisline.o \
      $(DEST)/portname.o \
      $(DEST)/print_toif.o \
      $(DEST)/printactiveaddr.o \
@@ -270,6 +271,8 @@ $(DEST)/parsefields.o: $(LIBSRC)/parsefields.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/parsefields.c -o $@
 $(DEST)/parseipfexpr.o: $(LIBSRC)/parseipfexpr.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/parseipfexpr.c -o $@
+$(DEST)/parsewhoisline.o: $(LIBSRC)/parsewhoisline.c $(INCDEP)
+	$(CC) $(CCARGS) -c $(LIBSRC)/parsewhoisline.c -o $@
 $(DEST)/portname.o: $(LIBSRC)/portname.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/portname.c -o $@
 $(DEST)/print_toif.o: $(LIBSRC)/print_toif.c $(INCDEP)

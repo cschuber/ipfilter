@@ -33,6 +33,7 @@
 #include "netinet/ip_lookup.h"
 #include "netinet/ip_pool.h"
 #include "netinet/ip_htable.h"
+#include "netinet/ip_dstlist.h"
 #include "ippool_l.h"
 #include "kmem.h"
 
@@ -46,12 +47,14 @@ extern	FILE	*yyin;
 static	iphtable_t	ipht;
 static	iphtent_t	iphte;
 static	ip_pool_t	iplo;
+static	ippool_dst_t	ipld;
 static	ioctlfunc_t	poolioctl = NULL;
 static	char		poolname[FR_GROUPLEN];
 
 static void ippool_setnodesize __P((ip_pool_node_t *));
 static iphtent_t *add_htablehosts __P((char *));
 static ip_pool_node_t *add_poolhosts __P((char *));
+static ip_pool_node_t *read_whoisfile __P((char *));
 
 %}
 
@@ -64,6 +67,7 @@ static ip_pool_node_t *add_poolhosts __P((char *));
 	iphtent_t	*ipe;
 	ip_pool_node_t	*ipp;
 	union	i6addr	ip6;
+	ipf_dstnode_t	*ipd;
 }
 
 %token  <num>	YY_NUMBER YY_HEX
@@ -79,6 +83,7 @@ static ip_pool_node_t *add_poolhosts __P((char *));
 %token	IPT_GROUP IPT_SIZE IPT_SEED IPT_NUM IPT_NAME
 %token	IPT_POOL IPT_DSTLIST IPT_ROUNDROBIN
 %token	IPT_WEIGHTED IPT_RANDOM IPT_CONNECTION IPT_BYTES
+%token	IPT_WHOIS IPT_FILE
 %type	<num> role table inout
 %type	<ipp> ipftree range addrlist
 %type	<adrmsk> addrmask
@@ -87,6 +92,7 @@ static ip_pool_node_t *add_poolhosts __P((char *));
 %type	<ip6> ipaddr mask
 %type	<ip4> ipv4
 %type	<str> number setgroup
+%type	<ipd> dstentry dstentries dstlist
 
 %%
 file:	line
@@ -117,7 +123,7 @@ line:	table role ipftree eol		{ iplo.ipo_unit = $2;
 					  use_inet6 = 0;
 					}
 	| YY_COMMENT
-	| poolline
+	| poolline eol
 	;
 
 eol:	';'
@@ -138,6 +144,7 @@ assigning:
 table:	IPT_TABLE		{ bzero((char *)&ipht, sizeof(ipht));
 				  bzero((char *)&iphte, sizeof(iphte));
 				  bzero((char *)&iplo, sizeof(iplo));
+				  bzero((char *)&ipld, sizeof(ipld));
 				  *ipht.iph_name = '\0';
 				  iplo.ipo_flags = IPHASH_ANON;
 				  iplo.ipo_name[0] = '\0';
@@ -219,7 +226,11 @@ hashopts:
 
 addrlist:
 	';'				{ $$ = NULL; }
-	| range next addrlist		{ $1->ipn_next = $3; $$ = $1; }
+	| range next addrlist		{ $$ = $1;
+					  while ($1->ipn_next != NULL)
+						$1 = $1->ipn_next;
+					  $1->ipn_next = $3;
+					}
 	| range next			{ $$ = $1; }
 	;
 
@@ -302,6 +313,7 @@ range:	addrmask	{ $$ = calloc(1, sizeof(*$$));
 				sizeof($$->ipn_mask.adf_addr));
 			}
 	| YY_STR			{ $$ = add_poolhosts($1); }
+	| IPT_WHOIS IPT_FILE YY_STR	{ $$ = read_whoisfile($3); }
 	;
 
 hashlist:
@@ -382,17 +394,47 @@ end:	'}'				{ yyexpectaddr = 0; }
 	;
 
 poolline:
-	IPT_POOL IPT_IPF '/' inout pooltype
-	| IPT_POOL IPT_NAT '/' inout pooltype
-	| IPT_POOL IPT_AUTH '/' inout pooltype
-	| IPT_POOL IPT_COUNT '/' inout pooltype
-	;
-
-pooltype:
-	IPT_DSTLIST '(' IPT_NAME YY_STR ';' dstopts ')' '{' dstlist '}'
-	| IPT_TREE '(' IPT_NAME YY_STR ';' ')' '{' addrlist '}'
-	| IPT_HASH '(' IPT_NAME YY_STR ';' hashoptlist ')' '{' hashlist '}'
-	| IPT_GROUPMAP '(' IPT_NAME YY_STR ';' ')' '{' setgrouplist '}'
+	IPT_POOL role '/' IPT_DSTLIST '(' IPT_NAME YY_STR ';' dstopts ')'
+	'{' dstlist '}'
+					{ bzero((char *)&ipld, sizeof(ipld));
+					  strncpy(ipld.ipld_name, $7,
+						  sizeof(ipld.ipld_name));
+					  /* ipld.ipld_dests = $12; */
+					  ipld.ipld_unit = $2;
+					  resetlexer();
+					  use_inet6 = 0;
+					}
+	| IPT_POOL role '/' IPT_TREE '(' IPT_NAME YY_STR ';' ')'
+	  '{' addrlist '}'
+					{ bzero((char *)&iplo, sizeof(iplo));
+					  strncpy(iplo.ipo_name, $7,
+						  sizeof(iplo.ipo_name));
+					  iplo.ipo_list = $11;
+					  iplo.ipo_unit = $2;
+					  load_pool(&iplo, poolioctl);
+					  resetlexer();
+					  use_inet6 = 0;
+					}
+	| IPT_POOL role '/' IPT_HASH '(' IPT_NAME YY_STR ';' hashoptlist ')'
+	  '{' hashlist '}'
+					{ bzero((char *)&ipht, sizeof(ipht));
+					  strncpy(ipht.iph_name, $7,
+						  sizeof(ipht.iph_name));
+					  ipht.iph_unit = $2;
+					  load_hash(&ipht, $12, poolioctl);
+					  resetlexer();
+					  use_inet6 = 0;
+					}
+	| IPT_POOL role '/' IPT_GROUPMAP '(' IPT_NAME YY_STR ';' ')'
+	  '{' setgrouplist '}'
+					{ bzero((char *)&ipht, sizeof(ipht));
+					  strncpy(ipht.iph_name, $7,
+						  sizeof(ipht.iph_name));
+					  ipht.iph_unit = $2;
+					  load_hash(&ipht, $11, poolioctl);
+					  resetlexer();
+					  use_inet6 = 0;
+					}
 	;
 
 hashoptlist:
@@ -405,16 +447,25 @@ hashopt:
 	;
 
 dstlist:
-	dstentries ';'
+	dstentries ';'			{ $$ = $1; }
 	;
 dstentries:
-	dstentry
-	| dstentries ';' dstentry
+	dstentry			{ $$ = $1; }
+	| dstentries ';' dstentry	{ $1->ipfd_next = $3; $$ = $1; }
 	;
 
 dstentry:
-	YY_STR ':' ipaddr
-	| ipaddr
+	YY_STR ':' ipaddr	{ $$ = calloc(1, sizeof($$));
+				  if ($$ != NULL) {
+					strncpy($$->ipfd_dest.fd_name, $1,
+						sizeof($$->ipfd_dest.fd_name));
+					$$->ipfd_dest.fd_ip6 = $3;
+				  }
+				}
+	| ipaddr		{ $$ = calloc(1, sizeof($$));
+				  if ($$ != NULL)
+					$$->ipfd_dest.fd_ip6 = $1;
+				}
 	;
 
 dstopts:
@@ -434,6 +485,7 @@ static	wordtab_t	yywords[] = {
 	{ "connection",		IPT_CONNECTION },
 	{ "count",		IPT_COUNT },
 	{ "dst-list",		IPT_DSTLIST },
+	{ "file",		IPT_FILE },
 	{ "group",		IPT_GROUP },
 	{ "group-map",		IPT_GROUPMAP },
 	{ "hash",		IPT_HASH },
@@ -443,6 +495,7 @@ static	wordtab_t	yywords[] = {
 	{ "nat",		IPT_NAT },
 	{ "number",		IPT_NUM },
 	{ "out",		IPT_OUT },
+	{ "pool",		IPT_POOL },
 	{ "random",		IPT_RANDOM },
 	{ "round-robin",	IPT_ROUNDROBIN },
 	{ "role",		IPT_ROLE },
@@ -452,6 +505,7 @@ static	wordtab_t	yywords[] = {
 	{ "tree",		IPT_TREE },
 	{ "type",		IPT_TYPE },
 	{ "weighted",		IPT_WEIGHTED },
+	{ "whois",		IPT_WHOIS },
 	{ NULL,			0 }
 };
 
@@ -654,4 +708,39 @@ char *url;
 	alist_free(hlist);
 
 	return ptop;
+}
+
+
+ip_pool_node_t *
+read_whoisfile(file)
+	char *file;
+{
+	ip_pool_node_t *ntop, *ipn, node, *last;
+	char line[1024];
+	FILE *fp;
+
+	fp = fopen(file, "r");
+	if (fp == NULL)
+		return NULL;
+
+	last = NULL;
+	ntop = NULL;
+	while (fgets(line, sizeof(line) - 1, fp) != NULL) {
+		line[sizeof(line) - 1] = '\0';
+
+		if (parsewhoisline(line, &node.ipn_addr, &node.ipn_mask))
+			continue;
+		ipn = calloc(1, sizeof(*ipn));
+		if (ipn == NULL)
+			continue;
+		ipn->ipn_addr = node.ipn_addr;
+		ipn->ipn_mask = node.ipn_mask;
+		if (last == NULL)
+			ntop = ipn;
+		else
+			last->ipn_next = ipn;
+		last = ipn;
+	}
+	fclose(fp);
+	return ntop;
 }

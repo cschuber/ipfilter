@@ -1,3 +1,14 @@
+/*
+ * Copyright (C) 2008 by Darren Reed.
+ *
+ * See the IPFILTER.LICENCE file for details on licencing.
+ *
+ * $Id$
+ */
+
+#ifndef	__IP_DSTLIST_H__
+#define	__IP_DSTLIST_H__
+
 typedef struct ipf_dstnode {
 	struct ipf_dstnode	*ipfd_next;
 	struct ipf_dstnode	**ipfd_pnext;
@@ -32,3 +43,5 @@ typedef struct ippool_dst {
 #define	IPDST_DELETE		0x01
 
 extern ipf_lookup_t ipf_dstlist_backend;
+
+#endif /* __IP_DSTLIST_H__ */

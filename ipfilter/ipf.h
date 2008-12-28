@@ -78,6 +78,7 @@ struct file;
 #include "netinet/ip_scan.h"
 #include "netinet/ip_htable.h"
 #include "netinet/ip_sync.h"
+#include "netinet/ip_dstlist.h"
 
 #include "opts.h"
 
@@ -283,6 +284,7 @@ extern int ntomask __P((int, int, u_32_t *));
 extern u_32_t optname __P((char ***, u_short *, int));
 extern wordtab_t *parsefields __P((wordtab_t *, char *));
 extern int *parseipfexpr __P((char *, char **));
+extern int parsewhoisline __P((char *, addrfamily_t *, addrfamily_t *));
 extern char *portname __P((int, int));
 extern int pri_findname __P((char *));
 extern char *pri_toname __P((int));

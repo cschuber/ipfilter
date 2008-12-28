@@ -996,6 +996,7 @@ ipf_sync_nat(softc, sp, data)
 		READ_ENTER(&softc->ipf_nat);
 
 		nat = sl->sl_ipn;
+		nat->nat_rev = sl->sl_rev;
 
 		MUTEX_ENTER(&nat->nat_lock);
 		ipf_nat_setqueue(softc, softc->ipf_nat_soft, nat);
