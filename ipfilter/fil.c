@@ -3057,16 +3057,9 @@ ipf_check(ctx, ip, hlen, ifp, out
 		(void) ipf_acctpkt(fin, NULL);
 
 	if (fr == NULL) {
-		if ((fin->fin_flx & FI_FRAG) != 0) {
+		if ((fin->fin_flx & FI_FRAG) != 0)
+
 			fr = ipf_frag_known(fin, &pass);
-			/*
-			 * Reset the keep state flag here so that we don't
-			 * try and add a new state entry because of it, leading
-			 * to a blocked packet because the add will fail.
-			 */
-			if (fr != NULL)
-				pass &= ~FR_KEEPSTATE;
-		}
 		if ((fr == NULL) && (softc->ipf_specfuncref[0]
 					    [softc->ipf_active] == 0))
 			fr = ipf_state_check(fin, &pass);

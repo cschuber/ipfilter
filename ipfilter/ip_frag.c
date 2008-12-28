@@ -925,6 +925,13 @@ ipf_frag_known(fin, passp)
 			pass = fr->fr_flags;
 			if ((pass & FR_KEEPSTATE) != 0) {
 				fin->fin_flx |= FI_STATE;
+				/*
+				 * Reset the keep state flag here so that we
+				 * don't try and add a new state entry because
+				 * of a match here. That leads to blocking of
+				 * the packet later because the add fails.
+				 */
+				pass &= ~FR_KEEPSTATE;
 			}
 			if ((pass & FR_LOGFIRST) != 0)
 				pass &= ~(FR_LOGFIRST|FR_LOG);
