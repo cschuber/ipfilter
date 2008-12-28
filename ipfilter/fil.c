@@ -152,6 +152,8 @@ static	int		ipf_flushlist __P((ipf_main_softc_t *, int, minor_t,
 static	int		ipf_flush_groups __P((ipf_main_softc_t *,
 					      int, int, int));
 static	ipfunc_t	ipf_findfunc __P((ipfunc_t));
+static	void		*ipf_findlookup __P((ipf_main_softc_t *, int,
+					     i6addr_t *, lookupfunc_t *));
 static	frentry_t	*ipf_firewall __P((fr_info_t *, u_32_t *));
 static	int		ipf_fr_matcharray __P((fr_info_t *, int *));
 static	int		ipf_frruleiter __P((ipf_main_softc_t *, void *, int,
@@ -4915,11 +4917,9 @@ frrequest(softc, unit, req, data, set, makecopy)
 			}
 			break;
 		case FRI_LOOKUP :
-			fp->fr_srcptr = ipf_lookup_res_num(softc,
-							   fp->fr_srctype,
-							   IPL_LOGIPF,
-							   fp->fr_srcnum,
-							   &fp->fr_srcfunc);
+			fp->fr_srcptr = ipf_findlookup(softc, IPL_LOGIPF,
+						       &fp->fr_src6,
+						       &fp->fr_srcfunc);
 			if (fp->fr_srcfunc == NULL) {
 				softc->ipf_interror = 2222;
 				return ESRCH;
@@ -4945,11 +4945,9 @@ frrequest(softc, unit, req, data, set, makecopy)
 			}
 			break;
 		case FRI_LOOKUP :
-			fp->fr_dstptr = ipf_lookup_res_num(softc,
-							   fp->fr_dsttype,
-							   IPL_LOGIPF,
-							   fp->fr_dstnum,
-							   &fp->fr_dstfunc);
+			fp->fr_dstptr = ipf_findlookup(softc, IPL_LOGIPF,
+						       &fp->fr_dst6,
+						       &fp->fr_dstfunc);
 			if (fp->fr_dstfunc == NULL) {
 				softc->ipf_interror = 3333;
 				return ESRCH;
@@ -5244,6 +5242,48 @@ done:
 		KFREES(ptr, fp->fr_dsize);
 	}
 	return (error);
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:   ipf_findlookup                                               */
+/* Returns:    NULL = failure, else success                                 */
+/* Parameters: softc(I) - pointer to soft context main structure            */
+/*             unit(I)  - device for which this is for                      */
+/*             addrp(I) - pointer to lookup information in address struct   */
+/*             funcp(I) - where to store the lookup function                */
+/*                                                                          */
+/* When using pools and hash tables to store addresses for matching in      */
+/* rules, it is necessary to resolve both the object referred to by the     */
+/* name or address (and return that pointer) and also provide the means by  */
+/* which to determine if an address belongs to that object (funcp) to make  */
+/* the packet matching quicker.                                             */
+/* ------------------------------------------------------------------------ */
+static void *
+ipf_findlookup(softc, unit, addrp, funcp)
+	ipf_main_softc_t *softc;
+	int unit;
+	i6addr_t *addrp;
+	lookupfunc_t *funcp;
+{
+	void *ptr;
+
+	switch (addrp->iplookupsubtype)
+	{
+	case 0 :
+		ptr = ipf_lookup_res_num(softc, addrp->iplookuptype,
+					 unit, addrp->iplookupnum, funcp);
+		break;
+	case 1 :
+		ptr = ipf_lookup_res_name(softc, addrp->iplookuptype,
+					  unit, addrp->iplookupname, funcp);
+		break;
+	default :
+		ptr = NULL;
+		break;
+	}
+
+	return ptr;
 }
 
 

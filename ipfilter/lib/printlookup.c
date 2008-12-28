@@ -12,6 +12,8 @@
 void printlookup(addr, mask)
 	i6addr_t *addr, *mask;
 {
+	char name[32];
+
 	switch (addr->iplookuptype)
 	{
 	case IPLT_POOL :
@@ -25,7 +27,14 @@ void printlookup(addr, mask)
 		break;
 	}
 
-	printf("%u", addr->iplookupnum);
+	if (addr->iplookupsubtype == 0)
+		printf("%u", addr->iplookupnum);
+	else if (addr->iplookupsubtype == 1) {
+		strncpy(name, addr->iplookupname, sizeof(addr->iplookupname));
+		name[sizeof(addr->iplookupname)] = '\0';
+		printf("%s", name);
+	}
+
 	if (mask->iplookupptr == NULL)
 		printf("(!)");
 }

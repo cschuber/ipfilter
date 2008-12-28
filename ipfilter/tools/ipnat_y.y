@@ -1015,11 +1015,27 @@ addr:	IPNY_ANY			{ yyexpectaddr = 0;
 					}
 	| pool slash YY_NUMBER		{ $$.a.iplookupnum = $3;
 					  $$.a.iplookuptype = IPLT_POOL;
+					  $$.a.iplookupsubtype = 0;
+					  $$.t = FRI_LOOKUP;
+					  $$.f = NA_NORMAL;
+					}
+	| pool slash YY_STR		{ strncpy($$.a.iplookupname, $3,
+						  sizeof($$.a.iplookupnum));
+					  $$.a.iplookuptype = IPLT_POOL;
+					  $$.a.iplookupsubtype = 1;
 					  $$.t = FRI_LOOKUP;
 					  $$.f = NA_NORMAL;
 					}
 	| hash slash YY_NUMBER		{ $$.a.iplookupnum = $3;
 					  $$.a.iplookuptype = IPLT_HASH;
+					  $$.a.iplookupsubtype = 0;
+					  $$.t = FRI_LOOKUP;
+					  $$.f = NA_NORMAL;
+					}
+	| hash slash YY_STR		{ strncpy($$.a.iplookupname, $3,
+						  sizeof($$.a.iplookupnum));
+					  $$.a.iplookuptype = IPLT_HASH;
+					  $$.a.iplookupsubtype = 1;
 					  $$.t = FRI_LOOKUP;
 					  $$.f = NA_NORMAL;
 					}
