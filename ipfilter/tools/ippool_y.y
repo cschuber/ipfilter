@@ -84,7 +84,7 @@ static ip_pool_node_t *read_whoisfile __P((char *));
 %token	IPT_POOL IPT_DSTLIST IPT_ROUNDROBIN
 %token	IPT_WEIGHTED IPT_RANDOM IPT_CONNECTION IPT_BYTES
 %token	IPT_WHOIS IPT_FILE
-%type	<num> role table inout
+%type	<num> role table inout unit
 %type	<ipp> ipftree range addrlist
 %type	<adrmsk> addrmask
 %type	<ipe> ipfgroup ipfhash hashlist hashentry
@@ -163,11 +163,14 @@ groupmap:
 inout:	IPT_IN				{ $$ = FR_INQUE; }
 	| IPT_OUT			{ $$ = FR_OUTQUE; }
 	;
-role:
-	IPT_ROLE '=' IPT_IPF		{ $$ = IPL_LOGIPF; }
-	| IPT_ROLE '=' IPT_NAT		{ $$ = IPL_LOGNAT; }
-	| IPT_ROLE '=' IPT_AUTH		{ $$ = IPL_LOGAUTH; }
-	| IPT_ROLE '=' IPT_COUNT	{ $$ = IPL_LOGCOUNT; }
+
+role:	IPT_ROLE '=' unit		{ $$ = $3; }
+	;
+
+unit:	IPT_IPF				{ $$ = IPL_LOGIPF; }
+	| IPT_NAT			{ $$ = IPL_LOGNAT; }
+	| IPT_AUTH			{ $$ = IPL_LOGAUTH; }
+	| IPT_COUNT			{ $$ = IPL_LOGCOUNT; }
 	;
 
 ipftree:
@@ -394,7 +397,7 @@ end:	'}'				{ yyexpectaddr = 0; }
 	;
 
 poolline:
-	IPT_POOL role '/' IPT_DSTLIST '(' IPT_NAME YY_STR ';' dstopts ')'
+	IPT_POOL unit '/' IPT_DSTLIST '(' IPT_NAME YY_STR ';' dstopts ')'
 	'{' dstlist '}'
 					{ bzero((char *)&ipld, sizeof(ipld));
 					  strncpy(ipld.ipld_name, $7,
@@ -404,7 +407,7 @@ poolline:
 					  resetlexer();
 					  use_inet6 = 0;
 					}
-	| IPT_POOL role '/' IPT_TREE '(' IPT_NAME YY_STR ';' ')'
+	| IPT_POOL unit '/' IPT_TREE '(' IPT_NAME YY_STR ';' ')'
 	  '{' addrlist '}'
 					{ bzero((char *)&iplo, sizeof(iplo));
 					  strncpy(iplo.ipo_name, $7,
@@ -415,7 +418,7 @@ poolline:
 					  resetlexer();
 					  use_inet6 = 0;
 					}
-	| IPT_POOL role '/' IPT_HASH '(' IPT_NAME YY_STR ';' hashoptlist ')'
+	| IPT_POOL unit '/' IPT_HASH '(' IPT_NAME YY_STR ';' hashoptlist ')'
 	  '{' hashlist '}'
 					{ bzero((char *)&ipht, sizeof(ipht));
 					  strncpy(ipht.iph_name, $7,
@@ -425,7 +428,7 @@ poolline:
 					  resetlexer();
 					  use_inet6 = 0;
 					}
-	| IPT_POOL role '/' IPT_GROUPMAP '(' IPT_NAME YY_STR ';' ')'
+	| IPT_POOL unit '/' IPT_GROUPMAP '(' IPT_NAME YY_STR ';' ')'
 	  '{' setgrouplist '}'
 					{ bzero((char *)&ipht, sizeof(ipht));
 					  strncpy(ipht.iph_name, $7,
