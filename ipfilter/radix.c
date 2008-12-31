@@ -108,8 +108,7 @@ typedef struct radix_softc_s {
 
 static u_char normal_chars[] = {0, 0x80, 0xc0, 0xe0, 0xf0, 0xf8, 0xfc, 0xfe, 0xff};
 
-#undef bcmp
-#define bcmp(a, b, l) (l == 0 ? 0 : bcmp((void *)(a), (void *)(b), (u_long)l))
+#define Bcmp(a, b, l) (l == 0 ? 0 : bcmp((void *)(a), (void *)(b), (u_long)l))
 
 static int ipf_rn_satisfies_leaf __P((radix_softc_t *, u_char *, struct ipf_radix_node *, int));
 static int ipf_rn_lexobetter __P((void *, void *));
@@ -514,7 +513,7 @@ ipf_rn_addmask(soft, n_arg, search, skip)
 		bzero(softr->addmask_key + m0, last_zeroed - m0);
 	*softr->addmask_key = last_zeroed = mlen;
 	x = ipf_rn_search(softr->addmask_key, softr->mask_rnhead->rnh_treetop);
-	if (bcmp(softr->addmask_key, x->rn_key, mlen) != 0)
+	if (Bcmp(softr->addmask_key, x->rn_key, mlen) != 0)
 		x = 0;
 	if (x || search)
 		return (x);
@@ -786,7 +785,7 @@ ipf_rn_delete(soft, v_arg, netmask_arg, head)
 	saved_tt = tt;
 	top = x;
 	if (tt == 0 ||
-	    bcmp(v + head_off, tt->rn_key + head_off, vlen - head_off))
+	    Bcmp(v + head_off, tt->rn_key + head_off, vlen - head_off))
 		return (0);
 	/*
 	 * Delete our route from mask lists.
