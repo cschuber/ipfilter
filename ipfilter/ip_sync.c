@@ -1455,7 +1455,7 @@ ipf_sync_poll_wakeup(softc)
 	MUTEX_EXIT(&softs->ipsl_mutex);
 	pollwakeup(&softc->ipf_poll_head[IPL_LOGSYNC], POLLIN|POLLRDNORM);
 #  else
-	wakeup(&softs->sl_tail);
+	WAKEUP(&softs->sl_tail, 0);
 	POLLWAKEUP(IPL_LOGSYNC);
 #  endif
 # endif
