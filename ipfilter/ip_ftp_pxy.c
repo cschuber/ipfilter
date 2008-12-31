@@ -35,6 +35,11 @@
 #define	FTPXY_PASS_2	14
 #define	FTPXY_PAOK_2	15
 
+#define	FTPXY_JUNK_OK	0
+#define	FTPXY_JUNK_BAD	1	/* Ignore all commands for this connection */
+#define	FTPXY_JUNK_EOL	2	/* consume the rest of this line only */
+#define	FTPXY_JUNK_CONT	3	/* Saerching for next numeric */
+
 /*
  * Values for FTP commands.  Numerics cover 0-999
  */
@@ -806,8 +811,8 @@ size_t len;
 
 	s = buf;
 
-	if (ftps->ftps_junk == 1)
-		return 1;
+	if (ftps->ftps_junk == FTPXY_JUNK_BAD)
+		return FTPXY_JUNK_BAD;
 
 	if (i < 5) {
 		if (ippr_ftp_debug > 3)
@@ -849,7 +854,7 @@ bad_client_command:
 			       "ippr_ftp_client_valid",
 			       ftps->ftps_junk, (int)len, (int)i, c,
 			       (int)len, (int)len, buf);
-		return 1;
+		return FTPXY_JUNK_BAD;
 	}
 
 	for (; i; i--) {
@@ -884,8 +889,8 @@ size_t len;
 	s = buf;
 	cmd = 0;
 
-	if (ftps->ftps_junk == 1)
-		return 1;
+	if (ftps->ftps_junk == FTPXY_JUNK_BAD)
+		return FTPXY_JUNK_BAD;
 
 	if (i < 5) {
 		if (ippr_ftp_debug > 3)
@@ -895,8 +900,10 @@ size_t len;
 
 	c = *s++;
 	i--;
-	if (c == ' ')
+	if (c == ' ') {
+		cmd = -1;
 		goto search_eol;
+	}
 
 	if (ISDIGIT(c)) {
 		cmd = (c - '0') * 100;
@@ -912,6 +919,8 @@ size_t len;
 				i--;
 				if ((c != '-') && (c != ' '))
 					goto bad_server_command;
+				if (c == '-')
+					return FTPXY_JUNK_CONT;
 			} else
 				goto bad_server_command;
 		} else
@@ -923,21 +932,28 @@ bad_server_command:
 			       "ippr_ftp_server_valid",
 			       ftps->ftps_junk, (int)len, (int)i,
 			       c, (int)len, (int)len, buf);
-		return 1;
+		if (ftps->ftps_junk == FTPXY_JUNK_CONT)
+			return FTPXY_JUNK_CONT;
+		return FTPXY_JUNK_BAD;
 	}
 search_eol:
 	for (; i; i--) {
 		pc = c;
 		c = *s++;
 		if ((pc == '\r') && (c == '\n')) {
-			ftps->ftps_cmds = cmd;
-			return 0;
+			if (cmd == -1) {
+				if (ftps->ftps_junk == FTPXY_JUNK_CONT)
+					return FTPXY_JUNK_CONT;
+			} else {
+				ftps->ftps_cmds = cmd;
+			}
+			return FTPXY_JUNK_OK;
 		}
 	}
 	if (ippr_ftp_debug > 3)
 		printf("ippr_ftp_server_valid:junk after cmd[%*.*s]\n",
 		       (int)len, (int)len, buf);
-	return 2;
+	return FTPXY_JUNK_EOL;
 }
 
 
@@ -1172,7 +1188,7 @@ int rv;
 			       len, len, rptr);
 
 		f->ftps_wptr = wptr;
-		if (f->ftps_junk != 0) {
+		if (f->ftps_junk != FTPXY_JUNK_OK) {
 			i = f->ftps_junk;
 			f->ftps_junk = ippr_ftp_valid(ftp, rv, rptr,
 						      wptr - rptr);
@@ -1181,7 +1197,7 @@ int rv;
 				printf("%s:junk %d -> %d\n",
 				       "ippr_ftp_process", i, f->ftps_junk);
 
-			if (f->ftps_junk != 0) {
+			if (f->ftps_junk != FTPXY_JUNK_OK) {
 				if (wptr - rptr == sizeof(f->ftps_buf)) {
 					if (ippr_ftp_debug > 4)
 						printf("%s:full buffer\n",
@@ -1190,19 +1206,12 @@ int rv;
 					f->ftps_wptr = f->ftps_buf;
 					rptr = f->ftps_rptr;
 					wptr = f->ftps_wptr;
-					/*
-					 * Because we throw away data here that
-					 * we would otherwise parse, set the
-					 * junk flag to indicate just ignore
-					 * any data upto the next CRLF.
-					 */
-					f->ftps_junk = 1;
 					continue;
 				}
 			}
 		}
 
-		while ((f->ftps_junk == 0) && (wptr > rptr)) {
+		while ((f->ftps_junk == FTPXY_JUNK_OK) && (wptr > rptr)) {
 			len = wptr - rptr;
 			f->ftps_junk = ippr_ftp_valid(ftp, rv, rptr, len);
 
@@ -1214,7 +1223,7 @@ int rv;
 				printf("buf [%*.*s]\n", len, len, rptr);
 			}
 
-			if (f->ftps_junk == 0) {
+			if (f->ftps_junk == FTPXY_JUNK_OK) {
 				f->ftps_rptr = rptr;
 				if (rv)
 					inc += ippr_ftp_server(fin, ip, nat,
@@ -1231,7 +1240,7 @@ int rv;
 		 * Off to a bad start so lets just forget about using the
 		 * ftp proxy for this connection.
 		 */
-		if ((f->ftps_cmds == 0) && (f->ftps_junk == 1)) {
+		if ((f->ftps_cmds == 0) && (f->ftps_junk == FTPXY_JUNK_BAD)) {
 			/* f->ftps_seq[1] += inc; */
 
 			if (ippr_ftp_debug > 1)
@@ -1240,12 +1249,13 @@ int rv;
 			return APR_ERR(2);
 		}
 
-		if ((f->ftps_junk != 0) && (rptr < wptr)) {
+		if ((f->ftps_junk != FTPXY_JUNK_OK) && (rptr < wptr)) {
 			for (s = rptr; s < wptr; s++) {
 				if ((*s == '\r') && (s + 1 < wptr) &&
 				    (*(s + 1) == '\n')) {
 					rptr = s + 2;
-					f->ftps_junk = 0;
+					if (f->ftps_junk != FTPXY_JUNK_CONT)
+						f->ftps_junk = FTPXY_JUNK_OK;
 					break;
 				}
 			}
