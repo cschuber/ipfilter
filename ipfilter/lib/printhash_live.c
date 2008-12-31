@@ -50,14 +50,16 @@ iphtable_t *printhash_live(hp, fd, name, opts)
 	top = NULL;
 	printed = 0;
 
-	while (!last && (ioctl(fd, SIOCLOOKUPITER, &obj) == 0)) {
-		if (entry.ipe_next == NULL)
-			last = 1;
-		entry.ipe_next = top;
-		top = malloc(sizeof(*top));
-		if (top == NULL)
-			break;
-		bcopy(&entry, top, sizeof(entry));
+	if (hp->iph_list != NULL) {
+		while (!last && (ioctl(fd, SIOCLOOKUPITER, &obj) == 0)) {
+			if (entry.ipe_next == NULL)
+				last = 1;
+			entry.ipe_next = top;
+			top = malloc(sizeof(*top));
+			if (top == NULL)
+				break;
+			bcopy(&entry, top, sizeof(entry));
+		}
 	}
 
 	while (top != NULL) {

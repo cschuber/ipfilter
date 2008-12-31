@@ -51,15 +51,17 @@ ip_pool_t *printpool_live(pool, fd, name, opts)
 	top = NULL;
 	printed = 0;
 
-	while (!last && (ioctl(fd, SIOCLOOKUPITER, &obj) == 0)) {
-		if (entry.ipn_next == NULL)
-			last = 1;
-		node = malloc(sizeof(*top));
-		if (node == NULL)
-			break;
-		bcopy(&entry, node, sizeof(entry));
-		node->ipn_next = top;
-		top = node;
+	if (pool->ipo_list != NULL) {
+		while (!last && (ioctl(fd, SIOCLOOKUPITER, &obj) == 0)) {
+			if (entry.ipn_next == NULL)
+				last = 1;
+			node = malloc(sizeof(*top));
+			if (node == NULL)
+				break;
+			bcopy(&entry, node, sizeof(entry));
+			node->ipn_next = top;
+			top = node;
+		}
 	}
 
 	while (top != NULL) {
