@@ -90,6 +90,7 @@ void *ipf_dstlist_select_ref __P((void *, int, char *));
 void ipf_dstlist_unselect_deref __P((ipf_dstnode_t *));
 static void ipf_dstlist_node_free __P((ipf_dstnode_t *));
 static int ipf_dstlist_node_deref __P((ipf_dstnode_t *));
+static void ipf_dstlist_expire __P((ipf_main_softc_t *, void *));
 
 ipf_lookup_t ipf_dstlist_backend = {
 	IPLT_DSTLIST,
@@ -108,7 +109,8 @@ ipf_lookup_t ipf_dstlist_backend = {
 	ipf_dstlist_table_del,
 	ipf_dstlist_table_deref,
 	ipf_dstlist_table_find,
-	ipf_dstlist_select_ref
+	ipf_dstlist_select_ref,
+	ipf_dstlist_expire
 };
 
 
@@ -739,4 +741,13 @@ ipf_dstlist_unselect_deref(node)
 	} else {
 		ipf_dstlist_node_free(node);
 	}
+}
+
+
+static void
+ipf_dstlist_expire(softc, arg)
+	ipf_main_softc_t *softc;
+	void *arg;
+{
+	return;
 }

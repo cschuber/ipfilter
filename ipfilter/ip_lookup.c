@@ -84,8 +84,8 @@ typedef struct ipf_lookup_softc_s {
 
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_lookup_init                                             */
-/* Returns:     int     - 0 = success, else error                           */
-/* Parameters:  Nil                                                         */
+/* Returns:     int      - 0 = success, else error                          */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
 /*                                                                          */
 /* Initialise all of the subcomponents of the lookup infrstructure.         */
 /* ------------------------------------------------------------------------ */
@@ -115,6 +115,14 @@ ipf_lookup_soft_create(softc)
 }
 
 
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_lookup_soft_init                                        */
+/* Returns:     int      - 0 = success, else error                          */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              arg(I)   - pointer to local context to use                  */
+/*                                                                          */
+/* Initialise all of the subcomponents of the lookup infrstructure.         */
+/* ------------------------------------------------------------------------ */
 int
 ipf_lookup_soft_init(softc, arg)
 	ipf_main_softc_t *softc;
@@ -134,6 +142,14 @@ ipf_lookup_soft_init(softc, arg)
 }
 
 
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_lookup_soft_fini                                        */
+/* Returns:     int      - 0 = success, else error                          */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              arg(I)   - pointer to local context to use                  */
+/*                                                                          */
+/* Call the fini function in each backend to cleanup all allocated data.    */
+/* ------------------------------------------------------------------------ */
 int
 ipf_lookup_soft_fini(softc, arg)
 	ipf_main_softc_t *softc;
@@ -153,9 +169,32 @@ ipf_lookup_soft_fini(softc, arg)
 
 
 /* ------------------------------------------------------------------------ */
+/* Function:    ipf_lookup_expire                                           */
+/* Returns:     Nil                                                         */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*                                                                          */
+/* Step through each of the backends and call their expire functions,       */
+/* allowing them to delete any lifetime limited data.                       */
+/* ------------------------------------------------------------------------ */
+void
+ipf_lookup_expire(softc)
+	ipf_main_softc_t *softc;
+{
+	ipf_lookup_softc_t *softl = softc->ipf_lookup_soft;
+	int i;
+
+	WRITE_ENTER(&softc->ipf_poolrw);
+	for (i = 0; i < MAX_BACKENDS; i++)
+		(*backends[i]->ipfl_expire)(softc, softl->ipf_back[i]);
+	RWLOCK_EXIT(&softc->ipf_poolrw);
+}
+
+
+/* ------------------------------------------------------------------------ */
 /* Function:    ipf_lookup_softc_destroy                                    */
 /* Returns:     int     - 0 = success, else error                           */
-/* Parameters:  Nil                                                         */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              arg(I)   - pointer to local context to use                  */
 /*                                                                          */
 /* Free up all pool related memory that has been allocated whilst IPFilter  */
 /* has been running.  Also, do any other deinitialisation required such     */
@@ -182,10 +221,14 @@ ipf_lookup_soft_destroy(softc, arg)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_lookup_ioctl                                            */
 /* Returns:     int      - 0 = success, else error                          */
-/* Parameters:  data(IO) - pointer to ioctl data to be copied to/from user  */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              arg(I)   - pointer to local context to use                  */
+/*              data(IO) - pointer to ioctl data to be copied to/from user  */
 /*                         space.                                           */
 /*              cmd(I)   - ioctl command number                             */
 /*              mode(I)  - file mode bits used with open                    */
+/*              uid(I)   - uid of process doing ioctl                       */
+/*              ctx(I)   - pointer that represents context for uid          */
 /*                                                                          */
 /* Handle ioctl commands sent to the ioctl device.  For the most part, this */
 /* involves just calling another function to handle the specifics of each   */
@@ -268,7 +311,8 @@ ipf_lookup_ioctl(softc, data, cmd, mode, uid, ctx)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_lookup_addnode                                          */
 /* Returns:     int     - 0 = success, else error                           */
-/* Parameters:  data(I) - pointer to data from ioctl call                   */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              data(I) - pointer to data from ioctl call                   */
 /*                                                                          */
 /* Add a new data node to a lookup structure.  First, check to see if the   */
 /* parent structure refered to by name exists and if it does, then go on to */
@@ -319,7 +363,8 @@ ipf_lookup_addnode(softc, data)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_lookup_delnode                                          */
 /* Returns:     int     - 0 = success, else error                           */
-/* Parameters:  data(I) - pointer to data from ioctl call                   */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              data(I) - pointer to data from ioctl call                   */
 /*                                                                          */
 /* Delete a node from a lookup table by first looking for the table it is   */
 /* in and then deleting the entry that gets found.                          */
@@ -366,7 +411,8 @@ ipf_lookup_delnode(softc, data)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_lookup_addtable                                         */
 /* Returns:     int     - 0 = success, else error                           */
-/* Parameters:  data(I) - pointer to data from ioctl call                   */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              data(I) - pointer to data from ioctl call                   */
 /*                                                                          */
 /* Create a new lookup table, if one doesn't already exist using the name   */
 /* for this one.                                                            */
@@ -425,7 +471,8 @@ ipf_lookup_addtable(softc, data)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_lookup_deltable                                         */
 /* Returns:     int     - 0 = success, else error                           */
-/* Parameters:  data(I) - pointer to data from ioctl call                   */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              data(I) - pointer to data from ioctl call                   */
 /*                                                                          */
 /* Decodes ioctl request to remove a particular hash table or pool and      */
 /* calls the relevant function to do the cleanup.                           */
@@ -473,7 +520,8 @@ ipf_lookup_deltable(softc, data)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_lookup_stats                                            */
 /* Returns:     int     - 0 = success, else error                           */
-/* Parameters:  data(I) - pointer to data from ioctl call                   */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              data(I) - pointer to data from ioctl call                   */
 /*                                                                          */
 /* Copy statistical information from inside the kernel back to user space.  */
 /* ------------------------------------------------------------------------ */
@@ -520,7 +568,8 @@ ipf_lookup_stats(softc, data)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_lookup_flush                                            */
 /* Returns:     int     - 0 = success, else error                           */
-/* Parameters:  data(I) - pointer to data from ioctl call                   */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              data(I) - pointer to data from ioctl call                   */
 /*                                                                          */
 /* A flush is called when we want to flush all the nodes from a particular  */
 /* entry in the hash table/pool or want to remove all groups from those.    */
@@ -578,7 +627,8 @@ ipf_lookup_flush(softc, data)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_lookup_delref                                           */
 /* Returns:     void                                                        */
-/* Parameters:  type(I) - table type to operate on                          */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              type(I) - table type to operate on                          */
 /*              ptr(I)  - pointer to object to remove reference for         */
 /*                                                                          */
 /* This function organises calling the correct deref function for a given   */
@@ -612,7 +662,8 @@ ipf_lookup_deref(softc, type, ptr)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_lookup_iterate                                          */
 /* Returns:     int     - 0 = success, else error                           */
-/* Parameters:  data(I) - pointer to data from ioctl call                   */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              data(I) - pointer to data from ioctl call                   */
 /*              uid(I)  - uid of caller                                     */
 /*              ctx(I)  - pointer to give the uid context                   */
 /*                                                                          */
@@ -677,10 +728,15 @@ ipf_lookup_iterate(softc, data, uid, ctx)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_lookup_iterderef                                        */
 /* Returns:     int     - 0 = success, else error                           */
-/* Parameters:  data(I) - pointer to data from ioctl call                   */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              type(I)  - backend type to iterate through                  */
+/*              data(I)  - pointer to data from ioctl call                  */
 /*                                                                          */
 /* Decodes ioctl request to remove a particular hash table or pool and      */
 /* calls the relevant function to do the cleanup.                           */
+/* Because each of the backend types has a different data structure,        */
+/* iteration is limited to one type at a time (i.e. it is not permitted to  */
+/* go on from pool types to hash types as part of the "get next".)          */
 /* ------------------------------------------------------------------------ */
 void
 ipf_lookup_iterderef(softc, type, data)
@@ -718,7 +774,8 @@ ipf_lookup_iterderef(softc, type, data)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_lookup_deltok                                           */
 /* Returns:     int     - 0 = success, else error                           */
-/* Parameters:  data(I) - pointer to data from ioctl call                   */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              data(I) - pointer to data from ioctl call                   */
 /*              uid(I)  - uid of caller                                     */
 /*              ctx(I)  - pointer to give the uid context                   */
 /*                                                                          */
@@ -748,8 +805,9 @@ ipf_lookup_deltok(softc, data, uid, ctx)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_lookup_res_num                                          */
 /* Returns:     void * - NULL = failure, else success.                      */
-/* Parameters:  unit(I)     - device for which this is for                  */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
 /*              type(I)     - type of lookup these parameters are for.      */
+/*              unit(I)     - device for which this is for                  */
 /*              number(I)   - table number to use when searching            */
 /*              funcptr(IO) - pointer to pointer for storing IP address     */
 /*                            searching function.                           */
@@ -782,8 +840,9 @@ ipf_lookup_res_num(softc, type, unit, number, funcptr)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_lookup_res_name                                         */
 /* Returns:     void * - NULL = failure, else success.                      */
-/* Parameters:  unit(I)     - device for which this is for                  */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
 /*              type(I)     - type of lookup these parameters are for.      */
+/*              unit(I)     - device for which this is for                  */
 /*              name(I)     - table name to use when searching              */
 /*              funcptr(IO) - pointer to pointer for storing IP address     */
 /*                            searching function.                           */
@@ -831,6 +890,17 @@ ipf_lookup_res_name(softc, type, unit, name, funcptr)
 }
 
 
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_lookup_find_htable                                      */
+/* Returns:     void * - NULL = failure, else success.                      */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              unit(I)     - device for which this is for                  */
+/*              name(I)     - table name to use when searching              */
+/*                                                                          */
+/* To support the group-map feature, where a hash table maps address        */
+/* networks to rule group numbers, we need to expose a function that uses   */
+/* only the hash table backend.                                             */
+/* ------------------------------------------------------------------------ */
 void *
 ipf_lookup_find_htable(softc, unit, name)
 	ipf_main_softc_t *softc;

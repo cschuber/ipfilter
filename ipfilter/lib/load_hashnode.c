@@ -15,10 +15,11 @@
 static int hashfd = -1;
 
 
-int load_hashnode(unit, name, node, iocfunc)
+int load_hashnode(unit, name, node, ttl, iocfunc)
 	int unit;
 	char *name;
 	iphtent_t *node;
+	int ttl;
 	ioctlfunc_t iocfunc;
 {
 	iplookupop_t op;
@@ -39,6 +40,7 @@ int load_hashnode(unit, name, node, iocfunc)
 
 	bzero((char *)&ipe, sizeof(ipe));
 	ipe.ipe_family = node->ipe_family;
+	ipe.ipe_die = ttl;
 	bcopy((char *)&node->ipe_addr, (char *)&ipe.ipe_addr,
 	      sizeof(ipe.ipe_addr));
 	bcopy((char *)&node->ipe_mask, (char *)&ipe.ipe_mask,

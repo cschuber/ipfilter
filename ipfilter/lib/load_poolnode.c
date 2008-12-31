@@ -15,10 +15,11 @@
 static int poolfd = -1;
 
 
-int load_poolnode(role, name, node, iocfunc)
+int load_poolnode(role, name, node, ttl, iocfunc)
 	int role;
 	char *name;
 	ip_pool_node_t *node;
+	int ttl;
 	ioctlfunc_t iocfunc;
 {
 	ip_pool_node_t pn;
@@ -43,6 +44,7 @@ int load_poolnode(role, name, node, iocfunc)
 	bcopy((char *)&node->ipn_mask, (char *)&pn.ipn_mask,
 	      sizeof(pn.ipn_mask));
 	pn.ipn_info = node->ipn_info;
+	pn.ipn_die = ttl;
 	strncpy(pn.ipn_name, node->ipn_name, sizeof(pn.ipn_name));
 
 	if ((opts & OPT_REMOVE) == 0)

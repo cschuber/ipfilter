@@ -272,10 +272,11 @@ extern char *kvatoname __P((ipfunc_t, ioctlfunc_t));
 extern alist_t *load_file __P((char *));
 extern int load_hash __P((struct iphtable_s *, struct iphtent_s *,
 			  ioctlfunc_t));
-extern int load_hashnode __P((int, char *, struct iphtent_s *, ioctlfunc_t));
+extern int load_hashnode __P((int, char *, struct iphtent_s *, int,
+			      ioctlfunc_t));
 extern alist_t *load_http __P((char *));
 extern int load_pool __P((struct ip_pool_s *list, ioctlfunc_t));
-extern int load_poolnode __P((int, char *, ip_pool_node_t *, ioctlfunc_t));
+extern int load_poolnode __P((int, char *, ip_pool_node_t *, int, ioctlfunc_t));
 extern alist_t *load_url __P((char *));
 extern alist_t *make_range __P((int, struct in_addr, struct in_addr));
 extern ipfunc_t nametokva __P((char *, ioctlfunc_t));

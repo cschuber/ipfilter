@@ -72,12 +72,12 @@ void usage(prog)
 	char *prog;
 {
 	fprintf(stderr, "Usage:\t%s\n", prog);
-	fprintf(stderr, "\t\t\t-a [-dnv] [-m <name>] [-o <role>] -i <ipaddr>[/netmask]\n");
+	fprintf(stderr, "\t\t\t-a [-dnv] [-m <name>] [-o <role>] [-t type] [-T ttl] -i <ipaddr>[/netmask]\n");
 	fprintf(stderr, "\t\t\t-A [-dnv] [-m <name>] [-o <role>] [-S <seed>] [-t <type>]\n");
 	fprintf(stderr, "\t\t\t-f <file> [-dnuv]\n");
 	fprintf(stderr, "\t\t\t-F [-dv] [-o <role>] [-t <type>]\n");
 	fprintf(stderr, "\t\t\t-l [-dv] [-m <name>] [-t <type>]\n");
-	fprintf(stderr, "\t\t\t-r [-dnv] [-m <name>] [-o <role>] -i <ipaddr>[/netmask]\n");
+	fprintf(stderr, "\t\t\t-r [-dnv] [-m <name>] [-o <role>] [-t type] -i <ipaddr>[/netmask]\n");
 	fprintf(stderr, "\t\t\t-R [-dnv] [-m <name>] [-o <role>] [-t <type>]\n");
 	fprintf(stderr, "\t\t\t-s [-dtv] [-M <core>] [-N <namelist>]\n");
 	exit(1);
@@ -135,7 +135,7 @@ int poolnodecommand(remove, argc, argv)
 	int remove, argc;
 	char *argv[];
 {
-	int err = 0, c, ipset, role, type = IPLT_POOL;
+	int err = 0, c, ipset, role, type = IPLT_POOL, ttl = 0;
 	char *poolname = NULL;
 	ip_pool_node_t pnode;
 	iphtent_t hnode;
@@ -146,7 +146,7 @@ int poolnodecommand(remove, argc, argv)
 	bzero((char *)&pnode, sizeof(pnode));
 	bzero((char *)&hnode, sizeof(hnode));
 
-	while ((c = getopt(argc, argv, "di:m:no:Rv")) != -1)
+	while ((c = getopt(argc, argv, "di:m:no:Rt:T:v")) != -1)
 		switch (c)
 		{
 		case 'd' :
@@ -195,6 +195,13 @@ int poolnodecommand(remove, argc, argv)
 				break;
 			}
 			break;
+		case 'T' :
+			ttl = atoi(optarg);
+			if (ttl < 0) {
+				fprintf(stderr, "cannot set negative ttl\n");
+				return -1;
+			}
+			break;
 		case 'v' :
 			opts |= OPT_VERBOSE;
 			break;
@@ -221,13 +228,13 @@ int poolnodecommand(remove, argc, argv)
 	switch (type) {
 	case IPLT_POOL :
 		if (remove == 0)
-			err = load_poolnode(role, poolname, &pnode, ioctl);
+			err = load_poolnode(role, poolname, &pnode, ttl, ioctl);
 		else
 			err = remove_poolnode(role, poolname, &pnode, ioctl);
 		break;
 	case IPLT_HASH :
 		if (remove == 0)
-			err = load_hashnode(role, poolname, &hnode, ioctl);
+			err = load_hashnode(role, poolname, &hnode, ttl, ioctl);
 		else
 			err = remove_hashnode(role, poolname, &hnode, ioctl);
 		break;
@@ -255,7 +262,7 @@ int poolcommand(remove, argc, argv)
 	bzero((char *)&iph, sizeof(iph));
 	bzero((char *)&pool, sizeof(pool));
 
-	while ((c = getopt(argc, argv, "dm:no:RSt:v")) != -1)
+	while ((c = getopt(argc, argv, "dm:no:RSv")) != -1)
 		switch (c)
 		{
 		case 'd' :
@@ -281,13 +288,6 @@ int poolcommand(remove, argc, argv)
 		case 'S' :
 			iph.iph_seed = atoi(optarg);
 			break;
-		case 't' :
-			type = gettype(optarg, &iph.iph_type);
-			if (type == IPLT_NONE) {
-				fprintf(stderr, "unknown type '%s'\n", optarg);
-				return -1;
-			}
-			break;
 		case 'v' :
 			opts |= OPT_VERBOSE;
 			break;
@@ -298,6 +298,12 @@ int poolcommand(remove, argc, argv)
 
 	if (poolname == NULL) {
 		fprintf(stderr, "poolname not given with add/remove pool\n");
+		return -1;
+	}
+
+	type = gettype(argv[optind], &iph.iph_type);
+	if (type == IPLT_NONE) {
+		fprintf(stderr, "unknown type '%s'\n", argv[optind]);
 		return -1;
 	}
 
@@ -582,13 +588,13 @@ int gettype(typename, minor)
 {
 	int type;
 
-	if (!strcasecmp(optarg, "tree") || !strcasecmp(optarg, "pool")) {
+	if (!strcasecmp(typename, "tree") || !strcasecmp(typename, "pool")) {
 		type = IPLT_POOL;
-	} else if (!strcasecmp(optarg, "hash")) {
+	} else if (!strcasecmp(typename, "hash")) {
 		type = IPLT_HASH;
 		if (minor != NULL)
 			*minor = IPHASH_LOOKUP;
-	} else if (!strcasecmp(optarg, "group-map")) {
+	} else if (!strcasecmp(typename, "group-map")) {
 		type = IPLT_HASH;
 		if (minor != NULL)
 			*minor = IPHASH_GROUPMAP;

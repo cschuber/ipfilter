@@ -100,7 +100,7 @@ int load_hash(iphp, list, iocfunc)
 		printf("Hash %s:\n", iph.iph_name);
 
 	for (a = list; a != NULL; a = a->ipe_next)
-		load_hashnode(iphp->iph_unit, iph.iph_name, a, iocfunc);
+		load_hashnode(iphp->iph_unit, iph.iph_name, a, 0, iocfunc);
 
 	if ((opts & OPT_REMOVE) != 0) {
 		if ((*iocfunc)(hashfd, SIOCLOOKUPDELTABLE, &op))

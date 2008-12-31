@@ -79,6 +79,7 @@ typedef struct ipf_pool_softc_s {
 	void		*ipf_radix;
 	ip_pool_t	*ipf_pool_list[IPL_LOGSIZE];
 	ipf_pool_stat_t	ipf_pool_stats;
+	ip_pool_node_t	*ipf_node_explist;
 } ipf_pool_softc_t;
 
 
@@ -91,8 +92,8 @@ static void *ipf_pool_find __P((void *, int, char *));
 static ip_pool_node_t *ipf_pool_findeq __P((ipf_pool_softc_t *, ip_pool_t *,
 					    addrfamily_t *, addrfamily_t *));
 static void ipf_pool_free __P((ipf_pool_softc_t *, ip_pool_t *));
-static int ipf_pool_insert __P((ipf_main_softc_t *, ipf_pool_softc_t *, ip_pool_t *,
-				struct ip_pool_node *));
+static int ipf_pool_insert_node __P((ipf_main_softc_t *, ipf_pool_softc_t *,
+				     ip_pool_t *, struct ip_pool_node *));
 static int ipf_pool_iter_deref __P((ipf_main_softc_t *, void *, int, int, void *));
 static int ipf_pool_iter_next __P((ipf_main_softc_t *,  void *, ipftoken_t *,
 				   ipflookupiter_t *));
@@ -100,8 +101,8 @@ static size_t ipf_pool_flush __P((ipf_main_softc_t *, void *, iplookupflush_t *)
 static int ipf_pool_node_add __P((ipf_main_softc_t *, void *, iplookupop_t *));
 static int ipf_pool_node_del __P((ipf_main_softc_t *, void *, iplookupop_t *));
 static void ipf_pool_node_deref __P((ipf_pool_softc_t *, ip_pool_node_t *));
-static int ipf_pool_remove __P((ipf_pool_softc_t *, ip_pool_t *,
-				ip_pool_node_t *));
+static int ipf_pool_remove_node __P((ipf_pool_softc_t *, ip_pool_t *,
+				     ip_pool_node_t *));
 static int ipf_pool_search __P((ipf_main_softc_t *, void *, int, void *));
 static void *ipf_pool_soft_create __P((ipf_main_softc_t *));
 static void ipf_pool_soft_destroy __P((ipf_main_softc_t *, void *));
@@ -111,6 +112,7 @@ static int ipf_pool_stats_get __P((ipf_main_softc_t *, void *, iplookupop_t *));
 static int ipf_pool_table_add __P((ipf_main_softc_t *, void *, iplookupop_t *));
 static int ipf_pool_table_del __P((ipf_main_softc_t *, void *, iplookupop_t *));
 static void *ipf_pool_select_add_ref __P((void *, int, char *));
+static void ipf_pool_expire __P((ipf_main_softc_t *, void *));
 
 ipf_lookup_t ipf_pool_backend = {
 	IPLT_POOL,
@@ -129,7 +131,8 @@ ipf_lookup_t ipf_pool_backend = {
 	ipf_pool_table_del,
 	ipf_pool_deref,
 	ipf_pool_find,
-	ipf_pool_select_add_ref
+	ipf_pool_select_add_ref,
+	ipf_pool_expire
 };
 
 
@@ -164,32 +167,32 @@ main(argc, argv)
 	node.ipn_addr.adf_addr.in4.s_addr = 0x0a010203;
 	node.ipn_mask.adf_addr.in4.s_addr = 0xffffffff;
 	node.ipn_info = 1;
-	ipf_pool_insert(ipo, &node);
+	ipf_pool_insert_node(ipo, &node);
 
 	node.ipn_addr.adf_addr.in4.s_addr = 0x0a000000;
 	node.ipn_mask.adf_addr.in4.s_addr = 0xff000000;
 	node.ipn_info = 0;
-	ipf_pool_insert(ipo, &node);
+	ipf_pool_insert_node(ipo, &node);
 
 	node.ipn_addr.adf_addr.in4.s_addr = 0x0a010100;
 	node.ipn_mask.adf_addr.in4.s_addr = 0xffffff00;
 	node.ipn_info = 1;
-	ipf_pool_insert(ipo, &node);
+	ipf_pool_insert_node(ipo, &node);
 
 	node.ipn_addr.adf_addr.in4.s_addr = 0x0a010200;
 	node.ipn_mask.adf_addr.in4.s_addr = 0xffffff00;
 	node.ipn_info = 0;
-	ipf_pool_insert(ipo, &node);
+	ipf_pool_insert_node(ipo, &node);
 
 	node.ipn_addr.adf_addr.in4.s_addr = 0x0a010000;
 	node.ipn_mask.adf_addr.in4.s_addr = 0xffff0000;
 	node.ipn_info = 1;
-	ipf_pool_insert(ipo, &node);
+	ipf_pool_insert_node(ipo, &node);
 
 	node.ipn_addr.adf_addr.in4.s_addr = 0x0a01020f;
 	node.ipn_mask.adf_addr.in4.s_addr = 0xffffffff;
 	node.ipn_info = 1;
-	ipf_pool_insert(ipo, &node);
+	ipf_pool_insert_node(ipo, &node);
 #ifdef	DEBUG_POOL
 	treeprint(ipo);
 #endif
@@ -406,7 +409,7 @@ ipf_pool_node_add(softc, arg, op)
 		softc->ipf_interror = 70018;
 		return EEXIST;
 	}
-	err = ipf_pool_insert(softc, arg, p, &node);
+	err = ipf_pool_insert_node(softc, arg, p, &node);
 
 	return err;
 }
@@ -451,7 +454,7 @@ ipf_pool_node_del(softc, arg, op)
 		softc->ipf_interror = 70022;
 		return ENOENT;
 	}
-	err = ipf_pool_remove(arg, p, m);
+	err = ipf_pool_remove_node(arg, p, m);
 
 	return err;
 }
@@ -590,6 +593,12 @@ ipf_pool_find(arg, unit, name)
 }
 
 
+/* ------------------------------------------------------------------------ */
+/* Function:   ipf_pool_select_add_ref                                      */
+/* Returns:    int - 0 = success, else error                                */
+/* Parameters: op(I) - pointer to lookup operatin data                      */
+/*                                                                          */
+/* ------------------------------------------------------------------------ */
 static void *
 ipf_pool_select_add_ref(arg, unit, name)
 	void *arg;
@@ -692,7 +701,7 @@ ipf_pool_search(softc, tptr, ipversion, dptr)
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    ipf_pool_insert                                             */
+/* Function:    ipf_pool_insert_node                                        */
 /* Returns:     int     - 0 = success, else error                           */
 /* Parameters:  ipo(I)  - pointer to the pool getting the new node.         */
 /*              addr(I) - address being added as a node                     */
@@ -704,7 +713,7 @@ ipf_pool_search(softc, tptr, ipversion, dptr)
 /* in (addr, mask, info) shold all be stored in the node.                   */
 /* ------------------------------------------------------------------------ */
 static int
-ipf_pool_insert(softc, softp, ipo, node)
+ipf_pool_insert_node(softc, softp, ipo, node)
 	ipf_main_softc_t *softc;
 	ipf_pool_softc_t *softp;
 	ip_pool_t *ipo;
@@ -733,9 +742,49 @@ ipf_pool_insert(softc, softp, ipo, node)
 
 	*x = *node;
 	bzero((char *)x->ipn_nodes, sizeof(x->ipn_nodes));
+	x->ipn_owner = ipo;
 	x->ipn_hits = 0;
 	x->ipn_next = NULL;
 	x->ipn_pnext = NULL;
+	x->ipn_dnext = NULL;
+	x->ipn_pdnext = NULL;
+
+	if (x->ipn_die != 0) {
+		/*
+		 * If the new node has a given expiration time, insert it
+		 * into the list of expiring nodes with the ones to be
+		 * removed first added to the front of the list. The
+		 * insertion is O(n) but it is kept sorted for quick scans
+		 * at expiration interval checks.
+		 */
+		ip_pool_node_t *n;
+
+		x->ipn_die = softc->ipf_ticks + IPF_TTLVAL(x->ipn_die);
+		for (n = softp->ipf_node_explist; n != NULL; n = n->ipn_dnext) {
+			if (x->ipn_die < n->ipn_die)
+				break;
+			if (n->ipn_dnext == NULL) {
+				/*
+				 * We've got to the last node and everything
+				 * wanted to be expired before this new node,
+				 * so we have to tack it on the end...
+				 */
+				n->ipn_dnext = x;
+				x->ipn_pdnext = &n->ipn_dnext;
+				n = NULL;
+				break;
+			}
+		}
+
+		if (softp->ipf_node_explist == NULL) {
+			softp->ipf_node_explist = x;
+			x->ipn_pdnext = &softp->ipf_node_explist;
+		} else if (n != NULL) {
+			x->ipn_dnext = n;
+			x->ipn_pdnext = n->ipn_pdnext;
+			n->ipn_pdnext = &x->ipn_dnext;
+		}
+	}
 
 	rn = ipo->ipo_head->rnh_addaddr(softp->ipf_radix,
 					&x->ipn_addr, &x->ipn_mask,
@@ -866,7 +915,7 @@ ipf_pool_create(softc, softp, op)
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    ipf_pool_remove                                             */
+/* Function:    ipf_pool_remove_node                                        */
 /* Returns:     int    - 0 = success, else error                            */
 /* Parameters:  ipo(I) - pointer to the pool to remove the node from.       */
 /*              ipe(I) - address being deleted as a node                    */
@@ -875,7 +924,7 @@ ipf_pool_create(softc, softp, op)
 /* Remove a node from the pool given by ipo.                                */
 /* ------------------------------------------------------------------------ */
 static int
-ipf_pool_remove(softp, ipo, ipe)
+ipf_pool_remove_node(softp, ipo, ipe)
 	ipf_pool_softc_t *softp;
 	ip_pool_t *ipo;
 	ip_pool_node_t *ipe;
@@ -885,6 +934,11 @@ ipf_pool_remove(softp, ipo, ipe)
 		*ipe->ipn_pnext = ipe->ipn_next;
 	if (ipe->ipn_next != NULL)
 		ipe->ipn_next->ipn_pnext = ipe->ipn_pnext;
+
+	if (ipe->ipn_pdnext != NULL)
+		*ipe->ipn_pdnext = ipe->ipn_dnext;
+	if (ipe->ipn_dnext != NULL)
+		ipe->ipn_dnext->ipn_pdnext = ipe->ipn_pdnext;
 
 	ipo->ipo_head->rnh_deladdr(softp->ipf_radix, &ipe->ipn_addr,
 				   &ipe->ipn_mask, ipo->ipo_head);
@@ -1035,6 +1089,12 @@ ipf_pool_clearnodes(softp, ipo)
 		*n->ipn_pnext = n->ipn_next;
 		if (n->ipn_next)
 			n->ipn_next->ipn_pnext = n->ipn_pnext;
+
+		if (n->ipn_pdnext != NULL) {
+			*n->ipn_pdnext = n->ipn_dnext;
+			if (n->ipn_dnext)
+				n->ipn_dnext->ipn_pdnext = n->ipn_pdnext;
+		}
 
 		KFREE(n);
 
@@ -1273,6 +1333,35 @@ ipf_pool_iter_deref(softc, arg, otype, unit, data)
 	}
 
 	return 0;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_pool_expire                                             */
+/* Returns:     Nil                                                         */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              arg(I)   - pointer to local context to use                  */
+/*                                                                          */
+/* At present this function exists just to support temporary addition of    */
+/* nodes to the address pool.                                               */
+/* ------------------------------------------------------------------------ */
+static void
+ipf_pool_expire(softc, arg)
+	ipf_main_softc_t *softc;
+	void *arg;
+{
+	ipf_pool_softc_t *softp = arg;
+	ip_pool_node_t *n;
+
+	while ((n = softp->ipf_node_explist) != NULL) {
+		/*
+		 * Because the list is kept sorted on insertion, the fist
+		 * one that dies in the future means no more work to do.
+		 */
+		if (n->ipn_die > softc->ipf_ticks)
+			break;
+		ipf_pool_remove_node(softp, n->ipn_owner, n);
+	}
 }
 
 

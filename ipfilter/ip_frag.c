@@ -79,6 +79,7 @@ struct file;
 #include "netinet/ip_frag.h"
 #include "netinet/ip_state.h"
 #include "netinet/ip_auth.h"
+#include "netinet/ip_lookup.h"
 #include "netinet/ip_proxy.h"
 #include "netinet/ip_sync.h"
 #if (__FreeBSD_version >= 300000)
@@ -1161,6 +1162,7 @@ ipf_slowtimer(ptr)
 	ipf_state_expire(softc);
 	ipf_nat_expire(softc);
 	ipf_auth_expire(softc);
+	ipf_lookup_expire(softc);
 # ifdef IPFILTER_SYNC
 	ipf_sync_expire(softc);
 # endif
@@ -1169,7 +1171,7 @@ ipf_slowtimer(ptr)
 		goto done;
 # ifdef _KERNEL
 #  if defined(__NetBSD__) && (__NetBSD_Version__ >= 104240000)
-	callout_reset(&ipf_slowtimer_ch, hz / 2, ipf_slowtimer, ptr);
+	callout_reset(&softc->ipf_slow_ch, hz / 2, ipf_slowtimer, ptr);
 #  else
 #   if defined(__OpenBSD__)
 	timeout_add(&ipf_slowtimer_ch, hz/2);

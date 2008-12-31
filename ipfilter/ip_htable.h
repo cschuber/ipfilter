@@ -6,9 +6,12 @@
 typedef	struct	iphtent_s	{
 	struct	iphtent_s	*ipe_next, **ipe_pnext;
 	struct	iphtent_s	*ipe_hnext, **ipe_phnext;
+	struct	iphtent_s	*ipe_dnext, **ipe_pdnext;
+	struct	iphtable_s	*ipe_owner;
 	void		*ipe_ptr;
 	i6addr_t	ipe_addr;
 	i6addr_t	ipe_mask;
+	u_long		ipe_die;
 	int		ipe_ref;
 	int		ipe_unit;
 	char		ipe_family;

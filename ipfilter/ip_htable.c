@@ -84,6 +84,7 @@ static int ipf_htent_deref __P((void *, iphtent_t *));
 static int ipf_htent_insert __P((ipf_main_softc_t *, void *, iphtable_t *, iphtent_t *));
 static int ipf_htent_remove __P((ipf_main_softc_t *, void *, iphtable_t *, iphtent_t *));
 static void *ipf_htable_select_add_ref __P((void *, int, char *));
+static void ipf_htable_expire __P((ipf_main_softc_t *, void *));
 
 
 typedef struct ipf_htable_softc_s {
@@ -91,6 +92,7 @@ typedef struct ipf_htable_softc_s {
 	u_long		ipf_nhtables[IPL_LOGSIZE];
 	u_long		ipf_nhtnodes[IPL_LOGSIZE];
 	iphtable_t	*ipf_htables[IPL_LOGSIZE];
+	iphtent_t	*ipf_node_explist;
 } ipf_htable_softc_t;
 
 ipf_lookup_t ipf_htable_backend = {
@@ -110,7 +112,8 @@ ipf_lookup_t ipf_htable_backend = {
 	ipf_htable_table_del,
 	ipf_htable_deref,
 	ipf_htable_exists,
-	ipf_htable_select_add_ref
+	ipf_htable_select_add_ref,
+	ipf_htable_expire
 };
 
 
@@ -583,6 +586,13 @@ ipf_htent_remove(softc, arg, iph, ipe)
 	ipe->ipe_phnext = NULL;
 	ipe->ipe_hnext = NULL;
 
+	if (ipe->ipe_dnext != NULL)
+		ipe->ipe_dnext->ipe_pdnext = ipe->ipe_pdnext;
+	if (ipe->ipe_pdnext != NULL)
+		*ipe->ipe_pdnext = ipe->ipe_dnext;
+	ipe->ipe_pdnext = NULL;
+	ipe->ipe_dnext = NULL;
+
 	if (ipe->ipe_next != NULL)
 		ipe->ipe_next->ipe_pnext = ipe->ipe_pnext;
 	if (ipe->ipe_pnext != NULL)
@@ -865,6 +875,7 @@ ipf_htent_insert(softc, arg, iph, ipeo)
 #endif
 		return -1;
 
+	ipe->ipe_owner = iph;
 	ipe->ipe_ref = 1;
 	ipe->ipe_hnext = iph->iph_table[hv];
 	ipe->ipe_phnext = iph->iph_table + hv;
@@ -878,6 +889,43 @@ ipf_htent_insert(softc, arg, iph, ipeo)
 	if (ipe->ipe_next != NULL)
 		ipe->ipe_next->ipe_pnext = &ipe->ipe_next;
 	iph->iph_list = ipe;
+
+	if (ipe->ipe_die != 0) {
+		/*
+		 * If the new node has a given expiration time, insert it
+		 * into the list of expiring nodes with the ones to be
+		 * removed first added to the front of the list. The
+		 * insertion is O(n) but it is kept sorted for quick scans
+		 * at expiration interval checks.
+		 */
+		iphtent_t *n;
+
+		ipe->ipe_die = softc->ipf_ticks + IPF_TTLVAL(ipe->ipe_die);
+		for (n = softh->ipf_node_explist; n != NULL; n = n->ipe_dnext) {
+			if (ipe->ipe_die < n->ipe_die)
+				break;
+			if (n->ipe_dnext == NULL) {
+				/*
+				 * We've got to the last node and everything
+				 * wanted to be expired before this new node,
+				 * so we have to tack it on the end...
+				 */
+				n->ipe_dnext = ipe;
+				ipe->ipe_pdnext = &n->ipe_dnext;
+				n = NULL;
+				break;
+			}
+		}
+
+		if (softh->ipf_node_explist == NULL) {
+			softh->ipf_node_explist = ipe;
+			ipe->ipe_pdnext = &softh->ipf_node_explist;
+		} else if (n != NULL) {
+			ipe->ipe_dnext = n;
+			ipe->ipe_pdnext = n->ipe_pdnext;
+			n->ipe_pdnext = &ipe->ipe_dnext;
+		}
+	}
 
 	if (ipe->ipe_family == AF_INET) {
 		if ((bits >= 0) && (bits != 32))
@@ -1297,6 +1345,23 @@ nextmask:
 	return ipe;
 }
 #endif
+
+
+static void
+ipf_htable_expire(softc, arg)
+	ipf_main_softc_t *softc;
+	void *arg;
+{
+	ipf_htable_softc_t *softh = arg;
+	iphtent_t *n;
+
+	while ((n = softh->ipf_node_explist) != NULL) {
+		if (n->ipe_die > softc->ipf_ticks)
+			break;
+
+		ipf_htent_remove(softc, softh, n->ipe_owner, n);
+	}
+}
 
 
 #ifndef _KERNEL

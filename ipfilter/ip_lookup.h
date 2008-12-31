@@ -1,4 +1,10 @@
-
+/*
+ * Copyright (C) 2002-2003 by Darren Reed.
+ *
+ * See the IPFILTER.LICENCE file for details on licencing.
+ *
+ * $Id$
+ */
 #ifndef __IP_LOOKUP_H__
 #define __IP_LOOKUP_H__
 
@@ -94,18 +100,28 @@ typedef struct ipf_lookup {
 	void	(*ipfl_destroy) __P((ipf_main_softc_t *, void *));
 	int	(*ipfl_init) __P((ipf_main_softc_t *, void *));
 	void	(*ipfl_fini) __P((ipf_main_softc_t *, void *));
-	int	(*ipfl_addr_find) __P((ipf_main_softc_t *, void *, int, void *));
-	size_t	(*ipfl_flush) __P((ipf_main_softc_t *, void *, iplookupflush_t *));
-	int	(*ipfl_iter_deref) __P((ipf_main_softc_t *, void *, int, int, void *));
-	int	(*ipfl_iter_next) __P((ipf_main_softc_t *, void *, ipftoken_t *, ipflookupiter_t *));
-	int	(*ipfl_node_add) __P((ipf_main_softc_t *, void *, iplookupop_t *));
-	int	(*ipfl_node_del) __P((ipf_main_softc_t *, void *, iplookupop_t *));
-	int	(*ipfl_stats_get) __P((ipf_main_softc_t *, void *, iplookupop_t *));
-	int	(*ipfl_table_add) __P((ipf_main_softc_t *, void *, iplookupop_t *));
-	int	(*ipfl_table_del) __P((ipf_main_softc_t *, void *, iplookupop_t *));
+	int	(*ipfl_addr_find) __P((ipf_main_softc_t *, void *,
+				       int, void *));
+	size_t	(*ipfl_flush) __P((ipf_main_softc_t *, void *,
+				   iplookupflush_t *));
+	int	(*ipfl_iter_deref) __P((ipf_main_softc_t *, void *,
+					int, int, void *));
+	int	(*ipfl_iter_next) __P((ipf_main_softc_t *, void *,
+				       ipftoken_t *, ipflookupiter_t *));
+	int	(*ipfl_node_add) __P((ipf_main_softc_t *, void *,
+				      iplookupop_t *));
+	int	(*ipfl_node_del) __P((ipf_main_softc_t *, void *,
+				      iplookupop_t *));
+	int	(*ipfl_stats_get) __P((ipf_main_softc_t *, void *,
+				       iplookupop_t *));
+	int	(*ipfl_table_add) __P((ipf_main_softc_t *, void *,
+				       iplookupop_t *));
+	int	(*ipfl_table_del) __P((ipf_main_softc_t *, void *,
+				       iplookupop_t *));
 	int	(*ipfl_table_deref) __P((ipf_main_softc_t *, void *, void *));
 	void	*(*ipfl_table_find) __P((void *, int, char *));
 	void	*(*ipfl_select_add_ref) __P((void *, int, char *));
+	void	(*ipfl_expire) __P((ipf_main_softc_t *, void *));
 } ipf_lookup_t;
 
 extern int ipf_lookup_init __P((void));
@@ -120,6 +136,7 @@ extern void *ipf_lookup_soft_create __P((ipf_main_softc_t *));
 extern int ipf_lookup_soft_init __P((ipf_main_softc_t *, void *));
 extern int ipf_lookup_soft_fini __P((ipf_main_softc_t *, void *));
 extern void *ipf_lookup_find_htable __P((ipf_main_softc_t *, int, char *));
+extern void ipf_lookup_expire __P((ipf_main_softc_t *));
 #ifndef _KERNEL
 extern	void	ipf_lookup_dump __P((ipf_main_softc_t *, void *));
 #endif

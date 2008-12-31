@@ -57,7 +57,7 @@ int load_pool(plp, iocfunc)
 	}
 
 	for (a = plp->ipo_list; a != NULL; a = a->ipn_next)
-		load_poolnode(plp->ipo_unit, pool.ipo_name, a, iocfunc);
+		load_poolnode(plp->ipo_unit, pool.ipo_name, a, 0, iocfunc);
 
 	if ((opts & OPT_REMOVE) != 0) {
 		if ((*iocfunc)(poolfd, SIOCLOOKUPDELTABLE, &op))
