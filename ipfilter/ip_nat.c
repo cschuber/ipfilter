@@ -3808,25 +3808,21 @@ u_32_t *passp;
 	else if ((nat = nat_outlookup(fin, nflags|NAT_SEARCH, (u_int)fin->fin_p,
 				      fin->fin_src, fin->fin_dst))) {
 		nflags = nat->nat_flags;
-	} else {
+	} else if (fin->fin_off == 0) {
 		u_32_t hv, msk, nmsk;
 
+		msk = 0xffffffff;
+		nmsk = nat_masks;
 		/*
 		 * If there is no current entry in the nat table for this IP#,
 		 * create one for it (if there is a matching rule).
 		 */
-		if ((fin->fin_off != 0) && (fin->fin_flx & FI_TCPUDP)) {
-			natfailed = -1;
-			goto nonatfrag;
-		}
-		msk = 0xffffffff;
-		nmsk = nat_masks;
 maskloop:
 		iph = ipa & htonl(msk);
 		hv = NAT_HASH_FN(iph, 0, ipf_natrules_sz);
 		for (np = nat_rules[hv]; np; np = npnext) {
 			npnext = np->in_mnext;
-			if ((np->in_ifps[1] && (np->in_ifps[1] != ifp)))
+			if (np->in_ifps[1] && (np->in_ifps[1] != ifp))
 				continue;
 			if (np->in_v != fin->fin_v)
 				continue;
@@ -3875,7 +3871,6 @@ maskloop:
 		}
 	}
 
-nonatfrag:
 	if (nat != NULL) {
 		rval = fr_natout(fin, nat, natadd, nflags);
 		if (rval == 1) {
@@ -4099,20 +4094,17 @@ u_32_t *passp;
 	if (((fin->fin_flx & FI_ICMPERR) != 0) &&
 	    (nat = nat_icmperror(fin, &nflags, NAT_INBOUND)))
 		/*EMPTY*/;
-	else if ((fin->fin_flx & FI_FRAG) && (nat = fr_nat_knownfrag(fin)))
+	else if ((fin->fin_flx & FI_FRAG) && 
+		 (nat = fr_nat_knownfrag(fin)))
 		natadd = 0;
 	else if ((nat = nat_inlookup(fin, nflags|NAT_SEARCH, (u_int)fin->fin_p,
 				     fin->fin_src, in))) {
 		nflags = nat->nat_flags;
-	} else {
+	} else if (fin->fin_off == 0) {
 		u_32_t hv, msk, rmsk;
 
-		if ((fin->fin_off != 0) && (fin->fin_flx & FI_TCPUDP)) {
-			natfailed = -1;
-			goto nonatfrag;
-		}
-		rmsk = rdr_masks;
 		msk = 0xffffffff;
+		rmsk = rdr_masks;
 		/*
 		 * If there is no current entry in the nat table for this IP#,
 		 * create one for it (if there is a matching rule).
@@ -4182,7 +4174,6 @@ maskloop:
 		}
 	}
 
-nonatfrag:
 	if (nat != NULL) {
 		rval = fr_natin(fin, nat, natadd, nflags);
 		if (rval == 1) {
