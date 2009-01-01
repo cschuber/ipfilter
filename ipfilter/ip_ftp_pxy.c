@@ -873,7 +873,7 @@ bad_client_command:
 	printf("ippr_ftp_client_valid:junk after cmd[%*.*s]\n",
 	       (int)len, (int)len, buf);
 #endif
-	return 2;
+	return FTPXY_JUNK_EOL;
 }
 
 
@@ -990,7 +990,7 @@ nat_t *nat;
 ftpinfo_t *ftp;
 int rv;
 {
-	int mlen, len, off, inc, i, sel, sel2, ok, ackoff, seqoff;
+	int mlen, len, off, inc, i, sel, sel2, ok, ackoff, seqoff, retry;
 	char *rptr, *wptr, *s;
 	u_32_t thseq, thack;
 	ap_session_t *aps;
@@ -1176,11 +1176,14 @@ int rv;
 
 	while (mlen > 0) {
 		len = MIN(mlen, sizeof(f->ftps_buf) - (wptr - rptr));
+		if (len == 0)
+			break;
 		COPYDATA(m, off, len, wptr);
 		mlen -= len;
 		off += len;
 		wptr += len;
 
+whilemore:
 		if (ippr_ftp_debug > 3)
 			printf("%s:len %d/%d off %d wptr %lx junk %d [%*.*s]\n",
 			       "ippr_ftp_process",
@@ -1197,7 +1200,7 @@ int rv;
 				printf("%s:junk %d -> %d\n",
 				       "ippr_ftp_process", i, f->ftps_junk);
 
-			if (f->ftps_junk != FTPXY_JUNK_OK) {
+			if (f->ftps_junk == FTPXY_JUNK_BAD) {
 				if (wptr - rptr == sizeof(f->ftps_buf)) {
 					if (ippr_ftp_debug > 4)
 						printf("%s:full buffer\n",
@@ -1249,11 +1252,13 @@ int rv;
 			return APR_ERR(2);
 		}
 
+		retry = 0;
 		if ((f->ftps_junk != FTPXY_JUNK_OK) && (rptr < wptr)) {
 			for (s = rptr; s < wptr; s++) {
 				if ((*s == '\r') && (s + 1 < wptr) &&
 				    (*(s + 1) == '\n')) {
 					rptr = s + 2;
+					retry = 1;
 					if (f->ftps_junk != FTPXY_JUNK_CONT)
 						f->ftps_junk = FTPXY_JUNK_OK;
 					break;
@@ -1271,13 +1276,15 @@ int rv;
 			 * current state.
 			 */
 			if (rptr > f->ftps_buf) {
-				bcopy(rptr, f->ftps_buf, len);
+				bcopy(rptr, f->ftps_buf, wptr - rptr);
 				wptr -= rptr - f->ftps_buf;
 				rptr = f->ftps_buf;
 			}
 		}
 		f->ftps_rptr = rptr;
 		f->ftps_wptr = wptr;
+		if (retry)
+			goto whilemore;
 	}
 
 	/* f->ftps_seq[1] += inc; */
