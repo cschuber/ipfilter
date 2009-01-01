@@ -770,7 +770,6 @@ static void printlivelist(out, set, fp, group, comment)
 	ipfobj_t obj;
 	int n;
 
-	fb.fr_next = fp;
 	n = 0;
 
 	rule.iri_inout = out;
@@ -802,11 +801,14 @@ static void printlivelist(out, set, fp, group, comment)
 		}
 		if (bcmp(fp, &zero, sizeof(zero)) == 0)
 			break;
+#ifdef USE_INET6
 		if (use_inet6 != 0) {
-			if (fp->fr_family != 0 && fp->fr_family != 6)
+			if (fp->fr_family != 0 && fp->fr_family != AF_INET6)
 				continue;
-		} else {
-			if (fp->fr_family != 0 && fp->fr_family != 4)
+		} else
+#endif
+		{
+			if (fp->fr_family != 0 && fp->fr_family != AF_INET)
 				continue;
 		}
 		if (fp->fr_data != NULL)
