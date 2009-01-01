@@ -374,6 +374,7 @@ int ipfattach(void)
 	    && ph_ifsync == NULL
 #   endif
 	   ) {
+		SPL_X(s);
 		printf("pfil_head_get failed\n");
 		return ENODEV;
 	}
@@ -519,8 +520,10 @@ int ipfdetach(void)
 	error = pfil_remove_hook((void *)fr_check, PFIL_IN|PFIL_OUT,
 				 &inetsw[ip_protox[IPPROTO_IP]].pr_pfh);
 #  endif
-	if (error)
+	if (error) {
+		SPL_X(s);
 		return error;
+	}
 # else
 	pfil_remove_hook((void *)fr_check, PFIL_IN|PFIL_OUT);
 # endif
@@ -535,8 +538,10 @@ int ipfdetach(void)
 	error = pfil_remove_hook((void *)fr_check, PFIL_IN|PFIL_OUT,
 				 &inetsw[ip_protox[IPPROTO_IPV6]].pr_pfh);
 #  endif
-	if (error)
+	if (error) {
+		SPL_X(s);
 		return error;
+	}
 # endif
 #endif
 	fr_deinitialise();
