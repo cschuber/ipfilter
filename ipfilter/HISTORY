@@ -10,6 +10,38 @@
 # and especially those who have found the time to port IP Filter to new
 # platforms.
 #
+4.1.32 RC1 - Release 1 January 2009
+
+2031730 4.1.31 Nat drops fragmented packets after the first
+
+2214661 ipf doesn't handle IPv6 fragments
+
+2473273 NAT removed before RST/ICMP sent
+
+2216500 fin_state serves no purpose
+
+2424604 adding random MD5 data causes panic
+
+2304435 Ineffecient lock usage in logging
+
+2216491 fin_nat serves little purpose
+
+1859718 IPF 4.1.28 repeated kernel panic Solaris 9 32bit
+
+2055619 duplicating a free'd packet will fail
+
+2042949 Excessive locking when creating nat_t
+
+2035610 nat_update does not need to get locks
+
+2214658 ipf mostly ignores locking in NetBSD
+
+1979427 Memory leak in user utilities - token never freed (rel br)
+
+* try to guess if SUNWspro wants -m64
+
+2063742 4.1.30 breaks builds on Solaris 8
+
 4.1.31 - Release 27 July 2008
 
 * compiling arc4random.c is challenging on solaris 10 or solaris without gcc
