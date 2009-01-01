@@ -259,7 +259,7 @@ int
 ipfattach(softc)
 	ipf_main_softc_t *softc;
 {
-	int s;
+	SPL_INT(s);
 #if (__NetBSD_Version__ >= 499005500)
 	int i;
 #endif
