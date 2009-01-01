@@ -526,6 +526,12 @@ fr_info_t *fin;
 /*              proto(I)    - protocol number for this extension header     */
 /*                                                                          */
 /* IPv6 Only                                                                */
+/* This function expects to find an IPv6 extension header at fin_dp.        */
+/* There must be at least 8 bytes of data at fin_dp for there to be a valid */
+/* extension header present. If a good one is found, fin_dp is advanced to  */
+/* point at the first piece of data after the extension header, fin_exthdr  */
+/* points to the start of the extension header and the "protocol" of the    */
+/* *NEXT* header is returned.                                               */
 /* ------------------------------------------------------------------------ */
 static INLINE int frpr_ipv6exthdr(fin, multiple, proto)
 fr_info_t *fin;
@@ -666,35 +672,41 @@ static INLINE int frpr_fragment6(fin)
 fr_info_t *fin;
 {
 	struct ip6_frag *frag;
-	int extoff;
+	int extoff = 0;
 
 	fin->fin_flx |= FI_FRAG;
 
+	/*
+	 * A fragmented IPv6 packet implies that there must be something
+	 * else after the fragment.
+	 */
 	if (frpr_ipv6exthdr(fin, 0, IPPROTO_FRAGMENT) == IPPROTO_NONE)
-		return IPPROTO_NONE;
+		goto badv6frag;
 
-	extoff = (char *)fin->fin_exthdr - (char *)fin->fin_dp;
+	extoff = (char *)fin->fin_dp - (char *)fin->fin_exthdr;
 
 	if (frpr_pullup(fin, sizeof(*frag)) == -1)
-		return IPPROTO_NONE;
+		goto badv6frag;
 
-	fin->fin_exthdr = (char *)fin->fin_dp + extoff;
+	fin->fin_exthdr = (char *)fin->fin_dp - extoff;
 	frag = fin->fin_exthdr;
 	/*
 	 * Fragment but no fragmentation info set?  Bad packet...
 	 */
 	if (frag->ip6f_offlg == 0) {
+badv6frag:
+		fin->fin_dp = (char *)fin->fin_dp - extoff;
+		fin->fin_dlen += extoff;
 		fin->fin_flx |= FI_BAD;
 		return IPPROTO_NONE;
 	}
 
 	fin->fin_off = ntohs(frag->ip6f_offlg & IP6F_OFF_MASK);
-	fin->fin_off <<= 3;
 	if (fin->fin_off != 0)
 		fin->fin_flx |= FI_FRAGBODY;
 
-	fin->fin_dp = (char *)fin->fin_dp + sizeof(*frag);
-	fin->fin_dlen -= sizeof(*frag);
+	if (frag->ip6f_offlg & IP6F_MORE_FRAG)
+		fin->fin_flx |= FI_MOREFRAG;
 
 	return frag->ip6f_nxt;
 }
@@ -1452,6 +1464,8 @@ fr_info_t *fin;
 		int morefrag = off & IP_MF;
 
 		fi->fi_flx |= FI_FRAG;
+		if (morefrag)
+			fi->fi_flx |= FI_MOREFRAG;
 		off &= IP_OFFMASK;
 		if (off != 0) {
 			fin->fin_flx |= FI_FRAGBODY;

@@ -27,14 +27,14 @@ typedef	struct	ipfr	{
 	 * therefore important for this set to remain together.
 	 */
 	void	*ipfr_ifp;
-	struct	in_addr	ipfr_src;
-	struct	in_addr	ipfr_dst;
+	i6addr_t ipfr_src;
+	i6addr_t ipfr_dst;
 	u_32_t	ipfr_optmsk;
 	u_short	ipfr_secmsk;
 	u_short	ipfr_auth;
-	u_short	ipfr_id;
-	u_char	ipfr_p;
-	u_char	ipfr_tos;
+	u_32_t	ipfr_id;
+	u_32_t	ipfr_p;
+	u_32_t	ipfr_tos;
 	u_32_t	ipfr_pass;
 } ipfr_t;
 
