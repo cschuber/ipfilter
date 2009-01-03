@@ -2714,7 +2714,7 @@ ipf_nat6_checkout(fin, passp)
 					   &fin->fin_src6.in6,
 					   &fin->fin_dst6.in6))) {
 		nflags = nat->nat_flags;
-	} else {
+	} else if (fin->fin_off == 0) {
 		u_32_t hv, nmsk;
 		i6addr_t msk;
 		int i;
@@ -2723,14 +2723,12 @@ ipf_nat6_checkout(fin, passp)
 		 * If there is no current entry in the nat table for this IP#,
 		 * create one for it (if there is a matching rule).
 		 */
-		RWLOCK_EXIT(&softc->ipf_nat);
 		i = 3;
 		msk.i6[0] = 0xffffffff;
 		msk.i6[1] = 0xffffffff;
 		msk.i6[2] = 0xffffffff;
 		msk.i6[3] = 0xffffffff;
 		nmsk = softn->ipf_nat6_map_masks[3];
-		WRITE_ENTER(&softc->ipf_nat);
 maskloop:
 		IP6_AND(&ipa, &msk, &iph);
 		hv = NAT_HASH_FN6(&iph, 0, softn->ipf_nat_maprules_sz);
@@ -2779,12 +2777,14 @@ maskloop:
 				break;
 			}
 
-			if ((nat = ipf_nat6_add(fin, np, NULL, nflags,
-					   NAT_OUTBOUND))) {
+			MUTEX_ENTER(&softn->ipf_nat_new);
+			nat = ipf_nat6_add(fin, np, NULL, nflags, NAT_OUTBOUND);
+			MUTEX_ENTER(&softn->ipf_nat_new);
+			if (nat != NULL) {
 				np->in_hits++;
 				break;
-			} else
-				natfailed = -1;
+			}
+			natfailed = -1;
 		}
 		if ((np == NULL) && (i >= 0)) {
 			while (i >= 0) {
@@ -3205,7 +3205,7 @@ ipf_nat6_checkin(fin, passp)
 					  (u_int)fin->fin_p,
 					  &fin->fin_src6.in6, &ipa.in6))) {
 		nflags = nat->nat_flags;
-	} else {
+	} else if (fin->fin_off == 0) {
 		u_32_t hv, rmsk;
 		i6addr_t msk;
 		int i;
@@ -3214,14 +3214,12 @@ ipf_nat6_checkin(fin, passp)
 		 * If there is no current entry in the nat table for this IP#,
 		 * create one for it (if there is a matching rule).
 		 */
-		RWLOCK_EXIT(&softc->ipf_nat);
 		i = 3;
 		msk.i6[0] = 0xffffffff;
 		msk.i6[1] = 0xffffffff;
 		msk.i6[2] = 0xffffffff;
 		msk.i6[3] = 0xffffffff;
 		rmsk = softn->ipf_nat6_rdr_masks[3];
-		WRITE_ENTER(&softc->ipf_nat);
 maskloop:
 		IP6_AND(&ipa, &msk, &iph);
 		hv = NAT_HASH_FN6(&iph, 0, softn->ipf_nat_rdrrules_sz);
@@ -3270,12 +3268,14 @@ maskloop:
 				break;
 			}
 
+			MUTEX_ENTER(&softn->ipf_nat_new);
 			nat = ipf_nat6_add(fin, np, NULL, nflags, NAT_INBOUND);
+			MUTEX_EXIT(&softn->ipf_nat_new);
 			if (nat != NULL) {
 				np->in_hits++;
 				break;
-			} else
-				natfailed = -1;
+			}
+			natfailed = -1;
 		}
 
 		if ((np == NULL) && (i >= 0)) {
@@ -3296,7 +3296,6 @@ maskloop:
 				}
 			}
 		}
-		MUTEX_DOWNGRADE(&softc->ipf_nat);
 	}
 	if (nat != NULL) {
 		rval = ipf_nat6_in(fin, nat, natadd, nflags);
