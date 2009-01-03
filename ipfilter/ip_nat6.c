@@ -1009,10 +1009,6 @@ ipf_nat6_add(fin, np, natsave, flags, direction)
 	nat->nat_pr[0] = fin->fin_p;
 	nat->nat_pr[1] = fin->fin_p;
 
-	if ((flags & NAT_SLAVE) == 0) {
-		MUTEX_ENTER(&softn->ipf_nat_new);
-	}
-
 	/*
 	 * Search the current table for a match and create a new mapping
 	 * if there is none found.
@@ -1109,9 +1105,6 @@ badnat:
 	KFREE(nat);
 	nat = NULL;
 done:
-	if ((flags & NAT_SLAVE) == 0) {
-		MUTEX_EXIT(&softn->ipf_nat_new);
-	}
 	return nat;
 }
 
@@ -2779,7 +2772,7 @@ maskloop:
 
 			MUTEX_ENTER(&softn->ipf_nat_new);
 			nat = ipf_nat6_add(fin, np, NULL, nflags, NAT_OUTBOUND);
-			MUTEX_ENTER(&softn->ipf_nat_new);
+			MUTEX_EXIT(&softn->ipf_nat_new);
 			if (nat != NULL) {
 				np->in_hits++;
 				break;
@@ -2804,7 +2797,6 @@ maskloop:
 				}
 			}
 		}
-		MUTEX_DOWNGRADE(&softc->ipf_nat);
 	}
 
 	if (nat != NULL) {
