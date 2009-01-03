@@ -420,6 +420,10 @@ void	printfr(fp, iocfunc)
 
 	if ((fp->fr_flags & FR_KEEPSTATE) && (opts & OPT_VERBOSE)) {
 		printf(" # count %d", fp->fr_statecnt);
+		if (fp->fr_die != 0)
+			printf(" rule-ttl %u", fp->fr_die);
+	} else if (fp->fr_die != 0) {
+		printf(" # rule-ttl %u", fp->fr_die);
 	}
 	(void)putchar('\n');
 }

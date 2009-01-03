@@ -1287,9 +1287,14 @@ int ipfrule_add_%s_%s()\n", instr, group);
 			if (strncmp(fp->fr_group,\n\
 				    ipf_rules_%s_%s[j]->fr_group,\n\
 				    FR_GROUPLEN) == 0) {\n\
+				if (ipf_rules_%s_%s[j] != NULL)\n\
+					ipf_rules_%s_%s[j]->fr_pnext =\n\
+					    &fp->fr_next;\n\
+				fp->fr_pnext = &ipf_rules_%s_%s[j];\n\
 				fp->fr_next = ipf_rules_%s_%s[j];\n\
 				break;\n\
-			}\n", instr, group, instr, group);
+			}\n", instr, group, instr, group, instr, group,
+			      instr, group, instr, group);
 	if (dogrp)
 		fprintf(fp, "\
 \n\

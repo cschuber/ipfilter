@@ -1030,11 +1030,13 @@ ipf_slowtimer()
 	}
 
 	ipl_ipfilter_intfsync();
-	ipf_expiretokens();
-	ipf_frag_expire();
-	ipf_state_expire();
-	ipf_nat_expire();
-	ipf_auth_expire();
+	ipf_expiretokens(&ipfmain);
+	ipf_frag_expire(&ipfmain);
+	ipf_state_expire(&ipfmain);
+	ipf_nat_expire(&ipfmain);
+	ipf_auth_expire(&ipfmain);
+	ipf_lookup_expire(&ipfmain);
+	ipf_rule_expire(&ipfmain);
 	ipf_ticks++;
 
 #if IRIX >= 60500

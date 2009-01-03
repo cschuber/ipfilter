@@ -1012,6 +1012,8 @@ ipf_slowtimer __P((void *ptr))
 		ipf_state_expire(softc);
 		ipf_nat_expire(softc);
 		ipf_auth_expire(softc);
+		ipf_lookup_expire(softc);
+		ipf_rule_expire(softc);
 		softc->ipf_ticks++;
 	}
 

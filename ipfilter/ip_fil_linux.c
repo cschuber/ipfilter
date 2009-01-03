@@ -675,12 +675,11 @@ int ipfattach()
 		return -EBUSY;
 	}
 
-	bzero((char *)ipf_cache, sizeof(ipf_cache));
-	MUTEX_INIT(&ipf_rw, "ipf rw mutex");
-	MUTEX_INIT(&ipl_mutex, "ipf log mutex");
-	MUTEX_INIT(&ipf_timeoutlock, "ipf timeout lock mutex");
-	RWLOCK_INIT(&ipf_ipidfrag, "ipf IP NAT-Frag rwlock");
-	RWLOCK_INIT(&ipf_tokens, "ipf token rwlock");
+	MUTEX_INIT(&ipfmain.ipf_rw, "ipf rw mutex");
+	MUTEX_INIT(&ipfmain.ipl_mutex, "ipf log mutex");
+	MUTEX_INIT(&ipfmain.ipf_timeoutlock, "ipf timeout lock mutex");
+	RWLOCK_INIT(&ipfmain.ipf_ipidfrag, "ipf IP NAT-Frag rwlock");
+	RWLOCK_INIT(&ipfmain.ipf_tokens, "ipf token rwlock");
 
 	for (i = 0; i < sizeof(ipf_hooks)/sizeof(ipf_hooks[0]); i++) {
 		err = nf_register_hook(&ipf_hooks[i]);
@@ -737,11 +736,11 @@ int ipfdetach()
 	(void) ipf_flush(IPL_LOGIPF, FR_INQUE|FR_OUTQUE|FR_INACTIVE);
 	(void) ipf_flush(IPL_LOGIPF, FR_INQUE|FR_OUTQUE);
 
-	MUTEX_DESTROY(&ipf_timeoutlock);
-	MUTEX_DESTROY(&ipl_mutex);
-	MUTEX_DESTROY(&ipf_rw);
-	RW_DESTROY(&ipf_tokens);
-	RW_DESTROY(&ipf_ipidfrag);
+	MUTEX_DESTROY(&ipfmain.ipf_timeoutlock);
+	MUTEX_DESTROY(&ipfmain.ipl_mutex);
+	MUTEX_DESTROY(&ipfmain.ipf_rw);
+	RW_DESTROY(&ipfmain.ipf_tokens);
+	RW_DESTROY(&ipfmain.ipf_ipidfrag);
 
 	SPL_X(s);
 
@@ -1011,20 +1010,22 @@ ipf_random()
 /* ------------------------------------------------------------------------ */
 void ipf_slowtimer(long value)
 {
-	READ_ENTER(&ipf_global);
+	READ_ENTER(&ipfmain.ipf_global);
 
-	ipf_expiretokens();
-	ipf_frag_expire();
-	ipf_state_expire();
-	ipf_nat_expire();
-	ipf_auth_expire();
+	ipf_expiretokens(&ipfmain);
+	ipf_frag_expire(&ipfmain);
+	ipf_state_expire(&ipfmain);
+	ipf_nat_expire(&ipfmain);
+	ipf_auth_expire(&ipfmain);
+	ipf_lookup_expire(&ipfmain);
+	ipf_rule_expire(&ipfmain);
 	ipf_ticks++;
 	if (ipf_running <= 0)
 		goto done;
 	mod_timer(&ipf_timer, HZ/2 + jiffies);
 
 done:
-	RWLOCK_EXIT(&ipf_global);
+	RWLOCK_EXIT(&ipfmain.ipf_global);
 }
 #endif
 

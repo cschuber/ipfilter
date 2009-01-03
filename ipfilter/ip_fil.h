@@ -446,7 +446,6 @@ typedef	struct	ipfunc_resolve	{
 	char		ipfu_name[32];
 	ipfunc_t	ipfu_addr;
 	ipfuncinit_t	ipfu_init;
-	int		*ipfu_ref;
 } ipfunc_resolve_t;
 
 /*
@@ -608,14 +607,18 @@ typedef	struct	frentry	* (* frentfunc_t) __P((fr_info_t *));
 typedef	struct	frentry {
 	ipfmutex_t	fr_lock;
 	struct	frentry	*fr_next;
+	struct	frentry	**fr_pnext;
 	struct	frentry	**fr_grp;
 	struct	frentry	**fr_icmpgrp;
 	struct	ipscan	*fr_isc;
+	struct	frentry	*fr_dnext;	/* 2 fr_die linked list pointers */
+	struct	frentry	**fr_pdnext;
 	void	*fr_ifas[4];
 	void	*fr_ptr;	/* for use with fr_arg */
 	char	*fr_comment;	/* text comment for rule */
 	int	fr_ref;		/* reference count - for grouping */
 	int	fr_statecnt;	/* state count - for limit rules */
+	u_32_t	fr_die;		/* only used on loading the rule */
 	/*
 	 * The line number from a file is here because we need to be able to
 	 * match the rule generated with ``grep rule ipf.conf | ipf -rf -''
@@ -1056,6 +1059,7 @@ typedef	struct frgroup {
 	struct frgroup	*fg_next;
 	struct frentry	*fg_head;
 	struct frentry	*fg_start;
+	struct frgroup	**fg_set;
 	u_32_t		fg_flags;
 	int		fg_ref;
 	char		fg_name[FR_GROUPLEN];
@@ -1542,6 +1546,7 @@ typedef struct ipf_main_softc_s {
 	struct frgroup	*ipf_groups[IPL_LOGSIZE][2];
 	frentry_t	*ipf_rules[2][2];
 	frentry_t	*ipf_acct[2][2];
+	frentry_t	*ipf_rule_explist[2];
 	ipftoken_t	*ipf_token_head;
 	ipftoken_t	**ipf_token_tail;
 #if (__FreeBSD_version >= 300000) && defined(_KERNEL)
@@ -1799,6 +1804,7 @@ extern	int		ipf_matchicmpqueryreply __P((int, icmpinfo_t *,
 						     struct icmp *, int));
 extern	u_32_t		ipf_newisn __P((fr_info_t *));
 extern	u_short		ipf_nextipid __P((fr_info_t *));
+extern	void		ipf_rule_expire __P((ipf_main_softc_t *));
 extern	int		ipf_rulen __P((ipf_main_softc_t *, int, frentry_t *));
 extern	int		ipf_scanlist __P((fr_info_t *, u_32_t));
 extern	frentry_t 	*ipf_srcgrpmap __P((fr_info_t *, u_32_t *));

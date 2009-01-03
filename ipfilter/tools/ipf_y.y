@@ -58,7 +58,7 @@ static	int		ipffd = -1;
 static	int		*yycont = NULL;
 static	ioctlfunc_t	ipfioctls[IPL_LOGSIZE];
 static	addfunc_t	ipfaddfunc = NULL;
-static	struct	wordtab ipfwords[102];
+static	struct	wordtab ipfwords[103];
 static	struct	wordtab	addrwords[4];
 static	struct	wordtab	maskwords[5];
 static	struct	wordtab icmpcodewords[17];
@@ -132,7 +132,7 @@ static	struct	wordtab logwords[33];
 %token	IPFY_FLAGS IPFY_MULTICAST
 %token	IPFY_MASK IPFY_BROADCAST IPFY_NETWORK IPFY_NETMASKED IPFY_PEER
 %token	IPFY_RPC IPFY_PORT
-%token	IPFY_NOW IPFY_COMMENT
+%token	IPFY_NOW IPFY_COMMENT IPFY_RULETTL
 %token	IPFY_ICMP IPFY_ICMPTYPE IPFY_ICMPCODE
 %token	IPFY_IPOPTS IPFY_SHORT IPFY_NAT IPFY_BADSRC IPFY_LOWTTL IPFY_FRAG
 %token	IPFY_MBCAST IPFY_BAD IPFY_BADNAT IPFY_OOW IPFY_NEWISN IPFY_NOICMPERR
@@ -293,7 +293,7 @@ ruletail:
 	;
 
 ruletail2:
-	pps age new comment
+	pps age new rulettl comment
 	;
 
 intag:	settagin matchtagin
@@ -518,6 +518,10 @@ pps:	| IPFY_PPS YY_NUMBER		{ DOALL(fr->fr_pps = $2;) }
 	;
 
 new:	| savegroup file restoregroup
+	;
+
+rulettl:
+	| IPFY_RULETTL YY_NUMBER	{ DOALL(fr->fr_die = $2;) }
 	;
 
 comment:
@@ -1643,7 +1647,7 @@ ipv4:	ipv4_24 '.' YY_NUMBER
 %%
 
 
-static	struct	wordtab ipfwords[102] = {
+static	struct	wordtab ipfwords[103] = {
 	{ "age",			IPFY_AGE },
 	{ "ah",				IPFY_AH },
 	{ "all",			IPFY_ALL },
@@ -1730,6 +1734,7 @@ static	struct	wordtab ipfwords[102] = {
 	{ "return-icmp-as-dest",	IPFY_RETICMPASDST },
 	{ "return-rst",			IPFY_RETRST },
 	{ "route-to",			IPFY_ROUTETO },
+	{ "rule-ttl",			IPFY_RULETTL },
 	{ "rpc",			IPFY_RPC },
 	{ "sec-class",			IPFY_SECCLASS },
 	{ "set-tag",			IPFY_SETTAG },

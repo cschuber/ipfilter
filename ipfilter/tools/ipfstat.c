@@ -144,8 +144,10 @@ static	void	showtqtable_live __P((int));
 static	void	showgroups __P((friostat_t *));
 static	void	usage __P((char *));
 static	int	state_matcharray __P((ipstate_t *, int *));
-static	void	printlivelist __P((int, int, frentry_t *, char *, char *));
-static	void	printdeadlist __P((int, int, frentry_t *, char *, char *));
+static	void	printlivelist __P((friostat_t *, int, int, frentry_t *,
+				   char *, char *));
+static	void	printdeadlist __P((friostat_t *, int, int, frentry_t *,
+				   char *, char *));
 static	void	printside __P((char *, ipf_statistics_t *));
 static	void	parse_ipportstr __P((const char *, i6addr_t *, int *));
 static	void	ipfstate_live __P((char *, friostat_t **, ips_stat_t **,
@@ -758,7 +760,8 @@ static	void	showstats(fp, frf)
 /*
  * Print out a list of rules from the kernel, starting at the one passed.
  */
-static void printlivelist(out, set, fp, group, comment)
+static void printlivelist(fiop, out, set, fp, group, comment)
+	struct friostat *fiop;
 	int out, set;
 	frentry_t *fp;
 	char *group, *comment;
@@ -831,6 +834,9 @@ static void printlivelist(out, set, fp, group, comment)
 		if (opts & OPT_SHOWLINENO)
 			PRINTF("@%d ", n);
 
+		if (fp->fr_die != 0)
+			fp->fr_die -= fiop->f_ticks;
+
 		printfr(fp, ioctl);
 		if (opts & OPT_VERBOSE) {
 			binprint(fp, sizeof(*fp));
@@ -860,7 +866,7 @@ static void printlivelist(out, set, fp, group, comment)
 			}
 		}
 		if (fp->fr_type == FR_T_CALLFUNC) {
-			printlivelist(out, set, fp->fr_data, group,
+			printlivelist(fiop, out, set, fp->fr_data, group,
 				      "# callfunc: ");
 		}
 	} while (fp->fr_next != NULL);
@@ -868,7 +874,8 @@ static void printlivelist(out, set, fp, group, comment)
 	if (group == NULL) {
 		while ((g = grtop) != NULL) {
 			printf("# Group %s\n", g->fg_name);
-			printlivelist(out, set, NULL, g->fg_name, comment);
+			printlivelist(fiop, out, set, NULL, g->fg_name,
+				      comment);
 			grtop = g->fg_next;
 			free(g);
 		}
@@ -876,7 +883,8 @@ static void printlivelist(out, set, fp, group, comment)
 }
 
 
-static void printdeadlist(out, set, fp, group, comment)
+static void printdeadlist(fiop, out, set, fp, group, comment)
+	friostat_t *fiop;
 	int out, set;
 	frentry_t *fp;
 	char *group, *comment;
@@ -961,13 +969,13 @@ static void printdeadlist(out, set, fp, group, comment)
 			}
 		}
 		if (type == FR_T_CALLFUNC) {
-			printdeadlist(out, set, fb.fr_data, group,
+			printdeadlist(fiop, out, set, fb.fr_data, group,
 				      "# callfunc: ");
 		}
 	}
 
 	while ((g = grtop) != NULL) {
-		printdeadlist(out, set, NULL, g->fg_name, comment);
+		printdeadlist(fiop, out, set, NULL, g->fg_name, comment);
 		grtop = g->fg_next;
 		free(g);
 	}
@@ -1018,9 +1026,9 @@ static	void	showlist(fiop)
 		return;
 	}
 	if (live_kernel == 1)
-		printlivelist(i, set, fp, NULL, NULL);
+		printlivelist(fiop, i, set, fp, NULL, NULL);
 	else
-		printdeadlist(i, set, fp, NULL, NULL);
+		printdeadlist(fiop, i, set, fp, NULL, NULL);
 }
 
 

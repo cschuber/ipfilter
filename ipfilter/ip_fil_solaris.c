@@ -898,6 +898,7 @@ ipf_slowtimer __P((void *ptr))
 	ipf_nat_expire(softc);
 	ipf_auth_expire(softc);
 	ipf_lookup_expire(softc);
+	ipf_rule_expire(softc);
 	softc->ipf_ticks++;
 	if (softc->ipf_running == -1 || softc->ipf_running == 1)
 		softc->ipf_slow_ch = timeout(ipf_slowtimer, ptr,

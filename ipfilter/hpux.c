@@ -530,6 +530,8 @@ static int ipf_slowtimer()
 	ipf_state_expire();
 	ipf_nat_expire();
 	ipf_auth_expire();
+	ipf_lookup_expire();
+	ipf_rule_expire();
 	ipf_ticks++;
 	ipf_timer_id = NULL;
 	if (ipf_running <= 0) {

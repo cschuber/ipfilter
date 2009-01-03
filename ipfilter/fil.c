@@ -143,8 +143,6 @@ extern	int	blockreason;
 static	INLINE int	ipf_check_ipf __P((fr_info_t *, frentry_t *, int));
 static	u_32_t		ipf_checkcipso __P((fr_info_t *, u_char *, int));
 static	u_32_t		ipf_checkripso __P((u_char *));
-static	void		ipf_checkrulefunc __P((ipf_main_softc_t *, void *,
-					       int, int));
 static	u_32_t		ipf_decaps __P((fr_info_t *, u_32_t, int));
 static	frentry_t	*ipf_dolog __P((fr_info_t *, u_32_t *));
 static	int		ipf_flushlist __P((ipf_main_softc_t *, int, minor_t,
@@ -174,6 +172,10 @@ static	INLINE void	ipf_pr_ipv4hdr __P((fr_info_t *));
 static	INLINE void	ipf_pr_short __P((fr_info_t *, int));
 static	INLINE int	ipf_pr_tcpcommon __P((fr_info_t *));
 static	INLINE int	ipf_pr_udpcommon __P((fr_info_t *));
+static	void		ipf_rule_delete __P((ipf_main_softc_t *, frentry_t *f,
+					     int, int));
+static	void		ipf_rule_expire_insert __P((ipf_main_softc_t *,
+						    frentry_t *, int));
 static	void		ipf_synclist __P((ipf_main_softc_t *, frentry_t *,
 					  void *));
 static	ipftuneable_t	*ipf_tune_findbyname __P((ipftuneable_t *,
@@ -281,13 +283,8 @@ int	ipf_features = 0
  * Table of functions available for use with call rules.
  */
 static ipfunc_resolve_t ipf_availfuncs[] = {
-	{ "srcgrpmap", ipf_srcgrpmap, ipf_grpmapinit, NULL },
-	{ "dstgrpmap", ipf_dstgrpmap, ipf_grpmapinit, NULL },
-#if 0
-	{ "checkstate", ipf_state_check, NULL, ipf_specfuncref[0] },
-	{ "natin", ipf_nat_ipfin, NULL, ipf_specfuncref[1] },
-	{ "natout", ipf_nat_ipfout, NULL, ipf_specfuncref[2] },
-#endif
+	{ "srcgrpmap", ipf_srcgrpmap, ipf_grpmapinit },
+	{ "dstgrpmap", ipf_dstgrpmap, ipf_grpmapinit },
 	{ "", NULL }
 };
 
@@ -3219,9 +3216,7 @@ filterdone:
 		 * can lead to fin_m being free'd... not good.
 		 */
 		if ((pass & FR_DUP) != 0) {
-#ifdef STES
 			mc = M_COPY(fin->fin_m);
-#endif
 			if (mc != NULL)
 				ipf_fastroute(mc, &mc, fin, &fr->fr_dif);
 		}
@@ -4032,6 +4027,10 @@ ipf_flushlist(softc, set, unit, nfreedp, listp)
 			continue;
 		}
 		*listp = fp->fr_next;
+		if (fp->fr_next != NULL)
+			fp->fr_next->fr_pnext = fp->fr_pnext;
+		fp->fr_pnext = NULL;
+
 		if (fp->fr_grp != NULL) {
 			ipf_flushlist(softc, set, unit, nfreedp, fp->fr_grp);
 		}
@@ -4051,9 +4050,9 @@ ipf_flushlist(softc, set, unit, nfreedp, listp)
 					       unit, set);
 			*fp->fr_icmphead = '\0';
 		}
+		fp->fr_next = NULL;
 
 		ASSERT(fp->fr_ref > 0);
-		fp->fr_next = NULL;
 		if (ipf_derefrule(softc, &fp) == 0)
 			freed++;
 	}
@@ -4144,6 +4143,9 @@ ipf_flush_groups(softc, unit, set, flags)
 				frp = &fr->fr_next;
 				continue;
 			}
+			if (fr->fr_next != NULL)
+				fr->fr_next->fr_pnext = fr->fr_pnext;
+			fr->fr_pnext = NULL;
 			*frp = fr->fr_next;
 			(void) ipf_derefrule(softc, &fr);
 			flushed++;
@@ -5158,18 +5160,7 @@ frrequest(softc, unit, req, data, set, makecopy)
 				goto done;
 			}
 
-			if (*f->fr_grhead != '\0')
-				ipf_group_del(softc, f->fr_grhead, unit, set);
-
-			if (*f->fr_icmphead != '\0')
-				ipf_group_del(softc, f->fr_icmphead, unit, set);
-
-			ipf_fixskip(ftail, f, -1);
-			*ftail = f->fr_next;
-			f->fr_next = NULL;
-			ipf_checkrulefunc(softc, (void *)f->fr_func,
-					  addrem, set);
-			(void) ipf_derefrule(softc, &f);
+			ipf_rule_delete(softc, f, unit, set);
 		}
 	} else {
 		/*
@@ -5198,9 +5189,13 @@ frrequest(softc, unit, req, data, set, makecopy)
 				    ipf_scan_attachfr(f))
 					f->fr_isc = (struct ipscan *)-1;
 #endif
+				if (f->fr_die != 0)
+					ipf_rule_expire_insert(softc, f, set);
+
 				f->fr_hits = 0;
 				if (makecopy != 0)
 					f->fr_ref = 1;
+				f->fr_pnext = ftail;
 				f->fr_next = *ftail;
 				*ftail = f;
 				if (addrem == 0)
@@ -5224,9 +5219,6 @@ frrequest(softc, unit, req, data, set, makecopy)
 					if (fg != NULL)
 						f->fr_grp = &fg->fg_start;
 				}
-
-				ipf_checkrulefunc(softc, (void *)f->fr_func,
-						  addrem, set);
 			} else {
 				softc->ipf_interror = 33;
 				error = ENOMEM;
@@ -5239,6 +5231,108 @@ done:
 		KFREES(ptr, fp->fr_dsize);
 	}
 	return (error);
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:   ipf_rule_delete                                              */
+/* Returns:    Nil                                                          */
+/* Parameters: softc(I) - pointer to soft context main structure            */
+/*             f(I)     - pointer to the rule being deleted                 */
+/*             ftail(I) - pointer to the pointer to f                       */
+/*             unit(I)  - device for which this is for                      */
+/*             set(I)   - 1 or 0 (filter set)                               */
+/*                                                                          */
+/* This function attempts to do what it can to delete a filter rule: remove */
+/* it from any linked lists and remove any groups it is responsible for.    */
+/* But in the end, removing a rule can only drop the reference count - we   */
+/* must use that as the guide for whether or not it can be freed.           */
+/* ------------------------------------------------------------------------ */
+static void
+ipf_rule_delete(softc, f, unit, set)
+	ipf_main_softc_t *softc;
+	frentry_t *f;
+	int unit, set;
+{
+
+	if (*f->fr_grhead != '\0')
+		ipf_group_del(softc, f->fr_grhead, unit, set);
+
+	if (*f->fr_icmphead != '\0')
+		ipf_group_del(softc, f->fr_icmphead, unit, set);
+
+	/*
+	 * If fr_pdnext is set, then the rule is on the expire list, so
+	 * remove it from there.
+	 */
+	if (f->fr_pdnext != NULL) {
+		*f->fr_pdnext = f->fr_dnext;
+		if (f->fr_dnext != NULL)
+			f->fr_dnext->fr_pdnext = f->fr_pdnext;
+		f->fr_pdnext = NULL;
+		f->fr_dnext = NULL;
+	}
+
+	ipf_fixskip(f->fr_pnext, f, -1);
+	if (f->fr_pnext != NULL)
+		*f->fr_pnext = f->fr_next;
+	if (f->fr_next != NULL)
+		f->fr_next->fr_pnext = f->fr_pnext;
+	f->fr_pnext = NULL;
+	f->fr_next = NULL;
+
+	(void) ipf_derefrule(softc, &f);
+}
+
+/* ------------------------------------------------------------------------ */
+/* Function:   ipf_rule_expire_insert                                       */
+/* Returns:    Nil                                                          */
+/* Parameters: softc(I) - pointer to soft context main structure            */
+/*             f(I)     - pointer to rule to be added to expire list        */
+/*             set(I)   - 1 or 0 (filter set)                               */
+/*                                                                          */
+/* If the new rule has a given expiration time, insert it into the list of  */
+/* expiring rules with the ones to be removed first added to the front of   */
+/* the list. The insertion is O(n) but it is kept sorted for quick scans at */
+/* expiration interval checks.                                              */
+/* ------------------------------------------------------------------------ */
+static void
+ipf_rule_expire_insert(softc, f, set)
+	ipf_main_softc_t *softc;
+	frentry_t *f;
+	int set;
+{
+	frentry_t *fr;
+
+	/*
+	 */
+
+	f->fr_die = softc->ipf_ticks + IPF_TTLVAL(f->fr_die);
+	for (fr = softc->ipf_rule_explist[set]; fr != NULL;
+	     fr = fr->fr_dnext) {
+		if (f->fr_die < fr->fr_die)
+			break;
+		if (fr->fr_dnext == NULL) {
+			/*
+			 * We've got to the last rule and everything
+			 * wanted to be expired before this new node,
+			 * so we have to tack it on the end...
+			 */
+			fr->fr_dnext = f;
+			f->fr_pdnext = &fr->fr_dnext;
+			fr = NULL;
+			break;
+		}
+	}
+
+	if (softc->ipf_rule_explist[set] == NULL) {
+		softc->ipf_rule_explist[set] = f;
+		f->fr_pdnext = &softc->ipf_rule_explist[set];
+	} else if (fr != NULL) {
+		f->fr_dnext = fr;
+		f->fr_pdnext = fr->fr_pdnext;
+		fr->fr_pdnext = &f->fr_dnext;
+	}
 }
 
 
@@ -8397,40 +8491,6 @@ cantdecaps:
 }
 
 
-
-/* ------------------------------------------------------------------------ */
-/* Function:    ipf_checkrulefunc                                           */
-/* Returns:     Nil                                                         */
-/* Parameters:  funcptr(I) - function pointer                               */
-/*              addrem(I)  - 0 == add, 1 == remove                          */
-/*              set(I)     - active/inactive set number                     */
-/*                                                                          */
-/* Lookup a function pointer in the table of available functions and modify */
-/* its use counter if found, according to the value of addrem.              */
-/* ------------------------------------------------------------------------ */
-static void
-ipf_checkrulefunc(softc, funcptr, addrem, set)
-	ipf_main_softc_t *softc;
-	void *funcptr;
-	int addrem, set;
-{
-	ipfunc_resolve_t *ft;
-
-	for (ft = ipf_availfuncs; ft->ipfu_addr != NULL; ft++)
-		if ((void *)ft->ipfu_addr == funcptr)
-			break;
-
-	if (ft->ipfu_addr == NULL || ft->ipfu_ref == NULL)
-		return;
-
-	if (addrem == 0) {
-		ATOMIC_INC32(ft->ipfu_ref[set]);
-	} else if (addrem == 1) {
-		ATOMIC_DEC32(ft->ipfu_ref[set]);
-	}
-}
-
-
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_matcharray_load                                         */
 /* Returns:     int         - 0 = success, else error                       */
@@ -9520,4 +9580,50 @@ ipf_fini_all(softc)
 		return -1;
 
 	return 0;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_rule_expire                                             */
+/* Returns:     Nil                                                         */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*                                                                          */
+/* At present this function exists just to support temporary addition of    */
+/* firewall rules. Both inactive and active lists are scanned for items to  */
+/* purge, as by rights, the expiration is computed as soon as the rule is   */
+/* loaded in.                                                               */
+/* ------------------------------------------------------------------------ */
+void
+ipf_rule_expire(softc)
+	ipf_main_softc_t *softc;
+{
+	frentry_t *fr;
+
+	if ((softc->ipf_rule_explist[0] == NULL) &&
+	    (softc->ipf_rule_explist[1] == NULL))
+		return;
+
+	WRITE_ENTER(&softc->ipf_mutex);
+
+	while ((fr = softc->ipf_rule_explist[0]) != NULL) {
+		/*
+		 * Because the list is kept sorted on insertion, the fist
+		 * one that dies in the future means no more work to do.
+		 */
+		if (fr->fr_die > softc->ipf_ticks)
+			break;
+		ipf_rule_delete(softc, fr, IPL_LOGIPF, 0);
+	}
+
+	while ((fr = softc->ipf_rule_explist[1]) != NULL) {
+		/*
+		 * Because the list is kept sorted on insertion, the fist
+		 * one that dies in the future means no more work to do.
+		 */
+		if (fr->fr_die > softc->ipf_ticks)
+			break;
+		ipf_rule_delete(softc, fr, IPL_LOGIPF, 1);
+	}
+
+	RWLOCK_EXIT(&softc->ipf_mutex);
 }

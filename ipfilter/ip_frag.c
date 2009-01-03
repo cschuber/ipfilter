@@ -1163,6 +1163,7 @@ ipf_slowtimer(ptr)
 	ipf_nat_expire(softc);
 	ipf_auth_expire(softc);
 	ipf_lookup_expire(softc);
+	ipf_rule_expire(softc);
 # ifdef IPFILTER_SYNC
 	ipf_sync_expire(softc);
 # endif
