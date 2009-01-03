@@ -195,9 +195,7 @@ ipf_p_rcmd_portmsg(fin, aps, nat)
 		return 0;
 
 	bzero(portbuf, sizeof(portbuf));
-#ifdef STES
 	COPYDATA(m, off, MIN(sizeof(portbuf), dlen), portbuf);
-#endif
 
 	portbuf[sizeof(portbuf) - 1] = '\0';
 	s = portbuf;

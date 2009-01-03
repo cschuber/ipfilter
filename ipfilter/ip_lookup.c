@@ -53,6 +53,7 @@ struct file;
 #include "netinet/ip_lookup.h"
 #include "netinet/ip_pool.h"
 #include "netinet/ip_htable.h"
+#include "netinet/ip_dstlist.h"
 /* END OF INCLUDES */
 
 #if !defined(lint)
@@ -71,9 +72,7 @@ static int ipf_lookup_deltok __P((ipf_main_softc_t *, void *, int, void *));
 static ipf_lookup_t *backends[] = {
 	&ipf_pool_backend,
 	&ipf_htable_backend,
-#ifdef STES
 	&ipf_dstlist_backend
-#endif
 };
 
 #define	MAX_BACKENDS	(sizeof(backends)/sizeof(backends[0]))

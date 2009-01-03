@@ -570,9 +570,7 @@ ipf_log_items(softc, unit, fin, items, itemsz, types, cnt)
 		if (types[i] == 0) {
 			bcopy(items[i], ptr, itemsz[i]);
 		} else if (types[i] == 1) {
-#ifdef STES
 			COPYDATA(items[i], 0, itemsz[i], ptr);
-#endif
 		}
 		ptr += itemsz[i];
 	}

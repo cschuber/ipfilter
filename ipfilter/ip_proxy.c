@@ -90,8 +90,7 @@ struct file;
 
 /* END OF INCLUDES */
 
-#ifdef STES
-# include "netinet/ip_pptp_pxy.c"
+#include "netinet/ip_pptp_pxy.c"
 #if defined(_KERNEL)
 # include "netinet/ip_irc_pxy.c"
 # include "netinet/ip_raudio_pxy.c"
@@ -100,7 +99,6 @@ struct file;
 #endif
 #include "netinet/ip_ipsec_pxy.c"
 #include "netinet/ip_rpcb_pxy.c"
-#endif /* STES */
 
 #if !defined(lint)
 static const char rcsid[] = "@(#)$Id$";

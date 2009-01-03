@@ -417,9 +417,7 @@ ipf_p_ftp_port(softf, fin, ip, nat, ftp, dlen)
 		m_adj(m, inc);
 # endif /* defined(MENTAT) */
 #endif /* !defined(_KERNEL) */
-#ifdef STES
 	COPYBACK(m, off, nlen, newbuf);
-#endif
 
 	if (inc != 0) {
 		fin->fin_plen += inc;
@@ -830,9 +828,7 @@ ipf_p_ftp_pasvreply(softf, fin, ip, nat, ftp, port, newmsg, s, data_ip)
 		m_adj(m, inc);
 # endif /* defined(MENTAT) */
 #endif /* !defined(_KERNEL) */
-#ifdef STES
 	COPYBACK(m, off, nlen, newmsg);
-#endif
 
 	if (inc != 0) {
 		fin->fin_plen += inc;
@@ -1387,9 +1383,7 @@ ipf_p_ftp_process(softf, fin, nat, ftp, rv)
 		len = MIN(mlen, sizeof(f->ftps_buf) - (wptr - rptr));
 		if (len == 0)
 			break;
-#ifdef STES
 		COPYDATA(m, off, len, wptr);
-#endif
 		mlen -= len;
 		off += len;
 		wptr += len;
@@ -1782,9 +1776,7 @@ ipf_p_ftp_eprt4(softf, fin, ip, nat, ftp, dlen)
 # endif
 #endif
 	/* the mbuf chain will be extended if necessary by m_copyback() */
-#ifdef STES
 	COPYBACK(m, off, nlen, newbuf);
-#endif
 
 	if (inc != 0) {
 		fin->fin_plen += inc;

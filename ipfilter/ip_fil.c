@@ -597,7 +597,6 @@ m_freem(m)
 	return;
 }
 
-#ifdef STES
 void
 m_copydata(m, off, len, cp)
 	mb_t *m;
@@ -606,7 +605,6 @@ m_copydata(m, off, len, cp)
 {
 	bcopy((char *)m + off, cp, len);
 }
-#endif
 
 int
 ipfuiomove(buf, len, rwflag, uio)
