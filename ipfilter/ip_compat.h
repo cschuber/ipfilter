@@ -2554,6 +2554,25 @@ typedef	struct	tcpiphdr	tcpiphdr_t;
 # define	MLD6_MTRACE		MLD_MTRACE
 #endif
 
+#if !defined(IPV6_FLOWINFO_MASK)
+# if (BYTE_ORDER == BIG_ENDIAN) || defined(_BIG_ENDIAN)
+#  define IPV6_FLOWINFO_MASK	0x0fffffff	/* flow info (28 bits) */
+# else
+#  if(BYTE_ORDER == LITTLE_ENDIAN) || !defined(_BIG_ENDIAN)
+#   define IPV6_FLOWINFO_MASK	0xffffff0f	/* flow info (28 bits) */
+#  endif /* LITTLE_ENDIAN */
+# endif
+#endif
+#if !defined(IPV6_FLOWLABEL_MASK)
+# if (BYTE_ORDER == BIG_ENDIAN) || defined(_BIG_ENDIAN)
+#  define IPV6_FLOWLABEL_MASK	0x000fffff	/* flow label (20 bits) */
+# else
+#  if (BYTE_ORDER == LITTLE_ENDIAN) || !defined(_BIG_ENDIAN)
+#   define IPV6_FLOWLABEL_MASK	0xffff0f00	/* flow label (20 bits) */
+#  endif /* LITTLE_ENDIAN */
+# endif
+#endif
+
 /*
  * ECN is a new addition to TCP - RFC 2481
  */
