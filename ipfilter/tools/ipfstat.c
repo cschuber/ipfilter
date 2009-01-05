@@ -816,6 +816,9 @@ static void printlivelist(fiop, out, set, fp, group, comment)
 		}
 		if (fp->fr_data != NULL)
 			fp->fr_data = (char *)fp + sizeof(*fp);
+		if (fp->fr_comment != NULL)
+			fp->fr_comment = (char *)fp + sizeof(*fp) +
+					 fp->fr_dsize;
 
 		n++;
 
@@ -930,6 +933,16 @@ static void printdeadlist(fiop, out, set, fp, group, comment)
 			}
 		}
 
+		if (fb.fr_comment) {
+			char *tmp = malloc(1024);
+
+			if (kstrncpy(tmp, (u_long)fb.fr_comment, 1024) == 0) {
+				perror("kstrncpy");
+				return;
+			}
+			fb.fr_comment = tmp;
+		}
+
 		if (opts & (OPT_HITS|OPT_VERBOSE))
 #ifdef	USE_QUAD_T
 			PRINTF("%qu ", (unsigned long long) fb.fr_hits);
@@ -951,6 +964,8 @@ static void printdeadlist(fiop, out, set, fp, group, comment)
 			if (fb.fr_data != NULL && fb.fr_dsize > 0)
 				binprint(fb.fr_data, fb.fr_dsize);
 		}
+		if (fb.fr_comment != NULL)
+			free(fb.fr_comment);
 		if (data != NULL)
 			free(data);
 		if (fb.fr_grhead[0] != '\0') {

@@ -416,7 +416,8 @@ void	printfr(fp, iocfunc)
 		printf(" pps %d", fp->fr_pps);
 
 	if (fp->fr_comment)
-		printf(" comment \"%s\"", fp->fr_comment);
+		printf(" comment \"%*.*s\"", fp->fr_commlen, fp->fr_commlen,
+		       fp->fr_comment);
 
 	if ((fp->fr_flags & FR_KEEPSTATE) && (opts & OPT_VERBOSE)) {
 		printf(" # count %d", fp->fr_statecnt);

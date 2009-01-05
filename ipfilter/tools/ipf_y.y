@@ -204,6 +204,10 @@ line:	rule		{ while ((fr = frtop) != NULL) {
 				/* XXX validate ? */
 				(*ipfaddfunc)(ipffd, ipfioctls[IPL_LOGIPF], fr);
 				fr->fr_next = frold;
+				if (frold && frold->fr_data)
+					free(frold->fr_data);
+				if (frold && frold->fr_comment)
+					free(frold->fr_comment);
 				frold = fr;
 			  }
 			  resetlexer();
@@ -525,7 +529,8 @@ rulettl:
 	;
 
 comment:
-	| IPFY_COMMENT YY_STR		{ DOALL(fr->fr_comment = strdup($2);) }
+	| IPFY_COMMENT YY_STR		{ DOALL(fr->fr_comment = strdup($2); \
+						fr->fr_commlen = strlen($2);) }
 	;
 
 savegroup:

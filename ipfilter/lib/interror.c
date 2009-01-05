@@ -15,7 +15,7 @@ typedef	struct	{
 	char	*iee_text;
 } ipf_error_entry_t;
 
-#define	IPF_NUM_ERRORS	361
+#define	IPF_NUM_ERRORS	364
 
 /*
  * NO REUSE OF NUMBERS!
@@ -151,6 +151,9 @@ static ipf_error_entry_t ipf_errors[IPF_NUM_ERRORS] = {
 	{	125,	"error copying in ipfobj structure" },
 	{	126,	"error copying in ipfobj structure" },
 	{	127,	"error copying in ipfobj structure" },
+	{	128,	"no memory for filter rule comment" },
+	{	129,	"error copying in filter rule comment" },
+	{	130,	"error copying out filter rule comment" },
 /* -------------------------------------------------------------------------- */
 	{	10001,	"could not find token for auth iterator" },
 	{	10002,	"write permissions require to add/remove auth rule" },

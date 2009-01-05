@@ -4698,7 +4698,7 @@ frrequest(softc, unit, req, data, set, makecopy)
 {
 	frentry_t frd, *fp, *f, **fprev, **ftail;
 	int error = 0, in, family, addrem;
-	void *ptr, *uptr;
+	void *ptr, *uptr, *cptr;
 	u_int *p, *pp;
 	frgroup_t *fg;
 	char *group;
@@ -4776,6 +4776,7 @@ frrequest(softc, unit, req, data, set, makecopy)
 	}
 
 	ptr = NULL;
+	cptr = NULL;
 
 	if (FR_ISACCOUNT(fp->fr_flags))
 		unit = IPL_LOGCOUNT;
@@ -5182,6 +5183,22 @@ frrequest(softc, unit, req, data, set, makecopy)
 				if (fp != f)
 					bcopy((char *)fp, (char *)f,
 					      sizeof(*f));
+
+				if (fp->fr_comment != 0 && makecopy) {
+					KMALLOCS(cptr, void *, fp->fr_commlen);
+					if (cptr == NULL) {
+						softc->ipf_interror = 128;
+						goto done;
+					}
+					error = COPYIN(fp->fr_comment, cptr,
+						       fp->fr_commlen);
+					if (error != 0) {
+						softc->ipf_interror = 129;
+						goto done;
+					}
+					f->fr_comment = cptr;
+				}
+
 				MUTEX_NUKE(&f->fr_lock);
 				MUTEX_INIT(&f->fr_lock, "filter rule lock");
 #ifdef	IPFILTER_SCAN
@@ -5227,8 +5244,13 @@ frrequest(softc, unit, req, data, set, makecopy)
 	}
 done:
 	RWLOCK_EXIT(&softc->ipf_mutex);
-	if ((ptr != NULL) && (error != 0) && (makecopy != 0)) {
-		KFREES(ptr, fp->fr_dsize);
+	if ((error != 0) && (makecopy != 0)) {
+		if (ptr != NULL) {
+			KFREES(ptr, fp->fr_dsize);
+		}
+		if (cptr != NULL) {
+			KFREES(cptr, fp->fr_commlen);
+		}
 	}
 	return (error);
 }
@@ -5564,10 +5586,13 @@ ipf_derefrule(softc, frp)
 		if (fr->fr_type == FR_T_IPF && fr->fr_datype == FRI_LOOKUP)
 			ipf_lookup_deref(softc, fr->fr_dsttype, fr->fr_dstptr);
 
-		if (fr->fr_dsize) {
-			KFREES(fr->fr_data, fr->fr_dsize);
-		}
 		if ((fr->fr_flags & FR_COPIED) != 0) {
+			if (fr->fr_commlen != 0) {
+				KFREES(fr->fr_comment, fr->fr_commlen);
+			}
+			if (fr->fr_dsize) {
+				KFREES(fr->fr_data, fr->fr_dsize);
+			}
 			KFREE(fr);
 			return 0;
 		}
@@ -7883,8 +7908,8 @@ ipf_getnextrule(softc, t, ptr)
 		} else {
 			if (fr != NULL)
 				(void) ipf_derefrule(softc, &fr);
+			dst += sizeof(*next);
 			if (next->fr_data != NULL) {
-				dst += sizeof(*next);
 				error = COPYOUT(next->fr_data, dst,
 						next->fr_dsize);
 				if (error != 0) {
@@ -7892,6 +7917,16 @@ ipf_getnextrule(softc, t, ptr)
 					error = EFAULT;
 				} else {
 					dst += next->fr_dsize;
+				}
+			}
+			if ((error == 0) && (next->fr_comment != NULL)) {
+				error = COPYOUT(next->fr_comment, dst,
+						next->fr_commlen);
+				if (error != 0) {
+					softc->ipf_interror = 130;
+					error = EFAULT;
+				} else {
+					dst += next->fr_commlen;
 				}
 			}
 			if (next->fr_next == NULL) {
