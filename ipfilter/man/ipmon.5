@@ -34,9 +34,9 @@ line can delivery output to one of three destinations:
 \fBfile\fR, \fBemail\fR or \fBcommand\fR.  For example:
 .nf
 
-match { type = ipf } do { save /var/log/ipf-log };
-match { type = nat } do { syslog };
-match { type = state } do { execute "/bin/mail root" };
+match { type = ipf; } do { save("file:///var/log/ipf-log"); };
+match { type = nat; } do { syslog; };
+match { type = state; } do { execute("/bin/mail root"); };
 .fi
 .PP
 and is roughly described like this:
@@ -121,27 +121,31 @@ matching.
 .SH SYNTAX - ACTIONS
 The list of actions supported is as follows:
 .TP
-save [raw] <filename>
+save("file://<filename>")
+save("raw://<filename>")
 Write out the log record to the filename given.  This file will be closed
-and reopened on receipt of a SIGHUP.  If the \fIraw\fP option is present,
+and reopened on receipt of a SIGHUP.  If the \fIraw\fP target is used,
 binary log data, as read from the kernel, is written out rather than a
-text log record
+text log record. The filename should be an absolute target, including
+the root directory. Thus, saving to /var/log/ipmon.log would be, as an
+example, save("file:///var/log/ipmon.log").
 .TP
-syslog [facility <facility> | priority <priority> ]
+syslog("<facility>.<priority>")
+syslog("<facility>.")
+syslog(".<priority>")
 To log a text record via syslog, the \fBsyslog\fP action word is used.
 The facility used by default is determined at first by the default
 compiled into \fBipmon\fP (usually LOG_LOCAL0), which can be changed
 via the command line (-L <facility>) or in an \fBipf.conf\fP rule
 using the \fIlevel\fP option with logging.  If the facility is
 specified here, it takes precedence over all other settings.
-The same applies to the syslog priority.  To specify both the
-syslog facility and priority, the syntax to use is:
-.RS
-.PP
-syslog facility <facility>.<priority>
-.RE
+The same applies to the syslog priority. By default, ipmon will
+determine a priority for the packet, depending on whether or not it
+has been blocked, passed, etc. It is possible to force the complete
+facility/priority value for each log entry or to choose to replace
+only one of them.
 .TP
-execute <command string>
+execute("<command string>")
 The
 .B execute
 action runs the specified command each time the log entry matches
@@ -159,12 +163,12 @@ Some further examples are:
 #
 # log everything to syslog local4, regardless
 #
-match { } do { syslog facility local4 };
+match { ; } do { syslog("local4."); };
 #
 # keep a local copy of things packets to/from port 80
 #
-match { srcport = 80 } do { save /var/log/web };
-match { dstport = 80 } do { save /var/log/web };
+match { srcport = 80; } do { save("file:///var/log/web"); };
+match { dstport = 80; } do { save("file:///var/log/web"); };
 .fi
 .SH MATCHING
 .PP

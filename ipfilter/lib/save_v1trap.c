@@ -1,5 +1,6 @@
 #include "ipf.h"
 #include "ipl.h"
+#include "ipmon.h"
 
 #define	IPF_ENTERPRISE	9932
 /*
@@ -14,7 +15,217 @@ static int writeint __P((u_char *, int));
 static int writelength __P((u_char *, u_int));
 static int maketrap_v1 __P((char *, u_char *, int, u_char *, int, u_32_t,
 			    u_int, time_t));
+static void snmpv1_destroy __P((void *));
+static void *snmpv1_dup __P((void *));
+static int snmpv1_match __P((void *, void *));
+static void *snmpv1_parse __P((char **));
+static void snmpv1_print __P((void *));
+static int snmpv1_send __P((void *, ipmon_msg_t *));
 
+typedef struct snmpv1_opts_s {
+	char			*community;
+	int			fd;
+	int			v6;
+	int			ref;
+#ifdef USE_INET6
+	struct sockaddr_in6	sin6;
+#endif
+	struct sockaddr_in	sin;
+} snmpv1_opts_t;
+
+ipmon_saver_t snmpv1saver = {
+	"snmpv1",
+	snmpv1_destroy,
+	snmpv1_dup,		/* dup */
+	snmpv1_match,		/* match */
+	snmpv1_parse,
+	snmpv1_print,
+	snmpv1_send
+};
+
+
+static int
+snmpv1_match(ctx1, ctx2)
+	void *ctx1, *ctx2;
+{
+	snmpv1_opts_t *s1 = ctx1, *s2 = ctx2;
+
+	if (s1->v6 != s2->v6)
+		return 1;
+
+	if (strcmp(s1->community, s2->community))
+		return 1;
+
+#ifdef USE_INET6
+	if (s1->v6 == 1) {
+		if (memcmp(&s1->sin6, &s2->sin6, sizeof(s1->sin6)))
+			return 1;
+	} else
+#endif
+	{
+		if (memcmp(&s1->sin, &s2->sin, sizeof(s1->sin)))
+			return 1;
+	}
+
+	return 0;
+}
+
+
+static void *
+snmpv1_dup(ctx)
+	void *ctx;
+{
+	snmpv1_opts_t *s = ctx;
+
+	s->ref++;
+	return s;
+}
+
+
+static void
+snmpv1_print(ctx)
+	void *ctx;
+{
+	snmpv1_opts_t *snmpv1 = ctx;
+
+	printf("%s ", snmpv1->community);
+#ifdef USE_INET6
+	if (snmpv1->v6 == 1) {
+		char buf[80];
+
+		printf("%s", inet_ntop(AF_INET6, &snmpv1->sin6.sin6_addr, buf,
+				       sizeof(snmpv1->sin6.sin6_addr)));
+	} else
+#endif
+	{
+		printf("%s", inet_ntoa(snmpv1->sin.sin_addr));
+	}
+}
+
+
+static void *
+snmpv1_parse(char **strings)
+{
+	snmpv1_opts_t *ctx;
+	int result;
+	char *str;
+	char *s;
+
+	if (strings[0] == NULL || strings[0][0] == '\0')
+		return NULL;
+
+	if (strchr(*strings, ' ') == NULL)
+		return NULL;
+
+	str = strdup(*strings);
+
+	ctx = calloc(1, sizeof(*ctx));
+	if (ctx == NULL)
+		return NULL;
+
+	ctx->fd = -1;
+
+	s = strchr(str, ' ');
+	*s++ = '\0';
+	ctx->community = str;
+
+	while (isspace(*s))
+		s++;
+	if (!*s) {
+		free(str);
+		free(ctx);
+		return NULL;
+	}
+
+#ifdef USE_INET6
+	if (strchr(s, ':') == NULL) {
+		result = inet_pton(AF_INET, s, &ctx->sin.sin_addr);
+		if (result == 1) {
+			ctx->fd = socket(AF_INET, SOCK_DGRAM, 0);
+			if (ctx->fd >= 0) {
+				ctx->sin.sin_family = AF_INET;
+				ctx->sin.sin_port = htons(162);
+				if (connect(ctx->fd,
+					    (struct sockaddr *)&ctx->sin,
+					    sizeof(ctx->sin)) != 0) {
+						snmpv1_destroy(ctx);
+						return NULL;
+				}
+			}
+		}
+	} else {
+		result = inet_pton(AF_INET6, s, &ctx->sin6.sin6_addr);
+		if (result == 1) {
+			ctx->v6 = 1;
+			ctx->fd = socket(AF_INET6, SOCK_DGRAM, 0);
+			if (ctx->fd >= 0) {
+				ctx->sin6.sin6_family = AF_INET6;
+				ctx->sin6.sin6_port = htons(162);
+				if (connect(ctx->fd,
+					    (struct sockaddr *)&ctx->sin6,
+					    sizeof(ctx->sin6)) != 0) {
+						snmpv1_destroy(ctx);
+						return NULL;
+				}
+			}
+		}
+	}
+#else
+	result = inet_aton(s, &ctx->sin.sin_addr);
+	if (result == 1) {
+		ctx->fd = socket(AF_INET, SOCK_DGRAM, 0);
+		if (ctx->fd >= 0) {
+			ctx->sin.sin_family = AF_INET;
+			ctx->sin.sin_port = htons(162);
+			if (connect(ctx->fd, &ctx->sin,
+				    sizeof(ctx->sin)) != 0) {
+					snmpv1_destroy(ctx);
+					return NULL;
+			}
+		}
+	}
+#endif
+
+	if (result != 1) {
+		free(str);
+		free(ctx);
+		return NULL;
+	}
+
+	ctx->ref = 1;
+
+	return ctx;
+}
+
+
+static void
+snmpv1_destroy(ctx)
+	void *ctx;
+{
+	snmpv1_opts_t *v1 = ctx;
+
+	v1->ref--;
+	if (v1->ref > 0)
+		return;
+
+	if (v1->community)
+		free(v1->community);
+	if (v1->fd >= 0)
+		close(v1->fd);
+	free(v1);
+}
+
+
+static int
+snmpv1_send(ctx, msg)
+	void *ctx;
+	ipmon_msg_t *msg;
+{
+	snmpv1_opts_t *v1 = ctx;
+
+	return sendtrap_v1_0(v1->fd, v1->community,
+			     msg->imm_msg, msg->imm_msglen, msg->imm_when);
+}
 
 static char def_community[] = "public";	/* ublic */
 

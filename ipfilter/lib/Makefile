@@ -122,12 +122,16 @@ LIBOBJS=$(DEST)/addicmp.o \
      $(DEST)/remove_poolnode.o \
      $(DEST)/resetlexer.o \
      $(DEST)/rwlock_emul.o \
+     $(DEST)/save_execute.o \
+     $(DEST)/save_file.o \
+     $(DEST)/save_nothing.o \
+     $(DEST)/save_syslog.o \
+     $(DEST)/save_v1trap.o \
+     $(DEST)/save_v2trap.o \
      $(DEST)/tcpflags.o \
      $(DEST)/tcp_flags.o \
      $(DEST)/var.o \
      $(DEST)/verbose.o \
-     $(DEST)/v1trap.o \
-     $(DEST)/v2trap.o \
      $(DEST)/v6ionames.o \
      $(DEST)/v6optvalue.o
 
@@ -385,10 +389,18 @@ $(DEST)/var.o: $(LIBSRC)/var.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/var.c -o $@
 $(DEST)/verbose.o: $(LIBSRC)/verbose.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/verbose.c -o $@
-$(DEST)/v1trap.o: $(LIBSRC)/v1trap.c $(TOP)/ipl.h
-	$(CC) $(CCARGS) -c $(LIBSRC)/v1trap.c -o $@
-$(DEST)/v2trap.o: $(LIBSRC)/v2trap.c $(TOP)/ipl.h
-	$(CC) $(CCARGS) -c $(LIBSRC)/v2trap.c -o $@
+$(DEST)/save_execute.o: $(LIBSRC)/save_execute.c $(TOP)/ipl.h
+	$(CC) $(CCARGS) -c $(LIBSRC)/save_execute.c -o $@
+$(DEST)/save_file.o: $(LIBSRC)/save_file.c $(TOP)/ipl.h
+	$(CC) $(CCARGS) -c $(LIBSRC)/save_file.c -o $@
+$(DEST)/save_nothing.o: $(LIBSRC)/save_nothing.c $(TOP)/ipl.h
+	$(CC) $(CCARGS) -c $(LIBSRC)/save_nothing.c -o $@
+$(DEST)/save_syslog.o: $(LIBSRC)/save_syslog.c $(TOP)/ipl.h
+	$(CC) $(CCARGS) -c $(LIBSRC)/save_syslog.c -o $@
+$(DEST)/save_v1trap.o: $(LIBSRC)/save_v1trap.c $(TOP)/ipl.h
+	$(CC) $(CCARGS) -c $(LIBSRC)/save_v1trap.c -o $@
+$(DEST)/save_v2trap.o: $(LIBSRC)/save_v2trap.c $(TOP)/ipl.h
+	$(CC) $(CCARGS) -c $(LIBSRC)/save_v2trap.c -o $@
 $(DEST)/v6ionames.o: $(LIBSRC)/v6ionames.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/v6ionames.c -o $@
 $(DEST)/v6optvalue.o: $(LIBSRC)/v6optvalue.c $(INCDEP)

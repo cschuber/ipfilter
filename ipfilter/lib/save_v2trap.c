@@ -1,5 +1,6 @@
 #include "ipf.h"
 #include "ipl.h"
+#include "ipmon.h"
 
 static u_char sysuptime[] = { 6, 8, 0x2b, 6, 1, 2, 1, 1, 3, 0 };
 /*
@@ -13,11 +14,222 @@ static int writeint __P((u_char *, int));
 static int writelength __P((u_char *, u_int));
 static int maketrap_v2 __P((char *, u_char *, int, u_char *, int, u_32_t,
 			    u_int, time_t));
+static void snmpv2_destroy __P((void *));
+static void *snmpv2_dup __P((void *));
+static int snmpv2_match __P((void *, void *));
+static void *snmpv2_parse __P((char **));
+static void snmpv2_print __P((void *));
+static int snmpv2_send __P((void *, ipmon_msg_t *));
+
 
 int sendtrap_v2_0 __P((int, char *, char *, int, time_t));
 
 static char def_community[] = "public";	/* ublic */
 
+typedef struct snmpv2_opts_s {
+	char			*community;
+	char			*server;
+	int			fd;
+	int			v6;
+	int			ref;
+#ifdef USE_INET6
+	struct sockaddr_in6	sin6;
+#endif
+	struct sockaddr_in	sin;
+} snmpv2_opts_t;
+
+ipmon_saver_t snmpv2saver = {
+	"snmpv2",
+	snmpv2_destroy,
+	snmpv2_dup,		/* dup */
+	snmpv2_match,		/* match */
+	snmpv2_parse,
+	snmpv2_print,
+	snmpv2_send
+};
+
+
+static int
+snmpv2_match(ctx1, ctx2)
+	void *ctx1, *ctx2;
+{
+	snmpv2_opts_t *s1 = ctx1, *s2 = ctx2;
+
+	if (s1->v6 != s2->v6)
+		return 1;
+
+	if (strcmp(s1->community, s2->community))
+		return 1;
+
+#ifdef USE_INET6
+	if (s1->v6 == 1) {
+		if (memcmp(&s1->sin6, &s2->sin6, sizeof(s1->sin6)))
+			return 1;
+	} else
+#endif
+	{
+		if (memcmp(&s1->sin, &s2->sin, sizeof(s1->sin))) 
+			return 1;
+	}
+
+	return 0;       
+}
+
+
+static void *
+snmpv2_dup(ctx)
+	void *ctx; 
+{
+	snmpv2_opts_t *s = ctx;
+
+	s->ref++;
+	return s;
+}
+
+
+static void
+snmpv2_print(ctx)
+        void *ctx;
+{
+	snmpv2_opts_t *snmpv2 = ctx;
+
+	printf("%s ", snmpv2->community);      
+#ifdef USE_INET6
+	if (snmpv2->v6 == 1) {
+		char buf[80];   
+
+		printf("%s", inet_ntop(AF_INET6, &snmpv2->sin6.sin6_addr, buf,
+				       sizeof(snmpv2->sin6.sin6_addr)));
+	} else
+#endif
+	{
+		printf("%s", inet_ntoa(snmpv2->sin.sin_addr));
+	}       
+}
+
+
+static void *
+snmpv2_parse(char **strings)
+{
+	snmpv2_opts_t *ctx;
+	int result;
+	char *str;
+	char *s;
+
+	if (strings[0] == NULL || strings[0][0] == '\0')
+		return NULL;
+	if (strchr(*strings, ' ') == NULL)
+		return NULL;
+
+	str = strdup(*strings);
+
+	ctx = calloc(1, sizeof(*ctx));
+	if (ctx == NULL)
+		return NULL;
+
+	ctx->fd = -1;
+
+	s = strchr(str, ' ');
+	*s++ = '\0';
+	ctx->community = str;
+
+	while (isspace(*s))
+		s++;
+	if (!*s) {
+		free(str);
+		free(ctx);
+		return NULL;
+	}
+
+#ifdef USE_INET6
+	if (strchr(s, ':') == NULL) {
+		result = inet_pton(AF_INET, s, &ctx->sin.sin_addr);
+		if (result == 1) {
+			ctx->fd = socket(AF_INET, SOCK_DGRAM, 0);
+			if (ctx->fd >= 0) {
+				ctx->sin.sin_family = AF_INET;
+				ctx->sin.sin_port = htons(162);
+				if (connect(ctx->fd,
+					    (struct sockaddr *)&ctx->sin,
+					    sizeof(ctx->sin)) != 0) {
+						snmpv2_destroy(ctx);
+						return NULL;
+				}
+			}
+		}
+	} else {
+		result = inet_pton(AF_INET6, s, &ctx->sin6.sin6_addr);
+		if (result == 1) {
+			ctx->v6 = 1;
+			ctx->fd = socket(AF_INET6, SOCK_DGRAM, 0);
+			if (ctx->fd >= 0) {
+				ctx->sin6.sin6_family = AF_INET6;
+				ctx->sin6.sin6_port = htons(162);
+				if (connect(ctx->fd,
+					    (struct sockaddr *)&ctx->sin6,
+					    sizeof(ctx->sin6)) != 0) {
+						snmpv2_destroy(ctx);
+						return NULL;
+				}
+			}
+		}
+	}
+#else
+	result = inet_aton(s, &ctx->sin.sin_addr);
+	if (result == 1) {
+		ctx->fd = socket(AF_INET, SOCK_DGRAM, 0);
+		if (ctx->fd >= 0) {
+			ctx->sin.sin_family = AF_INET;
+			ctx->sin.sin_port = htons(162);
+			if (connect(ctx->fd, &ctx->sin,
+				    sizeof(ctx->sin)) != 0) {
+					snmpv2_destroy(ctx);
+					return NULL;
+			}
+		}
+	}
+#endif
+
+	if (result != 1) {
+		free(str);
+		free(ctx);
+		return NULL;
+	}
+
+	ctx->ref = 1;
+
+	return ctx;
+}
+
+
+static void
+snmpv2_destroy(ctx)
+	void *ctx;
+{
+	snmpv2_opts_t *v2 = ctx;
+
+	v2->ref--;
+	if (v2->ref > 0)
+		return;
+
+	if (v2->community)
+		free(v2->community);
+	if (v2->fd >= 0)
+		close(v2->fd);
+	free(v2);
+}
+
+
+static int
+snmpv2_send(ctx, msg)
+	void *ctx;
+	ipmon_msg_t *msg;
+{
+	snmpv2_opts_t *v2 = ctx;
+
+	return sendtrap_v2_0(v2->fd, v2->community,
+			     msg->imm_msg, msg->imm_msglen, msg->imm_when);
+}
 static int
 writelength(buffer, value)
 	u_char *buffer;

@@ -19,9 +19,10 @@ extern	int	yylex __P((void));
 extern	int	yydebug;
 extern	FILE	*yyin;
 extern	int	yylineNum;
+extern	int	ipmonopts;
 
-typedef	struct	opt	{
-	struct	opt	*o_next;
+typedef	struct	opt_s	{
+	struct	opt_s	*o_next;
 	int		o_line;
 	int		o_type;
 	int		o_num;
@@ -31,20 +32,26 @@ typedef	struct	opt	{
 	int		o_logpri;
 } opt_t;
 
-static	void	build_action __P((struct opt *));
+static	void	build_action __P((opt_t *, ipmon_doing_t *));
 static	opt_t	*new_opt __P((int));
 static	void	free_action __P((ipmon_action_t *));
-static	void	apply_snmp __P((ipmon_snmp_t *, opt_t *));
+static	void	print_action __P((ipmon_action_t *));
+static	int	find_doing __P((char *));
+static	ipmon_doing_t *build_doing __P((char *, char *));
+static	void	print_match __P((ipmon_action_t *));
 
 static	ipmon_action_t	*alist = NULL;
+
+ipmon_saver_int_t	*saverlist = NULL;
 %}
 
 %union	{
 	char	*str;
 	u_32_t	num;
 	struct in_addr	addr;
-	struct opt	*opt;
+	struct opt_s	*opt;
 	union	i6addr	ip6;
+	struct ipmon_doing_s	*ipmd;
 }
 
 %token	<num>	YY_NUMBER YY_HEX
@@ -55,18 +62,17 @@ static	ipmon_action_t	*alist = NULL;
 %token	YY_RANGE_OUT YY_RANGE_IN
 
 %token	IPM_MATCH IPM_BODY IPM_COMMENT IPM_DIRECTION IPM_DSTIP IPM_DSTPORT
-%token	IPM_EVERY IPM_EXECUTE IPM_GROUP IPM_INTERFACE IPM_IN IPM_NO IPM_OUT
+%token	IPM_EVERY IPM_GROUP IPM_INTERFACE IPM_IN IPM_NO IPM_OUT
 %token	IPM_PACKET IPM_PACKETS IPM_POOL IPM_PROTOCOL IPM_RESULT IPM_RULE
 %token	IPM_SECOND IPM_SECONDS IPM_SRCIP IPM_SRCPORT IPM_LOGTAG IPM_WITH
-%token	IPM_DO IPM_SAVE IPM_SYSLOG IPM_NOTHING IPM_RAW IPM_TYPE IPM_NAT
-%token	IPM_STATE IPM_NATTAG IPM_IPF IPM_FACILITY IPM_PRIORITY
-%token	IPM_SENDTRAP IPM_V1 IPM_COMMUNITY IPM_V2
+%token	IPM_DO IPM_DOING IPM_TYPE IPM_NAT
+%token	IPM_STATE IPM_NATTAG IPM_IPF
 %type	<addr> ipv4
-%type	<opt> direction dstip dstport every execute group interface
+%type	<opt> direction dstip dstport every group interface
 %type	<opt> protocol result rule srcip srcport logtag matching
-%type	<opt> matchopt nattag type doopt doing save syslog nothing trap
-%type	<num> saveopts saveopt typeopt syslogopts
-%type	<str> community
+%type	<opt> matchopt nattag type
+%type	<num> typeopt
+%type	<ipmd> doopt doing
 
 %%
 file:	line
@@ -75,11 +81,10 @@ file:	line
 	| file assign
 	;
 
-line:	IPM_MATCH '{' matching '}' IPM_DO '{' doing '}' ';'
-					{ $3->o_next = $7;
-					  build_action($3);
-					  resetlexer();
-					}
+line:	IPM_MATCH '{' matching ';' '}' IPM_DO '{' doing ';' '}' ';'
+						{ build_action($3, $8);
+						  resetlexer();
+						}
 	| IPM_COMMENT
 	| YY_COMMENT
 	;
@@ -120,15 +125,20 @@ matchopt:
 
 doing:
 	doopt					{ $$ = $1; }
-	| doopt ',' doing			{ $1->o_next = $3; $$ = $1; }
+	| doopt ',' doing			{ $1->ipmd_next = $3; $$ = $1; }
 	;
 
 doopt:
-	execute					{ $$ = $1; }
-	| save					{ $$ = $1; }
-	| syslog				{ $$ = $1; }
-	| trap					{ $$ = $1; }
-	| nothing				{ $$ = $1; }
+	YY_STR				{ if (find_doing($1) != IPM_DOING)
+						yyerror("unknown action");
+					}
+	'(' YY_STR ')'			{ $$ = build_doing($1, $4);
+					  if ($$ == NULL)
+						yyerror("action building");
+					}
+	| YY_STR			{ if (find_doing($1) == IPM_DOING)
+						$$ = build_doing($1, NULL);
+					}
 	;
 
 direction:
@@ -218,79 +228,7 @@ typeopt:
 	| IPM_STATE				{ $$ = IPL_MAGIC_STATE; }
 	;
 
-execute:
-	IPM_EXECUTE YY_STR			{ $$ = new_opt(IPM_EXECUTE);
-						  $$->o_str = $2; }
-	;
 
-save:	IPM_SAVE saveopts YY_STR		{ $$ = new_opt(IPM_SAVE);
-						  $$->o_num = $2;
-						  $$->o_str = $3; }
-	;
-
-saveopts:					{ $$ = 0; }
-	| saveopt				{ $$ = $1; }
-	| saveopt ',' saveopts			{ $$ = $1 | $3; }
-	;
-
-saveopt:
-	IPM_RAW					{ $$ = IPMDO_SAVERAW; }
-	;
-
-trap:	IPM_SENDTRAP IPM_V1 community ipv4	{ $$ = new_opt(IPM_SENDTRAP);
-						  $$->o_num = 1;
-						  $$->o_str = $3;
-						  $$->o_ip = $4;
-						}
-	| IPM_SENDTRAP IPM_V2 community ipv4	{ $$ = new_opt(IPM_SENDTRAP);
-						  $$->o_num = 2;
-						  $$->o_str = $3;
-						  $$->o_ip = $4;
-						}
-	;
-
-syslog:	IPM_SYSLOG syslogopts	{ $$ = new_opt(IPM_SYSLOG);
-				  $$->o_logfac = $2 & 0xff;
-				  if ($2 >= 0) {
-					  $$->o_logpri = ($2 >> 8);
-					  $$->o_logpri &= 0xff;
-				  }
-				}
-	;
-
-syslogopts:			{ $$ = -1; }
-	| IPM_FACILITY YY_STR	{ int i = fac_findname($2);
-				  if (i == -1)
-					i = 0;
-				  $$ = i;
-				}
-	| IPM_PRIORITY YY_STR	{ int i = pri_findname($2);
-				  if (i == -1) {
-					yyerror("unknown syslog priority");
-					$$ = -1;
-				  } else {
-					$$ = i << 8;
-				  }
-				}
-	| IPM_FACILITY YY_STR '.' YY_STR
-				{ int i, j;
-				  i = fac_findname($2);
-				  if (i != -1) {
-					j = pri_findname($4);
-					if (j != -1) {
-						$$ = i | (j << 8);
-					} else {
-						$$ = -1;
-					}
-				  } else {
-					$$ = -1;
-				  }
-				}
-	;
-
-community:			{ $$ = strdup(""); }
-	| IPM_COMMUNITY YY_STR	{ $$ = $2; }
-	;
 
 ipv4:   YY_NUMBER '.' YY_NUMBER '.' YY_NUMBER '.' YY_NUMBER
 		{ if ($1 > 255 || $3 > 255 || $5 > 255 || $7 > 255) {
@@ -300,21 +238,14 @@ ipv4:   YY_NUMBER '.' YY_NUMBER '.' YY_NUMBER '.' YY_NUMBER
 		  $$.s_addr = ($1 << 24) | ($3 << 16) | ($5 << 8) | $7;
 		  $$.s_addr = htonl($$.s_addr);
 		}
-
-nothing:
-	IPM_NOTHING				{ $$ = 0; }
-	;
 %%
 static	struct	wordtab	yywords[] = {
 	{ "body",	IPM_BODY },
-	{ "community",	IPM_COMMUNITY },
 	{ "direction",	IPM_DIRECTION },
 	{ "do",		IPM_DO },
 	{ "dstip",	IPM_DSTIP },
 	{ "dstport",	IPM_DSTPORT },
 	{ "every",	IPM_EVERY },
-	{ "execute",	IPM_EXECUTE },
-	{ "facility",	IPM_FACILITY },
 	{ "group",	IPM_GROUP },
 	{ "in",		IPM_IN },
 	{ "interface",	IPM_INTERFACE },
@@ -324,24 +255,17 @@ static	struct	wordtab	yywords[] = {
 	{ "nat",	IPM_NAT },
 	{ "nattag",	IPM_NATTAG },
 	{ "no",		IPM_NO },
-	{ "nothing",	IPM_NOTHING },
 	{ "out",	IPM_OUT },
 	{ "packet",	IPM_PACKET },
 	{ "packets",	IPM_PACKETS },
-	{ "priority",	IPM_PRIORITY },
 	{ "protocol",	IPM_PROTOCOL },
 	{ "result",	IPM_RESULT },
 	{ "rule",	IPM_RULE },
-	{ "save",	IPM_SAVE },
 	{ "second",	IPM_SECOND },
 	{ "seconds",	IPM_SECONDS },
-	{ "send-trap",	IPM_SENDTRAP },
 	{ "srcip",	IPM_SRCIP },
 	{ "srcport",	IPM_SRCPORT },
 	{ "state",	IPM_STATE },
-	{ "syslog",	IPM_SYSLOG },
-	{ "v1",		IPM_V1 },
-	{ "v2",		IPM_V2 },
 	{ "with",	IPM_WITH },
 	{ NULL,		0 }
 };
@@ -366,8 +290,9 @@ static int macflags[17][2] = {
 	{ 0, 0 }
 };
 
-static opt_t *new_opt(type)
-int type;
+static opt_t *
+new_opt(type)
+	int type;
 {
 	opt_t *o;
 
@@ -379,20 +304,18 @@ int type;
 	return o;
 }
 
-static void build_action(olist)
-opt_t *olist;
+static void
+build_action(olist, todo)
+	opt_t *olist;
+	ipmon_doing_t *todo;
 {
 	ipmon_action_t *a;
 	opt_t *o;
-	char c;
 	int i;
 
 	a = (ipmon_action_t *)calloc(1, sizeof(*a));
 	if (a == NULL)
 		return;
-
-	a->ac_v1.is_fd = -1;
-	a->ac_v2.is_fd = -1;
 
 	while ((o = olist) != NULL) {
 		/*
@@ -425,19 +348,6 @@ opt_t *olist;
 			break;
 		case IPM_DSTPORT :
 			a->ac_dport = htons(o->o_num);
-			break;
-		case IPM_EXECUTE :
-			a->ac_exec = o->o_str;
-			c = *o->o_str;
-			if (c== '"'|| c == '\'') {
-				if (o->o_str[strlen(o->o_str) - 1] == c) {
-					a->ac_run = strdup(o->o_str + 1);
-					a->ac_run[strlen(a->ac_run) - 1] ='\0';
-				} else
-					a->ac_run = o->o_str;
-			} else
-				a->ac_run = o->o_str;
-			o->o_str = NULL;
 			break;
 		case IPM_INTERFACE :
 			a->ac_iface = o->o_str;
@@ -484,33 +394,6 @@ opt_t *olist;
 		case IPM_SRCPORT :
 			a->ac_sport = htons(o->o_num);
 			break;
-		case IPM_SAVE :
-			if (a->ac_savefile != NULL) {
-				fprintf(stderr, "%s redfined on line %d\n",
-					yykeytostr(o->o_type), yylineNum);
-				break;
-			}
-			a->ac_savefile = strdup(o->o_str);
-			a->ac_savefp = fopen(o->o_str, "a");
-			a->ac_dflag |= o->o_num & IPMDO_SAVERAW;
-			break;
-		case IPM_SYSLOG :
-			if (a->ac_syslog != 0) {
-				fprintf(stderr, "%s redfined on line %d\n",
-					yykeytostr(o->o_type), yylineNum);
-				break;
-			}
-			a->ac_syslog = 1;
-			a->ac_logfac = o->o_logfac;
-			a->ac_logpri = o->o_logpri;
-			break;
-		case IPM_SENDTRAP :
-			if (o->o_num == 1) {
-				apply_snmp(&a->ac_v1, o);
-			} else if (o->o_num == 2) {
-				apply_snmp(&a->ac_v2, o);
-			}
-			break;
 		case IPM_TYPE :
 			a->ac_type = o->o_num;
 			break;
@@ -525,17 +408,25 @@ opt_t *olist;
 			free(o->o_str);
 		free(o);
 	}
+
+	a->ac_doing = todo;
 	a->ac_next = alist;
 	alist = a;
+
+	if (ipmonopts & IPMON_VERBOSE)
+		print_action(a);
 }
 
 
-int check_action(buf, log, opts, lvl)
-char *buf, *log;
-int opts, lvl;
+int
+check_action(buf, log, opts, lvl)
+	char *buf, *log;
+	int opts, lvl;
 {
 	ipmon_action_t *a;
 	struct timeval tv;
+	ipmon_doing_t *d;
+	ipmon_msg_t msg;
 	ipflog_t *ipf;
 	tcphdr_t *tcp;
 	iplog_t *ipl;
@@ -548,6 +439,13 @@ int opts, lvl;
 	ipf = (ipflog_t *)(ipl +1);
 	ip = (ip_t *)(ipf + 1);
 	tcp = (tcphdr_t *)((char *)ip + (IP_HL(ip) << 2));
+
+	msg.imm_data = ipl;
+	msg.imm_dsize = ipl->ipl_dsize;
+	msg.imm_when = ipl->ipl_time.tv_sec;
+	msg.imm_msg = log;
+	msg.imm_msglen = strlen(log);
+	msg.imm_loglevel = lvl;
 
 	for (a = alist; a != NULL; a = a->ac_next) {
 		verbose(0, "== checking config rule\n");
@@ -710,97 +608,28 @@ int opts, lvl;
 		verbose(8, "++ matched\n");
 
 		/*
-		 * It matched so now execute the command
+		 * It matched so now perform the saves
 		 */
-		if (a->ac_syslog != 0) {
-			int facpri;
-
-			if (a->ac_logfac >= 0)
-				facpri = a->ac_logfac;
-			else
-				facpri = 0;
-
-			if (a->ac_logpri == -1)
-				facpri |= lvl;
-			else
-				facpri |= a->ac_logpri;
-
-			syslog(facpri, "%s", log);
-		}
-
-		if (a->ac_savefp != NULL) {
-			if (a->ac_dflag & IPMDO_SAVERAW)
-				fwrite(ipl, 1, ipl->ipl_dsize, a->ac_savefp);
-			else
-				fputs(log, a->ac_savefp);
-		}
-
-		if (a->ac_exec != NULL) {
-			switch (fork())
-			{
-			case 0 :
-			{
-				FILE *pi;
-
-				pi = popen(a->ac_run, "w");
-				if (pi != NULL) {
-					fprintf(pi, "%s\n", log);
-					if ((opts & OPT_HEXHDR) != 0) {
-						dumphex(pi, 0, buf,
-							sizeof(*ipl) +
-							sizeof(*ipf));
-					}
-					if ((opts & OPT_HEXBODY) != 0) {
-						dumphex(pi, 0, (char *)ip,
-							ipf->fl_hlen +
-							ipf->fl_plen);
-					}
-					pclose(pi);
-				}
-				exit(1);
-			}
-			case -1 :
-				break;
-			default :
-				break;
-			}
-		}
-
-		if (a->ac_v1.is_fd >= 0) {
-			sendtrap_v1_0(a->ac_v1.is_fd, a->ac_v1.is_community,
-				      log, strlen(log), ipl->ipl_time.tv_sec);
-		}
-		if (a->ac_v2.is_fd >= 0) {
-			sendtrap_v2_0(a->ac_v2.is_fd, a->ac_v2.is_community,
-				      log, strlen(log), ipl->ipl_time.tv_sec);
-		}
+		for (d = a->ac_doing; d != NULL; d = d->ipmd_next)
+			(*d->ipmd_store)(d->ipmd_token, &msg);
 	}
 
 	return matched;
 }
 
 
-static void free_action(a)
-ipmon_action_t *a;
+static void
+free_action(a)
+	ipmon_action_t *a;
 {
-	if (a->ac_savefile != NULL) {
-		free(a->ac_savefile);
-		a->ac_savefile = NULL;
+	ipmon_doing_t *d;
+
+	while ((d = a->ac_doing) != NULL) {
+		a->ac_doing = d->ipmd_next;
+		(*d->ipmd_saver->ims_destroy)(d->ipmd_token);
+		free(d);
 	}
-	if (a->ac_savefp != NULL) {
-		fclose(a->ac_savefp);
-		a->ac_savefp = NULL;
-	}
-	if (a->ac_exec != NULL) {
-		free(a->ac_exec);
-		if (a->ac_run == a->ac_exec)
-			a->ac_run = NULL;
-		a->ac_exec = NULL;
-	}
-	if (a->ac_run != NULL) {
-		free(a->ac_run);
-		a->ac_run = NULL;
-	}
+
 	if (a->ac_iface != NULL) {
 		free(a->ac_iface);
 		a->ac_iface = NULL;
@@ -810,23 +639,20 @@ ipmon_action_t *a;
 }
 
 
-int load_config(file)
-char *file;
+int
+load_config(file)
+	char *file;
 {
-	ipmon_action_t *a;
 	FILE *fp;
 	char *s;
+
+	unload_config();
 
 	s = getenv("YYDEBUG");
 	if (s != NULL)
 		yydebug = atoi(s);
 	else
 		yydebug = 0;
-
-	while ((a = alist) != NULL) {
-		alist = a->ac_next;
-		free_action(a);
-	}
 
 	yylineNum = 1;
 
@@ -845,33 +671,277 @@ char *file;
 }
 
 
-static void
-apply_snmp(is, o)
-	ipmon_snmp_t *is;
-	opt_t *o;
+void
+unload_config()
 {
-	if (is->is_fd > 0) {
-		fprintf(stderr, "%s redfined on line %d\n",
-			yykeytostr(o->o_type), yylineNum);
-		return;
-	}
-	is->is_fd = socket(AF_INET, SOCK_DGRAM, 0);
-	if (is->is_fd == -1) {
-		perror("socket");
-		return;
-	}
-	is->is_sin.sin_family = AF_INET;
-	is->is_sin.sin_port = htons(162);
-	is->is_sin.sin_addr = o->o_ip;
+	ipmon_action_t *a;
 
-	if (connect(is->is_fd, (struct sockaddr *)&is->is_sin,
-		    sizeof(is->is_sin)) == -1) {
-		close(is->is_fd);
-		is->is_fd = -1;
+	while ((a = alist) != NULL) {
+		alist = a->ac_next;
+		free_action(a);
+	}
+}
+
+
+void
+dump_config()
+{
+	ipmon_action_t *a;
+
+	for (a = alist; a != NULL; a = a->ac_next) {
+		print_action(a);
+
+		printf("#\n");
+	}
+}
+
+
+static void
+print_action(a)
+	ipmon_action_t *a;
+{
+	ipmon_doing_t *d;
+
+	printf("match { ");
+	print_match(a);
+	printf("; }\n");
+	printf("do {");
+	for (d = a->ac_doing; d != NULL; d = d->ipmd_next) {
+		printf("%s", d->ipmd_saver->ims_name);
+		if (d->ipmd_saver->ims_print != NULL) {
+			printf("(\"");
+			(*d->ipmd_saver->ims_print)(d->ipmd_token);
+			printf("\")");
+		}
+		printf(";");
+	}
+	printf("};\n");
+}
+
+
+void *
+add_doing(saver)
+	ipmon_saver_t *saver;
+{
+	ipmon_saver_int_t *it;
+
+	if (find_doing(saver->ims_name) == IPM_DOING)
+		return NULL;
+
+	it = calloc(1, sizeof(*it));
+	if (it == NULL)
+		return NULL;
+	it->imsi_stor = saver;
+	it->imsi_next = saverlist;
+	saverlist = it;
+	return it;
+}
+
+
+static int
+find_doing(string)
+	char *string;
+{
+	ipmon_saver_int_t *it;
+
+	for (it = saverlist; it != NULL; it = it->imsi_next) {
+		if (!strcmp(it->imsi_stor->ims_name, string))
+			return IPM_DOING;
+	}
+	return 0;
+}
+
+
+static ipmon_doing_t *
+build_doing(target, options)
+	char *target;
+	char *options;
+{
+	ipmon_saver_int_t *it;
+	char *strarray[2];
+	ipmon_doing_t *d, *d1;
+	ipmon_action_t *a;
+	ipmon_saver_t *save;
+
+	d = calloc(1, sizeof(*d));
+	if (d == NULL)
+		return NULL;
+
+	for (it = saverlist; it != NULL; it = it->imsi_next) {
+		if (!strcmp(it->imsi_stor->ims_name, target))
+			break;
+	}
+	if (it == NULL) {
+		free(d);
+		return NULL;
 	}
 
-	if (o->o_str != NULL && *o->o_str != '\0') {
-		is->is_community = o->o_str;
-		o->o_str = NULL;
+	strarray[0] = options;
+	strarray[1] = NULL;
+
+	d->ipmd_token = (*it->imsi_stor->ims_parse)(strarray);
+	if (d->ipmd_token == NULL) {
+		free(d);
+		return NULL;
+	}
+
+	save = it->imsi_stor;
+	d->ipmd_saver = save;
+	d->ipmd_store = it->imsi_stor->ims_store;
+
+	/*
+	 * Look for duplicate do-things that need to be dup'd
+	 */
+	for (a = alist; a != NULL; a = a->ac_next) {
+		for (d1 = a->ac_doing; d1 != NULL; d1 = d1->ipmd_next) {
+			if (save != d1->ipmd_saver)
+				continue;
+			if (save->ims_match == NULL || save->ims_dup == NULL)
+				continue;
+			if ((*save->ims_match)(d->ipmd_token, d1->ipmd_token))
+				continue;
+
+			(*d->ipmd_saver->ims_destroy)(d->ipmd_token);
+			d->ipmd_token = (*save->ims_dup)(d1->ipmd_token);
+			break;
+		}
+	}
+
+	return d;
+}
+
+
+static void
+print_match(a)
+	ipmon_action_t *a;
+{
+	char *coma = "";
+
+	if ((a->ac_mflag & IPMAC_DIRECTION) != 0) {
+		printf("direction = ");
+		if (a->ac_direction == IPM_IN)
+			printf("in");
+		else if (a->ac_direction == IPM_OUT)
+			printf("out");
+		coma = ", ";
+	}
+
+	if ((a->ac_mflag & IPMAC_DSTIP) != 0) {
+		printf("%sdstip = ", coma);
+		printhostmask(AF_INET, &a->ac_dip, &a->ac_dmsk);
+		coma = ", ";
+	}
+
+	if ((a->ac_mflag & IPMAC_DSTPORT) != 0) {
+		printf("%sdstport = %hu", coma, ntohs(a->ac_dport));
+		coma = ", ";
+	}
+
+	if ((a->ac_mflag & IPMAC_GROUP) != 0) {
+		char group[FR_GROUPLEN+1];
+
+		strncpy(group, a->ac_group, FR_GROUPLEN);
+		group[FR_GROUPLEN] = '\0';
+		printf("%sgroup = %s", coma, group);
+		coma = ", ";
+	}
+
+	if ((a->ac_mflag & IPMAC_INTERFACE) != 0) {
+		printf("%siface = %s", coma, a->ac_iface);
+		coma = ", ";
+	}
+
+	if ((a->ac_mflag & IPMAC_LOGTAG) != 0) {
+		printf("%slogtag = %u", coma, a->ac_logtag);
+		coma = ", ";
+	}
+
+	if ((a->ac_mflag & IPMAC_NATTAG) != 0) {
+		char tag[17];
+
+		strncpy(tag, a->ac_nattag, 16);
+		tag[16] = '\0';
+		printf("%snattag = %s", coma, tag);
+		coma = ", ";
+	}
+
+	if ((a->ac_mflag & IPMAC_PROTOCOL) != 0) {
+		printf("%sprotocol = %u", coma, a->ac_proto);
+		coma = ", ";
+	}
+
+	if ((a->ac_mflag & IPMAC_RESULT) != 0) {
+		printf("%sresult = ", coma);
+		switch (a->ac_result)
+		{
+		case IPMR_LOG :
+			printf("log");
+			break;
+		case IPMR_PASS :
+			printf("pass");
+			break;
+		case IPMR_BLOCK :
+			printf("block");
+			break;
+		case IPMR_NOMATCH :
+			printf("nomatch");
+			break;
+		}
+		coma = ", ";
+	}
+
+	if ((a->ac_mflag & IPMAC_RULE) != 0) {
+		printf("%srule = %u", coma, a->ac_rule);
+		coma = ", ";
+	}
+
+	if ((a->ac_mflag & IPMAC_EVERY) != 0) {
+		if (a->ac_packet > 1) {
+			printf("%severy %d packets", coma, a->ac_packet);
+			coma = ", ";
+		} else if (a->ac_packet == 1) {
+			printf("%severy packet", coma);
+			coma = ", ";
+		}
+		if (a->ac_second > 1) {
+			printf("%severy %d seconds", coma, a->ac_second);
+			coma = ", ";
+		} else if (a->ac_second == 1) {
+			printf("%severy second", coma);
+			coma = ", ";
+		}
+	}
+
+	if ((a->ac_mflag & IPMAC_SRCIP) != 0) {
+		printf("%ssrcip = ", coma);
+		printhostmask(AF_INET, &a->ac_sip, &a->ac_smsk);
+		coma = ", ";
+	}
+
+	if ((a->ac_mflag & IPMAC_SRCPORT) != 0) {
+		printf("%ssrcport = %hu", coma, ntohs(a->ac_sport));
+		coma = ", ";
+	}
+
+	if ((a->ac_mflag & IPMAC_TYPE) != 0) {
+		printf("%stype = ", coma);
+		switch (a->ac_type)
+		{
+		case IPL_LOGIPF :
+			printf("ipf");
+			break;
+		case IPL_LOGSTATE :
+			printf("state");
+			break;
+		case IPL_LOGNAT :
+			printf("nat");
+			break;
+		}
+		coma = ", ";
+	}
+
+	if ((a->ac_mflag & IPMAC_WITH) != 0) {
+		printf("%swith ", coma);
+		coma = ", ";
 	}
 }
