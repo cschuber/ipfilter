@@ -155,6 +155,38 @@ The command string given is executed using /bin/sh.
 nothing
 Literally, do nothing.  Use this if you want to be verbose in your config
 file about doing nothing for a particular log record.
+.SH PLUGIN ACTIONS
+It is possible to configure
+.B ipmon
+to use externally supplied modules to save log entries with.
+These are added to
+.B ipmon
+using the
+.I load_action
+configuration line. The syntax of this line is:
+.nf
+
+load_action <name> <path>;
+.fi
+.TP
+name
+is a short name for the action. It does not need to correspond to the
+name of the library file, but inside the library file, the functions
+.B <name>destroy
+,
+.B <name>parse
+and
+.B <name>store
+must be present.
+.TP
+path
+specifies the path in the filesystem to the shared object
+that contains the implementation of the new action. After the new
+action has been declared using
+.I load_action
+it can then be used in any
+.I do
+statement.
 .SH EXAMPLES
 .PP
 Some further examples are:
@@ -169,6 +201,10 @@ match { ; } do { syslog("local4."); };
 #
 match { srcport = 80; } do { save("file:///var/log/web"); };
 match { dstport = 80; } do { save("file:///var/log/web"); };
+#
+load_action local "/usr/lib/libmyaction.so";
+match { dstip 127.0.0.1; } do { local("local options"); };
+#
 .fi
 .SH MATCHING
 .PP

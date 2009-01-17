@@ -29,6 +29,7 @@ typedef struct ipmon_saver_s {
 typedef struct	ipmon_saver_int_s {
 	struct ipmon_saver_int_s	*imsi_next;
 	ipmon_saver_t			*imsi_stor;
+	void				*imsi_handle;
 } ipmon_saver_int_t;
 
 typedef	struct	ipmon_doing_s {

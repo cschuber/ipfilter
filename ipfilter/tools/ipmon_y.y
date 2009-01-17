@@ -11,6 +11,8 @@
 #include "ipmon_l.h"
 #include "ipmon.h"
 
+#include <dlfcn.h>
+
 #define	YYDEBUG	1
 
 extern	void	yyerror __P((char *));
@@ -39,6 +41,7 @@ static	void	print_action __P((ipmon_action_t *));
 static	int	find_doing __P((char *));
 static	ipmon_doing_t *build_doing __P((char *, char *));
 static	void	print_match __P((ipmon_action_t *));
+static	int	install_saver __P((char *, char *));
 
 static	ipmon_action_t	*alist = NULL;
 
@@ -62,7 +65,7 @@ ipmon_saver_int_t	*saverlist = NULL;
 %token	YY_RANGE_OUT YY_RANGE_IN
 
 %token	IPM_MATCH IPM_BODY IPM_COMMENT IPM_DIRECTION IPM_DSTIP IPM_DSTPORT
-%token	IPM_EVERY IPM_GROUP IPM_INTERFACE IPM_IN IPM_NO IPM_OUT
+%token	IPM_EVERY IPM_GROUP IPM_INTERFACE IPM_IN IPM_NO IPM_OUT IPM_LOADACTION
 %token	IPM_PACKET IPM_PACKETS IPM_POOL IPM_PROTOCOL IPM_RESULT IPM_RULE
 %token	IPM_SECOND IPM_SECONDS IPM_SRCIP IPM_SRCPORT IPM_LOGTAG IPM_WITH
 %token	IPM_DO IPM_DOING IPM_TYPE IPM_NAT
@@ -75,21 +78,26 @@ ipmon_saver_int_t	*saverlist = NULL;
 %type	<ipmd> doopt doing
 
 %%
-file:	line
-	| assign
-	| file line
-	| file assign
+file:	action
+	| file action
 	;
 
-line:	IPM_MATCH '{' matching ';' '}' IPM_DO '{' doing ';' '}' ';'
-						{ build_action($3, $8);
-						  resetlexer();
-						}
+action:	line ';'
+	| assign ';'
 	| IPM_COMMENT
 	| YY_COMMENT
 	;
 
-assign:	YY_STR assigning YY_STR ';'		{ set_variable($1, $3);
+line:	IPM_MATCH '{' matching ';' '}' IPM_DO '{' doing ';' '}'
+						{ build_action($3, $8);
+						  resetlexer();
+						}
+	| IPM_LOADACTION YY_STR YY_STR 	{ if (install_saver($2, $3))
+						yyerror("install saver");
+					}
+	;
+
+assign:	YY_STR assigning YY_STR 		{ set_variable($1, $3);
 						  resetlexer();
 						  free($1);
 						  free($3);
@@ -250,6 +258,7 @@ static	struct	wordtab	yywords[] = {
 	{ "in",		IPM_IN },
 	{ "interface",	IPM_INTERFACE },
 	{ "ipf",	IPM_IPF },
+	{ "load_action",IPM_LOADACTION },
 	{ "logtag",	IPM_LOGTAG },
 	{ "match",	IPM_MATCH },
 	{ "nat",	IPM_NAT },
@@ -674,11 +683,32 @@ load_config(file)
 void
 unload_config()
 {
+	ipmon_saver_int_t *sav, **imsip;
+	ipmon_saver_t *is;
 	ipmon_action_t *a;
 
 	while ((a = alist) != NULL) {
 		alist = a->ac_next;
 		free_action(a);
+	}
+
+	/*
+	 * Look for savers that have been added in dynamically from the
+	 * configuration file.
+	 */
+	for (imsip = &saverlist; (sav = *imsip) != NULL; ) {
+		if (sav->imsi_handle == NULL)
+			imsip = &sav->imsi_next;
+		else {
+			dlclose(sav->imsi_handle);
+
+			*imsip = sav->imsi_next;
+			is = sav->imsi_stor;
+			free(sav);
+
+			free(is->ims_name);
+			free(is);
+		}
 	}
 }
 
@@ -944,4 +974,77 @@ print_match(a)
 		printf("%swith ", coma);
 		coma = ", ";
 	}
+}
+
+
+static int
+install_saver(name, path)
+	char *name, *path;
+{
+	ipmon_saver_int_t *isi;
+	ipmon_saver_t *is;
+	char nbuf[80];
+
+	if (find_doing(name) == IPM_DOING)
+		return -1;
+
+	isi = calloc(1, sizeof(*isi));
+	if (isi == NULL)
+		return -1;
+
+	is = calloc(1, sizeof(*is));
+	if (is == NULL)
+		goto loaderror;
+
+	is->ims_name = name;
+
+#ifdef RTLD_LAZY
+	isi->imsi_handle = dlopen(path, RTLD_LAZY);
+#endif
+#ifdef RTLD_LAZY
+	isi->imsi_handle = dlopen(path, DL_LAZY);
+#endif
+
+	if (isi->imsi_handle == NULL)
+		goto loaderror;
+
+	snprintf(nbuf, sizeof(nbuf), "%sdup", name);
+	is->ims_dup = dlsym(isi->imsi_handle, nbuf);
+
+	snprintf(nbuf, sizeof(nbuf), "%sdestroy", name);
+	is->ims_destroy = dlsym(isi->imsi_handle, nbuf);
+	if (is->ims_destroy == NULL)
+		goto loaderror;
+
+	snprintf(nbuf, sizeof(nbuf), "%smatch", name);
+	is->ims_match = dlsym(isi->imsi_handle, nbuf);
+
+	snprintf(nbuf, sizeof(nbuf), "%sparse", name);
+	is->ims_parse = dlsym(isi->imsi_handle, nbuf);
+	if (is->ims_parse == NULL)
+		goto loaderror;
+
+	snprintf(nbuf, sizeof(nbuf), "%sprint", name);
+	is->ims_print = dlsym(isi->imsi_handle, nbuf);
+	if (is->ims_print == NULL)
+		goto loaderror;
+
+	snprintf(nbuf, sizeof(nbuf), "%sstore", name);
+	is->ims_store = dlsym(isi->imsi_handle, nbuf);
+	if (is->ims_store == NULL)
+		goto loaderror;
+
+	isi->imsi_stor = is;
+	isi->imsi_next = saverlist;
+	saverlist = isi;
+
+	return 0;
+
+loaderror:
+	if (isi->imsi_handle != NULL)
+		dlclose(isi->imsi_handle);
+	free(isi);
+	if (is != NULL)
+		free(is);
+	return -1;
 }
