@@ -713,8 +713,6 @@ static void printside(side, frs)
 	PRINTF("%lu\t%s packets short\n", frs->fr_short, side);
 	PRINTF("%lu\t%s packets logged and blocked\n", frs->fr_bpkl, side);
 	PRINTF("%lu\t%s packets logged and passed\n", frs->fr_ppkl, side);
-	PRINTF("%lu\t%s packets logged\n", frs->fr_pkl, side);
-	PRINTF("%lu\t%s log failures\n", frs->fr_skip, side);
 	PRINTF("%lu\t%s fragment state kept\n", frs->fr_nfr, side);
 	PRINTF("%lu\t%s fragment state lost\n", frs->fr_bnfr, side);
 	PRINTF("%lu\t%s packet state kept\n", frs->fr_ads, side);
@@ -739,6 +737,8 @@ static	void	showstats(fp, frf)
 	printside("input", &fp->f_st[0]);
 	printside("output", &fp->f_st[1]);
 
+	PRINTF("%lu\tpackets logged\n", fp->f_log_ok);
+	PRINTF("%lu\tlog failures\n", fp->f_log_fail);
 	PRINTF("%lu\tICMP replies sent\n", fp->f_st[0].fr_ret);
 	PRINTF("%lu\tTCP RSTs sent\n", fp->f_st[1].fr_ret);
 	PRINTF("%lu\tfastroute successes\n", fp->f_froute[0]);

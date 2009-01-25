@@ -537,14 +537,24 @@ ipf_state_stats(softc)
 	ipf_main_softc_t *softc;
 {
 	ipf_state_softc_t *softs = softc->ipf_state_soft;
+	ips_stat_t *issp = &softs->ipf_state_stats;
 
-	softs->ipf_state_stats.iss_state_size = softs->ipf_state_size;
-	softs->ipf_state_stats.iss_state_max = softs->ipf_state_max;
-	softs->ipf_state_stats.iss_table = softs->ipf_state_table;
-	softs->ipf_state_stats.iss_list = softs->ipf_state_list;
-	softs->ipf_state_stats.iss_ticks = softc->ipf_ticks;
-	return &softs->ipf_state_stats;
+	issp->iss_state_size = softs->ipf_state_size;
+	issp->iss_state_max = softs->ipf_state_max;
+	issp->iss_table = softs->ipf_state_table;
+	issp->iss_list = softs->ipf_state_list;
+	issp->iss_ticks = softc->ipf_ticks;
+
+#ifdef IPFILTER_LOGGING
+	issp->iss_log_ok = ipf_log_logok(softc, IPF_LOGSTATE);
+	issp->iss_log_fail = ipf_log_failures(softc, IPF_LOGSTATE);
+#else
+	issp->iss_log_ok = 0;
+	issp->iss_log_fail = 0;
+#endif
+	return issp;
 }
+
 
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_state_remove                                            */
@@ -4457,7 +4467,6 @@ ipf_state_log(softc, is, type)
 	u_int type;
 {
 #ifdef	IPFILTER_LOG
-	ipf_state_softc_t *softs = softc->ipf_state_soft;
 	struct	ipslog	ipsl;
 	size_t sizes[1];
 	void *items[1];
@@ -4505,11 +4514,7 @@ ipf_state_log(softc, is, type)
 	sizes[0] = sizeof(ipsl);
 	types[0] = 0;
 
-	if (ipf_log_items(softc, IPL_LOGSTATE, NULL, items, sizes, types, 1)) {
-		SBUMP(ipf_state_stats.iss_log_ok);
-	} else {
-		SBUMP(ipf_state_stats.iss_log_fail);
-	}
+	(void) ipf_log_items(softc, IPL_LOGSTATE, NULL, items, sizes, types, 1);
 #endif
 }
 

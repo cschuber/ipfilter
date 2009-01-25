@@ -1221,6 +1221,13 @@ ipf_nat_ioctl(softc, data, cmd, mode, uid, ctx)
 		nsp->ns_hostmap_sz = softn->ipf_nat_hostmap_sz;
 		nsp->ns_instances = softn->ipf_nat_instances;
 		nsp->ns_ticks = softc->ipf_ticks;
+#ifdef IPFILTER_LOGGING
+		nsp->ns_log_ok = ipf_log_logok(softc, IPF_LOGNAT);
+		nsp->ns_log_fail = ipf_log_failures(softc, IPF_LOGNAT);
+#else
+		nsp->ns_log_ok = 0;
+		nsp->ns_log_fail = 0;
+#endif
 		error = ipf_outobj(softc, data, nsp, IPFOBJ_NATSTAT);
 		break;
 	    }
@@ -6370,12 +6377,7 @@ ipf_nat_log(softc, softn, nat, action)
 	sizes[0] = sizeof(natl);
 	types[0] = 0;
 
-	if (ipf_log_items(softc, IPL_LOGNAT, NULL, items, sizes,
-			  types, 1) == 0) {
-		NBUMPSIDE(0, ns_log);
-	} else {
-		NBUMPSIDE(1, ns_log);
-	}
+	(void) ipf_log_items(softc, IPL_LOGNAT, NULL, items, sizes, types, 1);
 #endif
 }
 

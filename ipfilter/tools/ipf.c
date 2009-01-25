@@ -520,9 +520,6 @@ static void showstats(fp)
 			fp->f_st[0].fr_bpkl, fp->f_st[0].fr_ppkl);
 	printf("output packets logged:\tblocked %lu passed %lu\n",
 			fp->f_st[1].fr_bpkl, fp->f_st[1].fr_ppkl);
-	printf(" packets logged:\tinput %lu-%lu output %lu-%lu\n",
-			fp->f_st[0].fr_pkl, fp->f_st[0].fr_skip,
-			fp->f_st[1].fr_pkl, fp->f_st[1].fr_skip);
 }
 
 

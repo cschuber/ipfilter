@@ -632,6 +632,7 @@ static void print_natlog(conf, buf, blen)
 	char *buf;
 	int blen;
 {
+	static u_32_t seqnum = 0;
 	struct natlog *nl;
 	int res, i, len;
 	struct tm *tm;
@@ -643,6 +644,21 @@ static void print_natlog(conf, buf, blen)
 	t = line;
 	simple = 0;
 	ipl = (iplog_t *)buf;
+	if (ipl->ipl_seqnum != seqnum) {
+		if ((ipmonopts & IPMON_SYSLOG) != 0) {
+			syslog(LOG_WARNING,
+			       "missed %u NAT log entries: %u %u",
+			       ipl->ipl_seqnum - seqnum, seqnum,
+			       ipl->ipl_seqnum);
+		} else {
+			(void) fprintf(conf->log,
+				"missed %u NAT log entries: %u %u\n",
+			       ipl->ipl_seqnum - seqnum, seqnum,
+			       ipl->ipl_seqnum);
+		}
+	}
+	seqnum = ipl->ipl_seqnum + ipl->ipl_count;
+
 	nl = (struct natlog *)((char *)ipl + sizeof(*ipl));
 	res = (ipmonopts & IPMON_RESOLVE) ? 1 : 0;
 	tm = get_tm(ipl->ipl_sec);
@@ -805,6 +821,7 @@ static void print_statelog(conf, buf, blen)
 	char *buf;
 	int blen;
 {
+	static u_32_t seqnum = 0;
 	struct ipslog *sl;
 	char *t, *proto;
 	int res, i, len;
@@ -813,6 +830,21 @@ static void print_statelog(conf, buf, blen)
 
 	t = line;
 	ipl = (iplog_t *)buf;
+	if (ipl->ipl_seqnum != seqnum) {
+		if ((ipmonopts & IPMON_SYSLOG) != 0) {
+			syslog(LOG_WARNING,
+			       "missed %u state log entries: %u %u",
+			       ipl->ipl_seqnum - seqnum, seqnum,
+			       ipl->ipl_seqnum);
+		} else {
+			(void) fprintf(conf->log,
+				"missed %u state log entries: %u %u\n",
+			       ipl->ipl_seqnum - seqnum, seqnum,
+			       ipl->ipl_seqnum);
+		}
+	}
+	seqnum = ipl->ipl_seqnum + ipl->ipl_count;
+
 	sl = (struct ipslog *)((char *)ipl + sizeof(*ipl));
 	res = (ipmonopts & IPMON_RESOLVE) ? 1 : 0;
 	tm = get_tm(ipl->ipl_sec);
@@ -1005,6 +1037,7 @@ static void print_ipflog(conf, buf, blen)
 	char *buf;
 	int blen;
 {
+	static u_32_t seqnum = 0;
 	int i, v, lvl, res, len, off, plen, ipoff, defaction;
 	struct icmp *icmp;
 	struct icmp *ic;
@@ -1024,6 +1057,21 @@ static void print_ipflog(conf, buf, blen)
 #endif
 
 	ipl = (iplog_t *)buf;
+	if (ipl->ipl_seqnum != seqnum) {
+		if ((ipmonopts & IPMON_SYSLOG) != 0) {
+			syslog(LOG_WARNING,
+			       "missed %u ipf log entries: %u %u",
+			       ipl->ipl_seqnum - seqnum, seqnum,
+			       ipl->ipl_seqnum);
+		} else {
+			(void) fprintf(conf->log,
+				"missed %u ipf log entries: %u %u\n",
+			       ipl->ipl_seqnum - seqnum, seqnum,
+			       ipl->ipl_seqnum);
+		}
+	}
+	seqnum = ipl->ipl_seqnum + ipl->ipl_count;
+
 	ipf = (ipflog_t *)((char *)buf + sizeof(*ipl));
 	ip = (ip_t *)((char *)ipf + sizeof(*ipf));
 	if (ipf->fl_family == AF_INET) {

@@ -366,20 +366,29 @@ typedef	struct {
 typedef	struct	fr_info	{
 	void	*fin_main_soft;
 	void	*fin_ifp;		/* interface packet is `on' */
-	fr_ip_t	fin_fi;		/* IP Packet summary */
-	frdat_t	fin_dat;		/* TCP/UDP ports, ICMP code/type */
-	int	fin_icode;		/* ICMP error to return */
-	int	fin_mtu;		/* MTU input for ICMP need-frag */
-	int	fin_out;		/* in or out ? 1 == out, 0 == in */
-	int	fin_rev;		/* state only: 1 = reverse */
-	int	fin_family;		/* AF_INET, etc. */
-	u_short	fin_hlen;		/* length of IP header in bytes */
-	u_32_t	fin_rule;		/* rule # last matched */
-	char	fin_group[FR_GROUPLEN];	/* group number, -1 for none */
 	struct	frentry *fin_fr;	/* last matching rule */
-	void	*fin_dp;		/* start of data past IP header */
+	int	fin_out;		/* in or out ? 1 == out, 0 == in */
+	fr_ip_t	fin_fi;			/* IP Packet summary */
+	frdat_t	fin_dat;		/* TCP/UDP ports, ICMP code/type */
 	int	fin_dlen;		/* length of data portion of packet */
 	int	fin_plen;
+	u_32_t	fin_rule;		/* rule # last matched */
+	u_short	fin_hlen;		/* length of IP header in bytes */
+	char	fin_group[FR_GROUPLEN];	/* group number, -1 for none */
+	void	*fin_dp;		/* start of data past IP header */
+	/*
+	 * Fields after fin_dp aren't used for compression of log records.
+	 * fin_fi contains the IP version (fin_family)
+	 * fin_rule isn't included because adding a new rule can change it but
+	 * not change fin_fr. fin_rule is the rule number reported.
+	 * It isn't necessary to include fin_crc because that is checked
+	 * for explicitly, before calling bcmp.
+	 */
+	u_32_t	fin_crc;		/* Simple calculation for logging */
+	int	fin_family;		/* AF_INET, etc. */
+	int	fin_icode;		/* ICMP error to return */
+	int	fin_mtu;		/* MTU input for ICMP need-frag */
+	int	fin_rev;		/* state only: 1 = reverse */
 	int	fin_ipoff;		/* # bytes from buffer start to hdr */
 	u_32_t	fin_id;			/* IP packet id field */
 	u_short	fin_l4hlen;		/* length of L4 header, if known */
@@ -894,8 +903,6 @@ typedef	struct	ipf_statistics {
 	u_long	fr_ppkl;	/* packets allowed and logged */
 	u_long	fr_bpkl;	/* packets denied and logged */
 	u_long	fr_npkl;	/* packets unmatched and logged */
-	u_long	fr_pkl;		/* packets logged */
-	u_long	fr_skip;	/* packets to be logged but buffer full */
 	u_long	fr_ret;		/* packets for which a return is sent */
 	u_long	fr_acct;	/* packets for which counting was performed */
 	u_long	fr_bnfr;	/* bad attempts to allocate fragment state */
@@ -925,6 +932,7 @@ typedef	struct	ipf_statistics {
 typedef	struct	iplog	{
 	u_32_t		ipl_magic;
 	u_int		ipl_count;
+	u_32_t		ipl_seqnum;
 	struct	timeval	ipl_time;
 	size_t		ipl_dsize;
 	struct	iplog	*ipl_next;
@@ -966,12 +974,12 @@ typedef	struct	ipflog	{
 # define	IPF_DEFAULT_PASS	FR_PASS
 #endif
 
-#define	DEFAULT_IPFLOGSIZE	8192
+#define	DEFAULT_IPFLOGSIZE	32768
 #ifndef	IPFILTER_LOGSIZE
 # define	IPFILTER_LOGSIZE	DEFAULT_IPFLOGSIZE
 #else
-# if IPFILTER_LOGSIZE < DEFAULT_IPFLOGSIZE
-#  error IPFILTER_LOGSIZE too small.  Must be >= DEFAULT_IPFLOGSIZE
+# if IPFILTER_LOGSIZE < 8192
+#  error IPFILTER_LOGSIZE too small.  Must be >= 8192
 # endif
 #endif
 
@@ -1022,6 +1030,8 @@ typedef	struct	friostat	{
 	frentry_t	*f_auth;
 	struct frgroup	*f_groups[IPL_LOGSIZE][2];
 	u_long		f_froute[2];
+	u_long		f_log_ok;
+	u_long		f_log_fail;
 	u_32_t		f_ticks;
 	int		f_locks[IPL_LOGMAX];
 	int		f_defpass;	/* default pass - from fr_pass */
@@ -1777,10 +1787,13 @@ extern	int	ipf_log_init __P((void));
 extern	int	ipf_log_bytesused __P((ipf_main_softc_t *, int));
 extern	int	ipf_log_canread __P((ipf_main_softc_t *, int));
 extern	int	ipf_log_clear __P((ipf_main_softc_t *, minor_t));
+extern	u_long  ipf_log_failures __P((ipf_main_softc_t *, int));
 extern	int	ipf_log_read __P((ipf_main_softc_t *, minor_t, uio_t *));
 extern	int	ipf_log_items __P((ipf_main_softc_t *, int, fr_info_t *,
 				   void **, size_t *, int *, int));
+extern	u_long  ipf_log_logok __P((ipf_main_softc_t *, int));
 extern	void	ipf_log_unload __P((ipf_main_softc_t *));
+extern	int 	ipf_log_pkt __P((fr_info_t *, u_int));
 extern	int 	ipf_log_pkt __P((fr_info_t *, u_int));
 
 extern	frentry_t	*ipf_acctpkt __P((fr_info_t *, u_32_t *));

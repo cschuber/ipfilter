@@ -471,9 +471,18 @@ ipf_pr_ipv6hdr(fin)
 	fi->fi_auth = 0;
 
 	p = ip6->ip6_nxt;
+	fin->fin_crc = p;
 	fi->fi_ttl = ip6->ip6_hlim;
 	fi->fi_src.in6 = ip6->ip6_src;
+	fin->fin_crc += fi->fi_src.i6[0];
+	fin->fin_crc += fi->fi_src.i6[1];
+	fin->fin_crc += fi->fi_src.i6[2];
+	fin->fin_crc += fi->fi_src.i6[3];
 	fi->fi_dst.in6 = ip6->ip6_dst;
+	fin->fin_crc += fi->fi_dst.i6[0];
+	fin->fin_crc += fi->fi_dst.i6[1];
+	fin->fin_crc += fi->fi_dst.i6[2];
+	fin->fin_crc += fi->fi_dst.i6[3];
 	fin->fin_id = 0;
 
 	hdrcount = 0;
@@ -1756,6 +1765,7 @@ ipf_pr_ipv4hdr(fin)
 	ip = fin->fin_ip;
 	p = ip->ip_p;
 	fi->fi_p = p;
+	fin->fin_crc = p;
 	fi->fi_tos = ip->ip_tos;
 	fin->fin_id = ip->ip_id;
 	off = ntohs(ip->ip_off);
@@ -1763,9 +1773,6 @@ ipf_pr_ipv4hdr(fin)
 	/* Get both TTL and protocol */
 	fi->fi_p = ip->ip_p;
 	fi->fi_ttl = ip->ip_ttl;
-#if 0
-	(*(((u_short *)fi) + 1)) = (*(((u_short *)ip) + 4));
-#endif
 
 	/* Zero out bits not used in IPv6 address */
 	fi->fi_src.i6[1] = 0;
@@ -1776,7 +1783,9 @@ ipf_pr_ipv4hdr(fin)
 	fi->fi_dst.i6[3] = 0;
 
 	fi->fi_saddr = ip->ip_src.s_addr;
+	fin->fin_crc += fi->fi_saddr;
 	fi->fi_daddr = ip->ip_dst.s_addr;
+	fin->fin_crc += fi->fi_daddr;
 
 	/*
 	 * set packet attribute flags based on the offset and
@@ -2579,9 +2588,7 @@ ipf_scanlist(fin, pass)
 					passt |= FR_BLOCK|FR_QUICK;
 					fin->fin_reason = 1;
 				}
-				LBUMP(ipf_stats[fin->fin_out].fr_skip);
 			}
-			LBUMP(ipf_stats[fin->fin_out].fr_pkl);
 		}
 #endif /* IPFILTER_LOG */
 
@@ -3346,8 +3353,6 @@ ipf_dolog(fin, passp)
 
 logit:
 		if (ipf_log_pkt(fin, pass) == -1) {
-			LBUMP(ipf_stats[out].fr_skip);
-
 			/*
 			 * If the "or-block" option has been used then
 			 * block the packet if we failed to log it.
@@ -4570,8 +4575,12 @@ ipf_getstat(softc, fiop)
 		fiop->f_groups[i][1] = softc->ipf_groups[i][1];
 	}
 #ifdef  IPFILTER_LOG
+	fiop->f_log_ok = ipf_log_logok(softc, IPL_LOGIPF);
+	fiop->f_log_fail = ipf_log_failures(softc, IPL_LOGIPF);
 	fiop->f_logging = 1;
 #else
+	fiop->f_log_ok = 0;
+	fiop->f_log_fail = 0;
 	fiop->f_logging = 0;
 #endif
 	fiop->f_defpass = softc->ipf_pass;

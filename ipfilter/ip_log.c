@@ -157,7 +157,10 @@ typedef struct ipf_log_softc_s {
 	iplog_t		**iplh[IPL_LOGSIZE];
 	iplog_t		*iplt[IPL_LOGSIZE];
 	iplog_t		*ipll[IPL_LOGSIZE];
+	u_long		ipl_logfail[IPL_LOGSIZE];
+	u_long		ipl_logok[IPL_LOGSIZE];
 	fr_info_t	ipl_crc[IPL_LOGSIZE];
+	u_32_t		ipl_counter[IPL_LOGSIZE];
 	int		ipl_suppress;
 	int		ipl_logall;
 	int		ipl_log_init;
@@ -329,7 +332,7 @@ ipf_log_soft_destroy(softc, arg)
 
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_log_pkt                                                 */
-/* Returns:     int - 0 == success, -1 == failure                           */
+/* Returns:     int      - 0 == success, -1 == failure                      */
 /* Parameters:  fin(I)   - pointer to packet information                    */
 /*              flags(I) - flags from filter rules                          */
 /*                                                                          */
@@ -504,8 +507,9 @@ ipf_log_pkt(fin, flags)
 
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_log_items                                               */
-/* Returns:     int - 0 == success, -1 == failure                           */
-/* Parameters:  unit(I)   - device that owns this log record                */
+/* Returns:     int       - 0 == success, -1 == failure                     */
+/* Parameters:  softc(I)  - pointer to main soft context                    */
+/*              unit(I)   - device we are reading from                      */
 /*              fin(I)    - pointer to packet information                   */
 /*              items(I)  - array of pointers to log data                   */
 /*              itemsz(I) - array of size of valid memory pointed to        */
@@ -538,21 +542,29 @@ ipf_log_items(softc, unit, fin, items, itemsz, types, cnt)
 	for (i = 0, len = sizeof(iplog_t); i < cnt; i++)
 		len += itemsz[i];
 
+	SPL_NET(s);
+	MUTEX_ENTER(&softl->ipl_mutex[unit]);
+	softl->ipl_counter[unit]++;
 	/*
 	 * check that we have space to record this information and can
-	 * allocate that much. While ipl_used is being accessed without
-	 * the lock, this makes it possible for the size to be exceeded
-	 * by a small amount (a log record or two.)
+	 * allocate that much.
 	 */
-	if ((softl->ipl_used[unit] + len) > softl->ipl_logsize)
+	if ((softl->ipl_used[unit] + len) > softl->ipl_logsize) {
+		softl->ipl_logfail[unit]++;
+		MUTEX_EXIT(&softl->ipl_mutex[unit]);
 		return -1;
+	}
 
 	KMALLOCS(buf, caddr_t, len);
-	if (buf == NULL)
+	if (buf == NULL) {
+		softl->ipl_logfail[unit]++;
+		MUTEX_EXIT(&softl->ipl_mutex[unit]);
 		return -1;
+	}
 	ipl = (iplog_t *)buf;
 	ipl->ipl_magic = softl->ipl_magic[unit];
 	ipl->ipl_count = 1;
+	ipl->ipl_seqnum = softl->ipl_counter[unit];
 	ipl->ipl_next = NULL;
 	ipl->ipl_dsize = len;
 #ifdef _KERNEL
@@ -574,9 +586,6 @@ ipf_log_items(softc, unit, fin, items, itemsz, types, cnt)
 		}
 		ptr += itemsz[i];
 	}
-
-	SPL_NET(s);
-	MUTEX_ENTER(&softl->ipl_mutex[unit]);
 	/*
 	 * Check to see if this log record has a CRC which matches the last
 	 * record logged.  If it does, just up the count on the previous one
@@ -585,6 +594,7 @@ ipf_log_items(softc, unit, fin, items, itemsz, types, cnt)
 	if (softl->ipl_suppress) {
 		if ((fin != NULL) && (fin->fin_off == 0)) {
 			if ((softl->ipll[unit] != NULL) &&
+			    (fin->fin_crc == softl->ipl_crc[unit].fin_crc) &&
 			    bcmp((char *)fin, (char *)&softl->ipl_crc[unit],
 				 FI_LCSIZE) == 0) {
 				softl->ipll[unit]->ipl_count++;
@@ -595,6 +605,7 @@ ipf_log_items(softc, unit, fin, items, itemsz, types, cnt)
 			}
 			bcopy((char *)fin, (char *)&softl->ipl_crc[unit],
 			      FI_LCSIZE);
+			softl->ipl_crc[unit].fin_crc = fin->fin_crc;
 		} else
 			bzero((char *)&softl->ipl_crc[unit], FI_CSIZE);
 	}
@@ -603,6 +614,7 @@ ipf_log_items(softc, unit, fin, items, itemsz, types, cnt)
 	 * advance the log pointer to the next empty record and deduct the
 	 * amount of space we're going to use.
 	 */
+	softl->ipl_logok[unit]++;
 	softl->ipll[unit] = ipl;
 	*softl->iplh[unit] = ipl;
 	softl->iplh[unit] = &ipl->ipl_next;
@@ -631,9 +643,10 @@ ipf_log_items(softc, unit, fin, items, itemsz, types, cnt)
 
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_log_read                                                */
-/* Returns:     int    - 0 == success, else error value.                    */
-/* Parameters:  unit(I) - device we are reading from                        */
-/*              uio(O)  - pointer to information about where to store data  */
+/* Returns:     int      - 0 == success, else error value.                  */
+/* Parameters:  softc(I) - pointer to main soft context                     */
+/*              unit(I)  - device we are reading from                       */
+/*              uio(O)   - pointer to information about where to store data */
 /*                                                                          */
 /* Called to handle a read on an IPFilter device.  Returns only complete    */
 /* log messages - will not partially copy a log record out to userland.     */
@@ -765,8 +778,9 @@ ipf_log_read(softc, unit, uio)
 
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_log_clear                                               */
-/* Returns:     int    - number of log bytes cleared.                       */
-/* Parameters:  unit(I) - device we are reading from                        */
+/* Returns:     int      - number of log bytes cleared.                     */
+/* Parameters:  softc(I) - pointer to main soft context                     */
+/*              unit(I)  - device we are reading from                       */
 /*                                                                          */
 /* Deletes all queued up log records for a given output device.             */
 /* ------------------------------------------------------------------------ */
@@ -799,8 +813,9 @@ ipf_log_clear(softc, unit)
 
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_log_canread                                             */
-/* Returns:     int    - 0 == no data to read, 1 = data present             */
-/* Parameters:  unit(I) - device we are reading from                        */
+/* Returns:     int      - 0 == no data to read, 1 = data present           */
+/* Parameters:  softc(I) - pointer to main soft context                     */
+/*              unit(I)  - device we are reading from                       */
 /*                                                                          */
 /* Returns an indication of whether or not there is data present in the     */
 /* current buffer for the selected ipf device.                              */
@@ -816,6 +831,15 @@ ipf_log_canread(softc, unit)
 }
 
 
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_log_canread                                             */
+/* Returns:     int      - 0 == no data to read, 1 = data present           */
+/* Parameters:  softc(I) - pointer to main soft context                     */
+/*              unit(I)  - device we are reading from                       */
+/*                                                                          */
+/* Returns how many bytes are currently held in log buffers for the         */
+/* selected ipf device.                                                     */
+/* ------------------------------------------------------------------------ */
 int
 ipf_log_bytesused(softc, unit)
 	ipf_main_softc_t *softc;
@@ -824,5 +848,45 @@ ipf_log_bytesused(softc, unit)
 	ipf_log_softc_t *softl = softc->ipf_log_soft;
 
 	return softl->ipl_used[unit];
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_log_failures                                            */
+/* Returns:     U_QUAD_T - number of log failures                           */
+/* Parameters:  softc(I) - pointer to main soft context                     */
+/*              unit(I)  - device we are reading from                       */
+/*                                                                          */
+/* Returns how many times we've tried to log a packet but failed to do so   */
+/* for the selected ipf device.                                             */
+/* ------------------------------------------------------------------------ */
+u_long
+ipf_log_failures(softc, unit)
+	ipf_main_softc_t *softc;
+	int unit;
+{
+	ipf_log_softc_t *softl = softc->ipf_log_soft;
+
+	return softl->ipl_logfail[unit];
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_log_logok                                               */
+/* Returns:     U_QUAD_T - number of packets logged                         */
+/* Parameters:  softc(I) - pointer to main soft context                     */
+/*              unit(I)  - device we are reading from                       */
+/*                                                                          */
+/* Returns how many times we've successfully logged a packet for the        */
+/* selected ipf device.                                                     */
+/* ------------------------------------------------------------------------ */
+u_long
+ipf_log_logok(softc, unit)
+	ipf_main_softc_t *softc;
+	int unit;
+{
+	ipf_log_softc_t *softl = softc->ipf_log_soft;
+
+	return softl->ipl_logok[unit];
 }
 #endif /* IPFILTER_LOG */

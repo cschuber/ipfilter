@@ -525,6 +525,8 @@ typedef	struct	natstat	{
 	u_long		ns_hm_newfail;
 	u_long		ns_hm_addref;
 	u_long		ns_hm_nullnp;
+	u_long		ns_log_ok;
+	u_long		ns_log_fail;
 	u_int		ns_hostmap_sz;
 	nat_t		*ns_instances;
 	ipnat_t		*ns_list;
