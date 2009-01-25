@@ -3136,12 +3136,13 @@ filterdone:
 	 */
 	fin->fin_flx &= ~FI_STATE;
 
+#if defined(FASTROUTE_RECURSION)
 	/*
-	 * Up the reference on fr_lock and exit ipf_mutex.  fr_fastroute
-	 * only frees up the lock on ipf_global and the generation of a
-	 * packet below could cause a recursive call into IPFilter.
-	 * Hang onto the filter rule just in case someone decides to remove
-	 * or flush it in the meantime.
+	 * Up the reference on fr_lock and exit ipf_mutex. The generation of
+	 * a packet below can sometimes cause a recursive call into IPFilter.
+	 * On those platforms where that does happen, we need to hang onto
+	 * the filter rule just in case someone decides to remove or flush it
+	 * in the meantime.
 	 */
 	if (fr != NULL) {
 		MUTEX_ENTER(&fr->fr_lock);
@@ -3150,6 +3151,7 @@ filterdone:
 	}
 
 	RWLOCK_EXIT(&softc->ipf_mutex);
+#endif
 
 	if ((pass & FR_RETMASK) != 0) {
 		/*
@@ -3237,8 +3239,13 @@ filterdone:
 			m = *mp = NULL;
 		}
 
+#if defined(FASTROUTE_RECURSION)
 		(void) ipf_derefrule(softc, &fr);
+#endif
 	}
+#if !defined(FASTROUTE_RECURSION)
+	RWLOCK_EXIT(&softc->ipf_mutex);
+#endif
 
 finished:
 	if (!FR_ISPASS(pass)) {
