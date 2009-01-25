@@ -412,7 +412,7 @@ static	INLINE void	ipf_pr_gre6 __P((fr_info_t *));
 static	INLINE void	ipf_pr_udp6 __P((fr_info_t *));
 static	INLINE void	ipf_pr_tcp6 __P((fr_info_t *));
 static	INLINE void	ipf_pr_icmp6 __P((fr_info_t *));
-static	INLINE int	ipf_pr_ipv6hdr __P((fr_info_t *));
+static	INLINE void	ipf_pr_ipv6hdr __P((fr_info_t *));
 static	INLINE void	ipf_pr_short6 __P((fr_info_t *, int));
 static	INLINE int	ipf_pr_hopopts6 __P((fr_info_t *));
 static	INLINE int	ipf_pr_mobility6 __P((fr_info_t *));
@@ -446,7 +446,7 @@ ipf_pr_short6(fin, xmin)
 
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_pr_ipv6hdr                                              */
-/* Returns:     int    - 0 == packet ok, -1 = bad packet, drop it           */
+/* Returns:     void                                                        */
 /* Parameters:  fin(I) - pointer to packet information                      */
 /*                                                                          */
 /* IPv6 Only                                                                */
@@ -455,7 +455,7 @@ ipf_pr_short6(fin, xmin)
 /* analyzer may pullup or free the packet itself so we need to be vigiliant */
 /* of that possibility arising.                                             */
 /* ------------------------------------------------------------------------ */
-static INLINE int
+static INLINE void
 ipf_pr_ipv6hdr(fin)
 	fr_info_t *fin;
 {
@@ -575,10 +575,14 @@ ipf_pr_ipv6hdr(fin)
 	/*
 	 * Some of the above functions, like ipf_pr_esp6(), can call ipf_pullup
 	 * and destroy whatever packet was here.  The caller of this function
-	 * expects us to return -1 if there is a problem with ipf_pullup.
+	 * expects us to return if there is a problem with ipf_pullup.
 	 */
-	if (fin->fin_m == NULL)
-		return -1;
+	if (fin->fin_m == NULL) {
+		ipf_main_softc_t *softc = fin->fin_main_soft;
+
+		LBUMP(ipf_stats[fin->fin_out].fr_v6_bad);
+		return;
+	}
 
 	fi->fi_p = p;
 
@@ -591,9 +595,8 @@ ipf_pr_ipv6hdr(fin)
 
 		fin->fin_flx |= FI_BAD;
 		LBUMP(ipf_stats[fin->fin_out].fr_v6_badfrag);
-		return -1;
+		LBUMP(ipf_stats[fin->fin_out].fr_v6_bad);
 	}
-	return 0;
 }
 
 
@@ -2094,10 +2097,7 @@ ipf_makefrip(hlen, ip, fin)
 		fin->fin_dlen = fin->fin_plen;
 		fin->fin_plen += hlen;
 
-		if (ipf_pr_ipv6hdr(fin) == -1) {
-			LBUMP(ipf_stats[fin->fin_out].fr_v6_bad);
-			return -1;
-		}
+		ipf_pr_ipv6hdr(fin);
 #endif
 	}
 	if (fin->fin_ip == NULL) {
