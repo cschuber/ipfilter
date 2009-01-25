@@ -309,6 +309,7 @@ typedef struct qifpkt {
 #   define	GETIFMTU_6(x)	net_getmtu(softc->ipf_nd_v6, (phy_if_t)x, 0)
 #   define	GET_SOFTC(x)	ipf_find_softc(x)
 #  else
+#   define	FASTROUTE_RECURSION	1
 #   define	GET_SOFTC(x)	&ipfmain
 #   define	GETIFMTU_4(x)	((qif_t *)x)->qf_max_frag
 #   define	GETIFMTU_6(x)	((qif_t *)x)->qf_max_frag
@@ -368,6 +369,7 @@ typedef	struct	ip6_hdr	ip6_t;
 # endif
 
 # ifdef _KERNEL
+#  define	FASTROUTE_RECURSION	1
 #  define SNPRINTF	sprintf
 #  if (HPUXREV >= 1111)
 #   define	IPL_SELECT
