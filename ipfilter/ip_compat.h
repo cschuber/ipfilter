@@ -307,7 +307,8 @@ extern	void	*get_unit __P((char *, int));
 					} \
 				} while (0)
 #  else
-#   define	 COPYIFNAME(v, x, b) \
+#   define	FASTROUTE_RECURSION	1
+#   define	COPYIFNAME(v, x, b) \
 				(void) strncpy(b, ((qif_t *)x)->qf_name, \
 					       LIFNAMSIZ)
 #  endif
@@ -365,6 +366,7 @@ typedef	struct	ip6_hdr	ip6_t;
 # endif
 
 # ifdef _KERNEL
+#  define	FASTROUTE_RECURSION	1
 #  define SNPRINTF	sprintf
 #  if (HPUXREV >= 1111)
 #   define	IPL_SELECT

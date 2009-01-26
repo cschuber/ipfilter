@@ -2644,6 +2644,7 @@ filterdone:
 	 */
 	fin->fin_flx &= ~FI_STATE;
 
+#if defined(FASTROUTE_RECURSION)
 	/*
 	 * Up the reference on fr_lock and exit ipf_mutex.  fr_fastroute
 	 * only frees up the lock on ipf_global and the generation of a
@@ -2658,6 +2659,7 @@ filterdone:
 	}
 
 	RWLOCK_EXIT(&ipf_mutex);
+#endif
 
 	if ((pass & FR_RETMASK) != 0) {
 		/*
@@ -2739,8 +2741,13 @@ filterdone:
 			m = *mp = NULL;
 		}
 
+#if defined(FASTROUTE_RECURSION)
 		(void) fr_derefrule(&fr);
+#endif
 	}
+#if !defined(FASTROUTE_RECURSION)
+	RWLOCK_EXIT(&ipf_mutex);
+#endif
 
 finished:
 	if (!FR_ISPASS(pass)) {
