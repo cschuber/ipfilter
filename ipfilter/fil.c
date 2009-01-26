@@ -353,7 +353,7 @@ static	INLINE void	frpr_gre6 __P((fr_info_t *));
 static	INLINE void	frpr_udp6 __P((fr_info_t *));
 static	INLINE void	frpr_tcp6 __P((fr_info_t *));
 static	INLINE void	frpr_icmp6 __P((fr_info_t *));
-static	INLINE int	frpr_ipv6hdr __P((fr_info_t *));
+static	INLINE void	frpr_ipv6hdr __P((fr_info_t *));
 static	INLINE void	frpr_short6 __P((fr_info_t *, int));
 static	INLINE int	frpr_hopopts6 __P((fr_info_t *));
 static	INLINE int	frpr_mobility6 __P((fr_info_t *));
@@ -385,7 +385,7 @@ int xmin;
 
 /* ------------------------------------------------------------------------ */
 /* Function:    frpr_ipv6hdr                                                */
-/* Returns:     int    - 0 = IPv6 packet intact, -1 = packet lost           */
+/* Returns:     void                                                        */
 /* Parameters:  fin(I) - pointer to packet information                      */
 /*                                                                          */
 /* IPv6 Only                                                                */
@@ -394,7 +394,7 @@ int xmin;
 /* analyzer may pullup or free the packet itself so we need to be vigiliant */
 /* of that possibility arising.                                             */
 /* ------------------------------------------------------------------------ */
-static INLINE int frpr_ipv6hdr(fin)
+static INLINE void frpr_ipv6hdr(fin)
 fr_info_t *fin;
 {
 	ip6_t *ip6 = (ip6_t *)fin->fin_ip;
@@ -504,16 +504,6 @@ fr_info_t *fin;
 		}
 	}
 	fi->fi_p = p;
-
-	/*
-	 * Some of the above functions, like frpr_esp6(), can call fr_pullup
-	 * and destroy whatever packet was here.  The caller of this function
-	 * expects us to return -1 if there is a problem with fr_pullup.
-	 */
-	if (fin->fin_m == NULL)
-		return -1;
-
-	return 0;
 }
 
 
@@ -1638,8 +1628,7 @@ fr_info_t *fin;
 		fin->fin_dlen = fin->fin_plen;
 		fin->fin_plen += hlen;
 
-		if (frpr_ipv6hdr(fin) == -1)
-			return -1;
+		frpr_ipv6hdr(fin);
 #endif
 	}
 	if (fin->fin_ip == NULL)
