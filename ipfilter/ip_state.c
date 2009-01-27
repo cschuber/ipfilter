@@ -1133,8 +1133,19 @@ u_int flags;
 	grehdr_t *gre;
 	int out;
 
-	if (fr_state_lock ||
-	    (fin->fin_flx & (FI_SHORT|FI_STATE|FI_FRAGBODY|FI_BAD)))
+	/*
+	 * If a packet that was created locally is trying to go out but we
+	 * do not match here here because of this lock, it is likely that
+	 * the policy will block it and return network unreachable back up
+	 * the stack. To mitigate this error, EAGAIN is returned instead,
+	 * telling the IP stack to try sending this packet again later.
+	 */
+	if (fr_state_lock) {
+		fin->fin_error = EAGAIN;
+		return NULL;
+	}
+
+	if (fin->fin_flx & (FI_SHORT|FI_STATE|FI_FRAGBODY|FI_BAD))
 		return NULL;
 
 	if ((fin->fin_flx & FI_OOW) && !(fin->fin_tcpf & TH_SYN))
