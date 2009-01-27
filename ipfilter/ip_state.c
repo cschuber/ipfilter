@@ -1508,10 +1508,26 @@ ipf_state_add(softc, fin, stsave, flags)
 #endif
 	int out;
 
-	if (softs->ipf_state_lock ||
-	    (fin->fin_flx & (FI_SHORT|FI_STATE|FI_FRAGBODY|FI_BAD)) ||
-	    ((fin->fin_flx & FI_OOW) && !(fin->fin_tcpf & TH_SYN))) {
+	/*
+	 * If a packet that was created locally is trying to go out but we
+	 * do not match here here because of this lock, it is likely that
+	 * the policy will block it and return network unreachable back up
+	 * the stack. To mitigate this error, EAGAIN is returned instead,
+	 * telling the IP stack to try sending this packet again later.
+	 */
+	if (softs->ipf_state_lock) {
+		SINCL(ipf_state_stats.iss_add_locked);
+		fin->fin_error = EAGAIN;
+		return -1;
+	}
+
+	if (fin->fin_flx & (FI_SHORT|FI_STATE|FI_FRAGBODY|FI_BAD)) {
 		SINCL(ipf_state_stats.iss_add_bad);
+		return -1;
+	}
+
+	if ((fin->fin_flx & FI_OOW) && !(fin->fin_tcpf & TH_SYN)) {
+		SINCL(ipf_state_stats.iss_add_oow);
 		return -1;
 	}
 

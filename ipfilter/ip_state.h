@@ -205,8 +205,10 @@ typedef	struct	ipslog	{
 typedef	struct	ips_stat {
 	u_int	iss_active;
 	u_int	iss_active_proto[256];
-	u_long	iss_add_dup;
 	u_long	iss_add_bad;
+	u_long	iss_add_dup;
+	u_long	iss_add_locked;
+	u_long	iss_add_oow;
 	u_long	iss_bucket_full;
 	u_long	iss_check_bad;
 	u_long	iss_check_miss;
