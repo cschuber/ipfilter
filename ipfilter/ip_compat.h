@@ -172,9 +172,12 @@ struct file;
 # ifdef i386
 #  define _SYS_PROMIF_H
 # endif
+# include <inet/mib2.h>
 # include <inet/ip.h>
 # undef COPYOUT
-# include <inet/ip_ire.h>
+# if !defined(_SYS_NETI_H)
+#  include <inet/ip_ire.h>
+# endif
 # ifndef	KERNEL
 #  undef	_KERNEL
 # endif
