@@ -32,7 +32,6 @@ static const char rcsid[] = "@(#)$Id$";
 #include <sys/cmn_err.h>
 #include <net/if.h>
 #include <net/af.h>
-#include <net/route.h>
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>

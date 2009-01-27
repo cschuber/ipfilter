@@ -35,15 +35,10 @@ struct file;
 # endif
 #endif
 #include <sys/time.h>
-#if !defined(linux)
-# include <sys/protosw.h>
-#endif
-#include <sys/socket.h>
-#if defined(_KERNEL) && (!defined(__SVR4) && !defined(__svr4__))
+#if defined(_KERNEL) && !defined(SOLARIS2)
 # include <sys/mbuf.h>
 #endif
 #if defined(__SVR4) || defined(__svr4__)
-# include <sys/filio.h>
 # include <sys/byteorder.h>
 # ifdef _KERNEL
 #  include <sys/dditypes.h>

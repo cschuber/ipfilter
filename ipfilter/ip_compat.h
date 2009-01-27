@@ -176,9 +176,12 @@ struct file;
 # else
 #  include "radix_ipf_local.h"
 # endif
+# include <inet/mib2.h>
 # include <inet/ip.h>
 # undef COPYOUT
-# include <inet/ip_ire.h>
+# if !defined(_SYS_NETI_H)
+#  include <inet/ip_ire.h>
+# endif
 # ifndef	KERNEL
 #  undef	_KERNEL
 # endif

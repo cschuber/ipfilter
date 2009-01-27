@@ -101,7 +101,6 @@ struct file;
 #if __FreeBSD_version >= 300000
 # include <net/if_var.h>
 #endif
-#include <net/route.h>
 #include <netinet/in.h>
 #ifdef __sgi
 # include <sys/ddi.h>
