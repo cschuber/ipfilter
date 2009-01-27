@@ -5,6 +5,7 @@
  */
 
 #include "ipf.h"
+#include <ctype.h>
 
 #define	PRINTF	(void)printf
 #define	FPRINTF	(void)fprintf
@@ -24,7 +25,7 @@ void printpooldata(pool, opts)
 		if ((pool->ipo_flags & IPOOL_DELETE) != 0)
 			PRINTF("# ");
 		PRINTF("%s: %s",
-			isdigit(*pool->ipo_name) ? "Number" : "Name",
+			ISDIGIT(*pool->ipo_name) ? "Number" : "Name",
 			pool->ipo_name);
 		if ((pool->ipo_flags & IPOOL_ANON) == IPOOL_ANON)
 			PRINTF("(anon)");
@@ -64,7 +65,7 @@ void printpooldata(pool, opts)
 
 	if ((opts & OPT_DEBUG) == 0) {
 		PRINTF(" type = tree %s = %s\n",
-			(!*pool->ipo_name || isdigit(*pool->ipo_name)) ? \
+			(!*pool->ipo_name || ISDIGIT(*pool->ipo_name)) ? \
 			"number" : "name", pool->ipo_name);
 	} else {
 		putchar(' ');

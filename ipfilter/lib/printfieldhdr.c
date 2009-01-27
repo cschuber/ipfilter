@@ -7,6 +7,7 @@
  */
 
 #include "ipf.h"
+#include <ctype.h>
 
 
 void printfieldhdr(words, field)
@@ -42,7 +43,7 @@ void printfieldhdr(words, field)
 				printf("%s", field->w_word);
 			} else {
 				for (t = s; *t != '\0'; t++) {
-					if (isalpha(*t) && islower(*t))
+					if (ISALPHA(*t) && ISLOWER(*t))
 						*t = toupper(*t);
 				}
 				printf("%s", s);

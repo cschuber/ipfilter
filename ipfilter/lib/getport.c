@@ -7,6 +7,7 @@
  */
 
 #include "ipf.h"
+#include <ctype.h>
 
 int getport(fr, name, port, proto)
 	frentry_t *fr;
@@ -24,7 +25,7 @@ int getport(fr, name, port, proto)
 			return 0;
 		}
 
-		if (isdigit(*name)) {
+		if (ISDIGIT(*name)) {
 			int portval = atoi(name);
 			if (portval < 0 || portval > 65535)
 				return -1;

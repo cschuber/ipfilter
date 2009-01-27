@@ -1,6 +1,7 @@
 #include "ipf.h"
 #include "ipl.h"
 #include "ipmon.h"
+#include <ctype.h>
 
 static u_char sysuptime[] = { 6, 8, 0x2b, 6, 1, 2, 1, 1, 3, 0 };
 /*
@@ -133,7 +134,7 @@ snmpv2_parse(char **strings)
 	*s++ = '\0';
 	ctx->community = str;
 
-	while (isspace(*s))
+	while (ISSPACE(*s))
 		s++;
 	if (!*s) {
 		free(str);

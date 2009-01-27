@@ -7,6 +7,7 @@
  */
 
 #include "ipf.h"
+#include <ctype.h>
 
 /*
  * Format expected is one addres per line, at the start of each line.
@@ -121,16 +122,16 @@ load_http(char *url)
 				break;
 
 			*t++ = '\0';
-			for (u = buffer; isdigit(*u) || (*u == '.'); u++)
+			for (u = buffer; ISDIGIT(*u) || (*u == '.'); u++)
 				;
 			if (*u == '/') {
 				char *slash;
 
 				slash = u;
 				u++;
-				while (isdigit(*u))
+				while (ISDIGIT(*u))
 					u++;
-				if (!isspace(*u) && *u)
+				if (!ISSPACE(*u) && *u)
 					u = slash;
 			}
 			*u = '\0';

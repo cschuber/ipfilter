@@ -22,6 +22,7 @@ etherfind -n -t
 
 #include "ipf.h"
 #include "ipt.h"
+#include <ctype.h>
 
 
 #if !defined(lint)
@@ -100,16 +101,16 @@ static	int	etherf_readip(mb, ifn, dir)
 
 	switch (ip->ip_p) {
 	case IPPROTO_TCP :
-		if (isdigit(*sprt))
+		if (ISDIGIT(*sprt))
 			tcp->th_sport = htons(atoi(sprt) & 65535);
-		if (isdigit(*dprt))
+		if (ISDIGIT(*dprt))
 			tcp->th_dport = htons(atoi(dprt) & 65535);
 		extra = sizeof(struct tcphdr);
 		break;
 	case IPPROTO_UDP :
-		if (isdigit(*sprt))
+		if (ISDIGIT(*sprt))
 			tcp->th_sport = htons(atoi(sprt) & 65535);
-		if (isdigit(*dprt))
+		if (ISDIGIT(*dprt))
 			tcp->th_dport = htons(atoi(dprt) & 65535);
 		extra = sizeof(struct udphdr);
 		break;

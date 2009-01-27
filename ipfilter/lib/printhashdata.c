@@ -5,6 +5,7 @@
  */
 
 #include "ipf.h"
+#include <ctype.h>
 
 #define	PRINTF	(void)printf
 #define	FPRINTF	(void)fprintf
@@ -41,7 +42,7 @@ void printhashdata(hp, opts)
 		PRINTF(" role = ");
 	} else {
 		PRINTF("Hash Table %s: %s",
-			isdigit(*hp->iph_name) ? "Number" : "Name",
+			ISDIGIT(*hp->iph_name) ? "Number" : "Name",
 			hp->iph_name);
 		if ((hp->iph_type & IPHASH_ANON) == IPHASH_ANON)
 			PRINTF("(anon)");
@@ -72,7 +73,7 @@ void printhashdata(hp, opts)
 		if ((hp->iph_type & ~IPHASH_ANON) == IPHASH_LOOKUP)
 			PRINTF(" type = hash");
 		PRINTF(" %s = %s size = %lu",
-			isdigit(*hp->iph_name) ? "number" : "name",
+			ISDIGIT(*hp->iph_name) ? "number" : "name",
 			hp->iph_name, (u_long)hp->iph_size);
 		if (hp->iph_seed != 0)
 			PRINTF(" seed = %lu", hp->iph_seed);

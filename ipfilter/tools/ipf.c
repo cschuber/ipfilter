@@ -14,6 +14,7 @@
 #endif
 #include "ipf.h"
 #include <fcntl.h>
+#include <ctype.h>
 #include <sys/ioctl.h>
 #include "netinet/ipl.h"
 

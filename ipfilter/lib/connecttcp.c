@@ -7,6 +7,7 @@
  */
 
 #include "ipf.h"
+#include <ctype.h>
 
 /*
  * Format expected is one addres per line, at the start of each line.
@@ -22,7 +23,7 @@ connecttcp(char *server, int port)
 	sin.sin_family = AF_INET;
 	sin.sin_port = htons(port & 65535);
 
-	if (isdigit(*server)) {
+	if (ISDIGIT(*server)) {
 		if (inet_aton(server, &sin.sin_addr) == -1) {
 			return -1;
 		}

@@ -1,6 +1,7 @@
 #include "ipf.h"
 #include "ipl.h"
 #include "ipmon.h"
+#include <ctype.h>
 
 #define	IPF_ENTERPRISE	9932
 /*
@@ -129,7 +130,7 @@ snmpv1_parse(char **strings)
 	*s++ = '\0';
 	ctx->community = str;
 
-	while (isspace(*s))
+	while (ISSPACE(*s))
 		s++;
 	if (!*s) {
 		free(str);

@@ -1,4 +1,5 @@
 #include "ipf.h"
+#include <ctype.h>
 
 
 typedef struct ipfopentry {
@@ -52,7 +53,7 @@ int *parseipfexpr(line, errorptr)
 	 * Eliminate any white spaces to make parsing easier.
 	 */
 	for (s = temp; *s != '\0'; ) {
-		if (isspace(*s))
+		if (ISSPACE(*s))
 			strcpy(s, s + 1);
 		else
 			s++;

@@ -7,6 +7,7 @@
  */
 
 #include "ipf.h"
+#include <ctype.h>
 
 int getproto(name)
 	char *name;

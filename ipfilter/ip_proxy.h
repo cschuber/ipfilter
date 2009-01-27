@@ -127,28 +127,30 @@ typedef	struct	aproxy	{
 #define	APR_INC(x)	((x) & 0xffff)
 
 
+#ifdef _KERNEL
 /*
  * Generic #define's to cover missing things in the kernel
  */
-#ifndef isdigit
-#define isdigit(x)	((x) >= '0' && (x) <= '9')
-#endif
-#ifndef isupper
-#define isupper(x)	(((unsigned)(x) >= 'A') && ((unsigned)(x) <= 'Z'))
-#endif
-#ifndef islower
-#define islower(x)	(((unsigned)(x) >= 'a') && ((unsigned)(x) <= 'z'))
-#endif
-#ifndef isalpha
-#define isalpha(x)	(isupper(x) || islower(x))
-#endif
-#ifndef toupper
-#define toupper(x)	(isupper(x) ? (x) : (x) - 'a' + 'A')
-#endif
-#ifndef isspace
-#define isspace(x)	(((x) == ' ') || ((x) == '\r') || ((x) == '\n') || \
+# ifndef isdigit
+#  define isdigit(x)	((x) >= '0' && (x) <= '9')
+# endif
+# ifndef isupper
+#  define isupper(x)	(((unsigned)(x) >= 'A') && ((unsigned)(x) <= 'Z'))
+# endif
+# ifndef islower
+#  define islower(x)	(((unsigned)(x) >= 'a') && ((unsigned)(x) <= 'z'))
+# endif
+# ifndef isalpha
+#  define isalpha(x)	(isupper(x) || islower(x))
+# endif
+# ifndef toupper
+#  define toupper(x)	(isupper(x) ? (x) : (x) - 'a' + 'A')
+# endif
+# ifndef isspace
+#  define isspace(x)	(((x) == ' ') || ((x) == '\r') || ((x) == '\n') || \
 			 ((x) == '\t') || ((x) == '\b'))
-#endif
+# endif
+#endif /* _KERNEL */
 
 /*
  * For the ftp proxy.

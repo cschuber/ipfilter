@@ -7,6 +7,7 @@
  */
 
 #include "ipf.h"
+#include <ctype.h>
 
 alist_t *
 load_file(char *filename)
@@ -46,7 +47,7 @@ load_file(char *filename)
 		s = strchr(line, '\r');
 		if (s != NULL)
 			*s = '\0';
-		for (t = line; isspace(*t); t++)
+		for (t = line; ISSPACE(*t); t++)
 			;
 		if (*t == '!') {
 			not = 1;
@@ -67,10 +68,10 @@ load_file(char *filename)
 		 * Trim off tailing white spaces
 		 */
 		s = strlen(t) + t - 1;
-		while (isspace(*s))
+		while (ISSPACE(*s))
 			*s-- = '\0';
 
-		if (isdigit(*t)) {
+		if (ISDIGIT(*t)) {
 			a = alist_new(4, t);
 			if (a != NULL) {
 				a->al_not = not;

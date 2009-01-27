@@ -88,7 +88,7 @@ MODOBJS=$(OBJ)/ip_fil.o $(OBJ)/fil.o $(OBJ)/solaris.o $(OBJ)/ip_state.o \
 #	$(OBJ)/ip_trafcon.o
 IPF=$(OBJ)/ipf.o $(OBJ)/ipfcomp.o $(OBJ)/ipf_y.o $(OBJ)/ipf_l.o
 IPT=$(OBJ)/ipftest.o $(OBJ)/ip_fil_u.o $(OBJ)/ip_state_u.o \
-    $(OBJ)/ip_frag_u.o $(OBJ)/ip_nat_u.o $(OBJ)/fil_u.o \
+    $(OBJ)/ip_frag_u.o $(OBJ)/ip_nat_u.o $(OBJ)/fil_u.o $(OBJ)/ip_dstlist_u.o \
     $(OBJ)/ip_scan_u.o $(OBJ)/ip_sync_u.o $(OBJ)/ip_pool_u.o \
     $(OBJ)/ip_htable_u.o $(OBJ)/ip_lookup_u.o $(OBJ)/ip_proxy_u.o \
     $(OBJ)/ip_auth_u.o $(OBJ)/ip_log_u.o $(OBJ)/ip_rules_u.o\
@@ -329,6 +329,10 @@ $(OBJ)/ip_htable_u.o: $(TOP)/ip_htable.c $(TOP)/ip_htable.h $(TOP)/ip_compat.h \
 $(OBJ)/ip_lookup_u.o: $(TOP)/ip_lookup.c $(TOP)/ip_lookup.h $(TOP)/ip_compat.h \
 	$(TOP)/ip_fil.h $(TOP)/ip_lookup.h
 	$(CC) $(CCARGS) $(EXTRA) -c $(TOP)/ip_lookup.c -o $@
+
+$(OBJ)/ip_dstlist_u.o: $(TOP)/ip_dstlist.c $(TOP)/ip_dstlist.h \
+	$(TOP)/ip_compat.h $(TOP)/ip_fil.h
+	$(CC) $(CCARGS) $(EXTRA) -c $(TOP)/ip_dstlist.c -o $@
 
 $(OBJ)/ip_trafcon_u.o: $(TOP)/ip_trafcon.c $(TOP)/ip_compat.h $(TOP)/ip_fil.h \
 	$(TOP)/ip_trafcon.h

@@ -11,6 +11,7 @@
 #include "kmem.h"
 #include "ipscan_l.h"
 #include "netinet/ip_scan.h"
+#include <ctype.h>
 
 #define	YYDEBUG	1
 

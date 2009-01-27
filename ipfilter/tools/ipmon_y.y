@@ -1001,7 +1001,7 @@ install_saver(name, path)
 #ifdef RTLD_LAZY
 	isi->imsi_handle = dlopen(path, RTLD_LAZY);
 #endif
-#ifdef RTLD_LAZY
+#ifdef DL_LAZY
 	isi->imsi_handle = dlopen(path, DL_LAZY);
 #endif
 
