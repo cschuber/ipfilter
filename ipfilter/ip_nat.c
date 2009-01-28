@@ -3174,8 +3174,7 @@ struct in_addr src , mapdst;
 		if (nat->nat_ifps[0] != NULL) {
 			if ((ifp != NULL) && (ifp != nat->nat_ifps[0]))
 				continue;
-		} else if (ifp != NULL)
-			nat->nat_ifps[0] = ifp;
+		}
 
 		nflags = nat->nat_flags;
 
@@ -3216,6 +3215,8 @@ struct in_addr src , mapdst;
 			if ((ipn != NULL) && (nat->nat_aps != NULL))
 				if (appr_match(fin, nat) != 0)
 					continue;
+			if ((nat->nat_ifps[0] == NULL) && (ifp != NULL))
+				nat->nat_ifps[0] = ifp;
 			return nat;
 		}
 	}
@@ -3245,8 +3246,7 @@ find_in_wild_ports:
 		if (nat->nat_ifps[0] != NULL) {
 			if ((ifp != NULL) && (ifp != nat->nat_ifps[0]))
 				continue;
-		} else if (ifp != NULL)
-			nat->nat_ifps[0] = ifp;
+		}
 
 		if (nat->nat_p != fin->fin_p)
 			continue;
@@ -3271,6 +3271,8 @@ find_in_wild_ports:
 				nat_stats.ns_wilds--;
 				MUTEX_EXIT(&ipf_nat_new);
 			}
+			if ((nat->nat_ifps[0] == NULL) && (ifp != NULL))
+				nat->nat_ifps[0] = ifp;
 			nat->nat_oport = sport;
 			nat->nat_outport = dport;
 			nat->nat_flags &= ~(SI_W_DPORT|SI_W_SPORT);
@@ -3416,8 +3418,7 @@ struct in_addr src , dst;
 		if (nat->nat_ifps[1] != NULL) {
 			if ((ifp != NULL) && (ifp != nat->nat_ifps[1]))
 				continue;
-		} else if (ifp != NULL)
-			nat->nat_ifps[1] = ifp;
+		}
 
 		nflags = nat->nat_flags;
 
@@ -3448,6 +3449,8 @@ struct in_addr src , dst;
 			if ((ipn != NULL) && (nat->nat_aps != NULL))
 				if (appr_match(fin, nat) != 0)
 					continue;
+			if ((nat->nat_ifps[1] == NULL) && (ifp != NULL))
+				nat->nat_ifps[1] = ifp;
 			return nat;
 		}
 	}
@@ -3477,8 +3480,7 @@ find_out_wild_ports:
 		if (nat->nat_ifps[1] != NULL) {
 			if ((ifp != NULL) && (ifp != nat->nat_ifps[1]))
 				continue;
-		} else if (ifp != NULL)
-			nat->nat_ifps[1] = ifp;
+		}
 
 		if (nat->nat_p != fin->fin_p)
 			continue;
@@ -3503,6 +3505,8 @@ find_out_wild_ports:
 				nat_stats.ns_wilds--;
 				MUTEX_EXIT(&ipf_nat_new);
 			}
+			if ((nat->nat_ifps[1] == NULL) && (ifp != NULL))
+				nat->nat_ifps[1] = ifp;
 			nat->nat_inport = sport;
 			nat->nat_oport = dport;
 			if (nat->nat_outport == 0)
