@@ -1992,7 +1992,7 @@ ipf_nat6_inlookup(fin, flags, p, src, mapdst)
 					continue;
 #endif
 		}
-		if (ifp != NULL) {
+		if ((nat->nat_ifps[0] == NULL) && (ifp != NULL)) {
 			nat->nat_ifps[0] = ifp;
 			nat->nat_mtu[0] = GETIFMTU_6(ifp);
 		}
@@ -2088,7 +2088,7 @@ find_in_wild_ports:
 					nat->nat_ndport = sport;
 				}
 			}
-			if (ifp != NULL) {
+			if ((nat->nat_ifps[0] == NULL) && (ifp != NULL)) {
 				nat->nat_ifps[0] = ifp;
 				nat->nat_mtu[0] = GETIFMTU_6(ifp);
 			}
@@ -2310,7 +2310,7 @@ ipf_nat6_outlookup(fin, flags, p, src, dst)
 				continue;
 #endif
 
-		if (ifp != NULL) {
+		if ((nat->nat_ifps[1] == NULL) && (ifp != NULL)) {
 			nat->nat_ifps[1] = ifp;
 			nat->nat_mtu[1] = GETIFMTU_6(ifp);
 		}
@@ -2405,7 +2405,7 @@ find_out_wild_ports:
 					nat->nat_ndport = sport;
 				}
 			}
-			if (ifp != NULL) {
+			if ((nat->nat_ifps[1] == NULL) && (ifp != NULL)) {
 				nat->nat_ifps[1] = ifp;
 				nat->nat_mtu[1] = GETIFMTU_6(ifp);
 			}
