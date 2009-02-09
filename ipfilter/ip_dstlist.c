@@ -73,14 +73,22 @@ static void ipf_dstlist_soft_destroy __P((ipf_main_softc_t *, void *));
 static int ipf_dstlist_soft_init __P((ipf_main_softc_t *, void *));
 static void ipf_dstlist_soft_fini __P((ipf_main_softc_t *, void *));
 static int ipf_dstlist_addr_find __P((ipf_main_softc_t *, void *, int, void *));
-static size_t ipf_dstlist_flush __P((ipf_main_softc_t *, void *, iplookupflush_t *));
-static int ipf_dstlist_iter_deref __P((ipf_main_softc_t *, void *, int, int, void *));
-static int ipf_dstlist_iter_next __P((ipf_main_softc_t *, void *, ipftoken_t *, ipflookupiter_t *));
-static int ipf_dstlist_node_add __P((ipf_main_softc_t *, void *, iplookupop_t *));
-static int ipf_dstlist_node_del __P((ipf_main_softc_t *, void *, iplookupop_t *));
-static int ipf_dstlist_stats_get __P((ipf_main_softc_t *, void *, iplookupop_t *));
-static int ipf_dstlist_table_add __P((ipf_main_softc_t *, void *, iplookupop_t *));
-static int ipf_dstlist_table_del __P((ipf_main_softc_t *, void *, iplookupop_t *));
+static size_t ipf_dstlist_flush __P((ipf_main_softc_t *, void *,
+				     iplookupflush_t *));
+static int ipf_dstlist_iter_deref __P((ipf_main_softc_t *, void *, int, int,
+				       void *));
+static int ipf_dstlist_iter_next __P((ipf_main_softc_t *, void *, ipftoken_t *,
+				      ipflookupiter_t *));
+static int ipf_dstlist_node_add __P((ipf_main_softc_t *, void *,
+				     iplookupop_t *, int));
+static int ipf_dstlist_node_del __P((ipf_main_softc_t *, void *,
+				     iplookupop_t *, int));
+static int ipf_dstlist_stats_get __P((ipf_main_softc_t *, void *,
+				      iplookupop_t *));
+static int ipf_dstlist_table_add __P((ipf_main_softc_t *, void *,
+				      iplookupop_t *));
+static int ipf_dstlist_table_del __P((ipf_main_softc_t *, void *,
+				      iplookupop_t *));
 static int ipf_dstlist_table_deref __P((ipf_main_softc_t *, void *, void *));
 static void *ipf_dstlist_table_find __P((void *, int, char *));
 static void ipf_dstlist_table_flush __P((ipf_main_softc_t *, ippool_dst_t *));
@@ -219,11 +227,15 @@ ipf_dstlist_iter_deref(softc, arg, otype, unit, data)
 	int otype, unit;
 	void *data;
 {
-	if (data == NULL)
+	if (data == NULL) {
+		softc->ipf_interror = 120001;
 		return EINVAL;
+	}
 
-	if (unit < 0 || unit > IPL_LOGMAX)
+	if (unit < 0 || unit > IPL_LOGMAX) {
+		softc->ipf_interror = 120002;
 		return EINVAL;
+	}
 
 	switch (otype)
 	{
@@ -278,6 +290,7 @@ ipf_dstlist_iter_next(softc, arg, token, iter)
 			list = ipf_dstlist_table_find(arg, iter->ili_unit,
 						      iter->ili_name);
 			if (list == NULL) {
+				softc->ipf_interror = 120004;
 				err = ESRCH;
 				nextnode = NULL;
 			} else {
@@ -298,6 +311,7 @@ ipf_dstlist_iter_next(softc, arg, token, iter)
 		}
 		break;
 	default :
+		softc->ipf_interror = 120003;
 		err = EINVAL;
 		break;
 	}
@@ -314,6 +328,7 @@ ipf_dstlist_iter_next(softc, arg, token, iter)
 		token->ipt_data = next;
 		err = COPYOUT(next, iter->ili_data, sizeof(*next));
 		if (err != 0) {
+			softc->ipf_interror = 120005;
 			err = EFAULT;
 		}
 		break;
@@ -325,6 +340,7 @@ ipf_dstlist_iter_next(softc, arg, token, iter)
 		token->ipt_data = nextnode;
 		err = COPYOUT(nextnode, iter->ili_data, sizeof(*nextnode));
 		if (err != 0) {
+			softc->ipf_interror = 120006;
 			err = EFAULT;
 		}
 		break;
@@ -335,33 +351,39 @@ ipf_dstlist_iter_next(softc, arg, token, iter)
 
 
 static int
-ipf_dstlist_node_add(softc, arg, op)
+ipf_dstlist_node_add(softc, arg, op, uid)
 	ipf_main_softc_t *softc;
 	void *arg;
 	iplookupop_t *op;
+	int uid;
 {
 	ipf_dstnode_t *node;
 	ippool_dst_t *d;
 	int err;
 
 	if (op->iplo_size != sizeof(frdest_t)) {
+		softc->ipf_interror = 120007;
 		return EINVAL;
 	}
 
 	KMALLOC(node, ipf_dstnode_t *);
 	if (node == NULL) {
+		softc->ipf_interror = 120008;
 		return ENOMEM;
 	}
 
 	err = COPYIN(op->iplo_struct, &node->ipfd_dest,
 		     sizeof(node->ipfd_dest));
 	if (err != 0) {
+		softc->ipf_interror = 120009;
 		return EFAULT;
 	}
+	node->ipfd_uid = uid;
 
 	d = ipf_dstlist_table_find(arg, op->iplo_unit, op->iplo_name);
 	if (d == NULL) {
 		KFREE(node);
+		softc->ipf_interror = 120010;
 		return ESRCH;
 	}
 
@@ -408,10 +430,11 @@ ipf_dstlist_node_deref(node)
 
 
 static int
-ipf_dstlist_node_del(softc, arg, op)
+ipf_dstlist_node_del(softc, arg, op, uid)
 	ipf_main_softc_t *softc;
 	void *arg;
 	iplookupop_t *op;
+	int uid;
 {
 	ipf_dstnode_t *node;
 	ippool_dst_t *d;
@@ -420,16 +443,20 @@ ipf_dstlist_node_del(softc, arg, op)
 
 	err = COPYIN(op->iplo_struct, &dest, sizeof(dest));
 	if (err != 0) {
+		softc->ipf_interror = 120011;
 		return EFAULT;
 	}
 
 	d = ipf_dstlist_table_find(arg, op->iplo_unit, op->iplo_name);
 	if (d == NULL) {
+		softc->ipf_interror = 120012;
 		return ESRCH;
 	}
 
 	MUTEX_ENTER(&d->ipld_lock);
 	for (node = d->ipld_dests; node != NULL; node = node->ipfd_next) {
+		if ((uid != 0) && (node->ipfd_uid != uid))
+			continue;
 		if (!bcmp(&node->ipfd_dest.fd_ip6, &dest.fd_ip6,
 			  sizeof(dest) - offsetof(frdest_t, fd_ip6))) {
 			MUTEX_ENTER(&node->ipfd_lock);
@@ -503,10 +530,12 @@ ipf_dstlist_table_add(softc, arg, op)
 		if (new != NULL) {
 			KFREE(new);
 		}
+		softc->ipf_interror = 120013;
 		return EEXIST;
 	}
 
 	if (new == NULL) {
+		softc->ipf_interror = 120014;
 		return ENOMEM;
 	}
 
@@ -538,10 +567,12 @@ ipf_dstlist_table_del(softc, arg, op)
 
 	d = ipf_dstlist_table_find(arg, op->iplo_unit, op->iplo_name);
 	if (d == NULL) {
+		softc->ipf_interror = 120015;
 		return ESRCH;
 	}
 
 	if (d->ipld_dests != NULL) {
+		softc->ipf_interror = 120016;
 		return EBUSY;
 	}
 

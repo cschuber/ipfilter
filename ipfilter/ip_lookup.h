@@ -109,9 +109,9 @@ typedef struct ipf_lookup {
 	int	(*ipfl_iter_next) __P((ipf_main_softc_t *, void *,
 				       ipftoken_t *, ipflookupiter_t *));
 	int	(*ipfl_node_add) __P((ipf_main_softc_t *, void *,
-				      iplookupop_t *));
+				      iplookupop_t *, int));
 	int	(*ipfl_node_del) __P((ipf_main_softc_t *, void *,
-				      iplookupop_t *));
+				      iplookupop_t *, int));
 	int	(*ipfl_stats_get) __P((ipf_main_softc_t *, void *,
 				       iplookupop_t *));
 	int	(*ipfl_table_add) __P((ipf_main_softc_t *, void *,

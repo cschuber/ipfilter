@@ -93,8 +93,10 @@ static int ipf_pool_iter_deref __P((ipf_main_softc_t *, void *, int, int, void *
 static int ipf_pool_iter_next __P((ipf_main_softc_t *,  void *, ipftoken_t *,
 				   ipflookupiter_t *));
 static size_t ipf_pool_flush __P((ipf_main_softc_t *, void *, iplookupflush_t *));
-static int ipf_pool_node_add __P((ipf_main_softc_t *, void *, iplookupop_t *));
-static int ipf_pool_node_del __P((ipf_main_softc_t *, void *, iplookupop_t *));
+static int ipf_pool_node_add __P((ipf_main_softc_t *, void *, iplookupop_t *,
+				  int));
+static int ipf_pool_node_del __P((ipf_main_softc_t *, void *, iplookupop_t *,
+				  int));
 static void ipf_pool_node_deref __P((ipf_pool_softc_t *, ip_pool_node_t *));
 static int ipf_pool_remove_node __P((ipf_pool_softc_t *, ip_pool_t *,
 				     ip_pool_node_t *));
@@ -359,14 +361,17 @@ ipf_pool_soft_destroy(softc, arg)
 /* ------------------------------------------------------------------------ */
 /* Function:   ipf_pool_node_add                                            */
 /* Returns:    int - 0 = success, else error                                */
-/* Parameters: op(I) - pointer to lookup operatin data                      */
+/* Parameters: softc(I) - pointer to soft context main structure            */
+/*             arg(I)   - pointer to local context to use                   */
+/*             op(I) - pointer to lookup operatin data                      */
 /*                                                                          */
 /* ------------------------------------------------------------------------ */
 static int
-ipf_pool_node_add(softc, arg, op)
+ipf_pool_node_add(softc, arg, op, uid)
 	ipf_main_softc_t *softc;
 	void *arg;
 	iplookupop_t *op;
+	int uid;
 {
 	ip_pool_node_t node, *m;
 	ip_pool_t *p;
@@ -413,14 +418,17 @@ ipf_pool_node_add(softc, arg, op)
 /* ------------------------------------------------------------------------ */
 /* Function:   ipf_pool_node_del                                            */
 /* Returns:    int - 0 = success, else error                                */
-/* Parameters: op(I) - pointer to lookup operatin data                      */
+/* Parameters: softc(I) - pointer to soft context main structure            */
+/*             arg(I)   - pointer to local context to use                   */
+/*             op(I)    - pointer to lookup operatin data                   */
 /*                                                                          */
 /* ------------------------------------------------------------------------ */
 static int
-ipf_pool_node_del(softc, arg, op)
+ipf_pool_node_del(softc, arg, op, uid)
 	ipf_main_softc_t *softc;
 	void *arg;
 	iplookupop_t *op;
+	int uid;
 {
 	ip_pool_node_t node, *m;
 	ip_pool_t *p;
@@ -431,6 +439,7 @@ ipf_pool_node_del(softc, arg, op)
 		softc->ipf_interror = 70019;
 		return EINVAL;
 	}
+	node.ipn_uid = uid;
 
 	err = COPYIN(op->iplo_struct, &node, sizeof(node));
 	if (err != 0) {
@@ -449,6 +458,12 @@ ipf_pool_node_del(softc, arg, op)
 		softc->ipf_interror = 70022;
 		return ENOENT;
 	}
+
+	if ((uid != 0) && (uid != m->ipn_uid)) {
+		softc->ipf_interror = 70024;
+		return EACCES;
+	}
+
 	err = ipf_pool_remove_node(arg, p, m);
 
 	return err;
@@ -458,7 +473,9 @@ ipf_pool_node_del(softc, arg, op)
 /* ------------------------------------------------------------------------ */
 /* Function:   ipf_pool_table_add                                           */
 /* Returns:    int - 0 = success, else error                                */
-/* Parameters: op(I) - pointer to lookup operatin data                      */
+/* Parameters: softc(I) - pointer to soft context main structure            */
+/*             arg(I)   - pointer to local context to use                   */
+/*             op(I)    - pointer to lookup operatin data                   */
 /*                                                                          */
 /* ------------------------------------------------------------------------ */
 static int
@@ -483,7 +500,9 @@ ipf_pool_table_add(softc, arg, op)
 /* ------------------------------------------------------------------------ */
 /* Function:   ipf_pool_table_del                                           */
 /* Returns:    int - 0 = success, else error                                */
-/* Parameters: op(I) - pointer to lookup operatin data                      */
+/* Parameters: softc(I) - pointer to soft context main structure            */
+/*             arg(I)   - pointer to local context to use                   */
+/*             op(I)    - pointer to lookup operatin data                   */
 /*                                                                          */
 /* ------------------------------------------------------------------------ */
 static int
@@ -498,8 +517,10 @@ ipf_pool_table_del(softc, arg, op)
 
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_pool_statistics                                         */
-/* Returns:     int     - 0 = success, else error                           */
-/* Parameters:  op(I)   - pointer to lookup operation arguments             */
+/* Returns:     int      - 0 = success, else error                          */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              arg(I)   - pointer to local context to use                  */
+/*              op(I)    - pointer to lookup operatin data                  */
 /*                                                                          */
 /* Copy the current statistics out into user space, collecting pool list    */
 /* pointers as appropriate for later use.                                   */
@@ -541,8 +562,10 @@ ipf_pool_stats_get(softc, arg, op)
 
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_pool_exists                                             */
-/* Returns:     int     - 0 = success, else error                           */
-/* Parameters:  ipo(I)  - pointer to the pool getting the new node.         */
+/* Returns:     int      - 0 = success, else error                          */
+/* Parameters:  softp(I) - pointer to soft context pool information         */
+/*              unit(I)  - ipfilter device to which we are working on       */
+/*              name(I)  - name of the pool                                 */
 /*                                                                          */
 /* Find a matching pool inside the collection of pools for a particular     */
 /* device, indicated by the unit number.                                    */
@@ -564,8 +587,10 @@ ipf_pool_exists(softp, unit, name)
 
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_pool_find                                               */
-/* Returns:     int     - 0 = success, else error                           */
-/* Parameters:  ipo(I)  - pointer to the pool getting the new node.         */
+/* Returns:     int    - 0 = success, else error                            */
+/* Parameters:  arg(I)  - pointer to local context to use                   */
+/*              unit(I) - ipfilter device to which we are working on        */
+/*              name(I)  - name of the pool                                 */
 /*                                                                          */
 /* Find a matching pool inside the collection of pools for a particular     */
 /* device, indicated by the unit number.  If it is marked for deletion then */
@@ -589,9 +614,11 @@ ipf_pool_find(arg, unit, name)
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:   ipf_pool_select_add_ref                                      */
-/* Returns:    int - 0 = success, else error                                */
-/* Parameters: op(I) - pointer to lookup operatin data                      */
+/* Function:    ipf_pool_select_add_ref                                     */
+/* Returns:     int - 0 = success, else error                               */
+/* Parameters:  arg(I)  - pointer to local context to use                   */
+/*              unit(I) - ipfilter device to which we are working on        */
+/*              name(I)  - name of the pool                                 */
 /*                                                                          */
 /* ------------------------------------------------------------------------ */
 static void *
@@ -613,7 +640,8 @@ ipf_pool_select_add_ref(arg, unit, name)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_pool_findeq                                             */
 /* Returns:     int     - 0 = success, else error                           */
-/* Parameters:  ipo(I)  - pointer to the pool getting the new node.         */
+/* Parameters:  softp(I) - pointer to soft context pool information         */
+/*              ipo(I)  - pointer to the pool getting the new node.         */
 /*              addr(I) - pointer to address information to match on        */
 /*              mask(I) - pointer to the address mask to match              */
 /*                                                                          */
@@ -637,7 +665,8 @@ ipf_pool_findeq(softp, ipo, addr, mask)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_pool_search                                             */
 /* Returns:     int     - 0 == +ve match, -1 == error, 1 == -ve/no match    */
-/* Parameters:  tptr(I)    - pointer to the pool to search                  */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              tptr(I)    - pointer to the pool to search                  */
 /*              version(I) - IP protocol version (4 or 6)                   */
 /*              dptr(I)    - pointer to address information                 */
 /*                                                                          */
@@ -697,11 +726,11 @@ ipf_pool_search(softc, tptr, ipversion, dptr)
 
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_pool_insert_node                                        */
-/* Returns:     int     - 0 = success, else error                           */
-/* Parameters:  ipo(I)  - pointer to the pool getting the new node.         */
-/*              addr(I) - address being added as a node                     */
-/*              mask(I) - netmask to with the node being added              */
-/*              info(I) - extra information to store in this node.          */
+/* Returns:     int      - 0 = success, else error                          */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              softp(I) - pointer to soft context pool information         */
+/*              ipo(I)   - pointer to the pool getting the new node.        */
+/*              node(I)  - structure with address/mask to add               */
 /* Locks:       WRITE(ipf_poolrw)                                           */
 /*                                                                          */
 /* Add another node to the pool given by ipo.  The three parameters passed  */
@@ -809,8 +838,10 @@ ipf_pool_insert_node(softc, softp, ipo, node)
 
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_pool_create                                             */
-/* Returns:     int     - 0 = success, else error                           */
-/* Parameters:  op(I) - pointer to iplookup struct with call details        */
+/* Returns:     int      - 0 = success, else error                          */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              softp(I) - pointer to soft context pool information         */
+/*              op(I)    - pointer to iplookup struct with call details     */
 /* Locks:       WRITE(ipf_poolrw)                                           */
 /*                                                                          */
 /* Creates a new group according to the paramters passed in via the         */
@@ -911,9 +942,10 @@ ipf_pool_create(softc, softp, op)
 
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_pool_remove_node                                        */
-/* Returns:     int    - 0 = success, else error                            */
-/* Parameters:  ipo(I) - pointer to the pool to remove the node from.       */
-/*              ipe(I) - address being deleted as a node                    */
+/* Returns:     int      - 0 = success, else error                          */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              ipo(I)   - pointer to the pool to remove the node from.     */
+/*              ipe(I)   - address being deleted as a node                  */
 /* Locks:       WRITE(ipf_poolrw)                                           */
 /*                                                                          */
 /* Remove a node from the pool given by ipo.                                */
@@ -947,7 +979,10 @@ ipf_pool_remove_node(softp, ipo, ipe)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_pool_destroy                                            */
 /* Returns:     int    - 0 = success, else error                            */
-/* Parameters:  op(I)  -  information about the pool to remove              */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              softp(I) - pointer to soft context pool information         */
+/*              unit(I)  - ipfilter device to which we are working on      */
+/*              name(I)  - name of the pool                                 */
 /* Locks:       WRITE(ipf_poolrw) or WRITE(ipf_global)                      */
 /*                                                                          */
 /* Search for a pool using paramters passed in and if it's not otherwise    */
@@ -987,7 +1022,9 @@ ipf_pool_destroy(softc, softp, unit, name)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_pool_flush                                              */
 /* Returns:     int    - number of pools deleted                            */
-/* Parameters:  fp(I)  - which pool(s) to flush                             */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              arg(I)   - pointer to local context to use                  */
+/*              fp(I)    - which pool(s) to flush                           */
 /* Locks:       WRITE(ipf_poolrw) or WRITE(ipf_global)                      */
 /*                                                                          */
 /* Free all pools associated with the device that matches the unit number   */
@@ -1033,7 +1070,8 @@ ipf_pool_flush(softc, arg, fp)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_pool_free                                               */
 /* Returns:     void                                                        */
-/* Parameters:  ipo(I) -  pointer to pool structure                         */
+/* Parameters:  softp(I) - pointer to soft context pool information         */
+/*              ipo(I) - pointer to pool structure                          */
 /* Locks:       WRITE(ipf_poolrw) or WRITE(ipf_global)                      */
 /*                                                                          */
 /* Deletes the pool strucutre passed in from the list of pools and deletes  */
@@ -1065,7 +1103,8 @@ ipf_pool_free(softp, ipo)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_pool_clearnodes                                         */
 /* Returns:     void                                                        */
-/* Parameters:  ipo(I) -  pointer to pool structure                         */
+/* Parameters:  softp(I) - pointer to soft context pool information         */
+/*              ipo(I)   - pointer to pool structure                        */
 /* Locks:       WRITE(ipf_poolrw) or WRITE(ipf_global)                      */
 /*                                                                          */
 /* Deletes all nodes stored in a pool structure.                            */
@@ -1075,9 +1114,9 @@ ipf_pool_clearnodes(softp, ipo)
 	ipf_pool_softc_t *softp;
 	ip_pool_t *ipo;
 {
-	ip_pool_node_t *n;
+	ip_pool_node_t *n, **next;
 
-	while ((n = ipo->ipo_list) != NULL) {
+	for (next = &ipo->ipo_list; (n = *next) != NULL; ) {
 		ipo->ipo_head->rnh_deladdr(softp->ipf_radix, &n->ipn_addr,
 					   &n->ipn_mask, ipo->ipo_head);
 
@@ -1103,7 +1142,9 @@ ipf_pool_clearnodes(softp, ipo)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_pool_deref                                              */
 /* Returns:     void                                                        */
-/* Parameters:  ipo(I) -  pointer to pool structure                         */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              arg(I)   - pointer to local context to use                  */
+/*              pool(I)  - pointer to pool structure                        */
 /* Locks:       WRITE(ipf_poolrw)                                           */
 /*                                                                          */
 /* Drop the number of known references to this pool structure by one and if */
@@ -1131,7 +1172,8 @@ ipf_pool_deref(softc, arg, pool)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_pool_node_deref                                         */
 /* Returns:     void                                                        */
-/* Parameters:  ipn(I) - pointer to pool structure                          */
+/* Parameters:  softp(I) - pointer to soft context pool information         */
+/*              ipn(I)   - pointer to pool structure                        */
 /* Locks:       WRITE(ipf_poolrw)                                           */
 /*                                                                          */
 /* Drop a reference to the pool node passed in and if we're the last, free  */
@@ -1155,8 +1197,10 @@ ipf_pool_node_deref(softp, ipn)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_pool_iter_next                                          */
 /* Returns:     void                                                        */
-/* Parameters:  token(I) - pointer to pool structure                        */
-/*              ilp(IO)   - pointer to pool iterating structure             */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              arg(I)   - pointer to local context to use                  */
+/*              token(I) - pointer to pool structure                        */
+/*              ilp(IO)  - pointer to pool iterating structure              */
 /*                                                                          */
 /* ------------------------------------------------------------------------ */
 static int
@@ -1294,7 +1338,9 @@ ipf_pool_iter_next(softc, arg, token, ilp)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_pool_iterderef                                          */
 /* Returns:     void                                                        */
-/* Parameters:  ipn(I) - pointer to pool structure                          */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              arg(I)   - pointer to local context to use                  */
+/*              unit(I)  - ipfilter device to which we are working on       */
 /* Locks:       WRITE(ipf_poolrw)                                           */
 /*                                                                          */
 /* ------------------------------------------------------------------------ */

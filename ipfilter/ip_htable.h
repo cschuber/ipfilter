@@ -12,6 +12,7 @@ typedef	struct	iphtent_s	{
 	i6addr_t	ipe_addr;
 	i6addr_t	ipe_mask;
 	u_long		ipe_die;
+	int		ipe_uid;
 	int		ipe_ref;
 	int		ipe_unit;
 	char		ipe_family;

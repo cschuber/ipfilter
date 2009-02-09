@@ -21,6 +21,7 @@ typedef	struct ip_pool_node {
 	struct	ipf_radix_node	ipn_nodes[2];
 	addrfamily_t		ipn_addr;
 	addrfamily_t		ipn_mask;
+	int			ipn_uid;
 	int			ipn_info;
 	int			ipn_ref;
 	char			ipn_name[FR_GROUPLEN];

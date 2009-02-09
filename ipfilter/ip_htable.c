@@ -66,23 +66,34 @@ static int ipf_htable_create __P((ipf_main_softc_t *, void *, iplookupop_t *));
 static int ipf_htable_deref __P((ipf_main_softc_t *, void *, void *));
 static int ipf_htable_destroy __P((ipf_main_softc_t *, void *, int, char *));
 static void *ipf_htable_exists __P((void *, int, char *));
-static size_t ipf_htable_flush __P((ipf_main_softc_t *, void *, iplookupflush_t *));
+static size_t ipf_htable_flush __P((ipf_main_softc_t *, void *,
+				    iplookupflush_t *));
 static void ipf_htable_free __P((void *, iphtable_t *));
-static int ipf_htable_iter_deref __P((ipf_main_softc_t *, void *, int, int, void *));
-static int ipf_htable_iter_next __P((ipf_main_softc_t *, void *, ipftoken_t *, ipflookupiter_t *));
-static int ipf_htable_node_add __P((ipf_main_softc_t *, void *, iplookupop_t *));
-static int ipf_htable_node_del __P((ipf_main_softc_t *, void *, iplookupop_t *));
+static int ipf_htable_iter_deref __P((ipf_main_softc_t *, void *, int,
+				      int, void *));
+static int ipf_htable_iter_next __P((ipf_main_softc_t *, void *, ipftoken_t *,
+				     ipflookupiter_t *));
+static int ipf_htable_node_add __P((ipf_main_softc_t *, void *,
+				    iplookupop_t *, int));
+static int ipf_htable_node_del __P((ipf_main_softc_t *, void *,
+				    iplookupop_t *, int));
 static int ipf_htable_remove __P((ipf_main_softc_t *, void *, iphtable_t *));
 static void *ipf_htable_soft_create __P((ipf_main_softc_t *));
 static void ipf_htable_soft_destroy __P((ipf_main_softc_t *, void *));
 static int ipf_htable_soft_init __P((ipf_main_softc_t *, void *));
 static void ipf_htable_soft_fini __P((ipf_main_softc_t *, void *));
-static int ipf_htable_stats_get __P((ipf_main_softc_t *, void *, iplookupop_t *));
-static int ipf_htable_table_add __P((ipf_main_softc_t *, void *, iplookupop_t *));
-static int ipf_htable_table_del __P((ipf_main_softc_t *, void *, iplookupop_t *));
+static int ipf_htable_stats_get __P((ipf_main_softc_t *, void *,
+				     iplookupop_t *));
+static int ipf_htable_table_add __P((ipf_main_softc_t *, void *,
+				     iplookupop_t *));
+static int ipf_htable_table_del __P((ipf_main_softc_t *, void *,
+				     iplookupop_t *));
 static int ipf_htent_deref __P((void *, iphtent_t *));
-static int ipf_htent_insert __P((ipf_main_softc_t *, void *, iphtable_t *, iphtent_t *));
-static int ipf_htent_remove __P((ipf_main_softc_t *, void *, iphtable_t *, iphtent_t *));
+static iphtent_t *ipf_htent_find __P((iphtable_t *, iphtent_t *));
+static int ipf_htent_insert __P((ipf_main_softc_t *, void *, iphtable_t *,
+				 iphtent_t *));
+static int ipf_htent_remove __P((ipf_main_softc_t *, void *, iphtable_t *,
+				 iphtent_t *));
 static void *ipf_htable_select_add_ref __P((void *, int, char *));
 static void ipf_htable_expire __P((ipf_main_softc_t *, void *));
 
@@ -500,16 +511,18 @@ ipf_htable_remove(softc, arg, iph)
 /* Parameters:  softc(I) - pointer to soft context main structure           */
 /*              arg(I)   - pointer to local context to use                  */
 /*              op(I)    - pointer to lookup operation data                 */
+/*              uid(I)   - real uid of process doing operation              */
 /*                                                                          */
 /* ------------------------------------------------------------------------ */
 static int
-ipf_htable_node_del(softc, arg, op)
+ipf_htable_node_del(softc, arg, op, uid)
 	ipf_main_softc_t *softc;
 	void *arg;
 	iplookupop_t *op;
+	int uid;
 {
         iphtable_t *iph;
-        iphtent_t hte;
+        iphtent_t hte, *ent;
 	int err;
 
 	if (op->iplo_size != sizeof(hte)) {
@@ -528,7 +541,19 @@ ipf_htable_node_del(softc, arg, op)
 		softc->ipf_interror = 30016;
 		return ESRCH;
 	}
-	err = ipf_htent_remove(softc, arg, iph, &hte);
+
+	ent = ipf_htent_find(iph, &hte);
+	if (ent == NULL) {
+		softc->ipf_interror = 30022;
+		return ESRCH;
+	}
+
+	if ((uid != 0) && (ent->ipe_uid != uid)) {
+		softc->ipf_interror = 30023;
+		return EACCES;
+	}
+
+	err = ipf_htent_remove(softc, arg, iph, ent);
 
 	return err;
 }
@@ -562,7 +587,7 @@ ipf_htable_table_add(softc, arg, op)
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    ipf_htable_node_del                                         */
+/* Function:    ipf_htent_remove                                            */
 /* Returns:     int      - 0 = success, else error                          */
 /* Parameters:  softc(I) - pointer to soft context main structure           */
 /*              arg(I)   - pointer to local context to use                  */
@@ -785,14 +810,15 @@ ipf_htable_flush(softc, arg, op)
 /* Parameters:  softc(I) - pointer to soft context main structure           */
 /*              arg(I)   - pointer to local context to use                  */
 /*              op(I)    - pointer to lookup operation data                 */
+/*              uid(I)   - real uid of process doing operation              */
 /*                                                                          */
 /* ------------------------------------------------------------------------ */
 static int
-ipf_htable_node_add(softc, arg, op)
+ipf_htable_node_add(softc, arg, op, uid)
 	ipf_main_softc_t *softc;
 	void *arg;
 	iplookupop_t *op;
-
+	int uid;
 {
 	iphtable_t *iph;
 	iphtent_t hte;
@@ -808,12 +834,19 @@ ipf_htable_node_add(softc, arg, op)
 		softc->ipf_interror = 30019;
 		return EFAULT;
 	}
+	hte.ipe_uid = uid;
 
 	iph = ipf_htable_find(arg, op->iplo_unit, op->iplo_name);
 	if (iph == NULL) {
 		softc->ipf_interror = 30020;
 		return ESRCH;
 	}
+
+	if (ipf_htent_find(iph, &hte) != NULL) {
+		softc->ipf_interror = 30021;
+		return EEXIST;
+	}
+
 	err = ipf_htent_insert(softc, arg, iph, &hte);
 
 	return err;
@@ -855,6 +888,12 @@ ipf_htent_insert(softc, arg, iph, ipeo)
 		bits = count4bits(ipe->ipe_mask.in4_addr);
 		ipe->ipe_addr.i6[0] = ntohl(ipe->ipe_addr.i6[0]);
 		ipe->ipe_mask.i6[0] = ntohl(ipe->ipe_mask.i6[0]);
+		ipe->ipe_addr.i6[1] = 0;
+		ipe->ipe_addr.i6[2] = 0;
+		ipe->ipe_addr.i6[3] = 0;
+		ipe->ipe_mask.i6[1] = 0;
+		ipe->ipe_mask.i6[2] = 0;
+		ipe->ipe_mask.i6[3] = 0;
 		hv = IPE_V4_HASH_FN(ipe->ipe_addr.in4_addr,
 				    ipe->ipe_mask.in4_addr, iph->iph_size);
 	} else
@@ -968,7 +1007,75 @@ ipf_htent_insert(softc, arg, iph, ipeo)
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    ipf_htable_node_add                                         */
+/* Function:    ipf_htent_find                                              */
+/* Returns:     int     - 0 = success, else error                           */
+/* Parameters:  iph(I)  - pointer to table to search                        */
+/*              ipeo(I) - pointer to entry to find                          */
+/*                                                                          */
+/* While it isn't absolutely necessary to for the address and mask to be    */
+/* passed in through an iphtent_t structure, one is always present when it  */
+/* is time to call this function, so it is just more convenient.            */
+/* ------------------------------------------------------------------------ */
+static iphtent_t *
+ipf_htent_find(iph, ipeo)
+	iphtable_t *iph;
+	iphtent_t *ipeo;
+{
+	iphtent_t ipe, *ent;
+	u_int hv;
+	int bits;
+
+	bcopy((char *)ipeo, (char *)&ipe, sizeof(ipe));
+	ipe.ipe_addr.i6[0] &= ipe.ipe_mask.i6[0];
+	ipe.ipe_addr.i6[1] &= ipe.ipe_mask.i6[1];
+	ipe.ipe_addr.i6[2] &= ipe.ipe_mask.i6[2];
+	ipe.ipe_addr.i6[3] &= ipe.ipe_mask.i6[3];
+	if (ipe.ipe_family == AF_INET) {
+		bits = count4bits(ipe.ipe_mask.in4_addr);
+		ipe.ipe_addr.i6[0] = ntohl(ipe.ipe_addr.i6[0]);
+		ipe.ipe_mask.i6[0] = ntohl(ipe.ipe_mask.i6[0]);
+		ipe.ipe_addr.i6[1] = 0;
+		ipe.ipe_addr.i6[2] = 0;
+		ipe.ipe_addr.i6[3] = 0;
+		ipe.ipe_mask.i6[1] = 0;
+		ipe.ipe_mask.i6[2] = 0;
+		ipe.ipe_mask.i6[3] = 0;
+		hv = IPE_V4_HASH_FN(ipe.ipe_addr.in4_addr,
+				    ipe.ipe_mask.in4_addr, iph->iph_size);
+	} else
+#ifdef USE_INET6
+	if (ipe.ipe_family == AF_INET6) {
+		bits = count6bits(ipe.ipe_mask.i6);
+		ipe.ipe_addr.i6[0] = ntohl(ipe.ipe_addr.i6[0]);
+		ipe.ipe_addr.i6[1] = ntohl(ipe.ipe_addr.i6[1]);
+		ipe.ipe_addr.i6[2] = ntohl(ipe.ipe_addr.i6[2]);
+		ipe.ipe_addr.i6[3] = ntohl(ipe.ipe_addr.i6[3]);
+		ipe.ipe_mask.i6[0] = ntohl(ipe.ipe_mask.i6[0]);
+		ipe.ipe_mask.i6[1] = ntohl(ipe.ipe_mask.i6[1]);
+		ipe.ipe_mask.i6[2] = ntohl(ipe.ipe_mask.i6[2]);
+		ipe.ipe_mask.i6[3] = ntohl(ipe.ipe_mask.i6[3]);
+		hv = IPE_V6_HASH_FN(ipe.ipe_addr.i6,
+				    ipe.ipe_mask.i6, iph->iph_size);
+	} else
+#endif
+		return NULL;
+
+	for (ent = iph->iph_table[hv]; ent != NULL; ent = ent->ipe_hnext) {
+		if (ent->ipe_family != ipe.ipe_family)
+			continue;
+		if (IP6_NEQ(&ipe.ipe_addr, &ent->ipe_addr))
+			continue;
+		if (IP6_NEQ(&ipe.ipe_mask, &ent->ipe_mask))
+			continue;
+		break;
+	}
+
+	return ent;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_iphmfindgroup                                           */
 /* Returns:     int      - 0 = success, else error                          */
 /* Parameters:  softc(I) - pointer to soft context main structure           */
 /*              tptr(I)  -                                                  */
@@ -1006,7 +1113,8 @@ ipf_iphmfindgroup(softc, tptr, aptr)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_iphmfindip                                              */
 /* Returns:     int     - 0 == +ve match, -1 == error, 1 == -ve/no match    */
-/* Parameters:  tptr(I)      - pointer to the pool to search                */
+/* Parameters:  softc(I)     - pointer to soft context main structure       */
+/*              tptr(I)      - pointer to the pool to search                */
 /*              ipversion(I) - IP protocol version (4 or 6)                 */
 /*              aptr(I)      - pointer to address information               */
 /*                                                                          */

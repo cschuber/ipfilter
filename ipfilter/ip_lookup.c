@@ -60,8 +60,8 @@ struct file;
 static const char rcsid[] = "@(#)$Id$";
 #endif
 
-static int ipf_lookup_addnode __P((ipf_main_softc_t *, caddr_t));
-static int ipf_lookup_delnode __P((ipf_main_softc_t *, caddr_t data));
+static int ipf_lookup_addnode __P((ipf_main_softc_t *, caddr_t, int));
+static int ipf_lookup_delnode __P((ipf_main_softc_t *, caddr_t, int));
 static int ipf_lookup_addtable __P((ipf_main_softc_t *, caddr_t));
 static int ipf_lookup_deltable __P((ipf_main_softc_t *, caddr_t));
 static int ipf_lookup_stats __P((ipf_main_softc_t *, caddr_t));
@@ -253,14 +253,14 @@ ipf_lookup_ioctl(softc, data, cmd, mode, uid, ctx)
 	case SIOCLOOKUPADDNODE :
 	case SIOCLOOKUPADDNODEW :
 		WRITE_ENTER(&softc->ipf_poolrw);
-		err = ipf_lookup_addnode(softc, data);
+		err = ipf_lookup_addnode(softc, data, uid);
 		RWLOCK_EXIT(&softc->ipf_poolrw);
 		break;
 
 	case SIOCLOOKUPDELNODE :
 	case SIOCLOOKUPDELNODEW :
 		WRITE_ENTER(&softc->ipf_poolrw);
-		err = ipf_lookup_delnode(softc, data);
+		err = ipf_lookup_delnode(softc, data, uid);
 		RWLOCK_EXIT(&softc->ipf_poolrw);
 		break;
 
@@ -318,9 +318,10 @@ ipf_lookup_ioctl(softc, data, cmd, mode, uid, ctx)
 /* add a node to it.                                                        */
 /* ------------------------------------------------------------------------ */
 static int
-ipf_lookup_addnode(softc, data)
+ipf_lookup_addnode(softc, data, uid)
 	ipf_main_softc_t *softc;
 	caddr_t data;
+	int uid;
 {
 	ipf_lookup_softc_t *softl = softc->ipf_lookup_soft;
 	iplookupop_t op;
@@ -345,7 +346,7 @@ ipf_lookup_addnode(softc, data)
 		if (op.iplo_type == (*l)->ipfl_type) {
 			err = (*(*l)->ipfl_node_add)(softc,
 						     softl->ipf_back[i],
-						     &op);
+						     &op, uid);
 			break;
 		}
 	}
@@ -369,9 +370,10 @@ ipf_lookup_addnode(softc, data)
 /* in and then deleting the entry that gets found.                          */
 /* ------------------------------------------------------------------------ */
 static int
-ipf_lookup_delnode(softc, data)
+ipf_lookup_delnode(softc, data, uid)
 	ipf_main_softc_t *softc;
 	caddr_t data;
+	int uid;
 {
 	ipf_lookup_softc_t *softl = softc->ipf_lookup_soft;
 	iplookupop_t op;
@@ -394,7 +396,8 @@ ipf_lookup_delnode(softc, data)
 
 	for (i = 0, l = backends; i < MAX_BACKENDS; i++, l++) {
 		if (op.iplo_type == (*l)->ipfl_type) {
-			err = (*(*l)->ipfl_node_del)(softc, softl->ipf_back[i], &op);
+			err = (*(*l)->ipfl_node_del)(softc, softl->ipf_back[i],
+						     &op, uid);
 			break;
 		}
 	}
@@ -441,7 +444,9 @@ ipf_lookup_addtable(softc, data)
 
 	for (i = 0, l = backends; i < MAX_BACKENDS; i++, l++) {
 		if (op.iplo_type == (*l)->ipfl_type) {
-			err = (*(*l)->ipfl_table_add)(softc, softl->ipf_back[i], &op);
+			err = (*(*l)->ipfl_table_add)(softc,
+						      softl->ipf_back[i],
+						      &op);
 			break;
 		}
 	}

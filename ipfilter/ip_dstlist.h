@@ -17,6 +17,7 @@ typedef struct ipf_dstnode {
 	U_QUAD_T		ipfd_bytes;
 	int			ipfd_states;
 	int			ipfd_ref;
+	int			ipfd_uid;
 	ipfmutex_t		*ipfd_plock;
 } ipf_dstnode_t;
 

@@ -15,7 +15,7 @@ typedef	struct	{
 	char	*iee_text;
 } ipf_error_entry_t;
 
-#define	IPF_NUM_ERRORS	364
+#define	IPF_NUM_ERRORS	401
 
 /*
  * NO REUSE OF NUMBERS!
@@ -191,6 +191,16 @@ static ipf_error_entry_t ipf_errors[IPF_NUM_ERRORS] = {
 	{	30011,	"iterator error copying out hash table" },
 	{	30012,	"iterator error copying out hash table entry" },
 	{	30013,	"error copying out hash table statistics" },
+	{	30014,	"table node delete structure wrong size" },
+	{	30015,	"error copying in node to delete" },
+	{	30016,	"table to delete node from does not exist" },
+	{	30017,	"could not find table to remove node from" },
+	{	30018,	"table node add structure wrong size" },
+	{	30019,	"error copying in node to add" },
+	{	30020,	"could not find table to add node to" },
+	{	30021,	"node already exists in the table" },
+	{	30022,	"could not find node to delete in table" },
+	{	30023,	"uid mismatch on node to delete" },
 /* -------------------------------------------------------------------------- */
 	{	40001,	"invalid minor device numebr for log read" },
 	{	40002,	"read size too small" },
@@ -325,6 +335,17 @@ log" },
 	{	70011,	"unknown pool iterator" },
 	{	70012,	"error copying out pool head" },
 	{	70013,	"error copying out pool node" },
+	{	70014,	"add node size incorrect" },
+	{	70015,	"error copying in pool node" },
+	{	70016,	"node address/mask family mismatch" },
+	{	70017,	"cannot find pool for node" },
+	{	70018,	"node entry already present in pool" },
+	{	70019,	"delete node size incorrect" },
+	{	70020,	"error copying in node to delete" },
+	{	70021,	"cannot find pool to delete node from" },
+	{	70022,	"cannot find node to delete in pool" },
+	{	70023,	"pool name already exists" },
+	{	70024,	"uid mismatch for node removal" },
 /* -------------------------------------------------------------------------- */
 	{	80001,	"could not find proxy" },
 	{	80002,	"proxy does not support control operations" },
@@ -388,9 +409,9 @@ log" },
 	{	110006,	"zero length data with sync write header" },
 	{	110007,	"insufficient data for sync write" },
 	{	110008,	"bad sync read size" },
-	{	110009,	"interrupted sync read" },
-	{	110010,	"interrupted sync read" },
-	{	110011,	"interrupted sync read" },
+	{	110009,	"interrupted sync read (solaris)" },
+	{	110010,	"interrupted sync read (hpux)" },
+	{	110011,	"interrupted sync read (osf)" },
 	{	110012,	"interrupted sync read" },
 	{	110013,	"could not malloc memory for sync'd state" },
 	{	110014,	"could not malloc memory for sync-state list item" },
@@ -401,6 +422,23 @@ log" },
 	{	110019,	"sync update could not find NAT entry" },
 	{	110020,	"unrecognised sync NAT command" },
 	{	110021,	"ioctls are not handled with sync" },
+/* -------------------------------------------------------------------------- */
+	{	120001,	"null data pointer for iterator" },
+	{	120002,	"unit outside of acceptable range" },
+	{	120003,	"unknown iterator subtype" },
+	{	120004,	"cannot find destination list for iteration" },
+	{	120005,	"error copying out destination iteration list" },
+	{	120006,	"error copying out destination iteration node" },
+	{	120007,	"wrong size for frdest_t structure" },
+	{	120008,	"cannot allocate memory for new destination node" },
+	{	120009,	"error copying in destination node to add" },
+	{	120010,	"could not find destination table to add node to" },
+	{	120011,	"error copying in destination node to remove" },
+	{	120012,	"could not find dest. table to remove node from" },
+	{	120013,	"destination table already exists" },
+	{	120014,	"could not allocate new destination table" },
+	{	120015,	"could not find destination table to remove" },
+	{	120016,	"destination table cannot be removed - it is busy" },
 /* -------------------------------------------------------------------------- */
 };
 
