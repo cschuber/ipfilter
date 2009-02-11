@@ -58,6 +58,7 @@ struct file;
 # include "radix_ipf_local.h"
 # define _RADIX_H_
 #endif
+#include <sys/socket.h>
 #include <net/if.h>
 #include <netinet/in.h>
 
