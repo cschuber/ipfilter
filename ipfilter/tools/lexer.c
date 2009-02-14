@@ -244,7 +244,7 @@ nextchar:
 		}
 		yyswallow('\n');
 		rval = YY_COMMENT;
-		goto nextchar;
+		goto done;
 
 	case '$' :
 		if (isbuilding == 1) {
