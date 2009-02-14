@@ -1977,6 +1977,14 @@ ipstate_t *is;
 	bcopy((char *)is, (char *)clone, sizeof(*clone));
 
 	MUTEX_NUKE(&clone->is_lock);
+	/*
+	 * It has not yet been placed on any timeout queue, so make sure
+	 * all of that data is zero'd out.
+	 */     
+	clone->is_sti.tqe_pnext = NULL;
+	clone->is_sti.tqe_next = NULL;
+	clone->is_sti.tqe_ifq = NULL;
+	clone->is_sti.tqe_parent = clone;
 
 	clone->is_die = ONE_DAY + fr_ticks;
 	clone->is_state[0] = 0;
