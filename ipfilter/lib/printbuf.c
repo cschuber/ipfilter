@@ -11,7 +11,8 @@
 #include "ipf.h"
 
 
-void printbuf(buf, len, zend)
+void
+printbuf(buf, len, zend)
 	char *buf;
 	int len, zend;
 {
@@ -23,7 +24,7 @@ void printbuf(buf, len, zend)
 		if (ISPRINT(c))
 			putchar(c);
 		else
-			printf("\\%03o", c);
+			PRINTF("\\%03o", c);
 		if ((c == '\0') && zend)
 			break;
 	}

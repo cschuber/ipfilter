@@ -72,6 +72,10 @@ static	void	proxy_addconfig __P((char *, int, char *, namelist_t *));
 static	void	proxy_loadconfig __P((int, ioctlfunc_t, char *, int,
 				      char *, namelist_t *));
 static	void	proxy_loadrules __P((int, ioctlfunc_t, proxyrule_t *));
+static	void	setmapifnames __P((void));
+static	void	setrdrifnames __P((void));
+static	void	setifname __P((ipnat_t **, int, char *));
+static	int	addname __P((ipnat_t **, char *));
 %}
 %union	{
 	char	*str;
@@ -94,6 +98,8 @@ static	void	proxy_loadrules __P((int, ioctlfunc_t, proxyrule_t *));
 		int	t;
 		int	f;
 		int	v;
+		int	s;
+		int	n;
 	} ipp;
 	union	i6addr	ip6;
 	namelist_t	*names;
@@ -113,12 +119,12 @@ static	void	proxy_loadrules __P((int, ioctlfunc_t, proxyrule_t *));
 %token	IPNY_TLATE IPNY_POOL IPNY_HASH IPNY_NO IPNY_REWRITE IPNY_PROTO
 %token	IPNY_ON IPNY_SRC IPNY_DST IPNY_IN IPNY_OUT IPNY_DIVERT IPNY_ENCAP
 %token	IPNY_RANDOM IPNY_HASHMD5 IPNY_CONFIG IPNY_ALLOW IPNY_DENY IPNY_DNS
-%token	IPNY_SEQUENTIAL
+%token	IPNY_SEQUENTIAL IPNY_DSTLIST
 %type	<port> portspec
 %type	<num> hexnumber compare range proto functype
 %type	<num> saddr daddr sobject dobject mapfrom rdrfrom dip
 %type	<ipa> hostname ipv4 ipaddr
-%type	<ipp> addr rhsaddr rhdaddr afunc
+%type	<ipp> addr rhsaddr rhdaddr erhdaddr
 %type	<pc> portstuff portpair comaports srcports dstports
 %type	<names> dnslines dnsline
 %%
@@ -416,42 +422,42 @@ rwrproto:
 	| IPNY_PROTO setproto
 	;
 
-newdst:	src rhsaddr srcports dst rhdaddr dstports
-				{ bcopy(&$2.a, &nat->in_nsrc.na_addr[0],
-					sizeof($2.a));
-				  bcopy(&$2.m, &nat->in_nsrc.na_addr[1],
-					sizeof($2.m));
-				  nat->in_nsrcafunc = $2.f;
+newdst:	src rhsaddr srcports dst erhdaddr dstports
+				{ nat->in_nsrc.na_addr[0] = $2.a;
+				  nat->in_nsrc.na_addr[1] = $2.m;
+				  nat->in_nsrc.na_atype = $2.t;
+				  if ($2.t == FRI_LOOKUP) {
+					nat->in_nsrc.na_type = $2.f;
+					nat->in_nsrc.na_subtype = $2.s;
+					nat->in_nsrc.na_num = $2.n;
+				  }
 				  nat->in_nsports[0] = $3.p1;
 				  nat->in_nsports[1] = $3.p2;
-				  bcopy(&$5.a, &nat->in_ndst.na_addr[0],
-					sizeof($5.a));
-				  bcopy(&$5.m, &nat->in_ndst.na_addr[1],
-					sizeof($5.m));
-				  nat->in_ndstafunc = $5.f;
+				  nat->in_ndst.na_addr[0] = $5.a;
+				  nat->in_ndst.na_addr[1] = $5.m;
+				  nat->in_ndst.na_atype = $5.t;
+				  if ($5.t == FRI_LOOKUP) {
+					nat->in_ndst.na_type = $5.f;
+					nat->in_ndst.na_subtype = $5.s;
+					nat->in_ndst.na_num = $5.n;
+				  }
 				  nat->in_ndports[0] = $6.p1;
 				  nat->in_ndports[1] = $6.p2;
 				}
 	;
 
 divdst:	src addr ',' portspec dst addr ',' portspec IPNY_UDP
-				{ bcopy(&$2.a, &nat->in_nsrc.na_addr[0],
-					sizeof($2.a));
+				{ nat->in_nsrc.na_addr[0] = $2.a;
 				  if ($2.m.in4.s_addr != 0xffffffff)
 					yyerror("divert must have /32 dest");
-				  bcopy(&$2.m, &nat->in_nsrc.na_addr[1],
-					sizeof($2.m));
-				  nat->in_nsrcafunc = $2.f;
+				  nat->in_nsrc.na_addr[1] = $2.m;
 				  nat->in_nsports[0] = $4;
 				  nat->in_nsports[1] = $4;
 
-				  bcopy(&$6.a, &nat->in_ndst.na_addr[0],
-					sizeof($6.a));
-				  bcopy(&$6.m, &nat->in_ndst.na_addr[1],
-					sizeof($6.m));
+				  nat->in_ndst.na_addr[0] = $6.a;
+				  nat->in_ndst.na_addr[1] = $6.m;
 				  if ($6.m.in4.s_addr != 0xffffffff)
 					yyerror("divert must have /32 dest");
-				  nat->in_ndstafunc = $6.f;
 				  nat->in_ndports[0] = $8;
 				  nat->in_ndports[1] = $8;
 
@@ -460,14 +466,10 @@ divdst:	src addr ',' portspec dst addr ',' portspec IPNY_UDP
 	;
 
 encapdst:
-	src addr dst addr	{ bcopy(&$2.a, &nat->in_nsrc.na_addr[0],
-					sizeof($2.a));
-				  bcopy(&$2.m, &nat->in_nsrc.na_addr[1],
-					sizeof($2.m));
-				  bcopy(&$4.a, &nat->in_ndst.na_addr[0],
-					sizeof($4.a));
-				  bcopy(&$4.m, &nat->in_ndst.na_addr[1],
-					sizeof($4.m));
+	src addr dst addr	{ nat->in_nsrc.na_addr[0] = $2.a;
+				  nat->in_nsrc.na_addr[1] = $2.m;
+				  nat->in_ndst.na_addr[0] = $4.a;
+				  nat->in_ndst.na_addr[1] = $4.m;
 				  nat->in_redir |= NAT_ENCAP;
 				}
 	;
@@ -513,7 +515,9 @@ comaports:
 	;
 
 proxy:	| IPNY_PROXY port portspec YY_STR '/' proto
-			{ strncpy(nat->in_plabel, $4, sizeof(nat->in_plabel));
+			{ int pos;
+			  pos = addname(&nat, $4);
+			  nat->in_plabel = pos;
 			  if (nat->in_dcmp == 0) {
 				nat->in_odport = $3;
 			  } else if ($3 != nat->in_odport) {
@@ -524,8 +528,9 @@ proxy:	| IPNY_PROXY port portspec YY_STR '/' proto
 			  free($4);
 			}
 	| IPNY_PROXY port YY_STR YY_STR '/' proto
-			{ int pnum;
-			  strncpy(nat->in_plabel, $4, sizeof(nat->in_plabel));
+			{ int pnum, pos;
+			  pos = addname(&nat, $4);
+			  nat->in_plabel = pos;
 			  pnum = getportproto($3, $6);
 			  if (pnum == -1)
 				yyerror("invalid port number");
@@ -536,7 +541,9 @@ proxy:	| IPNY_PROXY port portspec YY_STR '/' proto
 			  free($4);
 			}
 	| IPNY_PROXY port portspec YY_STR '/' proto IPNY_CONFIG YY_STR
-			{ strncpy(nat->in_plabel, $4, sizeof(nat->in_plabel));
+			{ int pos;
+			  pos = addname(&nat, $4);
+			  nat->in_plabel = pos;
 			  if (nat->in_dcmp == 0) {
 				nat->in_odport = $3;
 			  } else if ($3 != nat->in_odport) {
@@ -544,22 +551,22 @@ proxy:	| IPNY_PROXY port portspec YY_STR '/' proto
 			  }
 			  nat->in_ndport = $3;
 			  setnatproto($6);
-			  strncpy(nat->in_pconfig, $8, APR_LABELLEN);
-			  nat->in_pconfig[APR_LABELLEN - 1] = '\0';
+			  nat->in_pconfig = addname(&nat, $8);
 			  free($4);
 			  free($8);
 			}
 	| IPNY_PROXY port YY_STR YY_STR '/' proto IPNY_CONFIG YY_STR
-			{ int pnum;
-			  strncpy(nat->in_plabel, $4, sizeof(nat->in_plabel));
+			{ int pnum, pos;
+			  pos = addname(&nat, $4);
+			  nat->in_plabel = pos;
 			  pnum = getportproto($3, $6);
 			  if (pnum == -1)
 				yyerror("invalid port number");
 			  nat->in_odport = ntohs(pnum);
 			  nat->in_ndport = ntohs(pnum);
 			  setnatproto($6);
-			  strncpy(nat->in_pconfig, $8, APR_LABELLEN);
-			  nat->in_pconfig[APR_LABELLEN - 1] = '\0';
+			  pos = addname(&nat, $8);
+			  nat->in_pconfig = pos;
 			  free($3);
 			  free($4);
 			  free($8);
@@ -592,22 +599,13 @@ setproto:
 
 rhsaddr:
 	addr				{ $$.t = $1.t;
-					  $$.f = NA_NORMAL;
 					  $$.a = $1.a;
 					  $$.m = $1.m;
 					  $$.v = $1.v;
 					  yyexpectaddr = 0;
 					}
-	| afunc				{ $$.t = $1.t;
-					  $$.f = $1.f;
-					  $$.a = $1.a;
-					  $$.m = $1.m;
-					  $$.v = 0;
-					  yyexpectaddr = 0;
-					}
 	| hostname '-' hostname
 					{ $$.t = FRI_RANGE;
-					  $$.f = NA_NORMAL;
 					  if ($1.v != $3.v)
 						yyerror("8.address family "
 							"mismatch");
@@ -619,7 +617,6 @@ rhsaddr:
 					}
 	| IPNY_RANGE hostname '-' hostname
 					{ $$.t = FRI_RANGE;
-					  $$.f = NA_NORMAL;
 					  if ($2.v != $4.v)
 						yyerror("9.address family "
 							"mismatch");
@@ -629,31 +626,6 @@ rhsaddr:
 					  nat->in_flags |= IPN_SIPRANGE;
 					  yyexpectaddr = 0;
 					}
-	;
-
-afunc:	functype '(' hostname '-' hostname ')'
-					{ $$.t = FRI_RANGE;
-					  if ($3.v != $5.v)
-						yyerror("19.address family "
-							"mismatch");
-					  $$.f = $1;
-					  $$.a = $3.a;
-					  $$.m = $5.a;
-					  $$.v = $3.v;
-					  yyexpectaddr = 0;
-					}
-	| functype '(' addr ')'		{ $$.t = $3.t;
-					  $$.f = $1;
-					  $$.a = $3.a;
-					  $$.m = $3.m;
-					  $$.v = $3.v;
-					  yyexpectaddr = 0;
-					}
-	;
-
-functype:
-	IPNY_RANDOM			{ $$ = NA_RANDOM; }
-	| IPNY_HASHMD5			{ $$ = NA_HASHMD5; }
 	;
 
 dip:
@@ -666,14 +638,12 @@ dip:
 					  nat->in_ndstip6 = $1.a;
 					  nat->in_ndstmsk6 = $4.a;
 					  nat->in_ndstatype = FRI_SPLIT;
-					  nat->in_ndstafunc = NA_NORMAL;
 					  yyexpectaddr = 0;
 					}
 	| rhdaddr		{ int bits;
 				  nat->in_ndstip6 = $1.a;
 				  nat->in_ndstmsk6 = $1.m;
-				  nat->in_ndstatype = $1.t;
-				  nat->in_ndstafunc = $1.f;
+				  nat->in_ndst.na_atype = $1.t;
 				  yyexpectaddr = 0;
 				  if ($1.v == 4)
 					bits = count4bits($1.m.in4.s_addr);
@@ -691,22 +661,13 @@ dip:
 	;
 
 rhdaddr:
-	addr				{ $$.t = $1.t;
-					  $$.f = NA_NORMAL;
-					  $$.a = $1.a;
-					  $$.v = $1.v;
-					  $$.m = $1.m;
+	addr				{ $$ = $1;
 					  yyexpectaddr = 0;
 					}
-	| afunc				{ $$.t = $1.t;
-					  $$.f = $1.f;
-					  $$.a = $1.a;
-					  $$.m = $1.m;
-					  $$.v = $1.v;
-					}
-	| hostname '-' hostname		{ $$.t = FRI_RANGE;
-					  $$.f = NA_NORMAL;
-					  if ($1.v != 0 && $3.v != 0 && $1.v != $3.v)
+	| hostname '-' hostname		{ bzero(&$$, sizeof($$));
+					  $$.t = FRI_RANGE;
+					  if ($1.v != 0 && $3.v != 0 &&
+					      $1.v != $3.v)
 						yyerror("11.address family "
 							"mismatch");
 					  $$.a = $1.a;
@@ -715,15 +676,30 @@ rhdaddr:
 					  yyexpectaddr = 0;
 					}
 	| IPNY_RANGE hostname '-' hostname
-					{ $$.t = FRI_RANGE;
-					  $$.f = NA_NORMAL;
-					  if ($2.v != 0 && $4.v != 0 && $2.v != $4.v)
+					{ bzero(&$$, sizeof($$));
+					  $$.t = FRI_RANGE;
+					  if ($2.v != 0 && $4.v != 0 &&
+					      $2.v != $4.v)
 						yyerror("12.address family "
 							"mismatch");
 					  $$.a = $2.a;
 					  $$.m = $4.a;
 					  nat->in_flags |= IPN_DIPRANGE;
 					  yyexpectaddr = 0;
+					}
+	;
+
+erhdaddr:
+	rhdaddr				{ $$ = $1; }
+	| IPNY_DSTLIST '/' YY_NUMBER	{ $$.t = FRI_LOOKUP;
+					  $$.f = IPLT_DSTLIST;
+					  $$.s = 0;
+					  $$.n = $3;
+					}
+	| IPNY_DSTLIST '/' YY_STR	{ $$.t = FRI_LOOKUP;
+					  $$.f = IPLT_DSTLIST;
+					  $$.s = 1;
+					  $$.n = addname(&nat, $3);
 					}
 	;
 
@@ -845,35 +821,31 @@ ifnames:
 	| ifname ',' otherifname	{ yyexpectaddr = 1; }
 	;
 
-ifname:	YY_STR			{ strncpy(nat->in_ifnames[0], $1,
-					  sizeof(nat->in_ifnames[0]));
-				  nat->in_ifnames[0][LIFNAMSIZ - 1] = '\0';
-				  free($1);
-				}
+ifname:	YY_STR				{ setifname(&nat, 0, $1);
+					  free($1);
+					}
 	;
 
 otherifname:
-	YY_STR			{ strncpy(nat->in_ifnames[1], $1,
-					  sizeof(nat->in_ifnames[1]));
-				  nat->in_ifnames[1][LIFNAMSIZ - 1] = '\0';
-				  free($1);
-				}
+	YY_STR				{ setifname(&nat, 1, $1);
+					  free($1);
+					}
 	;
 
 mapport:
 	IPNY_PORTMAP tcpudp portpair sequential
-				{ nat->in_spmin = $3.p1;
-				  nat->in_spmax = $3.p2;
-				}
+					{ nat->in_spmin = $3.p1;
+					  nat->in_spmax = $3.p2;
+					}
 	| IPNY_PORTMAP portpair tcpudp sequential
-				{ nat->in_spmin = $2.p1;
-				  nat->in_spmax = $2.p2;
-				}
+					{ nat->in_spmin = $2.p1;
+					  nat->in_spmax = $2.p2;
+					}
 	| IPNY_PORTMAP tcpudp IPNY_AUTO sequential
-				{ nat->in_flags |= IPN_AUTOPORTMAP;
-				  nat->in_spmin = 1024;
-				  nat->in_spmax = 65535;
-				}
+					{ nat->in_flags |= IPN_AUTOPORTMAP;
+					  nat->in_spmin = 1024;
+					  nat->in_spmax = 65535;
+					}
 	| IPNY_ICMPIDMAP YY_STR portpair sequential
 			{ if (strcmp($2, "icmp") != 0) {
 				yyerror("icmpidmap not followed by icmp");
@@ -932,15 +904,12 @@ daddr:	addr				{ nat->in_odstatype = $1.t;
 	;
 
 addr:	IPNY_ANY			{ yyexpectaddr = 0;
-					  bzero(&$$.a, sizeof($$.a));
-					  bzero(&$$.m, sizeof($$.a));
+					  bzero(&$$, sizeof($$));
 					  $$.t = FRI_NORMAL;
-					  $$.f = NA_NORMAL;
-					  $$.v = 0;
 					}
-	| hostname			{ $$.a = $1.a;
+	| hostname			{ bzero(&$$, sizeof($$));
+					  $$.a = $1.a;
 					  $$.t = FRI_NORMAL;
-					  $$.f = NA_NORMAL;
 					  $$.v = $1.v;
 					  if ($$.v == 4) {
 						  $$.m.in4.s_addr = 0xffffffff;
@@ -953,9 +922,9 @@ addr:	IPNY_ANY			{ yyexpectaddr = 0;
 					  yyexpectaddr = 0;
 					}
 	| hostname slash YY_NUMBER
-					{ $$.a = $1.a;
+					{ bzero(&$$, sizeof($$));
+					  $$.a = $1.a;
 					  $$.t = FRI_NORMAL;
-					  $$.f = NA_NORMAL;
 					  if ($1.v == 4)
 						  ntomask(AF_INET, $3,
 							  (u_32_t *)&$$.m);
@@ -969,14 +938,14 @@ addr:	IPNY_ANY			{ yyexpectaddr = 0;
 					  $$.v = $1.v;
 					  yyexpectaddr = 0;
 					}
-	| hostname slash ipaddr		{ if ($1.v != $3.v) {
+	| hostname slash ipaddr		{ bzero(&$$, sizeof($$));
+					  if ($1.v != $3.v) {
 						yyerror("1.address family "
 							"mismatch");
 					  }
 					  $$.a = $1.a;
 					  $$.m = $3.a;
 					  $$.t = FRI_NORMAL;
-					  $$.f = NA_NORMAL;
 					  $$.a.i6[0] &= $$.m.i6[0];
 					  $$.a.i6[1] &= $$.m.i6[1];
 					  $$.a.i6[2] &= $$.m.i6[2];
@@ -984,21 +953,21 @@ addr:	IPNY_ANY			{ yyexpectaddr = 0;
 					  $$.v = $1.v;
 					  yyexpectaddr = 0;
 					}
-	| hostname slash hexnumber	{ $$.a = $1.a;
+	| hostname slash hexnumber	{ bzero(&$$, sizeof($$));
+					  $$.a = $1.a;
 					  $$.m.in4.s_addr = htonl($3);
 					  $$.t = FRI_NORMAL;
-					  $$.f = NA_NORMAL;
 					  $$.a.in4.s_addr &= $$.m.in4.s_addr;
 					  $$.v = 4;
 					}
-	| hostname mask ipaddr		{ if ($1.v != $3.v) {
+	| hostname mask ipaddr		{ bzero(&$$, sizeof($$));
+					  if ($1.v != $3.v) {
 						yyerror("2.address family "
 							"mismatch");
 					  }
 					  $$.a = $1.a;
 					  $$.m = $3.a;
 					  $$.t = FRI_NORMAL;
-					  $$.f = NA_NORMAL;
 					  $$.a.i6[0] &= $$.m.i6[0];
 					  $$.a.i6[1] &= $$.m.i6[1];
 					  $$.a.i6[2] &= $$.m.i6[2];
@@ -1006,38 +975,36 @@ addr:	IPNY_ANY			{ yyexpectaddr = 0;
 					  $$.v = $1.v;
 					  yyexpectaddr = 0;
 					}
-	| hostname mask hexnumber	{ $$.a = $1.a;
+	| hostname mask hexnumber	{ bzero(&$$, sizeof($$));
+					  $$.a = $1.a;
 					  $$.m.in4.s_addr = htonl($3);
 					  $$.t = FRI_NORMAL;
-					  $$.f = NA_NORMAL;
 					  $$.a.in4.s_addr &= $$.m.in4.s_addr;
 					  $$.v = 4;
 					}
-	| pool slash YY_NUMBER		{ $$.a.iplookupnum = $3;
+	| pool slash YY_NUMBER		{ bzero(&$$, sizeof($$));
+					  $$.a.iplookupnum = $3;
 					  $$.a.iplookuptype = IPLT_POOL;
 					  $$.a.iplookupsubtype = 0;
 					  $$.t = FRI_LOOKUP;
-					  $$.f = NA_NORMAL;
 					}
-	| pool slash YY_STR		{ strncpy($$.a.iplookupname, $3,
-						  sizeof($$.a.iplookupnum));
+	| pool slash YY_STR		{ bzero(&$$, sizeof($$));
+					  $$.a.iplookupname = addname(&nat,$3);
 					  $$.a.iplookuptype = IPLT_POOL;
 					  $$.a.iplookupsubtype = 1;
 					  $$.t = FRI_LOOKUP;
-					  $$.f = NA_NORMAL;
 					}
-	| hash slash YY_NUMBER		{ $$.a.iplookupnum = $3;
+	| hash slash YY_NUMBER		{ bzero(&$$, sizeof($$));
+					  $$.a.iplookupnum = $3;
 					  $$.a.iplookuptype = IPLT_HASH;
 					  $$.a.iplookupsubtype = 0;
 					  $$.t = FRI_LOOKUP;
-					  $$.f = NA_NORMAL;
 					}
-	| hash slash YY_STR		{ strncpy($$.a.iplookupname, $3,
-						  sizeof($$.a.iplookupnum));
+	| hash slash YY_STR		{ bzero(&$$, sizeof($$));
+					  $$.a.iplookupname = addname(&nat,$3);
 					  $$.a.iplookuptype = IPLT_HASH;
 					  $$.a.iplookupsubtype = 1;
 					  $$.t = FRI_LOOKUP;
-					  $$.f = NA_NORMAL;
 					}
 	;
 
@@ -1093,7 +1060,7 @@ age:	| IPNY_AGE YY_NUMBER			{ nat->in_age[0] = $2;
 
 sticky: | IPNY_STICKY			{ if (!(nat->in_flags & IPN_ROUNDR) &&
 					      !(nat->in_flags & IPN_SPLIT)) {
-						fprintf(stderr,
+						FPRINTF(stderr,
 		"'sticky' for use with round-robin/IP splitting only\n");
 					  } else
 						nat->in_flags |= IPN_STICKY;
@@ -1122,13 +1089,14 @@ sequential:
 
 rdrproxy:
 	IPNY_PROXY YY_STR
-				{ strncpy(nat->in_plabel, $2,
-					  sizeof(nat->in_plabel));
-				  nat->in_odport = nat->in_dpnext;
-				  nat->in_dtop = nat->in_odport;
-				  free($2);
-				}
-	| proxy			{ if (nat->in_plabel[0] != '\0') {
+					{ int pos;
+					  pos = addname(&nat, $2);
+					  nat->in_plabel = pos;
+					  nat->in_odport = nat->in_dpnext;
+					  nat->in_dtop = nat->in_odport;
+					  free($2);
+					}
+	| proxy			{ if (nat->in_plabel != -1) {
 					nat->in_ndport = nat->in_odport;
 					nat->in_dpmin = nat->in_odport;
 					nat->in_dpmax = nat->in_dpmin;
@@ -1157,7 +1125,8 @@ hexnumber:
 	;
 
 hostname:
-	YY_STR				{ i6addr_t addr;
+	YY_STR				{ bzero(&$$, sizeof($$));
+					  i6addr_t addr;
 					  if (gethost(4, $1, &addr) == 0) {
 						$$.a = addr;
 						$$.v = 4;
@@ -1166,21 +1135,24 @@ hostname:
 						$$.a = addr;
 						$$.v = 6;
 					  } else {
-						fprintf(stderr,
+						FPRINTF(stderr,
 							"Unknown host '%s'\n",
 							$1);
 					  }
 					  free($1);
 					}
-	| YY_NUMBER			{ $$.a.in4.s_addr = htonl($1);
+	| YY_NUMBER			{ bzero(&$$, sizeof($$));
+					  $$.a.in4.s_addr = htonl($1);
 					  if ($$.a.in4.s_addr != 0)
 						$$.v = 4;
 					}
 	| ipv4				{ $$ = $1; }
-	| YY_IPV6			{ $$.a = $1;
+	| YY_IPV6			{ bzero(&$$, sizeof($$));
+					  $$.a = $1;
 					  $$.v = 6;
 					}
-	| YY_NUMBER YY_IPV6		{ $$.a = $2;
+	| YY_NUMBER YY_IPV6		{ bzero(&$$, sizeof($$));
+					  $$.a = $2;
 					  $$.v = 6;
 					}
 	;
@@ -1211,6 +1183,7 @@ ipv4:	YY_NUMBER '.' YY_NUMBER '.' YY_NUMBER '.' YY_NUMBER
 			yyerror("Invalid octet string for IP address");
 			return 0;
 		  }
+		  bzero((char *)&$$, sizeof($$));
 		  $$.a.in4.s_addr = ($1 << 24) | ($3 << 16) | ($5 << 8) | $7;
 		  $$.a.in4.s_addr = htonl($$.a.in4.s_addr);
 		  $$.v = 4;
@@ -1241,6 +1214,7 @@ static	wordtab_t	yywords[] = {
 	{ "config",	IPNY_CONFIG },
 	{ "divert",	IPNY_DIVERT },
 	{ "dst",	IPNY_DST },
+	{ "dstlist",	IPNY_DSTLIST },
 	{ "encap",	IPNY_ENCAP },
 	{ "frag",	IPNY_FRAG },
 	{ "from",	IPNY_FROM },
@@ -1287,11 +1261,12 @@ static	wordtab_t	yywords[] = {
 };
 
 
-int ipnat_parsefile(fd, addfunc, ioctlfunc, filename)
-int fd;
-addfunc_t addfunc;
-ioctlfunc_t ioctlfunc;
-char *filename;
+int
+ipnat_parsefile(fd, addfunc, ioctlfunc, filename)
+	int fd;
+	addfunc_t addfunc;
+	ioctlfunc_t ioctlfunc;
+	char *filename;
 {
 	FILE *fp = NULL;
 	char *s;
@@ -1307,7 +1282,7 @@ char *filename;
 	if (strcmp(filename, "-")) {
 		fp = fopen(filename, "r");
 		if (!fp) {
-			fprintf(stderr, "fopen(%s) failed: %s\n", filename,
+			FPRINTF(stderr, "fopen(%s) failed: %s\n", filename,
 				STRERROR(errno));
 			return -1;
 		}
@@ -1322,11 +1297,12 @@ char *filename;
 }
 
 
-int ipnat_parsesome(fd, addfunc, ioctlfunc, fp)
-int fd;
-addfunc_t addfunc;
-ioctlfunc_t ioctlfunc;
-FILE *fp;
+int
+ipnat_parsesome(fd, addfunc, ioctlfunc, fp)
+	int fd;
+	addfunc_t addfunc;
+	ioctlfunc_t ioctlfunc;
+	FILE *fp;
 {
 	char *s;
 	int i;
@@ -1358,7 +1334,8 @@ FILE *fp;
 }
 
 
-static void newnatrule()
+static void
+newnatrule()
 {
 	ipnat_t *n;
 
@@ -1366,22 +1343,28 @@ static void newnatrule()
 	if (n == NULL)
 		return;
 
-	n->in_osrcatype = FRI_NONE;
-	n->in_odstatype = FRI_NONE;
-
-	if (nat == NULL)
+	if (nat == NULL) {
 		nattop = nat = n;
-	else {
+		n->in_pnext = &nattop;
+	} else {
 		nat->in_next = n;
+		n->in_pnext = &nat->in_next;
 		nat = n;
 	}
+
+	n->in_ifnames[0] = -1;
+	n->in_ifnames[1] = -1;
+	n->in_plabel = -1;
+	n->in_pconfig = -1;
+	n->in_size = sizeof(*n);
 
 	suggest_port = 0;
 }
 
 
-static void setnatproto(p)
-int p;
+static void
+setnatproto(p)
+	int p;
 {
 	nat->in_pr[0] = p;
 	nat->in_pr[1] = p;
@@ -1430,19 +1413,21 @@ int p;
 }
 
 
-void ipnat_addrule(fd, ioctlfunc, ptr)
-int fd;
-ioctlfunc_t ioctlfunc;
-void *ptr;
+void
+ipnat_addrule(fd, ioctlfunc, ptr)
+	int fd;
+	ioctlfunc_t ioctlfunc;
+	void *ptr;
 {
 	ioctlcmd_t add, del;
+	int save, realerr;
 	ipfobj_t obj;
 	ipnat_t *ipn;
 
 	ipn = ptr;
 	bzero((char *)&obj, sizeof(obj));
 	obj.ipfo_rev = IPFILTER_VERSION;
-	obj.ipfo_size = sizeof(ipnat_t);
+	obj.ipfo_size = ipn->in_size;
 	obj.ipfo_type = IPFOBJ_IPNAT;
 	obj.ipfo_ptr = ptr;
 	add = 0;
@@ -1469,48 +1454,63 @@ void *ptr;
 
 	if ((opts & OPT_ZERORULEST) != 0) {
 		if ((*ioctlfunc)(fd, add, (void *)&obj) == -1) {
+			save = errno;
+
+			if ((*ioctlfunc)(fd, SIOCIPFINTERROR, &realerr))
+				realerr = 0;
+
 			if ((opts & OPT_DONOTHING) == 0) {
-				fprintf(stderr, "%d:", yylineNum);
-				perror("ioctl(SIOCZRLST)");
+				FPRINTF(stderr, "%d:%d:", realerr, yylineNum);
+				errno = save;
+				ipf_perror(realerr, "ioctl(SIOCZRLST)");
 			}
 		} else {
-#ifdef	USE_QUAD_T
-/*
-			printf("hits %qd bytes %qd ",
-				(long long)fr->fr_hits,
-				(long long)fr->fr_bytes);
-*/
+			PRINTF("hits %lu ", ipn->in_hits);
+#ifdef USE_QUAD_T
+			PRINTF("bytes %qu ",
+			       ipn->in_bytes[0] + ipn->in_bytes[1]);
 #else
-/*
-			printf("hits %ld bytes %ld ",
-				fr->fr_hits, fr->fr_bytes);
-*/
+			PRINTF("bytes %lu ",
+			       ipn->in_bytes[0] + ipn->in_bytes[1]);
 #endif
 			printnat(ipn, opts);
 		}
 	} else if ((opts & OPT_REMOVE) != 0) {
 		if ((*ioctlfunc)(fd, del, (void *)&obj) == -1) {
+			save = errno;
+
+			if ((*ioctlfunc)(fd, SIOCIPFINTERROR, &realerr))
+				realerr = 0;
+
 			if ((opts & OPT_DONOTHING) == 0) {
-				fprintf(stderr, "%d:", yylineNum);
-				perror("ioctl(delete nat rule)");
+				FPRINTF(stderr, "%d:%d:", realerr, yylineNum);
+				errno = save;
+				ipf_perror(realerr, "ioctl(delete nat rule)");
 			}
 		}
 	} else {
 		if ((*ioctlfunc)(fd, add, (void *)&obj) == -1) {
+			save = errno;
+
+			if ((*ioctlfunc)(fd, SIOCIPFINTERROR, &realerr))
+				realerr = 0;
+
 			if ((opts & OPT_DONOTHING) == 0) {
-				fprintf(stderr, "%d:", yylineNum);
-				perror("ioctl(add/insert nat rule)");
+				FPRINTF(stderr, "%d:%d:", realerr, yylineNum);
+				errno = save;
+				ipf_perror(realerr,
+					   "ioctl(add/insert nat rule)");
 			}
 		}
 	}
 }
 
 
-void setmapifnames()
+static void
+setmapifnames()
 {
-	if (nat->in_ifnames[1][0] == '\0')
-		strncpy(nat->in_ifnames[1], nat->in_ifnames[0],
-			sizeof(nat->in_ifnames[0]));
+	if (nat->in_ifnames[1] == -1)
+		nat->in_ifnames[1] = nat->in_ifnames[0];
 
 	if ((suggest_port == 1) && (nat->in_flags & IPN_TCPUDP) == 0)
 		nat->in_flags |= IPN_TCPUDP;
@@ -1524,7 +1524,8 @@ void setmapifnames()
 }
 
 
-void setrdrifnames()
+static void
+setrdrifnames()
 {
 	if ((suggest_port == 1) && (nat->in_flags & IPN_TCPUDP) == 0)
 		nat->in_flags |= IPN_TCPUDP;
@@ -1533,14 +1534,14 @@ void setrdrifnames()
 	    (nat->in_dpmin != 0 || nat->in_dpmax != 0 || nat->in_dpnext != 0))
 		setnatproto(IPPROTO_TCP);
 
-	if (nat->in_ifnames[1][0] == '\0')
-		strncpy(nat->in_ifnames[1], nat->in_ifnames[0],
-			sizeof(nat->in_ifnames[0]));
+	if (nat->in_ifnames[1] == -1)
+		nat->in_ifnames[1] = nat->in_ifnames[0];
 }
 
 
-static void proxy_setconfig(proxy)
-int proxy;
+static void
+proxy_setconfig(proxy)
+	int proxy;
 {
 	if (proxy == IPNY_DNS) {
 		yysetfixeddict(dnswords);
@@ -1548,14 +1549,16 @@ int proxy;
 }
 
 
-static void proxy_unsetconfig()
+static void
+proxy_unsetconfig()
 {
 	yyresetdict();
 }
 
 
-static namelist_t *proxy_dns_add_pass(prefix, name)
-char *prefix, *name;
+static namelist_t *
+proxy_dns_add_pass(prefix, name)
+	char *prefix, *name;
 {
 	namelist_t *n;
 
@@ -1573,8 +1576,9 @@ char *prefix, *name;
 }
 
 
-static namelist_t *proxy_dns_add_block(prefix, name)
-char *prefix, *name;
+static namelist_t *
+proxy_dns_add_block(prefix, name)
+	char *prefix, *name;
 {
 	namelist_t *n;
 
@@ -1593,10 +1597,11 @@ char *prefix, *name;
 }
 
 
-static void proxy_addconfig(proxy, proto, conf, list)
-char *proxy, *conf;
-int proto;
-namelist_t *list;
+static void
+proxy_addconfig(proxy, proto, conf, list)
+	char *proxy, *conf;
+	int proto;
+	namelist_t *list;
 {
 	proxyrule_t *pr;
 
@@ -1612,10 +1617,11 @@ namelist_t *list;
 }
 
 
-static void proxy_loadrules(fd, ioctlfunc, rules)
-int fd;
-ioctlfunc_t ioctlfunc;
-proxyrule_t *rules;
+static void
+proxy_loadrules(fd, ioctlfunc, rules)
+	int fd;
+	ioctlfunc_t ioctlfunc;
+	proxyrule_t *rules;
 {
 	proxyrule_t *pr;
 
@@ -1629,13 +1635,15 @@ proxyrule_t *rules;
 }
 
 
-static void proxy_loadconfig(fd, ioctlfunc, proxy, proto, conf, list)
-int fd;
-ioctlfunc_t ioctlfunc;
-char *proxy, *conf;
-int proto;
-namelist_t *list;
+static void
+proxy_loadconfig(fd, ioctlfunc, proxy, proto, conf, list)
+	int fd;
+	ioctlfunc_t ioctlfunc;
+	char *proxy, *conf;
+	int proto;
+	namelist_t *list;
 {
+	int realerr, save;
 	namelist_t *na;
 	ipfobj_t obj;
 	ap_ctl_t pcmd;
@@ -1662,9 +1670,16 @@ namelist_t *list;
 		pcmd.apc_config[APR_LABELLEN - 1] = '\0';
 
 		if ((*ioctlfunc)(fd, SIOCPROXY, (void *)&obj) == -1) {
+			save = errno;
+
+			if ((*ioctlfunc)(fd, SIOCIPFINTERROR, &realerr))
+				realerr = 0;
+
 			if ((opts & OPT_DONOTHING) == 0) {
-				fprintf(stderr, "%d:", yylineNum);
-				perror("ioctl(add/remm proxy rule)");
+				FPRINTF(stderr, "%d:%d:", realerr, yylineNum);
+				errno = save;
+				ipf_perror(realerr,
+					   "ioctl(add/remm proxy rule)");
 			}
 		}
 
@@ -1672,4 +1687,46 @@ namelist_t *list;
 		free(na->na_name);
 		free(na);
 	}
+}
+
+
+static void
+setifname(np, idx, name)
+	ipnat_t **np;
+	int idx;
+	char *name;
+{
+	int pos;
+
+	pos = addname(np, name);
+	if (pos == -1)
+		return;
+	(*np)->in_ifnames[idx] = pos;
+}
+
+
+static int
+addname(np, name)
+	ipnat_t **np;
+	char *name;
+{
+	ipnat_t *n;
+	int nlen;
+	int pos;
+
+	nlen = strlen(name) + 1;
+	n = realloc(*np, (*np)->in_size + nlen);
+	if (*np == nattop)
+		nattop = n;
+	*np = n;
+	if (n == NULL)
+		return -1;
+	if (n->in_pnext != NULL)
+		*n->in_pnext = n;
+	n->in_size += nlen;
+	pos = n->in_namelen;
+	n->in_namelen += nlen;
+	strcpy(n->in_names + pos, name);
+	n->in_names[n->in_namelen] = '\0';
+	return pos;
 }

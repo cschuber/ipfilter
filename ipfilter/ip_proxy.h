@@ -195,12 +195,12 @@ typedef	struct	ircinfo {
 
 
 /*
- * For the rcmd proxy.
+ * For the rcmd proxy. rcmd_rule must be last for names in ipnat_t
  */
 typedef	struct rcmdinfo	{
-	ipnat_t	rcmd_rule;	/* Template rule for back connection */
 	u_32_t	rcmd_port;	/* Port number seen */
 	u_32_t	rcmd_portseq;	/* Sequence number where port is first seen */
+	ipnat_t	rcmd_rule;	/* Template rule for back connection */
 } rcmdinfo_t;
 
 /*
@@ -258,7 +258,7 @@ typedef	struct	msnrpcinfo	{
 
 
 /*
- * IPSec proxy
+ * IPSec proxy. ipsc_rule must be last for names in ipnat_t
  */
 typedef	u_32_t	ipsec_cookie_t[2];
 
@@ -266,13 +266,13 @@ typedef struct ipsec_pxy {
 	ipsec_cookie_t	ipsc_icookie;
 	ipsec_cookie_t	ipsc_rcookie;
 	int		ipsc_rckset;
-	ipnat_t		ipsc_rule;
 	nat_t		*ipsc_nat;
 	struct ipstate	*ipsc_state;
+	ipnat_t		ipsc_rule;
 } ipsec_pxy_t;
 
 /*
- * PPTP proxy
+ * PPTP proxy. pptp_rule must be last for names in ipnat_t
  */
 typedef	struct pptp_side {
 	u_32_t		pptps_nexthdr;
@@ -286,11 +286,11 @@ typedef	struct pptp_side {
 } pptp_side_t;
 
 typedef	struct pptp_pxy {
-	ipnat_t		pptp_rule;
 	nat_t		*pptp_nat;
 	struct ipstate 	*pptp_state;
 	u_short		pptp_call[2];
 	pptp_side_t	pptp_side[2];
+	ipnat_t		pptp_rule;
 } pptp_pxy_t;
 
 

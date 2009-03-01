@@ -12,10 +12,9 @@
 #include "netinet/ip_lookup.h"
 #include "netinet/ip_htable.h"
 
-static int hashfd = -1;
 
-
-int load_hash(iphp, list, iocfunc)
+int
+load_hash(iphp, list, iocfunc)
 	iphtable_t *iphp;
 	iphtent_t *list;
 	ioctlfunc_t iocfunc;
@@ -26,9 +25,7 @@ int load_hash(iphp, list, iocfunc)
 	size_t size;
 	int n;
 
-	if ((hashfd == -1) && ((opts & OPT_DONOTHING) == 0))
-		hashfd = open(IPLOOKUP_NAME, O_RDWR);
-	if ((hashfd == -1) && ((opts & OPT_DONOTHING) == 0))
+	if (pool_open() == -1)
 		return -1;
 
 	for (n = 0, a = list; a != NULL; a = a->ipe_next)
@@ -65,7 +62,7 @@ int load_hash(iphp, list, iocfunc)
 	iph.iph_ref = 0;
 
 	if ((opts & OPT_REMOVE) == 0) {
-		if ((*iocfunc)(hashfd, SIOCLOOKUPADDTABLE, &op))
+		if (pool_ioctl(iocfunc, SIOCLOOKUPADDTABLE, &op))
 			if ((opts & OPT_DONOTHING) == 0) {
 				perror("load_hash:SIOCLOOKUPADDTABLE");
 				return -1;
@@ -103,7 +100,7 @@ int load_hash(iphp, list, iocfunc)
 		load_hashnode(iphp->iph_unit, iph.iph_name, a, 0, iocfunc);
 
 	if ((opts & OPT_REMOVE) != 0) {
-		if ((*iocfunc)(hashfd, SIOCLOOKUPDELTABLE, &op))
+		if (pool_ioctl(iocfunc, SIOCLOOKUPDELTABLE, &op))
 			if ((opts & OPT_DONOTHING) == 0) {
 				perror("load_hash:SIOCLOOKUPDELTABLE");
 				return -1;

@@ -26,7 +26,7 @@ ipfmutex_t	ipf_nat_new, ipf_natio, ipf_timeoutlock;
 ipfrwlock_t	ipf_mutex, ipf_global, ipf_ipidfrag, ip_poolrw, ipf_frcache;
 ipfrwlock_t	ipf_frag, ipf_state, ipf_nat, ipf_natfrag, ipf_authlk;
 ipfrwlock_t	ipf_tokens;
-int	opts = OPT_DONOTHING;
+int	opts = OPT_DONTOPEN;
 int	use_inet6 = 0;
 int	docksum = 0;
 int	pfil_delayed_copy = 0;

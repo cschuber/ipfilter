@@ -12,19 +12,16 @@
 #include "netinet/ip_lookup.h"
 #include "netinet/ip_htable.h"
 
-static int poolfd = -1;
 
-
-int remove_pool(poolp, iocfunc)
+int
+remove_pool(poolp, iocfunc)
 	ip_pool_t *poolp;
 	ioctlfunc_t iocfunc;
 {
 	iplookupop_t op;
 	ip_pool_t pool;
 
-	if ((poolfd == -1) && ((opts & OPT_DONOTHING) == 0))
-		poolfd = open(IPLOOKUP_NAME, O_RDWR);
-	if ((poolfd == -1) && ((opts & OPT_DONOTHING) == 0))
+	if (pool_open() == -1)
 		return -1;
 
 	op.iplo_type = IPLT_POOL;
@@ -38,7 +35,7 @@ int remove_pool(poolp, iocfunc)
 	strncpy(pool.ipo_name, poolp->ipo_name, sizeof(pool.ipo_name));
 	pool.ipo_flags = poolp->ipo_flags;
 
-	if ((*iocfunc)(poolfd, SIOCLOOKUPDELTABLE, &op))
+	if (pool_ioctl(iocfunc, SIOCLOOKUPDELTABLE, &op))
 		if ((opts & OPT_DONOTHING) == 0) {
 			perror("remove_pool:SIOCLOOKUPDELTABLE");
 			return -1;

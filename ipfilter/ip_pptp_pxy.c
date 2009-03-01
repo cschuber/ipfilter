@@ -101,9 +101,10 @@ ipf_p_pptp_new(arg, fin, aps, nat)
 			printf("ipf_p_pptp_new: GRE session already exists\n");
 		return -1;
 	}
+	np = nat->nat_ptr;
 
 	aps->aps_psiz = sizeof(*pptp);
-	KMALLOCS(aps->aps_data, pptp_pxy_t *, sizeof(*pptp));
+	KMALLOCS(aps->aps_data, pptp_pxy_t *, sizeof(*pptp) + np->in_namelen);
 	if (aps->aps_data == NULL) {
 		if (ipf_p_pptp_debug > 0)
 			printf("ipf_p_pptp_new: malloc for aps_data failed\n");
@@ -115,7 +116,6 @@ ipf_p_pptp_new(arg, fin, aps, nat)
 	 * created.  This is required because the current NAT rule does not
 	 * describe GRE but TCP instead.
 	 */
-	np = nat->nat_ptr;
 	pptp = aps->aps_data;
 	bzero((char *)pptp, sizeof(*pptp));
 	ipn = &pptp->pptp_rule;
@@ -137,10 +137,10 @@ ipf_p_pptp_new(arg, fin, aps, nat)
 	ipn->in_ndstmsk = 0xffffffff;
 	MUTEX_INIT(&ipn->in_lock, "pptp proxy NAT rule");
 
-	bcopy(np->in_ifnames[0], ipn->in_ifnames[0],
-	      sizeof(ipn->in_ifnames[0]));
-	bcopy(np->in_ifnames[1], ipn->in_ifnames[1],
-	      sizeof(ipn->in_ifnames[1]));
+	ipn->in_namelen = np->in_namelen;
+	bcopy(np->in_names, ipn->in_ifnames, ipn->in_namelen);
+	ipn->in_ifnames[0] = np->in_ifnames[0];
+	ipn->in_ifnames[1] = np->in_ifnames[1];
 
 	ipn->in_pr[0] = IPPROTO_GRE;
 	ipn->in_pr[1] = IPPROTO_GRE;

@@ -12,37 +12,56 @@
 typedef struct ipf_dstnode {
 	struct ipf_dstnode	*ipfd_next;
 	struct ipf_dstnode	**ipfd_pnext;
+	ipfmutex_t		*ipfd_plock;
 	ipfmutex_t		ipfd_lock;
 	frdest_t		ipfd_dest;
-	U_QUAD_T		ipfd_bytes;
+	int			ipfd_flags;
+	int			ipfd_size;
 	int			ipfd_states;
 	int			ipfd_ref;
 	int			ipfd_uid;
-	ipfmutex_t		*ipfd_plock;
+	char			ipfd_names[1];
 } ipf_dstnode_t;
 
 typedef enum ippool_policy_e {
 	IPLDP_NONE = 0,
 	IPLDP_ROUNDROBIN,
 	IPLDP_CONNECTION,
-	IPLDP_BYTES
+	IPLDP_RANDOM,
+	IPLDP_HASHED,
+	IPLDP_SRCHASH,
+	IPLDP_DSTHASH
 } ippool_policy_t;
 
 typedef struct ippool_dst {
 	struct ippool_dst	*ipld_next;
 	struct ippool_dst	**ipld_pnext;
 	ipfmutex_t		ipld_lock;
-	char			*ipld_name;
+	int			ipld_seed;
 	int			ipld_unit;
 	int			ipld_ref;
 	int			ipld_flags;
+	int			ipld_nodes;
+	int			ipld_maxnodes;
 	ippool_policy_t		ipld_policy;
-	ipf_dstnode_t		*ipld_dests;
+	ipf_dstnode_t		**ipld_dests;
 	ipf_dstnode_t		*ipld_selected;
+	char			ipld_name[FR_GROUPLEN];
 } ippool_dst_t;
 
 #define	IPDST_DELETE		0x01
 
+typedef	struct dstlist_stat_s {
+	void			*ipls_list[IPL_LOGMAX];
+	int			ipls_numlists;
+	u_long			ipls_nomem;
+	int			ipls_numnodes;
+	int			ipls_numdereflists;
+	int			ipls_numderefnodes;
+} ipf_dstl_stat_t;
+
 extern ipf_lookup_t ipf_dstlist_backend;
+
+extern int ipf_dstlist_select_node __P((fr_info_t *, void *, u_32_t *));
 
 #endif /* __IP_DSTLIST_H__ */

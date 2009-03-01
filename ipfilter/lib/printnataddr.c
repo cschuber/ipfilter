@@ -16,26 +16,27 @@ static const char rcsid[] = "@(#)$Id$";
 
 
 void
-printnataddr(v, addr, ifname)
+printnataddr(v, base, addr, ifidx)
 	int v;
+	char *base;
 	nat_addr_t *addr;
-	char *ifname;
+	int ifidx;
 {
 	switch (v)
 	{
 	case 4 :
 		if (addr->na_atype == FRI_NORMAL &&
 		    addr->na_addr[0].in4.s_addr == 0) {
-			printf("0/%d", count4bits(addr->na_addr[1].in4.s_addr));
+			PRINTF("0/%d", count4bits(addr->na_addr[1].in4.s_addr));
 		} else {
-			printaddr(AF_INET, addr->na_atype, ifname,
+			printaddr(AF_INET, addr->na_atype, base, ifidx,
 				  (u_32_t *)&addr->na_addr[0].in4.s_addr,
 				  (u_32_t *)&addr->na_addr[1].in4.s_addr);
 		}
 		break;
 #ifdef USE_INET6
 	case 6 :
-		printaddr(AF_INET6, addr->na_atype, ifname,
+		printaddr(AF_INET6, addr->na_atype, base, ifidx,
 			  (u_32_t *)&addr->na_addr[0].in6,
 			  (u_32_t *)&addr->na_addr[1].in6);
 		break;

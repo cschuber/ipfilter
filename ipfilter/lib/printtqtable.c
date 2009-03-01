@@ -9,17 +9,18 @@
 #include "ipf.h"
 
 
-void printtqtable(table)
+void
+printtqtable(table)
 	ipftq_t *table;
 {
 	int i;
 
-	printf("TCP Entries per state\n");
+	PRINTF("TCP Entries per state\n");
 	for (i = 0; i < IPF_TCP_NSTATES; i++)
-		printf(" %5d", i);
-	printf("\n");
+		PRINTF(" %5d", i);
+	PRINTF("\n");
 
 	for (i = 0; i < IPF_TCP_NSTATES; i++)
-		printf(" %5d", table[i].ifq_ref - 1);
-	printf("\n");
+		PRINTF(" %5d", table[i].ifq_ref - 1);
+	PRINTF("\n");
 }

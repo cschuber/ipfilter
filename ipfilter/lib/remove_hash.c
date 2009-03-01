@@ -12,19 +12,16 @@
 #include "netinet/ip_lookup.h"
 #include "netinet/ip_htable.h"
 
-static int hashfd = -1;
 
-
-int remove_hash(iphp, iocfunc)
+int
+remove_hash(iphp, iocfunc)
 	iphtable_t *iphp;
 	ioctlfunc_t iocfunc;
 {
 	iplookupop_t op;
 	iphtable_t iph;
 
-	if ((hashfd == -1) && ((opts & OPT_DONOTHING) == 0))
-		hashfd = open(IPLOOKUP_NAME, O_RDWR);
-	if ((hashfd == -1) && ((opts & OPT_DONOTHING) == 0))
+	if (pool_open() == -1)
 		return -1;
 
 	op.iplo_type = IPLT_HASH;
@@ -41,7 +38,7 @@ int remove_hash(iphp, iocfunc)
 	strncpy(iph.iph_name, iphp->iph_name, sizeof(iph.iph_name));
 	iph.iph_flags = iphp->iph_flags;
 
-	if ((*iocfunc)(hashfd, SIOCLOOKUPDELTABLE, &op))
+	if (pool_ioctl(iocfunc, SIOCLOOKUPDELTABLE, &op))
 		if ((opts & OPT_DONOTHING) == 0) {
 			perror("remove_hash:SIOCLOOKUPDELTABLE");
 			return -1;

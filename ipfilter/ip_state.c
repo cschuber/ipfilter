@@ -983,9 +983,16 @@ ipf_state_putent(softc, softs, data)
 		 * Look up all the interface names in the rule.
 		 */
 		for (i = 0; i < 4; i++) {
-			name = fr->fr_ifnames[i];
+			if (fr->fr_ifnames[i] == -1) {
+				fr->fr_ifas[i] = NULL;
+				continue;
+			}
+			name = fr->fr_names + fr->fr_ifnames[i];
 			fr->fr_ifas[i] = ipf_resolvenic(softc, name,
 							fr->fr_family);
+		}
+
+		for (i = 0; i < 4; i++) {
 			name = isn->is_ifname[i];
 			isn->is_ifp[i] = ipf_resolvenic(softc, name,
 							isn->is_v);
@@ -996,9 +1003,12 @@ ipf_state_putent(softc, softs, data)
 		fr->fr_data = NULL;
 		fr->fr_type = FR_T_NONE;
 
-		ipf_resolvedest(softc, &fr->fr_tifs[0], fr->fr_family);
-		ipf_resolvedest(softc, &fr->fr_tifs[1], fr->fr_family);
-		ipf_resolvedest(softc, &fr->fr_dif, fr->fr_family);
+		ipf_resolvedest(softc, fr->fr_names, &fr->fr_tifs[0],
+				fr->fr_family);
+		ipf_resolvedest(softc, fr->fr_names, &fr->fr_tifs[1],
+				fr->fr_family);
+		ipf_resolvedest(softc, fr->fr_names, &fr->fr_dif,
+				fr->fr_family);
 
 		/*
 		 * send a copy back to userland of what we ended up
@@ -1824,7 +1834,8 @@ ipf_state_add(softc, fin, stsave, flags)
 	if (fr != NULL) {
 		ipftq_t *tq;
 
-		(void) strncpy(is->is_group, fr->fr_group, FR_GROUPLEN);
+		(void) strncpy(is->is_group, FR_NAME(fr, fr_group),
+			       FR_GROUPLEN);
 		if (fr->fr_age[0] != 0) {
 			tq = ipf_addtimeoutqueue(softc,
 						 &softs->ipf_state_usertq,
@@ -1848,10 +1859,12 @@ ipf_state_add(softc, fin, stsave, flags)
 		 * match it, regardless of their interface.
 		 */
 		if ((fin->fin_ifp == NULL) ||
-		    (fr->fr_ifnames[out << 1][0] == '-' &&
-		     fr->fr_ifnames[out << 1][1] == '\0')) {
+		    (fr->fr_ifnames[out << 1] != -1 &&
+		     fr->fr_names[fr->fr_ifnames[out << 1] + 0] == '-' &&
+		     fr->fr_names[fr->fr_ifnames[out << 1] + 1] == '\0')) {
 			is->is_ifp[out << 1] = fr->fr_ifas[0];
-			strncpy(is->is_ifname[out << 1], fr->fr_ifnames[0],
+			strncpy(is->is_ifname[out << 1],
+				fr->fr_names + fr->fr_ifnames[0],
 				sizeof(fr->fr_ifnames[0]));
 		} else {
 			is->is_ifp[out << 1] = fin->fin_ifp;
@@ -1860,16 +1873,25 @@ ipf_state_add(softc, fin, stsave, flags)
 		}
 
 		is->is_ifp[(out << 1) + 1] = fr->fr_ifas[1];
-		strncpy(is->is_ifname[(out << 1) + 1], fr->fr_ifnames[1],
-			sizeof(fr->fr_ifnames[1]));
+		if (fr->fr_ifnames[1] != -1) {
+			strncpy(is->is_ifname[(out << 1) + 1],
+				fr->fr_names + fr->fr_ifnames[1],
+				sizeof(fr->fr_ifnames[1]));
+		}
 
 		is->is_ifp[(1 - out) << 1] = fr->fr_ifas[2];
-		strncpy(is->is_ifname[((1 - out) << 1)], fr->fr_ifnames[2],
-			sizeof(fr->fr_ifnames[2]));
+		if (fr->fr_ifnames[2] != -1) {
+			strncpy(is->is_ifname[((1 - out) << 1)],
+				fr->fr_names + fr->fr_ifnames[2],
+				sizeof(fr->fr_ifnames[2]));
+		}
 
 		is->is_ifp[((1 - out) << 1) + 1] = fr->fr_ifas[3];
-		strncpy(is->is_ifname[((1 - out) << 1) + 1], fr->fr_ifnames[3],
-			sizeof(fr->fr_ifnames[3]));
+		if (fr->fr_ifnames[3] != -1) {
+			strncpy(is->is_ifname[((1 - out) << 1) + 1],
+				fr->fr_names + fr->fr_ifnames[3],
+				sizeof(fr->fr_ifnames[3]));
+		}
 	} else {
 		if (fin->fin_ifp != NULL) {
 			is->is_ifp[out << 1] = fin->fin_ifp;
@@ -1951,19 +1973,22 @@ ipf_state_add(softc, fin, stsave, flags)
 	if (fin->fin_flx & FI_FRAG)
 		(void) ipf_frag_new(softc, fin, pass);
 	fdp = &fr->fr_tifs[0];
-	if (fdp->fd_type == FRD_POOL)
+	if (fdp->fd_type == FRD_DSTLIST)
 		fdp->fd_ptr = ipf_lookup_res_name(softc, IPLT_DSTLIST,
-						  IPL_LOGIPF, fdp->fd_name,
+						  IPL_LOGIPF,
+						  fr->fr_names + fdp->fd_name,
 						  NULL);
 	fdp = &fr->fr_tifs[1];
-	if (fdp->fd_type == FRD_POOL)
+	if (fdp->fd_type == FRD_DSTLIST)
 		fdp->fd_ptr = ipf_lookup_res_name(softc, IPLT_DSTLIST,
-						  IPL_LOGIPF, fdp->fd_name,
+						  IPL_LOGIPF,
+						  fr->fr_names + fdp->fd_name,
 						  NULL);
 	fdp = &fr->fr_dif;
-	if (fdp->fd_type == FRD_POOL)
+	if (fdp->fd_type == FRD_DSTLIST)
 		fdp->fd_ptr = ipf_lookup_res_name(softc, IPLT_DSTLIST,
-						  IPL_LOGIPF, fdp->fd_name,
+						  IPL_LOGIPF,
+						  fr->fr_names + fdp->fd_name,
 						  NULL);
 
 	return 0;
@@ -3498,7 +3523,8 @@ ipf_state_check(fin, passp)
 				return NULL;
 			}
 		}
-		(void) strncpy(fin->fin_group, fr->fr_group, FR_GROUPLEN);
+		(void) strncpy(fin->fin_group, FR_NAME(fr, fr_group),
+			       FR_GROUPLEN);
 		fin->fin_icode = fr->fr_icode;
 	}
 
@@ -3760,13 +3786,13 @@ ipf_state_del(softc, is, why)
 	is->is_rule = NULL;
 	if (fr != NULL) {
 		fdp = &fr->fr_tifs[0];
-		if (fdp->fd_type == FRD_POOL)
+		if (fdp->fd_type == FRD_DSTLIST)
 			ipf_lookup_deref(softc, IPLT_DSTLIST, fdp->fd_ptr);
 		fdp = &fr->fr_tifs[1];
-		if (fdp->fd_type == FRD_POOL)
+		if (fdp->fd_type == FRD_DSTLIST)
 			ipf_lookup_deref(softc, IPLT_DSTLIST, fdp->fd_ptr);
 		fdp = &fr->fr_dif;
-		if (fdp->fd_type == FRD_POOL)
+		if (fdp->fd_type == FRD_DSTLIST)
 			ipf_lookup_deref(softc, IPLT_DSTLIST, fdp->fd_ptr);
 	}
 

@@ -11,6 +11,7 @@ else
 		fi
 	fi
 fi
+/bin/rm -f $1
 echo "$1...";
 /bin/cp /dev/null results/$1
 if [ -f regress/$1.pool -a -f regress/$1.ipf ] ; then

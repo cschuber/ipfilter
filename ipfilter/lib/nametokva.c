@@ -22,7 +22,7 @@ ipfunc_t nametokva(name, iocfunc)
 	res.ipfu_addr = NULL;
 	fd = -1;
 
-	if ((opts & OPT_DONOTHING) == 0) {
+	if ((opts & OPT_DONTOPEN) == 0) {
 		fd = open(IPL_NAME, O_RDONLY);
 		if (fd == -1)
 			return NULL;

@@ -846,9 +846,10 @@ static void printlivelist(fiop, out, set, fp, group, comment)
 			if (fp->fr_data != NULL && fp->fr_dsize > 0)
 				binprint(fp->fr_data, fp->fr_dsize);
 		}
-		if (fp->fr_grhead[0] != '\0') {
+		if (fp->fr_grhead != -1) {
 			for (g = grtop; g != NULL; g = g->fg_next) {
-				if (!strncmp(fp->fr_grhead, g->fg_name,
+				if (!strncmp(fp->fr_names + fp->fr_grhead,
+					     g->fg_name,
 					     FR_GROUPLEN))
 					break;
 			}
@@ -856,7 +857,8 @@ static void printlivelist(fiop, out, set, fp, group, comment)
 				g = calloc(1, sizeof(*g));
 
 				if (g != NULL) {
-					strncpy(g->fg_name, fp->fr_grhead,
+					strncpy(g->fg_name,
+						fp->fr_names + fp->fr_grhead,
 						FR_GROUPLEN);
 					if (grtop == NULL) {
 						grtop = g;
@@ -968,11 +970,11 @@ static void printdeadlist(fiop, out, set, fp, group, comment)
 			free(fb.fr_comment);
 		if (data != NULL)
 			free(data);
-		if (fb.fr_grhead[0] != '\0') {
+		if (fb.fr_grhead != -1) {
 			g = calloc(1, sizeof(*g));
 
 			if (g != NULL) {
-				strncpy(g->fg_name, fb.fr_grhead,
+				strncpy(g->fg_name, fb.fr_names + fb.fr_grhead,
 					FR_GROUPLEN);
 				if (grtop == NULL) {
 					grtop = g;

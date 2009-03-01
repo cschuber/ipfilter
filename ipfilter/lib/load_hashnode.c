@@ -12,10 +12,9 @@
 #include "netinet/ip_lookup.h"
 #include "netinet/ip_htable.h"
 
-static int hashfd = -1;
 
-
-int load_hashnode(unit, name, node, ttl, iocfunc)
+int
+load_hashnode(unit, name, node, ttl, iocfunc)
 	int unit;
 	char *name;
 	iphtent_t *node;
@@ -26,9 +25,7 @@ int load_hashnode(unit, name, node, ttl, iocfunc)
 	iphtent_t ipe;
 	int err;
 
-	if ((hashfd == -1) && ((opts & OPT_DONOTHING) == 0))
-		hashfd = open(IPLOOKUP_NAME, O_RDWR);
-	if ((hashfd == -1) && ((opts & OPT_DONOTHING) == 0))
+	if (pool_open() == -1)
 		return -1;
 
 	op.iplo_type = IPLT_HASH;
@@ -49,9 +46,9 @@ int load_hashnode(unit, name, node, ttl, iocfunc)
 	      sizeof(ipe.ipe_group));
 
 	if ((opts & OPT_REMOVE) == 0)
-		err = (*iocfunc)(hashfd, SIOCLOOKUPADDNODE, &op);
+		err = pool_ioctl(iocfunc, SIOCLOOKUPADDNODE, &op);
 	else
-		err = (*iocfunc)(hashfd, SIOCLOOKUPDELNODE, &op);
+		err = pool_ioctl(iocfunc, SIOCLOOKUPDELNODE, &op);
 
 	if (err != 0)
 		if (!(opts & OPT_DONOTHING)) {

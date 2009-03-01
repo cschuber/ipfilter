@@ -9,7 +9,8 @@
 #include "ipf.h"
 
 
-void	printportcmp(pr, frp)
+void
+printportcmp(pr, frp)
 	int	pr;
 	frpcmp_t	*frp;
 {
@@ -17,11 +18,11 @@ void	printportcmp(pr, frp)
 				 "<>", "><", ":" };
 
 	if (frp->frp_cmp == FR_INRANGE || frp->frp_cmp == FR_OUTRANGE)
-		printf(" port %d %s %d", frp->frp_port,
+		PRINTF(" port %d %s %d", frp->frp_port,
 			     pcmp1[frp->frp_cmp], frp->frp_top);
 	else if (frp->frp_cmp == FR_INCRANGE)
-		printf(" port %d:%d", frp->frp_port, frp->frp_top);
+		PRINTF(" port %d:%d", frp->frp_port, frp->frp_top);
 	else
-		printf(" port %s %s", pcmp1[frp->frp_cmp],
+		PRINTF(" port %s %s", pcmp1[frp->frp_cmp],
 			     portname(pr, frp->frp_port));
 }

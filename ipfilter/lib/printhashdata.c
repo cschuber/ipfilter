@@ -7,11 +7,9 @@
 #include "ipf.h"
 #include <ctype.h>
 
-#define	PRINTF	(void)printf
-#define	FPRINTF	(void)fprintf
 
-
-void printhashdata(hp, opts)
+void
+printhashdata(hp, opts)
 	iphtable_t *hp;
 	int opts;
 {
@@ -39,7 +37,7 @@ void printhashdata(hp, opts)
 			PRINTF("%#x", hp->iph_type);
 			break;
 		}
-		PRINTF(" role = ");
+		PRINTF(" role=");
 	} else {
 		PRINTF("Hash Table %s: %s",
 			ISDIGIT(*hp->iph_name) ? "Number" : "Name",
@@ -50,33 +48,16 @@ void printhashdata(hp, opts)
 		PRINTF("Role: ");
 	}
 
-	switch (hp->iph_unit)
-	{
-	case IPL_LOGNAT :
-		PRINTF("nat");
-		break;
-	case IPL_LOGIPF :
-		PRINTF("ipf");
-		break;
-	case IPL_LOGAUTH :
-		PRINTF("auth");
-		break;
-	case IPL_LOGCOUNT :
-		PRINTF("count");
-		break;
-	default :
-		PRINTF("#%d", hp->iph_unit);
-		break;
-	}
+	printunit(hp->iph_unit);
 
 	if ((opts & OPT_DEBUG) == 0) {
 		if ((hp->iph_type & ~IPHASH_ANON) == IPHASH_LOOKUP)
-			PRINTF(" type = hash");
-		PRINTF(" %s = %s size = %lu",
+			PRINTF(" type=hash");
+		PRINTF(" %s=%s size=%lu",
 			ISDIGIT(*hp->iph_name) ? "number" : "name",
 			hp->iph_name, (u_long)hp->iph_size);
 		if (hp->iph_seed != 0)
-			PRINTF(" seed = %lu", hp->iph_seed);
+			PRINTF(" seed=%lu", hp->iph_seed);
 		putchar('\n');
 	} else {
 		PRINTF(" Type: ");

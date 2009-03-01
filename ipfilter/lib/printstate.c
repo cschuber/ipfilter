@@ -7,10 +7,9 @@
 #include "ipf.h"
 #include "kmem.h"
 
-#define	PRINTF	(void)printf
-#define	FPRINTF	(void)fprintf
 
-ipstate_t *printstate(sp, opts, now)
+ipstate_t *
+printstate(sp, opts, now)
 	ipstate_t *sp;
 	int opts;
 	u_long now;

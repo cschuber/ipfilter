@@ -180,13 +180,15 @@ ipf_p_h323_in(arg, fin, aps, nat)
 		 * it's like:
 		 *   map <if> <inter_ip>/<mask> -> <gate_ip>/<mask> proxy port <port> <port>/tcp
 		 */
-		KMALLOCS(newarray, char *, aps->aps_psiz + sizeof(*ipn));
+		KMALLOCS(newarray, char *, aps->aps_psiz + ipn->in_namelen + 5);
 		if (newarray == NULL) {
 			return -1;
 		}
 		ipn = (ipnat_t *)&newarray[aps->aps_psiz];
-		bcopy((caddr_t)nat->nat_ptr, (caddr_t)ipn, sizeof(ipnat_t));
-		(void) strncpy(ipn->in_plabel, "h245", APR_LABELLEN);
+		bcopy((caddr_t)nat->nat_ptr, (caddr_t)ipn, ipn->in_size);
+		ipn->in_plabel = ipn->in_namelen;
+		(void) strncpy(ipn->in_names + ipn->in_namelen, "h245", 4);
+		ipn->in_namelen += 4;
 
 		ipn->in_osrcip = nat->nat_osrcip;
 		ipn->in_osrcmsk = 0xffffffff;

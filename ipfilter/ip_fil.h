@@ -135,7 +135,7 @@ typedef	union	i6addr	{
 	struct {
 		u_short	type;
 		u_short	subtype;
-		char	label[12];
+		int	name;
 	} i6un;
 } i6addr_t;
 #else
@@ -147,14 +147,14 @@ typedef	union	i6addr	{
 	struct {
 		u_short	type;
 		u_short	subtype;
-		char	label[12];
+		int	name;
 	} i6un;
 } i6addr_t;
 #endif
 
 #define in4_addr	in4.s_addr
 #define	iplookupnum	i6[1]
-#define	iplookupname	i6un.label
+#define	iplookupname	i6un.name
 #define	iplookuptype	i6un.type
 #define	iplookupsubtype	i6un.subtype
 /*
@@ -483,10 +483,20 @@ typedef	struct	{
 #define	ipt_tag	ipt_un.iptu_tag
 #define	ipt_num	ipt_un.iptu_num
 
+/*
+ * Structure to define address for pool lookups.
+ */
+typedef	struct	{
+	u_char		adf_len;
+	sa_family_t	adf_family;
+	u_char		adf_xxx[2];
+	i6addr_t	adf_addr;
+} addrfamily_t;
+
 
 typedef enum fr_dtypes_e {
 	FRD_NORMAL = 0,
-	FRD_POOL
+	FRD_DSTLIST
 } fr_dtypes_t;
 /*
  * This structure is used to hold information about the next hop for where
@@ -494,12 +504,13 @@ typedef enum fr_dtypes_e {
  */
 typedef	struct	frdest	{
 	void		*fd_ptr;
-	i6addr_t	fd_ip6;
+	addrfamily_t	fd_addr;
 	fr_dtypes_t	fd_type;
+	int		fd_name;
 	int		fd_local;
-	char		fd_name[LIFNAMSIZ];
 } frdest_t;
 
+#define	fd_ip6	fd_addr.adf_addr
 #define	fd_ip	fd_ip6.in4
 
 
@@ -569,7 +580,8 @@ typedef enum fr_atypes_e {
 	FRI_BROADCAST,	/* broadcast address from if */
 	FRI_PEERADDR,	/* Peer address for P-to-P */
 	FRI_NETMASKED,	/* network address with netmask from if */
-	FRI_SPLIT	/* For NAT compatibility */
+	FRI_SPLIT,	/* For NAT compatibility */
+	FRI_INTERFACE	/* address is based on interface name */
 } fr_atypes_t;
 
 /*
@@ -625,10 +637,12 @@ typedef	struct	frentry {
 	void	*fr_ifas[4];
 	void	*fr_ptr;	/* for use with fr_arg */
 	char	*fr_comment;	/* text comment for rule */
+	int	fr_size;	/* size of this structure */
 	int	fr_commlen;	/* length of comment */
-	int	fr_ref;		/* reference count - for grouping */
+	int	fr_ref;		/* reference count */
 	int	fr_statecnt;	/* state count - for limit rules */
 	u_32_t	fr_die;		/* only used on loading the rule */
+	u_int	fr_cksum;	/* checksum on filter rules for performance */
 	/*
 	 * The line number from a file is here because we need to be able to
 	 * match the rule generated with ``grep rule ipf.conf | ipf -rf -''
@@ -674,18 +688,16 @@ typedef	struct	frentry {
 	int	fr_rpc;
 	u_char	fr_family;
 	u_char	fr_icode;	/* return ICMP code */
-	char	fr_group[FR_GROUPLEN];	/* group to which this rule belongs */
-	char	fr_grhead[FR_GROUPLEN];	/* group # which this rule starts */
-	char	fr_icmphead[FR_GROUPLEN]; /* ICMP group  for state options */
+	int	fr_group;	/* group to which this rule belongs */
+	int	fr_grhead;	/* group # which this rule starts */
+	int	fr_icmphead;	/* ICMP group  for state options */
 	ipftag_t fr_nattag;
-	char	fr_ifnames[4][LIFNAMSIZ];
+	int	fr_ifnames[4];
 	char	fr_isctag[16];
 	frdest_t fr_tifs[2];	/* "to"/"reply-to" interface */
 	frdest_t fr_dif;	/* duplicate packet interface */
-	/*
-	 * This must be last and will change after loaded into the kernel.
-	 */
-	u_int	fr_cksum;	/* checksum on filter rules for performance */
+	int	fr_namelen;
+	char	fr_names[1];
 } frentry_t;
 
 #define	fr_caddr	fr_dun.fru_caddr
@@ -749,8 +761,6 @@ typedef	struct	frentry {
 #define	fr_authmask	fr_mip.fi_auth
 #define	fr_flx		fr_ip.fi_flx
 #define	fr_mflx		fr_mip.fi_flx
-#define	fr_ifname	fr_ifnames[0]
-#define	fr_oifname	fr_ifnames[2]
 #define	fr_ifa		fr_ifas[0]
 #define	fr_oifa		fr_ifas[2]
 #define	fr_tif		fr_tifs[0]
@@ -763,12 +773,12 @@ typedef	struct	frentry {
 #endif
 #define	FR_CMPSIZ	(sizeof(struct frentry) - \
 			 offsetof(struct frentry, fr_func))
+#define	FR_NAME(_f, _n)	(_f)->_n == -1 ? "" : (_f)->fr_names + (_f)->_n
 
 
 /*
  * fr_flags
  */
-#define	FR_CALL		0x00000	/* call rule */
 #define	FR_BLOCK	0x00001	/* do not allow packet to pass */
 #define	FR_PASS		0x00002	/* allow packet to pass */
 #define	FR_AUTH		0x00003	/* use authentication */
@@ -776,6 +786,7 @@ typedef	struct	frentry {
 #define	FR_ACCOUNT	0x00005	/* Accounting rule */
 #define	FR_SKIP		0x00006	/* skip rule */
 #define	FR_DECAPSULATE	0x00008	/* decapsulate rule */
+#define	FR_CALL		0x00009	/* call rule */
 #define	FR_CMDMASK	0x0000f
 #define	FR_LOG		0x00010	/* Log */
 #define	FR_LOGB		0x00011	/* Log-fail */
@@ -1242,16 +1253,6 @@ typedef struct  ipftq   {
 #define	IPF_TTLVAL(x)	(((x) / IPF_HZ_MULT) * IPF_HZ_DIVIDE)
 
 typedef	int	(*ipftq_delete_fn_t)(struct ipf_main_softc_s *, void *);
-
-/*
- * Structure to define address for pool lookups.
- */
-typedef	struct	{
-	u_char		adf_len;
-	sa_family_t	adf_family;
-	u_char		adf_xxx[2];
-	i6addr_t	adf_addr;
-} addrfamily_t;
 
 
 /*
@@ -1727,7 +1728,8 @@ extern	int	ipf_outobj __P((ipf_main_softc_t *, void *, void *, int));
 extern	int	ipf_outobjsz __P((ipf_main_softc_t *, void *, void *,
 				  int, int));
 extern	void	*ipf_pullup __P((mb_t *, fr_info_t *, int));
-extern	void	ipf_resolvedest __P((ipf_main_softc_t *, struct frdest *, int));
+extern	void	ipf_resolvedest __P((ipf_main_softc_t *, char *,
+				     struct frdest *, int));
 extern	int	ipf_resolvefunc __P((ipf_main_softc_t *, void *));
 extern	void	*ipf_resolvenic __P((ipf_main_softc_t *, char *, int));
 extern	int	ipf_send_icmp_err __P((int, fr_info_t *, int));

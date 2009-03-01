@@ -14,18 +14,19 @@ static const char rcsid[] = "@(#)$Id$";
 #endif
 
 
-void printactivenat(nat, opts, alive, now)
+void
+printactivenat(nat, opts, alive, now)
 	nat_t *nat;
 	int opts, alive;
 	u_long now;
 {
 
-	printf("%s", getnattype(nat, alive));
+	PRINTF("%s", getnattype(nat, alive));
 
 	if (nat->nat_flags & SI_CLONE)
-		printf(" CLONE");
+		PRINTF(" CLONE");
 	if (nat->nat_phnext[0] == NULL && nat->nat_phnext[1] == NULL)
-		printf(" ORPHAN");
+		PRINTF(" ORPHAN");
 
 	putchar(' ');
 	if (nat->nat_redir & NAT_REWRITE) {
@@ -33,111 +34,111 @@ void printactivenat(nat, opts, alive, now)
 				   nat->nat_ifnames[0]);
 
 		if ((nat->nat_flags & IPN_TCPUDP) != 0)
-			printf(" %-5hu", ntohs(nat->nat_osport));
+			PRINTF(" %-5hu", ntohs(nat->nat_osport));
 
 		putchar(' ');
 		printactiveaddress(nat->nat_v[0], "%-15s", &nat->nat_odst6,
 				   nat->nat_ifnames[0]);
 
 		if ((nat->nat_flags & IPN_TCPUDP) != 0)
-			printf(" %-5hu", ntohs(nat->nat_odport));
+			PRINTF(" %-5hu", ntohs(nat->nat_odport));
 
-		printf("<- -> ");
+		PRINTF("<- -> ");
 		printactiveaddress(nat->nat_v[1], "%-15s", &nat->nat_nsrc6,
 				   nat->nat_ifnames[0]);
 
 		if ((nat->nat_flags & IPN_TCPUDP) != 0)
-			printf(" %-5hu", ntohs(nat->nat_nsport));
+			PRINTF(" %-5hu", ntohs(nat->nat_nsport));
 
 		putchar(' ');
 		printactiveaddress(nat->nat_v[1], "%-15s", &nat->nat_ndst6,
 				   nat->nat_ifnames[0]);
 		if ((nat->nat_flags & IPN_TCPUDP) != 0)
-			printf(" %-5hu", ntohs(nat->nat_ndport));
+			PRINTF(" %-5hu", ntohs(nat->nat_ndport));
 
 	} else if (nat->nat_dir == NAT_OUTBOUND) {
 		printactiveaddress(nat->nat_v[0], "%-15s", &nat->nat_osrc6,
 				   nat->nat_ifnames[0]);
 
 		if ((nat->nat_flags & IPN_TCPUDP) != 0)
-			printf(" %-5hu", ntohs(nat->nat_osport));
+			PRINTF(" %-5hu", ntohs(nat->nat_osport));
 
-		printf(" <- -> ");
+		PRINTF(" <- -> ");
 		printactiveaddress(nat->nat_v[1], "%-15s", &nat->nat_nsrc6,
 				   nat->nat_ifnames[0]);
 
 		if ((nat->nat_flags & IPN_TCPUDP) != 0)
-			printf(" %-5hu", ntohs(nat->nat_nsport));
+			PRINTF(" %-5hu", ntohs(nat->nat_nsport));
 
-		printf(" [");
+		PRINTF(" [");
 		printactiveaddress(nat->nat_v[0], "%s", &nat->nat_odst6,
 				   nat->nat_ifnames[0]);
 
 		if ((nat->nat_flags & IPN_TCPUDP) != 0)
-			printf(" %hu", ntohs(nat->nat_odport));
-		printf("]");
+			PRINTF(" %hu", ntohs(nat->nat_odport));
+		PRINTF("]");
 	} else {
 		printactiveaddress(nat->nat_v[1], "%-15s", &nat->nat_ndst6,
 				   nat->nat_ifnames[0]);
 
 		if ((nat->nat_flags & IPN_TCPUDP) != 0)
-			printf(" %-5hu", ntohs(nat->nat_ndport));
+			PRINTF(" %-5hu", ntohs(nat->nat_ndport));
 
-		printf(" <- -> ");
+		PRINTF(" <- -> ");
 		printactiveaddress(nat->nat_v[0], "%-15s", &nat->nat_odst6,
 				   nat->nat_ifnames[0]);
 
 		if ((nat->nat_flags & IPN_TCPUDP) != 0)
-			printf(" %-5hu", ntohs(nat->nat_odport));
+			PRINTF(" %-5hu", ntohs(nat->nat_odport));
 
-		printf(" [");
+		PRINTF(" [");
 		printactiveaddress(nat->nat_v[0], "%s", &nat->nat_osrc6,
 				   nat->nat_ifnames[0]);
 
 		if ((nat->nat_flags & IPN_TCPUDP) != 0)
-			printf(" %hu", ntohs(nat->nat_osport));
-		printf("]");
+			PRINTF(" %hu", ntohs(nat->nat_osport));
+		PRINTF("]");
 	}
 
 	if (opts & OPT_VERBOSE) {
-		printf("\n\tttl %lu use %hu sumd %s/",
+		PRINTF("\n\tttl %lu use %hu sumd %s/",
 			nat->nat_age - now, nat->nat_use,
 			getsumd(nat->nat_sumd[0]));
-		printf("%s pr %u/%u hash %u/%u flags %x\n",
+		PRINTF("%s pr %u/%u hash %u/%u flags %x\n",
 			getsumd(nat->nat_sumd[1]),
 			nat->nat_pr[0], nat->nat_pr[1],
 			nat->nat_hv[0], nat->nat_hv[1], nat->nat_flags);
-		printf("\tifp %s", getifname(nat->nat_ifps[0]));
-		printf(",%s ", getifname(nat->nat_ifps[1]));
+		PRINTF("\tifp %s", getifname(nat->nat_ifps[0]));
+		PRINTF(",%s ", getifname(nat->nat_ifps[1]));
 #ifdef	USE_QUAD_T
-		printf("bytes %qu/%qu pkts %qu/%qu",
+		PRINTF("bytes %qu/%qu pkts %qu/%qu",
 			(unsigned long long)nat->nat_bytes[0],
 			(unsigned long long)nat->nat_bytes[1],
 			(unsigned long long)nat->nat_pkts[0],
 			(unsigned long long)nat->nat_pkts[1]);
 #else
-		printf("bytes %lu/%lu pkts %lu/%lu", nat->nat_bytes[0],
+		PRINTF("bytes %lu/%lu pkts %lu/%lu", nat->nat_bytes[0],
 			nat->nat_bytes[1], nat->nat_pkts[0], nat->nat_pkts[1]);
 #endif
-		printf(" ipsumd %x", nat->nat_ipsumd);
+		PRINTF(" ipsumd %x", nat->nat_ipsumd);
 	}
 
 	if (opts & OPT_DEBUG) {
-		printf("\n\tnat_next %p _pnext %p _hm %p\n",
+		PRINTF("\n\tnat_next %p _pnext %p _hm %p\n",
 			nat->nat_next, nat->nat_pnext, nat->nat_hm);
-		printf("\t_hnext %p/%p _phnext %p/%p\n",
+		PRINTF("\t_hnext %p/%p _phnext %p/%p\n",
 			nat->nat_hnext[0], nat->nat_hnext[1],
 			nat->nat_phnext[0], nat->nat_phnext[1]);
-		printf("\t_data %p _me %p _state %p _aps %p\n",
+		PRINTF("\t_data %p _me %p _state %p _aps %p\n",
 			nat->nat_data, nat->nat_me, nat->nat_state,
 			nat->nat_aps);
-		printf("\tfr %p ptr %p ifps %p/%p sync %p\n",
+		PRINTF("\tfr %p ptr %p ifps %p/%p sync %p\n",
 			nat->nat_fr, nat->nat_ptr, nat->nat_ifps[0],
 			nat->nat_ifps[1], nat->nat_sync);
-		printf("\ttqe:pnext %p next %p ifq %p parent %p/%p\n",
+		PRINTF("\ttqe:pnext %p next %p ifq %p parent %p/%p\n",
 			nat->nat_tqe.tqe_pnext, nat->nat_tqe.tqe_next,
 			nat->nat_tqe.tqe_ifq, nat->nat_tqe.tqe_parent, nat);
-		printf("\ttqe:die %d touched %d flags %x state %d/%d\n",
+		PRINTF("\ttqe:die %d touched %d flags %x state %d/%d\n",
 			nat->nat_tqe.tqe_die, nat->nat_tqe.tqe_touched,
 			nat->nat_tqe.tqe_flags, nat->nat_tqe.tqe_state[0],
 			nat->nat_tqe.tqe_state[1]);

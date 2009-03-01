@@ -12,20 +12,21 @@ static const char rcsid[] = "@(#)$Id$";
 #endif
 
 
-void printproto(pr, p, np)
+void
+printproto(pr, p, np)
 	struct protoent *pr;
 	int p;
 	ipnat_t *np;
 {
 	if (np != NULL) {
 		if ((np->in_flags & IPN_TCPUDP) == IPN_TCPUDP)
-			printf("tcp/udp");
+			PRINTF("tcp/udp");
 		else if (np->in_flags & IPN_TCP)
-			printf("tcp");
+			PRINTF("tcp");
 		else if (np->in_flags & IPN_UDP)
-			printf("udp");
+			PRINTF("udp");
 		else if (np->in_flags & IPN_ICMPQUERY)
-			printf("icmp");
+			PRINTF("icmp");
 #ifdef _AIX51
 		/*
 		 * To make up for "ip = 252" and "hopopt = 0" in /etc/protocols
@@ -35,20 +36,20 @@ void printproto(pr, p, np)
 		 */
 #endif
 		else if (np->in_pr[0] == 0)
-			printf("ip");
+			PRINTF("ip");
 		else if (pr != NULL)
-			printf("%s", pr->p_name);
+			PRINTF("%s", pr->p_name);
 		else
-			printf("%d", np->in_pr[0]);
+			PRINTF("%d", np->in_pr[0]);
 	} else {
 #ifdef _AIX51
 		if (p == 0)
-			printf("ip");
+			PRINTF("ip");
 		else
 #endif
 		if (pr != NULL)
-			printf("%s", pr->p_name);
+			PRINTF("%s", pr->p_name);
 		else
-			printf("%d", p);
+			PRINTF("%d", p);
 	}
 }

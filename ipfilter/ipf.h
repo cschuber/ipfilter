@@ -119,6 +119,9 @@ typedef unsigned int	u_32_t;
 #define	MAX_ICMPCODE	16
 #define	MAX_ICMPTYPE	19
 
+#define	PRINTF	(void)printf
+#define	FPRINTF	(void)fprintf
+
 
 struct	ipopt_names	{
 	int	on_value;
@@ -238,7 +241,7 @@ extern char *fac_toname __P((int));
 extern int fac_findname __P((char *));
 extern void fill6bits __P((int, u_int *));
 extern wordtab_t *findword __P((wordtab_t *, char *));
-extern char *ipf_geterror __P((int));
+extern char *ipf_geterror __P((int, ioctlfunc_t *));
 extern int genmask __P((int, char *, i6addr_t *));
 extern int gethost __P((int, char *, i6addr_t *));
 extern int geticmptype __P((int, char *));
@@ -258,7 +261,9 @@ extern void ipf_addrule __P((int, ioctlfunc_t, void *));
 extern void ipf_mutex_clean __P((void));
 extern int ipf_parsefile __P((int, addfunc_t, ioctlfunc_t *, char *));
 extern int ipf_parsesome __P((int, addfunc_t, ioctlfunc_t *, FILE *));
+extern void ipf_perror __P((int, char *));
 extern void ipf_rwlock_clean __P((void));
+extern char *ipf_strerror __P((int));
 extern void ipferror __P((int, char *));
 extern int ipmon_parsefile __P((char *));
 extern int ipmon_parsesome __P((FILE *));
@@ -269,6 +274,10 @@ extern int ippool_parsefile __P((int, char *, ioctlfunc_t));
 extern int ippool_parsesome __P((int, FILE *, ioctlfunc_t));
 extern int kmemcpywrap __P((void *, void *, size_t));
 extern char *kvatoname __P((ipfunc_t, ioctlfunc_t));
+extern int load_dstlist __P((struct ippool_dst *, ioctlfunc_t,
+			     ipf_dstnode_t *));
+extern int load_dstlistnode __P((int, char *, struct ipf_dstnode *, int,
+				 ioctlfunc_t));
 extern alist_t *load_file __P((char *));
 extern int load_hash __P((struct iphtable_s *, struct iphtent_s *,
 			  ioctlfunc_t));
@@ -286,18 +295,22 @@ extern u_32_t optname __P((char ***, u_short *, int));
 extern wordtab_t *parsefields __P((wordtab_t *, char *));
 extern int *parseipfexpr __P((char *, char **));
 extern int parsewhoisline __P((char *, addrfamily_t *, addrfamily_t *));
+extern void pool_close __P((void));
+extern int pool_ioctl __P((ioctlfunc_t, ioctlcmd_t, void *));
+extern int pool_open __P((void));
 extern char *portname __P((int, int));
 extern int pri_findname __P((char *));
 extern char *pri_toname __P((int));
-extern void print_toif __P((char *, struct frdest *));
+extern void print_toif __P((char *, char *, struct frdest *));
 extern void printaps __P((ap_session_t *, int));
-extern void printaddr __P((int, int, char *, u_32_t *, u_32_t *));
+extern void printaddr __P((int, int, char *, int, u_32_t *, u_32_t *));
 extern void printbuf __P((char *, int, int));
 extern void printfieldhdr __P((wordtab_t *, wordtab_t *));
 extern void printfr __P((struct frentry *, ioctlfunc_t));
 extern struct iphtable_s *printhash __P((struct iphtable_s *, copyfunc_t,
 					 char *, int));
 extern struct iphtable_s *printhash_live __P((iphtable_t *, int, char *, int));
+extern ippool_dst_t *printdstl_live __P((ippool_dst_t *, int, char *, int));
 extern void printhashdata __P((iphtable_t *, int));
 extern struct iphtent_s *printhashnode __P((struct iphtable_s *,
 					    struct iphtent_s *,
@@ -324,6 +337,7 @@ extern void printportcmp __P((int, struct frpcmp *));
 extern void printstatefield __P((ipstate_t *, int));
 extern void printtqtable __P((ipftq_t *));
 extern void printtunable __P((ipftune_t *));
+extern void printunit __P((int));
 extern void optprint __P((u_short *, u_long, u_long));
 #ifdef	USE_INET6
 extern void optprintv6 __P((u_short *, u_long, u_long));

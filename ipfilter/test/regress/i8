@@ -11,11 +11,11 @@ pass in proto icmp all icmp-type unreach code host-prohib
 pass in proto icmp all icmp-type unreach code host-tos
 pass in proto icmp all icmp-type unreach code host-unk
 pass in proto icmp all icmp-type unreach code host-unr
-pass in proto icmp all icmp-type unreach code (net-unk,net-unr)
+pass in proto icmp all icmp-type unreach code {net-unk,net-unr}
 pass in proto icmp all icmp-type unreach code port-unr
 pass in proto icmp all icmp-type unreach code proto-unr
 pass in proto icmp all icmp-type unreach code srcfail
-pass in proto icmp all icmp-type (echo,echorep)
+pass in proto icmp all icmp-type {echo,echorep}
 pass in proto icmp all icmp-type inforeq
 pass in proto icmp all icmp-type inforep
 pass in proto icmp all icmp-type maskrep
@@ -42,11 +42,11 @@ pass in proto icmp all icmp-type unreach code host-prohib
 pass in proto icmp all icmp-type unreach code host-tos
 pass in proto icmp all icmp-type unreach code host-unk
 pass in proto icmp all icmp-type unreach code host-unr
-pass in proto icmp all icmp-type unreach code (net-unk,net-unr)
+pass in proto icmp all icmp-type unreach code {net-unk,net-unr}
 pass in proto icmp all icmp-type unreach code port-unr
 pass in proto icmp all icmp-type unreach code proto-unr
 pass in proto icmp all icmp-type unreach code srcfail
-pass in proto icmp all icmp-type (echo,echorep)
+pass in proto icmp all icmp-type {echo,echorep}
 pass in proto icmp all icmp-type inforeq
 pass in proto icmp all icmp-type inforep
 pass in proto icmp all icmp-type maskrep

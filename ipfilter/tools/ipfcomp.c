@@ -169,6 +169,8 @@ static void addrule(fp, fr)
 	frentry_t *f, **fpp;
 	frgroup_t *g;
 	u_long *ulp;
+	char *ghead;
+	char *gname;
 	char *and;
 	int i;
 
@@ -181,8 +183,10 @@ static void addrule(fp, fr)
 	}
 
 	f->fr_next = NULL;
+	gname = FR_NAME(fr, fr_group);
+
 	for (g = groups; g != NULL; g = g->fg_next)
-		if ((strncmp(g->fg_name, f->fr_group, FR_GROUPLEN) == 0) &&
+		if ((strncmp(g->fg_name, gname, FR_GROUPLEN) == 0) &&
 		    (g->fg_flags == (f->fr_flags & FR_INOUT)))
 			break;
 
@@ -191,7 +195,7 @@ static void addrule(fp, fr)
 		g->fg_next = groups;
 		groups = g;
 		g->fg_head = f;
-		bcopy(f->fr_group, g->fg_name, FR_GROUPLEN);
+		strncpy(g->fg_name, gname, FR_GROUPLEN);
 		g->fg_ref = 0;
 		g->fg_flags = f->fr_flags & FR_INOUT;
 	}
@@ -220,10 +224,10 @@ static u_long ipf%s_rule_data_%s_%u[] = {\n",
 
 	g->fg_ref++;
 
-	if (f->fr_grhead != 0) {
+	if (f->fr_grhead != -1) {
+		ghead = FR_NAME(f, fr_grhead);
 		for (g = groups; g != NULL; g = g->fg_next)
-			if ((strncmp(g->fg_name, f->fr_grhead,
-				     FR_GROUPLEN) == 0) &&
+			if ((strncmp(g->fg_name, ghead, FR_GROUPLEN) == 0) &&
 			    g->fg_flags == (f->fr_flags & FR_INOUT))
 				break;
 		if (g == NULL) {
@@ -231,7 +235,7 @@ static u_long ipf%s_rule_data_%s_%u[] = {\n",
 			g->fg_next = groups;
 			groups = g;
 			g->fg_head = f;
-			bcopy(f->fr_grhead, g->fg_name, FR_GROUPLEN);
+			strncpy(g->fg_name, ghead, FR_GROUPLEN);
 			g->fg_ref = 0;
 			g->fg_flags = f->fr_flags & FR_INOUT;
 		}
@@ -515,9 +519,8 @@ static void emitGroup(num, dir, v, fr, group, incount, outcount)
 			if ((i & 1) == 0) {
 				fprintf(fp, "\n\t");
 			}
-			fprintf(fp,
-				"(frentry_t *)&in_rule_%s_%d",
-				f->fr_group, i);
+			fprintf(fp, "(frentry_t *)&in_rule_%s_%d",
+				FR_NAME(f, fr_group), i);
 			if (i + 1 < incount)
 				fprintf(fp, ", ");
 			i++;
@@ -535,9 +538,8 @@ static void emitGroup(num, dir, v, fr, group, incount, outcount)
 			if ((i & 1) == 0) {
 				fprintf(fp, "\n\t");
 			}
-			fprintf(fp,
-				"(frentry_t *)&out_rule_%s_%d",
-				f->fr_group, i);
+			fprintf(fp, "(frentry_t *)&out_rule_%s_%d",
+				FR_NAME(f, fr_group), i);
 			if (i + 1 < outcount)
 				fprintf(fp, ", ");
 			i++;
@@ -587,7 +589,7 @@ static void emitGroup(num, dir, v, fr, group, incount, outcount)
 		switch(m[i].c)
 		{
 		case FRC_IFN :
-			if (*fr->fr_ifname)
+			if (fr->fr_ifnames[0] != -1)
 				m[i].s = 1;
 			break;
 		case FRC_V :
@@ -941,11 +943,11 @@ static void emitGroup(num, dir, v, fr, group, incount, outcount)
 	if (fr->fr_flags & FR_QUICK) {
 		fprintf(fp, "return (frentry_t *)&%s_rule_%s_%d;\n",
 			fr->fr_flags & FR_INQUE ? "in" : "out",
-			fr->fr_group, num);
+			FR_NAME(fr, fr_group), num);
 	} else {
 		fprintf(fp, "fr = (frentry_t *)&%s_rule_%s_%d;\n",
 			fr->fr_flags & FR_INQUE ? "in" : "out",
-			fr->fr_group, num);
+			FR_NAME(fr, fr_group), num);
 	}
 	if (n == NULL)
 		n = (mc_t *)malloc(sizeof(*n) * FRC_MAX);
@@ -1028,7 +1030,8 @@ static void printCgroup(dir, top, m, group)
 				continue;
 
 			if ((n & 0x0001) &&
-			    !strcmp(fr1->fr_ifname, fr->fr_ifname)) {
+			    !strcmp(fr1->fr_names + fr1->fr_ifnames[0],
+				    fr->fr_names + fr->fr_ifnames[0])) {
 				m[FRC_IFN].e++;
 				m[FRC_IFN].n++;
 			} else
@@ -1284,7 +1287,8 @@ int ipfrule_add_%s_%s()\n", instr, group);
 
 	fprintf(fp, "\
 		for (j = i + 1; j < max; j++)\n\
-			if (strncmp(fp->fr_group,\n\
+			if (strncmp(fp->fr_names + fp->fr_group,\n\
+				    ipf_rules_%s_%s[j]->fr_names +\n\
 				    ipf_rules_%s_%s[j]->fr_group,\n\
 				    FR_GROUPLEN) == 0) {\n\
 				if (ipf_rules_%s_%s[j] != NULL)\n\
@@ -1294,13 +1298,13 @@ int ipfrule_add_%s_%s()\n", instr, group);
 				fp->fr_next = ipf_rules_%s_%s[j];\n\
 				break;\n\
 			}\n", instr, group, instr, group, instr, group,
-			      instr, group, instr, group);
+			      instr, group, instr, group, instr, group);
 	if (dogrp)
 		fprintf(fp, "\
 \n\
-		if (fp->fr_grhead != 0) {\n\
-			fg = fr_addgroup(fp->fr_grhead, fp, FR_INQUE,\n\
-					 IPL_LOGIPF, 0);\n\
+		if (fp->fr_grhead != -1) {\n\
+			fg = fr_addgroup(fp->fr_names + fp->fr_grhead,\n\
+					 fp, FR_INQUE, IPL_LOGIPF, 0);\n\
 			if (fg != NULL)\n\
 				fp->fr_grp = &fg->fg_start;\n\
 		}\n");

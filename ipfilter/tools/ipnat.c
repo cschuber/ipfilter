@@ -154,7 +154,7 @@ int main(argc, argv)
 			kernel = optarg;
 			break;
 		case 'n' :
-			opts |= OPT_DONOTHING;
+			opts |= OPT_DONOTHING|OPT_DONTOPEN;
 			mode = O_RDONLY;
 			break;
 		case 'O' :

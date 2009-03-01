@@ -12,10 +12,9 @@
 #include "netinet/ip_lookup.h"
 #include "netinet/ip_pool.h"
 
-static int poolfd = -1;
 
-
-int load_pool(plp, iocfunc)
+int
+load_pool(plp, iocfunc)
 	ip_pool_t *plp;
 	ioctlfunc_t iocfunc;
 {
@@ -23,9 +22,7 @@ int load_pool(plp, iocfunc)
 	ip_pool_node_t *a;
 	ip_pool_t pool;
 
-	if ((poolfd == -1) && ((opts & OPT_DONOTHING) == 0))
-		poolfd = open(IPLOOKUP_NAME, O_RDWR);
-	if ((poolfd == -1) && ((opts & OPT_DONOTHING) == 0))
+	if (pool_open() == -1)
 		return -1;
 
 	op.iplo_unit = plp->ipo_unit;
@@ -40,7 +37,7 @@ int load_pool(plp, iocfunc)
 		op.iplo_arg |= IPOOL_ANON;
 
 	if ((opts & OPT_REMOVE) == 0) {
-		if ((*iocfunc)(poolfd, SIOCLOOKUPADDTABLE, &op))
+		if (pool_ioctl(iocfunc, SIOCLOOKUPADDTABLE, &op))
 			if ((opts & OPT_DONOTHING) == 0) {
 				perror("load_pool:SIOCLOOKUPADDTABLE");
 				return -1;
@@ -52,15 +49,16 @@ int load_pool(plp, iocfunc)
 
 	if ((opts & OPT_VERBOSE) != 0) {
 		pool.ipo_list = plp->ipo_list;
-		printpool(&pool, bcopywrap, pool.ipo_name, opts);
+		(void) printpool(&pool, bcopywrap, pool.ipo_name, opts);
 		pool.ipo_list = NULL;
 	}
 
 	for (a = plp->ipo_list; a != NULL; a = a->ipn_next)
-		load_poolnode(plp->ipo_unit, pool.ipo_name, a, 0, iocfunc);
+		load_poolnode(plp->ipo_unit, pool.ipo_name,
+				     a, 0, iocfunc);
 
 	if ((opts & OPT_REMOVE) != 0) {
-		if ((*iocfunc)(poolfd, SIOCLOOKUPDELTABLE, &op))
+		if (pool_ioctl(iocfunc, SIOCLOOKUPDELTABLE, &op))
 			if ((opts & OPT_DONOTHING) == 0) {
 				perror("load_pool:SIOCLOOKUPDELTABLE");
 				return -1;

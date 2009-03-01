@@ -9,7 +9,8 @@
 #include "ipf.h"
 
 
-void	printip(family, addr)
+void
+printip(family, addr)
 	int family;
 	u_32_t *addr;
 {
@@ -18,9 +19,9 @@ void	printip(family, addr)
 	if (family == AF_INET) {
 		ipa.s_addr = *addr;
 		if (ntohl(ipa.s_addr) < 256)
-			printf("%lu", (u_long)ntohl(ipa.s_addr));
+			PRINTF("%lu", (u_long)ntohl(ipa.s_addr));
 		else
-			printf("%s", inet_ntoa(ipa));
+			PRINTF("%s", inet_ntoa(ipa));
 	}
 #ifdef AF_INET6
 	else if (family == AF_INET6) {
@@ -30,11 +31,11 @@ void	printip(family, addr)
 		buf[0] = '\0';
 		str = inet_ntop(AF_INET6, addr, buf, sizeof(buf) - 1);
 		if (str != NULL)
-			printf("%s", str);
+			PRINTF("%s", str);
 		else
-			printf("???");
+			PRINTF("???");
 	}
 #endif
 	else
-		printf("?(%d)?", family);
+		PRINTF("?(%d)?", family);
 }

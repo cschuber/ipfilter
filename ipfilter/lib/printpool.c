@@ -6,10 +6,9 @@
 
 #include "ipf.h"
 
-#define	PRINTF	(void)printf
-#define	FPRINTF	(void)fprintf
 
-ip_pool_t *printpool(pp, copyfunc, name, opts)
+ip_pool_t *
+printpool(pp, copyfunc, name, opts)
 	ip_pool_t *pp;
 	copyfunc_t copyfunc;
 	char *name;

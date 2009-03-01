@@ -10,7 +10,8 @@
 #include <ctype.h>
 
 
-void printfieldhdr(words, field)
+void
+printfieldhdr(words, field)
 	wordtab_t *words, *field;
 {
 	wordtab_t *w;
@@ -40,13 +41,13 @@ void printfieldhdr(words, field)
 			}
 
 			if ((w->w_word != field->w_word) || (s == NULL)) {
-				printf("%s", field->w_word);
+				PRINTF("%s", field->w_word);
 			} else {
 				for (t = s; *t != '\0'; t++) {
 					if (ISALPHA(*t) && ISLOWER(*t))
 						*t = toupper(*t);
 				}
-				printf("%s", s);
+				PRINTF("%s", s);
 				free(s);
 			}
 		}

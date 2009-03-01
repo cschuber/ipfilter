@@ -12,10 +12,9 @@
 #include "netinet/ip_lookup.h"
 #include "netinet/ip_pool.h"
 
-static int poolfd = -1;
 
-
-int load_poolnode(role, name, node, ttl, iocfunc)
+int
+load_poolnode(role, name, node, ttl, iocfunc)
 	int role;
 	char *name;
 	ip_pool_node_t *node;
@@ -26,9 +25,7 @@ int load_poolnode(role, name, node, ttl, iocfunc)
 	iplookupop_t op;
 	int err;
 
-	if ((poolfd == -1) && ((opts & OPT_DONOTHING) == 0))
-		poolfd = open(IPLOOKUP_NAME, O_RDWR);
-	if ((poolfd == -1) && ((opts & OPT_DONOTHING) == 0))
+	if (pool_open() == -1)
 		return -1;
 
 	op.iplo_unit = role;
@@ -48,9 +45,9 @@ int load_poolnode(role, name, node, ttl, iocfunc)
 	strncpy(pn.ipn_name, node->ipn_name, sizeof(pn.ipn_name));
 
 	if ((opts & OPT_REMOVE) == 0)
-		err = (*iocfunc)(poolfd, SIOCLOOKUPADDNODE, &op);
+		err = pool_ioctl(iocfunc, SIOCLOOKUPADDNODE, &op);
 	else
-		err = (*iocfunc)(poolfd, SIOCLOOKUPDELNODE, &op);
+		err = pool_ioctl(iocfunc, SIOCLOOKUPDELNODE, &op);
 
 	if (err != 0) {
 		if ((opts & OPT_DONOTHING) == 0) {

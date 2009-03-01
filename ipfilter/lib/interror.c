@@ -15,7 +15,9 @@ typedef	struct	{
 	char	*iee_text;
 } ipf_error_entry_t;
 
-#define	IPF_NUM_ERRORS	401
+static ipf_error_entry_t *find_error __P((int));
+
+#define	IPF_NUM_ERRORS	428
 
 /*
  * NO REUSE OF NUMBERS!
@@ -154,6 +156,19 @@ static ipf_error_entry_t ipf_errors[IPF_NUM_ERRORS] = {
 	{	128,	"no memory for filter rule comment" },
 	{	129,	"error copying in filter rule comment" },
 	{	130,	"error copying out filter rule comment" },
+	{	131,	"no memory for new rule alloc buffer" },
+	{	132,	"cannot find source lookup pool" },
+	{	133,	"unknown source address type" },
+	{	134,	"cannot find destination lookup pool" },
+	{	135,	"unknown destination address type" },
+	{	136,	"icmp head group name index incorrect" },
+	{	137,	"group head name index incorrect" },
+	{	138,	"group name index incorrect" },
+	{	139,	"to interface name index incorrect" },
+	{	140,	"dup-to interface name index incorrect" },
+	{	141,	"reply-to interface name index incorrect" },
+	{	142,	"could not initialise call now function" },
+	{	143,	"could not initialise call function" },
 /* -------------------------------------------------------------------------- */
 	{	10001,	"could not find token for auth iterator" },
 	{	10002,	"write permissions require to add/remove auth rule" },
@@ -321,6 +336,9 @@ log" },
 	{	60066,	"cannot allocate new outbound NAT bucketlen table" },
 	{	60067,	"cannot allocate new NAT rules table" },
 	{	60068,	"cannot allocate new NAT hostmap table" },
+	{	60069,	"new source lookup type is not dstlist" },
+	{	60070,	"cannot allocate NAT rule scratch space" },
+	{	60071,	"new destination lookup type is not dstlist" },
 /* -------------------------------------------------------------------------- */
 	{	70001,	"incorrect object size to get pool stats" },
 	{	70002,	"could not malloc memory for new pool node" },
@@ -346,6 +364,8 @@ log" },
 	{	70022,	"cannot find node to delete in pool" },
 	{	70023,	"pool name already exists" },
 	{	70024,	"uid mismatch for node removal" },
+	{	70025,	"stats device unit is invalid" },
+	{	70026,	"error copying out statistics" },
 /* -------------------------------------------------------------------------- */
 	{	80001,	"could not find proxy" },
 	{	80002,	"proxy does not support control operations" },
@@ -426,47 +446,90 @@ log" },
 	{	120001,	"null data pointer for iterator" },
 	{	120002,	"unit outside of acceptable range" },
 	{	120003,	"unknown iterator subtype" },
-	{	120004,	"cannot find destination list for iteration" },
+	{	120004,	"cannot find dest. list for iteration" },
 	{	120005,	"error copying out destination iteration list" },
 	{	120006,	"error copying out destination iteration node" },
 	{	120007,	"wrong size for frdest_t structure" },
 	{	120008,	"cannot allocate memory for new destination node" },
 	{	120009,	"error copying in destination node to add" },
-	{	120010,	"could not find destination table to add node to" },
+	{	120010,	"could not find destination list to add node to" },
 	{	120011,	"error copying in destination node to remove" },
-	{	120012,	"could not find dest. table to remove node from" },
-	{	120013,	"destination table already exists" },
+	{	120012,	"could not find dest. list to remove node from" },
+	{	120013,	"destination list already exists" },
 	{	120014,	"could not allocate new destination table" },
-	{	120015,	"could not find destination table to remove" },
-	{	120016,	"destination table cannot be removed - it is busy" },
+	{	120015,	"could not find destination list to remove" },
+	{	120016,	"destination list cannot be removed - it is busy" },
+	{	120017,	"error copying in names for destination" },
+	{	120018,	"destination name is too long/short" },
+	{	120019,	"unrecognised address family in destination" },
+	{	120020,	"statistics not yet supported for dest. lists" },
+	{	120021,	"error copying in new destination table" },
+	{	120022,	"cannot allocate memory for node table" },
+	{	120023,	"stats object size is incorrect for dest. lists" },
+	{	120024,	"stats device unit is invalid for dest. lists" },
+	{	120025,	"error copying out dest. list statistics" },
 /* -------------------------------------------------------------------------- */
 };
 
 
-char *ipf_geterror(fd)
+static ipf_error_entry_t *
+find_error(errnum)
+	int errnum;
+{
+	ipf_error_entry_t *ie;
+
+	int l = -1, r = IPF_NUM_ERRORS + 1, step;
+	step = (r - l) / 2;;
+
+	while (step != 0) {
+		ie = ipf_errors + l + step;
+		if (ie->iee_number == errnum)
+			return ie;
+		step = l + step;
+		if (ie->iee_number > errnum)
+			r = step;
+		else
+			l = step;
+		step = (r - l) / 2;;
+	}
+
+	return NULL;
+}
+
+char *
+ipf_geterror(fd, func)
 	int fd;
+	ioctlfunc_t *func;
 {
 	static char text[80];
 	ipf_error_entry_t *ie;
-	int step, errnum;
+	int errnum;
 
-	if (ioctl(fd, SIOCIPFINTERROR, &errnum) == 0) {
-		step = IPF_NUM_ERRORS;
-		ie = ipf_errors + step / 2;
+	if ((*func)(fd, SIOCIPFINTERROR, &errnum) == 0) {
 
-		while (step != 0) {
-			step >>= 1;
-			if (ie->iee_number == errnum)
-				return ie->iee_text;
-			if (ie->iee_number > errnum)
-				ie -= step;
-			else
-				ie += step;
-		}
-
+		ie = find_error(errnum);
+		if (ie != NULL)
+			return ie->iee_text;
 		sprintf(text, "unknown error %d", errnum);
 	} else {
 		sprintf(text, "retrieving error number failed (%d)", errno);
 	}
+	return text;
+}
+
+
+char *
+ipf_strerror(errnum)
+	int errnum;
+{
+	static char text[80];
+	ipf_error_entry_t *ie;
+
+
+	ie = find_error(errnum);
+	if (ie != NULL)
+		return ie->iee_text;
+
+	sprintf(text, "unknown error %d", errnum);
 	return text;
 }

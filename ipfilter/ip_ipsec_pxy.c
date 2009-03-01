@@ -138,8 +138,8 @@ ipf_p_ipsec_new(arg, fin, aps, nat)
 	ipf_nat_softc_t *softn = softc->ipf_nat_soft;
 #endif
 	ipsec_pxy_t *ipsec;
+	ipnat_t *ipn, *np;
 	fr_info_t fi;
-	ipnat_t *ipn;
 	char *ptr;
 	int p, off, dlen, ttl;
 	mb_t *m;
@@ -160,8 +160,10 @@ ipf_p_ipsec_new(arg, fin, aps, nat)
 			  ip->ip_dst) != NULL)
 		return -1;
 
+	np = nat->nat_ptr;
 	aps->aps_psiz = sizeof(*ipsec);
-	KMALLOCS(aps->aps_data, ipsec_pxy_t *, sizeof(*ipsec));
+	KMALLOCS(aps->aps_data, ipsec_pxy_t *,
+		 sizeof(*ipsec) + np->in_namelen);
 	if (aps->aps_data == NULL)
 		return -1;
 
@@ -192,11 +194,14 @@ ipf_p_ipsec_new(arg, fin, aps, nat)
 	ipn->in_ndstip = nat->nat_ndstip;
 	ipn->in_ndstmsk = 0xffffffff;
 	ipn->in_redir = NAT_MAP;
-	bcopy(nat->nat_ptr->in_ifnames[0], ipn->in_ifnames[0],
-	      sizeof(ipn->in_ifnames[0]));
 	ipn->in_pr[0] = IPPROTO_ESP;
 	ipn->in_pr[1] = IPPROTO_ESP;
 	MUTEX_INIT(&ipn->in_lock, "IPSec proxy NAT rule");
+
+	ipn->in_namelen = np->in_namelen;
+	bcopy(np->in_names, ipn->in_ifnames, ipn->in_namelen);
+	ipn->in_ifnames[0] = np->in_ifnames[0];
+	ipn->in_ifnames[1] = np->in_ifnames[1];
 
 	bcopy((char *)fin, (char *)&fi, sizeof(fi));
 	fi.fin_fi.fi_p = IPPROTO_ESP;

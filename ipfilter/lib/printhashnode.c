@@ -6,10 +6,9 @@
 
 #include "ipf.h"
 
-#define	PRINTF	(void)printf
-#define	FPRINTF	(void)fprintf
 
-iphtent_t *printhashnode(iph, ipep, copyfunc, opts)
+iphtent_t *
+printhashnode(iph, ipep, copyfunc, opts)
 	iphtable_t *iph;
 	iphtent_t *ipep;
 	copyfunc_t copyfunc;
@@ -48,7 +47,7 @@ iphtent_t *printhashnode(iph, ipep, copyfunc, opts)
 			case IPHASH_GROUPMAP :
 				if (strncmp(ipe.ipe_group, iph->iph_name,
 					    FR_GROUPLEN))
-					PRINTF(", group = %s", ipe.ipe_group);
+					PRINTF(", group=%s", ipe.ipe_group);
 				break;
 			}
 		}

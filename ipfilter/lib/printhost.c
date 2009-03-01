@@ -9,7 +9,8 @@
 #include "ipf.h"
 
 
-void	printhost(family, addr)
+void
+printhost(family, addr)
 	int	family;
 	u_32_t	*addr;
 {
@@ -20,15 +21,15 @@ void	printhost(family, addr)
 #endif
 
 	if ((family == -1) || !*addr)
-		printf("any");
+		PRINTF("any");
 	else {
 		void *ptr = addr;
 
 #ifdef  USE_INET6
-		printf("%s", inet_ntop(family, ptr, ipbuf, sizeof(ipbuf)));
+		PRINTF("%s", inet_ntop(family, ptr, ipbuf, sizeof(ipbuf)));
 #else
 		ipa.s_addr = *addr;
-		printf("%s", inet_ntoa(ipa));
+		PRINTF("%s", inet_ntoa(ipa));
 #endif
 	}
 }

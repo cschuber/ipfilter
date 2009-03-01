@@ -9,14 +9,16 @@
 #include "ipf.h"
 
 
-void print_toif(tag, fdp)
+void
+print_toif(tag, base, fdp)
 	char *tag;
+	char *base;
 	frdest_t *fdp;
 {
 	switch (fdp->fd_type)
 	{
 	case FRD_NORMAL :
-		printf("%s %s%s", tag, fdp->fd_name,
+		PRINTF("%s %s%s", tag, base + fdp->fd_name,
 		       (fdp->fd_ptr || (long)fdp->fd_ptr == -1) ? "" : "(!)");
 #ifdef	USE_INET6
 		if (use_inet6 && IP6_NOTZERO(&fdp->fd_ip6.in6)) {
@@ -24,11 +26,11 @@ void print_toif(tag, fdp)
 
 			inet_ntop(AF_INET6, &fdp->fd_ip6, ipv6addr,
 				  sizeof(fdp->fd_ip6));
-			printf(":%s", ipv6addr);
+			PRINTF(":%s", ipv6addr);
 		} else
 #endif
 			if (fdp->fd_ip.s_addr)
-				printf(":%s", inet_ntoa(fdp->fd_ip));
+				PRINTF(":%s", inet_ntoa(fdp->fd_ip));
 		putchar(' ');
 		break;
 	default :

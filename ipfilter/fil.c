@@ -150,7 +150,7 @@ static	int		ipf_flushlist __P((ipf_main_softc_t *, int, minor_t,
 static	int		ipf_flush_groups __P((ipf_main_softc_t *,
 					      int, int, int));
 static	ipfunc_t	ipf_findfunc __P((ipfunc_t));
-static	void		*ipf_findlookup __P((ipf_main_softc_t *, int,
+static	void		*ipf_findlookup __P((ipf_main_softc_t *, frentry_t *,
 					     i6addr_t *, lookupfunc_t *));
 static	frentry_t	*ipf_firewall __P((fr_info_t *, u_32_t *));
 static	int		ipf_fr_matcharray __P((fr_info_t *, int *));
@@ -2548,7 +2548,7 @@ ipf_scanlist(fin, pass)
 			if (ipf_matchtag(&fr->fr_nattag, fin->fin_nattag) == 0)
 				continue;
 		}
-		FR_VERBOSE(("=%s/%s.%d *", fr->fr_grhead,fr->fr_group, rulen));
+		FR_VERBOSE(("=%d/%d.%d *", fr->fr_grhead, fr->fr_group, rulen));
 
 		passt = fr->fr_flags;
 
@@ -2562,7 +2562,7 @@ ipf_scanlist(fin, pass)
 			frentry_t *frs;
 
 			ATOMIC_INC64(fr->fr_hits);
-			if ((fr->fr_func != NULL) &&
+			if ((fr->fr_func == NULL) ||
 			    (fr->fr_func == (ipfunc_t)-1))
 				continue;
 
@@ -2609,14 +2609,20 @@ ipf_scanlist(fin, pass)
 		if (passt & (FR_RETICMP|FR_FAKEICMP))
 			fin->fin_icode = fr->fr_icode;
 
-		(void) strncpy(fin->fin_group, fr->fr_group, FR_GROUPLEN);
+		if (fr->fr_group != -1) {
+			(void) strncpy(fin->fin_group,
+				       FR_NAME(fr, fr_group),
+				       strlen(FR_NAME(fr, fr_group)));
+		} else {
+			fin->fin_group[0] = '\0';
+		}
 
 		FR_DEBUG(("pass %#x\n", pass));
 
 		if (fr->fr_grp != NULL) {
 
 			fin->fin_fr = *fr->fr_grp;
-			FR_VERBOSE(("group %s\n", fr->fr_grhead));
+			FR_VERBOSE(("group %s\n", FR_NAME(fr, fr_grhead)));
 
 			if (FR_ISDECAPS(pass))
 				passt = ipf_decaps(fin, pass, fr->fr_icode);
@@ -2625,8 +2631,12 @@ ipf_scanlist(fin, pass)
 
 			if (fin->fin_fr == NULL) {
 				fin->fin_rule = rulen;
-				(void) strncpy(fin->fin_group, fr->fr_group,
-					       FR_GROUPLEN);
+				if (fr->fr_group != -1)
+					(void) strncpy(fin->fin_group,
+						       fr->fr_names +
+						       fr->fr_group,
+						       strlen(fr->fr_names +
+							      fr->fr_group));
 				fin->fin_fr = fr;
 				passt = pass;
 			}
@@ -3892,7 +3902,7 @@ ipf_group_add(softc, group, head, flags, unit, set)
 		fg->fg_head = head;
 		fg->fg_start = NULL;
 		fg->fg_next = *fgp;
-		bcopy(group, fg->fg_name, FR_GROUPLEN);
+		bcopy(group, fg->fg_name, strlen(group) + 1);
 		fg->fg_flags = gflags;
 		fg->fg_ref = 1;
 		*fgp = fg;
@@ -3987,10 +3997,15 @@ ipf_rulen(softc, unit, fr)
 	frentry_t *fh;
 	frgroup_t *fg;
 	u_32_t n = 0;
+	char *gname;
 
 	if (fr == NULL)
 		return -1;
-	fg = ipf_findgroup(softc, fr->fr_group, unit, softc->ipf_active, NULL);
+	if (fr->fr_group == -1)
+		gname = "";
+	else
+		gname = FR_NAME(fr, fr_group);
+	fg = ipf_findgroup(softc, gname, unit, softc->ipf_active, NULL);
 	if (fg == NULL)
 		return -1;
 	for (fh = fg->fg_head; fh; n++, fh = fh->fr_next)
@@ -4051,16 +4066,18 @@ ipf_flushlist(softc, set, unit, nfreedp, listp)
 				      fp->fr_icmpgrp);
 		}
 
-		if (fp->fr_grhead != NULL) {
-			freed += ipf_group_del(softc, fp->fr_grhead,
+		if (fp->fr_grhead != -1) {
+			freed += ipf_group_del(softc,
+					       FR_NAME(fp, fr_grhead),
 					       unit, set);
-			*fp->fr_grhead = '\0';
+			fp->fr_names[fp->fr_grhead] = '\0';
 		}
 
-		if (fp->fr_icmphead != NULL) {
-			freed += ipf_group_del(softc, fp->fr_icmphead,
+		if (fp->fr_icmphead != -1) {
+			freed += ipf_group_del(softc,
+					       FR_NAME(fp, fr_icmphead),
 					       unit, set);
-			*fp->fr_icmphead = '\0';
+			fp->fr_names[fp->fr_icmphead] = '\0';
 		}
 		fp->fr_next = NULL;
 
@@ -4323,6 +4340,8 @@ ipf_synclist(softc, fr, ifp)
 	void *ifp;
 {
 	frdest_t *fdp;
+	char *name;
+	void *ifa;
 	int v, i;
 
 	for (; fr; fr = fr->fr_next) {
@@ -4334,36 +4353,40 @@ ipf_synclist(softc, fr, ifp)
 		for (i = 0; i < 4; i++) {
 			if ((ifp != NULL) && (fr->fr_ifas[i] != ifp))
 				continue;
-			fr->fr_ifas[i] = ipf_resolvenic(softc,
-							fr->fr_ifnames[i], v);
+			if (fr->fr_ifnames[i] == -1)
+				continue;
+			name = FR_NAME(fr, fr_ifnames[i]);
+			fr->fr_ifas[i] = ipf_resolvenic(softc, name, v);
 		}
 
 		if (fr->fr_type == FR_T_IPF) {
 			if (fr->fr_satype != FRI_NORMAL &&
 			    fr->fr_satype != FRI_LOOKUP) {
-				ipf_ifpaddr(softc, v, fr->fr_satype,
-					    fr->fr_ifas[fr->fr_sifpidx],
+				ifa = ipf_resolvenic(softc, fr->fr_names +
+						     fr->fr_sifpidx, v);
+				ipf_ifpaddr(softc, v, fr->fr_satype, ifa,
 					    &fr->fr_src6, &fr->fr_smsk6);
 			}
 			if (fr->fr_datype != FRI_NORMAL &&
 			    fr->fr_datype != FRI_LOOKUP) {
-				ipf_ifpaddr(softc, v, fr->fr_datype,
-					    fr->fr_ifas[fr->fr_difpidx],
+				ifa = ipf_resolvenic(softc, fr->fr_names +
+						     fr->fr_sifpidx, v);
+				ipf_ifpaddr(softc, v, fr->fr_datype, ifa,
 					    &fr->fr_dst6, &fr->fr_dmsk6);
 			}
 		}
 
 		fdp = &fr->fr_tifs[0];
 		if ((ifp == NULL) || (fdp->fd_ptr == ifp))
-			ipf_resolvedest(softc, fdp, v);
+			ipf_resolvedest(softc, fr->fr_names, fdp, v);
 
 		fdp = &fr->fr_tifs[1];
 		if ((ifp == NULL) || (fdp->fd_ptr == ifp))
-			ipf_resolvedest(softc, fdp, v);
+			ipf_resolvedest(softc, fr->fr_names, fdp, v);
 
 		fdp = &fr->fr_dif;
 		if ((ifp == NULL) || (fdp->fd_ptr == ifp)) {
-			ipf_resolvedest(softc, fdp, v);
+			ipf_resolvedest(softc, fr->fr_names, fdp, v);
 
 			fr->fr_flags &= ~FR_DUP;
 			if ((fdp->fd_ptr != (void *)-1) &&
@@ -4719,6 +4742,8 @@ frrequest(softc, unit, req, data, set, makecopy)
 	frgroup_t *fg;
 	char *group;
 
+	ptr = NULL;
+	cptr = NULL;
 	fg = NULL;
 	fp = &frd;
 	if (makecopy != 0) {
@@ -4730,6 +4755,20 @@ frrequest(softc, unit, req, data, set, makecopy)
 			softc->ipf_interror = 6;
 			return EINVAL;
 		}
+		KMALLOCS(f, frentry_t *, fp->fr_size);
+		if (f == NULL) {
+			softc->ipf_interror = 131;
+			return ENOMEM;
+		}
+		error = ipf_inobjsz(softc, data, f, IPFOBJ_FRENTRY,
+				    fp->fr_size);
+		if (error) {
+			KFREES(f, fp->fr_size);
+			return error;
+		}
+
+		fp = f;
+		f = NULL;
 		fp->fr_ref = 0;
 		fp->fr_flags |= FR_COPIED;
 	} else {
@@ -4744,7 +4783,8 @@ frrequest(softc, unit, req, data, set, makecopy)
 	if (((fp->fr_dsize == 0) && (fp->fr_data != NULL)) ||
 	    ((fp->fr_dsize != 0) && (fp->fr_data == NULL))) {
 		softc->ipf_interror = 8;
-		return EINVAL;
+		error = EINVAL;
+		goto donenolock;
 	}
 
 	family = fp->fr_family;
@@ -4759,7 +4799,8 @@ frrequest(softc, unit, req, data, set, makecopy)
 		addrem = 2;
 	else {
 		softc->ipf_interror = 9;
-		return EINVAL;
+		error = EINVAL;
+		goto donenolock;
 	}
 
 	/*
@@ -4773,7 +4814,8 @@ frrequest(softc, unit, req, data, set, makecopy)
 #endif
 	} else if (family != 0) {
 		softc->ipf_interror = 10;
-		return EINVAL;
+		error = EINVAL;
+		goto donenolock;
 	}
 
 	/*
@@ -4784,11 +4826,24 @@ frrequest(softc, unit, req, data, set, makecopy)
 	if ((makecopy == 1) && (fp->fr_func != NULL)) {
 		if (ipf_findfunc(fp->fr_func) == NULL) {
 			softc->ipf_interror = 11;
-			return ESRCH;
+			error = ESRCH;
+			goto donenolock;
 		}
 		error = ipf_funcinit(softc, fp);
 		if (error != 0)
-			return error;
+			goto donenolock;
+	}
+	if ((fp->fr_flags & FR_CALLNOW) &&
+	    ((fp->fr_func == NULL) || (fp->fr_func == (void *)-1))) {
+		softc->ipf_interror = 142;
+		error = ESRCH;
+		goto donenolock;
+	}
+	if (((fp->fr_flags & FR_CMDMASK) == FR_CALL) &&
+	    ((fp->fr_func == NULL) || (fp->fr_func == (void *)-1))) {
+		softc->ipf_interror = 143;
+		error = ESRCH;
+		goto donenolock;
 	}
 
 	ptr = NULL;
@@ -4798,40 +4853,75 @@ frrequest(softc, unit, req, data, set, makecopy)
 		unit = IPL_LOGCOUNT;
 
 	/*
-	 * Check that the group number does exist and that its use (in/out)
-	 * matches what the rule is.
+	 * Check that each group name in the rule has a start index that
+	 * is valid.
 	 */
-
-	if (!strncmp(fp->fr_icmphead, "0", FR_GROUPLEN))
-		*fp->fr_icmphead = '\0';
-
-	if (!strncmp(fp->fr_grhead, "0", FR_GROUPLEN))
-		*fp->fr_grhead = '\0';
-
-	group = fp->fr_group;
-
-	if ((req != (int)SIOCZRLST) && (*group != '\0')) {
-		fg = ipf_findgroup(softc, group, unit, set, NULL);
-		if (fg == NULL) {
-			softc->ipf_interror = 12;
-			return ESRCH;
+	if (fp->fr_icmphead != -1) {
+		if ((fp->fr_icmphead < 0) ||
+		    (fp->fr_icmphead >= fp->fr_namelen)) {
+			softc->ipf_interror = 136;
+			error = EINVAL;
+			goto donenolock;
 		}
-		if (fg->fg_flags == 0)
-			fg->fg_flags = fp->fr_flags & FR_INOUT;
-		else if (fg->fg_flags != (fp->fr_flags & FR_INOUT)) {
-			softc->ipf_interror = 13;
-			return ESRCH;
-		}
+		if (!strcmp(FR_NAME(fp, fr_icmphead), "0"))
+			fp->fr_names[fp->fr_icmphead] = '\0';
 	}
 
-	/*
-	 * If a rule is going to be part of a group then it does not matter
-	 * whether it is an in or out rule.
-	 */
-	if ((fp->fr_flags & (FR_INQUE|FR_OUTQUE)) == 0) {
-		if (*group == '\0') {
+	if (fp->fr_grhead != -1) {
+		if ((fp->fr_grhead < 0) ||
+		    (fp->fr_grhead >= fp->fr_namelen)) {
+			softc->ipf_interror = 137;
+			error = EINVAL;
+			goto donenolock;
+		}
+		if (!strcmp(FR_NAME(fp, fr_grhead), "0"))
+			fp->fr_names[fp->fr_grhead] = '\0';
+	}
+
+	if (fp->fr_group != -1) {
+		if ((fp->fr_group < 0) ||
+		    (fp->fr_group >= fp->fr_namelen)) {
+			softc->ipf_interror = 138;
+			error = EINVAL;
+			goto donenolock;
+		}
+		if ((req != (int)SIOCZRLST) && (fp->fr_group != -1)) {
+			/*
+			 * Allow loading rules that are in groups to cause
+			 * them to be created if they don't already exit.
+			 */
+			group = FR_NAME(fp, fr_group);
+			fg = ipf_findgroup(softc, group, unit, set, NULL);
+			if (fg == NULL) {
+				if (addrem == 0) {
+					fg = ipf_group_add(softc, group, NULL,
+							   fp->fr_flags, unit,
+							   set);
+				}
+				if (fg == NULL) {
+					softc->ipf_interror = 12;
+					error = ESRCH;
+					goto donenolock;
+				}
+			}
+			if (fg->fg_flags == 0)
+				fg->fg_flags = fp->fr_flags & FR_INOUT;
+			else if (fg->fg_flags != (fp->fr_flags & FR_INOUT)) {
+				softc->ipf_interror = 13;
+				error = ESRCH;
+				goto donenolock;
+			}
+		}
+	} else {
+		/*
+		 * If a rule is going to be part of a group then it does
+		 * not matter whether it is an in or out rule, but if it
+		 * isn't in a group, then it does...
+		 */
+		if ((fp->fr_flags & (FR_INQUE|FR_OUTQUE)) == 0) {
 			softc->ipf_interror = 14;
-			return EINVAL;
+			error = EINVAL;
+			goto donenolock;
 		}
 	}
 	in = (fp->fr_flags & FR_INQUE) ? 0 : 1;
@@ -4851,7 +4941,8 @@ frrequest(softc, unit, req, data, set, makecopy)
 	}
 	if (fprev == NULL) {
 		softc->ipf_interror = 15;
-		return ESRCH;
+		error = ESRCH;
+		goto donenolock;
 	}
 
 	if (fg != NULL)
@@ -4865,13 +4956,15 @@ frrequest(softc, unit, req, data, set, makecopy)
 			KMALLOCS(ptr, void *, fp->fr_dsize);
 			if (ptr == NULL) {
 				softc->ipf_interror = 16;
-				return ENOMEM;
+				error = ENOMEM;
+				goto donenolock;
 			}
 			error = COPYIN(uptr, ptr, fp->fr_dsize);
 			if (error != 0) {
 				softc->ipf_interror = 17;
 				KFREES(ptr, fp->fr_dsize);
-				return EFAULT;
+				error = EFAULT;
+				goto donenolock;
 			}
 		} else {
 			ptr = uptr;
@@ -4890,21 +4983,20 @@ frrequest(softc, unit, req, data, set, makecopy)
 	case FR_T_BPFOPC :
 		if (fp->fr_dsize == 0) {
 			softc->ipf_interror = 19;
-			return EINVAL;
+			error = EINVAL;
+			break;
 		}
 		if (!bpf_validate(ptr, fp->fr_dsize/sizeof(struct bpf_insn))) {
-			if (makecopy && fp->fr_data != NULL) {
-				KFREES(fp->fr_data, fp->fr_dsize);
-			}
 			softc->ipf_interror = 20;
-			return EINVAL;
+			error = EINVAL;
 		}
 		break;
 #endif
 	case FR_T_IPF :
 		if (fp->fr_dsize != sizeof(fripf_t)) {
 			softc->ipf_interror = 21;
-			return EINVAL;
+			error = EINVAL;
+			break;
 		}
 
 		/*
@@ -4914,7 +5006,8 @@ frrequest(softc, unit, req, data, set, makecopy)
 		 */
 		if ((fp->fr_flags & FR_KEEPSTATE) && (fp->fr_flx & FI_OOW)) {
 			softc->ipf_interror = 22;
-			return EINVAL;
+			error = EINVAL;
+			break;
 		}
 
 		switch (fp->fr_satype)
@@ -4924,26 +5017,29 @@ frrequest(softc, unit, req, data, set, makecopy)
 		case FRI_NETWORK :
 		case FRI_NETMASKED :
 		case FRI_PEERADDR :
-			if (fp->fr_sifpidx < 0 || fp->fr_sifpidx > 3) {
-				if (makecopy && fp->fr_data != NULL) {
-					KFREES(fp->fr_data, fp->fr_dsize);
-				}
+			if (fp->fr_sifpidx < 0) {
 				softc->ipf_interror = 23;
-				return EINVAL;
+				error = EINVAL;
 			}
 			break;
 		case FRI_LOOKUP :
-			fp->fr_srcptr = ipf_findlookup(softc, IPL_LOGIPF,
+			fp->fr_srcptr = ipf_findlookup(softc, fp,
 						       &fp->fr_src6,
 						       &fp->fr_srcfunc);
 			if (fp->fr_srcfunc == NULL) {
-				softc->ipf_interror = 2222;
-				return ESRCH;
+				softc->ipf_interror = 132;
+				error = ESRCH;
 			}
 			break;
+		case FRI_NORMAL :
+			break;
 		default :
+			softc->ipf_interror = 133;
+			error = EINVAL;
 			break;
 		}
+		if (error != 0)
+			break;
 
 		switch (fp->fr_datype)
 		{
@@ -4952,25 +5048,25 @@ frrequest(softc, unit, req, data, set, makecopy)
 		case FRI_NETWORK :
 		case FRI_NETMASKED :
 		case FRI_PEERADDR :
-			if (fp->fr_difpidx < 0 || fp->fr_difpidx > 3) {
-				if (makecopy && fp->fr_data != NULL) {
-					KFREES(fp->fr_data, fp->fr_dsize);
-				}
+			if (fp->fr_difpidx < 0) {
 				softc->ipf_interror = 24;
-				return EINVAL;
+				error = EINVAL;
 			}
 			break;
 		case FRI_LOOKUP :
-			fp->fr_dstptr = ipf_findlookup(softc, IPL_LOGIPF,
+			fp->fr_dstptr = ipf_findlookup(softc, fp,
 						       &fp->fr_dst6,
 						       &fp->fr_dstfunc);
 			if (fp->fr_dstfunc == NULL) {
-				softc->ipf_interror = 3333;
-				return ESRCH;
+				softc->ipf_interror = 134;
+				error = ESRCH;
 			}
 			break;
-		default :
+		case FRI_NORMAL :
 			break;
+		default :
+			softc->ipf_interror = 135;
+			error = EINVAL;
 		}
 		break;
 
@@ -4985,20 +5081,44 @@ frrequest(softc, unit, req, data, set, makecopy)
 
 	case FR_T_IPFEXPR :
 		if (ipf_matcharray_verify(fp->fr_data, fp->fr_dsize) == -1) {
-			if (makecopy && fp->fr_data != NULL) {
-				KFREES(fp->fr_data, fp->fr_dsize);
-			}
 			softc->ipf_interror = 25;
-			return EINVAL;
+			error = EINVAL;
 		}
 		break;
 
 	default :
-		if (makecopy && fp->fr_data != NULL) {
-			KFREES(fp->fr_data, fp->fr_dsize);
-		}
 		softc->ipf_interror = 26;
-		return EINVAL;
+		error = EINVAL;
+		break;
+	}
+	if (error != 0)
+		goto donenolock;
+
+	if (fp->fr_tif.fd_name != -1) {
+		if ((fp->fr_tif.fd_name < 0) ||
+		    (fp->fr_tif.fd_name >= fp->fr_namelen)) {
+			softc->ipf_interror = 139;
+			error = EINVAL;
+			goto donenolock;
+		}
+	}
+
+	if (fp->fr_dif.fd_name != -1) {
+		if ((fp->fr_dif.fd_name < 0) ||
+		    (fp->fr_dif.fd_name >= fp->fr_namelen)) {
+			softc->ipf_interror = 140;
+			error = EINVAL;
+			goto donenolock;
+		}
+	}
+
+	if (fp->fr_rif.fd_name != -1) {
+		if ((fp->fr_rif.fd_name < 0) ||
+		    (fp->fr_rif.fd_name >= fp->fr_namelen)) {
+			softc->ipf_interror = 141;
+			error = EINVAL;
+			goto donenolock;
+		}
 	}
 
 	/*
@@ -5065,7 +5185,7 @@ frrequest(softc, unit, req, data, set, makecopy)
 			 * only resets them to 0 if they are successfully
 			 * copied out into user space.
 			 */
-			bcopy((char *)f, (char *)fp, sizeof(*f));
+			bcopy((char *)f, (char *)fp, f->fr_size);
 			/* MUTEX_DOWNGRADE(&softc->ipf_mutex); */
 
 			/*
@@ -5090,8 +5210,11 @@ frrequest(softc, unit, req, data, set, makecopy)
 			}
 		}
 
-		if ((ptr != NULL) && (makecopy != 0)) {
-			KFREES(ptr, fp->fr_dsize);
+		if (makecopy != 0) {
+			if (ptr != NULL) {
+				KFREES(ptr, fp->fr_dsize);
+			}
+			KFREES(fp, fp->fr_size);
 		}
 		RWLOCK_EXIT(&softc->ipf_mutex);
 		return error;
@@ -5178,6 +5301,14 @@ frrequest(softc, unit, req, data, set, makecopy)
 			}
 
 			ipf_rule_delete(softc, f, unit, set);
+
+			if (makecopy != 0) {
+				if (ptr != NULL) {
+					KFREES(ptr, fp->fr_dsize);
+				}
+				KFREES(fp, fp->fr_size);
+				fp = NULL;
+			}
 		}
 	} else {
 		/*
@@ -5186,80 +5317,62 @@ frrequest(softc, unit, req, data, set, makecopy)
 		if (f != NULL) {
 			softc->ipf_interror = 32;
 			error = EEXIST;
-		} else {
-			if (unit == IPL_LOGAUTH) {
-				error = ipf_auth_precmd(softc, req, fp, ftail);
+			goto done;
+		}
+		if (unit == IPL_LOGAUTH) {
+			error = ipf_auth_precmd(softc, req, fp, ftail);
+			goto done;
+		}
+
+		if (fp->fr_comment != 0 && makecopy) {
+			KMALLOCS(cptr, void *, fp->fr_commlen);
+			if (cptr == NULL) {
+				softc->ipf_interror = 128;
+				error = ENOMEM;
 				goto done;
 			}
-			if (makecopy) {
-				KMALLOC(f, frentry_t *);
-			} else
-				f = fp;
-			if (f != NULL) {
-				if (fp != f)
-					bcopy((char *)fp, (char *)f,
-					      sizeof(*f));
-
-				if (fp->fr_comment != 0 && makecopy) {
-					KMALLOCS(cptr, void *, fp->fr_commlen);
-					if (cptr == NULL) {
-						softc->ipf_interror = 128;
-						goto done;
-					}
-					error = COPYIN(fp->fr_comment, cptr,
-						       fp->fr_commlen);
-					if (error != 0) {
-						softc->ipf_interror = 129;
-						goto done;
-					}
-					f->fr_comment = cptr;
-				}
-
-				MUTEX_NUKE(&f->fr_lock);
-				MUTEX_INIT(&f->fr_lock, "filter rule lock");
-#ifdef	IPFILTER_SCAN
-				if (f->fr_isctag[0] != '\0' &&
-				    ipf_scan_attachfr(f))
-					f->fr_isc = (struct ipscan *)-1;
-#endif
-				if (f->fr_die != 0)
-					ipf_rule_expire_insert(softc, f, set);
-
-				f->fr_hits = 0;
-				if (makecopy != 0)
-					f->fr_ref = 1;
-				f->fr_pnext = ftail;
-				f->fr_next = *ftail;
-				*ftail = f;
-				if (addrem == 0)
-					ipf_fixskip(ftail, f, 1);
-
-				f->fr_icmpgrp = NULL;
-				group = f->fr_icmphead;
-				if (*group != '\0') {
-					fg = ipf_group_add(softc, group, f, 0,
-							   unit, set);
-					if (fg != NULL)
-						f->fr_icmpgrp = &fg->fg_start;
-				}
-
-				f->fr_grp = NULL;
-				group = f->fr_grhead;
-				if (*group != '\0') {
-					fg = ipf_group_add(softc, group, f,
-							   f->fr_flags, unit,
-							   set);
-					if (fg != NULL)
-						f->fr_grp = &fg->fg_start;
-				}
-			} else {
-				softc->ipf_interror = 33;
-				error = ENOMEM;
+			error = COPYIN(fp->fr_comment, cptr, fp->fr_commlen);
+			if (error != 0) {
+				softc->ipf_interror = 129;
+				goto done;
 			}
+			fp->fr_comment = cptr;
+		}
+
+		MUTEX_NUKE(&fp->fr_lock);
+		MUTEX_INIT(&fp->fr_lock, "filter rule lock");
+		if (fp->fr_die != 0)
+			ipf_rule_expire_insert(softc, fp, set);
+
+		fp->fr_hits = 0;
+		if (makecopy != 0)
+			fp->fr_ref = 1;
+		fp->fr_pnext = ftail;
+		fp->fr_next = *ftail;
+		*ftail = fp;
+		if (addrem == 0)
+			ipf_fixskip(ftail, fp, 1);
+
+		fp->fr_icmpgrp = NULL;
+		group = FR_NAME(fp, fr_icmphead);
+		if (*group != '\0') {
+			fg = ipf_group_add(softc, group, fp, 0, unit, set);
+			if (fg != NULL)
+				fp->fr_icmpgrp = &fg->fg_start;
+		}
+
+		fp->fr_grp = NULL;
+		group = FR_NAME(fp, fr_grhead);
+		if (*group != '\0') {
+			fg = ipf_group_add(softc, group, fp, fp->fr_flags,
+					   unit, set);
+			if (fg != NULL)
+				fp->fr_grp = &fg->fg_start;
 		}
 	}
 done:
 	RWLOCK_EXIT(&softc->ipf_mutex);
+donenolock:
 	if ((error != 0) && (makecopy != 0)) {
 		if (ptr != NULL) {
 			KFREES(ptr, fp->fr_dsize);
@@ -5267,6 +5380,7 @@ done:
 		if (cptr != NULL) {
 			KFREES(cptr, fp->fr_commlen);
 		}
+		KFREES(fp, fp->fr_size);
 	}
 	return (error);
 }
@@ -5293,11 +5407,11 @@ ipf_rule_delete(softc, f, unit, set)
 	int unit, set;
 {
 
-	if (*f->fr_grhead != '\0')
-		ipf_group_del(softc, f->fr_grhead, unit, set);
+	if (f->fr_grhead != -1)
+		ipf_group_del(softc, FR_NAME(f, fr_grhead), unit, set);
 
-	if (*f->fr_icmphead != '\0')
-		ipf_group_del(softc, f->fr_icmphead, unit, set);
+	if (f->fr_icmphead != -1)
+		ipf_group_del(softc, FR_NAME(f, fr_icmphead), unit, set);
 
 	/*
 	 * If fr_pdnext is set, then the rule is on the expire list, so
@@ -5378,7 +5492,7 @@ ipf_rule_expire_insert(softc, f, set)
 /* Function:   ipf_findlookup                                               */
 /* Returns:    NULL = failure, else success                                 */
 /* Parameters: softc(I) - pointer to soft context main structure            */
-/*             unit(I)  - device for which this is for                      */
+/*             fp(I)    - rule for which lookup is for                      */
 /*             addrp(I) - pointer to lookup information in address struct   */
 /*             funcp(I) - where to store the lookup function                */
 /*                                                                          */
@@ -5389,26 +5503,32 @@ ipf_rule_expire_insert(softc, f, set)
 /* the packet matching quicker.                                             */
 /* ------------------------------------------------------------------------ */
 static void *
-ipf_findlookup(softc, unit, addrp, funcp)
+ipf_findlookup(softc, fr, addrp, funcp)
 	ipf_main_softc_t *softc;
-	int unit;
+	frentry_t *fr;
 	i6addr_t *addrp;
 	lookupfunc_t *funcp;
 {
-	void *ptr;
+	void *ptr = NULL;
 
 	switch (addrp->iplookupsubtype)
 	{
 	case 0 :
 		ptr = ipf_lookup_res_num(softc, addrp->iplookuptype,
-					 unit, addrp->iplookupnum, funcp);
+					 IPL_LOGIPF, addrp->iplookupnum,
+					 funcp);
 		break;
 	case 1 :
+		if (addrp->iplookupname < 0)
+			break;
+		if (addrp->iplookupname >= fr->fr_namelen)
+			break;
 		ptr = ipf_lookup_res_name(softc, addrp->iplookuptype,
-					  unit, addrp->iplookupname, funcp);
+					  IPL_LOGIPF,
+					  fr->fr_names + addrp->iplookupname,
+					  funcp);
 		break;
 	default :
-		ptr = NULL;
 		break;
 	}
 
@@ -5609,7 +5729,7 @@ ipf_derefrule(softc, frp)
 			if (fr->fr_dsize) {
 				KFREES(fr->fr_data, fr->fr_dsize);
 			}
-			KFREE(fr);
+			KFREES(fr, fr->fr_size);
 			return 0;
 		}
 		return 1;
@@ -6310,11 +6430,11 @@ ipf_ioctlswitch(softc, unit, data, cmd, mode, uid, ctx)
  */
 static	int	ipf_objbytes[IPFOBJ_COUNT][2] = {
 	{ 1,	sizeof(struct frentry) },		/* frentry */
-	{ 0,	sizeof(struct friostat) },
+	{ 1,	sizeof(struct friostat) },
 	{ 0,	sizeof(struct fr_info) },
 	{ 0,	sizeof(struct ipf_authstat) },
 	{ 0,	sizeof(struct ipfrstat) },
-	{ 0,	sizeof(struct ipnat) },
+	{ 1,	sizeof(struct ipnat) },
 	{ 0,	sizeof(struct natstat) },
 	{ 0,	sizeof(struct ipstate_save) },
 	{ 1,	sizeof(struct nat_save) },		/* nat_save */
@@ -7514,8 +7634,10 @@ ipf_zerostats(softc, data)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_resolvedest                                             */
 /* Returns:     Nil                                                         */
-/* Parameters:  fdp(IO) - pointer to destination information to resolve     */
-/*              v(I)    - IP protocol version to match                      */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              base(I)  - where strings are stored                         */
+/*              fdp(IO)  - pointer to destination information to resolve    */
+/*              v(I)     - IP protocol version to match                     */
 /*                                                                          */
 /* Looks up an interface name in the frdest structure pointed to by fdp and */
 /* if a matching name can be found for the particular IP protocol version   */
@@ -7524,8 +7646,9 @@ ipf_zerostats(softc, data)
 /* indicate there is no information at all in the structure.                */
 /* ------------------------------------------------------------------------ */
 void
-ipf_resolvedest(softc, fdp, v)
+ipf_resolvedest(softc, base, fdp, v)
 	ipf_main_softc_t *softc;
+	char *base;
 	frdest_t *fdp;
 	int v;
 {
@@ -7533,8 +7656,8 @@ ipf_resolvedest(softc, fdp, v)
 
 	ifp = NULL;
 
-	if (*fdp->fd_name != '\0') {
-		ifp = GETIFP(fdp->fd_name, v);
+	if (fdp->fd_name != -1) {
+		ifp = GETIFP(base + fdp->fd_name, v);
 		if (ifp == NULL)
 			ifp = (void *)-1;
 	}
@@ -7558,16 +7681,6 @@ ipf_resolvedest(softc, fdp, v)
 /* to that passed in and that is also being used for that IP protocol       */
 /* version (necessary on some platforms where there are separate listings   */
 /* for both IPv4 and IPv6 on the same physical NIC.                         */
-/*                                                                          */
-/* One might wonder why name gets terminated with a \0 byte in here.  The   */
-/* reason is an interface name could get into the kernel structures of ipf  */
-/* in any number of ways and so long as they all use the same sized array   */
-/* to put the name in, it makes sense to ensure it gets null terminated     */
-/* before it is used for its intended purpose - finding its match in the    */
-/* kernel's list of configured interfaces.                                  */
-/*                                                                          */
-/* NOTE: This SHOULD ONLY be used with IPFilter structures that have an     */
-/*       array for the name that is LIFNAMSIZ bytes (at least) in length.   */
 /* ------------------------------------------------------------------------ */
 void *
 ipf_resolvenic(softc, name, v)
@@ -7583,8 +7696,6 @@ ipf_resolvenic(softc, name, v)
 	if ((name[1] == '\0') && ((name[0] == '-') || (name[0] == '*'))) {
 		return NULL;
 	}
-
-	name[LIFNAMSIZ - 1] = '\0';
 
 	nic = GETIFP(name, v);
 	if (nic == NULL)

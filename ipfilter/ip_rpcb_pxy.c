@@ -1243,7 +1243,7 @@ ipf_p_rpcb_getnat(fin, nat, proto, port)
 			ipn->in_scmp = 0;
 			ipn->in_dcmp = 0;
 		}
-		*ipn->in_plabel = '\0';
+		ipn->in_plabel = -1;
 
 		/* Create NAT entry.  return NULL if this fails. */
 		MUTEX_ENTER(&softn->ipf_nat_new);

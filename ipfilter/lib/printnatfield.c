@@ -47,7 +47,8 @@ wordtab_t natfields[] = {
 };
 
 
-void printnatfield(n, fieldnum)
+void
+printnatfield(n, fieldnum)
 	nat_t *n;
 	int fieldnum;
 {
@@ -66,151 +67,151 @@ void printnatfield(n, fieldnum)
 		break;
 
 	case 1:
-		printf("%#lx", (u_long)n->nat_ifps[0]);
+		PRINTF("%#lx", (u_long)n->nat_ifps[0]);
 		break;
 
 	case 2:
-		printf("%#lx", (u_long)n->nat_ifps[1]);
+		PRINTF("%#lx", (u_long)n->nat_ifps[1]);
 		break;
 
 	case 3:
-		printf("%d", n->nat_mtu[0]);
+		PRINTF("%d", n->nat_mtu[0]);
 		break;
 
 	case 4:
-		printf("%d", n->nat_mtu[1]);
+		PRINTF("%d", n->nat_mtu[1]);
 		break;
 
 	case 5:
-		printf("%s", n->nat_ifnames[0]);
+		PRINTF("%s", n->nat_ifnames[0]);
 		break;
 
 	case 6:
-		printf("%s", n->nat_ifnames[1]);
+		PRINTF("%s", n->nat_ifnames[1]);
 		break;
 
 	case 7:
-		printf("%d", n->nat_sumd[0]);
+		PRINTF("%d", n->nat_sumd[0]);
 		break;
 
 	case 8:
-		printf("%d", n->nat_sumd[1]);
+		PRINTF("%d", n->nat_sumd[1]);
 		break;
 
 	case 9:
 #ifdef USE_QUAD_T
-		printf("%qu", n->nat_pkts[0]);
+		PRINTF("%qu", n->nat_pkts[0]);
 #else
-		printf("%lu", n->nat_pkts[0]);
+		PRINTF("%lu", n->nat_pkts[0]);
 #endif
 		break;
 
 	case 10:
 #ifdef USE_QUAD_T
-		printf("%qu", n->nat_pkts[1]);
+		PRINTF("%qu", n->nat_pkts[1]);
 #else
-		printf("%lu", n->nat_pkts[1]);
+		PRINTF("%lu", n->nat_pkts[1]);
 #endif
 		break;
 
 	case 11:
 #ifdef USE_QUAD_T
-		printf("%qu", n->nat_bytes[0]);
+		PRINTF("%qu", n->nat_bytes[0]);
 #else
-		printf("%lu", n->nat_bytes[0]);
+		PRINTF("%lu", n->nat_bytes[0]);
 #endif
 		break;
 
 	case 12:
 #ifdef USE_QUAD_T
-		printf("%qu", n->nat_bytes[1]);
+		PRINTF("%qu", n->nat_bytes[1]);
 #else
-		printf("%lu", n->nat_bytes[1]);
+		PRINTF("%lu", n->nat_bytes[1]);
 #endif
 		break;
 
 	case 13:
-		printf("%d", n->nat_pr[0]);
+		PRINTF("%d", n->nat_pr[0]);
 		break;
 
 	case 14:
-		printf("%d", n->nat_pr[1]);
+		PRINTF("%d", n->nat_pr[1]);
 		break;
 
 	case 15:
-		printf("%u", n->nat_hv[0]);
+		PRINTF("%u", n->nat_hv[0]);
 		break;
 
 	case 16:
-		printf("%u", n->nat_hv[1]);
+		PRINTF("%u", n->nat_hv[1]);
 		break;
 
 	case 17:
-		printf("%d", n->nat_ref);
+		PRINTF("%d", n->nat_ref);
 		break;
 
 	case 18:
-		printf("%d", n->nat_rev);
+		PRINTF("%d", n->nat_rev);
 		break;
 
 	case 19:
-		printf("%d", n->nat_v[0]);
+		PRINTF("%d", n->nat_v[0]);
 		break;
 
 	case 33:
-		printf("%d", n->nat_v[0]);
+		PRINTF("%d", n->nat_v[0]);
 		break;
 
 	case 20:
-		printf("%d", n->nat_redir);
+		PRINTF("%d", n->nat_redir);
 		break;
 
 	case 21:
-		printf("%d", n->nat_use);
+		PRINTF("%d", n->nat_use);
 		break;
 
 	case 22:
-		printf("%u", n->nat_ipsumd);
+		PRINTF("%u", n->nat_ipsumd);
 		break;
 
 	case 23:
-		printf("%d", n->nat_dir);
+		PRINTF("%d", n->nat_dir);
 		break;
 
 	case 24:
-		printf("%s", hostname(n->nat_v[0], &n->nat_odstip));
+		PRINTF("%s", hostname(n->nat_v[0], &n->nat_odstip));
 		break;
 
 	case 25:
-		printf("%s", hostname(n->nat_v[0], &n->nat_osrcip));
+		PRINTF("%s", hostname(n->nat_v[0], &n->nat_osrcip));
 		break;
 
 	case 26:
-		printf("%s", hostname(n->nat_v[1], &n->nat_ndstip));
+		PRINTF("%s", hostname(n->nat_v[1], &n->nat_ndstip));
 		break;
 
 	case 27:
-		printf("%s", hostname(n->nat_v[1], &n->nat_nsrcip));
+		PRINTF("%s", hostname(n->nat_v[1], &n->nat_nsrcip));
 		break;
 
 	case 28:
-		printf("%hu", ntohs(n->nat_odport));
+		PRINTF("%hu", ntohs(n->nat_odport));
 		break;
 
 	case 29:
-		printf("%hu", ntohs(n->nat_osport));
+		PRINTF("%hu", ntohs(n->nat_osport));
 		break;
 
 	case 30:
-		printf("%hu", ntohs(n->nat_ndport));
+		PRINTF("%hu", ntohs(n->nat_ndport));
 		break;
 
 	case 31:
-		printf("%hu", ntohs(n->nat_nsport));
+		PRINTF("%hu", ntohs(n->nat_nsport));
 		break;
 
 	case 32:
-		printf("%u", n->nat_age);
+		PRINTF("%u", n->nat_age);
 		break;
 
 	default:

@@ -1,13 +1,15 @@
 #include "ipf.h"
 
-void printtcpflags(tcpf, tcpfm)
+
+void
+printtcpflags(tcpf, tcpfm)
 	u_32_t tcpf, tcpfm;
 {
 	u_char *t;
 	char *s;
 
 	if (tcpf & ~TCPF_ALL) {
-		printf("0x%x", tcpf);
+		PRINTF("0x%x", tcpf);
 	} else {
 		for (s = flagset, t = flags; *s; s++, t++) {
 			if (tcpf & *t)
@@ -18,7 +20,7 @@ void printtcpflags(tcpf, tcpfm)
 	if (tcpfm) {
 		(void)putchar('/');
 		if (tcpfm & ~TCPF_ALL) {
-			printf("0x%x", tcpfm);
+			PRINTF("0x%x", tcpfm);
 		} else {
 			for (s = flagset, t = flags; *s; s++, t++)
 				if (tcpfm & *t)

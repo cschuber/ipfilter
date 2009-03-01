@@ -8,9 +8,10 @@
 
 #include "ipf.h"
 
-void printaddr(family, type, ifname, addr, mask)
-	int family, type;
-	char *ifname;
+void
+printaddr(family, type, base, ifidx, addr, mask)
+	int family, type, ifidx;
+	char *base;
 	u_32_t *addr, *mask;
 {
 	char *suffix;
@@ -22,7 +23,7 @@ void printaddr(family, type, ifname, addr, mask)
 		break;
 
 	case FRI_DYNAMIC :
-		printf("%s", ifname);
+		PRINTF("%s", base + ifidx);
 		printmask(family, mask);
 		suffix = NULL;
 		break;
@@ -41,7 +42,7 @@ void printaddr(family, type, ifname, addr, mask)
 
 	case FRI_LOOKUP :
 		suffix = NULL;
-		printlookup((i6addr_t *)addr, (i6addr_t *)mask);
+		printlookup(base, (i6addr_t *)addr, (i6addr_t *)mask);
 		break;
 
 	case FRI_NONE :
@@ -62,13 +63,13 @@ void printaddr(family, type, ifname, addr, mask)
 		suffix = NULL;
 		break;
 	default :
-		printf("<%d>", type);
+		PRINTF("<%d>", type);
 		printmask(family, mask);
 		suffix = NULL;
 		break;
 	}
 
 	if (suffix != NULL) {
-		printf("%s/%s", ifname, suffix);
+		PRINTF("%s/%s", base + ifidx, suffix);
 	}
 }

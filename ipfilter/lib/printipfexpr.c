@@ -5,7 +5,8 @@ static void printhosts __P((int *));
 static void printsingle __P((int *));
 
 
-void printipfexpr(array)
+void
+printipfexpr(array)
 	int *array;
 {
 	int i, nelems, j, not;
@@ -23,42 +24,42 @@ void printipfexpr(array)
 		switch (ipfe->ipfe_cmd)
 		{
 		case IPF_EXP_IP_ADDR :
-			printf("ip.addr %s= ", not ? "!" : "");
+			PRINTF("ip.addr %s= ", not ? "!" : "");
 			printhosts(array + i);
 			break;
 
 		case IPF_EXP_IP_PR :
-			printf("ip.p %s= ", not ? "!" : "");
+			PRINTF("ip.p %s= ", not ? "!" : "");
 			printsingle(array + i);
 			break;
 
 		case IPF_EXP_IP_SRCADDR :
-			printf("ip.src %s= ", not ? "!" : "");
+			PRINTF("ip.src %s= ", not ? "!" : "");
 			printhosts(array + i);
 			break;
 
 		case IPF_EXP_IP_DSTADDR :
-			printf("ip.dst %s= ", not ? "!" : "");
+			PRINTF("ip.dst %s= ", not ? "!" : "");
 			printhosts(array + i);
 			break;
 
 		case IPF_EXP_TCP_PORT :
-			printf("tcp.port %s= ", not ? "!" : "");
+			PRINTF("tcp.port %s= ", not ? "!" : "");
 			printport(array + i);
 			break;
 
 		case IPF_EXP_TCP_DPORT :
-			printf("tcp.dport %s= ", not ? "!" : "");
+			PRINTF("tcp.dport %s= ", not ? "!" : "");
 			printport(array + i);
 			break;
 
 		case IPF_EXP_TCP_SPORT :
-			printf("tcp.sport %s= ", not ? "!" : "");
+			PRINTF("tcp.sport %s= ", not ? "!" : "");
 			printport(array + i);
 			break;
 
 		case IPF_EXP_TCP_FLAGS :
-			printf("tcp.flags %s= ", not ? "!" : "");
+			PRINTF("tcp.flags %s= ", not ? "!" : "");
 
 			for (j = 0; j < ipfe->ipfe_narg; ) {
 				printtcpflags(array[i + 3], array[i + 4]);
@@ -69,27 +70,27 @@ void printipfexpr(array)
 			break;
 
 		case IPF_EXP_UDP_PORT :
-			printf("udp.port %s= ", not ? "!" : "");
+			PRINTF("udp.port %s= ", not ? "!" : "");
 			printport(array + i);
 			break;
 
 		case IPF_EXP_UDP_DPORT :
-			printf("udp.dport %s= ", not ? "!" : "");
+			PRINTF("udp.dport %s= ", not ? "!" : "");
 			printport(array + i);
 			break;
 
 		case IPF_EXP_UDP_SPORT :
-			printf("udp.sport %s= ", not ? "!" : "");
+			PRINTF("udp.sport %s= ", not ? "!" : "");
 			printport(array + i);
 			break;
 
 		case IPF_EXP_IDLE_GT :
-			printf("idle-gt %s= ", not ? "!" : "");
+			PRINTF("idle-gt %s= ", not ? "!" : "");
 			printsingle(array + i);
 			break;
 
 		case IPF_EXP_TCP_STATE :
-			printf("tcp-state %s= ", not ? "!" : "");
+			PRINTF("tcp-state %s= ", not ? "!" : "");
 			printsingle(array + i);
 			break;
 
@@ -97,7 +98,7 @@ void printipfexpr(array)
 			break;
 
 		default :
-			printf("#%#x,len=%d;",
+			PRINTF("#%#x,len=%d;",
 			       ipfe->ipfe_cmd, ipfe->ipfe_narg);
 		}
 
@@ -118,7 +119,7 @@ static void printsingle(array)
 	int i;
 
 	for (i = 0; i < ipfe->ipfe_narg; ) {
-		printf("%d", array[i + 3]);
+		PRINTF("%d", array[i + 3]);
 		i++;
 		if (i < ipfe->ipfe_narg)
 			putchar(',');
@@ -133,7 +134,7 @@ static void printport(array)
 	int i;
 
 	for (i = 0; i < ipfe->ipfe_narg; ) {
-		printf("%d", ntohs(array[i + 3]));
+		PRINTF("%d", ntohs(array[i + 3]));
 		i++;
 		if (i < ipfe->ipfe_narg)
 			putchar(',');

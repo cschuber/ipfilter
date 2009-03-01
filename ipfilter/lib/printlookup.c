@@ -9,7 +9,9 @@
 #include "ipf.h"
 
 
-void printlookup(addr, mask)
+void
+printlookup(base, addr, mask)
+	char *base;
 	i6addr_t *addr, *mask;
 {
 	char name[32];
@@ -17,24 +19,27 @@ void printlookup(addr, mask)
 	switch (addr->iplookuptype)
 	{
 	case IPLT_POOL :
-		printf("pool/");
+		PRINTF("pool/");
 		break;
 	case IPLT_HASH :
-		printf("hash/");
+		PRINTF("hash/");
+		break;
+	case IPLT_DSTLIST :
+		PRINTF("dstlist/");
 		break;
 	default :
-		printf("lookup(%x)=", addr->iplookuptype);
+		PRINTF("lookup(%x)=", addr->iplookuptype);
 		break;
 	}
 
 	if (addr->iplookupsubtype == 0)
-		printf("%u", addr->iplookupnum);
+		PRINTF("%u", addr->iplookupnum);
 	else if (addr->iplookupsubtype == 1) {
-		strncpy(name, addr->iplookupname, sizeof(addr->iplookupname));
-		name[sizeof(addr->iplookupname)] = '\0';
-		printf("%s", name);
+		strncpy(name, base + addr->iplookupname, sizeof(name));
+		name[sizeof(name) - 1] = '\0';
+		PRINTF("%s", name);
 	}
 
 	if (mask->iplookupptr == NULL)
-		printf("(!)");
+		PRINTF("(!)");
 }

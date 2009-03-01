@@ -13,7 +13,8 @@
 #endif
 
 
-void printpacket(dir, m)
+void
+printpacket(dir, m)
 	int dir;
 	mb_t *m;
 {
@@ -42,10 +43,10 @@ void printpacket(dir, m)
 		for (; m != NULL; m = m->mb_next) {
 			len = m->mb_len;
 			for (s = (u_char *)m->mb_data, i = 0; i < len; i++) {
-				printf("%02x", *s++ & 0xff);
+				PRINTF("%02x", *s++ & 0xff);
 				if (len - i > 1) {
 					i++;
-					printf("%02x", *s++ & 0xff);
+					PRINTF("%02x", *s++ & 0xff);
 				}
 				putchar(' ');
 			}
@@ -61,25 +62,25 @@ void printpacket(dir, m)
 	}
 
 	if (dir)
-		printf("> ");
+		PRINTF("> ");
 	else
-		printf("< ");
+		PRINTF("< ");
 
 	off = ntohs(ip->ip_off);
 	tcp = (struct tcphdr *)((char *)ip + (IP_HL(ip) << 2));
-	printf("ip #%d %d(%d) %d", ntohs(ip->ip_id), ntohs(ip->ip_len),
+	PRINTF("ip #%d %d(%d) %d", ntohs(ip->ip_id), ntohs(ip->ip_len),
 	       IP_HL(ip) << 2, ip->ip_p);
 	if (off & IP_OFFMASK)
-		printf(" @%d", off << 3);
-	printf(" %s", inet_ntoa(ip->ip_src));
+		PRINTF(" @%d", off << 3);
+	PRINTF(" %s", inet_ntoa(ip->ip_src));
 	if (!(off & IP_OFFMASK))
 		if (ip->ip_p == IPPROTO_TCP || ip->ip_p == IPPROTO_UDP)
-			printf(",%d", ntohs(tcp->th_sport));
-	printf(" > ");
-	printf("%s", inet_ntoa(ip->ip_dst));
+			PRINTF(",%d", ntohs(tcp->th_sport));
+	PRINTF(" > ");
+	PRINTF("%s", inet_ntoa(ip->ip_dst));
 	if (!(off & IP_OFFMASK)) {
 		if (ip->ip_p == IPPROTO_TCP || ip->ip_p == IPPROTO_UDP)
-			printf(",%d", ntohs(tcp->th_dport));
+			PRINTF(",%d", ntohs(tcp->th_dport));
 		if ((ip->ip_p == IPPROTO_TCP) && (tcp->th_flags != 0)) {
 			putchar(' ');
 			if (tcp->th_flags & TH_FIN)

@@ -17,18 +17,17 @@ static const char rcsid[] = "@(#)$Id$";
 void
 printactiveaddress(v, fmt, addr, ifname)
 	int v;
-	char *fmt;
+	char *fmt, *ifname;
 	i6addr_t *addr;
-	char *ifname;
 {
 	switch (v)
 	{
 	case 4 :
-		printf(fmt, inet_ntoa(addr->in4));
+		PRINTF(fmt, inet_ntoa(addr->in4));
 		break;
 #ifdef USE_INET6
 	case 6 :
-		printaddr(AF_INET6, FRI_NORMAL, ifname,
+		printaddr(AF_INET6, FRI_NORMAL, ifname, 0,
 			  (u_32_t *)&addr->in6, NULL);
 		break;
 #endif

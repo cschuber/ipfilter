@@ -124,6 +124,7 @@ ipf_lookup_t ipf_htable_backend = {
 	ipf_htable_deref,
 	ipf_htable_exists,
 	ipf_htable_select_add_ref,
+	NULL,
 	ipf_htable_expire
 };
 
@@ -237,6 +238,7 @@ ipf_htable_stats_get(softc, arg, op)
 {
 	ipf_htable_softc_t *softh = arg;
 	iphtstat_t stats;
+	int err;
 
 	if (op->iplo_size != sizeof(stats)) {
 		softc->ipf_interror = 30001;
@@ -248,7 +250,8 @@ ipf_htable_stats_get(softc, arg, op)
 	stats.iphs_numnodes = softh->ipf_nhtnodes[op->iplo_unit];
 	stats.iphs_nomem = softh->ipht_nomem[op->iplo_unit];
 
-	if (COPYOUT(&stats, op->iplo_struct, sizeof(stats)) != 0) {
+	err = COPYOUT(&stats, op->iplo_struct, sizeof(stats));
+	if (err != 0) {
 		softc->ipf_interror = 30013;
 		return EFAULT;
 	}

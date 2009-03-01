@@ -8,11 +8,13 @@
 
 #include "ipf.h"
 
-void printifname(format, name, ifp)
+
+void
+printifname(format, name, ifp)
 	char *format, *name;
 	void *ifp;
 {
-	printf("%s%s", format, name);
+	PRINTF("%s%s", format, name);
 	if ((ifp == NULL) && strcmp(name, "-") && strcmp(name, "*"))
-		printf("(!)");
+		PRINTF("(!)");
 }

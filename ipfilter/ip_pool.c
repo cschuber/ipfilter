@@ -56,6 +56,7 @@ struct file;
 #undef _NET_RADIX_H_
 #include "radix_ipf.h"
 #define _NET_RADIX_H_	1
+#include <sys/socket.h>
 #include <net/if.h>
 #include <netinet/in.h>
 
@@ -129,6 +130,7 @@ ipf_lookup_t ipf_pool_backend = {
 	ipf_pool_deref,
 	ipf_pool_find,
 	ipf_pool_select_add_ref,
+	NULL,
 	ipf_pool_expire
 };
 
@@ -486,7 +488,8 @@ ipf_pool_table_add(softc, arg, op)
 {
 	int err;
 
-	if (ipf_pool_find(arg, op->iplo_unit, op->iplo_name) != NULL) {
+	if (((op->iplo_arg & LOOKUP_ANON) == 0) &&
+	    (ipf_pool_find(arg, op->iplo_unit, op->iplo_name) != NULL)) {
 		softc->ipf_interror = 70023;
 		err = EEXIST;
 	} else {
@@ -552,11 +555,17 @@ ipf_pool_stats_get(softc, arg, op)
 		else
 			stats.ipls_list[unit] = softp->ipf_pool_list[unit];
 	} else {
+		softc->ipf_interror = 70025;
 		err = EINVAL;
 	}
-	if (err == 0)
+	if (err == 0) {
 		err = COPYOUT(&stats, op->iplo_struct, sizeof(stats));
-	return err;
+		if (err != 0) {
+			softc->ipf_interror = 70026;
+			return EFAULT;
+		}
+	}
+	return 0;
 }
 
 

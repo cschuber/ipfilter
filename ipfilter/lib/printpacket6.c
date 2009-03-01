@@ -12,7 +12,8 @@
  * This is meant to work without the IPv6 header files being present or
  * the inet_ntop() library.
  */
-void printpacket6(dir, m)
+void
+printpacket6(dir, m)
 	int dir;
 	mb_t *m;
 {
@@ -30,26 +31,26 @@ void printpacket6(dir, m)
 	addrs = (u_short *)buf + 4;
 
 	if (dir)
-		printf("> ");
+		PRINTF("> ");
 	else
-		printf("< ");
+		PRINTF("< ");
 
-	printf("ip6/%d %d %#x %d", buf[0] & 0xf, plen, flow, p);
-	printf(" %x:%x:%x:%x:%x:%x:%x:%x",
+	PRINTF("ip6/%d %d %#x %d", buf[0] & 0xf, plen, flow, p);
+	PRINTF(" %x:%x:%x:%x:%x:%x:%x:%x",
 		ntohs(addrs[0]), ntohs(addrs[1]), ntohs(addrs[2]),
 		ntohs(addrs[3]), ntohs(addrs[4]), ntohs(addrs[5]),
 		ntohs(addrs[6]), ntohs(addrs[7]));
 	if (plen >= 4)
 		if (p == IPPROTO_TCP || p == IPPROTO_UDP)
-			(void)printf(",%d", ntohs(tcp->th_sport));
-	printf(" >");
+			(void)PRINTF(",%d", ntohs(tcp->th_sport));
+	PRINTF(" >");
 	addrs += 8;
-	printf(" %x:%x:%x:%x:%x:%x:%x:%x",
+	PRINTF(" %x:%x:%x:%x:%x:%x:%x:%x",
 		ntohs(addrs[0]), ntohs(addrs[1]), ntohs(addrs[2]),
 		ntohs(addrs[3]), ntohs(addrs[4]), ntohs(addrs[5]),
 		ntohs(addrs[6]), ntohs(addrs[7]));
 	if (plen >= 4)
 		if (p == IPPROTO_TCP || p == IPPROTO_UDP)
-			(void)printf(",%d", ntohs(tcp->th_dport));
+			PRINTF(",%d", ntohs(tcp->th_dport));
 	putchar('\n');
 }

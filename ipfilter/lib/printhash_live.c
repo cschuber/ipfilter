@@ -8,11 +8,9 @@
 #include "ipf.h"
 #include "netinet/ipl.h"
 
-#define	PRINTF	(void)printf
-#define	FPRINTF	(void)fprintf
 
-
-iphtable_t *printhash_live(hp, fd, name, opts)
+iphtable_t *
+printhash_live(hp, fd, name, opts)
 	iphtable_t *hp;
 	int fd;
 	char *name;

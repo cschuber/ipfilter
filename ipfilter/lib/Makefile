@@ -47,6 +47,7 @@ LIBOBJS=$(DEST)/addicmp.o \
      $(DEST)/ipferror.o \
      $(DEST)/ipoptsec.o \
      $(DEST)/ipf_dotuning.o \
+     $(DEST)/ipf_perror.o \
      $(DEST)/ipft_ef.o \
      $(DEST)/ipft_hx.o \
      $(DEST)/ipft_pc.o \
@@ -57,6 +58,8 @@ LIBOBJS=$(DEST)/addicmp.o \
      $(DEST)/kmemcpywrap.o \
      $(DEST)/kvatoname.o \
      $(DEST)/load_file.o \
+     $(DEST)/load_dstlist.o \
+     $(DEST)/load_dstlistnode.o \
      $(DEST)/load_hash.o \
      $(DEST)/load_hashnode.o \
      $(DEST)/load_http.o \
@@ -75,6 +78,7 @@ LIBOBJS=$(DEST)/addicmp.o \
      $(DEST)/parsefields.o \
      $(DEST)/parseipfexpr.o \
      $(DEST)/parsewhoisline.o \
+     $(DEST)/poolio.o \
      $(DEST)/portname.o \
      $(DEST)/print_toif.o \
      $(DEST)/printactiveaddr.o \
@@ -82,6 +86,10 @@ LIBOBJS=$(DEST)/addicmp.o \
      $(DEST)/printaddr.o \
      $(DEST)/printaps.o \
      $(DEST)/printbuf.o \
+     $(DEST)/printdstlist.o \
+     $(DEST)/printdstlistdata.o \
+     $(DEST)/printdstlistnode.o \
+     $(DEST)/printdstlistpolicy.o \
      $(DEST)/printfieldhdr.o \
      $(DEST)/printfr.o \
      $(DEST)/printfraginfo.o \
@@ -89,6 +97,7 @@ LIBOBJS=$(DEST)/addicmp.o \
      $(DEST)/printhashdata.o \
      $(DEST)/printhashnode.o \
      $(DEST)/printhash_live.o \
+     $(DEST)/printdstl_live.o \
      $(DEST)/printhost.o \
      $(DEST)/printhostmap.o \
      $(DEST)/printhostmask.o \
@@ -116,6 +125,7 @@ LIBOBJS=$(DEST)/addicmp.o \
      $(DEST)/printtcpflags.o \
      $(DEST)/printtunable.o \
      $(DEST)/printtqtable.o \
+     $(DEST)/printunit.o \
      $(DEST)/remove_hash.o \
      $(DEST)/remove_hashnode.o \
      $(DEST)/remove_pool.o \
@@ -220,6 +230,8 @@ $(DEST)/ionames.o: $(LIBSRC)/ionames.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/ionames.c -o $@
 $(DEST)/ipf_dotuning.o: $(LIBSRC)/ipf_dotuning.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/ipf_dotuning.c -o $@
+$(DEST)/ipf_perror.o: $(LIBSRC)/ipf_perror.c $(INCDEP)
+	$(CC) $(CCARGS) -c $(LIBSRC)/ipf_perror.c -o $@
 $(DEST)/ipft_ef.o: $(LIBSRC)/ipft_ef.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/ipft_ef.c -o $@
 $(DEST)/ipft_hx.o: $(LIBSRC)/ipft_hx.c $(INCDEP)
@@ -240,6 +252,11 @@ $(DEST)/kvatoname.o: $(LIBSRC)/kvatoname.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/kvatoname.c -o $@
 $(DEST)/load_file.o: $(LIBSRC)/load_file.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/load_file.c -o $@
+$(DEST)/load_dstlist.o: $(LIBSRC)/load_dstlist.c $(INCDEP) $(TOP)/ip_dstlist.h
+	$(CC) $(CCARGS) -c $(LIBSRC)/load_dstlist.c -o $@
+$(DEST)/load_dstlistnode.o: $(LIBSRC)/load_dstlistnode.c $(INCDEP) \
+    $(TOP)/ip_dstlist.h
+	$(CC) $(CCARGS) -c $(LIBSRC)/load_dstlistnode.c -o $@
 $(DEST)/load_hash.o: $(LIBSRC)/load_hash.c $(INCDEP) $(TOP)/ip_htable.h
 	$(CC) $(CCARGS) -c $(LIBSRC)/load_hash.c -o $@
 $(DEST)/load_hashnode.o: $(LIBSRC)/load_hashnode.c $(INCDEP) $(TOP)/ip_htable.h
@@ -277,6 +294,8 @@ $(DEST)/parseipfexpr.o: $(LIBSRC)/parseipfexpr.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/parseipfexpr.c -o $@
 $(DEST)/parsewhoisline.o: $(LIBSRC)/parsewhoisline.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/parsewhoisline.c -o $@
+$(DEST)/poolio.o: $(LIBSRC)/poolio.c $(INCDEP)
+	$(CC) $(CCARGS) -c $(LIBSRC)/poolio.c -o $@
 $(DEST)/portname.o: $(LIBSRC)/portname.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/portname.c -o $@
 $(DEST)/print_toif.o: $(LIBSRC)/print_toif.c $(INCDEP)
@@ -291,6 +310,17 @@ $(DEST)/printaps.o: $(LIBSRC)/printaps.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/printaps.c -o $@
 $(DEST)/printbuf.o: $(LIBSRC)/printbuf.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/printbuf.c -o $@
+$(DEST)/printdstlist.o: $(LIBSRC)/printdstlist.c $(INCDEP) $(TOP)/ip_dstlist.h
+	$(CC) $(CCARGS) -c $(LIBSRC)/printdstlist.c -o $@
+$(DEST)/printdstlistdata.o: $(LIBSRC)/printdstlistdata.c $(INCDEP) \
+    $(TOP)/ip_dstlist.h
+	$(CC) $(CCARGS) -c $(LIBSRC)/printdstlistdata.c -o $@
+$(DEST)/printdstlistnode.o: $(LIBSRC)/printdstlistnode.c $(INCDEP) \
+    $(TOP)/ip_dstlist.h
+	$(CC) $(CCARGS) -c $(LIBSRC)/printdstlistnode.c -o $@
+$(DEST)/printdstlistpolicy.o: $(LIBSRC)/printdstlistpolicy.c $(INCDEP) \
+    $(TOP)/ip_dstlist.h
+	$(CC) $(CCARGS) -c $(LIBSRC)/printdstlistpolicy.c -o $@
 $(DEST)/printfieldhdr.o: $(LIBSRC)/printfieldhdr.c $(TOP)/ip_fil.h
 	$(CC) $(CCARGS) -c $(LIBSRC)/printfieldhdr.c -o $@
 $(DEST)/printfr.o: $(LIBSRC)/printfr.c $(TOP)/ip_fil.h
@@ -308,6 +338,9 @@ $(DEST)/printhashnode.o: $(LIBSRC)/printhashnode.c $(TOP)/ip_fil.h \
 $(DEST)/printhash_live.o: $(LIBSRC)/printhash_live.c $(TOP)/ip_fil.h \
     $(TOP)/ip_htable.h
 	$(CC) $(CCARGS) -c $(LIBSRC)/printhash_live.c -o $@
+$(DEST)/printdstl_live.o: $(LIBSRC)/printdstl_live.c $(TOP)/ip_fil.h \
+    $(TOP)/ip_dstlist.h
+	$(CC) $(CCARGS) -c $(LIBSRC)/printdstl_live.c -o $@
 $(DEST)/printip.o: $(LIBSRC)/printip.c $(TOP)/ip_fil.h
 	$(CC) $(CCARGS) -c $(LIBSRC)/printip.c -o $@
 $(DEST)/printipfexpr.o: $(LIBSRC)/printipfexpr.c $(TOP)/ip_fil.h
@@ -365,6 +398,8 @@ $(DEST)/printtqtable.o: $(LIBSRC)/printtqtable.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/printtqtable.c -o $@
 $(DEST)/printtunable.o: $(LIBSRC)/printtunable.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/printtunable.c -o $@
+$(DEST)/printunit.o: $(LIBSRC)/printunit.c $(INCDEP)
+	$(CC) $(CCARGS) -c $(LIBSRC)/printunit.c -o $@
 $(DEST)/remove_hash.o: $(LIBSRC)/remove_hash.c $(INCDEP) \
     $(TOP)/ip_htable.h
 	$(CC) $(CCARGS) -c $(LIBSRC)/remove_hash.c -o $@

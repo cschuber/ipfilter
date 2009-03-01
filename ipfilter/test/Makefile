@@ -3,6 +3,9 @@
 #
 # See the IPFILTER.LICENCE file for details on licencing.
 #
+POOLDEP=../ip_lookup.c ../ip_lookup.h ../ip_pool.c ../ip_pool.h \
+	../ip_htable.c ../ip_htable.h ../ip_dstlist.c ../ip_dstlist.h \
+	../tools/ippool_y.y
 BINDEST=/usr/local/bin
 SBINDEST=/sbin
 MANDIR=/usr/share/man
@@ -399,6 +402,9 @@ in100: expected/in100 regress/in100
 	@/bin/sh ./intest `awk "/^$@ / { print; } " test.format`
 
 in101: expected/in101 regress/in101
+	@/bin/sh ./intest `awk "/^$@ / { print; } " test.format`
+
+in102: expected/in102 regress/in102
 	@/bin/sh ./intest `awk "/^$@ / { print; } " test.format`
 
 l1:

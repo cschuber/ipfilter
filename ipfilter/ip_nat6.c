@@ -92,6 +92,7 @@ extern struct ifnet vpnif;
 #include "netinet/ip_state.h"
 #include "netinet/ip_proxy.h"
 #include "netinet/ip_lookup.h"
+#include "netinet/ip_dstlist.h"
 #ifdef	IPFILTER_SYNC
 #include "netinet/ip_sync.h"
 #endif
@@ -1216,6 +1217,7 @@ ipf_nat6_insert(softc, softn, nat)
 {
 	u_int hv1, hv2;
 	nat_t **natp;
+	ipnat_t *in;
 
 	/*
 	 * Try and return an error as early as possible, so calculate the hash
@@ -1276,6 +1278,7 @@ ipf_nat6_insert(softc, softn, nat)
 
 	MUTEX_INIT(&nat->nat_lock, "nat entry lock");
 
+	in = nat->nat_ptr;
 	nat->nat_ref = 1;
 	nat->nat_bytes[0] = 0;
 	nat->nat_pkts[0] = 0;
@@ -1290,12 +1293,11 @@ ipf_nat6_insert(softc, softn, nat)
 		nat->nat_ifnames[1][LIFNAMSIZ - 1] = '\0';
 		nat->nat_ifps[1] = ipf_resolvenic(softc, nat->nat_ifnames[1],
 						  nat->nat_v[1]);
-	} else {
-		ipnat_t *in = nat->nat_ptr;
+	} else if (in->in_ifnames[1] != -1) {
+		char *name;
 
-		if (in->in_ifnames[1][1] != '\0' &&
-		    in->in_ifnames[1][0] != '-' &&
-		    in->in_ifnames[1][0] != '*') {
+		name = in->in_names + in->in_ifnames[1];
+		if (name[1] != '\0' && name[0] != '-' && name[0] != '*') {
 			(void) strncpy(nat->nat_ifnames[1],
 				       nat->nat_ifnames[0], LIFNAMSIZ);
 			nat->nat_ifnames[1][LIFNAMSIZ - 1] = '\0';
@@ -2756,7 +2758,7 @@ maskloop:
 				continue;
 
 #ifdef IPF_V6_PROXIES
-			if (*np->in_plabel != '\0') {
+			if (np->in_plabel != -1) {
 				if (((np->in_flags & IPN_FILTER) == 0) &&
 				    (np->in_odport != fin->fin_data[1]))
 					continue;
@@ -3248,7 +3250,7 @@ maskloop:
 			}
 
 #ifdef IPF_V6_PROXIES
-			if (*np->in_plabel != '\0') {
+			if (np->in_plabel != -1) {
 				if (!appr_ok(fin, tcp, np)) {
 					continue;
 				}
@@ -4180,8 +4182,9 @@ ipf_nat6_nextaddr(fin, na, old, dst)
 {
 	ipf_main_softc_t *softc = fin->fin_main_soft;
 	ipf_nat_softc_t *softn = softc->ipf_nat_soft;
-	u_32_t min, max;
 	i6addr_t newip, new;
+	u_32_t min, max;
+	int error;
 
 	new.i6[0] = 0;
 	new.i6[1] = 0;
@@ -4206,26 +4209,24 @@ ipf_nat6_nextaddr(fin, na, old, dst)
 		max |= min;
 		break;
 
+	case FRI_LOOKUP :
+		break;
+
 	case FRI_BROADCAST :
 	case FRI_PEERADDR :
 	case FRI_NETWORK :
-	case FRI_LOOKUP :
 	default :
 		return -1;
 	}
 
+	error = -1;
 	switch (na->na_function)
 	{
-	case NA_RANDOM :
-#ifdef NEED_128BIT_MATH
-		range = ntohl(max) - ntohl(min);
-		new = ipf_random() % range;
-		new += ntohl(min);
-		new = htonl(new);
-#endif
+	case IPLT_DSTLIST :
+		error = ipf_dstlist_select_node(fin, na->na_ptr, dst->i6);
 		break;
 
-	case NA_NORMAL :
+	case IPLT_NONE :
 		/*
 		 * 0/0 as the new address means leave it alone.
 		 */
@@ -4247,44 +4248,15 @@ ipf_nat6_nextaddr(fin, na, old, dst)
 		} else {
 			new.in6 = na->na_nextip6;
 		}
+		*dst = new;
 		break;
 
-	case NA_HASHMD5 :
-	    {
-#ifdef NEED_128BIT_MATH
-		u_char hash[16];
-		MD5_CTX ctx;
-
-		range = ntohl(max) - ntohl(min);
-
-		MD5Init(&ctx);
-		MD5Update(&ctx, (u_char *)dst, sizeof(struct in6_addr));
-		MD5Final(hash, &ctx);
-		new = 0;
-		if (range > 0xffffff)
-			new = hash[0];
-		new <<= 8;
-		if (range > 0xffff)
-			new |= hash[1];
-		new <<= 8;
-		if (range > 0xff)
-			new |= hash[2];
-		new <<= 8;
-		new |= hash[3];
-		new %= range;
-		new += ntohl(min);
-		new = htonl(new);
-#endif
-		break;
-	    }
 	default :
 		NBUMPSIDE6(fin->fin_out, ns_badnextaddr);
-		return -1;
+		break;
 	}
 
-	*dst = new;
-
-	return 0;
+	return error;
 }
 
 

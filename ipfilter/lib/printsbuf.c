@@ -13,7 +13,8 @@
 #include "ipf.h"
 #include "netinet/ip_scan.h"
 
-void printsbuf(buf)
+void
+printsbuf(buf)
 	char *buf;
 {
 	u_char *s;
@@ -23,7 +24,7 @@ void printsbuf(buf)
 		if (ISPRINT(*s))
 			putchar(*s);
 		else
-			printf("\\%o", *s);
+			PRINTF("\\%o", *s);
 	}
 }
 #else

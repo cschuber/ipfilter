@@ -6,11 +6,9 @@
 
 #include "ipf.h"
 
-#define	PRINTF	(void)printf
-#define	FPRINTF	(void)fprintf
 
-
-iphtable_t *printhash(hp, copyfunc, name, opts)
+iphtable_t *
+printhash(hp, copyfunc, name, opts)
 	iphtable_t *hp;
 	copyfunc_t copyfunc;
 	char *name;

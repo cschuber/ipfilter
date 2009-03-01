@@ -93,6 +93,7 @@ extern struct ifnet vpnif;
 #include "netinet/ip_state.h"
 #include "netinet/ip_proxy.h"
 #include "netinet/ip_lookup.h"
+#include "netinet/ip_dstlist.h"
 #ifdef	IPFILTER_SYNC
 #include "netinet/ip_sync.h"
 #endif
@@ -207,13 +208,13 @@ static	void	ipf_nat_addencap __P((ipf_nat_softc_t *, ipnat_t *));
 static	void	ipf_nat_addmap __P((ipf_nat_softc_t *, ipnat_t *));
 static	void	ipf_nat_addrdr __P((ipf_nat_softc_t *, ipnat_t *));
 static	int	ipf_nat_builddivertmp __P((ipf_nat_softc_t *, ipnat_t *));
-static	int	ipf_nat_clearlist __P((ipf_nat_softc_t *));
+static	int	ipf_nat_clearlist __P((ipf_main_softc_t *, ipf_nat_softc_t *));
 static	int	ipf_nat_decap __P((fr_info_t *, nat_t *));
 static	int	ipf_nat_encapok __P((fr_info_t *, nat_t *));
 static	int	ipf_nat_extraflush __P((ipf_main_softc_t *, ipf_nat_softc_t *, int));
 static	int	ipf_nat_finalise __P((fr_info_t *, nat_t *));
 static	int	ipf_nat_flushtable __P((ipf_main_softc_t *, ipf_nat_softc_t *));
-static	void	ipf_nat_free_rule __P((ipf_nat_softc_t *, ipnat_t *));
+static	void	ipf_nat_free_rule __P((ipf_main_softc_t *, ipf_nat_softc_t *, ipnat_t *));
 static	int	ipf_nat_getnext __P((ipf_main_softc_t *, ipftoken_t *,
 				     ipfgeniter_t *));
 static	int	ipf_nat_gettable __P((ipf_main_softc_t *, ipf_nat_softc_t *,
@@ -238,8 +239,8 @@ static	int	ipf_nat_newrdr __P((fr_info_t *, nat_t *, natinfo_t *));
 static	int	ipf_nat_newrewrite __P((fr_info_t *, nat_t *, natinfo_t *));
 static	int	ipf_nat_nextaddr __P((fr_info_t *, nat_addr_t *, u_32_t *,
 				      u_32_t *));
-static	int	ipf_nat_nextaddrinit __P((ipf_main_softc_t *, nat_addr_t *,
-					  int, void *));
+static	int	ipf_nat_nextaddrinit __P((ipf_main_softc_t *, char *,
+					  nat_addr_t *, int, void *));
 static	nat_t	*ipf_nat_rebuildencapicmp __P((fr_info_t *, nat_t *));
 static	int	ipf_nat_resolverule __P((ipf_main_softc_t *, ipnat_t *));
 static	int	ipf_nat_ruleaddrinit __P((ipf_main_softc_t *,
@@ -526,7 +527,7 @@ ipf_nat_soft_fini(softc, arg)
 	ipf_nat_softc_t *softn = arg;
 	ipftq_t *ifq, *ifqnext;
 
-	(void) ipf_nat_clearlist(softn);
+	(void) ipf_nat_clearlist(softc, softn);
 	(void) ipf_nat_flushtable(softc, softn);
 
 	/*
@@ -1066,11 +1067,7 @@ ipf_nat_ioctl(softc, data, cmd, mode, uid, ctx)
 #endif
 
 	nat = NULL;     /* XXX gcc -Wuninitialized */
-	if (cmd == (ioctlcmd_t)SIOCADNAT) {
-		KMALLOC(nt, ipnat_t *);
-	} else {
-		nt = NULL;
-	}
+	nt = NULL;
 
 	if ((cmd == (ioctlcmd_t)SIOCADNAT) || (cmd == (ioctlcmd_t)SIOCRMNAT)) {
 		if (mode & NAT_SYSSPACE) {
@@ -1078,11 +1075,21 @@ ipf_nat_ioctl(softc, data, cmd, mode, uid, ctx)
 			error = 0;
 		} else {
 			error = ipf_inobj(softc, data, &natd, IPFOBJ_IPNAT);
+			if (error != 0)
+				goto done;
+
+			KMALLOCS(nt, ipnat_t *, natd.in_size);
+			if (nt == NULL) {
+				softc->ipf_interror = 60070;
+				error = ENOMEM;
+				goto done;
+			}
+			error = ipf_inobjsz(softc, data, nt, IPFOBJ_IPNAT,
+					    natd.in_size);
+			if (error)
+				goto done;
 		}
 	}
-
-	if (error != 0)
-		goto done;
 
 	/*
 	 * For add/delete, look to see if the NAT entry is already present
@@ -1105,7 +1112,8 @@ ipf_nat_ioctl(softc, data, cmd, mode, uid, ctx)
 			}
 		}
 		MUTEX_ENTER(&softn->ipf_nat_io);
-		for (np = &softn->ipf_nat_list; ((n = *np) != NULL); np = &n->in_next)
+		for (np = &softn->ipf_nat_list; ((n = *np) != NULL);
+		     np = &n->in_next)
 			if (!bcmp((char *)&nat->in_v, (char *)&n->in_v,
 					IPN_CMPSIZ))
 				break;
@@ -1290,7 +1298,7 @@ ipf_nat_ioctl(softc, data, cmd, mode, uid, ctx)
 			if (arg == 0)
 				ret = ipf_nat_flushtable(softc, softn);
 			else if (arg == 1)
-				ret = ipf_nat_clearlist(softn);
+				ret = ipf_nat_clearlist(softc, softn);
 			else
 				ret = ipf_nat_extraflush(softc, softn, arg);
 			ipf_proxy_flush(softc->ipf_proxy_soft, arg);
@@ -1408,7 +1416,7 @@ ipf_nat_ioctl(softc, data, cmd, mode, uid, ctx)
 	}
 done:
 	if (nt != NULL)
-		KFREE(nt);
+		KFREES(nt, nt->in_size);
 	return error;
 }
 
@@ -1601,19 +1609,33 @@ ipf_nat_ruleaddrinit(softc, softn, n)
 	/*
 	 * Initialise all of the address fields.
 	 */
-	error = ipf_nat_nextaddrinit(softc, &n->in_osrc, 1, n->in_ifps[idx]);
+	error = ipf_nat_nextaddrinit(softc, n->in_names, &n->in_osrc, 1,
+				     n->in_ifps[idx]);
 	if (error != 0)
 		return error;
 
-	error = ipf_nat_nextaddrinit(softc, &n->in_odst, 1, n->in_ifps[idx]);
+	error = ipf_nat_nextaddrinit(softc, n->in_names, &n->in_odst, 1,
+				     n->in_ifps[idx]);
 	if (error != 0)
 		return error;
 
-	error = ipf_nat_nextaddrinit(softc, &n->in_nsrc, 1, n->in_ifps[idx]);
+	if ((n->in_nsrc.na_atype == FRI_LOOKUP) &&
+	    (n->in_nsrc.na_type != IPLT_DSTLIST)) {
+		softc->ipf_interror = 60069;
+		return EINVAL;
+	}
+	error = ipf_nat_nextaddrinit(softc, n->in_names, &n->in_nsrc, 1,
+				     n->in_ifps[idx]);
 	if (error != 0)
 		return error;
 
-	error = ipf_nat_nextaddrinit(softc, &n->in_ndst, 1, n->in_ifps[idx]);
+	if ((n->in_ndst.na_atype == FRI_LOOKUP) &&
+	    (n->in_ndst.na_type != IPLT_DSTLIST)) {
+		softc->ipf_interror = 60071;
+		return EINVAL;
+	}
+	error = ipf_nat_nextaddrinit(softc, n->in_names, &n->in_ndst, 1,
+				     n->in_ifps[idx]);
 	if (error != 0)
 		return error;
 
@@ -1638,27 +1660,30 @@ ipf_nat_resolverule(softc, n)
 	ipf_main_softc_t *softc;
 	ipnat_t *n;
 {
-	n->in_ifnames[0][LIFNAMSIZ - 1] = '\0';
-	n->in_ifps[0] = ipf_resolvenic(softc, n->in_ifnames[0], n->in_v[0]);
+	char *base;
 
-	n->in_ifnames[1][LIFNAMSIZ - 1] = '\0';
-	if (n->in_ifnames[1][0] == '\0') {
-		(void) strncpy(n->in_ifnames[1], n->in_ifnames[0], LIFNAMSIZ);
+	base = n->in_names;
+
+	n->in_ifps[0] = ipf_resolvenic(softc, base + n->in_ifnames[0],
+				       n->in_v[0]);
+
+	if (n->in_ifnames[1] == -1) {
+		n->in_ifnames[1] = n->in_ifnames[0];
 		n->in_ifps[1] = n->in_ifps[0];
 	} else {
-		n->in_ifps[1] = ipf_resolvenic(softc, n->in_ifnames[1],
+		n->in_ifps[1] = ipf_resolvenic(softc, base + n->in_ifnames[1],
 					       n->in_v[1]);
 	}
 
-	if (n->in_plabel[0] != '\0') {
+	if (n->in_plabel != -1) {
 		if (n->in_redir & NAT_REDIRECT)
 			n->in_apr = ipf_proxy_lookup(softc->ipf_proxy_soft,
 						     n->in_pr[0],
-						     n->in_plabel);
+						     base + n->in_plabel);
 		else
 			n->in_apr = ipf_proxy_lookup(softc->ipf_proxy_soft,
 						     n->in_pr[1],
-						     n->in_plabel);
+						     base + n->in_plabel);
 		if (n->in_apr == NULL)
 			return -1;
 	}
@@ -1722,7 +1747,7 @@ ipf_nat_siocdelnat(softc, softn, n, np, getlock)
 	*np = n->in_next;
 
 	if (n->in_use == 0) {
-		ipf_nat_free_rule(softn, n);
+		ipf_nat_free_rule(softc, softn, n);
 	} else {
 		n->in_flags |= IPN_DELETE;
 		n->in_next = NULL;
@@ -1734,12 +1759,19 @@ ipf_nat_siocdelnat(softc, softn, n, np, getlock)
 
 
 static void
-ipf_nat_free_rule(softn, n)
+ipf_nat_free_rule(softc, softn, n)
+	ipf_main_softc_t *softc;
 	ipf_nat_softc_t *softn;
 	ipnat_t *n;
 {
 	if (n->in_apr != NULL)
 		ipf_proxy_free(n->in_apr);
+
+	if (n->in_ndst.na_atype == FRI_LOOKUP)
+		ipf_lookup_deref(softc, n->in_ndst.na_type, n->in_ndst.na_ptr);
+
+	if (n->in_nsrc.na_atype == FRI_LOOKUP)
+		ipf_lookup_deref(softc, n->in_nsrc.na_type, n->in_nsrc.na_ptr);
 
 	if (n->in_redir & NAT_REDIRECT) {
 		ATOMIC_DEC32(softn->ipf_nat_stats.ns_rules_rdr);
@@ -2555,7 +2587,8 @@ ipf_nat_flushtable(softc, softn)
 /* clear out the tables used for hashed NAT rule lookups.                   */
 /* ------------------------------------------------------------------------ */
 static int
-ipf_nat_clearlist(softn)
+ipf_nat_clearlist(softc, softn)
+	ipf_main_softc_t *softc;
 	ipf_nat_softc_t *softn;
 {
 	ipnat_t *n, **np = &softn->ipf_nat_list;
@@ -2574,7 +2607,7 @@ ipf_nat_clearlist(softn)
 
 	while ((n = *np) != NULL) {
 		*np = n->in_next;
-		ipf_nat_delrule(softn, n);
+		ipf_nat_delrule(softc, softn, n);
 		i++;
 	}
 #if SOLARIS && !defined(INSTANCES)
@@ -2599,7 +2632,8 @@ ipf_nat_clearlist(softn)
 /*                                                                          */
 /* ------------------------------------------------------------------------ */
 void
-ipf_nat_delrule(softn, np)
+ipf_nat_delrule(softc, softn, np)
+	ipf_main_softc_t *softc;
 	ipf_nat_softc_t *softn;
 	ipnat_t *np;
 {
@@ -2611,7 +2645,7 @@ ipf_nat_delrule(softn, np)
 			FREE_MB_T(np->in_divmp);
 		}
 
-		ipf_nat_free_rule(softn, np);
+		ipf_nat_free_rule(softc, softn, np);
 	} else {
 		np->in_flags |= IPN_DELETE;
 		np->in_next = NULL;
@@ -3413,6 +3447,7 @@ ipf_nat_insert(softc, softn, nat)
 	nat_t *nat;
 {
 	u_int hv0, hv1, rhv0, rhv1;
+	ipnat_t *in;
 	nat_t **natp;
 
 	/*
@@ -3475,6 +3510,7 @@ ipf_nat_insert(softc, softn, nat)
 
 	MUTEX_INIT(&nat->nat_lock, "nat entry lock");
 
+	in = nat->nat_ptr;
 	nat->nat_ref = nat->nat_me ? 2 : 1;
 
 	nat->nat_ifnames[0][LIFNAMSIZ - 1] = '\0';
@@ -3484,12 +3520,11 @@ ipf_nat_insert(softc, softn, nat)
 		nat->nat_ifnames[1][LIFNAMSIZ - 1] = '\0';
 		nat->nat_ifps[1] = ipf_resolvenic(softc,
 						  nat->nat_ifnames[1], 4);
-	} else {
-		ipnat_t *in = nat->nat_ptr;
+	} else if (in->in_ifnames[1] != -1) {
+		char *name;
 
-		if (in->in_ifnames[1][1] != '\0' &&
-		    in->in_ifnames[1][0] != '-' &&
-		    in->in_ifnames[1][0] != '*') {
+		name = in->in_names + in->in_ifnames[1];
+		if (name[1] != '\0' && name[0] != '-' && name[0] != '*') {
 			(void) strncpy(nat->nat_ifnames[1],
 				       nat->nat_ifnames[0], LIFNAMSIZ);
 			nat->nat_ifnames[1][LIFNAMSIZ - 1] = '\0';
@@ -4795,10 +4830,12 @@ ipf_nat_update(fin, nat)
 	 * TCP, however, if it is TCP and there is no rule timeout set,
 	 * then do not update the timeout here.
 	 */
-	if (np != NULL)
+	if (np != NULL) {
+		np->in_bytes[fin->fin_rev] += fin->fin_plen;
 		ifq2 = np->in_tqehead[fin->fin_rev];
-	else
+	} else {
 		ifq2 = NULL;
+	}
 
 	if (nat->nat_pr[0] == IPPROTO_TCP && ifq2 == NULL) {
 		(void) ipf_tcp_age(&nat->nat_tqe, fin, softn->ipf_nat_tcptq,
@@ -5018,7 +5055,7 @@ retry_roundrobin:
 			    !ipf_matchtag(&np->in_tag, &fr->fr_nattag))
 				continue;
 
-			if (*np->in_plabel != '\0') {
+			if (np->in_plabel != -1) {
 				if (((np->in_flags & IPN_FILTER) == 0) &&
 				    (np->in_odport != fin->fin_data[1]))
 					continue;
@@ -5614,7 +5651,7 @@ retry_roundrobin:
 					continue;
 			}
 
-			if (*np->in_plabel != '\0') {
+			if (np->in_plabel != -1) {
 				if (!ipf_proxy_ok(fin, tcp, np)) {
 					continue;
 				}
@@ -6235,11 +6272,15 @@ ipf_nat_sync(softc, ifp)
 	}
 
 	for (n = softn->ipf_nat_list; (n != NULL); n = n->in_next) {
+		char *base = n->in_names;
+
 		if ((ifp == NULL) || (n->in_ifps[0] == ifp))
-			n->in_ifps[0] = ipf_resolvenic(softc, n->in_ifnames[0],
+			n->in_ifps[0] = ipf_resolvenic(softc,
+						       base + n->in_ifnames[0],
 						       n->in_v[0]);
 		if ((ifp == NULL) || (n->in_ifps[1] == ifp))
-			n->in_ifps[1] = ipf_resolvenic(softc, n->in_ifnames[1],
+			n->in_ifps[1] = ipf_resolvenic(softc,
+						       base + n->in_ifnames[1],
 						       n->in_v[1]);
 
 		if (n->in_redir & NAT_REDIRECT)
@@ -6251,14 +6292,14 @@ ipf_nat_sync(softc, ifp)
 		    (n->in_ifps[idx] != NULL &&
 		     n->in_ifps[idx] != (void *)-1)) {
 
-			ipf_nat_nextaddrinit(softc, &n->in_osrc, 0,
-					     n->in_ifps[idx]);
-			ipf_nat_nextaddrinit(softc, &n->in_odst, 0,
-					     n->in_ifps[idx]);
-			ipf_nat_nextaddrinit(softc, &n->in_nsrc, 0,
-					     n->in_ifps[idx]);
-			ipf_nat_nextaddrinit(softc, &n->in_ndst, 0,
-					     n->in_ifps[idx]);
+			ipf_nat_nextaddrinit(softc, n->in_names, &n->in_osrc,
+					     0, n->in_ifps[idx]);
+			ipf_nat_nextaddrinit(softc, n->in_names, &n->in_odst,
+					     0, n->in_ifps[idx]);
+			ipf_nat_nextaddrinit(softc, n->in_names, &n->in_nsrc,
+					     0, n->in_ifps[idx]);
+			ipf_nat_nextaddrinit(softc, n->in_names, &n->in_ndst,
+					     0, n->in_ifps[idx]);
 		}
 	}
 	RWLOCK_EXIT(&softc->ipf_nat);
@@ -6424,7 +6465,7 @@ ipf_nat_rulederef(softc, inp)
 	in->in_space++;
 	in->in_use--;
 	if (in->in_use == 0 && (in->in_flags & IPN_DELETE)) {
-		ipf_nat_free_rule(softn, in);
+		ipf_nat_free_rule(softc, softn, in);
 	}
 }
 
@@ -7266,7 +7307,7 @@ ipf_nat_newrewrite(fin, nat, nai)
 		 * Find a new source address
 		 */
 		if (ipf_nat_nextaddr(fin, &np->in_nsrc, &frnat.fin_saddr,
-				 &frnat.fin_saddr) == -1) {
+				     &frnat.fin_saddr) == -1) {
 			return -1;
 		}
 
@@ -7321,9 +7362,8 @@ ipf_nat_newrewrite(fin, nat, nai)
 		/* TRACE (fin, np, l, frnat) */
 
 		if (ipf_nat_nextaddr(fin, &np->in_ndst, &frnat.fin_daddr,
-				 &frnat.fin_daddr) == -1)
+				     &frnat.fin_daddr) == -1)
 			return -1;
-
 		if ((np->in_ndstaddr == 0) && (np->in_ndstmsk == 0xffffffff)) {
 			dst_search = 0;
 			if (np->in_stepnext == 2)
@@ -7788,7 +7828,7 @@ ipf_nat_matchencap(softn, fin, np)
 			 != np->in_odstaddr);
 		break;
 	case FRI_LOOKUP :
-		match = (*np->in_nsrcfunc)(fin->fin_main_soft, np->in_odstptr,
+		match = (*np->in_ndstfunc)(fin->fin_main_soft, np->in_odstptr,
 					   np->in_v[0], &ip->ip_src.s_addr);
 		break;
 	}
@@ -7856,7 +7896,7 @@ ipf_nat_nextaddr(fin, na, old, dst)
 	ipf_nat_softc_t *softn = softc->ipf_nat_soft;
 	u_32_t min, max, new;
 	i6addr_t newip;
-	int range;
+	int error;
 
 	new = 0;
 	min = na->na_addr[0].in4.s_addr;
@@ -7878,24 +7918,26 @@ ipf_nat_nextaddr(fin, na, old, dst)
 		max |= min;
 		break;
 
+	case FRI_LOOKUP :
+		break;
+
 	case FRI_BROADCAST :
 	case FRI_PEERADDR :
 	case FRI_NETWORK :
-	case FRI_LOOKUP :
 	default :
 		return -1;
 	}
 
-	switch (na->na_function)
-	{
-	case NA_RANDOM :
-		range = ntohl(max) - ntohl(min);
-		new = ipf_random() % range;
-		new += ntohl(min);
-		new = htonl(new);
-		break;
+	error = -1;
 
-	case NA_NORMAL :
+	if (na->na_atype == FRI_LOOKUP) {
+		if (na->na_type == IPLT_DSTLIST) {
+			error = ipf_dstlist_select_node(fin, na->na_ptr, dst);
+		} else {
+			NBUMPSIDE(fin->fin_out, ns_badnextaddr);
+		}
+
+	} else if (na->na_atype == IPLT_NONE) {
 		/*
 		 * 0/0 as the new address means leave it alone.
 		 */
@@ -7917,42 +7959,14 @@ ipf_nat_nextaddr(fin, na, old, dst)
 		} else {
 			new = htonl(na->na_nextip);
 		}
-		break;
+		*dst = new;
+		error = 0;
 
-	case NA_HASHMD5 :
-	    {
-		u_char hash[16];
-		MD5_CTX ctx;
-
-		range = ntohl(max) - ntohl(min);
-		MD5Init(&ctx);
-		MD5Update(&ctx, (u_char *)dst, 4);
-		MD5Final(hash, &ctx);
-		new = 0;
-		if (range > 0xffffff)
-			new = hash[0];
-		new <<= 8;
-		if (range > 0xffff)
-			new |= hash[1];
-		new <<= 8;
-		if (range > 0xff)
-			new |= hash[2];
-		new <<= 8;
-		new |= hash[3];
-		new %= range;
-		new += ntohl(min);
-		new = htonl(new);
-		break;
-	    }
-
-	default :
+	} else {
 		NBUMPSIDE(fin->fin_out, ns_badnextaddr);
-		return -1;
 	}
 
-	*dst = new;
-
-	return 0;
+	return error;
 }
 
 
@@ -7976,20 +7990,27 @@ ipf_nat_nextaddr(fin, na, old, dst)
 /* come out of ipf_nat_nextaddr() will be.                                  */
 /* ------------------------------------------------------------------------ */
 static int
-ipf_nat_nextaddrinit(softc, na, initial, ifp)
+ipf_nat_nextaddrinit(softc, base, na, initial, ifp)
 	ipf_main_softc_t *softc;
+	char *base;
 	nat_addr_t *na;
 	int initial;
 	void *ifp;
 {
+
 	switch (na->na_atype)
 	{
 	case FRI_LOOKUP :
-		if (na->na_ptr == NULL) {
+		if (na->na_subtype == 0) {
 			na->na_ptr = ipf_lookup_res_num(softc, na->na_type,
 							IPL_LOGNAT,
 							na->na_num,
 							&na->na_func);
+		} else if (na->na_subtype == 1) {
+			na->na_ptr = ipf_lookup_res_name(softc, na->na_type,
+							 IPL_LOGNAT,
+							 base + na->na_num,
+							 &na->na_func);
 		}
 		if (na->na_func == NULL) {
 			softc->ipf_interror = 60060;
@@ -8000,6 +8021,7 @@ ipf_nat_nextaddrinit(softc, na, initial, ifp)
 			return ESRCH;
 		}
 		break;
+
 	case FRI_DYNAMIC :
 	case FRI_BROADCAST :
 	case FRI_NETWORK :
@@ -8007,7 +8029,7 @@ ipf_nat_nextaddrinit(softc, na, initial, ifp)
 	case FRI_PEERADDR :
 		if (ifp != NULL)
 			(void )ipf_ifpaddr(softc, 4, na->na_atype, ifp,
-					  &na->na_addr[0], &na->na_addr[1]);
+					   &na->na_addr[0], &na->na_addr[1]);
 		break;
 
 	case FRI_SPLIT :

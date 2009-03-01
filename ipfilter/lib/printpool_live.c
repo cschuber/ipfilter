@@ -10,11 +10,9 @@
 #include "ipf.h"
 #include "netinet/ipl.h"
 
-#define	PRINTF	(void)printf
-#define	FPRINTF	(void)fprintf
 
-
-ip_pool_t *printpool_live(pool, fd, name, opts)
+ip_pool_t *
+printpool_live(pool, fd, name, opts)
 	ip_pool_t *pool;
 	int fd;
 	char *name;

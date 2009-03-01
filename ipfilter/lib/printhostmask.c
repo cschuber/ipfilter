@@ -9,7 +9,8 @@
 #include "ipf.h"
 
 
-void	printhostmask(family, addr, mask)
+void
+printhostmask(family, addr, mask)
 	int	family;
 	u_32_t	*addr, *mask;
 {
@@ -20,15 +21,15 @@ void	printhostmask(family, addr, mask)
 #endif
 
 	if ((family == -1) || ((!addr || !*addr) && (!mask || !*mask)))
-		printf("any");
+		PRINTF("any");
 	else {
 		void *ptr = addr;
 
 #ifdef  USE_INET6
-		printf("%s", inet_ntop(family, ptr, ipbuf, sizeof(ipbuf)));
+		PRINTF("%s", inet_ntop(family, ptr, ipbuf, sizeof(ipbuf)));
 #else
 		ipa.s_addr = *addr;
-		printf("%s", inet_ntoa(ipa));
+		PRINTF("%s", inet_ntoa(ipa));
 #endif
 		if (mask != NULL)
 			printmask(family, mask);

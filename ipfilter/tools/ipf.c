@@ -124,7 +124,7 @@ int main(argc,argv)
 			filter = parseipfexpr(optarg, NULL);
 			break;
 		case 'n' :
-			opts ^= OPT_DONOTHING;
+			opts ^= OPT_DONOTHING|OPT_DONTOPEN;
 			break;
 		case 'o' :
 			break;
