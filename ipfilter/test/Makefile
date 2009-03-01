@@ -40,11 +40,11 @@ ntests6: n1_6 n2_6 n4_6 n5_6 n6_6 n7_6 n8_6 n9_6 n11_6 n12_6 n15_6
 nitests: ni1 ni2 ni3 ni4 ni5 ni6 ni7 ni8 ni9 ni10 ni11 ni12 ni13 ni14 ni15 \
 	 ni16 ni17 ni18 ni19 ni20 ni21 ni23
 
-intests: in1 in2 in3 in4 in5 in6 in7 in100 in101
+intests: in1 in2 in3 in4 in5 in6 in7 in100 in101 in102
 
 logtests: l1
 
-pools: p1 p2 p3 p4 ip1 ip2
+pools: p1 p2 p3 p4 p5 p6 p7 p9 p10 p11 p12 ip1 ip2 ip3
 
 ipv6: ipv6.1 ipv6.2 ipv6.3 ipv6.4 ipv6.5 ipv6.6 ntests6
 
@@ -428,25 +428,46 @@ ipv6.5: expected/ipv6.5 input/ipv6.5 regress/ipv6.5
 ipv6.6: expected/ipv6.6 input/ipv6.6 regress/ipv6.6
 	@/bin/sh ./dotest6 `awk "/^$@ / { print; } " test.format`
 
-p1: expected/p1 input/p1 regress/p1.ipf regress/p1.pool
+p1: expected/p1 input/p1 regress/p1.ipf regress/p1.pool $(POOLDEP)
 	@/bin/sh ./ptest `awk "/^$@ / { print; } " test.format`
 
-p2: expected/p2 input/p2 regress/p2.ipf
+p2: expected/p2 input/p2 regress/p2.ipf $(POOLDEP)
 	@/bin/sh ./ptest `awk "/^$@ / { print; } " test.format`
 
-p3: expected/p3 input/p3 regress/p3.ipf regress/p3.pool
+p3: expected/p3 input/p3 regress/p3.ipf regress/p3.pool $(POOLDEP)
 	@/bin/sh ./ptest `awk "/^$@ / { print; } " test.format`
 
-p4: expected/p4 input/p4 regress/p4.nat regress/p4.pool
+p4: expected/p4 input/p4 regress/p4.nat regress/p4.pool $(POOLDEP)
 	@/bin/sh ./ptest `awk "/^$@ / { print; } " test.format`
 
-p5: expected/p5 input/p5 regress/p5.ipf regress/p5.pool
+p5: expected/p5 input/p5 regress/p5.ipf regress/p5.pool $(POOLDEP)
 	@/bin/sh ./ptest `awk "/^$@ / { print; } " test.format`
 
-ip1: expected/ip1 regress/ip1
+p6: expected/p6 input/p6 regress/p6.ipf regress/p6.pool $(POOLDEP)
+	@/bin/sh ./ptest `awk "/^$@ / { print; } " test.format`
+
+p7: expected/p7 input/p7 regress/p7.nat regress/p7.pool $(POOLDEP)
+	@/bin/sh ./ptest `awk "/^$@ / { print; } " test.format`
+
+p9: expected/p9 input/p9 regress/p9.nat regress/p9.pool $(POOLDEP)
+	@/bin/sh ./ptest `awk "/^$@ / { print; } " test.format`
+
+p10: expected/p10 input/p10 regress/p10.nat regress/p10.pool $(POOLDEP)
+	@/bin/sh ./ptest `awk "/^$@ / { print; } " test.format`
+
+p11: expected/p11 input/p11 regress/p11.nat regress/p11.pool $(POOLDEP)
+	@/bin/sh ./ptest `awk "/^$@ / { print; } " test.format`
+
+p12: expected/p12 input/p12 regress/p12.nat regress/p12.pool $(POOLDEP)
+	@/bin/sh ./ptest `awk "/^$@ / { print; } " test.format`
+
+ip1: expected/ip1 regress/ip1 $(POOLDEP)
 	@/bin/sh ./iptest `awk "/^$@ / { print; } " test.format`
 
-ip2: expected/ip2 input/ip2.data regress/ip2
+ip2: expected/ip2 input/ip2.data regress/ip2 $(POOLDEP)
+	@/bin/sh ./iptest `awk "/^$@ / { print; } " test.format`
+
+ip3: expected/ip3 regress/ip3 $(POOLDEP)
 	@/bin/sh ./iptest `awk "/^$@ / { print; } " test.format`
 
 bpf-f1: expected/bpf-f1 regress/bpf-f1
@@ -456,13 +477,13 @@ clean:
 	/bin/rm -f f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17
 	/bin/rm -f f18 f19 f20 f21 f22 f24 f25
 	/bin/rm -f i1 i2 i3 i4 i5 i6 i7 i8 i9 i10 i11 i12 i13 i14 i15 i16 i17
-	/bin/rm -f i18 i19 i20 i21 i22
+	/bin/rm -f i18 i19 i20 i21 i22 i23
 	/bin/rm -f n1 n2 n3 n4 n5 n6 n7 n8 n9 n10 n11 n12 n13 n14 n15 n16 n17 n18 n100 n101 n102 n103 n104 n105 n106 n200 n201 n202
 	/bin/rm -f n1_6 n2_6 n4_6 n5_6 n6_6 n7_6 n8_6 n9_6 n11_6 n12_6 n15_6
 	/bin/rm -f ni1 ni2 ni3 ni4 ni5 ni6 ni7 ni8 ni9
 	/bin/rm -f ni10 ni11 ni12 ni13 ni14 ni15 ni16 ni17 ni18 ni19 ni20 ni21 ni23
-	/bin/rm -f in1 in2 in3 in4 in5 in6 in100 in101
-	/bin/rm -f p1 p2 p3 p4 ip1 ip2
+	/bin/rm -f in1 in2 in3 in4 in5 in6 in7 in100 in101 in102
+	/bin/rm -f p1 p2 p3 p4 p5 p6 p7 p9 p10 p11 p12 ip1 ip2 ip3
 	/bin/rm -f l1
 	/bin/rm -f ipv6.1 ipv6.2 ipv6.3 ipv6.4 ipv6.5 ipv6.6
 	/bin/rm -f bpf1 bpf-f1
