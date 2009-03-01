@@ -180,6 +180,7 @@ ipf_p_h323_in(arg, fin, aps, nat)
 		 * it's like:
 		 *   map <if> <inter_ip>/<mask> -> <gate_ip>/<mask> proxy port <port> <port>/tcp
 		 */
+		ipn = nat->nat_ptr;
 		KMALLOCS(newarray, char *, aps->aps_psiz + ipn->in_namelen + 5);
 		if (newarray == NULL) {
 			return -1;
