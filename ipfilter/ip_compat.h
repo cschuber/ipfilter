@@ -874,10 +874,8 @@ typedef	u_int32_t	u_32_t;
 # if defined(_KERNEL)
 #  if (__FreeBSD_version >= 500000)
 #   include "opt_bpf.h"
-#  else
-#   include "bpf.h"
 #  endif
-#  if defined(__FreeBSD_version) && (__FreeBSD_version >= 400000)
+#  if defined(__FreeBSD_version) && (__FreeBSD_version >= 500000)
 #   include "opt_inet6.h"
 #  endif
 #  if defined(INET6) && !defined(USE_INET6)
