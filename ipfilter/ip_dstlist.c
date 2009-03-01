@@ -834,6 +834,7 @@ ipf_dstlist_table_add(softc, arg, op)
 	new->ipld_dests = NULL;
 	new->ipld_nodes = 0;
 	new->ipld_maxnodes = 0;
+	new->ipld_selected = NULL;
 
 	new->ipld_pnext = &softd->dstlist[unit];
 	new->ipld_next = softd->dstlist[unit];
