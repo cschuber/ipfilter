@@ -636,9 +636,8 @@ typedef	struct	frentry {
 	struct	frentry	**fr_pdnext;
 	void	*fr_ifas[4];
 	void	*fr_ptr;	/* for use with fr_arg */
-	char	*fr_comment;	/* text comment for rule */
+	int	fr_comment;	/* text comment for rule */
 	int	fr_size;	/* size of this structure */
-	int	fr_commlen;	/* length of comment */
 	int	fr_ref;		/* reference count */
 	int	fr_statecnt;	/* state count - for limit rules */
 	u_32_t	fr_die;		/* only used on loading the rule */

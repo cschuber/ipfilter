@@ -422,9 +422,8 @@ printfr(fp, iocfunc)
 	if (fp->fr_pps)
 		PRINTF(" pps %d", fp->fr_pps);
 
-	if (fp->fr_comment)
-		PRINTF(" comment \"%*.*s\"", fp->fr_commlen, fp->fr_commlen,
-		       fp->fr_comment);
+	if (fp->fr_comment != -1)
+		PRINTF(" comment \"%s\"", fp->fr_names + fp->fr_comment);
 
 	if ((fp->fr_flags & FR_KEEPSTATE) && (opts & OPT_VERBOSE)) {
 		PRINTF(" # count %d", fp->fr_statecnt);

@@ -5324,21 +5324,6 @@ frrequest(softc, unit, req, data, set, makecopy)
 			goto done;
 		}
 
-		if (fp->fr_comment != 0 && makecopy) {
-			KMALLOCS(cptr, void *, fp->fr_commlen);
-			if (cptr == NULL) {
-				softc->ipf_interror = 128;
-				error = ENOMEM;
-				goto done;
-			}
-			error = COPYIN(fp->fr_comment, cptr, fp->fr_commlen);
-			if (error != 0) {
-				softc->ipf_interror = 129;
-				goto done;
-			}
-			fp->fr_comment = cptr;
-		}
-
 		MUTEX_NUKE(&fp->fr_lock);
 		MUTEX_INIT(&fp->fr_lock, "filter rule lock");
 		if (fp->fr_die != 0)
@@ -5376,9 +5361,6 @@ donenolock:
 	if ((error != 0) && (makecopy != 0)) {
 		if (ptr != NULL) {
 			KFREES(ptr, fp->fr_dsize);
-		}
-		if (cptr != NULL) {
-			KFREES(cptr, fp->fr_commlen);
 		}
 		KFREES(fp, fp->fr_size);
 	}
@@ -5723,9 +5705,6 @@ ipf_derefrule(softc, frp)
 			ipf_lookup_deref(softc, fr->fr_dsttype, fr->fr_dstptr);
 
 		if ((fr->fr_flags & FR_COPIED) != 0) {
-			if (fr->fr_commlen != 0) {
-				KFREES(fr->fr_comment, fr->fr_commlen);
-			}
 			if (fr->fr_dsize) {
 				KFREES(fr->fr_data, fr->fr_dsize);
 			}
@@ -8044,16 +8023,6 @@ ipf_getnextrule(softc, t, ptr)
 					error = EFAULT;
 				} else {
 					dst += next->fr_dsize;
-				}
-			}
-			if ((error == 0) && (next->fr_comment != NULL)) {
-				error = COPYOUT(next->fr_comment, dst,
-						next->fr_commlen);
-				if (error != 0) {
-					softc->ipf_interror = 130;
-					error = EFAULT;
-				} else {
-					dst += next->fr_commlen;
 				}
 			}
 			if (next->fr_next == NULL) {

@@ -216,8 +216,6 @@ line:	rule		{ while ((fr = frtop) != NULL) {
 				fr->fr_next = frold;
 				if (frold && frold->fr_data)
 					free(frold->fr_data);
-				if (frold && frold->fr_comment)
-					free(frold->fr_comment);
 				frold = fr;
 			  }
 			  resetlexer();
@@ -539,8 +537,8 @@ rulettl:
 	;
 
 comment:
-	| IPFY_COMMENT YY_STR		{ DOALL(fr->fr_comment = strdup($2); \
-						fr->fr_commlen = strlen($2);) }
+	| IPFY_COMMENT YY_STR		{ DOALL(fr->fr_comment = addname(&fr, \
+						$2);) }
 	;
 
 savegroup:
@@ -2610,6 +2608,7 @@ static frentry_t *allocfr()
 	fr = calloc(1, sizeof(*fr));
 	if (fr != NULL) {
 		fr->fr_size = sizeof(*fr);
+		fr->fr_comment = -1;
 		fr->fr_group = -1;
 		fr->fr_grhead = -1;
 		fr->fr_icmphead = -1;
