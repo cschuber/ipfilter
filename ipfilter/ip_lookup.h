@@ -30,6 +30,9 @@
 # define	SIOCLOOKUPDELNODEW	_IOW(r, 68, struct iplookupop)
 #endif
 
+#define	LOOKUP_POOL_MAX	(IPL_LOGSIZE)
+#define	LOOKUP_POOL_SZ	(IPL_LOGSIZE + 1)
+
 typedef	struct	iplookupop	{
 	int	iplo_type;	/* IPLT_* */
 	int	iplo_unit;	/* IPL_LOG* */

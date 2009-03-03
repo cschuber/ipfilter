@@ -60,6 +60,15 @@ struct file;
 static const char rcsid[] = "@(#)$Id$";
 #endif
 
+/*
+ * In this file, ip_pool.c, ip_htable.c and ip_dstlist.c, you will find the
+ * range for unit is [-1,IPL_LOGMAX]. The -1 is considered to be a valid number
+ * and represents a "wildcard" or "all" units (IPL_LOGALL). The reason for not
+ * starting the numbering at 0 is because the numbers [0,IPL_LOGMAX] correspond
+ * to the minor device number for their respective device. Thus where there is
+ * array indexing on the unit, +1 is used to map [-1.IPL_LOGMAX] to
+ * [0.POOL_LOOKUP_MAX].
+ */
 static int ipf_lookup_addnode __P((ipf_main_softc_t *, caddr_t, int));
 static int ipf_lookup_delnode __P((ipf_main_softc_t *, caddr_t, int));
 static int ipf_lookup_addtable __P((ipf_main_softc_t *, caddr_t));
@@ -335,7 +344,8 @@ ipf_lookup_addnode(softc, data, uid)
 		return EFAULT;
 	}
 
-	if (op.iplo_unit < 0 || op.iplo_unit > IPL_LOGMAX) {
+	if ((op.iplo_unit < 0 || op.iplo_unit > IPL_LOGMAX) &&
+	    (op.iplo_unit != IPLT_ALL)) {
 		softc->ipf_interror = 50003;
 		return EINVAL;
 	}
@@ -387,7 +397,8 @@ ipf_lookup_delnode(softc, data, uid)
 		return EFAULT;
 	}
 
-	if (op.iplo_unit < 0 || op.iplo_unit > IPL_LOGMAX) {
+	if ((op.iplo_unit < 0 || op.iplo_unit > IPL_LOGMAX) &&
+	    (op.iplo_unit != IPLT_ALL)) {
 		softc->ipf_interror = 50013;
 		return EINVAL;
 	}
@@ -435,7 +446,8 @@ ipf_lookup_addtable(softc, data)
 		return EFAULT;
 	}
 
-	if (op.iplo_unit < 0 || op.iplo_unit > IPL_LOGMAX) {
+	if ((op.iplo_unit < 0 || op.iplo_unit > IPL_LOGMAX) &&
+	    (op.iplo_unit != IPLT_ALL)) {
 		softc->ipf_interror = 50023;
 		return EINVAL;
 	}
@@ -497,7 +509,8 @@ ipf_lookup_deltable(softc, data)
 		return EFAULT;
 	}
 
-	if (op.iplo_unit < 0 || op.iplo_unit > IPL_LOGMAX) {
+	if ((op.iplo_unit < 0 || op.iplo_unit > IPL_LOGMAX) &&
+	    (op.iplo_unit != IPLT_ALL)) {
 		softc->ipf_interror = 50029;
 		return EINVAL;
 	}
@@ -546,7 +559,8 @@ ipf_lookup_stats(softc, data)
 		return EFAULT;
 	}
 
-	if (op.iplo_unit < 0 || op.iplo_unit > IPL_LOGMAX) {
+	if ((op.iplo_unit < 0 || op.iplo_unit > IPL_LOGMAX) &&
+	    (op.iplo_unit != IPLT_ALL)) {
 		softc->ipf_interror = 50032;
 		return EINVAL;
 	}

@@ -52,7 +52,7 @@ typedef struct ippool_dst {
 #define	IPDST_DELETE		0x01
 
 typedef	struct dstlist_stat_s {
-	void			*ipls_list[IPL_LOGMAX];
+	void			*ipls_list[LOOKUP_POOL_SZ];
 	int			ipls_numlists;
 	u_long			ipls_nomem;
 	int			ipls_numnodes;

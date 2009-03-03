@@ -40,6 +40,7 @@ printunit(unit)
 		break;
 	case IPL_LOGALL :
 		PRINTF("all");
+		break;
 	default :
 		PRINTF("unknown(%d)", unit);
 	}

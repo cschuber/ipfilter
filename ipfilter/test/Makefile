@@ -44,7 +44,7 @@ intests: in1 in2 in3 in4 in5 in6 in7 in100 in101 in102
 
 logtests: l1
 
-pools: p1 p2 p3 p4 p5 p6 p7 p9 p10 p11 p12 ip1 ip2 ip3
+pools: p1 p2 p3 p4 p5 p6 p7 p9 p10 p11 p12 p13 ip1 ip2 ip3
 
 ipv6: ipv6.1 ipv6.2 ipv6.3 ipv6.4 ipv6.5 ipv6.6 ntests6
 
@@ -461,6 +461,9 @@ p11: expected/p11 input/p11 regress/p11.nat regress/p11.pool $(POOLDEP)
 p12: expected/p12 input/p12 regress/p12.nat regress/p12.pool $(POOLDEP)
 	@/bin/sh ./ptest `awk "/^$@ / { print; } " test.format`
 
+p13: expected/p13 input/p13 regress/p13.ipf regress/p13.pool $(POOLDEP)
+	@/bin/sh ./ptest `awk "/^$@ / { print; } " test.format`
+
 ip1: expected/ip1 regress/ip1 $(POOLDEP)
 	@/bin/sh ./iptest `awk "/^$@ / { print; } " test.format`
 
@@ -483,7 +486,7 @@ clean:
 	/bin/rm -f ni1 ni2 ni3 ni4 ni5 ni6 ni7 ni8 ni9
 	/bin/rm -f ni10 ni11 ni12 ni13 ni14 ni15 ni16 ni17 ni18 ni19 ni20 ni21 ni23
 	/bin/rm -f in1 in2 in3 in4 in5 in6 in7 in100 in101 in102
-	/bin/rm -f p1 p2 p3 p4 p5 p6 p7 p9 p10 p11 p12 ip1 ip2 ip3
+	/bin/rm -f p1 p2 p3 p4 p5 p6 p7 p9 p10 p11 p12 p13 ip1 ip2 ip3
 	/bin/rm -f l1
 	/bin/rm -f ipv6.1 ipv6.2 ipv6.3 ipv6.4 ipv6.5 ipv6.6
 	/bin/rm -f bpf1 bpf-f1

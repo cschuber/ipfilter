@@ -70,7 +70,7 @@ static const char rcsid[] = "@(#)$Id$";
 #endif
 
 typedef struct ipf_dstl_softc_s {
-	ippool_dst_t	*dstlist[IPL_LOGSIZE];
+	ippool_dst_t	*dstlist[LOOKUP_POOL_SZ];
 	ipf_dstl_stat_t	stats;
 } ipf_dstl_softc_t;
 
@@ -208,10 +208,10 @@ ipf_dstlist_soft_fini(softc, arg)
 	ipf_dstl_softc_t *softd = arg;
 	int i;
 
-	for (i = 0; i < IPL_LOGSIZE; i++)
-		while (softd->dstlist[i] != NULL)
+	for (i = -1; i <= IPL_LOGMAX; i++)
+		while (softd->dstlist[i + 1] != NULL)
 			ipf_dstlist_table_remove(softc, softd,
-						 softd->dstlist[i]);
+						 softd->dstlist[i + 1]);
 
 	ASSERT(softd->stats.ipls_numderefnodes == 0);
 }
@@ -226,6 +226,8 @@ ipf_dstlist_soft_fini(softc, arg)
 /*              arg3(I)  - pointer to local context to use                  */
 /*              arg4(I)  - pointer to local context to use                  */
 /*                                                                          */
+/* There is currently no such thing as searching a destination list for an  */
+/* address so this function becomes a no-op.                                */
 /* ------------------------------------------------------------------------ */
 /*ARGSUSED*/
 static int
@@ -234,9 +236,6 @@ ipf_dstlist_addr_find(softc, arg1, arg2, arg3)
 	void *arg1, *arg3;
 	int arg2;
 {
-	/*
-	 * No such thing as searching a destination list for an address?
-	 */
 	return -1;
 }
 
@@ -262,10 +261,10 @@ ipf_dstlist_flush(softc, arg, fop)
 	ippool_dst_t *node, *next;
 	int n, i;
 
-	for (n = 0, i = 0; i < IPL_LOGSIZE; i++) {
+	for (n = 0, i = -1; i <= IPL_LOGMAX; i++) {
 		if (fop->iplf_unit != IPLT_ALL && fop->iplf_unit != i)
 			continue;
-		for (node = softd->dstlist[i]; node != NULL; node = next) {
+		for (node = softd->dstlist[i + 1]; node != NULL; node = next) {
 			next = node->ipld_next;
 
 			if ((*fop->iplf_name != '\0') &&
@@ -303,7 +302,7 @@ ipf_dstlist_iter_deref(softc, arg, otype, unit, data)
 		return EINVAL;
 	}
 
-	if (unit < 0 || unit > IPL_LOGMAX) {
+	if (unit < -1 || unit > IPL_LOGMAX) {
 		softc->ipf_interror = 120002;
 		return EINVAL;
 	}
@@ -349,7 +348,7 @@ ipf_dstlist_iter_next(softc, arg, token, iter)
 	case IPFLOOKUPITER_LIST :
 		list = token->ipt_data;
 		if (list == NULL) {
-			next = softd->dstlist[(int)iter->ili_unit];
+			next = softd->dstlist[(int)iter->ili_unit + 1];
 		} else {
 			next = list->ipld_next;
 		}
@@ -734,7 +733,8 @@ ipf_dstlist_node_free(softd, d, node)
 /*              arg(I)   - pointer to local context to use                  */
 /*              op(I)    - pointer to lookup operation data                 */
 /*                                                                          */
-/* There are currently no statistics for destination lists.                 */
+/* Return the current statistics for destination lists. This may be for all */
+/* of them or just information pertaining to a particular table.            */
 /* ------------------------------------------------------------------------ */
 /*ARGSUSED*/
 static int
@@ -755,17 +755,17 @@ ipf_dstlist_stats_get(softc, arg, op)
 	stats = softd->stats;
 	unit = op->iplo_unit;
 	if (unit == IPL_LOGALL) {
-		for (i = 0; i < IPL_LOGSIZE; i++)
+		for (i = 0; i <= IPL_LOGMAX; i++)
 			stats.ipls_list[i] = softd->dstlist[i];
-	} else if (unit >= 0 && unit < IPL_LOGSIZE) {
+	} else if (unit >= 0 && unit <= IPL_LOGMAX) {
 		void *ptr;
 
 		if (op->iplo_name[0] != '\0')
 			ptr = ipf_dstlist_table_find(softd, unit,
 						     op->iplo_name);
 		else
-			ptr = softd->dstlist[unit];
-		stats.ipls_list[unit] = ptr;
+			ptr = softd->dstlist[unit + 1];
+		stats.ipls_list[unit + 1] = ptr;
 	} else {
 		softc->ipf_interror = 120024;
 		err = EINVAL;
@@ -836,11 +836,11 @@ ipf_dstlist_table_add(softc, arg, op)
 	new->ipld_maxnodes = 0;
 	new->ipld_selected = NULL;
 
-	new->ipld_pnext = &softd->dstlist[unit];
-	new->ipld_next = softd->dstlist[unit];
-	if (softd->dstlist[unit] != NULL)
-		softd->dstlist[unit]->ipld_pnext = &new->ipld_next;
-	softd->dstlist[unit] = new;
+	new->ipld_pnext = &softd->dstlist[unit + 1];
+	new->ipld_next = softd->dstlist[unit + 1];
+	if (softd->dstlist[unit + 1] != NULL)
+		softd->dstlist[unit + 1]->ipld_pnext = &new->ipld_next;
+	softd->dstlist[unit + 1] = new;
 	softd->stats.ipls_numlists++;
 
 	return 0;
@@ -854,6 +854,8 @@ ipf_dstlist_table_add(softc, arg, op)
 /*              arg(I)   - pointer to local context to use                  */
 /*              op(I)    - pointer to lookup operation data                 */
 /*                                                                          */
+/* Find a named destinstion list table and delete it. If there are other    */
+/* references to it, the caller isn't told.                                 */
 /* ------------------------------------------------------------------------ */
 static int
 ipf_dstlist_table_del(softc, arg, op)
@@ -874,7 +876,7 @@ ipf_dstlist_table_del(softc, arg, op)
 		return EBUSY;
 	}
 
-	ipf_dstlist_table_deref(softc, arg, d);
+	ipf_dstlist_table_remove(softc, arg, d);
 
 	return 0;
 }
@@ -887,6 +889,10 @@ ipf_dstlist_table_del(softc, arg, op)
 /*              arg(I)   - pointer to local context to use                  */
 /*              op(I)    - pointer to lookup operation data                 */
 /*                                                                          */
+/* Remove a given destination list from existance. While the IPDST_DELETE   */
+/* flag is set every time we call this function and the reference count is  */
+/* non-zero, the "numdereflists" counter is only incremented when the entry */
+/* is removed from the list as it only becomes dereferenced once.           */
 /* ------------------------------------------------------------------------ */
 static void
 ipf_dstlist_table_remove(softc, softd, d)
@@ -895,8 +901,11 @@ ipf_dstlist_table_remove(softc, softd, d)
 	ippool_dst_t *d;
 {
 
-	if (d->ipld_pnext != NULL)
+	if (d->ipld_pnext != NULL) {
 		*d->ipld_pnext = d->ipld_next;
+		if (d->ipld_ref > 1)
+			softd->stats.ipls_numdereflists++;
+	}
 	if (d->ipld_next != NULL)
 		d->ipld_next->ipld_pnext = d->ipld_pnext;
 	d->ipld_pnext = NULL;
@@ -904,15 +913,16 @@ ipf_dstlist_table_remove(softc, softd, d)
 
 	ipf_dstlist_table_clearnodes(softd, d);
 
-	if (d->ipld_ref > 0)
+	if (d->ipld_ref > 0) {
+		d->ipld_flags |= IPDST_DELETE;
 		return;
+	}
 
 	MUTEX_DESTROY(&d->ipld_lock);
 
 	if ((d->ipld_flags & IPDST_DELETE) != 0)
 		softd->stats.ipls_numdereflists--;
-	else
-		softd->stats.ipls_numlists--;
+	softd->stats.ipls_numlists--;
 
 	if (d->ipld_dests != NULL) {
 		KFREES(d->ipld_dests,
@@ -930,6 +940,8 @@ ipf_dstlist_table_remove(softc, softd, d)
 /*              arg(I)   - pointer to local context to use                  */
 /*              op(I)    - pointer to lookup operation data                 */
 /*                                                                          */
+/* Drops the reference count on a destination list table object and free's  */
+/* it if 0 has been reached.                                                */
 /* ------------------------------------------------------------------------ */
 static int
 ipf_dstlist_table_deref(softc, arg, table)
@@ -937,18 +949,11 @@ ipf_dstlist_table_deref(softc, arg, table)
 	void *arg;
 	void *table;
 {
-	ipf_dstl_softc_t *softd = arg;
 	ippool_dst_t *d = table;
 
-	ipf_dstlist_table_clearnodes(softd, d);
-
 	d->ipld_ref--;
-	if (d->ipld_ref != 1) {
-		if (!(d->ipld_flags & IPDST_DELETE))
-			softd->stats.ipls_numdereflists++;
-		d->ipld_flags |= IPDST_DELETE;
+	if (d->ipld_ref > 0)
 		return d->ipld_ref;
-	}
 
 	ipf_dstlist_table_remove(softc, arg, table);
 
@@ -995,7 +1000,7 @@ ipf_dstlist_table_find(arg, unit, name)
 	ipf_dstl_softc_t *softd = arg;
 	ippool_dst_t *d;
 
-	for (d = softd->dstlist[unit]; d != NULL; d = d->ipld_next) {
+	for (d = softd->dstlist[unit + 1]; d != NULL; d = d->ipld_next) {
 		if ((d->ipld_unit == unit) &&
 		    !strncmp(d->ipld_name, name, FR_GROUPLEN)) {
 			return d;
@@ -1041,7 +1046,24 @@ ipf_dstlist_select_ref(arg, unit, name)
 /* Parameters:  d(I)   - pointer to destination list                        */
 /*                                                                          */
 /* Find the next node in the destination list to be used according to the   */
-/* defined policy.                                                          */
+/* defined policy. Of these, "connection" is the most expensive policy to   */
+/* implement as it always looks for the node with the least number of       */
+/* connections associated with it.                                          */
+/*                                                                          */
+/* The hashes exclude the port numbers so that all protocols map to the     */
+/* same destination. Otherwise, someone doing a ping would target a         */
+/* different server than their TCP connection, etc. MD-5 is used to         */
+/* transform the addressese into something random that the other end could  */
+/* not easily guess and use in an attack. ipld_seed introduces an unknown   */
+/* into the hash calculation to increase the difficult of an attacker       */
+/* guessing the bucket.                                                     */
+/*                                                                          */
+/* One final comment: mixing different address families in a single pool    */
+/* will currently result in failures as the address family of the node is   */
+/* only matched up with that in the packet as the last step. While this can */
+/* be coded around for the weighted connection and round-robin models, it   */
+/* cannot be supported for the hash/random models as they do not search and */
+/* nor is the algorithm conducive to searching.                             */
 /* ------------------------------------------------------------------------ */
 static ipf_dstnode_t *
 ipf_dstlist_select(fin, d)
@@ -1106,15 +1128,6 @@ ipf_dstlist_select(fin, d)
 		sel = d->ipld_dests[x];
 		break;
 
-	/*
-	 * The hashes exclude the port numbers so that all protocols map to
-	 * the same destination. Otherwise, someone doing a ping would target
-	 * a different server than their TCP connection, etc.
-	 * MD-5 is used to transform the addressese into something random
-	 * that the other end could not guess and use in an attack.
-	 * ipld_seed introduces an unknown into the hash calculation to
-	 * increase the difficult of an attacker guessing the bucket.
-	 */
 	case IPLDP_HASHED :
 		MD5Init(&ctx);
 		MD5Update(&ctx, (u_char *)&d->ipld_seed, sizeof(d->ipld_seed));
@@ -1169,6 +1182,9 @@ ipf_dstlist_select(fin, d)
 /*              group(I) - destination pool to search                       */
 /*              addr(I)  - pointer to store selected address                */
 /*                                                                          */
+/* This function is only responsible for obtaining the next IP address for  */
+/* use and storing it in the caller's address space (addr). No permanent    */
+/* reference is currently kept on the node.                                 */
 /* ------------------------------------------------------------------------ */
 int
 ipf_dstlist_select_node(fin, group, addr)

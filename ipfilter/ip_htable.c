@@ -99,10 +99,10 @@ static void ipf_htable_expire __P((ipf_main_softc_t *, void *));
 
 
 typedef struct ipf_htable_softc_s {
-	u_long		ipht_nomem[IPL_LOGSIZE];
-	u_long		ipf_nhtables[IPL_LOGSIZE];
-	u_long		ipf_nhtnodes[IPL_LOGSIZE];
-	iphtable_t	*ipf_htables[IPL_LOGSIZE];
+	u_long		ipht_nomem[LOOKUP_POOL_SZ];
+	u_long		ipf_nhtables[LOOKUP_POOL_SZ];
+	u_long		ipf_nhtnodes[LOOKUP_POOL_SZ];
+	iphtable_t	*ipf_htables[LOOKUP_POOL_SZ];
 	iphtent_t	*ipf_node_explist;
 } ipf_htable_softc_t;
 
@@ -245,10 +245,10 @@ ipf_htable_stats_get(softc, arg, op)
 		return EINVAL;
 	}
 
-	stats.iphs_tables = softh->ipf_htables[op->iplo_unit];
-	stats.iphs_numtables = softh->ipf_nhtables[op->iplo_unit];
-	stats.iphs_numnodes = softh->ipf_nhtnodes[op->iplo_unit];
-	stats.iphs_nomem = softh->ipht_nomem[op->iplo_unit];
+	stats.iphs_tables = softh->ipf_htables[op->iplo_unit + 1];
+	stats.iphs_numtables = softh->ipf_nhtables[op->iplo_unit + 1];
+	stats.iphs_numnodes = softh->ipf_nhtnodes[op->iplo_unit + 1];
+	stats.iphs_nomem = softh->ipht_nomem[op->iplo_unit + 1];
 
 	err = COPYOUT(&stats, op->iplo_struct, sizeof(stats));
 	if (err != 0) {
@@ -296,7 +296,7 @@ ipf_htable_create(softc, arg, op)
 
 	KMALLOC(iph, iphtable_t *);
 	if (iph == NULL) {
-		softh->ipht_nomem[op->iplo_unit]++;
+		softh->ipht_nomem[op->iplo_unit + 1]++;
 		softc->ipf_interror = 30002;
 		return ENOMEM;
 	}
@@ -321,7 +321,7 @@ ipf_htable_create(softc, arg, op)
 #else
 			(void)sprintf(name, "%u", i);
 #endif
-			for (oiph = softh->ipf_htables[unit]; oiph != NULL;
+			for (oiph = softh->ipf_htables[unit + 1]; oiph != NULL;
 			     oiph = oiph->iph_next)
 				if (strncmp(oiph->iph_name, name,
 					    sizeof(oiph->iph_name)) == 0)
@@ -337,7 +337,7 @@ ipf_htable_create(softc, arg, op)
 		 iph->iph_size * sizeof(*iph->iph_table));
 	if (iph->iph_table == NULL) {
 		KFREE(iph);
-		softh->ipht_nomem[unit]++;
+		softh->ipht_nomem[unit + 1]++;
 		softc->ipf_interror = 30006;
 		return ENOMEM;
 	}
@@ -350,13 +350,13 @@ ipf_htable_create(softc, arg, op)
 	iph->iph_list = NULL;
 
 	iph->iph_ref = 1;
-	iph->iph_next = softh->ipf_htables[unit];
-	iph->iph_pnext = &softh->ipf_htables[unit];
-	if (softh->ipf_htables[unit] != NULL)
-		softh->ipf_htables[unit]->iph_pnext = &iph->iph_next;
-	softh->ipf_htables[unit] = iph;
+	iph->iph_next = softh->ipf_htables[unit + 1];
+	iph->iph_pnext = &softh->ipf_htables[unit + 1];
+	if (softh->ipf_htables[unit + 1] != NULL)
+		softh->ipf_htables[unit + 1]->iph_pnext = &iph->iph_next;
+	softh->ipf_htables[unit + 1] = iph;
 
-	softh->ipf_nhtables[unit]++;
+	softh->ipf_nhtables[unit + 1]++;
 
 	return 0;
 }
@@ -470,7 +470,7 @@ ipf_htable_free(arg, iph)
 	iph->iph_pnext = NULL;
 	iph->iph_next = NULL;
 
-	softh->ipf_nhtables[iph->iph_unit]--;
+	softh->ipf_nhtables[iph->iph_unit + 1]--;
 
 	KFREES(iph->iph_table, iph->iph_size * sizeof(*iph->iph_table));
 	KFREE(iph);
@@ -689,8 +689,7 @@ ipf_htent_deref(arg, ipe)
 
 	ipe->ipe_ref--;
 	if (ipe->ipe_ref == 0) {
-		softh->ipf_nhtnodes[ipe->ipe_unit]--;
-
+		softh->ipf_nhtnodes[ipe->ipe_unit + 1]--;
 		KFREE(ipe);
 
 		return 0;
@@ -714,9 +713,27 @@ ipf_htable_exists(arg, unit, name)
 	ipf_htable_softc_t *softh = arg;
 	iphtable_t *iph;
 
-	for (iph = softh->ipf_htables[unit]; iph != NULL; iph = iph->iph_next)
-		if (strncmp(iph->iph_name, name, sizeof(iph->iph_name)) == 0)
-			break;
+	if (unit == IPL_LOGALL) {
+		int i;
+
+		for (i = 0; i <= LOOKUP_POOL_MAX; i++) {
+			for (iph = softh->ipf_htables[i]; iph != NULL;
+			     iph = iph->iph_next) {
+				if (strncmp(iph->iph_name, name,
+					    sizeof(iph->iph_name)) == 0)
+					break;
+			}
+			if (iph != NULL)
+				break;
+		}
+	} else {
+		for (iph = softh->ipf_htables[unit + 1]; iph != NULL;
+		     iph = iph->iph_next) {
+			if (strncmp(iph->iph_name, name,
+				    sizeof(iph->iph_name)) == 0)
+				break;
+		}
+	}
 	return iph;
 }
 
@@ -791,9 +808,9 @@ ipf_htable_flush(softc, arg, op)
 
 	freed = 0;
 
-	for (i = 0; i <= IPL_LOGMAX; i++) {
+	for (i = -1; i <= IPL_LOGMAX; i++) {
 		if (op->iplf_unit == i || op->iplf_unit == IPL_LOGALL) {
-			while ((iph = softh->ipf_htables[i]) != NULL) {
+			while ((iph = softh->ipf_htables[i + 1]) != NULL) {
 				if (ipf_htable_remove(softc, arg, iph) == 0) {
 					freed++;
 				} else {
@@ -1003,7 +1020,7 @@ ipf_htent_insert(softc, arg, iph, ipeo)
 	}
 
 	ipe->ipe_unit = iph->iph_unit;
-	softh->ipf_nhtnodes[ipe->ipe_unit]++;
+	softh->ipf_nhtnodes[ipe->ipe_unit + 1]++;
 
 	return 0;
 }
@@ -1246,7 +1263,7 @@ ipf_htable_iter_next(softc, arg, token, ilp)
 	case IPFLOOKUPITER_LIST :
 		iph = token->ipt_data;
 		if (iph == NULL) {
-			nextiph = softh->ipf_htables[(int)ilp->ili_unit];
+			nextiph = softh->ipf_htables[(int)ilp->ili_unit + 1];
 		} else {
 			nextiph = iph->iph_next;
 		}
@@ -1264,7 +1281,7 @@ ipf_htable_iter_next(softc, arg, token, ilp)
 	case IPFLOOKUPITER_NODE :
 		node = token->ipt_data;
 		if (node == NULL) {
-			iph = ipf_htable_find(arg, ilp->ili_unit,
+			iph = ipf_htable_find(arg, ilp->ili_unit + 1,
 					      ilp->ili_name);
 			if (iph == NULL) {
 				softc->ipf_interror = 30009;
@@ -1369,7 +1386,7 @@ ipf_htable_iter_deref(softc, arg, otype, unit, data)
 	if (data == NULL)
 		return EFAULT;
 
-	if (unit < 0 || unit > IPL_LOGMAX)
+	if (unit < -1 || unit > IPL_LOGMAX)
 		return EINVAL;
 
 	switch (otype)

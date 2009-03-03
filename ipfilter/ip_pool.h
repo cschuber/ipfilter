@@ -55,7 +55,7 @@ typedef	struct	ipf_pool_stat	{
 	u_long			ipls_pools;
 	u_long			ipls_tables;
 	u_long			ipls_nodes;
-	ip_pool_t		*ipls_list[IPL_LOGSIZE];
+	ip_pool_t		*ipls_list[LOOKUP_POOL_SZ];
 } ipf_pool_stat_t;
 
 #endif /* _RADIX_IPF_H_ */

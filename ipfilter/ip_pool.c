@@ -73,7 +73,7 @@ static const char rcsid[] = "@(#)$Id$";
 
 typedef struct ipf_pool_softc_s {
 	void		*ipf_radix;
-	ip_pool_t	*ipf_pool_list[IPL_LOGSIZE];
+	ip_pool_t	*ipf_pool_list[LOOKUP_POOL_SZ];
 	ipf_pool_stat_t	ipf_pool_stats;
 	ip_pool_node_t	*ipf_node_explist;
 } ipf_pool_softc_t;
@@ -328,8 +328,8 @@ ipf_pool_soft_fini(softc, arg)
 
 	softc = arg;
 
-	for (i = 0; i <= IPL_LOGMAX; i++) {
-		for (q = softp->ipf_pool_list[i]; (p = q) != NULL; ) {
+	for (i = -1; i <= IPL_LOGMAX; i++) {
+		for (q = softp->ipf_pool_list[i + 1]; (p = q) != NULL; ) {
 			q = p->ipo_next;
 			(void) ipf_pool_destroy(softc, arg, i, p->ipo_name);
 		}
@@ -546,9 +546,10 @@ ipf_pool_stats_get(softc, arg, op)
 	bcopy((char *)&softp->ipf_pool_stats, (char *)&stats, sizeof(stats));
 	unit = op->iplo_unit;
 	if (unit == IPL_LOGALL) {
-		for (i = 0; i < IPL_LOGSIZE; i++)
+		for (i = 0; i <= LOOKUP_POOL_MAX; i++)
 			stats.ipls_list[i] = softp->ipf_pool_list[i];
-	} else if (unit >= 0 && unit < IPL_LOGSIZE) {
+	} else if (unit >= 0 && unit <= IPL_LOGMAX) {
+		unit++;						/* -1 => 0 */
 		if (op->iplo_name[0] != '\0')
 			stats.ipls_list[unit] = ipf_pool_exists(softp, unit,
 								op->iplo_name);
@@ -586,10 +587,26 @@ ipf_pool_exists(softp, unit, name)
 	char *name;
 {
 	ip_pool_t *p;
+	int i;
 
-	for (p = softp->ipf_pool_list[unit]; p != NULL; p = p->ipo_next)
-		if (strncmp(p->ipo_name, name, sizeof(p->ipo_name)) == 0)
-			break;
+	if (unit == IPL_LOGALL) {
+		for (i = 0; i <= LOOKUP_POOL_MAX; i++) {
+			for (p = softp->ipf_pool_list[i]; p != NULL;
+			     p = p->ipo_next) {
+				if (strncmp(p->ipo_name, name,
+					    sizeof(p->ipo_name)) == 0)
+					break;
+			}
+			if (p != NULL)
+				break;
+		}
+	} else {
+		for (p = softp->ipf_pool_list[unit + 1]; p != NULL;
+		     p = p->ipo_next)
+			if (strncmp(p->ipo_name, name,
+				    sizeof(p->ipo_name)) == 0)
+				break;
+	}
 	return p;
 }
 
@@ -638,7 +655,9 @@ ipf_pool_select_add_ref(arg, unit, name)
 {
 	ip_pool_t *p;
 
-	p = ipf_pool_find(arg, unit, name);
+	p = ipf_pool_find(arg, -1, name);
+	if (p == NULL)
+		p = ipf_pool_find(arg, unit, name);
 	if (p != NULL) {
 		ATOMIC_INC32(p->ipo_ref);
 	}
@@ -913,7 +932,7 @@ ipf_pool_create(softc, softp, op)
 		(void)sprintf(name, "%x", poolnum);
 #endif
 
-		for (p = softp->ipf_pool_list[unit]; p != NULL; ) {
+		for (p = softp->ipf_pool_list[unit + 1]; p != NULL; ) {
 			if (strncmp(name, p->ipo_name,
 				    sizeof(p->ipo_name)) == 0) {
 				poolnum++;
@@ -922,7 +941,7 @@ ipf_pool_create(softc, softp, op)
 #else
 				(void)sprintf(name, "%x", poolnum);
 #endif
-				p = softp->ipf_pool_list[unit];
+				p = softp->ipf_pool_list[unit + 1];
 			} else
 				p = p->ipo_next;
 		}
@@ -937,11 +956,11 @@ ipf_pool_create(softc, softp, op)
 	h->ipo_ref = 1;
 	h->ipo_list = NULL;
 	h->ipo_unit = unit;
-	h->ipo_next = softp->ipf_pool_list[unit];
-	if (softp->ipf_pool_list[unit] != NULL)
-		softp->ipf_pool_list[unit]->ipo_pnext = &h->ipo_next;
-	h->ipo_pnext = &softp->ipf_pool_list[unit];
-	softp->ipf_pool_list[unit] = h;
+	h->ipo_next = softp->ipf_pool_list[unit + 1];
+	if (softp->ipf_pool_list[unit + 1] != NULL)
+		softp->ipf_pool_list[unit + 1]->ipo_pnext = &h->ipo_next;
+	h->ipo_pnext = &softp->ipf_pool_list[unit + 1];
+	softp->ipf_pool_list[unit + 1] = h;
 
 	softp->ipf_pool_stats.ipls_pools++;
 
@@ -1052,20 +1071,14 @@ ipf_pool_flush(softc, arg, fp)
 	ipf_pool_softc_t *softp = arg;
 	int i, num = 0, unit, err;
 	ip_pool_t *p, *q;
-	iplookupop_t op;
 
 	unit = fp->iplf_unit;
-
-	for (i = 0; i <= IPL_LOGMAX; i++) {
+	for (i = 0; i <= LOOKUP_POOL_MAX; i++) {
 		if (unit != IPLT_ALL && i != unit)
 			continue;
 		for (q = softp->ipf_pool_list[i]; (p = q) != NULL; ) {
-			op.iplo_unit = i;
-			(void)strncpy(op.iplo_name, p->ipo_name,
-				sizeof(op.iplo_name));
 			q = p->ipo_next;
-			err = ipf_pool_destroy(softc, softp, op.iplo_unit,
-					       op.iplo_name);
+			err = ipf_pool_destroy(softc, softp, i, p->ipo_name);
 			if (err == 0)
 				num++;
 			else
@@ -1241,7 +1254,7 @@ ipf_pool_iter_next(softc, arg, token, ilp)
 	case IPFLOOKUPITER_LIST :
 		ipo = token->ipt_data;
 		if (ipo == NULL) {
-			nextipo = softp->ipf_pool_list[(int)ilp->ili_unit];
+			nextipo = softp->ipf_pool_list[(int)ilp->ili_unit + 1];
 		} else {
 			nextipo = ipo->ipo_next;
 		}
@@ -1430,7 +1443,7 @@ ipf_pool_dump(softc, arg)
 	int i;
 
 	printf("List of configured pools\n");
-	for (i = 0; i < IPL_LOGSIZE; i++)
+	for (i = 0; i <= IPL_LOGMAX; i++)
 		for (ipl = softp->ipf_pool_list[i]; ipl != NULL; ipl = ipl->ipo_next)
 			printpool(ipl, bcopywrap, NULL, opts);
 }

@@ -77,7 +77,7 @@ static ip_pool_node_t *read_whoisfile __P((char *));
 %token	YY_COMMENT
 %token	YY_CMP_EQ YY_CMP_NE YY_CMP_LE YY_CMP_GE YY_CMP_LT YY_CMP_GT
 %token	YY_RANGE_OUT YY_RANGE_IN
-%token	IPT_IPF IPT_NAT IPT_COUNT IPT_AUTH IPT_IN IPT_OUT
+%token	IPT_IPF IPT_NAT IPT_COUNT IPT_AUTH IPT_IN IPT_OUT IPT_ALL
 %token	IPT_TABLE IPT_GROUPMAP IPT_HASH IPT_SRCHASH IPT_DSTHASH
 %token	IPT_ROLE IPT_TYPE IPT_TREE
 %token	IPT_GROUP IPT_SIZE IPT_SEED IPT_NUM IPT_NAME IPT_POLICY
@@ -171,6 +171,7 @@ unit:	IPT_IPF				{ $$ = IPL_LOGIPF; }
 	| IPT_NAT			{ $$ = IPL_LOGNAT; }
 	| IPT_AUTH			{ $$ = IPL_LOGAUTH; }
 	| IPT_COUNT			{ $$ = IPL_LOGCOUNT; }
+	| IPT_ALL			{ $$ = IPL_LOGALL; }
 	;
 
 ipftree:
@@ -410,6 +411,16 @@ poolline:
 					  resetlexer();
 					  use_inet6 = 0;
 					}
+	| IPT_POOL '(' IPT_NAME YY_STR ';' ')' '{' addrlist '}'
+					{ bzero((char *)&iplo, sizeof(iplo));
+					  strncpy(iplo.ipo_name, $4,
+						  sizeof(iplo.ipo_name));
+					  iplo.ipo_list = $8;
+					  iplo.ipo_unit = IPL_LOGALL;
+					  load_pool(&iplo, poolioctl);
+					  resetlexer();
+					  use_inet6 = 0;
+					}
 	| IPT_POOL unit '/' IPT_HASH '(' IPT_NAME YY_STR ';' hashoptlist ')'
 	  '{' hashlist '}'
 					{ bzero((char *)&ipht, sizeof(ipht));
@@ -485,6 +496,7 @@ weighting:
 	;
 %%
 static	wordtab_t	yywords[] = {
+	{ "all",		IPT_ALL },
 	{ "auth",		IPT_AUTH },
 	{ "connection",		IPT_CONNECTION },
 	{ "count",		IPT_COUNT },
