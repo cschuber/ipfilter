@@ -395,8 +395,8 @@ printfr(fp, iocfunc)
 		}
 	}
 	if (fp->fr_isc != (struct ipscan *)-1) {
-		if (fp->fr_isctag[0])
-			PRINTF(" scan %s", fp->fr_isctag);
+		if (fp->fr_isctag != -1)
+			PRINTF(" scan %s", fp->fr_isctag + fp->fr_names);
 		else
 			PRINTF(" scan *");
 	}
