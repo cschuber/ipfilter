@@ -217,9 +217,9 @@ ipf_scan_attachfr(fr)
 {
 	ipscan_t *i;
 
-	if (fr->fr_isctag[0]) {
+	if (fr->fr_isctag != -1) {
 		READ_ENTER(&ipf_scan_rwlock);
-		i = ipf_scan_lookup(fr->fr_isctag);
+		i = ipf_scan_lookup(fr->fr_isctag + fr->fr_names);
 		if (i != NULL) {
 			ATOMIC_INC32(i->ipsc_fref);
 		}

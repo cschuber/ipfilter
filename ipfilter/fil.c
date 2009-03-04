@@ -5290,7 +5290,7 @@ frrequest(softc, unit, req, data, set, makecopy)
 				goto done;
 			}
 #ifdef	IPFILTER_SCAN
-			if (f->fr_isctag[0] != '\0' &&
+			if (f->fr_isctag != -1 &&
 			    (f->fr_isc != (struct ipscan *)-1))
 				ipf_scan_detachfr(f);
 #endif

@@ -692,7 +692,7 @@ typedef	struct	frentry {
 	int	fr_icmphead;	/* ICMP group  for state options */
 	ipftag_t fr_nattag;
 	int	fr_ifnames[4];
-	char	fr_isctag[16];
+	int	fr_isctag;
 	frdest_t fr_tifs[2];	/* "to"/"reply-to" interface */
 	frdest_t fr_dif;	/* duplicate packet interface */
 	int	fr_namelen;
