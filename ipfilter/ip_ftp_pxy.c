@@ -172,7 +172,7 @@ ipf_p_ftp_soft_create(softc)
 	if (softf == NULL)
 		return NULL;
 
-	bzero((char *)softf, sizeof(softf));
+	bzero((char *)softf, sizeof(*softf));
 #if defined(_KERNEL)
 	softf->ipf_p_ftp_debug = 0;
 #else
