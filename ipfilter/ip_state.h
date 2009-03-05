@@ -55,6 +55,7 @@ typedef struct ipstate {
 	u_int	is_pass;
 	u_char	is_p;			/* Protocol */
 	u_char	is_v;
+	int	is_family;
 	u_32_t	is_hv;
 	u_32_t	is_tag;
 	u_32_t	is_opt[2];		/* packet options set */
@@ -246,6 +247,7 @@ typedef	struct	ips_stat {
 	u_long	iss_lookup_miss;
 	u_long	iss_max;
 	u_long	iss_max_ref;
+	u_long	iss_max_track;
 	u_long	iss_miss_mask;
 	u_long	iss_nomem;
 	u_long	iss_oow;
@@ -287,7 +289,7 @@ extern	void	ipf_state_expire __P((ipf_main_softc_t *));
 extern	int	ipf_state_flush __P((ipf_main_softc_t *, int, int));
 extern	ipstate_t *ipf_state_lookup __P((fr_info_t *, tcphdr_t *, ipftq_t **));
 extern	int	ipf_state_init __P((void));
-extern	void	ipf_state_insert __P((ipf_main_softc_t *, struct ipstate *, int));
+extern	int	ipf_state_insert __P((ipf_main_softc_t *, struct ipstate *, int));
 extern	int	ipf_state_ioctl __P((ipf_main_softc_t *, caddr_t, ioctlcmd_t, int, int, void *));
 extern	void	ipf_state_log __P((ipf_main_softc_t *, struct ipstate *, u_int));
 extern	int	ipf_state_matchflush __P((ipf_main_softc_t *, caddr_t));

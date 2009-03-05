@@ -127,6 +127,8 @@ n17 hex hex -D
 f24 hex text
 ipv6.6 hex text
 f25 hex text -D
+f26 text text
+f27 hex text
 n1_6 text text -6
 n2_6 text text -6
 n4_6 text text -6

@@ -64,7 +64,7 @@ static	int		ipffd = -1;
 static	int		*yycont = NULL;
 static	ioctlfunc_t	ipfioctls[IPL_LOGSIZE];
 static	addfunc_t	ipfaddfunc = NULL;
-static	struct	wordtab ipfwords[103];
+static	struct	wordtab ipfwords[105];
 static	struct	wordtab	addrwords[4];
 static	struct	wordtab	maskwords[5];
 static	struct	wordtab icmpcodewords[17];
@@ -148,6 +148,7 @@ static	struct	wordtab logwords[33];
 %token	IPFY_MBCAST IPFY_BAD IPFY_BADNAT IPFY_OOW IPFY_NEWISN IPFY_NOICMPERR
 %token	IPFY_KEEP IPFY_STATE IPFY_FRAGS IPFY_LIMIT IPFY_STRICT IPFY_AGE
 %token	IPFY_SYNC IPFY_FRAGBODY IPFY_ICMPHEAD IPFY_NOLOG
+%token	IPFY_MAX_SRCS IPFY_MAX_PER_SRC
 %token	IPFY_IPOPT_NOP IPFY_IPOPT_RR IPFY_IPOPT_ZSU IPFY_IPOPT_MTUP
 %token	IPFY_IPOPT_MTUR IPFY_IPOPT_ENCODE IPFY_IPOPT_TS IPFY_IPOPT_TR
 %token	IPFY_IPOPT_SEC IPFY_IPOPT_LSRR IPFY_IPOPT_ESEC IPFY_IPOPT_CIPSO
@@ -1088,6 +1089,18 @@ addr:	pool '/' YY_NUMBER		{ pooled = 1;
 					  $$.a.iplookupnum = makehash($5);
 					}
 	| ipaddr			{ $$ = $1;
+					  if ((fr->fr_family == AF_INET) &&
+					      ($1.v == 6)) {
+						yyerror("address family mix");
+					  }
+					  if ((fr->fr_family == AF_INET6) &&
+					      ($1.v == 4)) {
+						yyerror("address family mix");
+					  }
+					  if ($1.v == 4)
+						fr->fr_family = AF_INET;
+					  else if ($1.v == 6)
+						fr->fr_family = AF_INET6;
 					  yyexpectaddr = 0; }
 	;
 
@@ -1724,7 +1737,7 @@ ipv4:	ipv4_24 '.' YY_NUMBER
 %%
 
 
-static	struct	wordtab ipfwords[103] = {
+static	struct	wordtab ipfwords[105] = {
 	{ "age",			IPFY_AGE },
 	{ "ah",				IPFY_AH },
 	{ "all",			IPFY_ALL },
@@ -1782,6 +1795,8 @@ static	struct	wordtab ipfwords[103] = {
 	{ "lt",				YY_CMP_LT },
 	{ "mask",			IPFY_MASK },
 	{ "match-tag",			IPFY_MATCHTAG },
+	{ "max-per-src",		IPFY_MAX_PER_SRC },
+	{ "max-srcs",			IPFY_MAX_SRCS },
 	{ "mbcast",			IPFY_MBCAST },
 	{ "mcast",			IPFY_MULTICAST },
 	{ "multicast",			IPFY_MULTICAST },

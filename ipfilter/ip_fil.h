@@ -14,6 +14,8 @@
 #if (__NetBSD_Version__ >= 104040000)
 # include <sys/callout.h>
 #endif
+#include "netinet/in.h"
+#include "sys/tree.h"
 
 #ifndef	SOLARIS
 # define SOLARIS (defined(sun) && (defined(__svr4__) || defined(__SVR4)))
@@ -493,6 +495,23 @@ typedef	struct	{
 	i6addr_t	adf_addr;
 } addrfamily_t;
 
+typedef	struct	host_node_s {
+	RB_ENTRY(host_node_s)	hn_entry;
+	i6addr_t		hn_addr;
+	int			hn_family;
+	int			hn_active;
+} host_node_t;
+
+typedef RB_HEAD(ipf_rb, host_node_s) ipf_rb_head_t;
+
+typedef	struct	host_track_s {
+	ipf_rb_head_t	ht_root;
+	int		ht_max_nodes;
+	int		ht_max_per_node;
+	int		ht_netmask;
+	int		ht_cur_nodes;
+} host_track_t;
+
 
 typedef enum fr_dtypes_e {
 	FRD_NORMAL = 0,
@@ -906,6 +925,7 @@ typedef	struct	ipf_statistics {
 	u_long	fr_v4_gre_pullup;
 	u_long	fr_v4_icmp_frag;
 	u_long	fr_v4_icmp_pullup;
+	u_long	fr_badcoalesces;
 	u_long	fr_pass;	/* packets allowed */
 	u_long	fr_block;	/* packets denied */
 	u_long	fr_nom;		/* packets which don't match any rule */
@@ -1042,6 +1062,8 @@ typedef	struct	friostat	{
 	u_long		f_froute[2];
 	u_long		f_log_ok;
 	u_long		f_log_fail;
+	u_long		f_rb_no_mem;
+	u_long		f_rb_node_max;
 	u_32_t		f_ticks;
 	int		f_locks[IPL_LOGMAX];
 	int		f_defpass;	/* default pass - from fr_pass */
@@ -1543,7 +1565,8 @@ typedef struct ipf_main_softc_s {
         u_int		ipf_iptimeout;
 	u_long		ipf_ticks;
 	u_long		ipf_userifqs;
-	u_long		ipf_badcoalesces[2];
+	u_long		ipf_rb_no_mem;
+	u_long		ipf_rb_node_max;
 	u_long		ipf_frouteok[2];
 	ipftuneable_t	*ipf_tuners;
 	void		*ipf_frag_soft;
@@ -1871,5 +1894,9 @@ extern	int	icmptoicmp6unreach[ICMP_MAX_UNREACH];
 extern	int	icmpreplytype6[ICMP6_MAXTYPE + 1];
 #endif
 extern	int	icmpreplytype4[ICMP_MAXTYPE + 1];
+
+extern	void	ipf_rb_ht_init __P((host_track_t *));
+extern	int	ipf_ht_node_add __P((ipf_main_softc_t *, host_track_t *, int, i6addr_t *));
+extern	int	ipf_ht_node_del __P((host_track_t *, int, i6addr_t *));
 
 #endif	/* __IP_FIL_H__ */

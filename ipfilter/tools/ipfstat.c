@@ -720,6 +720,7 @@ static void printside(side, frs)
 	PRINTF("%lu\t%s invalid source\n", frs->fr_badsrc, side);
 	PRINTF("%lu\t%s cache hits\n", frs->fr_chit, side);
 	PRINTF("%lu\t%s cache misses\n", frs->fr_cmiss, side);
+	PRINTF("%lu\t%s bad coalesces\n", frs->fr_badcoalesces, side);
 	PRINTF("%lu\t%s pullups succeeded\n", frs->fr_pull[0], side);
 	PRINTF("%lu\t%s pullups failed\n", frs->fr_pull[1], side);
 	PRINTF("%lu\t%s TCP checksum failures\n", frs->fr_tcpbad, side);
@@ -739,6 +740,8 @@ static	void	showstats(fp, frf)
 
 	PRINTF("%lu\tpackets logged\n", fp->f_log_ok);
 	PRINTF("%lu\tlog failures\n", fp->f_log_fail);
+	PRINTF("%lu\tred-black no memory\n", fp->f_rb_no_mem);
+	PRINTF("%lu\tred-black node maximum\n", fp->f_rb_node_max);
 	PRINTF("%lu\tICMP replies sent\n", fp->f_st[0].fr_ret);
 	PRINTF("%lu\tTCP RSTs sent\n", fp->f_st[1].fr_ret);
 	PRINTF("%lu\tfastroute successes\n", fp->f_froute[0]);
@@ -1145,6 +1148,7 @@ static void showstatestats(ipsp)
 		ipsp->iss_lookup_miss);
 	PRINTF("\t%lu bucket full\n", ipsp->iss_bucket_full);
 	PRINTF("\t%lu maximum rule references\n", ipsp->iss_max_ref);
+	PRINTF("\t%lu maximum hosts per rule\n", ipsp->iss_max_track);
 	PRINTF("\t%lu maximum\n\t%lu no memory\n\t%u bkts in use\n",
 		ipsp->iss_max, ipsp->iss_nomem, ipsp->iss_inuse);
 	PRINTF("\t%u active\n\t%lu expired\n\t%lu closed\n",

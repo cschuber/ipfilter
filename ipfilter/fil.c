@@ -4079,6 +4079,10 @@ ipf_flushlist(softc, set, unit, nfreedp, listp)
 					       unit, set);
 			fp->fr_names[fp->fr_icmphead] = '\0';
 		}
+
+		if (fp->fr_srctrack.ht_max_nodes)
+			ipf_rb_ht_init(&fp->fr_srctrack);
+
 		fp->fr_next = NULL;
 
 		ASSERT(fp->fr_ref > 0);
@@ -4591,6 +4595,8 @@ ipf_getstat(softc, fiop)
 	fiop->f_active = softc->ipf_active;
 	fiop->f_froute[0] = softc->ipf_frouteok[0];
 	fiop->f_froute[1] = softc->ipf_frouteok[1];
+	fiop->f_rb_no_mem = softc->ipf_rb_no_mem;
+	fiop->f_rb_node_max = softc->ipf_rb_node_max;
 
 	fiop->f_running = softc->ipf_running;
 	for (i = 0; i < IPL_LOGSIZE; i++) {
@@ -6974,7 +6980,7 @@ ipf_coalesce(fin)
 	if (ipf_pullup(fin->fin_m, fin, fin->fin_plen) == NULL) {
 		ipf_main_softc_t *softc = fin->fin_main_soft;
 
-		LBUMP(ipf_badcoalesces[fin->fin_out]);
+		LBUMP(ipf_stats[fin->fin_out].fr_badcoalesces);
 # ifdef MENTAT
 		FREE_MB_T(*fin->fin_mp);
 # endif
@@ -9757,4 +9763,249 @@ ipf_rule_expire(softc)
 	}
 
 	RWLOCK_EXIT(&softc->ipf_mutex);
+}
+
+
+/*
+ * NOTE:
+ *
+ * As there is currently only 1 use of a red-black tree in IPFilter, I'm
+ * happy to use the widespread BSD interfaces in <sys/tree.h>. Was there
+ * more than one use, I'd be using a .c file implementation fof a red-
+ * -black tree.
+ */
+static int ipf_ht_node_cmp __P((struct host_node_s *, struct host_node_s *));
+static void ipf_ht_node_make_key __P((host_track_t *, host_node_t *, int,
+				      i6addr_t *));
+
+RB_PROTOTYPE(ipf_rb, host_node_s, hn_entry, ipf_ht_node_cmp);
+RB_GENERATE(ipf_rb, host_node_s, hn_entry, ipf_ht_node_cmp);
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_ht_node_cmp                                             */
+/* Returns:     int   - 0 == nodes are the same, ..                         */
+/* Parameters:  k1(I) - pointer to first key to compare                     */
+/*              k2(I) - pointer to second key to compare                    */
+/*                                                                          */
+/* The "key" for the node is a combination of two fields: the address       */
+/* family and the address itself.                                           */
+/*                                                                          */
+/* Because we're not actually interpreting the address data, it isn't       */
+/* necessary to convert them to/from network/host byte order. The mask is   */
+/* just used to remove bits that aren't significant - it doesn't matter     */
+/* where they are, as long as they're always in the same place.             */
+/*                                                                          */
+/* As with IP6_EQ, comparing IPv6 addresses starts at the bottom because    */
+/* this is where individual ones will differ the most - but not true for    */
+/* for /48's, etc.                                                          */
+/* ------------------------------------------------------------------------ */
+static int
+ipf_ht_node_cmp(k1, k2)
+	struct host_node_s *k1, *k2;
+{
+	int i;
+
+	i = (k2->hn_family - k1->hn_family);
+	if (i != 0)
+		return i;
+
+	if (k1->hn_family == AF_INET)
+		return (k2->hn_addr.in4.s_addr - k1->hn_addr.in4.s_addr);
+
+	i = k2->hn_addr.i6[3] - k1->hn_addr.i6[3];
+	if (i != 0)
+		return i;
+	i = k2->hn_addr.i6[2] - k1->hn_addr.i6[2];
+	if (i != 0)
+		return i;
+	i = k2->hn_addr.i6[1] - k1->hn_addr.i6[1];
+	if (i != 0)
+		return i;
+	i = k2->hn_addr.i6[0] - k1->hn_addr.i6[0];
+	return i;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_ht_node_make_key                                        */
+/* Returns:     Nil                                                         */
+/* parameters:  htp(I)    - pointer to address tracking structure           */
+/*              key(I)    - where to store masked address for lookup        */
+/*              family(I) - protocol family of address                      */
+/*              addr(I)   - pointer to network address                      */
+/*                                                                          */
+/* Using the "netmask" (number of bits) stored parent host tracking struct, */
+/* copy the address passed in into the key structure whilst masking out the */
+/* bits that we don't want.                                                 */
+/*                                                                          */
+/* Because the parser will set ht_netmask to 128 if there is no protocol    */
+/* specified (the parser doesn't know if it should be a v4 or v6 rule), we  */
+/* have to be wary of that and not allow 32-128 to happen.                  */
+/* ------------------------------------------------------------------------ */
+static void
+ipf_ht_node_make_key(htp, key, family, addr)
+	host_track_t *htp;
+	host_node_t *key;
+	int family;
+	i6addr_t *addr;
+{
+	key->hn_family = family;
+	if (family == AF_INET) {
+		u_32_t mask;
+		int bits;
+
+		bits = htp->ht_netmask;
+		if (bits >= 32) {
+			mask = 0xffffffff;
+		} else {
+			mask = htonl(0xffffffff << (32 - bits));
+		}
+		key->hn_addr.in4.s_addr = addr->in4.s_addr & mask;
+	} else {
+		int bits = htp->ht_netmask;
+
+		if (bits > 96) {
+			key->hn_addr.i6[3] = addr->i6[3] &
+					     htonl(0xffffffff << (128 - bits));
+			key->hn_addr.i6[2] = addr->i6[2];
+			key->hn_addr.i6[1] = addr->i6[2];
+			key->hn_addr.i6[0] = addr->i6[2];
+		} else if (bits > 64) {
+			key->hn_addr.i6[3] = 0;
+			key->hn_addr.i6[2] = addr->i6[2] &
+					     htonl(0xffffffff << (96 - bits));
+			key->hn_addr.i6[1] = addr->i6[1];
+			key->hn_addr.i6[0] = addr->i6[0];
+		} else if (bits > 32) {
+			key->hn_addr.i6[3] = 0;
+			key->hn_addr.i6[2] = 0;
+			key->hn_addr.i6[1] = addr->i6[1] &
+					     htonl(0xffffffff << (64 - bits));
+			key->hn_addr.i6[0] = addr->i6[0];
+		} else {
+			key->hn_addr.i6[3] = 0;
+			key->hn_addr.i6[2] = 0;
+			key->hn_addr.i6[1] = 0;
+			key->hn_addr.i6[0] = addr->i6[0] &
+					     htonl(0xffffffff << (32 - bits));
+		}
+	}
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_ht_node_add                                             */
+/* Returns:     int       - 0 == success,  -1 == failure                    */
+/* Parameters:  softc(I)  - pointer to soft context main structure          */
+/*              htp(I)    - pointer to address tracking structure           */
+/*              family(I) - protocol family of address                      */
+/*              addr(I)   - pointer to network address                      */
+/*                                                                          */
+/* NOTE: THIS FUNCTION MUST BE CALLED WITH AN EXCLUSIVE LOCK THAT PREVENTS  */
+/*       ipf_ht_node_del FROM RUNNING CONCURRENTLY ON THE SAME htp.         */
+/*                                                                          */
+/* After preparing the key with the address information to find, look in    */
+/* the red-black tree to see if the address is known. A successful call to  */
+/* this function can mean one of two things: a new node was added to the    */
+/* tree or a matching node exists and we're able to bump up its activity.   */
+/* ------------------------------------------------------------------------ */
+int
+ipf_ht_node_add(softc, htp, family, addr)
+	ipf_main_softc_t *softc;
+	host_track_t *htp;
+	int family;
+	i6addr_t *addr;
+{
+	host_node_t *h;
+	host_node_t k;
+
+	ipf_ht_node_make_key(htp, &k, family, addr);
+
+	h = RB_FIND(ipf_rb, &htp->ht_root, &k);
+	if (h == NULL) {
+		if (htp->ht_cur_nodes >= htp->ht_max_nodes)
+			return -1;
+		KMALLOC(h, host_node_t *);
+		if (h == NULL) {
+			LBUMP(ipf_rb_no_mem);
+			return -1;
+		}
+
+		/*
+		 * If there was a macro to initialise the RB node then that
+		 * would get used here, but there isn't...
+		 */
+		bzero((char *)h, sizeof(*h));
+		h->hn_addr = k.hn_addr;
+		h->hn_family = k.hn_family;
+		RB_INSERT(ipf_rb, &htp->ht_root, h);
+		htp->ht_cur_nodes++;
+	} else {
+		if ((htp->ht_max_per_node != 0) &&
+		    (h->hn_active >= htp->ht_max_per_node)) {
+			LBUMP(ipf_rb_node_max);
+			return -1;
+		}
+	}
+
+	h->hn_active++;
+
+	return 0;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_ht_node_del                                             */
+/* Returns:     int       - 0 == success,  -1 == failure                    */
+/* parameters:  htp(I)    - pointer to address tracking structure           */
+/*              family(I) - protocol family of address                      */
+/*              addr(I)   - pointer to network address                      */
+/*                                                                          */
+/* NOTE: THIS FUNCTION MUST BE CALLED WITH AN EXCLUSIVE LOCK THAT PREVENTS  */
+/*       ipf_ht_node_add FROM RUNNING CONCURRENTLY ON THE SAME htp.         */
+/*                                                                          */
+/* Try and find the address passed in amongst the leavese on this tree to   */
+/* be friend. If found then drop the active account for that node drops by  */
+/* one. If that count reaches 0, it is time to free it all up.              */
+/* ------------------------------------------------------------------------ */
+int
+ipf_ht_node_del(htp, family, addr)
+	host_track_t *htp;
+	int family;
+	i6addr_t *addr;
+{
+	host_node_t *h;
+	host_node_t k;
+
+	ipf_ht_node_make_key(htp, &k, family, addr);
+
+	h = RB_FIND(ipf_rb, &htp->ht_root, &k);
+	if (h == NULL) {
+		return -1;
+	} else {
+		h->hn_active--;
+		if (h->hn_active == 0) {
+			RB_REMOVE(ipf_rb, &htp->ht_root, h);
+			htp->ht_cur_nodes--;
+			KFREE(h);
+		}
+	}
+
+	return 0;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_rb_ht_init                                              */
+/* Returns:     Nil                                                         */
+/* Parameters:  head(I) - pointer to host tracking structure                */
+/*                                                                          */
+/* Initialise the host tracking structure to be ready for use above.        */
+/* ------------------------------------------------------------------------ */
+void
+ipf_rb_ht_init(head)
+	host_track_t *head;
+{
+	RB_INIT(&head->ht_root);
 }

@@ -352,14 +352,25 @@ printfr(fp, iocfunc)
 	}
 
 	if (fp->fr_flags & FR_KEEPSTATE) {
+		host_track_t *src = &fp->fr_srctrack;
 		PRINTF(" keep state");
 		if ((fp->fr_flags & (FR_STSTRICT|FR_NEWISN|
 				     FR_NOICMPERR|FR_STATESYNC)) ||
-		    (fp->fr_statemax != 0) || (fp->fr_age[0] != 0)) {
+		    (fp->fr_statemax != 0) || (fp->fr_age[0] != 0) ||
+		    (src->ht_max_nodes != 0)) {
 			char *comma = "";
 			PRINTF(" (");
 			if (fp->fr_statemax != 0) {
 				PRINTF("limit %u", fp->fr_statemax);
+				comma = ",";
+			}
+			if (src->ht_max_nodes != 0) {
+				PRINTF("%smax-nodes %d", comma,
+				       src->ht_max_nodes);
+				if (src->ht_max_per_node)
+					PRINTF(", max-per-src %d/%d",
+					       src->ht_max_per_node,
+					       src->ht_netmask);
 				comma = ",";
 			}
 			if (fp->fr_flags & FR_STSTRICT) {

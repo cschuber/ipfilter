@@ -958,11 +958,14 @@ ipf_state_putent(softc, softs, data)
 	fr = ips.ips_rule;
 
 	if (fr == NULL) {
+		int error;
+
 		READ_ENTER(&softc->ipf_state);
-		ipf_state_insert(softc, isn, 0);
+		error = ipf_state_insert(softc, isn, 0);
 		MUTEX_EXIT(&isn->is_lock);
 		RWLOCK_EXIT(&softc->ipf_state);
-		return 0;
+
+		return error;
 	}
 
 	if (isn->is_flags & SI_NEWFR) {
@@ -1023,7 +1026,7 @@ ipf_state_putent(softc, softs, data)
 			return EFAULT;
 		}
 		READ_ENTER(&softc->ipf_state);
-		ipf_state_insert(softc, isn, 0);
+		error = ipf_state_insert(softc, isn, 0);
 		MUTEX_EXIT(&isn->is_lock);
 		RWLOCK_EXIT(&softc->ipf_state);
 
@@ -1031,7 +1034,7 @@ ipf_state_putent(softc, softs, data)
 		READ_ENTER(&softc->ipf_state);
 		for (is = softs->ipf_state_list; is; is = is->is_next)
 			if (is->is_rule == fr) {
-				ipf_state_insert(softc, isn, 0);
+				error = ipf_state_insert(softc, isn, 0);
 				MUTEX_EXIT(&isn->is_lock);
 				break;
 			}
@@ -1044,17 +1047,17 @@ ipf_state_putent(softc, softs, data)
 
 		if (isn == NULL) {
 			softc->ipf_interror = 100033;
-			return ESRCH;
+			error = ESRCH;
 		}
 	}
 
-	return 0;
+	return error;
 }
 
 
 /* ------------------------------------------------------------------------ */
 /* Function:   ipf_state_insert                                             */
-/* Returns:    Nil                                                          */
+/* Returns:    int    - 0 == success, -1 == failure                         */
 /* Parameters: is(I)  - pointer to state structure                          */
 /*             rev(I) - flag indicating forward/reverse direction of packet */
 /*                                                                          */
@@ -1062,10 +1065,13 @@ ipf_state_putent(softc, softs, data)
 /* of state entries (for enumeration).  Resolves all of the interface names */
 /* to pointers and adjusts running stats for the hash table as appropriate. */
 /*                                                                          */
+/* This function can fail if the filter rule has had a population policy of */
+/* IP addresses used with stateful filteirng assigned to it.                */
+/*                                                                          */
 /* Locking: it is assumed that some kind of lock on ipf_state is held.      */
-/*          Exits with is_lock initialised and held.                        */
+/*          Exits with is_lock initialised and held - *EVEN IF ERROR*.      */
 /* ------------------------------------------------------------------------ */
-void
+int
 ipf_state_insert(softc, is, rev)
 	ipf_main_softc_t *softc;
 	ipstate_t *is;
@@ -1075,16 +1081,6 @@ ipf_state_insert(softc, is, rev)
 	frentry_t *fr;
 	u_int hv;
 	int i;
-
-	MUTEX_INIT(&is->is_lock, "ipf state entry");
-
-	fr = is->is_rule;
-	if (fr != NULL) {
-		MUTEX_ENTER(&fr->fr_lock);
-		fr->fr_ref++;
-		fr->fr_statecnt++;
-		MUTEX_EXIT(&fr->fr_lock);
-	}
 
 	/*
 	 * Look up all the interface names in the state entry.
@@ -1109,8 +1105,29 @@ ipf_state_insert(softc, is, rev)
 	 * possible that once the insert is complete another packet might
 	 * come along, match the entry and want to update it.
 	 */
+	MUTEX_INIT(&is->is_lock, "ipf state entry");
 	MUTEX_ENTER(&is->is_lock);
 	MUTEX_ENTER(&softs->ipf_stinsert);
+
+	fr = is->is_rule;
+	if (fr != NULL) {
+		if ((fr->fr_srctrack.ht_max_nodes != 0) &&
+		    (ipf_ht_node_add(softc, &fr->fr_srctrack,
+				     is->is_family, &is->is_src) == -1)) {
+			SINCL(ipf_state_stats.iss_max_track);
+			MUTEX_EXIT(&softs->ipf_stinsert);
+			return -1;
+		}
+
+		MUTEX_ENTER(&fr->fr_lock);
+		fr->fr_ref++;
+		fr->fr_statecnt++;
+		MUTEX_EXIT(&fr->fr_lock);
+	}
+
+	if (is->is_flags & (SI_WILDP|SI_WILDA)) {
+		SINCL(ipf_state_stats.iss_wild);
+	}
 
 	SBUMP(ipf_state_stats.iss_proto[is->is_p]);
 	SBUMP(ipf_state_stats.iss_active_proto[is->is_p]);
@@ -1136,6 +1153,8 @@ ipf_state_insert(softc, is, rev)
 	MUTEX_EXIT(&softs->ipf_stinsert);
 
 	ipf_state_setqueue(softc, is, rev);
+
+	return 0;
 }
 
 
@@ -1590,6 +1609,7 @@ ipf_state_add(softc, fin, stsave, flags)
 	 */
 	is->is_pass = pass;
 	is->is_v = fin->fin_v;
+	is->is_family = fin->fin_family;
 	is->is_opt[0] = fin->fin_optmsk;
 	is->is_optmsk[0] = 0xffffffff;
 	is->is_optmsk[1] = 0xffffffff;
@@ -1803,11 +1823,12 @@ ipf_state_add(softc, fin, stsave, flags)
 	is->is_hv = hv;
 	is->is_rule = fr;
 	is->is_flags = flags & IS_INHERITED;
+	is->is_rulen = fin->fin_rule;
 
 	/*
 	 * Look for identical state.
 	 */
-	for (is = softs->ipf_state_table[is->is_hv % softs->ipf_state_size];
+	for (is = softs->ipf_state_table[hv % softs->ipf_state_size];
 	     is != NULL; is = is->is_hnext) {
 		if (ipf_state_match(&ips, is) == 1)
 			break;
@@ -1932,18 +1953,32 @@ ipf_state_add(softc, fin, stsave, flags)
 	if (pass & FR_STATESYNC)
 		is->is_flags |= IS_STATESYNC;
 
-	if (flags & (SI_WILDP|SI_WILDA)) {
-		SINCL(ipf_state_stats.iss_wild);
-	}
-	is->is_rulen = fin->fin_rule;
-
-
 	if (pass & FR_LOGFIRST)
 		is->is_pass &= ~(FR_LOGFIRST|FR_LOG);
 
 	READ_ENTER(&softc->ipf_state);
 
-	ipf_state_insert(softc, is, fin->fin_rev);
+	if (ipf_state_insert(softc, is, fin->fin_rev) == -1) {
+		RWLOCK_EXIT(&softc->ipf_state);
+		/*
+		 * This is a bit more manual than it should be but
+		 * ipf_state_del cannot be called.
+		 */
+		MUTEX_EXIT(&is->is_lock);
+		MUTEX_DESTROY(&is->is_lock);
+		if (is->is_tqehead[0] != NULL) {
+			if (ipf_deletetimeoutqueue(is->is_tqehead[0]) == 0)
+				ipf_freetimeoutqueue(softc, is->is_tqehead[0]);
+			is->is_tqehead[0] = NULL;
+		}
+		if (is->is_tqehead[1] != NULL) {
+			if (ipf_deletetimeoutqueue(is->is_tqehead[1]) == 0)
+				ipf_freetimeoutqueue(softc, is->is_tqehead[1]);
+			is->is_tqehead[1] = NULL;
+		}
+		KFREE(is);
+		return -1;
+	}
 
 	if (fin->fin_p == IPPROTO_TCP) {
 		/*
@@ -1965,6 +2000,7 @@ ipf_state_add(softc, fin, stsave, flags)
 		ipf_state_log(softc, is, ISL_NEW);
 
 	RWLOCK_EXIT(&softc->ipf_state);
+
 	if (stsave != NULL)
 		*stsave = is;
 	is->is_me = stsave;
@@ -2498,7 +2534,11 @@ ipf_state_clone(fin, tcp, is)
 
 	clone->is_flags &= ~SI_CLONE;
 	clone->is_flags |= SI_CLONED;
-	ipf_state_insert(softc, clone, fin->fin_rev);
+	if (ipf_state_insert(softc, clone, fin->fin_rev) == -1) {
+		KFREE(clone);
+		return NULL;
+	}
+
 	clone->is_ref = 1;
 	if (clone->is_p == IPPROTO_TCP) {
 		(void) ipf_tcp_age(&clone->is_sti, fin, softs->ipf_state_tcptq,
@@ -3794,6 +3834,11 @@ ipf_state_del(softc, is, why)
 		fdp = &fr->fr_dif;
 		if (fdp->fd_type == FRD_DSTLIST)
 			ipf_lookup_deref(softc, IPLT_DSTLIST, fdp->fd_ptr);
+
+		if (fr->fr_srctrack.ht_max_nodes != 0) {
+			(void) ipf_ht_node_del(&fr->fr_srctrack,
+					       is->is_family, &is->is_src);
+		}
 	}
 
 	is->is_ref = 0;
