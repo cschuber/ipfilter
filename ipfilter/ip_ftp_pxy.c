@@ -58,6 +58,7 @@ typedef struct ipf_ftp_softc_s {
 	/* PASV must be last command prior to 227 */
 	int	ipf_p_ftp_forcepasv;
 	int	ipf_p_ftp_debug;
+	int	ipf_p_ftp_single_xfer;
 	void	*ipf_p_ftp_tune;
 } ipf_ftp_softc_t;
 
@@ -128,6 +129,9 @@ static	ipftuneable_t	ipf_ftp_tuneables[] = {
 	{ { (void *)offsetof(ipf_ftp_softc_t, ipf_p_ftp_forcepasv) },
 		"ftp_forcepasv", 0,	1,
 		stsizeof(ipf_ftp_softc_t, ipf_p_ftp_forcepasv), 0, NULL },
+	{ { (void *)offsetof(ipf_ftp_softc_t, ipf_p_ftp_single_xfer) },
+		"ftp_single_xfer", 0,	1,
+		stsizeof(ipf_ftp_softc_t, ipf_p_ftp_single_xfer), 0, NULL },
 	{ { NULL }, NULL, 0, 0, 0, 0, NULL }
 };
 
@@ -174,6 +178,7 @@ ipf_p_ftp_soft_create(softc)
 #else
 	softf->ipf_p_ftp_debug = 2;
 #endif
+	softf->ipf_p_ftp_forcepasv = 1;
 
 	softf->ipf_p_ftp_tune = ipf_tune_array_copy(softf,
 						    sizeof(ipf_ftp_tuneables),
@@ -452,8 +457,15 @@ ipf_p_ftp_addport(softf, fin, ip, nat, ftp, dlen, nport, inc)
 	softc = fin->fin_main_soft;
 	softn = softc->ipf_nat_soft;
 
-	if ((ftp->ftp_pendnat != NULL)  || (ftp->ftp_pendstate != NULL))
+	if ((ftp->ftp_pendnat != NULL)  || (ftp->ftp_pendstate != NULL)) {
+		if (softf->ipf_p_ftp_single_xfer != 0) {
+			if (softf->ipf_p_ftp_debug > 0)
+				printf("ipf_p_ftp_addport:xfer active %p/%p\n",
+				       ftp->ftp_pendnat, ftp->ftp_pendstate);
+			return 0;
+		}
 		ipf_p_ftp_setpending(softc, ftp);
+	}
 
 	/*
 	 * Add skeleton NAT entry for connection which will come back the
@@ -483,11 +495,13 @@ ipf_p_ftp_addport(softf, fin, ip, nat, ftp, dlen, nport, inc)
 	 * other way.
 	 */
 	if (nat->nat_dir == NAT_OUTBOUND)
-		nat2 = ipf_nat_outlookup(&fi, NAT_SEARCH|IPN_TCP, nat->nat_pr[1],
-				     nat->nat_osrcip, nat->nat_odstip);
+		nat2 = ipf_nat_outlookup(&fi, NAT_SEARCH|IPN_TCP,
+					 nat->nat_pr[1], nat->nat_osrcip,
+					 nat->nat_odstip);
 	else
-		nat2 = ipf_nat_inlookup(&fi, NAT_SEARCH|IPN_TCP, nat->nat_pr[0],
-				    nat->nat_nsrcip, nat->nat_odstip);
+		nat2 = ipf_nat_inlookup(&fi, NAT_SEARCH|IPN_TCP,
+					nat->nat_pr[0], nat->nat_nsrcip,
+					nat->nat_odstip);
 	if (nat2 == NULL) {
 		int slen;
 
