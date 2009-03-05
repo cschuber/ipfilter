@@ -639,7 +639,8 @@ ipf_p_ftp_pasv(softf, fin, ip, nat, ftp, dlen)
 	ftpside_t *f;
 	char *s;
 
-	if (ftp->ftp_side[0].ftps_cmd != FTPXY_C_PASV) {
+	if ((softf->ipf_p_ftp_forcepasv != 0) &&
+	    (ftp->ftp_side[0].ftps_cmd != FTPXY_C_PASV)) {
 		if (softf->ipf_p_ftp_debug > 0)
 			printf("ipf_p_ftp_pasv:ftps_cmd(%d) != FTPXY_C_PASV\n",
 			       ftp->ftp_side[0].ftps_cmd);
@@ -1803,7 +1804,8 @@ ipf_p_ftp_epsv(softf, fin, ip, nat, ftp, dlen)
 	ftpside_t *f;
 	char *s;
 
-	if (ftp->ftp_side[0].ftps_cmd != FTPXY_C_EPSV) {
+	if ((softf->ipf_p_ftp_forcepasv != 0) &&
+	    (ftp->ftp_side[0].ftps_cmd != FTPXY_C_EPSV)) {
 		if (softf->ipf_p_ftp_debug > 0)
 			printf("ipf_p_ftp_epsv:ftps_cmd(%d) != FTPXY_C_EPSV\n",
 			       ftp->ftp_side[0].ftps_cmd);
