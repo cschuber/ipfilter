@@ -221,7 +221,7 @@ main(argc,argv)
 		ip = MTOD(m, ip_t *);
 		ifp = get_unit(iface, IP_V(ip));
 
-		if (!use_inet6) {
+		if (IP_V(ip) == 4) {
 			if ((r->r_flags & R_DO_CKSUM) || docksum)
 				fixv4sums(m, ip);
 			hlen = IP_HL(ip) << 2;
