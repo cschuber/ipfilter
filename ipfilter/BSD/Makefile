@@ -69,6 +69,11 @@ AROPTS=cq
 HERE!=pwd
 CCARGS=-I. $(DEBUG) $(CFLAGS) $(UFLAGS)
 KCARGS=-I. $(DEBUG) $(CFLAGS)
+.if ${MACHINE_ARCH} == amd64
+KCARGS+=-mcmodel=kernel -mno-red-zone -fno-omit-frame-pointer \
+	-mfpmath=387 -mno-sse -mno-sse2 -mno-mmx -mno-3dnow \
+	-msoft-float -fno-asynchronous-unwind-tables
+.endif
 #
 # Extra is option kernel things we always want in user space.
 #
@@ -270,8 +275,12 @@ ipfrule.ko: ip_rulesx.o $(MLR)
 	ld -Bshareable -o $@ setdef0.o ip_rulesx.o $(MLR) setdef1.o
 
 ipf.ko.5 ipl.ko.5: $(MODOBJS)
+.if ${MACHINE_ARCH} != amd64
 	ld -warn-common -r -d -o $(.TARGET:S/.ko/.kld/) $(MODOBJS)
 	ld -Bshareable -d -warn-common -o $(LKM:S/.5$//) $(.TARGET:S/.ko/.kld/)
+.else
+	ld -warn-common -r -d -o $(.TARGET:S/.5$//) $(MODOBJS)
+.endif
 
 ipf.ko ipl.ko: $(MODOBJS)
 	gensetdefs $(MODOBJS)
@@ -353,7 +362,7 @@ vnode_if.h: $(VNODESHDIR)/vnode_if.src
 
 ml_ipl.o: vnode_if.h $(TOP)/$(MLD) $(TOP)/ipl.h
 	-/bin/rm -f vnode_if.c
-	$(CC) -I. $(CFLAGS) $(DFLAGS) -c $(TOP)/$(ML) -o $@
+	$(CC) -I. $(KCARGS) $(DFLAGS) -c $(TOP)/$(ML) -o $@
 
 ip_rules.o: ip_rules.c $(TOP)/ip_rules.h
 	$(CC) -I. $(CFLAGS) $(DFLAGS) $(COMPIPF) -c ip_rules.c -o $@
@@ -369,7 +378,7 @@ $(TOP)/ip_rules.h: ip_rules.c
 	fi
 
 ip_rulesx.o: ip_rules.c $(TOP)/ip_rules.h
-	$(CC) -I. $(CFLAGS) $(DFLAGS) -DIPFILTER_COMPILED -c ip_rules.c -o $@
+	$(CC) -I. $(KCARGS) $(DFLAGS) -DIPFILTER_COMPILED -c ip_rules.c -o $@
 
 mlf_rule.o: $(TOP)/mlf_rule.c $(TOP)/ip_rules.h
 	$(CC) -I. $(CFLAGS) $(DFLAGS) -c $(TOP)/mlf_rule.c -o $@
@@ -381,7 +390,7 @@ mlo_rule.o: $(TOP)/mlo_rule.c $(TOP)/ip_rules.h
 	$(CC) -I. $(CFLAGS) $(DFLAGS) -c $(TOP)/mlo_rule.c -o $@
 
 mlfk_rule.o: $(TOP)/mlfk_rule.c $(TOP)/ip_rules.h
-	$(CC) -I. $(CFLAGS) $(DFLAGS) -c $(TOP)/mlfk_rule.c -o $@
+	$(CC) -I. $(KCARGS) $(DFLAGS) -c $(TOP)/mlfk_rule.c -o $@
 
 ipf_y.o: ipf_y.c ipf_y.h $(TOP)/ipf.h ipf_l.h $(TOP)/opts.h
 	$(CC) $(CCARGS) $(IPFBPF) -c ipf_y.c -o $@
@@ -520,6 +529,7 @@ install:
 	-if [ -d /modules -a -f ipfrule.ko ] ; then \
 		cp ipfrule.ko /modules; \
 	fi
+.if ${MACHINE_ARCH} != amd64
 	-if [ -d /boot/kernel -a -f ipf.ko ] ; then \
 		if [ -f /boot/kernel/ipl.ko ] ; then \
 			cp ipf.ko /boot/kernel/ipl.ko; \

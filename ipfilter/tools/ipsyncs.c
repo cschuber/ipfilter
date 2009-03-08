@@ -145,7 +145,7 @@ int main(argc, argv)
 			n1 = read(nfd, buff+inbuf, BUFFERLEN-inbuf);
 
 			printf("header : %d bytes read (header = %d bytes)\n",
-			       n1, sizeof(*sh));
+			       n1, (int) sizeof(*sh));
 
 			if (n1 < 0) {
 				syslog(LOG_ERR, "Read error (header): %m");
