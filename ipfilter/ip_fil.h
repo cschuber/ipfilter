@@ -694,26 +694,32 @@ typedef	struct	frentry {
 	ipfunc_t fr_func; 	/* call this function */
 	int	fr_dsize;
 	int	fr_pps;
-	int	fr_statemax;	/* max reference count */
 	fr_rtypes_t	fr_type;
 	u_32_t	fr_flags;	/* per-rule flags && options (see below) */
 	u_32_t	fr_logtag;	/* user defined log tag # */
 	u_32_t	fr_collect;	/* collection number */
 	u_int	fr_arg;		/* misc. numeric arg for rule */
 	u_int	fr_loglevel;	/* syslog log facility + priority */
-	u_int	fr_age[2];	/* non-TCP state timeouts */
-	int	fr_nostatelog;
-	int	fr_rpc;
 	u_char	fr_family;
 	u_char	fr_icode;	/* return ICMP code */
 	int	fr_group;	/* group to which this rule belongs */
 	int	fr_grhead;	/* group # which this rule starts */
-	int	fr_icmphead;	/* ICMP group  for state options */
-	ipftag_t fr_nattag;
 	int	fr_ifnames[4];
 	int	fr_isctag;
+	ipftag_t fr_nattag;
 	frdest_t fr_tifs[2];	/* "to"/"reply-to" interface */
 	frdest_t fr_dif;	/* duplicate packet interface */
+	/*
+	 * These are all options related to stateful filtering
+	 */
+	host_track_t	fr_srctrack;
+	int	fr_nostatelog;
+	int	fr_statemax;	/* max reference count */
+	int	fr_icmphead;	/* ICMP group  for state options */
+	u_int	fr_age[2];	/* non-TCP state timeouts */
+	/*
+	 * How big is the name buffer at the end?
+	 */
 	int	fr_namelen;
 	char	fr_names[1];
 } frentry_t;
@@ -787,7 +793,7 @@ typedef	struct	frentry {
 #define	FR_NOLOGTAG	0
 
 #ifndef	offsetof
-#define	offsetof(t,m)	(int)((&((t *)0L)->m))
+#define	offsetof(t,m)	(size_t)((&((t *)0L)->m))
 #endif
 #define	FR_CMPSIZ	(sizeof(struct frentry) - \
 			 offsetof(struct frentry, fr_func))
@@ -1795,7 +1801,7 @@ extern	int	ipf_tune_array_link __P((ipf_main_softc_t *, ipftuneable_t *));
 extern	int	ipf_tune_array_unlink __P((ipf_main_softc_t *,
 					   ipftuneable_t *));
 extern	ipftuneable_t *ipf_tune_array_copy __P((void *, size_t,
-						ipftuneable_t *));
+						ipftuneable_t *));    
 
 extern int	ipf_pr_pullup __P((fr_info_t *, int));
 
