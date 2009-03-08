@@ -1,5 +1,4 @@
 #! /bin/sh
-solrev=`uname -r | sh -c 'IFS=. read j n x; echo $n'`
 if [ ! -f netinet/done ] ; then
 	echo "Do NOT run this script directly, do 'make solaris'!"
 	exit 1
@@ -14,19 +13,17 @@ fi
 
 testcc()
 {
-	echo "test $1"
-	echo '' | $1 -E -
 	if echo '' | $1 -E - >/dev/null 2>&1 ; then
 		CC=$1
 		return 0
 	fi
-	echo "$1 fail"
 	return 1
 }
 
 if [ -f /usr/include/sys/neti.h ] ; then
 	INST='-DINSTANCES=1'
 fi
+
 if [ $rev = 5 ] ; then
 	if [ ! -f /usr/include/sys/neti.h -a ! -d ../pfil ] ; then
 		cat << __EOF__
@@ -45,6 +42,7 @@ __EOF__
 
 	cpu=`uname -p`
 	cpudir=${cpu}-`uname -r`
+	solrev=`uname -r | sh -c 'IFS=. read j n x; echo $n'`
 	if [ ! -d SunOS5/${cpudir} -a ! -h  SunOS5/${cpudir} ] ; then
 		mkdir -p SunOS5/${cpudir}
 	fi
@@ -66,7 +64,6 @@ __EOF__
 			fi
 		fi
 	else
-		echo "CC=$CC"
 		testcc $CC
 		if [ $? -ne 0 ] ; then
 			case $CC in
@@ -92,16 +89,20 @@ __EOF__
 	case "$CC" in
 	*gcc*)	# gcc
 		XARCH32_i386=""
-		XARCH32_sparc="-fno-dwarf2-indirect-strings"
-		XARCH64_sparc="-m64 -mcmodel=medlow -fno-dwarf2-indirect-strings"
+		XARCH32_sparc=""
+		XARCH64_sparc="-m64 -mcmodel=medlow"
 		XARCH64_i386="-m64 -mcmodel=kernel -mno-red-zone -ffreestanding"
 		;;
 	*)	# Sun C
 		XARCH32_i386="-Xa -xildoff"
-		XARCH32_sparc="-g -Xa -xildoff -xarch=v8 -xmemalign=8s"
-		XARCH64_sparc="-g -Xa -xildoff -xarch=v9 -xchip=ultra -xmemalign=8s -xcode=abs32 -Wc,-Qiselect-regsym=0 -xO3 -D_ASM_INLINES -Xa -xspace -W0,-Lt -errtags=yes -g -Wc,-Qiselect-T1 -xc99=%all -W0,-noglobal -xdebugformat=stabs -xc99=%all -Wd,-xsafe=unboundsym -Wc,-Qassembler-ounrefsym=0 -W2,-xwrap_int -W0,-xglobalstatic -xregs=no%float -xstrconst"
-#		XARCH64_i386="$XARCH32 -xarch=amd64 -xcode=abs32"
-		XARCH64_i386="$XARCH32 -m64 -xmodel=kernel"
+		XARCH32_sparc="-Xa -xildoff -xarch=v8 -xmemalign=8s"
+		if [ `cc -xarch=amd64 -xarch=v9 2>&1 | grep -c deprec` -eq 1 ] ; then
+			XARCH64_sparc="-Xa -xildoff -m64 -xmemalign=8s"
+			XARCH64_i386="$XARCH32 -m64"
+		else
+			XARCH64_sparc="-Xa -xildoff -xarch=v9 -xchip=ultra -xmemalign=8s -xcode=abs32"
+			XARCH64_i386="$XARCH32 -xarch=amd64 -xcode=abs32"
+		fi
 		;;
 	esac
 	XARCH32="`eval echo '$XARCH32_'$cpu`"
@@ -145,7 +146,7 @@ __EOF__
 		int main(void)
 		{
 			printf("%ld\n", (long) sizeof(long));
-			return(0);
+			exit(0);
 		}
 		EOF
 
@@ -156,9 +157,6 @@ __EOF__
 			echo $CC $XARCH32 cannot create 32 bit executables. 1>&2
 			exit 1
 		fi
-echo "$CC $XARCH64 $t"
-$CC $XARCH64 $t
-file 64.out
 		if $CC $XARCH64 $t -o 64.out >/dev/null 2>&1 &&
 		    { out64=`./64.out 2>/dev/null` ;
 		    [ "$out64" = 8 -o "`isainfo -b`" = 32 -a "$out64" = "" ]
@@ -175,7 +173,6 @@ file 64.out
 
 	# If we're running 64 bit, we *must* build 64 bit.
 	if ([ "`isainfo -b`" = 64 ]) 2>/dev/null ; then
-echo "CC64=${CC64}"
 		if $CC64 ; then :; else
 			echo "No 64 bit capable compiler was found" 1>&2
 			exit 1

@@ -121,7 +121,7 @@ static	int	addname __P((ipnat_t **, char *));
 %token	IPNY_RANDOM IPNY_HASHMD5 IPNY_CONFIG IPNY_ALLOW IPNY_DENY IPNY_DNS
 %token	IPNY_SEQUENTIAL IPNY_DSTLIST
 %type	<port> portspec
-%type	<num> hexnumber compare range proto functype
+%type	<num> hexnumber compare range proto
 %type	<num> saddr daddr sobject dobject mapfrom rdrfrom dip
 %type	<ipa> hostname ipv4 ipaddr
 %type	<ipp> addr rhsaddr rhdaddr erhdaddr

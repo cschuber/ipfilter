@@ -319,13 +319,18 @@ extern void printhost __P((int, u_32_t *));
 extern void printhostmask __P((int, u_32_t *, u_32_t *));
 extern void printip __P((int, u_32_t *));
 extern void printlog __P((struct frentry *));
-extern void printlookup __P((i6addr_t *addr, i6addr_t *mask));
+extern void printlookup __P((char *, i6addr_t *addr, i6addr_t *mask));
 extern void printmask __P((int, u_32_t *));
-extern void printnataddr __P((int, nat_addr_t *, char *));
+extern void printnataddr __P((int, char *, nat_addr_t *, int));           
 extern void printnatfield __P((nat_t *, int));
 extern void printnatside __P((char *, natstat_t *, nat_stat_side_t *));
 extern void printpacket __P((int, mb_t *));
 extern void printpacket6 __P((int, mb_t *));
+extern struct ippool_dst *printdstlist __P((struct ippool_dst *, copyfunc_t,
+					    char *, int, ipf_dstnode_t *));
+extern void printdstlistdata __P((ippool_dst_t *, int));
+extern ipf_dstnode_t *printdstlistnode __P((ipf_dstnode_t *, copyfunc_t, int));
+extern void printdstlistpolicy __P((ippool_policy_t));
 extern struct ip_pool_s *printpool __P((struct ip_pool_s *, copyfunc_t,
 					char *, int));
 extern struct ip_pool_s *printpool_live __P((struct ip_pool_s *, int,

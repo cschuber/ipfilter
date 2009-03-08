@@ -84,7 +84,8 @@ MODOBJS=$(OBJ)/ip_fil.o $(OBJ)/fil.o $(OBJ)/solaris.o $(OBJ)/ip_state.o \
     $(OBJ)/ip_frag.o $(OBJ)/ip_nat.o $(OBJ)/ip_proxy.o $(OBJ)/ip_auth.o \
     $(OBJ)/ip_pool.o $(OBJ)/ip_htable.o $(OBJ)/ip_lookup.o $(OBJ)/ip_log.o \
     $(OBJ)/ip_scan.o $(OBJ)/ip_sync.o $(OBJ)/radix.o $(OBJ)/md5.o \
-    $(OBJ)/ip_nat6.o $(OBJ)/arc4random.o $(BPFILTER)
+    $(OBJ)/ip_nat6.o $(OBJ)/ip_dstlist.o $(OBJ)/arc4random.o \
+    $(OBJ)/mblk_misc.o $(BPFILTER)
 #	$(OBJ)/ip_trafcon.o
 IPF=$(OBJ)/ipf.o $(OBJ)/ipfcomp.o $(OBJ)/ipf_y.o $(OBJ)/ipf_l.o
 IPT=$(OBJ)/ipftest.o $(OBJ)/ip_fil_u.o $(OBJ)/ip_state_u.o \
@@ -94,7 +95,7 @@ IPT=$(OBJ)/ipftest.o $(OBJ)/ip_fil_u.o $(OBJ)/ip_state_u.o \
     $(OBJ)/ip_auth_u.o $(OBJ)/ip_log_u.o $(OBJ)/ip_rules_u.o\
     $(OBJ)/ippool_y.o $(OBJ)/ippool_l.o $(OBJ)/ipnat_y.o $(OBJ)/ipnat_l.o \
     $(OBJ)/ipf_y.o $(OBJ)/ipf_l.o $(OBJ)/radix_u.o $(OBJ)/md5_u.o \
-    $(OBJ)/ip_nat6_u.o $(OBJ)/bpf_filter_u.o
+    $(OBJ)/ip_nat6_u.o $(OBJ)/ip_dstlist_u.o $(OBJ)/bpf_filter_u.o
 #	$(OBJ)/ip_trafcon_u.o
 IPNAT=$(OBJ)/ipnat.o $(OBJ)/ipnat_y.o $(OBJ)/ipnat_l.o
 IPMON=$(OBJ)/ipmon.o $(OBJ)/ipmon_y.o $(OBJ)/ipmon_l.o
@@ -233,55 +234,83 @@ $(OBJ)/ipfrule: $(OBJ)/ip_rulesx.o $(OBJ)/mlso_rule.o
 	ld -r $(OBJ)/ip_rulesx.o $(OBJ)/mlso_rule.o -o $@
 
 $(OBJ)/ipf: $(MODOBJS)
-	ld -dy -Ndrv/ip -Nmisc/neti -Nmisc/md5 -r $(MODOBJS) -o $@
+	if [ -f /kernel/misc/sparcv9/neti -o -f /kernel/misc/neti ] ; then \
+		ld -dy -Nmisc/hook -Nmisc/neti -Nmisc/md5 -Ndrv/ip -r $(MODOBJS) -o $@; \
+	else \
+		ld -dy -Ndrv/ip -Ndrv/pfil -Nmisc/md5 -r $(MODOBJS) -o $@; \
+	fi
 
 $(OBJ)/md5.o: $(TOP)/md5.c $(TOP)/md5.h
 	$(CC) -I$(TOP) $(DFLAGS) -c $(TOP)/md5.c -o $@
+	$(CTFCONVERT) $@
 
 $(OBJ)/radix.o: $(TOP)/md5.c $(TOP)/radix_ipf.h
 	$(CC) -I$(TOP) $(DFLAGS) -c $(TOP)/radix.c -o $@
+	$(CTFCONVERT) $@
 
 $(OBJ)/ip_nat.o: $(TOP)/ip_nat.c $(TOP)/ip_nat.h $(TOP)/ip_compat.h
 	$(CC) -I$(TOP) $(DFLAGS) -c $(TOP)/ip_nat.c -o $@
+	$(CTFCONVERT) $@
 
 $(OBJ)/ip_nat6.o: $(TOP)/ip_nat6.c $(TOP)/ip_nat.h $(TOP)/ip_compat.h
 	$(CC) -I$(TOP) $(DFLAGS) -c $(TOP)/ip_nat6.c -o $@
+	$(CTFCONVERT) $@
 
 $(OBJ)/ip_state.o: $(TOP)/ip_state.c $(TOP)/ip_state.h $(TOP)/ip_compat.h
 	$(CC) -I$(TOP) $(DFLAGS) -c $(TOP)/ip_state.c -o $@
+	$(CTFCONVERT) $@
 
 $(OBJ)/ip_scan.o: $(TOP)/ip_scan.c $(TOP)/ip_scan.h $(TOP)/ip_compat.h
 	$(CC) -I$(TOP) $(DFLAGS) -c $(TOP)/ip_scan.c -o $@
+	$(CTFCONVERT) $@
 
 $(OBJ)/ip_sync.o: $(TOP)/ip_sync.c $(TOP)/ip_sync.h $(TOP)/ip_compat.h
 	$(CC) -I$(TOP) $(DFLAGS) -c $(TOP)/ip_sync.c -o $@
+	$(CTFCONVERT) $@
 
 $(OBJ)/ip_proxy.o: $(TOP)/ip_proxy.c $(TOP)/ip_proxy.h $(TOP)/ip_compat.h \
         $(TOP)/ip_ftp_pxy.c $(TOP)/ip_rcmd_pxy.c $(TOP)/ip_raudio_pxy.c \
         $(TOP)/ip_rpcb_pxy.c $(TOP)/ip_ipsec_pxy.c $(TOP)/ip_nat.h \
 	$(TOP)/ip_fil.h
 	$(CC) -I$(TOP) $(DFLAGS) -c $(TOP)/ip_proxy.c -o $@
+	$(CTFCONVERT) $@
 
 $(OBJ)/ip_frag.o: $(TOP)/ip_frag.c $(TOP)/ip_frag.h $(TOP)/ip_compat.h
 	$(CC) -I$(TOP) $(DFLAGS) -c $(TOP)/ip_frag.c -o $@
+	$(CTFCONVERT) $@
 
 $(OBJ)/ip_auth.o: $(TOP)/ip_auth.c $(TOP)/ip_auth.h $(TOP)/ip_compat.h
 	$(CC) -I$(TOP) $(DFLAGS) -c $(TOP)/ip_auth.c -o $@
+	$(CTFCONVERT) $@
 
 $(OBJ)/ip_pool.o: $(TOP)/ip_pool.c $(TOP)/ip_compat.h $(TOP)/ip_fil.h \
 	$(TOP)/ip_pool.h $(TOP)/ip_lookup.h
 	$(CC) $(CCARGS) $(DFLAGS) -c $(TOP)/ip_pool.c -o $@
+	$(CTFCONVERT) $@
 
 $(OBJ)/ip_htable.o: $(TOP)/ip_htable.c $(TOP)/ip_compat.h $(TOP)/ip_fil.h \
 	$(TOP)/ip_htable.h $(TOP)/ip_lookup.h
 	$(CC) $(CCARGS) $(DFLAGS) -c $(TOP)/ip_htable.c -o $@
+	$(CTFCONVERT) $@
+
+$(OBJ)/ip_dstlist.o: $(TOP)/ip_dstlist.c $(TOP)/ip_compat.h $(TOP)/ip_fil.h \
+	$(TOP)/ip_dstlist.h $(TOP)/ip_lookup.h
+	$(CC) $(CCARGS) $(DFLAGS) -c $(TOP)/ip_dstlist.c -o $@
+	$(CTFCONVERT) $@
 
 $(OBJ)/ip_lookup.o: $(TOP)/ip_lookup.c $(TOP)/ip_compat.h $(TOP)/ip_fil.h \
-	$(TOP)/ip_pool.h $(TOP)/ip_htable.h $(TOP)/ip_lookup.h
+	$(TOP)/ip_pool.h $(TOP)/ip_htable.h $(TOP)/ip_lookup.h \
+	$(TOP)/ip_dstlist.h
 	$(CC) $(CCARGS) $(DFLAGS) -c $(TOP)/ip_lookup.c -o $@
+	$(CTFCONVERT) $@
 
 $(OBJ)/arc4random.o: $(TOP)/arc4random.c
 	$(CC) $(CCARGS) $(DFLAGS) -c $(TOP)/arc4random.c -o $@
+	$(CTFCONVERT) $@
+
+$(OBJ)/mblk_misc.o: $(TOP)/SunOS5/mblk_misc.c
+	$(CC) $(CCARGS) $(DFLAGS) -c $(TOP)/SunOS5/mblk_misc.c -o $@
+	$(CTFCONVERT) $@
 
 $(OBJ)/ip_trafcon.o: $(TOP)/ip_trafcon.c $(TOP)/ip_compat.h $(TOP)/ip_fil.h \
 	$(TOP)/ip_trafcon.h
@@ -325,6 +354,10 @@ $(OBJ)/ip_pool_u.o: $(TOP)/ip_pool.c $(TOP)/ip_pool.h $(TOP)/ip_compat.h \
 $(OBJ)/ip_htable_u.o: $(TOP)/ip_htable.c $(TOP)/ip_htable.h $(TOP)/ip_compat.h \
 	$(TOP)/ip_fil.h $(TOP)/ip_lookup.h
 	$(CC) $(CCARGS) $(EXTRA) -c $(TOP)/ip_htable.c -o $@
+
+$(OBJ)/ip_dstlist_u.o: $(TOP)/ip_dstlist.c $(TOP)/ip_dstlist.h \
+	$(TOP)/ip_compat.h $(TOP)/ip_fil.h $(TOP)/ip_lookup.h
+	$(CC) $(CCARGS) $(EXTRA) -c $(TOP)/ip_dstlist.c -o $@
 
 $(OBJ)/ip_lookup_u.o: $(TOP)/ip_lookup.c $(TOP)/ip_lookup.h $(TOP)/ip_compat.h \
 	$(TOP)/ip_fil.h $(TOP)/ip_lookup.h
@@ -378,7 +411,7 @@ $(OBJ)/solaris.o: $(TOP)/solaris.c $(TOP)/ipl.h
 	$(CTFCONVERT) $@
 
 $(OBJ)/ipmon: $(IPMON) $(OBJ)/libipf.a
-	$(CC) $(CCARGS) $(LOGFAC) $(IPMON) -o $@ $(LIBS) -ll
+	$(CC) $(CCARGS) $(LOGFAC) $(IPMON) -o $@ $(LIBS) -ll -ldl
 
 $(OBJ)/ipmon.o: $(TOOL)/ipmon.c $(TOP)/ipmon.h
 	$(CC) $(CCARGS) $(LOGFAC) -c $(TOOL)/ipmon.c -o $@
@@ -520,13 +553,14 @@ $(CPUDIR)/ipf.pkg.common:
 	-cp $(TOP)/ip_fil.h $(TOP)/ip_compat.h $(TOP)/ip_state.h .
 	-cp $(TOP)/ip_nat.h $(TOP)/ip_frag.h $(TOP)/ip_proxy.h .
 	-cp $(TOP)/ip_auth.h $(TOP)/ip_htable.h $(TOP)/ip_pool.h .
-	-cp $(TOP)/ip_lookup.h .
+	-cp $(TOP)/ip_lookup.h $(TOP)/ip_dstlist.h .
 	-$(INSTALL) ip_fil.h $(ROOTINC)/ipfilter
 	-$(INSTALL) ip_compat.h $(ROOTINC)/ipfilter
 	-$(INSTALL) ip_state.h $(ROOTINC)/ipfilter
 	-$(INSTALL) ip_nat.h $(ROOTINC)/ipfilter
 	-$(INSTALL) ip_frag.h $(ROOTINC)/ipfilter
 	-$(INSTALL) ip_htable.h $(ROOTINC)/ipfilter
+	-$(INSTALL) ip_dstlist.h $(ROOTINC)/ipfilter
 	-$(INSTALL) ip_lookup.h $(ROOTINC)/ipfilter
 	-$(INSTALL) ip_pool.h $(ROOTINC)/ipfilter
 	-$(INSTALL) ip_proxy.h $(ROOTINC)/ipfilter

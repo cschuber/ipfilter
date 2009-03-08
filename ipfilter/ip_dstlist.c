@@ -929,7 +929,7 @@ ipf_dstlist_table_remove(softc, softd, d)
 		       d->ipld_maxnodes * sizeof(*d->ipld_dests));
 	}
 
-	KFREES(d, d->ipld_size);
+	KFREE(d);
 }
 
 
