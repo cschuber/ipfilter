@@ -1631,7 +1631,7 @@ extern void eMrwlock_downgrade __P((eMrwlock_t *, char *, int));
  * On BSD's use quad_t as a guarantee for getting at least a 64bit sized
  * object.
  */
-#if defined(BSD) && (BSD > 199306)
+#if !defined(__amd64__) && defined(BSD) && (BSD > 199306)
 # define	USE_QUAD_T
 # define	U_QUAD_T	u_quad_t
 # define	QUAD_T		quad_t
@@ -1858,7 +1858,7 @@ typedef	struct	tcpiphdr	tcpiphdr_t;
 #endif
 
 #ifndef offsetof
-# define offsetof(t,m) (int)((&((t *)0L)->m))
+# define offsetof(t,m) (size_t)((&((t *)0L)->m))
 #endif
 
 /*
