@@ -1435,6 +1435,17 @@ stateopt:
 				{ DOALL(fr->fr_rpc = 1;) }
 	| IPFY_RPC IPFY_IN YY_STR
 				{ DOALL(fr->fr_rpc = 1;) }
+	| IPFY_MAX_SRCS YY_NUMBER
+				{ DOALL(fr->fr_srctrack.ht_max_nodes = $2;) }
+	| IPFY_MAX_PER_SRC YY_NUMBER
+				{ DOALL(fr->fr_srctrack.ht_max_per_node = $2; \
+					fr->fr_srctrack.ht_netmask = \
+					fr->fr_family == AF_INET ? 32: 128;)
+				}
+	| IPFY_MAX_PER_SRC YY_NUMBER '/' YY_NUMBER
+				{ DOALL(fr->fr_srctrack.ht_max_per_node = $2; \
+					fr->fr_srctrack.ht_netmask = $4;)
+				}
 	;
 
 portnum:
