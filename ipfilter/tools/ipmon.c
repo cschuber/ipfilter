@@ -675,7 +675,7 @@ static void print_natlog(conf, buf, blen)
 	}
 	(void) strftime(t, len, "%T", tm);
 	t += strlen(t);
-	sprintf(t, ".%-.6ld @%hd ", ipl->ipl_usec, nl->nl_rule + 1);
+	sprintf(t, ".%-.6ld @%hd ", (long)ipl->ipl_usec, nl->nl_rule + 1);
 	t += strlen(t);
 
 	switch (nl->nl_action)
@@ -860,7 +860,7 @@ static void print_statelog(conf, buf, blen)
 	}
 	(void) strftime(t, len, "%T", tm);
 	t += strlen(t);
-	sprintf(t, ".%-.6ld ", ipl->ipl_usec);
+	sprintf(t, ".%-.6ld ", (long)ipl->ipl_usec);
 	t += strlen(t);
 
 	switch (sl->isl_type)
@@ -1100,7 +1100,7 @@ static void print_ipflog(conf, buf, blen)
 	}
 	(void) strftime(t, len, "%T", tm);
 	t += strlen(t);
-	sprintf(t, ".%-.6ld ", ipl->ipl_usec);
+	sprintf(t, ".%-.6ld ", (long)ipl->ipl_usec);
 	t += strlen(t);
 	if (ipl->ipl_count > 1) {
 		sprintf(t, "%dx ", ipl->ipl_count);
