@@ -591,16 +591,14 @@ ipfpoll(dev, events, anyyet, reventsp, phpp)
 			revents |= events & (POLLIN | POLLRDNORM);
 		break;
 	case IPL_LOGSYNC :
-#ifdef IPFILTER_SYNC
 		if ((events & (POLLIN | POLLRDNORM)) &&
 		    ipf_sync_canread(softc))
 			revents |= events & (POLLIN | POLLRDNORM);
 		if ((events & (POLLOUT | POLLWRNORM)) &&
 		    ipf_sync_canwrite(softc))
 			revents |= events & POLLOUT;
-# ifdef POLLOUTNORM
+#ifdef POLLOUTNORM
 			revents |= events & POLLOUTNORM;
-# endif
 #endif
 		break;
 	case IPL_LOGSCAN :
@@ -649,9 +647,7 @@ ipfopen(devp, flags, otype, cred)
 		case IPL_LOGSTATE :
 		case IPL_LOGAUTH :
 		case IPL_LOGLOOKUP :
-#ifdef IPFILTER_SYNC
 		case IPL_LOGSYNC :
-#endif
 #ifdef IPFILTER_SCAN
 		case IPL_LOGSCAN :
 #endif
@@ -708,10 +704,8 @@ ipfread(dev, uio, cp)
 	if (softc->ipf_running < 1)
 		return EIO;
 
-#ifdef	IPFILTER_SYNC
 	if (getminor(dev) == IPL_LOGSYNC)
 		return ipf_sync_read(softc, uio);
-#endif
 
 #ifdef	IPFILTER_LOG
 	return ipf_log_read(softc, getminor(dev), uio);
@@ -744,10 +738,8 @@ ipfwrite(dev, uio, cp)
 	if (softc->ipf_running < 1)
 		return EIO;
 
-#ifdef	IPFILTER_SYNC
 	if (getminor(dev) == IPL_LOGSYNC)
 		return ipf_sync_write(softc, uio);
-#endif /* IPFILTER_SYNC */
 	return ENXIO;
 }
 

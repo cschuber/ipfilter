@@ -26,7 +26,7 @@
  *	@(#)radix.h	8.2 (Berkeley) 10/31/94
  */
 
-#if !defined(_RADIX_IPF_H_) && !defined(_NET_RADIX_H_)
+#if !defined(_RADIX_IPF_H_)
 #define	_RADIX_IPF_H_
 
 #ifndef __P
@@ -69,11 +69,17 @@ struct ipf_radix_node {
 #endif
 };
 
+#undef rn_dupedkey
 #define rn_dupedkey rn_u.rn_leaf.rn_Dupedkey
+#undef rn_key
 #define rn_key rn_u.rn_leaf.rn_Key
+#undef rn_mask
 #define rn_mask rn_u.rn_leaf.rn_Mask
+#undef rn_off
 #define rn_off rn_u.rn_node.rn_Off
+#undef rn_l
 #define rn_l rn_u.rn_node.rn_L
+#undef rn_r
 #define rn_r rn_u.rn_node.rn_R
 
 /*

@@ -42,24 +42,24 @@
 extern	int	lkmenodev __P((void));
 
 #if OpenBSD >= 200311
-int	if_ipl_lkmentry __P((struct lkm_table *, int, int));
+int	if_ipf_lkmentry __P((struct lkm_table *, int, int));
 #else
-int	if_ipl __P((struct lkm_table *, int, int));
+int	if_ipf __P((struct lkm_table *, int, int));
 #endif
-static	int	ipl_unload __P((void));
-static	int	ipl_load __P((void));
-static	int	ipl_remove __P((void));
-static	int	iplaction __P((struct lkm_table *, int));
+static	int	ipf_unload __P((void));
+static	int	ipf_load __P((void));
+static	int	ipf_remove __P((void));
+static	int	ipfaction __P((struct lkm_table *, int));
 static	char	*ipf_devfiles[] = { IPL_NAME, IPNAT_NAME, IPSTATE_NAME,
 				    IPAUTH_NAME, IPSYNC_NAME, IPSCAN_NAME,
 				    IPLOOKUP_NAME, NULL };
 
 
-struct	cdevsw	ipldevsw =
+struct	cdevsw	ipfdevsw =
 {
-	iplopen,		/* open */
-	iplclose,		/* close */
-	iplread,		/* read */
+	ipfopen,		/* open */
+	ipfclose,		/* close */
+	ipfread,		/* read */
 	(void *)nullop,		/* write */
 	ipfioctl,		/* ioctl */
 	(void *)nullop,		/* stop */
@@ -69,9 +69,9 @@ struct	cdevsw	ipldevsw =
 	NULL			/* strategy */
 };
 
-int	ipl_major = 0;
+int	ipf_major = 0;
 
-MOD_DEV(IPL_VERSION, LM_DT_CHAR, -1, &ipldevsw);
+MOD_DEV(IPL_VERSION, LM_DT_CHAR, -1, &ipfdevsw);
 
 extern int vd_unuseddev __P((void));
 extern struct cdevsw cdevsw[];
@@ -79,19 +79,19 @@ extern int nchrdev;
 
 
 #if OpenBSD >= 200311
-int if_ipl_lkmentry (lkmtp, cmd, ver)
+int if_ipf_lkmentry (lkmtp, cmd, ver)
 #else
-int if_ipl(lkmtp, cmd, ver)
+int if_ipf(lkmtp, cmd, ver)
 #endif
 	struct lkm_table *lkmtp;
 	int cmd, ver;
 {
-	DISPATCH(lkmtp, cmd, ver, iplaction, iplaction, iplaction);
+	DISPATCH(lkmtp, cmd, ver, ipfaction, ipfaction, ipfaction);
 }
 
 int lkmexists __P((struct lkm_table *)); /* defined in /sys/kern/kern_lkm.c */
 
-static int iplaction(lkmtp, cmd)
+static int ipfaction(lkmtp, cmd)
 	struct lkm_table *lkmtp;
 	int cmd;
 {
@@ -107,22 +107,22 @@ static int iplaction(lkmtp, cmd)
 
 		for (i = 0; i < nchrdev; i++)
 			if (cdevsw[i].d_open == (dev_type_open((*)))lkmenodev ||
-			    cdevsw[i].d_open == iplopen)
+			    cdevsw[i].d_open == ipfopen)
 				break;
 		if (i == nchrdev) {
 			printf("IP Filter: No free cdevsw slots\n");
 			return ENODEV;
 		}
 
-		ipl_major = i;
+		ipf_major = i;
 		args->lkm_offset = i;   /* slot in cdevsw[] */
-		printf("IP Filter: loaded into slot %d\n", ipl_major);
-		return ipl_load();
+		printf("IP Filter: loaded into slot %d\n", ipf_major);
+		return ipf_load();
 	case LKM_E_UNLOAD :
-		err = ipl_unload();
+		err = ipf_unload();
 		if (!err)
 			printf("IP Filter: unloaded from slot %d\n",
-			       ipl_major);
+			       ipf_major);
 		break;
 	case LKM_E_STAT :
 		break;
@@ -134,7 +134,7 @@ static int iplaction(lkmtp, cmd)
 }
 
 
-static int ipl_remove()
+static int ipf_remove()
 {
 	struct nameidata nd;
 	int error, i;
@@ -165,7 +165,7 @@ static int ipl_remove()
 }
 
 
-static int ipl_unload()
+static int ipf_unload()
 {
 	int error = 0;
 
@@ -180,14 +180,14 @@ static int ipl_unload()
 
 	if (error == 0) {
 		ipf_running = -2;
-		error = ipl_remove();
+		error = ipf_remove();
 		printf("%s unloaded\n", ipfilter_version);
 	}
 	return error;
 }
 
 
-static int ipl_load()
+static int ipf_load()
 {
 	struct nameidata nd;
 	struct vattr vattr;
@@ -199,7 +199,7 @@ static int ipl_load()
 	 * XXX using the assigned LKM device slot's major number.  In a
 	 * XXX perfect world we could use the ones specified by cdevsw[].
 	 */
-	(void)ipl_remove();
+	(void)ipf_remove();
 
 	error = ipfattach();
 
@@ -220,7 +220,7 @@ static int ipl_load()
 		VATTR_NULL(&vattr);
 		vattr.va_type = VCHR;
 		vattr.va_mode = (fmode & 07777);
-		vattr.va_rdev = (ipl_major << 8) | i;
+		vattr.va_rdev = (ipf_major << 8) | i;
 		VOP_LEASE(nd.ni_dvp, curproc, curproc->p_ucred, LEASE_WRITE);
 		error = VOP_MKNOD(nd.ni_dvp, &nd.ni_vp, &nd.ni_cnd, &vattr);
 	}
@@ -258,7 +258,7 @@ static int ipl_load()
  * routines below for saving IP headers to buffer
  */
 int
-iplopen(dev, flags, devtype, p)
+ipfopen(dev, flags, devtype, p)
 	dev_t dev;
 	int flags;
 	int devtype;
@@ -277,9 +277,7 @@ iplopen(dev, flags, devtype, p)
 		case IPL_LOGSTATE :
 		case IPL_LOGAUTH :
 		case IPL_LOGLOOKUP :
-#ifdef IPFILTER_SYNC
 		case IPL_LOGSYNC :
-#endif
 #ifdef IPFILTER_SCAN
 		case IPL_LOGSCAN :
 #endif
@@ -295,7 +293,7 @@ iplopen(dev, flags, devtype, p)
 
 
 int
-iplclose(dev, flags, devtype, p)
+ipfclose(dev, flags, devtype, p)
 	dev_t dev;
 	int flags;
 	int devtype;
@@ -312,13 +310,13 @@ iplclose(dev, flags, devtype, p)
 
 
 /*
- * iplread/ipllog
+ * ipfread/ipflog
  * both of these must operate with at least splnet() lest they be
  * called during packet processing and cause an inconsistancy to appear in
  * the filter lists.
  */
 int
-iplread(dev, uio, ioflag)
+ipfread(dev, uio, ioflag)
 	dev_t dev;
 	register struct uio *uio;
 	int ioflag;
@@ -327,10 +325,8 @@ iplread(dev, uio, ioflag)
 	if (ipf_running < 1)
 		return EIO;
 
-# ifdef IPFILTER_SYNC
 	if (GET_MINOR(dev) == IPL_LOGSYNC)
 		return ipfsync_read(uio);
-# endif
 
 #ifdef IPFILTER_LOG
 	return ipflog_read(GET_MINOR(dev), uio);
@@ -341,17 +337,17 @@ iplread(dev, uio, ioflag)
 
 
 /*
- * iplwrite
+ * ipfwrite
  * both of these must operate with at least splnet() lest they be
  * called during packet processing and cause an inconsistancy to appear in
  * the filter lists.
  */
 int
 #if (BSD >= 199306)
-iplwrite(dev, uio, ioflag)
+ipfwrite(dev, uio, ioflag)
 	int ioflag;
 #else
-iplwrite(dev, uio)
+ipfwrite(dev, uio)
 #endif
 	dev_t dev;
 	register struct uio *uio;
@@ -360,9 +356,7 @@ iplwrite(dev, uio)
 	if (ipf_running < 1)
 		return EIO;
 
-#ifdef  IPFILTER_SYNC
 	if (GET_MINOR(dev) == IPL_LOGSYNC)
 		return ipfsync_write(uio);
-#endif
 	return ENXIO;
 }

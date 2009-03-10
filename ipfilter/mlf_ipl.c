@@ -139,13 +139,13 @@ static void *ipf_devfs[IPL_LOGSIZE];
 #endif
 
 #if !defined(__FreeBSD_version) || (__FreeBSD_version < 220000)
-int	ipl_major = 0;
+int	ipf_major = 0;
 
-static struct   cdevsw  ipldevsw =
+static struct   cdevsw  ipfdevsw =
 {
-	iplopen,		/* open */
-	iplclose,		/* close */
-	iplread,		/* read */
+	ipfopen,		/* open */
+	ipfclose,		/* close */
+	ipfread,		/* read */
 	(void *)nullop,		/* write */
 	ipfioctl,		/* ioctl */
 	(void *)nullop,		/* stop */
@@ -156,45 +156,45 @@ static struct   cdevsw  ipldevsw =
 	NULL			/* strategy */
 };
 
-MOD_DEV(IPL_VERSION, LM_DT_CHAR, -1, &ipldevsw);
+MOD_DEV(IPL_VERSION, LM_DT_CHAR, -1, &ipfdevsw);
 
 extern struct cdevsw cdevsw[];
 extern int vd_unuseddev __P((void));
 extern int nchrdev;
 #else
 
-static struct cdevsw ipl_cdevsw = {
-	iplopen,	iplclose,	iplread,	nowrite, /* 79 */
+static struct cdevsw ipf_cdevsw = {
+	ipfopen,	ipfclose,	ipfread,	nowrite, /* 79 */
 	ipfioctl,	nostop,		noreset,	nodevtotty,
 #if (__FreeBSD_version >= 300000)
-	seltrue,	nommap,		nostrategy,	"ipl",
+	seltrue,	nommap,		nostrategy,	"ipf",
 #else
-	noselect,	nommap,		nostrategy,	"ipl",
+	noselect,	nommap,		nostrategy,	"ipf",
 #endif
 	NULL,	-1
 };
 #endif
 
-static void ipl_drvinit __P((void *));
+static void ipf_drvinit __P((void *));
 
 #ifdef ACTUALLY_LKM_NOT_KERNEL
-static  int     if_ipl_unload __P((struct lkm_table *, int));
-static  int     if_ipl_load __P((struct lkm_table *, int));
-static  int     if_ipl_remove __P((void));
-static  int     ipl_major = CDEV_MAJOR;
+static  int     if_ipf_unload __P((struct lkm_table *, int));
+static  int     if_ipf_load __P((struct lkm_table *, int));
+static  int     if_ipf_remove __P((void));
+static  int     ipf_major = CDEV_MAJOR;
 
-static int iplaction __P((struct lkm_table *, int));
+static int ipfaction __P((struct lkm_table *, int));
 static char *ipf_devfiles[] = { IPL_NAME, IPL_NAT, IPL_STATE, IPL_AUTH,
 				IPL_SCAN, IPL_SYNC, IPL_POOL, NULL };
 
 extern	int	lkmenodev __P((void));
 
-static int iplaction(lkmtp, cmd)
+static int ipfaction(lkmtp, cmd)
 	struct lkm_table *lkmtp;
 	int cmd;
 {
 #if !defined(__FreeBSD_version) || (__FreeBSD_version < 220000)
-	int i = ipl_major;
+	int i = ipf_major;
 	struct lkm_dev *args = lkmtp->private.lkm_dev;
 #endif
 	int err = 0;
@@ -208,27 +208,27 @@ static int iplaction(lkmtp, cmd)
 #if !defined(__FreeBSD_version) || (__FreeBSD_version < 220000)
 		for (i = 0; i < nchrdev; i++)
 			if (cdevsw[i].d_open == lkmenodev ||
-			    cdevsw[i].d_open == iplopen)
+			    cdevsw[i].d_open == ipfopen)
 				break;
 		if (i == nchrdev) {
 			printf("IP Filter: No free cdevsw slots\n");
 			return ENODEV;
 		}
 
-		ipl_major = i;
+		ipf_major = i;
 		args->lkm_offset = i;   /* slot in cdevsw[] */
 #endif
-		printf("IP Filter: loaded into slot %d\n", ipl_major);
-		err = if_ipl_load(lkmtp, cmd);
+		printf("IP Filter: loaded into slot %d\n", ipf_major);
+		err = if_ipf_load(lkmtp, cmd);
 		if (!err)
-			ipl_drvinit((void *)NULL);
+			ipf_drvinit((void *)NULL);
 		return err;
 		break;
 	case LKM_E_UNLOAD :
-		err = if_ipl_unload(lkmtp, cmd);
+		err = if_ipf_unload(lkmtp, cmd);
 		if (!err) {
 			printf("IP Filter: unloaded from slot %d\n",
-				ipl_major);
+				ipf_major);
 #ifdef	DEVFS
 			if (ipf_devfs[IPL_LOGIPF])
 				devfs_remove_dev(ipf_devfs[IPL_LOGIPF]);
@@ -257,7 +257,7 @@ static int iplaction(lkmtp, cmd)
 }
 
 
-static int if_ipl_remove __P((void))
+static int if_ipf_remove __P((void))
 {
 	char *name;
 	struct nameidata nd;
@@ -290,7 +290,7 @@ static int if_ipl_remove __P((void))
 }
 
 
-static int if_ipl_unload(lkmtp, cmd)
+static int if_ipf_unload(lkmtp, cmd)
 	struct lkm_table *lkmtp;
 	int cmd;
 {
@@ -298,12 +298,12 @@ static int if_ipl_unload(lkmtp, cmd)
 
 	error = ipfdetach();
 	if (!error)
-		error = if_ipl_remove();
+		error = if_ipf_remove();
 	return error;
 }
 
 
-static int if_ipl_load(lkmtp, cmd)
+static int if_ipf_load(lkmtp, cmd)
 	struct lkm_table *lkmtp;
 	int cmd;
 {
@@ -315,7 +315,7 @@ static int if_ipl_load(lkmtp, cmd)
 	error = ipfattach();
 	if (error)
 		return error;
-	(void) if_ipl_remove();
+	(void) if_ipf_remove();
 
 	for (i = 0; (name = ipf_devfiles[i]); i++) {
 		NDINIT(&nd, CREATE, LOCKPARENT, UIO_SYSSPACE, name, curproc);
@@ -333,7 +333,7 @@ static int if_ipl_load(lkmtp, cmd)
 		VATTR_NULL(&vattr);
 		vattr.va_type = VCHR;
 		vattr.va_mode = (fmode & 07777);
-		vattr.va_rdev = (ipl_major << 8) | i;
+		vattr.va_rdev = (ipf_major << 8) | i;
 		VOP_LEASE(nd.ni_dvp, curproc, curproc->p_ucred, LEASE_WRITE);
 		error = VOP_MKNOD(nd.ni_dvp, &nd.ni_vp, &nd.ni_cnd, &vattr);
 #if (__FreeBSD_version >= 300000)
@@ -366,16 +366,16 @@ int xxxinit(lkmtp, cmd, ver)
 	struct lkm_table *lkmtp;
 	int cmd, ver;
 {
-	DISPATCH(lkmtp, cmd, ver, iplaction, iplaction, iplaction);
+	DISPATCH(lkmtp, cmd, ver, ipfaction, ipfaction, ipfaction);
 }
 #else	/* __FREEBSD_version >= 220000 */
 # ifdef	IPFILTER_LKM
 #  include <sys/exec.h>
 
 #  if (__FreeBSD_version >= 300000)
-MOD_DEV(if_ipl, LM_DT_CHAR, CDEV_MAJOR, &ipl_cdevsw);
+MOD_DEV(if_ipf, LM_DT_CHAR, CDEV_MAJOR, &ipf_cdevsw);
 #  else
-MOD_DECL(if_ipl);
+MOD_DECL(if_ipf);
 
 
 static struct lkm_dev _module = {
@@ -384,48 +384,48 @@ static struct lkm_dev _module = {
 	IPL_VERSION,
 	CDEV_MAJOR,
 	LM_DT_CHAR,
-	{ (void *)&ipl_cdevsw }
+	{ (void *)&ipf_cdevsw }
 };
 #  endif
 
 
-int if_ipl __P((struct lkm_table *, int, int));
+int if_ipf __P((struct lkm_table *, int, int));
 
 
-int if_ipl(lkmtp, cmd, ver)
+int if_ipf(lkmtp, cmd, ver)
 	struct lkm_table *lkmtp;
 	int cmd, ver;
 {
 #  if (__FreeBSD_version >= 300000)
-	MOD_DISPATCH(if_ipl, lkmtp, cmd, ver, iplaction, iplaction, iplaction);
+	MOD_DISPATCH(if_ipf, lkmtp, cmd, ver, ipfaction, ipfaction, ipfaction);
 #  else
-	DISPATCH(lkmtp, cmd, ver, iplaction, iplaction, iplaction);
+	DISPATCH(lkmtp, cmd, ver, ipfaction, ipfaction, ipfaction);
 #  endif
 }
 # endif /* IPFILTER_LKM */
-static ipl_devsw_installed = 0;
+static ipf_devsw_installed = 0;
 
-static void ipl_drvinit __P((void *unused))
+static void ipf_drvinit __P((void *unused))
 {
 	dev_t dev;
 # ifdef	DEVFS
 	void **tp = ipf_devfs;
 # endif
 
-	if (!ipl_devsw_installed ) {
+	if (!ipf_devsw_installed ) {
 		dev = makedev(CDEV_MAJOR, 0);
-		cdevsw_add(&dev, &ipl_cdevsw, NULL);
-		ipl_devsw_installed = 1;
+		cdevsw_add(&dev, &ipf_cdevsw, NULL);
+		ipf_devsw_installed = 1;
 
 # ifdef	DEVFS
-		tp[IPL_LOGIPF] = devfs_add_devswf(&ipl_cdevsw, IPL_LOGIPF,
+		tp[IPL_LOGIPF] = devfs_add_devswf(&ipf_cdevsw, IPL_LOGIPF,
 						  DV_CHR, 0, 0, 0600, "ipf");
-		tp[IPL_LOGNAT] = devfs_add_devswf(&ipl_cdevsw, IPL_LOGNAT,
+		tp[IPL_LOGNAT] = devfs_add_devswf(&ipf_cdevsw, IPL_LOGNAT,
 						  DV_CHR, 0, 0, 0600, "ipnat");
-		tp[IPL_LOGSTATE] = devfs_add_devswf(&ipl_cdevsw, IPL_LOGSTATE,
+		tp[IPL_LOGSTATE] = devfs_add_devswf(&ipf_cdevsw, IPL_LOGSTATE,
 						    DV_CHR, 0, 0, 0600,
 						    "ipstate");
-		tp[IPL_LOGAUTH] = devfs_add_devswf(&ipl_cdevsw, IPL_LOGAUTH,
+		tp[IPL_LOGAUTH] = devfs_add_devswf(&ipf_cdevsw, IPL_LOGAUTH,
 						   DV_CHR, 0, 0, 0600,
 						   "ipauth");
 # endif
@@ -462,7 +462,7 @@ sysctl_ipf_int SYSCTL_HANDLER_ARGS
 
 # if defined(IPFILTER_LKM) || \
      defined(__FreeBSD_version) && (__FreeBSD_version >= 220000)
-SYSINIT(ipldev,SI_SUB_DRIVERS,SI_ORDER_MIDDLE+CDEV_MAJOR,ipl_drvinit,NULL)
+SYSINIT(ipfdev,SI_SUB_DRIVERS,SI_ORDER_MIDDLE+CDEV_MAJOR,ipf_drvinit,NULL)
 # endif /* IPFILTER_LKM */
 #endif /* _FreeBSD_version */
 
@@ -470,7 +470,7 @@ SYSINIT(ipldev,SI_SUB_DRIVERS,SI_ORDER_MIDDLE+CDEV_MAJOR,ipl_drvinit,NULL)
 /*
  * routines below for saving IP headers to buffer
  */
-int iplopen(dev, flags
+int ipfopen(dev, flags
 #if ((BSD >= 199506) || (__FreeBSD_version >= 220000))
 , devtype, p)
 	int devtype;
@@ -499,7 +499,7 @@ int iplopen(dev, flags
 }
 
 
-int iplclose(dev, flags
+int ipfclose(dev, flags
 #if ((BSD >= 199506) || (__FreeBSD_version >= 220000))
 , devtype, p)
 	int devtype;
@@ -528,16 +528,16 @@ int iplclose(dev, flags
 }
 
 /*
- * iplread/ipllog
+ * ipfread/ipflog
  * both of these must operate with at least splnet() lest they be
  * called during packet processing and cause an inconsistancy to appear in
  * the filter lists.
  */
 #if (BSD >= 199306)
-int iplread(dev, uio, ioflag)
+int ipfread(dev, uio, ioflag)
 	int ioflag;
 #else
-int iplread(dev, uio)
+int ipfread(dev, uio)
 #endif
 #if (__FreeBSD_version >= 502116)
 	struct cdev *dev;
@@ -554,10 +554,8 @@ int iplread(dev, uio)
 	if (ipf_running < 1)
 		return EIO;
 
-# ifdef	IPFILTER_SYNC
 	if (unit == IPL_LOGSYNC)
 		return ipfsync_read(uio);
-# endif
 
 #ifdef IPFILTER_LOG
 	return ipflog_read(unit, uio);
@@ -568,16 +566,16 @@ int iplread(dev, uio)
 
 
 /*
- * iplwrite
+ * ipfwrite
  * both of these must operate with at least splnet() lest they be
  * called during packet processing and cause an inconsistancy to appear in
  * the filter lists.
  */
 #if (BSD >= 199306)
-int iplwrite(dev, uio, ioflag)
+int ipfwrite(dev, uio, ioflag)
 	int ioflag;
 #else
-int iplwrite(dev, uio)
+int ipfwrite(dev, uio)
 #endif
 #if (__FreeBSD_version >= 502116)
 	struct cdev *dev;
@@ -590,9 +588,7 @@ int iplwrite(dev, uio)
 	if (ipf_running < 1)
 		return EIO;
 
-#ifdef	IPFILTER_SYNC
 	if (GET_MINOR(dev) == IPL_LOGSYNC)
 		return ipfsync_write(uio);
-#endif
 	return ENXIO;
 }

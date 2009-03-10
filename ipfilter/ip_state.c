@@ -79,9 +79,7 @@ struct file;
 #include "netinet/ip_state.h"
 #include "netinet/ip_proxy.h"
 #include "netinet/ip_lookup.h"
-#ifdef	IPFILTER_SYNC
 #include "netinet/ip_sync.h"
-#endif
 #ifdef	USE_INET6
 #include <netinet/icmp6.h>
 #endif
@@ -133,40 +131,39 @@ static ipftuneable_t ipf_state_tuneables[] = {
 	{ { (void *)offsetof(ipf_state_softc_t, ipf_state_max) },
 		"state_max",		1,	0x7fffffff,
 		stsizeof(ipf_state_softc_t, ipf_state_max),
-		0,			NULL },
+		0,			NULL,	NULL },
 	{ { (void *)offsetof(ipf_state_softc_t, ipf_state_size) },
 		"state_size",		1,	0x7fffffff,
 		stsizeof(ipf_state_softc_t, ipf_state_size),
-		0,			NULL,
-		ipf_state_rehash },
+		0,			NULL,	ipf_state_rehash },
 	{ { (void *)offsetof(ipf_state_softc_t, ipf_state_lock) },
 		"state_lock",		0,	1,
 		stsizeof(ipf_state_softc_t, ipf_state_lock),
-		IPFT_RDONLY,		NULL },
+		IPFT_RDONLY,		NULL,	NULL },
 	{ { (void *)offsetof(ipf_state_softc_t, ipf_state_maxbucket) },
 		"state_maxbucket",	1,	0x7fffffff,
 		stsizeof(ipf_state_softc_t, ipf_state_maxbucket),
-		0,			NULL },
+		0,			NULL,	NULL },
 	{ { (void *)offsetof(ipf_state_softc_t, ipf_state_logging) },
 		"state_logging",0,	1,
 		stsizeof(ipf_state_softc_t, ipf_state_logging),
-		0,			NULL },
+		0,			NULL,	NULL },
 	{ { (void *)offsetof(ipf_state_softc_t, ipf_state_wm_high) },
 		"state_wm_high",2,	100,
 		stsizeof(ipf_state_softc_t, ipf_state_wm_high),
-		0,			NULL },
+		0,			NULL,	NULL },
 	{ { (void *)offsetof(ipf_state_softc_t, ipf_state_wm_low) },
 		"state_wm_low",	1,	99,
 		stsizeof(ipf_state_softc_t, ipf_state_wm_low),
-		0,			NULL },
+		0,			NULL,	NULL },
 	{ { (void *)offsetof(ipf_state_softc_t, ipf_state_wm_freq) },
 		"state_wm_freq",2,	999999,
 		stsizeof(ipf_state_softc_t, ipf_state_wm_freq),
-		0,			NULL },
+		0,			NULL,	NULL },
 	{ { NULL },
 		NULL,			0,	0,
 		0,
-		0,	NULL }
+		0,	NULL, NULL }
 };
 
 #define	SINCL(x)	ATOMIC_INCL(softs->x)
@@ -958,14 +955,14 @@ ipf_state_putent(softc, softs, data)
 	fr = ips.ips_rule;
 
 	if (fr == NULL) {
-		int error;
+		int inserr;
 
 		READ_ENTER(&softc->ipf_state);
-		error = ipf_state_insert(softc, isn, 0);
+		inserr = ipf_state_insert(softc, isn, 0);
 		MUTEX_EXIT(&isn->is_lock);
 		RWLOCK_EXIT(&softc->ipf_state);
 
-		return error;
+		return inserr;
 	}
 
 	if (isn->is_flags & SI_NEWFR) {
@@ -1342,15 +1339,15 @@ ipf_state_match(is1, is2)
 {
 	int	rv;
 	int	amatch;
-	int	pmatch;
+	int	pomatch;
 
 	if (bcmp(&is1->is_pass, &is2->is_pass,
 		 offsetof(struct ipstate, is_authmsk) -
 		 offsetof(struct ipstate, is_pass)) == 0) {
 
-		pmatch = ipf_state_matchisps(is1, is2);
+		pomatch = ipf_state_matchisps(is1, is2);
 		amatch = ipf_state_matchaddresses(is1, is2);
-		rv = (amatch != 0) && (amatch == pmatch);
+		rv = (amatch != 0) && (amatch == pomatch);
 	} else {
 		rv = 0;
 	}
@@ -1992,10 +1989,8 @@ ipf_state_add(softc, fin, stsave, flags)
 	} else {
 		MUTEX_EXIT(&is->is_lock);
 	}
-#ifdef	IPFILTER_SYNC
 	if ((is->is_flags & IS_STATESYNC) && ((is->is_flags & SI_CLONE) == 0))
 		is->is_sync = ipf_sync_new(softc, SMC_STATE, fin, is);
-#endif
 	if (softs->ipf_state_logging)
 		ipf_state_log(softc, is, ISL_NEW);
 
@@ -2545,10 +2540,8 @@ ipf_state_clone(fin, tcp, is)
 				   clone->is_flags, 2);
 	}
 	MUTEX_EXIT(&clone->is_lock);
-#ifdef	IPFILTER_SYNC
 	if (is->is_flags & IS_STATESYNC)
 		clone->is_sync = ipf_sync_new(softc, SMC_STATE, fin, clone);
-#endif
 	SBUMP(ipf_state_stats.iss_cloned);
 	return clone;
 }
@@ -3600,10 +3593,8 @@ ipf_state_check(fin, passp)
 
 	pass = is->is_pass;
 
-#ifdef	IPFILTER_SYNC
 	if (is->is_flags & IS_STATESYNC)
 		ipf_sync_update(softc, SMC_STATE, fin, is->is_sync);
-#endif
 
 	RWLOCK_EXIT(&softc->ipf_state);
 
@@ -3852,10 +3843,8 @@ ipf_state_del(softc, is, why)
 			ipf_freetimeoutqueue(softc, is->is_tqehead[1]);
 	}
 
-#ifdef	IPFILTER_SYNC
 	if (is->is_sync)
 		ipf_sync_del_state(softc->ipf_sync_soft, is->is_sync);
-#endif
 
 	/*
 	 * Now remove it from the linked list of known states

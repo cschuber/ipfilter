@@ -33,7 +33,11 @@
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include "netinet/ip_compat.h"
-#include "md5.h"
+#ifdef HAS_SYS_MD5_H
+# include <sys/md5.h>
+#else
+# include "md5.h"
+#endif
 
 #if !defined(__GNUC__)
 # define __inline

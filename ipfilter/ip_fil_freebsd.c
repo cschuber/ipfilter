@@ -91,9 +91,7 @@ static const char rcsid[] = "@(#)$Id$";
 #include "netinet/ip_state.h"
 #include "netinet/ip_proxy.h"
 #include "netinet/ip_auth.h"
-#ifdef	IPFILTER_SYNC
 #include "netinet/ip_sync.h"
-#endif
 #ifdef	IPFILTER_SCAN
 #include "netinet/ip_scan.h"
 #endif
@@ -124,7 +122,7 @@ static	int	(*ipf_savep) __P((void *, ip_t *, int, void *, int, struct mbuf **));
 static	int	ipf_send_ip __P((fr_info_t *, mb_t *, mb_t **));
 int		ipf_locks_done = 0;
 
-extern ipf_main_softc_t ipfmain;
+ipf_main_softc_t ipfmain;
 
 #if (__FreeBSD_version >= 500011)
 # include <sys/conf.h>

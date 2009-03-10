@@ -121,9 +121,11 @@ typedef struct ipf_proxy_softc_s {
 static ipftuneable_t ipf_proxy_tuneables[] = {
 	{ { (void *)offsetof(ipf_proxy_softc_t, ips_proxy_debug) },
 		"ips_proxy_debug",	0,	10,
-		stsizeof(ipf_proxy_softc_t, ips_proxy_debug),	0,	NULL },
+		stsizeof(ipf_proxy_softc_t, ips_proxy_debug),
+		0,	NULL,	NULL },
 	{ { NULL },		NULL,			0,	0,
-		0,				0,	NULL }
+		0,
+		0,	NULL,	NULL}
 };
 
 static	aproxy_t	*ap_proxylist = NULL;
@@ -134,14 +136,15 @@ static	aproxy_t	ips_proxies[] = {
 	  ipf_p_ftp_soft_create, ipf_p_ftp_soft_destroy,
 	  NULL, NULL,
 	  ipf_p_ftp_new, ipf_p_ftp_del, ipf_p_ftp_in, ipf_p_ftp_out, NULL,
-	  NULL, NULL },
+	  NULL, NULL, NULL, NULL },
 #endif
 #ifdef	IPF_IRC_PROXY
 	{ NULL, NULL, "irc", (char)IPPROTO_TCP, 0, 0, 0,
 	  ipf_p_irc_main_load, ipf_p_irc_main_unload,
 	  NULL, NULL,
 	  NULL, NULL,
-	  ipf_p_irc_new, NULL, NULL, ipf_p_irc_out, NULL, NULL, NULL, NULL },
+	  ipf_p_irc_new, NULL, NULL, ipf_p_irc_out, NULL,
+	  NULL, NULL, NULL, NULL },
 #endif
 #ifdef	IPF_RCMD_PROXY
 	{ NULL, NULL, "rcmd", (char)IPPROTO_TCP, 0, 0, 0,
@@ -149,30 +152,32 @@ static	aproxy_t	ips_proxies[] = {
 	  NULL, NULL,
 	  NULL, NULL,
 	  ipf_p_rcmd_new, ipf_p_rcmd_del,
-	  ipf_p_rcmd_in, ipf_p_rcmd_out, NULL, NULL, NULL, NULL },
+	  ipf_p_rcmd_in, ipf_p_rcmd_out, NULL,
+	  NULL, NULL, NULL, NULL },
 #endif
 #ifdef	IPF_RAUDIO_PROXY
 	{ NULL, NULL, "raudio", (char)IPPROTO_TCP, 0, 0, 0,
 	  ipf_p_raudio_main_load, ipf_p_raudio_main_unload,
 	  NULL, NULL,
 	  NULL, NULL,
-	  ipf_p_raudio_new, NULL, ipf_p_raudio_in, ipf_p_raudio_out, NULL, NULL,
-	  NULL, NULL },
+	  ipf_p_raudio_new, NULL, ipf_p_raudio_in, ipf_p_raudio_out, NULL,
+	  NULL, NULL, NULL, NULL },
 #endif
 #ifdef	IPF_MSNRPC_PROXY
 	{ NULL, NULL, "msnrpc", (char)IPPROTO_TCP, 0, 0, 0,
 	  ipf_p_msnrpc_init, ipf_p_msnrpc_fini,
 	  NULL, NULL,
 	  NULL, NULL,
-	  ipf_p_msnrpc_new, NULL, ipf_p_msnrpc_in, ipf_p_msnrpc_out, NULL, NULL,
-	  NULL, NULL },
+	  ipf_p_msnrpc_new, NULL, ipf_p_msnrpc_in, ipf_p_msnrpc_out, NULL,
+	  NULL, NULL, NULL, NULL },
 #endif
 #ifdef	IPF_NETBIOS_PROXY
 	{ NULL, NULL, "netbios", (char)IPPROTO_UDP, 0, 0, 0,
 	  ipf_p_netbios_main_load, ipf_p_netbios_main_unload,
 	  NULL, NULL,
 	  NULL, NULL,
-	  NULL, NULL, NULL, ipf_p_netbios_out, NULL, NULL, NULL, NULL },
+	  NULL, NULL, NULL, ipf_p_netbios_out, NULL,
+	  NULL, NULL, NULL, NULL },
 #endif
 #ifdef	IPF_IPSEC_PROXY
 	{ NULL, NULL, "ipsec", (char)IPPROTO_UDP, 0, 0, 0,
@@ -180,14 +185,14 @@ static	aproxy_t	ips_proxies[] = {
 	  ipf_p_ipsec_soft_create, ipf_p_ipsec_soft_destroy,
 	  ipf_p_ipsec_soft_init, ipf_p_ipsec_soft_fini,
 	  ipf_p_ipsec_new, ipf_p_ipsec_del,
-	  ipf_p_ipsec_inout, ipf_p_ipsec_inout, ipf_p_ipsec_match, NULL,
-	  NULL, NULL },
+	  ipf_p_ipsec_inout, ipf_p_ipsec_inout, ipf_p_ipsec_match,
+	  NULL, NULL, NULL, NULL },
 #endif
 #ifdef	IPF_DNS_PROXY
 	{ NULL, NULL, "dns", (char)IPPROTO_UDP, 0, 0, 0,
 	  ipf_p_dns_init, ipf_p_dns_fini, ipf_p_dns_new, ipf_p_ipsec_del,
-	  ipf_p_dns_inout, ipf_p_dns_inout, ipf_p_dns_match, NULL,
-	  NULL, NULL },
+	  ipf_p_dns_inout, ipf_p_dns_inout, ipf_p_dns_match,
+	  NULL, NULL, NULL, NULL },
 #endif
 #ifdef	IPF_PPTP_PROXY
 	{ NULL, NULL, "pptp", (char)IPPROTO_TCP, 0, 0, 0,
@@ -195,18 +200,23 @@ static	aproxy_t	ips_proxies[] = {
 	  NULL, NULL,
 	  NULL, NULL,
 	  ipf_p_pptp_new, ipf_p_pptp_del,
-	  ipf_p_pptp_inout, ipf_p_pptp_inout, NULL, NULL, NULL, NULL },
+	  ipf_p_pptp_inout, ipf_p_pptp_inout, NULL,
+	  NULL, NULL, NULL, NULL },
 #endif
 #ifdef  IPF_H323_PROXY
 	{ NULL, NULL, "h323", (char)IPPROTO_TCP, 0, 0, 0,
 	  ipf_p_h323_main_load, ipf_p_h323_main_unload,
 	  NULL, NULL,
 	  NULL, NULL,
-	  ipf_p_h323_new, ipf_p_h323_del, ipf_p_h323_in, NULL, NULL, NULL, NULL },
+	  ipf_p_h323_new, ipf_p_h323_del,
+	  ipf_p_h323_in, NULL, NULL,
+	  NULL, NULL, NULL, NULL },
 	{ NULL, NULL, "h245", (char)IPPROTO_TCP, 0, 0, 0, NULL, NULL,
 	  NULL, NULL,
 	  NULL, NULL,
-	  ipf_p_h245_new, NULL, NULL, ipf_p_h245_out, NULL, NULL, NULL },
+	  ipf_p_h245_new, NULL,
+	  NULL, ipf_p_h245_out, NULL,
+	  NULL, NULL, NULL, NULL },
 #endif
 #ifdef	IPF_RPCB_PROXY
 # ifndef _KERNEL
@@ -215,16 +225,24 @@ static	aproxy_t	ips_proxies[] = {
 	  NULL, NULL,
 	  NULL, NULL,
 	  ipf_p_rpcb_new, ipf_p_rpcb_del,
-	  ipf_p_rpcb_in, ipf_p_rpcb_out, NULL, NULL, NULL, NULL },
+	  ipf_p_rpcb_in, ipf_p_rpcb_out, NULL,
+	  NULL, NULL, NULL, NULL },
 # endif
 	{ NULL, NULL, "rpcbu", (char)IPPROTO_UDP, 0, 0, 0,
 	  ipf_p_rpcb_main_load, ipf_p_rpcb_main_unload,
 	  NULL, NULL,
 	  NULL, NULL,
 	  ipf_p_rpcb_new, ipf_p_rpcb_del,
-	  ipf_p_rpcb_in, ipf_p_rpcb_out, NULL, NULL, NULL, NULL },
+	  ipf_p_rpcb_in, ipf_p_rpcb_out, NULL,
+	  NULL, NULL, NULL, NULL },
 #endif
-	{ NULL, NULL, "", '\0', 0, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL }
+	{ NULL, NULL, "", '\0', 0, 0, 0,
+	  NULL, NULL,
+	  NULL, NULL,
+	  NULL, NULL,
+	  NULL, NULL,
+	  NULL, NULL, NULL,
+	  NULL, NULL, NULL, NULL }
 };
 
 

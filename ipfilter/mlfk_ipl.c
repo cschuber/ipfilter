@@ -30,7 +30,7 @@
 #include "netinet/ip_frag.h"
 #include "netinet/ip_sync.h"
 
-ipf_main_softc_t ipfmain;
+extern ipf_main_softc_t ipfmain;
 
 #if __FreeBSD_version >= 502116
 static struct cdev *ipf_devs[IPL_LOGSIZE];
@@ -356,12 +356,10 @@ ipfpoll(dev_t dev, int events, struct proc *td)
 			revents |= events & (POLLIN | POLLRDNORM);
 		break;
 	case IPL_LOGSYNC :
-#ifdef IPFILTER_SYNC
 		if ((events & (POLLIN | POLLRDNORM)) && ipf_sync_canread(&ipfmain))
 			revents |= events & (POLLIN | POLLRDNORM);
 		if ((events & (POLLOUT | POLLWRNORM)) && ipf_sync_canwrite(&ipfmain))
 			revents |= events & (POLLOUT | POLLWRNORM);
-#endif
 		break;
 	case IPL_LOGSCAN :
 	case IPL_LOGLOOKUP :
@@ -411,9 +409,7 @@ static int ipfopen(dev, flags
 		case IPL_LOGSTATE :
 		case IPL_LOGAUTH :
 		case IPL_LOGLOOKUP :
-#ifdef IPFILTER_SYNC
 		case IPL_LOGSYNC :
-#endif
 #ifdef IPFILTER_SCAN
 		case IPL_LOGSCAN :
 #endif
@@ -483,10 +479,8 @@ static int ipfread(dev, uio)
 	if (ipfmain.ipf_running < 1)
 		return EIO;
 
-# ifdef	IPFILTER_SYNC
 	if (unit == IPL_LOGSYNC)
 		return ipf_sync_read(&ipfmain, uio);
-# endif
 
 #ifdef IPFILTER_LOG
 	return ipf_log_read(&ipfmain, unit, uio);
@@ -519,9 +513,7 @@ static int ipfwrite(dev, uio)
 	if (ipfmain.ipf_running < 1)
 		return EIO;
 
-#ifdef	IPFILTER_SYNC
 	if (GET_MINOR(dev) == IPL_LOGSYNC)
 		return ipf_sync_write(&ipfmain, uio);
-#endif
 	return ENXIO;
 }

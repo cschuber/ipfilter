@@ -102,17 +102,17 @@ static drv_info_t ipf_drv_info = {
 
 
 static drv_ops_t ipf_drv_ops = {
-	iplopen,
-	iplclose,
+	ipfopen,
+	ipfclose,
 	NULL,		/* strategy */
 	NULL,		/* dump */
 	NULL,		/* psize */
 	NULL,		/* mount */
-	iplread,
-	ipf_write,	/* write */
+	ipfread,
+	ipfwrite,	/* write */
 	ipfioctl,	/* ioctl */
 #ifdef	IPL_SELECT
-	iplselect,	/* select */
+	ipfselect,	/* select */
 #else
 	NULL,		/* select */
 #endif
@@ -546,7 +546,7 @@ static int ipf_slowtimer()
 /*
  * routines below for saving IP headers to buffer
  */
-int iplopen(dev, flag, dummy, mode)
+int ipfopen(dev, flag, dummy, mode)
 	dev_t dev;
 	int flag;
 	intptr_t dummy;
@@ -556,7 +556,7 @@ int iplopen(dev, flag, dummy, mode)
 	int error;
 
 #ifdef  IPFDEBUG
-	cmn_err(CE_CONT, "iplopen(%x,%x,%x,%x)\n", dev, flag, dummy, mode);
+	cmn_err(CE_CONT, "ipfopen(%x,%x,%x,%x)\n", dev, flag, dummy, mode);
 #endif
 	if (IPL_LOGMAX < unit) {
 		error = ENXIO;
@@ -568,9 +568,7 @@ int iplopen(dev, flag, dummy, mode)
 		case IPL_LOGSTATE :
 		case IPL_LOGAUTH :
 		case IPL_LOGLOOKUP :
-#ifdef IPFILTER_SYNC
 		case IPL_LOGSYNC :
-#endif
 #ifdef IPFILTER_SCAN
 		case IPL_LOGSCAN :
 #endif
@@ -585,7 +583,7 @@ int iplopen(dev, flag, dummy, mode)
 }
 
 
-int iplclose(dev, flag, mode)
+int ipfclose(dev, flag, mode)
 	dev_t dev;
 	int flag;
 	int mode;
@@ -593,7 +591,7 @@ int iplclose(dev, flag, mode)
 	minor_t unit = getminor(dev);
 
 #ifdef  IPFDEBUG
-	cmn_err(CE_CONT, "iplclose(%x,%x,%x)\n", dev, flag, mode);
+	cmn_err(CE_CONT, "ipfclose(%x,%x,%x)\n", dev, flag, mode);
 #endif
 
 	if (ipf_running < 1)
@@ -606,17 +604,17 @@ int iplclose(dev, flag, mode)
 
 #ifdef IPFILTER_LOG
 /*
- * iplread/ipllog
+ * ipfread/ipflog
  * both of these must operate with at least splnet() lest they be
  * called during packet processing and cause an inconsistancy to appear in
  * the filter lists.
  */
-int iplread(dev, uio)
+int ipfread(dev, uio)
 	dev_t dev;
 	register struct uio *uio;
 {
 #ifdef	IPFDEBUG
-	cmn_err(CE_CONT, "iplread(%x,%x)\n", dev, uio);
+	cmn_err(CE_CONT, "ipfread(%x,%x)\n", dev, uio);
 #endif
 
 	if (ipf_running < 1)
@@ -627,20 +625,19 @@ int iplread(dev, uio)
 #endif /* IPFILTER_LOG */
 
 
-#if 0
 /*
- * iplread/ipllog
+ * ipfread/ipflog
  * both of these must operate with at least splnet() lest they be
  * called during packet processing and cause an inconsistancy to appear in
  * the filter lists.
  */
-int iplwrite(dev, uio, cp)
+int ipfwrite(dev, uio, cp)
 	dev_t dev;
 	register struct uio *uio;
 	cred_t *cp;
 {
 #ifdef	IPFDEBUG
-	cmn_err(CE_CONT, "iplwrite(%x,%x,%x)\n", dev, uio, cp);
+	cmn_err(CE_CONT, "ipfwrite(%x,%x,%x)\n", dev, uio, cp);
 #endif
 
 	if (ipf_running < 1)
@@ -650,4 +647,3 @@ int iplwrite(dev, uio, cp)
 		return ENXIO;
 	return ipfsync_write(uio);
 }
-#endif /* IPFILTER_SYNC */

@@ -798,7 +798,7 @@ typedef	struct	frentry {
 #endif
 #define	FR_CMPSIZ	(sizeof(struct frentry) - \
 			 offsetof(struct frentry, fr_func))
-#define	FR_NAME(_f, _n)	(_f)->_n == -1 ? "" : (_f)->fr_names + (_f)->_n
+#define	FR_NAME(_f, _n)	(_f)->fr_names + (_f)->_n
 
 
 /*

@@ -93,13 +93,15 @@ extern struct ifnet vpnif;
 #include "netinet/ip_proxy.h"
 #include "netinet/ip_lookup.h"
 #include "netinet/ip_dstlist.h"
-#ifdef	IPFILTER_SYNC
 #include "netinet/ip_sync.h"
-#endif
 #if (__FreeBSD_version >= 300000)
 # include <sys/malloc.h>
 #endif
-#include "md5.h"
+#ifdef HAS_SYS_MD5_H
+# include <sys/md5.h>
+#else
+# include "md5.h"
+#endif
 /* END OF INCLUDES */
 
 #undef	SOCKADDR_IN
@@ -1163,10 +1165,8 @@ ipf_nat6_finalise(fin, nat)
 
 	nat->nat_sumd[1] = nat->nat_sumd[0];
 
-#ifdef	IPFILTER_SYNC
 	if ((nat->nat_flags & SI_CLONE) == 0)
 		nat->nat_sync = ipf_sync_new(softc, SMC_NAT, fin, nat);
-#endif
 
 	if ((nat->nat_ifps[0] != NULL) && (nat->nat_ifps[0] != (void *)-1)) {
 		nat->nat_mtu[0] = GETIFMTU_6(nat->nat_ifps[0]);
@@ -3034,9 +3034,7 @@ ipf_nat6_out(fin, nat, natadd, nflags)
 		else
 			ipf_fix_incksum(fin, csump, nat->nat_sumd[1]);
 	}
-#ifdef	IPFILTER_SYNC
 	ipf_sync_update(softc, SMC_NAT, fin, nat->nat_sync);
-#endif
 	/* ------------------------------------------------------------- */
 	/* A few quick notes:						 */
 	/*	Following are test conditions prior to calling the 	 */
@@ -3384,9 +3382,7 @@ ipf_nat6_in(fin, nat, natadd, nflags)
 		}
 	}
 
-#ifdef	IPFILTER_SYNC
 	ipf_sync_update(softc, SMC_NAT, fin, nat->nat_sync);
-#endif
 
 	/*
 	 * Fix up checksums, not by recalculating them, but
@@ -4183,19 +4179,19 @@ ipf_nat6_nextaddr(fin, na, old, dst)
 	ipf_main_softc_t *softc = fin->fin_main_soft;
 	ipf_nat_softc_t *softn = softc->ipf_nat_soft;
 	i6addr_t newip, new;
-	u_32_t min, max;
+	u_32_t amin, amax;
 	int error;
 
 	new.i6[0] = 0;
 	new.i6[1] = 0;
 	new.i6[2] = 0;
 	new.i6[3] = 0;
-	min = na->na_addr[0].in4.s_addr;
+	amin = na->na_addr[0].in4.s_addr;
 
 	switch (na->na_atype)
 	{
 	case FRI_RANGE :
-		max = na->na_addr[1].in4.s_addr;
+		amax = na->na_addr[1].in4.s_addr;
 		break;
 
 	case FRI_NETMASKED :
@@ -4205,8 +4201,8 @@ ipf_nat6_nextaddr(fin, na, old, dst)
 		 * Compute the maximum address by adding the inverse of the
 		 * netmask to the minimum address.
 		 */
-		max = ~na->na_addr[1].in4.s_addr;
-		max |= min;
+		amax = ~na->na_addr[1].in4.s_addr;
+		amax |= amin;
 		break;
 
 	case FRI_LOOKUP :

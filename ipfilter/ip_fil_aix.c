@@ -50,9 +50,7 @@ static const char rcsid[] = "@(#)$Id$";
 #include "netinet/ip_state.h"
 #include "netinet/ip_proxy.h"
 #include "netinet/ip_auth.h"
-#ifdef	IPFILTER_SYNC
 #include "netinet/ip_sync.h"
-#endif
 #ifdef	IPFILTER_SCAN
 #include "netinet/ip_scan.h"
 #endif
@@ -444,9 +442,7 @@ ipfopen(dev_t dev, u_long flags, chan_t chan, int ext)
 		case IPL_LOGSTATE :
 		case IPL_LOGAUTH :
 		case IPL_LOGLOOKUP :
-#ifdef IPFILTER_SYNC
 		case IPL_LOGSYNC :
-#endif
 #ifdef IPFILTER_SCAN
 		case IPL_LOGSCAN :
 #endif
@@ -483,10 +479,8 @@ int
 ipfread(dev_t dev, struct uio *uio, chan_t chan, int ext)
 {
 
-# ifdef	IPFILTER_SYNC
 	if (GET_MINOR(dev) == IPL_LOGSYNC)
 		return ipfsync_read(uio);
-# endif
 
 #ifdef IPFILTER_LOG
 	return ipflog_read(GET_MINOR(dev), uio);
@@ -506,10 +500,8 @@ int
 ipfwrite(dev_t dev, struct uio *uio, chan_t chan, int ext)
 {
 
-#ifdef	IPFILTER_SYNC
 	if (GET_MINOR(dev) == IPL_LOGSYNC)
 		return ipfsync_write(uio);
-#endif
 	return ENXIO;
 }
 

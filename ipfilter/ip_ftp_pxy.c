@@ -116,23 +116,29 @@ static	frentry_t	ftppxyfr;
 static	ipftuneable_t	ipf_ftp_tuneables[] = {
 	{ { (void *)offsetof(ipf_ftp_softc_t, ipf_p_ftp_debug) },
 		"ftp_debug",	0,	10,
-		stsizeof(ipf_ftp_softc_t, ipf_p_ftp_debug),	0, NULL },
+		stsizeof(ipf_ftp_softc_t, ipf_p_ftp_debug),
+		0, NULL, NULL },
 	{ { (void *)offsetof(ipf_ftp_softc_t, ipf_p_ftp_pasvonly) },
 		"ftp_pasvonly",	0,	1,
-		stsizeof(ipf_ftp_softc_t, ipf_p_ftp_pasvonly), 0, NULL },
+		stsizeof(ipf_ftp_softc_t, ipf_p_ftp_pasvonly),
+		0, NULL, NULL },
 	{ { (void *)offsetof(ipf_ftp_softc_t, ipf_p_ftp_insecure) },
 		"ftp_insecure",	0,	1,
-		stsizeof(ipf_ftp_softc_t, ipf_p_ftp_insecure), 0, NULL },
+		stsizeof(ipf_ftp_softc_t, ipf_p_ftp_insecure),
+		0, NULL, NULL },
 	{ { (void *)offsetof(ipf_ftp_softc_t, ipf_p_ftp_pasvrdr) },
 		"ftp_pasvrdr",	0,	1,
-		stsizeof(ipf_ftp_softc_t, ipf_p_ftp_pasvrdr), 0, NULL },
+		stsizeof(ipf_ftp_softc_t, ipf_p_ftp_pasvrdr),
+		0, NULL, NULL },
 	{ { (void *)offsetof(ipf_ftp_softc_t, ipf_p_ftp_forcepasv) },
 		"ftp_forcepasv", 0,	1,
-		stsizeof(ipf_ftp_softc_t, ipf_p_ftp_forcepasv), 0, NULL },
+		stsizeof(ipf_ftp_softc_t, ipf_p_ftp_forcepasv),
+		0, NULL, NULL },
 	{ { (void *)offsetof(ipf_ftp_softc_t, ipf_p_ftp_single_xfer) },
 		"ftp_single_xfer", 0,	1,
-		stsizeof(ipf_ftp_softc_t, ipf_p_ftp_single_xfer), 0, NULL },
-	{ { NULL }, NULL, 0, 0, 0, 0, NULL }
+		stsizeof(ipf_ftp_softc_t, ipf_p_ftp_single_xfer),
+		0, NULL, NULL },
+	{ { NULL }, NULL, 0, 0, 0, 0, NULL, NULL }
 };
 
 

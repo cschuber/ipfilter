@@ -83,7 +83,7 @@ void panic __P((char *str));
 # undef _RADIX_H_
 #endif
 /* END OF INCLUDES */
-#include "radix_ipf.h"
+#include "net/radix_ipf.h"
 #ifndef min
 # define	min	MIN
 #endif

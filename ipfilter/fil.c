@@ -110,9 +110,7 @@ struct file;
 #ifdef IPFILTER_SCAN
 # include "netinet/ip_scan.h"
 #endif
-#ifdef IPFILTER_SYNC
-# include "netinet/ip_sync.h"
-#endif
+#include "netinet/ip_sync.h"
 #include "netinet/ip_pool.h"
 #include "netinet/ip_htable.h"
 #ifdef IPFILTER_COMPILED
@@ -267,9 +265,7 @@ int	ipf_features = 0
 #ifdef	IPFILTER_CKSUM
 		| IPF_FEAT_CKSUM
 #endif
-#ifdef	IPFILTER_SYNC
 		| IPF_FEAT_SYNC
-#endif
 #ifdef	IPFILTER_SCAN
 		| IPF_FEAT_SCAN
 #endif
@@ -285,47 +281,47 @@ int	ipf_features = 0
 static ipfunc_resolve_t ipf_availfuncs[] = {
 	{ "srcgrpmap", ipf_srcgrpmap, ipf_grpmapinit },
 	{ "dstgrpmap", ipf_dstgrpmap, ipf_grpmapinit },
-	{ "", NULL }
+	{ "", NULL, NULL }
 };
 
 static ipftuneable_t ipf_main_tuneables[] = {
 	{ { (void *)offsetof(struct ipf_main_softc_s, ipf_flags) },
 		"ipf_flags",		0,	0xffffffff,
 		stsizeof(ipf_main_softc_t, ipf_flags),
-		0,			NULL },
+		0,			NULL,	NULL },
 	{ { (void *)offsetof(struct ipf_main_softc_s, ipf_active) },
 		"active",		0,	0,
 		stsizeof(ipf_main_softc_t, ipf_active),
-		IPFT_RDONLY,		NULL },
+		IPFT_RDONLY,		NULL,	NULL },
 	{ { (void *)offsetof(ipf_main_softc_t, ipf_control_forwarding) },
 		"control_forwarding",	0, 1,
 		stsizeof(ipf_main_softc_t, ipf_control_forwarding),
-		0,			NULL },
+		0,			NULL,	NULL },
 	{ { (void *)offsetof(ipf_main_softc_t, ipf_update_ipid) },
 		"update_ipid",		0,	1,
 		stsizeof(ipf_main_softc_t, ipf_update_ipid),
-		0,			NULL },
+		0,			NULL,	NULL },
 	{ { (void *)offsetof(ipf_main_softc_t, ipf_chksrc) },
 		"chksrc",		0,	1,
 		stsizeof(ipf_main_softc_t, ipf_chksrc),
-		0,			NULL },
+		0,			NULL,	NULL },
 	{ { (void *)offsetof(ipf_main_softc_t, ipf_minttl) },
 		"min_ttl",		0,	4,
 		stsizeof(ipf_main_softc_t, ipf_minttl),
-		0,			NULL },
+		0,			NULL,	NULL },
 	{ { (void *)offsetof(ipf_main_softc_t, ipf_icmpminfragmtu) },
 		"icmp_minfragmtu",	0,	1,
 		stsizeof(ipf_main_softc_t, ipf_icmpminfragmtu),
-		0,			NULL },
+		0,			NULL,	NULL },
 	{ { (void *)offsetof(ipf_main_softc_t, ipf_pass) },
 		"default_pass",		0,	0xffffffff,
 		stsizeof(ipf_main_softc_t, ipf_pass),
-		0,			NULL },
+		0,			NULL,	NULL },
 #ifdef IPFILTER_XID
 	{ { (void *)offsetof(ipf_main_softc_t, ipf_xid_debug) },
 		"xid_debug",	0,	10,
 		stsizeof(ipf_main_softc_t, ipf_xid_debug),
-		0,			NULL },
+		0,			NULL,	NULL },
 #endif
 	{ { (void *)offsetof(ipf_main_softc_t, ipf_tcpidletimeout) },
 		"tcp_idle_timeout",	1,	0x7fffffff,
@@ -3998,13 +3994,16 @@ ipf_rulen(softc, unit, fr)
 	frgroup_t *fg;
 	u_32_t n = 0;
 	char *gname;
+	char grp[1];
 
 	if (fr == NULL)
 		return -1;
-	if (fr->fr_group == -1)
-		gname = "";
-	else
+	if (fr->fr_group == -1) {
+		grp[0] = '\0';
+		gname = grp;
+	} else {
 		gname = FR_NAME(fr, fr_group);
+	}
 	fg = ipf_findgroup(softc, gname, unit, softc->ipf_active, NULL);
 	if (fg == NULL)
 		return -1;
@@ -5345,16 +5344,16 @@ frrequest(softc, unit, req, data, set, makecopy)
 			ipf_fixskip(ftail, fp, 1);
 
 		fp->fr_icmpgrp = NULL;
-		group = FR_NAME(fp, fr_icmphead);
-		if (*group != '\0') {
+		if (fp->fr_icmphead != -1) {
+			group = FR_NAME(fp, fr_icmphead);
 			fg = ipf_group_add(softc, group, fp, 0, unit, set);
 			if (fg != NULL)
 				fp->fr_icmpgrp = &fg->fg_start;
 		}
 
 		fp->fr_grp = NULL;
-		group = FR_NAME(fp, fr_grhead);
-		if (*group != '\0') {
+		if (fp->fr_grhead != -1) {
+			group = FR_NAME(fp, fr_grhead);
 			fg = ipf_group_add(softc, group, fp, fp->fr_flags,
 					   unit, set);
 			if (fg != NULL)
@@ -6340,40 +6339,37 @@ ipf_ioctlswitch(softc, unit, data, cmd, mode, uid, ctx)
 		error = ipf_ipf_ioctl(softc, data, cmd, mode, uid, ctx);
 		break;
 	case IPL_LOGNAT :
-		if (softc->ipf_running > 0)
+		if (softc->ipf_running > 0) {
 			error = ipf_nat_ioctl(softc, data, cmd, mode,
 					      uid, ctx);
-		else {
+		} else {
 			softc->ipf_interror = 42;
 			error = EIO;
 		}
 		break;
 	case IPL_LOGSTATE :
-		if (softc->ipf_running > 0)
+		if (softc->ipf_running > 0) {
 			error = ipf_state_ioctl(softc, data, cmd, mode,
 						uid, ctx);
-		else {
+		} else {
 			softc->ipf_interror = 43;
 			error = EIO;
 		}
 		break;
 	case IPL_LOGAUTH :
-		if (softc->ipf_running > 0)
+		if (softc->ipf_running > 0) {
 			error = ipf_auth_ioctl(softc, data, cmd, mode,
 					       uid, ctx);
-		else {
+		} else {
 			softc->ipf_interror = 44;
 			error = EIO;
 		}
 		break;
 	case IPL_LOGSYNC :
-#ifdef IPFILTER_SYNC
-		if (softc->ipf_running > 0)
+		if (softc->ipf_running > 0) {
 			error = ipf_sync_ioctl(softc, data, cmd, mode,
 					       uid, ctx);
-		else
-#endif
-		{
+		} else {
 			error = EIO;
 			softc->ipf_interror = 45;
 		}
@@ -6391,10 +6387,10 @@ ipf_ioctlswitch(softc, unit, data, cmd, mode, uid, ctx)
 		}
 		break;
 	case IPL_LOGLOOKUP :
-		if (softc->ipf_running > 0)
+		if (softc->ipf_running > 0) {
 			error = ipf_lookup_ioctl(softc, data, cmd, mode,
 						 uid, ctx);
-		else {
+		} else {
 			error = EIO;
 			softc->ipf_interror = 47;
 		}
@@ -7553,11 +7549,9 @@ ipf_initialise(void)
 	if (i < 0)
 		return -60 + i;
 
-#ifdef IPFILTER_SYNC
 	i = ipf_sync_init();
 	if (i < 0)
 		return -70 + i;
-#endif
 #ifdef IPFILTER_SCAN
 	i = ipf_scan_init();
 	if (i < 0)

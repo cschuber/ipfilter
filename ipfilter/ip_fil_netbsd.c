@@ -67,14 +67,13 @@ static const char rcsid[] = "@(#)$Id$";
 #include "netinet/ip_state.h"
 #include "netinet/ip_proxy.h"
 #include "netinet/ip_auth.h"
-#ifdef	IPFILTER_SYNC
 #include "netinet/ip_sync.h"
-#endif
 #ifdef	IPFILTER_SCAN
 #include "netinet/ip_scan.h"
 #endif
 #include <sys/md5.h>
 #include <sys/kernel.h>
+#include <sys/conf.h>
 #ifdef INET
 extern	int	ip_optcopy __P((struct ip *, struct ip *));
 #endif
@@ -90,7 +89,34 @@ MALLOC_DEFINE(M_IPFILTER, "IP Filter", "IP Filter packet filter data structures"
 #if __NetBSD_Version__ < 200000000
 extern	struct	protosw	inetsw[];
 #endif
-extern	ipf_main_softc_t	ipfmain;
+#if (NetBSD >= 199511)
+static  int     ipfopen(dev_t dev, int flags, int devtype, PROC_T *p);
+static  int     ipfclose(dev_t dev, int flags, int devtype, PROC_T *p);
+#else
+# if (__NetBSD_Version__ >= 399001400)
+static  int     ipfopen(dev_t dev, int flags, struct lwp *);
+static  int     ipfclose(dev_t dev, int flags, struct lwp *);
+# else
+static  int     ipfopen(dev_t dev, int flags);
+static  int     ipfclose(dev_t dev, int flags);
+# endif /* __NetBSD_Version__ >= 399001400 */
+#endif
+static  int     ipfread(dev_t, struct uio *, int ioflag);
+static  int     ipfwrite(dev_t, struct uio *, int ioflag);
+static  int     ipfpoll(dev_t, int events, PROC_T *);
+
+const struct cdevsw ipl_cdevsw = {
+	ipfopen, ipfclose, ipfread, ipfwrite, ipfioctl,
+	nostop, notty, ipfpoll, nommap,
+#if  (__NetBSD_Version__ >= 200000000)
+	nokqfilter,
+#endif
+#ifdef D_OTHER   
+	D_OTHER,
+#endif
+};
+
+ipf_main_softc_t ipfmain;
 
 static	int	(*ipf_savep) __P((void *, ip_t *, int, void *, int, struct mbuf **));
 static	int	ipf_send_ip __P((fr_info_t *, mb_t *, mb_t **));
@@ -99,7 +125,6 @@ static int ipf_fastroute6 __P((struct mbuf *, struct mbuf **,
 			      fr_info_t *, frdest_t *));
 #endif
 
-#include <sys/conf.h>
 #if defined(NETBSD_PF)
 # include <net/pfil.h>
 /*
@@ -241,18 +266,13 @@ ipf_identify(s)
 /*
  * Try to detect the case when compiling for NetBSD with pseudo-device
  */
-#if defined(PFIL_HOOKS)
 void
 ipfilterattach(count)
 	int count;
 {
-# ifdef USE_MUTEXES
-	RWLOCK_INIT(&ipfmain.ipf_global, "ipf filter load/unload mutex");
-	RWLOCK_INIT(&ipfmain.ipf_mutex, "ipf filter rwlock");
-	RWLOCK_INIT(&ipfmain.ipf_frcache, "ipf cache rwlock");
-# endif
+	if (ipf_load_all() == 0)
+		(void) ipf_create_all(&ipfmain);
 }
-#endif
 
 
 int
@@ -275,12 +295,6 @@ ipfattach(softc)
 #  endif
 # endif
 #endif
-
-	if (ipf_load_all() != 0)
-		return EIO;
-
-	if (ipf_create_all(softc) == NULL)
-		return EIO;
 
 	SPL_NET(s);
 	if ((softc->ipf_running > 0) || (ipf_checkp == ipf_check)) {
@@ -1525,12 +1539,13 @@ u_short
 ipf_nextipid(fin)
 	fr_info_t *fin;
 {
+	ipf_main_softc_t *softc = fin->fin_main_soft;
 	static u_short ipid = 0;
 	u_short id;
 
-	MUTEX_ENTER(&ipf_rw);
+	MUTEX_ENTER(&softc->ipf_rw);
 	id = ipid++;
-	MUTEX_EXIT(&ipf_rw);
+	MUTEX_EXIT(&softc->ipf_rw);
 
 	return id;
 }
@@ -1836,4 +1851,160 @@ ipf_random()
 
 	number = arc4random();
 	return number;
+}
+
+
+/*
+ * routines below for saving IP headers to buffer
+ */
+static int ipfopen(dev, flags
+#if (NetBSD >= 199511)
+, devtype, p)
+	int devtype;
+	PROC_T *p;
+#else
+)
+#endif
+	dev_t dev;
+	int flags;
+{
+	u_int unit = GET_MINOR(dev);
+	int error;
+
+	if (IPL_LOGMAX < unit) {
+		error = ENXIO;
+	} else {
+		switch (unit)
+		{
+		case IPL_LOGIPF :
+		case IPL_LOGNAT :
+		case IPL_LOGSTATE :
+		case IPL_LOGAUTH :
+		case IPL_LOGLOOKUP :
+		case IPL_LOGSYNC :
+#ifdef IPFILTER_SCAN
+		case IPL_LOGSCAN :
+#endif
+			error = 0;
+			break;
+		default :
+			error = ENXIO;
+			break;
+		}
+	}
+	return error;
+}
+
+
+static int ipfclose(dev, flags
+#if (NetBSD >= 199511)
+, devtype, p)
+	int devtype;
+	PROC_T *p;
+#else
+)
+#endif
+	dev_t dev;
+	int flags;
+{
+	u_int	unit = GET_MINOR(dev);
+
+	if (IPL_LOGMAX < unit)
+		unit = ENXIO;
+	else
+		unit = 0;
+	return unit;
+}
+
+/*
+ * ipfread/ipflog
+ * both of these must operate with at least splnet() lest they be
+ * called during packet processing and cause an inconsistancy to appear in
+ * the filter lists.
+ */
+static int ipfread(dev, uio, ioflag)
+	int ioflag;
+	dev_t dev;
+	register struct uio *uio;
+{
+
+	if (ipfmain.ipf_running < 1)
+		return EIO;
+
+	if (GET_MINOR(dev) == IPL_LOGSYNC)
+		return ipf_sync_read(&ipfmain, uio);
+
+#ifdef IPFILTER_LOG
+	return ipf_log_read(&ipfmain, GET_MINOR(dev), uio);
+#else
+	return ENXIO;
+#endif
+}
+
+
+/*
+ * ipfwrite
+ * both of these must operate with at least splnet() lest they be
+ * called during packet processing and cause an inconsistancy to appear in
+ * the filter lists.
+ */
+static int ipfwrite(dev, uio, ioflag)
+	int ioflag;
+	dev_t dev;
+	register struct uio *uio;
+{
+
+	if (ipfmain.ipf_running < 1)
+		return EIO;
+
+	if (GET_MINOR(dev) == IPL_LOGSYNC)
+		return ipf_sync_write(&ipfmain, uio);
+	return ENXIO;
+}
+
+
+static int ipfpoll(dev, events, p)
+	dev_t dev;
+	int events;
+	PROC_T *p;
+{
+	u_int unit = GET_MINOR(dev);
+	int revents = 0;
+
+	if (IPL_LOGMAX < unit)
+		return ENXIO;
+
+	switch (unit)
+	{
+	case IPL_LOGIPF :
+	case IPL_LOGNAT :
+	case IPL_LOGSTATE :
+#ifdef IPFILTER_LOG
+		if ((events & (POLLIN | POLLRDNORM)) &&
+		    ipf_log_canread(&ipfmain, unit))
+			revents |= events & (POLLIN | POLLRDNORM);
+#endif
+		break;
+	case IPL_LOGAUTH :
+		if ((events & (POLLIN | POLLRDNORM)) &&
+		    ipf_auth_waiting(&ipfmain))
+			revents |= events & (POLLIN | POLLRDNORM);
+		break;
+	case IPL_LOGSYNC :
+		if ((events & (POLLIN | POLLRDNORM)) &&
+		    ipf_sync_canread(&ipfmain))
+			revents |= events & (POLLIN | POLLRDNORM);
+		if ((events & (POLLOUT | POLLWRNORM)) &&
+		    ipf_sync_canwrite(&ipfmain))
+			revents |= events & (POLLOUT | POLLWRNORM);
+		break;
+	case IPL_LOGSCAN :
+	case IPL_LOGLOOKUP :
+	default :
+		break;
+	}
+
+	if ((revents == 0) && (((events & (POLLIN|POLLRDNORM)) != 0)))
+		selrecord(p, &ipfmain.ipf_selwait[unit]);
+	return revents;
 }

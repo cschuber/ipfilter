@@ -351,6 +351,8 @@ ip_trafcon.o: $(TOP)/ip_trafcon.c $(TOP)/ip_compat.h $(TOP)/ip_fil.h \
 
 vnode_if.h: $(VNODESHDIR)/vnode_if.src
 	mkdir -p ../sys
+	mkdir -p ../rump/include/rump
+	mkdir -p ../rump/librump/rumpvfs
 	if [ -f $(VNODESHDIR)/vnode_if.sh ] ; then \
 		sh $(VNODESHDIR)/vnode_if.sh $(VNODESHDIR)/vnode_if.src; \
 	fi
@@ -359,6 +361,7 @@ vnode_if.h: $(VNODESHDIR)/vnode_if.src
 	fi
 	if [ -f ../sys/vnode_if.h ] ; then mv ../sys/vnode_if.h .; fi
 	rmdir ../sys
+	rm -rf ../rump
 
 ml_ipl.o: vnode_if.h $(TOP)/$(MLD) $(TOP)/ipl.h
 	-/bin/rm -f vnode_if.c

@@ -45,7 +45,7 @@ static const char rcsid[] = "@(#)$Id$";
 
 extern	int	ipfdetach __P((void));
 #ifndef	IPFILTER_LOG
-#define	iplread	nulldev
+#define	ipfread	nulldev
 #endif
 extern	int	nulldev __P((void));
 extern	int	errno;
@@ -53,34 +53,34 @@ extern	int	errno;
 extern int nodev __P((void));
 
 static	int	unload __P((void));
-static	int	ipl_attach __P((void));
+static	int	ipf_attach __P((void));
 int	xxxinit __P((u_int, struct vddrv *, caddr_t, struct vdstat *));
 static	char	*ipf_devfiles[] = { IPL_NAME, IPNAT_NAME, IPSTATE_NAME,
 				    IPAUTH_NAME, IPSYNC_NAME, IPSCAN_NAME,
 				    IPLOOKUP_NAME, NULL };
-static	int	iplopen __P((dev_t, int));
-static	int	iplclose __P((dev_t, int));
-static	int	iplread __P((dev_t, struct uio *));
-static	int	iplwrite __P((dev_t, struct uio *));
+static	int	ipfopen __P((dev_t, int));
+static	int	ipfclose __P((dev_t, int));
+static	int	ipfread __P((dev_t, struct uio *));
+static	int	ipfwrite __P((dev_t, struct uio *));
 
 
-struct	cdevsw	ipldevsw =
+struct	cdevsw	ipfdevsw =
 {
-	iplopen, iplclose, iplread, nulldev,
+	ipfopen, ipfclose, ipfread, nulldev,
 	ipfioctl, nulldev, nulldev, nulldev,
 	0, nulldev,
 };
 
 
-struct	dev_ops	ipl_ops =
+struct	dev_ops	ipf_ops =
 {
 	1,
-	iplidentify,
+	ipfidentify,
 	ipfattach,
-	iplopen,
-	iplclose,
-	iplread,
-	iplwrite,
+	ipfopen,
+	ipfclose,
+	ipfread,
+	ipfwrite,
 	NULL,		/* strategy */
 	NULL,		/* dump */
 	0,		/* psize */
@@ -89,16 +89,16 @@ struct	dev_ops	ipl_ops =
 	NULL		/* mmap */
 };
 
-int	ipl_major = 0;
+int	ipf_major = 0;
 
 #ifdef sun4m
 struct	vdldrv	vd =
 {
 	VDMAGIC_PSEUDO,
 	IPL_VERSION,
-	&ipl_ops,
+	&ipf_ops,
 	NULL,
-	&ipldevsw,
+	&ipfdevsw,
 	0,
 	0,
 	NULL,
@@ -113,7 +113,7 @@ struct vdldrv vd =
 	VDMAGIC_PSEUDO,	/* magic */
 	IPL_VERSION,
 #ifdef sun4c
-	&ipl_ops,	/* dev_ops */
+	&ipf_ops,	/* dev_ops */
 #else
 	NULL,		/* struct mb_ctlr *mb_ctlr */
 	NULL,		/* struct mb_driver *mb_driver */
@@ -122,7 +122,7 @@ struct vdldrv vd =
 	1,		/* numdevs */
 #endif /* sun4c */
 	NULL,		/* bdevsw */
-	&ipldevsw,	/* cdevsw */
+	&ipfdevsw,	/* cdevsw */
 	0,		/* block major */
 	0,		/* char major */
 };
@@ -148,20 +148,20 @@ xxxinit(fc, vdp, data, vds)
 		if (vdi && vdi->vdi_userconf)
 			for (vdc = vdi->vdi_userconf; vdc->vdc_type; vdc++)
 				if (vdc->vdc_type == VDCCHARMAJOR) {
-					ipl_major = vdc->vdc_data;
+					ipf_major = vdc->vdc_data;
 					break;
 				}
 
-		if (!ipl_major) {
-			while (ipl_major < nchrdev &&
-			       cdevsw[ipl_major].d_open != vd_unuseddev)
-				ipl_major++;
-			if (ipl_major == nchrdev)
+		if (!ipf_major) {
+			while (ipf_major < nchrdev &&
+			       cdevsw[ipf_major].d_open != vd_unuseddev)
+				ipf_major++;
+			if (ipf_major == nchrdev)
 				return ENODEV;
 		}
 		vdp->vdd_vdtab = (struct vdlinkage *)&vd;
-		vd.Drv_charmajor = ipl_major;
-		return ipl_attach();
+		vd.Drv_charmajor = ipf_major;
+		return ipf_attach();
 	    }
 	case VDUNLOAD:
 		return unload();
@@ -193,7 +193,7 @@ static	int	unload()
 }
 
 
-static	int	ipl_attach()
+static	int	ipf_attach()
 {
 	struct vnode *vp;
 	struct vattr vattr;
@@ -209,7 +209,7 @@ static	int	ipl_attach()
 		vattr_null(&vattr);
 		vattr.va_type = MFTOVT(fmode);
 		vattr.va_mode = (fmode & 07777);
-		vattr.va_rdev = (ipl_major << 8) | i;
+		vattr.va_rdev = (ipf_major << 8) | i;
 
 		error = vn_create(name, UIO_SYSSPACE, &vattr, EXCL, 0, &vp);
 		if (error) {
@@ -252,7 +252,7 @@ static	int	ipl_attach()
 /*
  * routines below for saving IP headers to buffer
  */
-static int iplopen(dev, flags)
+static int ipfopen(dev, flags)
 	dev_t dev;
 	int flags;
 {
@@ -269,9 +269,7 @@ static int iplopen(dev, flags)
 		case IPL_LOGSTATE :
 		case IPL_LOGAUTH :
 		case IPL_LOGLOOKUP :
-#ifdef IPFILTER_SYNC
 		case IPL_LOGSYNC :
-#endif
 #ifdef IPFILTER_SCAN
 		case IPL_LOGSCAN :
 #endif
@@ -286,7 +284,7 @@ static int iplopen(dev, flags)
 }
 
 
-static int iplclose(dev, flags)
+static int ipfclose(dev, flags)
 	dev_t dev;
 	int flags;
 {
@@ -301,12 +299,12 @@ static int iplclose(dev, flags)
 
 
 /*
- * iplread/ipllog
+ * ipfread/ipflog
  * both of these must operate with at least splnet() lest they be
  * called during packet processing and cause an inconsistancy to appear in
  * the filter lists.
  */
-static int iplread(dev, uio)
+static int ipfread(dev, uio)
 	dev_t dev;
 	register struct uio *uio;
 {
@@ -323,9 +321,9 @@ static int iplread(dev, uio)
 
 
 /*
- * iplwrite
+ * ipfwrite
  */
-static int iplwrite(dev, uio)
+static int ipfwrite(dev, uio)
 	dev_t dev;
 	register struct uio *uio;
 {
@@ -333,9 +331,7 @@ static int iplwrite(dev, uio)
 	if (ipf_running < 1)
 		return EIO;
 
-#ifdef IPFILTER_SYNC
 	if (getminor(dev) == IPL_LOGSYNC)
 		return ipfsync_write(uio);
-#endif /* IPFILTER_SYNC */
 	return ENXIO;
 }

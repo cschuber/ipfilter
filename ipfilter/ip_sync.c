@@ -102,10 +102,6 @@ static const char rcsid[] = "@(#)$Id$";
 #define	SYNC_STATETABSZ	256
 #define	SYNC_NATTABSZ	256
 
-#ifdef	IPFILTER_SYNC
-# if SOLARIS && defined(_KERNEL)
-# endif
-
 typedef struct ipf_sync_softc_s {
 	ipfmutex_t	ipf_syncadd;
 	ipfmutex_t	ipsl_mutex;
@@ -1481,4 +1477,3 @@ ipf_sync_expire(softc)
 		ipf_sync_poll_wakeup(softc);
 	}
 }
-#endif /* IPFILTER_SYNC */

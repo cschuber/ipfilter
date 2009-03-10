@@ -94,13 +94,15 @@ extern struct ifnet vpnif;
 #include "netinet/ip_proxy.h"
 #include "netinet/ip_lookup.h"
 #include "netinet/ip_dstlist.h"
-#ifdef	IPFILTER_SYNC
 #include "netinet/ip_sync.h"
-#endif
 #if (__FreeBSD_version >= 300000)
 # include <sys/malloc.h>
 #endif
-#include "md5.h"
+#ifdef HAS_SYS_MD5_H
+# include <sys/md5.h>
+#else
+# include "md5.h"
+#endif
 /* END OF INCLUDES */
 
 #undef	SOCKADDR_IN
@@ -126,16 +128,15 @@ static ipftuneable_t ipf_nat_tuneables[] = {
 	{ { (void *)offsetof(ipf_nat_softc_t, ipf_nat_lock) },
 		"nat_lock",	0,	1,
 		stsizeof(ipf_nat_softc_t, ipf_nat_lock),
-		IPFT_RDONLY,		NULL },
+		IPFT_RDONLY,		NULL,	NULL },
 	{ { (void *)offsetof(ipf_nat_softc_t, ipf_nat_table_sz) },
 		"nat_table_size", 1,	0x7fffffff,
 		stsizeof(ipf_nat_softc_t, ipf_nat_table_sz),
-		0,			NULL,
-		ipf_nat_rehash },
+		0,			NULL,	ipf_nat_rehash },
 	{ { (void *)offsetof(ipf_nat_softc_t, ipf_nat_table_max) },
 		"nat_table_max", 1,	0x7fffffff,
 		stsizeof(ipf_nat_softc_t, ipf_nat_table_max),
-		0,			NULL },
+		0,			NULL,	NULL },
 	{ { (void *)offsetof(ipf_nat_softc_t, ipf_nat_maprules_sz) },
 		"nat_rules_size", 1,	0x7fffffff,
 		stsizeof(ipf_nat_softc_t, ipf_nat_maprules_sz),
@@ -151,27 +152,27 @@ static ipftuneable_t ipf_nat_tuneables[] = {
 	{ { (void *)offsetof(ipf_nat_softc_t, ipf_nat_maxbucket) },
 		"nat_maxbucket",1,	0x7fffffff,
 		stsizeof(ipf_nat_softc_t, ipf_nat_maxbucket),
-		0,			NULL },
+		0,			NULL,	NULL },
 	{ { (void *)offsetof(ipf_nat_softc_t, ipf_nat_logging) },
 		"nat_logging",	0,	1,
 		stsizeof(ipf_nat_softc_t, ipf_nat_logging),
-		0,			NULL },
+		0,			NULL,	NULL },
 	{ { (void *)offsetof(ipf_nat_softc_t, ipf_nat_doflush) },
 		"nat_doflush",	0,	1,
 		stsizeof(ipf_nat_softc_t, ipf_nat_doflush),
-		0,			NULL },
+		0,			NULL,	NULL },
 	{ { (void *)offsetof(ipf_nat_softc_t, ipf_nat_table_wm_low) },
 		"nat_table_wm_low",	1,	99,
 		stsizeof(ipf_nat_softc_t, ipf_nat_table_wm_low),
-		0,			NULL },
+		0,			NULL,	NULL },
 	{ { (void *)offsetof(ipf_nat_softc_t, ipf_nat_table_wm_high) },
 		"nat_table_wm_high",	2,	100,
 		stsizeof(ipf_nat_softc_t, ipf_nat_table_wm_high),
-		0,			NULL },
+		0,			NULL,	NULL },
 	{ { 0 },
 		NULL,			0,	0,
 		0,
-		0,			NULL }
+		0,			NULL,	NULL }
 };
 
 /* ======================================================================== */
@@ -2493,10 +2494,8 @@ ipf_nat_delete(softc, nat, logtype)
 		softn->ipf_nat_stats.ns_wilds--;
 	softn->ipf_nat_stats.ns_proto[nat->nat_pr[0]]--;
 
-#ifdef	IPFILTER_SYNC
 	if (nat->nat_sync)
 		ipf_sync_del_nat(softc->ipf_sync_soft,nat->nat_sync);
-#endif
 
 	if (nat->nat_fr != NULL) {
 		(void) ipf_derefrule(softc, &nat->nat_fr);
@@ -3405,10 +3404,8 @@ ipf_nat_finalise(fin, nat)
 		nat->nat_mtu[1] = GETIFMTU_4(nat->nat_ifps[1]);
 	}
 
-#ifdef	IPFILTER_SYNC
 	if ((nat->nat_flags & SI_CLONE) == 0)
 		nat->nat_sync = ipf_sync_new(softc, SMC_NAT, fin, nat);
-#endif
 
 	if (ipf_nat_insert(softc, softn, nat) == 0) {
 		if (softn->ipf_nat_logging)
@@ -5429,9 +5426,7 @@ ipf_nat_out(fin, nat, natadd, nflags)
 		}
 	}
 
-#ifdef	IPFILTER_SYNC
 	ipf_sync_update(softc, SMC_NAT, fin, nat->nat_sync);
-#endif
 	/* ------------------------------------------------------------- */
 	/* A few quick notes:                                            */
 	/*      Following are test conditions prior to calling the       */
@@ -5790,9 +5785,7 @@ ipf_nat_in(fin, nat, natadd, nflags)
 		}
 	}
 
-#ifdef	IPFILTER_SYNC
 	ipf_sync_update(softc, SMC_NAT, fin, nat->nat_sync);
-#endif
 
 	ipsumd = nat->nat_ipsumd;
 	/*
@@ -6585,9 +6578,7 @@ ipf_nat_clone(fin, nat)
 		(void) ipf_tcp_age(&clone->nat_tqe, fin, softn->ipf_nat_tcptq,
 				   clone->nat_flags, 2);
 	}
-#ifdef	IPFILTER_SYNC
 	clone->nat_sync = ipf_sync_new(softc, SMC_NAT, fin, clone);
-#endif
 	if (softn->ipf_nat_logging)
 		ipf_nat_log(softc, softn, clone, NL_CLONE);
 	return clone;
@@ -7894,17 +7885,17 @@ ipf_nat_nextaddr(fin, na, old, dst)
 {
 	ipf_main_softc_t *softc = fin->fin_main_soft;
 	ipf_nat_softc_t *softn = softc->ipf_nat_soft;
-	u_32_t min, max, new;
+	u_32_t amin, amax, new;
 	i6addr_t newip;
 	int error;
 
 	new = 0;
-	min = na->na_addr[0].in4.s_addr;
+	amin = na->na_addr[0].in4.s_addr;
 
 	switch (na->na_atype)
 	{
 	case FRI_RANGE :
-		max = na->na_addr[1].in4.s_addr;
+		amax = na->na_addr[1].in4.s_addr;
 		break;
 
 	case FRI_NETMASKED :
@@ -7914,8 +7905,8 @@ ipf_nat_nextaddr(fin, na, old, dst)
 		 * Compute the maximum address by adding the inverse of the
 		 * netmask to the minimum address.
 		 */
-		max = ~na->na_addr[1].in4.s_addr;
-		max |= min;
+		amax = ~na->na_addr[1].in4.s_addr;
+		amax |= amin;
 		break;
 
 	case FRI_LOOKUP :

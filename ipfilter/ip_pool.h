@@ -9,13 +9,11 @@
 #ifndef	__IP_POOL_H__
 #define	__IP_POOL_H__
 
-#include "radix_ipf.h"
+#include "net/radix_ipf.h"
 #include "netinet/ip_lookup.h"
 
 #define	IP_POOL_NOMATCH		0
 #define	IP_POOL_POSITIVE	1
-
-#if defined(_RADIX_IPF_H_)
 
 typedef	struct ip_pool_node {
 	struct	ipf_radix_node	ipn_nodes[2];
@@ -57,8 +55,6 @@ typedef	struct	ipf_pool_stat	{
 	u_long			ipls_nodes;
 	ip_pool_t		*ipls_list[LOOKUP_POOL_SZ];
 } ipf_pool_stat_t;
-
-#endif /* _RADIX_IPF_H_ */
 
 extern	ipf_lookup_t	ipf_pool_backend;
 

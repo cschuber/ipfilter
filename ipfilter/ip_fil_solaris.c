@@ -53,7 +53,11 @@ static const char rcsid[] = "@(#)$Id$";
 #include "netinet/ip_lookup.h"
 #include <inet/ip_ire.h>
 
-#include "md5.h"
+#ifdef HAS_SYS_MD5_H
+# include <sys/md5.h>
+#else
+# include "md5.h"
+#endif
 
 static	int	ipf_send_ip __P((fr_info_t *fin, mblk_t *m, mblk_t **mp));
 static	void	ipf_fixl4sum __P((fr_info_t *));

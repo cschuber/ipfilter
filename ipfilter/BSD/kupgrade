@@ -23,6 +23,7 @@ fi
 if [ -d /sys/dist/ipf ] ; then
 	ipfdir=/sys/dist/ipf/netinet
 fi
+mkdir -m 755 -p $ipfdir/../net
 confdir="$archdir/conf"
 if [ -f /dev/ipnat ] ; then
 	major=`ls -l /dev/ipnat | sed -e 's/.* \([0-9]*\),.*/\1/'`
@@ -54,6 +55,12 @@ for j in auth frag nat proxy scan state sync pool dstlist htable lookup rules \
 		fi
 	done
 done
+echo -n " net/radix_ipf.h"
+cp net/radix_ipf.h $ipfdir/../net
+chmod 644 $ipfdir/../net/radix_ipf.h
+echo -n " radix.c -> $ipfdir/radix_ipf.c"
+cp radix.c $ipfdir/radix_ipf.c
+chmod 644 $ipfdir/radix_ipf.c
 
 case $os in
 SunOS)
@@ -89,7 +96,7 @@ if [ -f $ipfdir/ip_fil.c ] ; then
 	chmod 644 $ipfdir/ip_fil.c
 fi
 
-for i in ip_fil.h fil.c ip_log.c ip_compat.h ipl.h ip_*_pxy.c; do
+for i in ip_nat6.c ip_fil.h fil.c ip_log.c ip_compat.h ipl.h ip_*_pxy.c; do
 	echo -n " $i"
 	cp $i $ipfdir
 	chmod 644 $ipfdir/$i
@@ -167,7 +174,7 @@ if [ $os = FreeBSD -a -f /sys/conf/files ] ; then
 	done
 	grep ip_sync.c files >/dev/null 2>&1
 	if [ $? -ne 0 ] ; then
-		echo 'contrib/ipfilter/netinet/ip_sync.c	optional ipfilter inet ipfilter_sync' >> files
+		echo 'contrib/ipfilter/netinet/ip_sync.c	optional ipfilter inet' >> files
 	fi
 	grep ip_scan.c files >/dev/null 2>&1
 	if [ $? -ne 0 ] ; then
@@ -193,7 +200,7 @@ if [ $os = NetBSD -a -f /sys/conf/files ] ; then
 		done
 		grep ip_sync.c files >/dev/null 2>&1
 		if [ $? -ne 0 ] ; then
-			echo 'file	netinet/ip_sync.c	ipfilter & ipfilter_sync' >> files
+			echo 'file	netinet/ip_sync.c	ipfilter' >> files
 		fi
 		grep ip_scan.c files >/dev/null 2>&1
 		if [ $? -ne 0 ] ; then
@@ -220,7 +227,7 @@ if [ $os = OpenBSD -a -f /sys/conf/files ] ; then
 		done
 		grep ip_sync.c files >/dev/null 2>&1
 		if [ $? -ne 0 ] ; then
-			echo 'file	netinet/ip_sync.c	ipfilter & ipfilter_sync' >> files
+			echo 'file	netinet/ip_sync.c	ipfilter' >> files
 		fi
 		grep ip_scan.c files >/dev/null 2>&1
 		if [ $? -ne 0 ] ; then
@@ -251,7 +258,7 @@ cat | (cd /usr/src/sys/modules/ipfilter; patch) <<__EOF__
 ! CFLAGS+= -DIPFILTER=1 -DIPFILTER_LKM -DIPFILTER_LOG -DPFIL_HOOKS
 --- 5,15 ----
   KMOD=	ipl
-  SRCS=	mlfk_ipl.c ip_nat.c ip_frag.c ip_state.c ip_proxy.c ip_auth.c \\
+  SRCS=	mlfk_ipl.c ip_nat.c ip_nat6.c ip_frag.c ip_state.c ip_proxy.c ip_auth.c \\
 ! 	ip_log.c ip_fil.c fil.c ip_lookup.c ip_pool.c ip_dstlist.c ip_htable.c \\
 ! 	ip_sync.c ip_scan.c ip_rules.c
 
@@ -262,5 +269,30 @@ cat | (cd /usr/src/sys/modules/ipfilter; patch) <<__EOF__
 ! CFLAGS+= -DIPFILTER=1 -DIPFILTER_LKM -DIPFILTER_LOG -DPFIL_HOOKS \\
 ! 	-DIPFILTER_LOOKUP -DIPFILTER_COMPILED
 __EOF__
+fi
+
+CONF=/sys/netinet/files.ipfilter
+if [ -f $CONF -a -os = NetBSD ] ; then
+	for i in ip_nat6.c ip_dstlist.c radix_ipf.c; do
+		echo "Checking for $i in $CONF"
+		grep $i $CONF >/dev/null 2>&1
+		if [ $? -ne 0 ] ; then
+			echo "Adding $i to $CONF"
+			sed -n -e /ip_nat.c/s/ip_nat.c/$i/p $CONF >> $CONF
+		fi
+	done
+fi
+
+CONF=/sys/conf/files
+if [ -f $CONF -a -os = FreeBSD ] ; then
+	for i in ip_nat6.c ip_dstlist.c radix_ipf.c; do
+		echo "Checking for $i in $CONF"
+		grep $i $CONF >/dev/null 2>&1
+		if [ $? -ne 0 ] ; then
+			echo "Adding $i to $CONF"
+			sed -n -e /ip_nat.c/,/NORMAL/p $CONF | \
+			sed -e s/ip_nat.c/$i/p >> $CONF
+		fi
+	done
 fi
 exit 0

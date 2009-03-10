@@ -780,6 +780,7 @@ typedef unsigned int    u_32_t;
 /*                                  N E T B S D                            */
 /* ----------------------------------------------------------------------- */
 #ifdef __NetBSD__
+# define HAS_SYS_MD5_H	1
 # if (NetBSD >= 199905) && !defined(IPFILTER_LKM) && defined(_KERNEL)
 #  if (__NetBSD_Version__ < 399001400)
 #   include "opt_ipfilter_log.h"
@@ -791,6 +792,7 @@ typedef unsigned int    u_32_t;
 #  include <sys/systm.h>
 # else
 #  include <stddef.h>
+#  include <stdbool.h>
 # endif
 # if defined(_KERNEL) && !defined(IPFILTER_LKM)
 #  include "bpfilter.h"
@@ -836,7 +838,14 @@ typedef	char *	caddr_t;
 #   include <sys/selinfo.h>
 #  endif
 #  if (__NetBSD_Version__ >= 399001400)
+#   define	PROC_T  struct lwp
+#   define	FREE(a,b)		free((a), _M_IPF)
+#   define	FREES(a,b)		free((a), _M_IPF)
+#   define	KMALLOC(a, b)		(a) = (b)malloc(sizeof (*(a)), \
+							_M_IPF, M_NOWAIT)
 #   define	KMALLOCS(a, b, c)	(a) = (b)malloc((c), _M_IPF, M_NOWAIT)
+#  else
+#   define	PROC_T  struct proc
 #  endif
 #  define	MSGDSIZE(x)	mbufchainlen(x)
 #  define	M_LEN(x)	(x)->m_len
@@ -1729,12 +1738,18 @@ MALLOC_DECLARE(M_IPFILTER);
 #    endif /* M_IPFILTER */
 #   endif /* M_PFIL */
 #  endif /* IPFILTER_M_IPFILTER */
-#  define	KMALLOC(a, b)	MALLOC((a), b, sizeof(*(a)), _M_IPF, M_NOWAIT)
+#  if !defined(KMALLOC)
+#   define	KMALLOC(a, b)	MALLOC((a), b, sizeof(*(a)), _M_IPF, M_NOWAIT)
+#  endif
 #  if !defined(KMALLOCS)
 #   define	KMALLOCS(a, b, c)	MALLOC((a), b, (c), _M_IPF, M_NOWAIT)
 #  endif
-#  define	KFREE(x)	FREE((x), _M_IPF)
+#  if !defined(KFREE)
+#   define	KFREE(x)	FREE((x), _M_IPF)
+#  endif
+#   if !defined(KFREES)
 #  define	KFREES(x,s)	FREE((x), _M_IPF)
+#  endif
 #  define	UIOMOVE(a,b,c,d)	uiomove((caddr_t)a,b,d)
 #  define	SLEEP(id, n)	tsleep((id), PPAUSE|PCATCH, n, 0)
 #  define	WAKEUP(id,x)	wakeup(id+x)

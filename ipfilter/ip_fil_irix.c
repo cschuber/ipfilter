@@ -56,9 +56,7 @@ static const char rcsid[] = "@(#)$Id$";
 #include "netinet/ip_state.h"
 #include "netinet/ip_proxy.h"
 #include "netinet/ip_auth.h"
-#ifdef	IPFILTER_SYNC
 #include "netinet/ip_sync.h"
-#endif
 #ifdef	IPFILTER_SCAN
 #include "netinet/ip_scan.h"
 #endif
@@ -75,13 +73,13 @@ extern	toid_t	ipf_timer_id;
 
 static	int	(*ipf_savep) __P((ip_t *, int, void *, int, struct mbuf **));
 static	int	ipf_send_ip __P((fr_info_t *, struct mbuf *, struct mbuf **));
-static	int	iplopen __P((dev_t *, int, int, cred_t *));
-static	int	iplclose __P((dev_t *, int, int, cred_t *));
-static	int	iplread __P((dev_t, struct uio *, cred_t *));
+static	int	ipfopen __P((dev_t *, int, int, cred_t *));
+static	int	ipfclose __P((dev_t *, int, int, cred_t *));
+static	int	ipfread __P((dev_t, struct uio *, cred_t *));
 
 
 int
-ipl_attach()
+ipf_attach()
 {
 	int error = 0, s;
 
@@ -94,7 +92,7 @@ ipl_attach()
 	if (ipf_initialise() < 0)
 		return -1;
 
-	error = ipl_ipfilter_attach();
+	error = ipf_ipfilter_attach();
 	if (error) {
 		ipf_deinitialise();
 		SPL_X(s);
@@ -126,7 +124,7 @@ ipl_attach()
  * stream.
  */
 int
-ipl_detach()
+ipf_detach()
 {
 	int s, error = 0;
 
@@ -153,7 +151,7 @@ ipl_detach()
 	(void) frflush(IPL_LOGIPF, FR_INQUE|FR_OUTQUE|FR_INACTIVE);
 	(void) frflush(IPL_LOGIPF, FR_INQUE|FR_OUTQUE);
 
-	ipl_ipfilter_detach();
+	ipf_ipfilter_detach();
 
 	SPL_X(s);
 	return 0;
@@ -206,7 +204,7 @@ ipfioctl(dev, cmd, data, mode, cp, rp)
  * routines below for saving IP headers to buffer
  */
 static int
-iplopen(pdev, flags, devtype, cp)
+ipfopen(pdev, flags, devtype, cp)
 	dev_t *pdev;
 	int flags, devtype;
 	cred_t *cp;
@@ -224,9 +222,7 @@ iplopen(pdev, flags, devtype, cp)
 		case IPL_LOGSTATE :
 		case IPL_LOGAUTH :
 		case IPL_LOGLOOKUP :
-#ifdef IPFILTER_SYNC
 		case IPL_LOGSYNC :
-#endif
 #ifdef IPFILTER_SCAN
 		case IPL_LOGSCAN :
 #endif
@@ -242,7 +238,7 @@ iplopen(pdev, flags, devtype, cp)
 
 
 static int
-iplclose(dev, flags, devtype, cp)
+ipfclose(dev, flags, devtype, cp)
 	dev_t dev;
 	int flags, devtype;
 	cred_t *cp;
@@ -257,13 +253,13 @@ iplclose(dev, flags, devtype, cp)
 }
 
 /*
- * iplread/ipllog
+ * ipfread/ipflog
  * both of these must operate with at least splnet() lest they be
  * called during packet processing and cause an inconsistancy to appear in
  * the filter lists.
  */
 static int
-iplread(dev, uio, crp)
+ipfread(dev, uio, crp)
 	dev_t dev;
 	register struct uio *uio;
 	cred_t *crp;
@@ -608,18 +604,18 @@ ipf_send_icmp_err(type, fin, dst)
 
 
 void
-iplinit(void)
+ipfinit(void)
 {
 	int i;
 
 	for (i = 0; i < 256; i++)
-		if (cdevsw[i].d_open == iplopen) {
-			printf("iplinit:ipfilter @%d\n", i); break;
+		if (cdevsw[i].d_open == ipfopen) {
+			printf("ipfinit:ipfilter @%d\n", i); break;
 		}
 	if (i == 256)
-		printf("iplinit:ipfilter not found\n");
+		printf("ipfinit:ipfilter not found\n");
 
-	if (ipl_attach() != 0)
+	if (ipf_attach() != 0)
 		printf("IP Filter failed to attach\n");
 	else
 		ip_init();
@@ -632,7 +628,7 @@ ipfattach(void)
 	int i;
 
 	for (i = 0; i < 256; i++)
-		if (cdevsw[i].d_open == iplopen) {
+		if (cdevsw[i].d_open == ipfopen) {
 			printf("ipfattach:ipfilter @%d\n", i); break;
 		}
 	if (i == 256)
@@ -641,17 +637,17 @@ ipfattach(void)
 }
 
 void
-iplstart(void)
+ipfstart(void)
 {
 	int i;
 
 	for (i = 0; i < 256; i++)
-		if (cdevsw[i].d_open == iplopen) {
-			printf("iplstart:ipfilter @%d\n", i);
+		if (cdevsw[i].d_open == ipfopen) {
+			printf("ipfstart:ipfilter @%d\n", i);
 			break;
 		}
 	if (i==256)
-		printf("iplstart:ipfilter not found\n");
+		printf("ipfstart:ipfilter not found\n");
 }
 
 
@@ -1029,7 +1025,7 @@ ipf_slowtimer()
 		return;
 	}
 
-	ipl_ipfilter_intfsync();
+	ipf_ipfilter_intfsync();
 	ipf_expiretokens(&ipfmain);
 	ipf_frag_expire(&ipfmain);
 	ipf_state_expire(&ipfmain);

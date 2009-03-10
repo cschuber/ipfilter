@@ -88,11 +88,7 @@ struct	dsent	ipfilter_devsw_entry = {
 	ipfilterclose,
 	nodev,		/* d_strategy */
 	ipfilterread,
-#ifdef	IPFILTER_SYNC
 	ipfilterwrite,
-#else
-	nulldev,	/* d_write */
-#endif
 	ipfilterioctl,
 	nodev,		/* d_dump */
 	nodev,		/* d_psize */
@@ -631,6 +627,21 @@ ipfilter_attach(void)
 	printf("ipfilter_attach(void)\n");
 #endif
 
+	if ((status = ipf_load_all()) != 0) {
+#ifdef IPFDEBUG
+		printf("ipf_load_all() == %d\n", status);
+#endif
+		return EIO;
+	}
+
+        if ((status = ipf_init_all(&ipfmain)) < 0) {
+		SPL_X(s);
+#ifdef IPFDEBUG
+		printf("ipf_init_all() == %d\n", status);
+#endif
+		return EIO;
+	}
+
 	status = ipfattach(&ipfmain);
 #ifdef	IPFDEBUG
 	printf("ipfattach() = %d\n", status);
@@ -1040,9 +1051,7 @@ int ipfilteropen(dev_t dev, int flag, int format)
 		case IPL_LOGSTATE :
 		case IPL_LOGAUTH :
 		case IPL_LOGLOOKUP :
-#ifdef IPFILTER_SYNC
 		case IPL_LOGSYNC :
-#endif
 #ifdef IPFILTER_SCAN
 		case IPL_LOGSCAN :
 #endif
@@ -1110,7 +1119,6 @@ int ipfilterread(dev_t dev, struct uio *uio, int flag)
 * return: ESUCCESS on success.
 *         fail: An error number from errno.h
 *--------------------------------------------------------*/
-#ifdef	IPFILTER_SYNC
 int
 ipfilterwrite(dev_t dev, struct uio *uio)
 {
@@ -1124,7 +1132,6 @@ ipfilterwrite(dev_t dev, struct uio *uio)
         return ipfsync_write(&ipfmain, uio);
 
 }
-#endif
 
 
 /*---------------------------------------------------------

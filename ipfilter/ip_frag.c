@@ -154,14 +154,15 @@ ipftuneable_t ipf_tuneables[] = {
 	{ { (void *)offsetof(ipf_frag_softc_t, ipfr_size) },
 		"frag_size",		1,	0x7fffffff,
 		stsizeof(ipf_frag_softc_t, ipfr_size),
-		IPFT_WRDISABLED,	NULL },
+		IPFT_WRDISABLED,	NULL,	NULL },
 	{ { (void *)offsetof(ipf_frag_softc_t, ipfr_ttl) },
 		"frag_ttl",		1,	0x7fffffff,
 		stsizeof(ipf_frag_softc_t, ipfr_ttl),
-		0,			NULL },
+		0,			NULL,	NULL },
 	{ { NULL },
 		NULL,			0,	0,
-		0,				0,	NULL }
+		0,
+		0,			NULL,	NULL }
 };
 
 #define	FBUMP(x)	ATOMIC_INCL(softf->ipfr_stats.x)
@@ -1163,9 +1164,7 @@ ipf_slowtimer(ptr)
 	ipf_auth_expire(softc);
 	ipf_lookup_expire(softc);
 	ipf_rule_expire(softc);
-# ifdef IPFILTER_SYNC
 	ipf_sync_expire(softc);
-# endif
 	softc->ipf_ticks++;
 	if (softc->ipf_running <= 0)
 		goto done;

@@ -111,9 +111,7 @@ struct file;
 #include "netinet/ip_state.h"
 #include "netinet/ip_proxy.h"
 #include "netinet/ip_auth.h"
-#ifdef	IPFILTER_SYNC
 #include "netinet/ip_sync.h"
-#endif
 #ifdef	IPFILTER_SCAN
 #include "netinet/ip_scan.h"
 #endif
@@ -135,6 +133,9 @@ extern	struct	protosw	inetsw[];
 #endif
 
 #include "ipt.h"
+
+ipf_main_softc_t	ipfmain;
+
 static	struct	ifnet **ifneta = NULL;
 static	int	nifs = 0;
 

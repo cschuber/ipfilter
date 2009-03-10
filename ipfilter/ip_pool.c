@@ -54,7 +54,7 @@ struct file;
 # include <net/radix.h>
 #endif
 #undef _NET_RADIX_H_
-#include "radix_ipf.h"
+#include "net/radix_ipf.h"
 #define _NET_RADIX_H_	1
 #include <sys/socket.h>
 #include <net/if.h>

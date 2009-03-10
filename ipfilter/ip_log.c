@@ -178,17 +178,18 @@ static ipftuneable_t ipf_log_tuneables[] = {
 	{ { (void *)offsetof(ipf_log_softc_t, ipl_suppress) },
 		"log_suppress",		0,	1,
 		stsizeof(ipf_log_softc_t, ipl_suppress),
-		0,			NULL },
+		0,			NULL,	NULL },
 	{ { (void *)offsetof(ipf_log_softc_t, ipl_logall) },
 		"log_all",		0,	1,
 		stsizeof(ipf_log_softc_t, ipl_logall),
-		0,			NULL },
+		0,			NULL,	NULL },
 	{ { (void *)offsetof(ipf_log_softc_t, ipl_logsize) },
 		"log_size",		0,	0x80000,
 		stsizeof(ipf_log_softc_t, ipl_logsize),
-		0,			NULL },
+		0,			NULL,	NULL },
 	{ { NULL },		NULL,			0,	0,
-		0,				0,	NULL }
+		0,
+		0,			NULL,	NULL }
 };
 
 
@@ -717,7 +718,7 @@ ipf_log_read(softc, unit, uio)
 		spinunlock(l);
 #  else
 #   if defined(__osf__) && defined(_KERNEL)
-		error = mpsleep(&softl->iplh[unit], PSUSP|PCATCH,  "iplread", 0,
+		error = mpsleep(&softl->iplh[unit], PSUSP|PCATCH,  "ipfread", 0,
 				&softl->ipl_mutex, MS_LOCK_SIMPLE);
 #   else
 		MUTEX_EXIT(&softl->ipl_mutex[unit]);
