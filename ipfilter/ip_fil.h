@@ -14,6 +14,16 @@
 #if (__NetBSD_Version__ >= 104040000)
 # include <sys/callout.h>
 #endif
+#if defined(BSD) && defined(_KERNEL)
+# if (defined(__NetBSD__) && (__NetBSD_Version__ < 399000000)) || \
+      defined(__osf__) || \
+	    (defined(__FreeBSD_version) && (__FreeBSD_version < 500043))
+#  include <sys/select.h>
+# else
+#  include <sys/selinfo.h>
+# endif
+#endif
+
 #include "netinet/in.h"
 #include "sys/tree.h"
 
