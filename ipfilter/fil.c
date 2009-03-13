@@ -2929,7 +2929,8 @@ ipf_check(ctx, ip, hlen, ifp, out
 	 */
 	m->m_flags &= ~M_CANFASTFWD;
 #  endif /* M_CANFASTFWD */
-#  ifdef CSUM_DELAY_DATA
+#  if defined(CSUM_DELAY_DATA) && (!defined(__FreeBSD_version) || \
+				   (__FreeBSD_version < 501108))
 	/*
 	 * disable delayed checksums.
 	 */

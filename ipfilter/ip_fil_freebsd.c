@@ -158,6 +158,19 @@ ipf_check_wrapper(void *arg, struct mbuf **mp, struct ifnet *ifp, int dir)
 	struct ip *ip = mtod(*mp, struct ip *);
 	int rv;
 
+# ifdef CSUM_DELAY_DATA
+	/*
+	 * disable delayed checksums.
+	 */
+	if ((*mp)->m_pkthdr.csum_flags & CSUM_DELAY_DATA) {
+		in_delayed_cksum(*mp);
+		(*mp)->m_pkthdr.csum_flags &= ~CSUM_DELAY_DATA;
+	}                
+# endif /* CSUM_DELAY_DATA */
+
+	/*
+	 * IPFilter expects evreything in network byte order
+	 */
 	ip->ip_len = htons(ip->ip_len);
 	ip->ip_off = htons(ip->ip_off);
 	rv = ipf_check(&ipfmain, ip, ip->ip_hl << 2, ifp, (dir == PFIL_OUT),
