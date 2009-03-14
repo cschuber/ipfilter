@@ -551,7 +551,7 @@ ipf_pool_stats_get(softc, arg, op)
 	} else if (unit >= 0 && unit <= IPL_LOGMAX) {
 		unit++;						/* -1 => 0 */
 		if (op->iplo_name[0] != '\0')
-			stats.ipls_list[unit] = ipf_pool_exists(softp, unit,
+			stats.ipls_list[unit] = ipf_pool_exists(softp, unit - 1,
 								op->iplo_name);
 		else
 			stats.ipls_list[unit] = softp->ipf_pool_list[unit];
@@ -1073,16 +1073,14 @@ ipf_pool_flush(softc, arg, fp)
 	ip_pool_t *p, *q;
 
 	unit = fp->iplf_unit;
-	for (i = 0; i <= LOOKUP_POOL_MAX; i++) {
+	for (i = -1; i <= IPL_LOGMAX; i++) {
 		if (unit != IPLT_ALL && i != unit)
 			continue;
-		for (q = softp->ipf_pool_list[i]; (p = q) != NULL; ) {
+		for (q = softp->ipf_pool_list[i + 1]; (p = q) != NULL; ) {
 			q = p->ipo_next;
 			err = ipf_pool_destroy(softc, softp, i, p->ipo_name);
 			if (err == 0)
 				num++;
-			else
-				break;
 		}
 	}
 	return num;
@@ -1443,8 +1441,9 @@ ipf_pool_dump(softc, arg)
 	int i;
 
 	printf("List of configured pools\n");
-	for (i = 0; i <= IPL_LOGMAX; i++)
-		for (ipl = softp->ipf_pool_list[i]; ipl != NULL; ipl = ipl->ipo_next)
+	for (i = 0; i <= LOOKUP_POOL_MAX; i++)
+		for (ipl = softp->ipf_pool_list[i]; ipl != NULL;
+		     ipl = ipl->ipo_next)
 			printpool(ipl, bcopywrap, NULL, opts);
 }
 #endif

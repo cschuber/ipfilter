@@ -74,14 +74,14 @@ usage(prog)
 	char *prog;
 {
 	fprintf(stderr, "Usage:\t%s\n", prog);
-	fprintf(stderr, "\t\t\t-a [-dnv] [-m <name>] [-o <role>] [-t type] [-T ttl] -i <ipaddr>[/netmask]\n");
-	fprintf(stderr, "\t\t\t-A [-dnv] [-m <name>] [-o <role>] [-S <seed>] [-t <type>]\n");
-	fprintf(stderr, "\t\t\t-f <file> [-dnuv]\n");
-	fprintf(stderr, "\t\t\t-F [-dv] [-o <role>] [-t <type>]\n");
-	fprintf(stderr, "\t\t\t-l [-dv] [-m <name>] [-t <type>]\n");
-	fprintf(stderr, "\t\t\t-r [-dnv] [-m <name>] [-o <role>] [-t type] -i <ipaddr>[/netmask]\n");
-	fprintf(stderr, "\t\t\t-R [-dnv] [-m <name>] [-o <role>] [-t <type>]\n");
-	fprintf(stderr, "\t\t\t-s [-dtv] [-M <core>] [-N <namelist>]\n");
+	fprintf(stderr, "\t-a [-dnv] [-m <name>] [-o <role>] [-t type] [-T ttl] -i <ipaddr>[/netmask]\n");
+	fprintf(stderr, "\t-A [-dnv] [-m <name>] [-o <role>] [-S <seed>] [-t <type>]\n");
+	fprintf(stderr, "\t-f <file> [-dnuv]\n");
+	fprintf(stderr, "\t-F [-dv] [-o <role>] [-t <type>]\n");
+	fprintf(stderr, "\t-l [-dv] [-m <name>] [-t <type>]\n");
+	fprintf(stderr, "\t-r [-dnv] [-m <name>] [-o <role>] [-t type] -i <ipaddr>[/netmask]\n");
+	fprintf(stderr, "\t-R [-dnv] [-m <name>] [-o <role>] [-t <type>]\n");
+	fprintf(stderr, "\t-s [-dtv] [-M <core>] [-N <namelist>]\n");
 	exit(1);
 }
 
@@ -401,6 +401,7 @@ poolstats(argc, argv)
 {
 	int c, type, role, live_kernel;
 	ipf_pool_stat_t plstat;
+	ipf_dstl_stat_t dlstat;
 	char *kernel, *core;
 	iphtstat_t htstat;
 	iplookupop_t op;
@@ -465,11 +466,11 @@ poolstats(argc, argv)
 		if (!(opts & (OPT_DONOTHING|OPT_DONTOPEN))) {
 			c = ioctl(fd, SIOCLOOKUPSTAT, &op);
 			if (c == -1) {
-				ipferror(fd, "ioctl(SIOCLOOKUPSTAT)");
+				ipferror(fd, "ioctl(S0IOCLOOKUPSTAT)");
 				return -1;
 			}
-			printf("Pools:\t%lu\n", plstat.ipls_pools);
-			printf("Nodes:\t%lu\n", plstat.ipls_nodes);
+			printf("%lu\taddress pools\n", plstat.ipls_pools);
+			printf("%lu\taddress pool nodes\n", plstat.ipls_nodes);
 		}
 	}
 
@@ -483,9 +484,33 @@ poolstats(argc, argv)
 				ipferror(fd, "ioctl(SIOCLOOKUPSTAT)");
 				return -1;
 			}
-			printf("Hash Tables:\t%lu\n", htstat.iphs_numtables);
-			printf("Nodes:\t%lu\n", htstat.iphs_numnodes);
-			printf("Out of Memory:\t%lu\n", htstat.iphs_nomem);
+			printf("%lu\thash tables\n", htstat.iphs_numtables);
+			printf("%lu\thash table nodes\n", htstat.iphs_numnodes);
+			printf("%lu\thash table no memory \n",
+				htstat.iphs_nomem);
+		}
+	}
+
+	if (type == IPLT_ALL || type == IPLT_DSTLIST) {
+		op.iplo_type = IPLT_DSTLIST;
+		op.iplo_struct = &dlstat;
+		op.iplo_size = sizeof(dlstat);
+		if (!(opts & (OPT_DONOTHING|OPT_DONTOPEN))) {
+			c = ioctl(fd, SIOCLOOKUPSTAT, &op);
+			if (c == -1) {
+				ipferror(fd, "ioctl(SIOCLOOKUPSTAT)");
+				return -1;
+			}
+			printf("%u\tdestination lists\n",
+			       dlstat.ipls_numlists);
+			printf("%u\tdestination list nodes\n",
+			       dlstat.ipls_numnodes);
+			printf("%lu\tdestination list no memory\n",
+			       dlstat.ipls_nomem);
+			printf("%u\tdestination list zombies\n",
+			       dlstat.ipls_numdereflists);
+			printf("%u\tdesetination list node zombies\n",
+			       dlstat.ipls_numderefnodes);
 		}
 	}
 	return 0;
@@ -770,12 +795,11 @@ poollist_live(role, poolname, type, fd)
 	int role, type, fd;
 	char *poolname;
 {
+	ipf_pool_stat_t plstat;
 	iplookupop_t op;
 	int c;
 
 	if (type == IPLT_ALL || type == IPLT_POOL) {
-		ipf_pool_stat_t plstat;
-
 		op.iplo_type = IPLT_POOL;
 		op.iplo_size = sizeof(plstat);
 		op.iplo_struct = &plstat;
@@ -793,7 +817,7 @@ poollist_live(role, poolname, type, fd)
 
 			showpools_live(fd, role, &plstat, poolname);
 		} else {
-			for (role = 0; role <= IPL_LOGMAX; role++) {
+			for (role = -1; role <= IPL_LOGMAX; role++) {
 				op.iplo_unit = role;
 
 				c = ioctl(fd, SIOCLOOKUPSTAT, &op);
@@ -839,6 +863,7 @@ poollist_live(role, poolname, type, fd)
 
 				showhashs_live(fd, role, &htstat, poolname);
 			}
+			role = IPL_LOGALL;
 		}
 	}
 
@@ -872,6 +897,7 @@ poollist_live(role, poolname, type, fd)
 
 				showdstls_live(fd, role, &dlstat, poolname);
 			}
+			role = IPL_LOGALL;
 		}
 	}
 }
@@ -900,14 +926,16 @@ showpools_live(fd, role, plstp, poolname)
 	iter.ili_unit = role;
 	*iter.ili_name = '\0';
 
-	while (plstp->ipls_list[role] != NULL) {
+	bzero((char *)&pool, sizeof(pool));
+
+	while (plstp->ipls_list[role + 1] != NULL) {
 		if (ioctl(fd, SIOCLOOKUPITER, &obj)) {
 			ipferror(fd, "ioctl(SIOCLOOKUPITER)");
 			break;
 		}
 		printpool_live(&pool, fd, poolname, opts);
 
-		plstp->ipls_list[role] = pool.ipo_next;
+		plstp->ipls_list[role + 1] = pool.ipo_next;
 	}
 }
 

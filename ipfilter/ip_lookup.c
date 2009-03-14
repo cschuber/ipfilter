@@ -704,7 +704,7 @@ ipf_lookup_iterate(softc, data, uid, ctx)
 	if (err != 0)
 		return err;
 
-	if (iter.ili_unit > IPL_LOGMAX) {
+	if (iter.ili_unit < IPL_LOGALL && iter.ili_unit > IPL_LOGMAX) {
 		softc->ipf_interror = 50038;
 		return EINVAL;
 	}

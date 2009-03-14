@@ -75,7 +75,7 @@ typedef	union	{
 		u_char	ilik_ival;
 		u_char	ilik_type;	/* IPLT_* */
 		u_char	ilik_otype;
-		u_char	ilik_unit;	/* IPL_LOG* */
+		signed char	ilik_unit;	/* IPL_LOG* */
 	} ilik_unstr;
 	u_32_t	ilik_key;
 } iplookupiterkey_t;
