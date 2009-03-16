@@ -99,8 +99,9 @@ findfunc(void *lib, char *name)
 {
 #ifdef HAVE_DLFUNC
 	return ((npf_func_t)dlfunc(lib, name));
-#endif
-#ifdef HAVE_DLSYM
+#else
+# ifdef HAVE_DLSYM
 	return ((npf_func_t)dlsym(lib, name));
+# endif
 #endif
 }
