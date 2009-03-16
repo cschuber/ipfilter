@@ -103,14 +103,20 @@ npf_ipf_fw_rule_to_frentry(npf_filter_rule_t *nf, frentry_t *fr)
 	else
 		fr->fr_flags |= FR_INQUE;
 
-	strncpy(fr->fr_group, nf->nfr_group, sizeof(fr->fr_group));
-	fr->fr_group[FR_GROUPLEN - 1] = '\0';
+	if (*nf->nfr_group != '\0') {
+		i = npf_ipf_fr_add_name(&fr, nf->nfr_group);
+		fr->fr_group = i;
+	}
 
-	strncpy(fr->fr_ifnames[0], nf->nfr_ifname, LIFNAMSIZ);
-	fr->fr_ifnames[0][LIFNAMSIZ - 1] = '\0';
+	if (*nf->nfr_ifname != '\0') {
+		i = npf_ipf_fr_add_name(&fr, nf->nfr_ifname);
+		fr->fr_ifnames[0] = i;
+	}
 
-	strncpy(fr->fr_ifnames[1], nf->nfr_ifname, LIFNAMSIZ);
-	fr->fr_ifnames[1][LIFNAMSIZ - 1] = '\0';
+	if (*nf->nfr_ifname != '\0') {
+		i = npf_ipf_fr_add_name(&fr, nf->nfr_ifname);
+		fr->fr_ifnames[1] = i;
+	}
 
 	if (fr->fr_family == AF_INET) {
 		struct sockaddr_in *sin;
@@ -153,4 +159,27 @@ npf_ipf_fw_rule_to_frentry(npf_filter_rule_t *nf, frentry_t *fr)
 				  nf->nfr_dst.nra_mask);
 	}
 	return (0);
+}
+
+
+static int
+npf_ipf_fr_add_name(frentry_t **frp, char *name)
+{
+	frentry_t *f;
+	int nlen;
+	int pos;
+
+	nlen = strlen(name) + 1;
+	f = realloc(*frp, (*frp)->fr_size + nlen);
+	*frp = f;
+	if (f == NULL)
+		return -1;
+	if (f->fr_pnext != NULL)
+		*f->fr_pnext = f;
+	f->fr_size += nlen;
+	pos = f->fr_namelen;
+	f->fr_namelen += nlen;
+	strcpy(f->fr_names + pos, name);
+	f->fr_names[f->fr_namelen] = '\0';
+	return pos;
 }
