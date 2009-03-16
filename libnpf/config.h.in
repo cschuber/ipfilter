@@ -1,0 +1,2 @@
+#undef	HAVE_DLFUNC
+#undef	HAVE_DLSYM

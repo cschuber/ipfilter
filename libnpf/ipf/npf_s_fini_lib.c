@@ -36,6 +36,7 @@ npf_s_fini_lib(npf_handle_t *npf)
 
 	ipf = npf_get_private(npf);
 	if (ipf != NULL) {
+		close(ipf->npfi_poolfd);
 		close(ipf->npfi_natfd);
 		close(ipf->npfi_fd);
 		free(ipf);

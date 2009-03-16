@@ -1,0 +1,5 @@
+AC_INIT(libnpf,1)
+AC_LANG(C)
+AC_CHECK_FUNCS(dlfunc dlsym)
+AC_CONFIG_HEADERS(config.h)
+AC_OUTPUT

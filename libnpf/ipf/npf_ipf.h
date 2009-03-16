@@ -39,9 +39,15 @@
 typedef struct npf_ipf_s {
 	int	npfi_fd;
 	int	npfi_natfd;
+	int	npfi_poolfd;
+	int	npfi_liberror;
+	int	npfi_ipferror;
 } npf_ipf_t;
 
 
 extern int npf_ipf_fw_rule_to_frentry(npf_filter_rule_t *nf, frentry_t *fr);
 extern void npf_ipf_setv6mask(i6addr_t *addr, i6addr_t *mask, int masklen);
-
+extern void npf_ipf_error_set(npf_handle_t *npf, int error);
+extern void npf_ipf_ipferror_save(npf_handle_t *npf);
+extern int npf_ipf_option_role(npf_handle_t *npf, const char *, int *);
+extern int npf_ipf_option_timeout(npf_handle_t *npf, const char *, int *);

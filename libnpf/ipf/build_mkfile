@@ -1,0 +1,21 @@
+#!/bin/sh
+
+srcs=`echo npf_s_*.c`
+for i in $srcs; do
+	base=`expr $i : '\(.*\)\.c'`
+	blist="${blist} ${base}"
+	objs="${sobjs} ${base}.o"
+	sobjs="${sobjs} ${base}.so"
+done
+sed -e "s/__OBJS__/$objs/" -e "s/__SOBJS__/$sobjs/" Makefile.dist > Makefile
+
+for i in ${blist}; do
+	echo "${i}.o: ${i}.c \$(TOP)/npf.h npf_ipf.h" >> Makefile
+        echo "	\$(CC) \$(CFLAGS) -c ${i}.c -o \$@" >> Makefile
+	echo '' >> Makefile
+	echo "${i}.so: ${i}.c \$(TOP)/npf.h npf_ipf.h" >> Makefile
+        echo "	\$(CC) \$(SO_CFLAGS) -c ${i}.c -o \$@" >> Makefile
+	echo '' >> Makefile
+done
+
+

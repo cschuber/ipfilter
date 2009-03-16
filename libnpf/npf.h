@@ -29,7 +29,10 @@
 #ifndef _NPF_H_
 #define _NPF_H_
 
+#include "config.h"
+#include <sys/types.h>
 #include <sys/socket.h>
+#include <netinet/in_systm.h>
 #include <net/if.h>
 #include <netinet/in.h>
 
@@ -193,6 +196,13 @@ typedef struct npf_destination_s {
 	char			npfd_ifname[LIFNAMSIZ];
 } npf_destination_t;
 
+
+typedef struct npf_group_addr_s {
+	struct sockaddr		**nga_addr;
+	int			nga_naddr;
+	char			nga_group[NPF_GROUP_NAME_SIZE];
+} npf_group_addr_t;
+
 /*
  * Needed:
  * - negation matching on fields
@@ -240,6 +250,9 @@ typedef struct npf_handle_s {
 	npf_func_t	nat_getnext_rule;
 	npf_func_t	nat_insert_rule;
 	npf_func_t	nat_lookup_rdr;
+	npf_func_t	fw_group_address_add;
+	npf_func_t	fw_group_address_del;
+	npf_func_t	fw_group_flush;
 	void		*private;
 	npf_version_t	version;
 } npf_handle_t;
@@ -249,16 +262,17 @@ extern int npf_close(npf_handle_t *);
 extern void npf_set_private(npf_handle_t *, void *);
 extern void *npf_get_private(npf_handle_t *);
 
-extern int npf_fw_delete_rule(npf_handle_t *, npf_filter_rule_t *,
-			      const char *);
-extern int npf_fw_insert_rule(npf_handle_t *, npf_filter_rule_t *,
-			      const char *);
+extern int npf_fw_delete_rule(npf_handle_t *, npf_filter_rule_t *, const char *);
+extern int npf_fw_insert_rule(npf_handle_t *, npf_filter_rule_t *, const char *);
 
 extern int npf_nat_delete_rule(npf_handle_t *, npf_nat_rule_t *, const char *);
 extern int npf_nat_find_rule(npf_handle_t *, npf_nat_rule_t *, const char *);
 extern int npf_nat_lookup_rdr(npf_handle_t *, npf_nat_desc_t *, const char *);
 extern int npf_nat_getnext_rule(npf_handle_t *, npf_nat_rule_t *, const char *);
 extern int npf_nat_insert_rule(npf_handle_t *, npf_nat_rule_t *, const char *);
+extern int npf_fw_group_address_add(npf_handle_t *, npf_group_addr_t *, const char *);
+extern int npf_fw_group_address_del(npf_handle_t *, npf_group_addr_t *, const char *);
+extern int npf_fw_group_flush(npf_handle_t *, void *, const char *);
 
 /*
  * From FreeBSD...

@@ -38,26 +38,23 @@ npf_ipf_fw_rule_to_frentry(npf_filter_rule_t *nf, frentry_t *fr)
 	 * Make sure the address families line up.
 	 */
 	if (nf->nfr_src.nra_addr.ss_family == AF_INET) {
-		fr->fr_v = 4;
 		if (nf->nfr_dst.nra_addr.ss_family != AF_INET &&
 		    nf->nfr_dst.nra_addr.ss_family != AF_UNSPEC)
 			return (-1);
 	} else if (nf->nfr_src.nra_addr.ss_family == AF_INET6) {
-		fr->fr_v = 6;
 		if (nf->nfr_dst.nra_addr.ss_family != AF_INET6 &&
 		    nf->nfr_dst.nra_addr.ss_family != AF_UNSPEC)
 			return (-1);
 	} else if (nf->nfr_dst.nra_addr.ss_family == AF_INET) {
-		fr->fr_v = 4;
 		if (nf->nfr_src.nra_addr.ss_family != AF_INET &&
 		    nf->nfr_src.nra_addr.ss_family != AF_UNSPEC)
 			return (-1);
 	} else if (nf->nfr_dst.nra_addr.ss_family == AF_INET6) {
-		fr->fr_v = 6;
 		if (nf->nfr_src.nra_addr.ss_family != AF_INET6 &&
 		    nf->nfr_src.nra_addr.ss_family != AF_UNSPEC)
 			return (-1);
 	}
+	fr->fr_family = nf->nfr_src.nra_addr.ss_family;
 
 	switch (nf->nfr_action)
 	{
@@ -115,7 +112,7 @@ npf_ipf_fw_rule_to_frentry(npf_filter_rule_t *nf, frentry_t *fr)
 	strncpy(fr->fr_ifnames[1], nf->nfr_ifname, LIFNAMSIZ);
 	fr->fr_ifnames[1][LIFNAMSIZ - 1] = '\0';
 
-	if (fr->fr_v == 4) {
+	if (fr->fr_family == AF_INET) {
 		struct sockaddr_in *sin;
 
 		if (nf->nfr_src.nra_mask < 0 || nf->nfr_src.nra_mask > 32)
@@ -134,7 +131,7 @@ npf_ipf_fw_rule_to_frentry(npf_filter_rule_t *nf, frentry_t *fr)
 		if (sin->sin_family == AF_INET)
 			fr->fr_daddr = sin->sin_addr.s_addr & fr->fr_dmask;
 
-	} else if (fr->fr_v == 6) {
+	} else if (fr->fr_family == AF_INET6) {
 		struct sockaddr_in6 *sin6;
 
 		if (nf->nfr_src.nra_mask < 0 || nf->nfr_src.nra_mask > 128)

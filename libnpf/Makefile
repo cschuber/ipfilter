@@ -42,7 +42,7 @@ src:
 	make build
 
 build: libnpf.a libnpf.so test1 test2
-	(cd ipf; make)
+	(cd ipf; ./build_mkfile; make)
 	/bin/rm -f libnpf_ipf.a
 	ln -s ipf/libnpf_ipf.a .
 	/bin/rm -f libnpf_ipf.so
@@ -51,8 +51,13 @@ build: libnpf.a libnpf.so test1 test2
 clean:
 	/bin/rm -f o.d/*.o o.d/*.a so.d/*.so test1 test2
 	/bin/rm -f ipf/*.o ipf/*.so ipf/*.a
-	/bin/rm -f *.o *.a *.so
+	/bin/rm -f *.o *.a *.so *.so.*
+	/bin/rm -f ipf/Makefile
 	(cd src.d; make clean)
+
+distclean:
+	make clean
+	/bin/rm -f config.h config.log config.status
 
 libnpf.a: $(NPFOBJSO)
 	ar cq $@ $(NPFOBJSO)
@@ -64,4 +69,4 @@ test1: src.d/test.c libnpf.a
 	$(CC) -static -g -I. src.d/test.c -o test1 -L. -lnpf
 
 test2: src.d/test.c libnpf.so
-	$(CC) -dy -g -I. src.d/test.c -o test2 -L. -lnpf
+	$(CC) -shared -g -I. src.d/test.c -o test2 -R. -L. -lnpf

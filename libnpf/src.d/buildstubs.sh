@@ -5,6 +5,25 @@
 
 make_file() {
 	base=$1
+	proto=`sed -n -e "/extern .*$base/s/[^(]*(\(.*\)).*/\1/p" ../npf.h`
+	old="$proto"
+	count=0
+	new=""
+	while [ -n "$old" ] ; do
+		o1=`echo "$old" | sed -n -e '/,/s/^\([^,]*,\).*/\1/p'`
+		if [ -z "$o1" ] ; then
+			o1=$old
+			old=""
+		else
+			o2=`echo "$o1" | sed -e 's/\\*/\\\\\*/g'`
+			old=`echo "$old" | sed -n -e "s/^$o2//p"`
+		fi
+		o1=`echo "$o1" | sed -e "s/,/ arg$count,/"`
+		new="$new$o1"
+		count=`expr $count + 1`
+	done
+	new="${new}arg${count}"
+
 	if [ -f npf_s_$base.c ] ; then
 		file=`find npf_s_$base.c -newer ../npf.h`
 		if [ ! -z $file ] ; then
@@ -88,22 +107,22 @@ else
 fi
 
 echo '#' > Makefile.o
-echo 'O_D=' > Makefile.o
+echo 'O_D=' >> Makefile.o
 for i in $PRIVATE; do
 	cat << __EOF__ >> Makefile.o
 O_D+= o.d/npf_${i}.o
 o.d/npf_${i}.o: src.d/npf_${i}.c npf.h
-	\$(CC) \$(CFLAGS) -c src.d/npf_${i}.c -o \$@
+	\$(CC) \$(CFLAGS) -g -c src.d/npf_${i}.c -o \$@
 __EOF__
 done
 
 echo '#' > Makefile.so
-echo 'SO_D=' > Makefile.so
+echo 'SO_D=' >> Makefile.so
 for i in $PRIVATE; do
 	cat << __EOF__ >> Makefile.so
 SO_D+= so.d/npf_${i}.so
 so.d/npf_${i}.so: src.d/npf_${i}.c npf.h
-	\$(CC) \$(SO_CFLAGS) -c src.d/npf_${i}.c -o \$@
+	\$(CC) \$(SO_CFLAGS) -g -c src.d/npf_${i}.c -o \$@
 __EOF__
 done
 for i in $LIST; do
@@ -128,3 +147,4 @@ so.d/npf_${i}.so: src.d/npf_${i}.c npf.h
 	\$(CC) \$(SO_CFLAGS) -c src.d/npf_${i}.c -o \$@
 __EOF__
 done
+exit 0

@@ -71,8 +71,8 @@ npf_open(const char *name, const npf_version_t version)
 		return (NULL);
 	}
 
-	npf->init_lib = (npf_func_t)dlfunc(npf->lib, "npf_s_init_lib");
-	npf->fini_lib = (npf_func_t)dlfunc(npf->lib, "npf_s_fini_lib");
+	npf->init_lib = findfunc(npf->lib, "npf_s_init_lib");
+	npf->fini_lib = findfunc(npf->lib, "npf_s_fini_lib");
 
 	if (npf->init_lib != NULL) {
 		if (npf->init_lib(npf, NULL, NULL) == -1) {
@@ -97,5 +97,10 @@ npf_open(const char *name, const npf_version_t version)
 static npf_func_t
 findfunc(void *lib, char *name)
 {
+#ifdef HAVE_DLFUNC
 	return ((npf_func_t)dlfunc(lib, name));
+#endif
+#ifdef HAVE_DLSYM
+	return ((npf_func_t)dlsym(lib, name));
+#endif
 }

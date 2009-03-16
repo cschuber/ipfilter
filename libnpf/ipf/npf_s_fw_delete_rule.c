@@ -32,16 +32,16 @@ static char rcsid[] = "$Id$";
 int
 npf_s_fw_delete_rule(npf_handle_t *handle, void *param, const char *options)
 {
-	npf_filter_desc_t *nf = param;
+	npf_filter_rule_t *nf = param;
 	ipfobj_t obj;
 	frentry_t fr;
-	fripf_t ipf;
+	fripf_t ipfdata;
 	npf_ipf_t *ipf;
 
 	bzero((char *)&fr, sizeof(fr));
 	bzero((char *)&ipf, sizeof(ipf));
 
-	fr.fr_ipf = &ipf;
+	fr.fr_ipf = &ipfdata;
 	fr.fr_type = FR_T_IPF;
 	fr.fr_dsize = sizeof(ipf);
 
@@ -54,7 +54,7 @@ npf_s_fw_delete_rule(npf_handle_t *handle, void *param, const char *options)
 	obj.ipfo_ptr = &fr;
 	obj.ipfo_offset = 0;
 
-	ipf = handle->npf_private;
+	ipf = npf_get_private(handle);
 	if (ioctl(ipf->npfi_fd, SIOCRMAFR, &obj) == 0)
 		return (0);
 	return (-1);

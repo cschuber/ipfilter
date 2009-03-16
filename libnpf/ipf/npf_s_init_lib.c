@@ -53,8 +53,18 @@ npf_s_init_lib(npf_handle_t *npf)
 		npf->error = errno;
 		return (-1);
 	}
+
 	ipf->npfi_natfd = open(IPNAT_NAME, O_RDWR);
 	if (ipf->npfi_natfd == -1) {
+		close(ipf->npfi_fd);
+		free(ipf);
+		npf->error = errno;
+		return (-1);
+	}
+
+	ipf->npfi_poolfd = open(IPLOOKUP_NAME, O_RDWR);
+	if (ipf->npfi_poolfd == -1) {
+		close(ipf->npfi_natfd);
 		close(ipf->npfi_fd);
 		free(ipf);
 		npf->error = errno;
