@@ -272,7 +272,7 @@ __EOF__
 fi
 
 CONF=/sys/netinet/files.ipfilter
-if [ -f $CONF -a -os = NetBSD ] ; then
+if [ -f $CONF -a $os = NetBSD ] ; then
 	for i in ip_nat6.c ip_dstlist.c radix_ipf.c; do
 		echo "Checking for $i in $CONF"
 		grep $i $CONF >/dev/null 2>&1
@@ -284,7 +284,7 @@ if [ -f $CONF -a -os = NetBSD ] ; then
 fi
 
 CONF=/sys/conf/files
-if [ -f $CONF -a -os = FreeBSD ] ; then
+if [ -f $CONF -a $os = FreeBSD ] ; then
 	for i in ip_nat6.c ip_dstlist.c radix_ipf.c; do
 		echo "Checking for $i in $CONF"
 		grep $i $CONF >/dev/null 2>&1
