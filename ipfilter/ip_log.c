@@ -847,6 +847,9 @@ ipf_log_bytesused(softc, unit)
 {
 	ipf_log_softc_t *softl = softc->ipf_log_soft;
 
+	if (softl == NULL)
+		return 0;
+
 	return softl->ipl_used[unit];
 }
 
@@ -867,6 +870,9 @@ ipf_log_failures(softc, unit)
 {
 	ipf_log_softc_t *softl = softc->ipf_log_soft;
 
+	if (softl == NULL)
+		return 0;
+
 	return softl->ipl_logfail[unit];
 }
 
@@ -886,6 +892,9 @@ ipf_log_logok(softc, unit)
 	int unit;
 {
 	ipf_log_softc_t *softl = softc->ipf_log_soft;
+
+	if (softl == NULL)
+		return 0;
 
 	return softl->ipl_logok[unit];
 }
