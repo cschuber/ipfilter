@@ -17,7 +17,7 @@ typedef	struct	{
 
 static ipf_error_entry_t *find_error __P((int));
 
-#define	IPF_NUM_ERRORS	428
+#define	IPF_NUM_ERRORS	445
 
 /*
  * NO REUSE OF NUMBERS!
@@ -469,6 +469,23 @@ log" },
 	{	120024,	"stats device unit is invalid for dest. lists" },
 	{	120025,	"error copying out dest. list statistics" },
 /* -------------------------------------------------------------------------- */
+	{	130001,	"ioctl denied by system security level" },
+	{	130002,	"ioctl operation on invalid minor device" },
+	{	130003,	"ioctl on device denied, ipfitler is disabled" },
+	{	130004,	"ioctl command not allowed when disabled" },
+	{	130005,	"ioctl denied due to insufficient authorisation" },
+	{	130006,	"cannot read while ipfilter is disabled" },
+	{	130007,	"read on minor device not supported" },
+	{	130008,	"cannot write while ipfilter is disabled" },
+	{	130009,	"write on minor device not supported" },
+	{	130010,	"poll on minor device is not supported" },
+	{	130011,	"error removing IPv4 filter hooks" },
+	{	130012,	"error removing IPv6 filter hooks" },
+	{	130013,	"attaching IPv4 hook failed" },
+	{	130014,	"attaching IPv6 hook failed" },
+	{	130015,	"ipf_init_all failed" },
+	{	130016,	"finding pfil head failed" },
+	{	130017,	"ipfilter is already initialised and running" },
 };
 
 
