@@ -280,10 +280,10 @@ typedef	union	i6addr	{
 			  _d->i6[2] = _s1->i6[2] & ~_s2->i6[2]; \
 			  _d->i6[3] = _s1->i6[3] & ~_s2->i6[3]; \
 			}
-typedef	union	{
-	u_short	ipsou_ripso[2];
-	u_32_t	ipsou_doi;
-} ipso_u_t;
+typedef	union ipso_u	{
+	u_short	ipso_ripso[2];
+	u_32_t	ipso_doi;
+} ipso_t;
 
 typedef	struct	fr_ip	{
 	u_32_t	fi_v:4;		/* IP version */
@@ -294,7 +294,7 @@ typedef	struct	fr_ip	{
 	u_32_t	fi_optmsk;	/* bitmask composed from IP options */
 	i6addr_t fi_src;	/* source address from packet */
 	i6addr_t fi_dst;	/* destination address from packet */
-	ipso_u_t fi_ipso;	/* IP security options */
+	ipso_t	fi_ipso;	/* IP security options */
 	u_32_t	fi_flx;		/* packet flags */
 	u_32_t	fi_tcpmsk;	/* TCP options set/reset */
 	u_32_t	fi_ports[2];	/* TCP ports */
@@ -302,10 +302,6 @@ typedef	struct	fr_ip	{
 	u_char	fi_sensitivity;
 	u_char	fi_xxx[2];	/* pad */
 } fr_ip_t;
-
-#define	fi_secmsk	fi_ipso.ipsou_ripso[0]
-#define	fi_auth		fi_ipso.ipsou_ripso[1]
-#define	fi_doi		fi_ipso.ipsou_doi
 
 /*
  * For use in fi_flx
@@ -338,6 +334,9 @@ typedef	struct	fr_ip	{
 #define	FI_NOCKSUM	0x20000000	/* don't do a L4 checksum validation */
 #define	FI_IGNORE	0x80000000
 
+#define	fi_secmsk	fi_ipso.ipso_ripso[0]
+#define	fi_auth		fi_ipso.ipso_ripso[1]
+#define	fi_doi		fi_ipso.ipso_doi
 #define	fi_saddr	fi_src.in4.s_addr
 #define	fi_daddr	fi_dst.in4.s_addr
 #define	fi_srcnum	fi_src.iplookupnum
@@ -441,6 +440,7 @@ typedef	struct	fr_info	{
 #define	fin_flx		fin_fi.fi_flx
 #define	fin_optmsk	fin_fi.fi_optmsk
 #define	fin_secmsk	fin_fi.fi_secmsk
+#define	fin_doi		fin_fi.fi_doi
 #define	fin_auth	fin_fi.fi_auth
 #define	fin_src		fin_fi.fi_src.in4
 #define	fin_saddr	fin_fi.fi_saddr
@@ -794,6 +794,8 @@ typedef	struct	frentry {
 #define	fr_secmask	fr_mip.fi_secmsk
 #define	fr_authbits	fr_ip.fi_auth
 #define	fr_authmask	fr_mip.fi_auth
+#define	fr_doi		fr_ip.fi_doi
+#define	fr_doimask	fr_mip.fi_doi
 #define	fr_flx		fr_ip.fi_flx
 #define	fr_mflx		fr_mip.fi_flx
 #define	fr_ifa		fr_ifas[0]

@@ -1973,11 +1973,18 @@ ipf_checkripso(s)
 
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_checkcipso                                              */
-/* Returns:     void                                                        */
+/* Returns:     u_32_t  - 0 = failure, else the doi from the header         */
 /* Parameters:  fin(IO) - pointer to packet information                     */
 /*              s(I)    - pointer to start of CIPSO option                  */
 /*              ol(I)   - length of CIPSO option field                      */
 /*                                                                          */
+/* This function returns the domain of integrity (DOI) field from the CIPSO */
+/* header and returns that whilst also storing the highest sensitivity      */
+/* value found in the fr_info_t structure.                                  */
+/*                                                                          */
+/* No attempt is made to extract the category bitmaps as these are defined  */
+/* by the user (rather than the protocol) and can be rather numerous on the */
+/* end nodes.                                                               */
 /* ------------------------------------------------------------------------ */
 static u_32_t
 ipf_checkcipso(fin, s, ol)
