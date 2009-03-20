@@ -64,7 +64,7 @@ static	int		ipffd = -1;
 static	int		*yycont = NULL;
 static	ioctlfunc_t	ipfioctls[IPL_LOGSIZE];
 static	addfunc_t	ipfaddfunc = NULL;
-static	struct	wordtab ipfwords[105];
+static	struct	wordtab ipfwords[106];
 static	struct	wordtab	addrwords[4];
 static	struct	wordtab	maskwords[5];
 static	struct	wordtab icmpcodewords[17];
@@ -131,7 +131,7 @@ static	struct	wordtab logwords[33];
 %token	IPFY_DUPTO IPFY_TO IPFY_FROUTE IPFY_REPLY_TO IPFY_ROUTETO
 %token	IPFY_TOS IPFY_TTL IPFY_PROTO IPFY_INET IPFY_INET6
 %token	IPFY_HEAD IPFY_GROUP
-%token	IPFY_AUTH IPFY_PREAUTH IPFY_DIVERT
+%token	IPFY_AUTH IPFY_PREAUTH
 %token	IPFY_LOG IPFY_BODY IPFY_FIRST IPFY_LEVEL IPFY_ORBLOCK IPFY_L5AS
 %token	IPFY_LOGTAG IPFY_MATCHTAG IPFY_SETTAG IPFY_SKIP IPFY_DECAPS
 %token	IPFY_FROM IPFY_ALL IPFY_ANY IPFY_BPFV4 IPFY_BPFV6 IPFY_POOL IPFY_HASH
@@ -156,7 +156,7 @@ static	struct	wordtab logwords[33];
 %token	IPFY_IPOPT_IMITD IPFY_IPOPT_EIP IPFY_IPOPT_FINN IPFY_IPOPT_DPS
 %token	IPFY_IPOPT_SDB IPFY_IPOPT_NSAPA IPFY_IPOPT_RTRALRT IPFY_IPOPT_UMP
 %token	IPFY_SECCLASS IPFY_SEC_UNC IPFY_SEC_CONF IPFY_SEC_RSV1 IPFY_SEC_RSV2
-%token	IPFY_SEC_RSV4 IPFY_SEC_SEC IPFY_SEC_TS IPFY_SEC_RSV3
+%token	IPFY_SEC_RSV4 IPFY_SEC_SEC IPFY_SEC_TS IPFY_SEC_RSV3 IPFY_DOI
 
 %token	IPF6_V6HDRS IPFY_IPV6OPT IPFY_IPV6OPT_DSTOPTS IPFY_IPV6OPT_HOPOPTS
 %token	IPFY_IPV6OPT_IPV6 IPFY_IPV6OPT_NONE IPFY_IPV6OPT_ROUTING
@@ -1594,7 +1594,7 @@ opt:
 	| IPFY_IPOPT_SEC		{ $$ = getoptbyvalue(IPOPT_SECURITY); }
 	| IPFY_IPOPT_LSRR		{ $$ = getoptbyvalue(IPOPT_LSRR); }
 	| IPFY_IPOPT_ESEC		{ $$ = getoptbyvalue(IPOPT_E_SEC); }
-	| IPFY_IPOPT_CIPSO		{ $$ = getoptbyvalue(IPOPT_CIPSO); }
+	| IPFY_IPOPT_CIPSO doi		{ $$ = getoptbyvalue(IPOPT_CIPSO); }
 	| IPFY_IPOPT_SATID		{ $$ = getoptbyvalue(IPOPT_SATID); }
 	| IPFY_IPOPT_SSRR		{ $$ = getoptbyvalue(IPOPT_SSRR); }
 	| IPFY_IPOPT_ADDEXT		{ $$ = getoptbyvalue(IPOPT_ADDEXT); }
@@ -1622,7 +1622,15 @@ opt:
 	;
 
 setsecclass:
-	IPFY_SECCLASS	{ yysetdict(ipv4secwords); }
+	IPFY_SECCLASS			{ yysetdict(ipv4secwords); }
+	;
+
+doi:	IPFY_DOI YY_NUMBER		{ DOALL(fr->fr_doimask = 0xffffffff; \
+						if (!nowith) \
+							fr->fr_doi = $2;) }
+	| IPFY_DOI YY_HEX		{ DOALL(fr->fr_doimask = 0xffffffff; \
+						if (!nowith) \
+							fr->fr_doi = $2;) }
 	;
 
 ipv6hdr:
@@ -1748,7 +1756,7 @@ ipv4:	ipv4_24 '.' YY_NUMBER
 %%
 
 
-static	struct	wordtab ipfwords[105] = {
+static	struct	wordtab ipfwords[106] = {
 	{ "age",			IPFY_AGE },
 	{ "ah",				IPFY_AH },
 	{ "all",			IPFY_ALL },
@@ -1769,8 +1777,8 @@ static	struct	wordtab ipfwords[105] = {
 	{ "comment",			IPFY_COMMENT },
 	{ "count",			IPFY_COUNT },
 	{ "decapsulate",		IPFY_DECAPS },
-	{ "divert",			IPFY_DIVERT },
 	{ "dstlist",			IPFY_DSTLIST },
+	{ "doi",			IPFY_DOI },
 	{ "dup-to",			IPFY_DUPTO },
 	{ "eq",				YY_CMP_EQ },
 	{ "esp",			IPFY_ESP },
@@ -1841,6 +1849,7 @@ static	struct	wordtab ipfwords[105] = {
 	{ "rule-ttl",			IPFY_RULETTL },
 	{ "rpc",			IPFY_RPC },
 	{ "sec-class",			IPFY_SECCLASS },
+	{ "set",			IPFY_SET },
 	{ "set-tag",			IPFY_SETTAG },
 	{ "skip",			IPFY_SKIP },
 	{ "short",			IPFY_SHORT },
