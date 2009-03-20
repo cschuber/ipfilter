@@ -268,6 +268,9 @@ ipf_modunload()
 		error = ipfdetach(&ipfmain);
 		if (error != 0)
 			return error;
+
+		ipf_destroy_all(&ipfmain);
+		ipf_unload_all();
 	} else
 		error = 0;
 

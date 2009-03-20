@@ -213,12 +213,6 @@ ipfattach(softc)
 	int s;
 #endif
 
-	if (ipf_load_all() != 0)
-		return EIO;
-
-	if (ipf_create_all(softc) == NULL)
-		return EIO;
-
 	SPL_NET(s);
 	if (softc->ipf_running > 0) {
 		SPL_X(s);
@@ -290,8 +284,6 @@ ipfdetach(softc)
 
 	SPL_X(s);
 
-	ipf_destroy_all(softc);
-
 	return 0;
 }
 
@@ -330,21 +322,30 @@ ipfioctl(dev, cmd, data, mode
 	SPL_INT(s);
 
 #if (BSD >= 199306)
-	if ((securelevel >= 3) && (mode & FWRITE))
+	if ((securelevel >= 3) && (mode & FWRITE)) {
+		ipfmain.ipf_interror = 130001;
 		return EPERM;
+	}
 #endif
 
 	unit = GET_MINOR(dev);
-	if ((IPL_LOGMAX < unit) || (unit < 0))
+	if ((IPL_LOGMAX < unit) || (unit < 0)) {
+		ipfmain.ipf_interror = 130002;
 		return ENXIO;
+	}
 
 	if (ipfmain.ipf_running <= 0) {
-		if (unit != IPL_LOGIPF)
+		if (unit != IPL_LOGIPF) {
+			ipfmain.ipf_interror = 130003;
 			return EIO;
+		}
 		if (cmd != SIOCIPFGETNEXT && cmd != SIOCIPFGET &&
 		    cmd != SIOCIPFSET && cmd != SIOCFRENB &&
-		    cmd != SIOCGETFS && cmd != SIOCGETFF)
+		    cmd != SIOCGETFS && cmd != SIOCGETFF &&
+		    cmd != SIOCIPFINTERROR) {
+			ipfmain.ipf_interror = 130004;
 			return EIO;
+		}
 	}
 
 	SPL_NET(s);
@@ -1469,8 +1470,9 @@ int ipf_pfil_hook(void) {
 #    ifdef USE_INET6
 	    && ph_inet6 == NULL
 #    endif
-	   )
+	   ) {
 		return ENODEV;
+	}
 
 	if (ph_inet != NULL)
 		pfil_add_hook((void *)ipf_check_wrapper, NULL,
@@ -1500,13 +1502,13 @@ void
 ipf_event_reg(void)
 {
 #if (__FreeBSD_version >= 502103)
-	ipf_arrivetag =  EVENTHANDLER_REGISTER(ifnet_arrival_event, \
+	ipf_arrivetag = EVENTHANDLER_REGISTER(ifnet_arrival_event, \
 					       ipf_ifevent, &ipfmain, \
 					       EVENTHANDLER_PRI_ANY);
-	ipf_departtag =  EVENTHANDLER_REGISTER(ifnet_departure_event, \
+	ipf_departtag = EVENTHANDLER_REGISTER(ifnet_departure_event, \
 					       ipf_ifevent, &ipfmain, \
 					       EVENTHANDLER_PRI_ANY);
-	ipf_clonetag =  EVENTHANDLER_REGISTER(if_clone_event, ipf_ifevent, \
+	ipf_clonetag  = EVENTHANDLER_REGISTER(if_clone_event, ipf_ifevent, \
 					      NULL, EVENTHANDLER_PRI_ANY);
 #endif
 }

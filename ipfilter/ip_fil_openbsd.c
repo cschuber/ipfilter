@@ -183,7 +183,8 @@ ipfioctl(dev, cmd, data, mode , p)
 			return EIO;
 		if (cmd != SIOCIPFGETNEXT && cmd != SIOCIPFGET &&
 		    cmd != SIOCIPFSET && cmd != SIOCFRENB &&
-		    cmd != SIOCGETFS && cmd != SIOCGETFF)
+		    cmd != SIOCGETFS && cmd != SIOCGETFF &&
+		    cmd != SIOCIPFINTERROR)
 			return EIO;
 	}
 

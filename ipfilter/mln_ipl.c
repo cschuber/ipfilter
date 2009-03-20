@@ -92,10 +92,11 @@ extern struct cdevsw cdevsw[];
 extern int nchrdev;
 
 
+int
 #if NetBSD >= 199706
-int ipflkm_lkmentry(lkmtp, cmd, ver)
+ipflkm_lkmentry(lkmtp, cmd, ver)
 #else
-int xxxinit(lkmtp, cmd, ver)
+xxxinit(lkmtp, cmd, ver)
 #endif
 	struct lkm_table *lkmtp;
 	int cmd, ver;
@@ -104,7 +105,8 @@ int xxxinit(lkmtp, cmd, ver)
 }
 
 
-static int ipfaction(lkmtp, cmd)
+static int
+ipfaction(lkmtp, cmd)
 	struct lkm_table *lkmtp;
 	int cmd;
 {
@@ -165,7 +167,8 @@ static int ipfaction(lkmtp, cmd)
 }
 
 
-static int ipf_remove()
+static int
+ipf_remove()
 {
 	char *name;
 	struct nameidata nd;
@@ -221,7 +224,8 @@ static int ipf_remove()
 }
 
 
-static int ipf_unload()
+static int
+ipf_unload()
 {
 	int error = 0;
 
@@ -231,8 +235,13 @@ static int ipf_unload()
 	 */
 	if (ipfmain.ipf_refcnt)
 		error = EBUSY;
-	else if (ipfmain.ipf_running >= 0)
+	else if (ipfmain.ipf_running >= 0) {
 		error = ipfdetach(&ipfmain);
+		if (error == 0) {
+			ipf_destroy_all(&ipfmain);
+			ipf_unload_all();      
+		}
+	}
 
 	if (error == 0) {
 		ipfmain.ipf_running = -2;
@@ -243,7 +252,8 @@ static int ipf_unload()
 }
 
 
-static int ipf_load()
+static int
+ipf_load()
 {
 	struct nameidata nd;
 	struct vattr vattr;
@@ -258,7 +268,19 @@ static int ipf_load()
 	(void)ipf_remove();
 
 	bzero((char *)&ipfmain, sizeof(ipfmain));
+        error = ipf_load_all();
+	if (error != 0)
+		return error;
+	if (ipf_create_all(&ipfmain) == NULL) {
+		ipf_unload_all();
+		return EIO;
+	}
+
 	error = ipfattach(&ipfmain);
+	if (error != 0) {
+		(void) ipf_unload();
+		return error;
+	}
 
 	for (i = 0; (error == 0) && (name = ipf_devfiles[i]); i++) {
 #if (__NetBSD_Version__ > 399001400)

@@ -161,7 +161,7 @@ ipfdetach(softc)
  * Filter ioctl interface.
  */
 int
-ipwwwwtl(dev, cmd, data, mode)
+ipfioctl(dev, cmd, data, mode)
 	dev_t dev;
 	int cmd;
 	caddr_t data;
@@ -172,19 +172,26 @@ ipwwwwtl(dev, cmd, data, mode)
 	SPL_INT(s);
 
 	unit = minor(dev);
-	if ((IPL_LOGMAX < unit) || (unit < 0))
+	if ((IPL_LOGMAX < unit) || (unit < 0)) {
+		softc->ipf_interror = 130002;
 		return ENXIO;
+	}
 
 	if (ipfmain.ipf_running <= 0) {
-		if (unit != IPL_LOGIPF)
+		if (unit != IPL_LOGIPF) {
+			softc->ipf_interror = 130003;
 			return EIO;
+		}
 		if (cmd != (ioctlcmd_t)SIOCIPFGETNEXT &&
 		    cmd != (ioctlcmd_t)SIOCIPFGET &&
 		    cmd != (ioctlcmd_t)SIOCIPFSET &&
 		    cmd != (ioctlcmd_t)SIOCFRENB &&
 		    cmd != (ioctlcmd_t)SIOCGETFS &&
-		    cmd != (ioctlcmd_t)SIOCGETFF)
+		    cmd != (ioctlcmd_t)SIOCGETFF &&
+		    cmd != (ioctlcmd_t)SIOCIPFINTERROR) {
+			softc->ipf_interror = 130004;
 			return EIO;
+		}
 	}
 
 	SPL_NET(s);

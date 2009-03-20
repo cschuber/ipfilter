@@ -634,10 +634,10 @@ ipfilter_attach(void)
 		return EIO;
 	}
 
-        if ((status = ipf_init_all(&ipfmain)) < 0) {
+        if ((status = ipf_create_all(&ipfmain)) < 0) {
 		SPL_X(s);
 #ifdef IPFDEBUG
-		printf("ipf_init_all() == %d\n", status);
+		printf("ipf_create_all() == %d\n", status);
 #endif
 		return EIO;
 	}
@@ -822,6 +822,10 @@ ipfilter_detach(void)
 		}
 #endif
 		printf("%s unloaded\n", ipfilter_version);
+
+		ipf_destroy_all(&ipfmain);
+
+		ipf_unload_all();
 	} else {
 		RWLOCK_EXIT(&ipf_tru64);
 	}
@@ -879,7 +883,7 @@ int ipfilter_ifioctl(ifp, cmd, data)
 	unsigned int cmd;
 	caddr_t data;
 {
-	return(EOPNOTSUPP);
+	return (EOPNOTSUPP);
 }
 
 /* Stub output routine.  Should never be called, but just in case... */
@@ -894,7 +898,7 @@ int ipfilter_ifoutput(ifp, m0, dst, rt)
 	struct sockaddr *dst;
 	struct rtentry *rt;
 {
-	return(EOPNOTSUPP);
+	return (EOPNOTSUPP);
 }
 
 
@@ -960,7 +964,8 @@ ipfilter_preconfig_callback(int point, int order, ulong argument, ulong event_ar
 	/*
 	 * Add ourselves to the switch table.
 	 */
-	majnum = devsw_add(ipfilter_name, MAJOR_INSTANCE, NO_DEV, &ipfilter_devsw_entry);
+	majnum = devsw_add(ipfilter_name, MAJOR_INSTANCE,
+			   NO_DEV, &ipfilter_devsw_entry);
 	if (majnum == NO_DEV) {
 		printf("devsw_add_failed\n");
 		(void)cfgmgr_set_status(ipfilter_name);
@@ -996,7 +1001,8 @@ ipfilter_preconfig_callback(int point, int order, ulong argument, ulong event_ar
 int ipfilter_postconfig()
 {
 
-	majnum = devsw_add(ipfilter_name,MAJOR_INSTANCE, majnum, &ipfilter_devsw_entry);
+	majnum = devsw_add(ipfilter_name,MAJOR_INSTANCE, majnum,
+			   &ipfilter_devsw_entry);
 
 	if (majnum == ENODEV) {
 		printf("ipfilter_postconfig: call to devsw_add failed\n");
@@ -1014,7 +1020,8 @@ int ipfilter_postconfig()
 }
 
 void
-ipfilter_postconfig_callback(int point, int order, ulong argument, ulong event_arg)
+ipfilter_postconfig_callback(int point, int order, ulong argument,
+			     ulong event_arg)
 {
 	int status;
 

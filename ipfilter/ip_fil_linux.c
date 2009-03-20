@@ -127,7 +127,8 @@ ipf_ioctl(struct inode *in, struct file *fp, u_int cmd, u_long arg)
 			return -EIO;
 		if (cmd != SIOCIPFGETNEXT && cmd != SIOCIPFGET &&
 		    cmd != SIOCIPFSET && cmd != SIOCFRENB &&
-		    cmd != SIOCGETFS && cmd != SIOCGETFF)
+		    cmd != SIOCGETFS && cmd != SIOCGETFF &&
+		    cmd != SIOCIPFINTERROR)
 			return -EIO;
 	}
 
@@ -656,8 +657,10 @@ ipf_zerostats(caddr_t data)
 
 	ipf_getstat(&fio);
 	error = copyoutptr(&fio, data, sizeof(fio));
-	if (error)
+	if (error) {
+		softc->ipf_interror = 9999XXX;
 		return EFAULT;
+	}
 
 	bzero((char *)ipf_stats, sizeof(*ipf_stats) * 2);
 

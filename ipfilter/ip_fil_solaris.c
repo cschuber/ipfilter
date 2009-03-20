@@ -239,18 +239,25 @@ ipfioctl(dev, cmd, data, mode, cp, rp)
 		dev, cmd, data, mode, cp, rp);
 #endif
 	unit = getminor(dev);
-	if (IPL_LOGMAX < unit)
+	if (IPL_LOGMAX < unit) {
+		softc->ipf_interror = 130002;
 		return ENXIO;
+	}
 
 	softc = GET_SOFTC(crgetzoneid(cp));
 
 	if (softc->ipf_running <= 0) {
-		if (unit != IPL_LOGIPF)
+		if (unit != IPL_LOGIPF) {
+			softc->ipf_interror = 130003;
 			return EIO;
+		}
 		if (cmd != SIOCIPFGETNEXT && cmd != SIOCIPFGET &&
 		    cmd != SIOCIPFSET && cmd != SIOCFRENB &&
-		    cmd != SIOCGETFS && cmd != SIOCGETFF)
+		    cmd != SIOCGETFS && cmd != SIOCGETFF &&
+		    cmd != SIOCIPFINTERROR) {
+			softc->ipf_interror = 130004;
 			return EIO;
+		}
 	}
 
 	error = ipf_ioctlswitch(softc, unit, (caddr_t)data, cmd, mode,

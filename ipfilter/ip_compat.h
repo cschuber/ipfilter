@@ -790,6 +790,7 @@ typedef unsigned int    u_32_t;
 # endif
 # if defined(_KERNEL)
 #  include <sys/systm.h>
+#  include <sys/malloc.h>
 # else
 #  include <stddef.h>
 #  include <stdbool.h>
@@ -834,13 +835,11 @@ typedef	char *	caddr_t;
 # endif
 
 # ifdef _KERNEL
-#  if (__NetBSD_Version__ > 299001400)
-#   include <sys/selinfo.h>
-#  endif
 #  if (__NetBSD_Version__ >= 399001400)
+#   include <sys/selinfo.h>		/* Not in NetBSD 3.1 */
 #   define	PROC_T  struct lwp
-#   define	FREE(a,b)		free((a), _M_IPF)
-#   define	FREES(a,b)		free((a), _M_IPF)
+#   define	KFREE(a)		free((a), _M_IPF)
+#   define	KFREES(a, b)		free((a), _M_IPF)
 #   define	KMALLOC(a, b)		(a) = (b)malloc(sizeof (*(a)), \
 							_M_IPF, M_NOWAIT)
 #   define	KMALLOCS(a, b, c)	(a) = (b)malloc((c), _M_IPF, M_NOWAIT)

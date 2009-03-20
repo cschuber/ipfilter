@@ -300,11 +300,13 @@ ipfattach(softc)
 	if ((softc->ipf_running > 0) || (ipf_checkp == ipf_check)) {
 		printf("IP Filter: already initialized\n");
 		SPL_X(s);
+		ipfmain.ipf_interror = 130017;
 		return EBUSY;
 	}
 
 	if (ipf_init_all(softc) < 0) {
 		SPL_X(s);
+		ipfmain.ipf_interror = 130015;
 		return EIO;
 	}
 
@@ -328,7 +330,7 @@ ipfattach(softc)
 #   endif
 	   ) {
 		SPL_X(s);
-		printf("pfil_head_get failed\n");
+		ipfmain.ipf_interror = 130016;
 		return ENODEV;
 	}
 
@@ -341,8 +343,10 @@ ipfattach(softc)
 	error = pfil_add_hook((void *)ipf_check, PFIL_IN|PFIL_OUT,
 			      &inetsw[ip_protox[IPPROTO_IP]].pr_pfh);
 #  endif
-	if (error)
+	if (error) {
+		ipfmain.ipf_interror = 130013;
 		goto pfil_error;
+	}
 # else
 	pfil_add_hook((void *)ipf_check, PFIL_IN|PFIL_OUT);
 # endif
@@ -357,6 +361,7 @@ ipfattach(softc)
 	if (error) {
 		pfil_remove_hook((void *)ipf_check_wrapper6, NULL,
 				 PFIL_IN|PFIL_OUT, ph_inet6);
+		ipfmain.ipf_interror = 130014;
 		goto pfil_error;
 	}
 #  else
@@ -365,6 +370,7 @@ ipfattach(softc)
 	if (error) {
 		pfil_remove_hook((void *)ipf_check, PFIL_IN|PFIL_OUT,
 				 &inetsw[ip_protox[IPPROTO_IP]].pr_pfh);
+		ipfmain.ipf_interror = 130014;
 		goto pfil_error;
 	}
 #  endif
@@ -410,8 +416,6 @@ ipfattach(softc)
 pfil_error:
 	SPL_X(s);
 	ipf_fini_all(softc);
-	ipf_destroy_all(softc);
-	ipf_unload_all();
 	return error;
 #endif
 }
@@ -478,6 +482,7 @@ ipfdetach(softc)
 #  endif
 	if (error) {
 		SPL_X(s);
+		softc->ipf_interror = 130011;
 		return error;
 	}
 # else
@@ -496,6 +501,7 @@ ipfdetach(softc)
 #  endif
 	if (error) {
 		SPL_X(s);
+		softc->ipf_interror = 130012;
 		return error;
 	}
 # endif
@@ -508,10 +514,6 @@ ipfdetach(softc)
 #endif
 
 	ipf_fini_all(softc);
-
-	ipf_destroy_all(softc);
-
-	ipf_unload_all();
 
 	return 0;
 }
@@ -555,25 +557,34 @@ ipfioctl(dev, cmd, data, mode
 	    kauth_authorize_network(p->l_cred, KAUTH_NETWORK_FIREWALL,
 				    KAUTH_REQ_NETWORK_FIREWALL_FW, NULL,
 				    NULL, NULL)) {
+		ipfmain.ipf_interror = 130005;
 		return EPERM;
 	}
 #else
 	if ((securelevel >= 2) && (mode & FWRITE)) {
+		ipfmain.ipf_interror = 130001;
 		return EPERM;
 	}
 #endif
 
   	unit = GET_MINOR(dev);
-  	if ((IPL_LOGMAX < unit) || (unit < 0))
+  	if ((IPL_LOGMAX < unit) || (unit < 0)) {
+		ipfmain.ipf_interror = 130002;
 		return ENXIO;
+	}
 
 	if (ipfmain.ipf_running <= 0) {
-		if (unit != IPL_LOGIPF)
+		if (unit != IPL_LOGIPF) {
+			ipfmain.ipf_interror = 130003;
 			return EIO;
+		}
 		if (cmd != SIOCIPFGETNEXT && cmd != SIOCIPFGET &&
 		    cmd != SIOCIPFSET && cmd != SIOCFRENB &&
-		    cmd != SIOCGETFS && cmd != SIOCGETFF)
+		    cmd != SIOCGETFS && cmd != SIOCGETFF &&
+		    cmd != SIOCIPFINTERROR) {
+			ipfmain.ipf_interror = 130004;
 			return EIO;
+		}
 	}
 
 	SPL_NET(s);
@@ -1539,7 +1550,9 @@ u_short
 ipf_nextipid(fin)
 	fr_info_t *fin;
 {
+#ifdef USE_MUTEXES
 	ipf_main_softc_t *softc = fin->fin_main_soft;
+#endif
 	static u_short ipid = 0;
 	u_short id;
 
@@ -1928,8 +1941,10 @@ static int ipfread(dev, uio, ioflag)
 	register struct uio *uio;
 {
 
-	if (ipfmain.ipf_running < 1)
+	if (ipfmain.ipf_running < 1) {
+		ipfmain.ipf_interror = 130006;
 		return EIO;
+	}
 
 	if (GET_MINOR(dev) == IPL_LOGSYNC)
 		return ipf_sync_read(&ipfmain, uio);
@@ -1937,6 +1952,7 @@ static int ipfread(dev, uio, ioflag)
 #ifdef IPFILTER_LOG
 	return ipf_log_read(&ipfmain, GET_MINOR(dev), uio);
 #else
+	ipfmain.ipf_interror = 130007;
 	return ENXIO;
 #endif
 }
@@ -1954,11 +1970,14 @@ static int ipfwrite(dev, uio, ioflag)
 	register struct uio *uio;
 {
 
-	if (ipfmain.ipf_running < 1)
+	if (ipfmain.ipf_running < 1) {
+		ipfmain.ipf_interror = 130008;
 		return EIO;
+	}
 
 	if (GET_MINOR(dev) == IPL_LOGSYNC)
 		return ipf_sync_write(&ipfmain, uio);
+	ipfmain.ipf_interror = 130009;
 	return ENXIO;
 }
 
@@ -1971,8 +1990,10 @@ static int ipfpoll(dev, events, p)
 	u_int unit = GET_MINOR(dev);
 	int revents = 0;
 
-	if (IPL_LOGMAX < unit)
+	if (IPL_LOGMAX < unit) {
+		ipfmain.ipf_interror = 130010;
 		return ENXIO;
+	}
 
 	switch (unit)
 	{

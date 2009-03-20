@@ -12,9 +12,13 @@ void ipferror(fd, msg)
 
 	err = 0;
 
-	if (fd >= 0)
+	if (fd >= 0) {
 		(void) ioctl(fd, SIOCIPFINTERROR, &err);
 
-	fprintf(stderr, "%d:", err);
-	perror(msg);
+		fprintf(stderr, "%d:", err);
+		ipf_perror(err, msg);
+	} else {
+		fprintf(stderr, "0:");
+		perror(msg);
+	}
 }

@@ -150,7 +150,9 @@ struct ipf_radix_node_head {
 #if defined(linux) && defined(_KERNEL)
 # define Bcopy(a, b, n)	memmove(((caddr_t)(b)), ((caddr_t)(a)), (unsigned)(n))
 #else
-# define Bcopy(a, b, n)	bcopy(((caddr_t)(a)), ((caddr_t)(b)), (unsigned)(n))
+# if !defined(Bcopy)
+#  define Bcopy(a, b, n) bcopy(((caddr_t)(a)), ((caddr_t)(b)), (unsigned)(n))
+# endif
 #endif
 
 void	 *ipf_rn_create __P((void));

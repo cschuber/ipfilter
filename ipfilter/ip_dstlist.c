@@ -1196,7 +1196,9 @@ ipf_dstlist_select_node(fin, group, addr)
 	void *group;
 	u_32_t *addr;
 {
+#ifdef USE_MUTEXES
 	ipf_main_softc_t *softc = fin->fin_main_soft;
+#endif
 	ippool_dst_t *d = group;
 	ipf_dstnode_t *node;
 

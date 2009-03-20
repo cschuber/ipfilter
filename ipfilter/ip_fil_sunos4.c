@@ -149,16 +149,23 @@ ipfioctl(dev, cmd, data, mode)
 	SPL_INT(s);
 
 	unit = GET_MINOR(dev);
-	if ((IPL_LOGMAX < unit) || (unit < 0))
+	if ((IPL_LOGMAX < unit) || (unit < 0)) {
+		ipfmain.ipf_interror = 130002;
 		return ENXIO;
+	}
 
 	if (ipf_running <= 0) {
-		if (unit != IPL_LOGIPF)
+		if (unit != IPL_LOGIPF) {
+			ipfmain.ipf_interror = 130003;
 			return EIO;
+		}
 		if (cmd != SIOCIPFGETNEXT && cmd != SIOCIPFGET &&
 		    cmd != SIOCIPFSET && cmd != SIOCFRENB &&
-		    cmd != SIOCGETFS && cmd != SIOCGETFF)
+		    cmd != SIOCGETFS && cmd != SIOCGETFF &&
+		    cmd != SIOCIPFINTERROR) {
+			ipfmain.ipf_interror = 130004;
 			return EIO;
+		}
 	}
 
 	SPL_NET(s);

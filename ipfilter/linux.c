@@ -263,9 +263,9 @@ static int ipfilter_init(void)
 	}
 #endif
 
-	RWLOCK_INIT(&ipf_global, "ipf global rwlock");
-	RWLOCK_INIT(&ipf_mutex, "ipf global mutex rwlock");
-	RWLOCK_INIT(&ipf_frcache, "ipf cache mutex rwlock");
+	ipf_load_all();
+
+	ipf_create_all(&ipfmain);
 
 	i = ipfattach();
 
@@ -308,9 +308,8 @@ static int ipfilter_init(void)
 #endif /* CONFIG_PROC_FS */
 
 	if (i != 0) {
-		RW_DESTROY(&ipf_global);
-		RW_DESTROY(&ipf_mutex);
-		RW_DESTROY(&ipf_frcache);
+		ipf_destroy_all(&ipfmain);
+		ipf_unload_all();
 	}
 
 	return i;
@@ -334,12 +333,11 @@ static int ipfilter_fini(void)
 			if (result > 0)
 				result = -result;
 			return result;
+		} else {
+			ipf_destroy_all(&ipfmain);
+			ipf_unload_all();
 		}
 	}
-
-	RW_DESTROY(&ipf_global);
-	RW_DESTROY(&ipf_mutex);
-	RW_DESTROY(&ipf_frcache);
 
 	ipf_running = -2;
 #ifdef CONFIG_PROC_FS

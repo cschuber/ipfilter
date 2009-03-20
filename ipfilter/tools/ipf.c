@@ -462,7 +462,7 @@ static void swapactive()
 	int in = 2;
 
 	if (opendevice(ipfname, 1) != -2 && ioctl(fd, SIOCSWAPA, &in) == -1)
-		perror("ioctl(SIOCSWAPA)");
+		ipferror(fd, "ioctl(SIOCSWAPA)");
 	else
 		printf("Set %d now inactive\n", in);
 }
@@ -473,7 +473,7 @@ void ipf_frsync()
 	int frsyn = 0;
 
 	if (opendevice(ipfname, 1) != -2 && ioctl(fd, SIOCFRSYN, &frsyn) == -1)
-		perror("SIOCFRSYN");
+		ipferror(fd, "SIOCFRSYN");
 	else
 		printf("filter sync'd\n");
 }

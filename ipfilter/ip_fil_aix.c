@@ -145,8 +145,11 @@ ipfconfig(devno, cmd, uiop)
 	{
 	case CFG_INIT :
 		error = devswadd(devno, &ipfdevsw);
-		if (error == 0)
-			error = ipfattach();
+		if (error == 0) {
+			ipf_load_all();
+			ipf_create_all(&ipfmain);
+			error = ipfattach(&ipfmain);
+		}
 		break;
 	case CFG_TERM :
 		error = devswdel(devno);
@@ -163,7 +166,8 @@ ipfconfig(devno, cmd, uiop)
 
 
 int
-ipfattach()
+ipfattach(softc)
+	ipf_main_softc_t *softc;
 {
 	int s;
 
@@ -174,24 +178,13 @@ ipfattach()
 		return EBUSY;
 	}
 
-	MUTEX_INIT(&ipf_rw, "ipf rw mutex");
-	MUTEX_INIT(&ipf_timeoutlock, "ipf timeout lock mutex");
-	RWLOCK_INIT(&ipf_ipidfrag, "ipf IP NAT-Frag rwlock");
-	RWLOCK_INIT(&ipf_tokens, "ipf token rwlock");
-	RWLOCK_INIT(&ipf_frcachelk, "ipf cache rwlock");
-	ipf_locks_done = 1;
-
-	if (fr_initialise() < 0) {
-		SPL_X(s);
-		return EIO;
-	}
-
-	bzero((char *)ipf_cache, sizeof(ipf_cache));
 	inbound_fw = ipf_check_inbound;
 	outbound_fw = ipf_check_outbound;
 
 	if (fr_control_forwarding & 1)
 		ipforwarding = 1;
+
+	ipf_init_all(softc);
 
 	SPL_X(s);
 
@@ -204,7 +197,8 @@ ipfattach()
  * stream.
  */
 int
-ipfdetach()
+ipfdetach(softc)
+	ipf_main_softc_t *softc;
 {
 	int s;
 
@@ -218,7 +212,7 @@ ipfdetach()
 	if (fr_control_forwarding & 2)
 		ipforwarding = 0;
 
-	fr_deinitialise();
+	ipf_fini_all(softc);
 
 	SPL_X(s);
 	return 0;
@@ -398,16 +392,23 @@ ipfioctl(dev, cmd, data, mode)
 	SPL_INT(s);
 
 	unit = GET_MINOR(dev);
-	if ((IPL_LOGMAX < unit) || (unit < 0))
+	if ((IPL_LOGMAX < unit) || (unit < 0)) {
+		ipfmain.ipf_interror = 130002;
 		return ENXIO;
+	}
 
 	if (ipf_running <= 0) {
-		if (unit != IPL_LOGIPF)
+		if (unit != IPL_LOGIPF) {
+			ipfmain.ipf_interror = 130003;
 			return EIO;
+		}
 		if (cmd != SIOCIPFGETNEXT && cmd != SIOCIPFGET &&
 		    cmd != SIOCIPFSET && cmd != SIOCFRENB &&
-		    cmd != SIOCGETFS && cmd != SIOCGETFF)
+		    cmd != SIOCGETFS && cmd != SIOCGETFF &&
+		    cmd != SIOCIPFINTERROR) {
+			ipfmain.ipf_interror = 130004;
 			return EIO;
+		}
 	}
 
 	SPL_NET(s);
@@ -479,12 +480,18 @@ int
 ipfread(dev_t dev, struct uio *uio, chan_t chan, int ext)
 {
 
+	if (ipf_running < 1) {
+		ipfmain.ipf_interror = 130006; 
+		return EIO;  
+	}
+
 	if (GET_MINOR(dev) == IPL_LOGSYNC)
 		return ipfsync_read(uio);
 
 #ifdef IPFILTER_LOG
 	return ipflog_read(GET_MINOR(dev), uio);
 #else
+	ipfmain.ipf_interror = 130007;
 	return ENXIO;
 #endif
 }
@@ -502,6 +509,7 @@ ipfwrite(dev_t dev, struct uio *uio, chan_t chan, int ext)
 
 	if (GET_MINOR(dev) == IPL_LOGSYNC)
 		return ipfsync_write(uio);
+	ipfmain.ipf_interror = 130009;
 	return ENXIO;
 }
 

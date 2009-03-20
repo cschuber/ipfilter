@@ -99,7 +99,6 @@ ipf_attach()
 		return error;
 	}
 
-	bzero((char *)ipf_cache, sizeof(ipf_cache));
 	if (ipf_checkp != ipf_check) {
 		ipf_savep = ipf_checkp;
 		ipf_checkp = ipf_check;
@@ -174,16 +173,23 @@ ipfioctl(dev, cmd, data, mode, cp, rp)
 	SPL_INT(s);
 
 	unit = GET_MINOR(dev);
-	if ((IPL_LOGMAX < unit) || (unit < 0))
+	if ((IPL_LOGMAX < unit) || (unit < 0)) {
+		ipfmain.ipf_interror = 130002;
 		return ENXIO;
+	}
 
 	if (ipf_running <= 0) {
-		if (unit != IPL_LOGIPF)
+		if (unit != IPL_LOGIPF) {
+			ipfmain.ipf_interror = 130003;
 			return EIO;
+		}
 		if (cmd != SIOCIPFGETNEXT && cmd != SIOCIPFGET &&
 		    cmd != SIOCIPFSET && cmd != SIOCFRENB &&
-		    cmd != SIOCGETFS && cmd != SIOCGETFF)
+		    cmd != SIOCGETFS && cmd != SIOCGETFF &&
+		    cmd != SIOCIPFINTERROR) {
+			ipfmain.ipf_interror = 130004;
 			return EIO;
+		}
 	}
 
 	SPL_NET(s);
@@ -264,12 +270,15 @@ ipfread(dev, uio, crp)
 	register struct uio *uio;
 	cred_t *crp;
 {
-	if (ipf_running < 1)
+	if (ipf_running < 1) {
+		ipfmain.ipf_interror = 130006;
 		return EIO;
+	}
 
 #ifdef IPFILTER_LOG
 	return ipflog_read(GET_MINOR(dev), uio);
 #else
+	ipfmain.ipf_interror = 130007;
 	return ENXIO;
 #endif
 }

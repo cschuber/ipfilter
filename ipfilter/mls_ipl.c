@@ -173,7 +173,8 @@ xxxinit(fc, vdp, data, vds)
 }
 
 
-static	int	unload()
+static int
+unload()
 {
 	int err = 0, i;
 	char *name;
@@ -193,7 +194,8 @@ static	int	unload()
 }
 
 
-static	int	ipf_attach()
+static int
+ipf_attach()
 {
 	struct vnode *vp;
 	struct vattr vattr;
@@ -252,7 +254,8 @@ static	int	ipf_attach()
 /*
  * routines below for saving IP headers to buffer
  */
-static int ipfopen(dev, flags)
+static int
+ipfopen(dev, flags)
 	dev_t dev;
 	int flags;
 {
@@ -284,7 +287,8 @@ static int ipfopen(dev, flags)
 }
 
 
-static int ipfclose(dev, flags)
+static int
+ipfclose(dev, flags)
 	dev_t dev;
 	int flags;
 {
@@ -304,17 +308,21 @@ static int ipfclose(dev, flags)
  * called during packet processing and cause an inconsistancy to appear in
  * the filter lists.
  */
-static int ipfread(dev, uio)
+static int
+ipfread(dev, uio)
 	dev_t dev;
 	register struct uio *uio;
 {
 
-	if (ipf_running < 1)
+	if (ipf_running < 1) {
+		ipfmain.ipf_interror = 130006;
 		return EIO;
+	}
 
 #ifdef IPFILTER_LOG
 	return ipflog_read(GET_MINOR(dev), uio);
 #else
+	ipfmain.ipf_interror = 130007;
 	return ENXIO;
 #endif
 }
@@ -323,15 +331,19 @@ static int ipfread(dev, uio)
 /*
  * ipfwrite
  */
-static int ipfwrite(dev, uio)
+static int
+ipfwrite(dev, uio)
 	dev_t dev;
 	register struct uio *uio;
 {
 
-	if (ipf_running < 1)
+	if (ipf_running < 1) {
+		ipfmain.ipf_interror = 130008;
 		return EIO;
+	}
 
 	if (getminor(dev) == IPL_LOGSYNC)
 		return ipfsync_write(uio);
+	ipfmain.ipf_interror = 130009;
 	return ENXIO;
 }
