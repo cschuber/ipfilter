@@ -252,8 +252,13 @@ if_ipl.o: $(MODOBJS)
 	${RM} -f if_ipl
 
 ipfrule.ko.5: ip_rulesx.o $(MLR)
+.if ${MACHINE_ARCH} != amd64
 	ld -warn-common -r -d -o $(.TARGET:S/.ko/.kld/) ip_rulesx.o $(MLR)
 	ld -Bshareable -d -warn-common -o $(LKMR:S/.5$//) $(.TARGET:S/.ko/.kld/)
+.else
+	ld -warn-common -r -d -o $(.TARGET:S/.5$//) ip_rulesx.o $(MLR)
+.endif
+
 ipfrule.ko: ip_rulesx.o $(MLR)
 	gensetdefs ip_rulesx.o $(MLR)
 	$(CC) $(KCARGS) -c setdef0.c

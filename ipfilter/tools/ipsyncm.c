@@ -127,7 +127,7 @@ char *argv[];
 			n1 = read(lfd, buff+inbuf, BUFFERLEN-inbuf);
 
 			printf("header : %d bytes read (header = %d bytes)\n",
-			       n1, sizeof(*sh));
+			       n1, (int) sizeof(*sh));
 
 			if (n1 < 0) {
 				syslog(LOG_ERR, "Read error (header): %m");
