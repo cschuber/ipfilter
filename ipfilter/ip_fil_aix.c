@@ -1196,8 +1196,8 @@ frdest_t *fdp;
 
 		error = ip6_getpmtu(ro, ro, ifp, &finaldst, &mtu, &frag);
 		if ((error == 0) && (m0->m_pkthdr.len <= mtu)) {
+			error = nd6_output(ifp, ifp, *mpp, dst6, rt);
 			*mpp = NULL;
-			error = nd6_output(ifp, ifp, m0, dst6, rt);
 		} else {
 			error = EMSGSIZE;
 		}

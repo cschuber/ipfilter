@@ -708,33 +708,35 @@ frdest_t *fdp;
 
 #if 0 /* ifdef	USE_INET6 */
 	if (fin->fin_v == 6) {
-                dst6->sin6_family = AF_INET6;
+		dst6->sin6_family = AF_INET6;
 
-                fr = fin->fin_fr;
-                if (fdp != NULL)
-                        ifp = fdp->fd_ifp;
-                else {
-                        ifp = fin->fin_ifp;
-                        dst->sin6_addr = fin->fin_daddr6;
-                }
+		fr = fin->fin_fr;
+		if (fdp != NULL)
+			ifp = fdp->fd_ifp;
+		else {
+			ifp = fin->fin_ifp;
+			dst->sin6_addr = fin->fin_daddr6;
+		}
 
-                ip6tx.tx_mbuf = m0;
-                ip6tx.tx_ip6 = (ip6_t *)ip;
-                ip6tx.tx_ro = ro;
-                ip6tx.tx_if6 = NULL;
-                ip6tx.tx_nexthop = dst6;
-                ip6tx.tx_imo6 = NULL;
-                ip6tx.tx_pmtudisc = 0;
-                ip6tx.tx_dontroute = 0;
-                ip6tx.tx_rawoutput = 0;
-                ip6tx.tx_mtu = ifp->if_mtu;
-                ip6tx.tx_opt = NULL;
+		ip6tx.tx_mbuf = *mpp;
+		ip6tx.tx_ip6 = (ip6_t *)ip;
+		ip6tx.tx_ro = ro;
+		ip6tx.tx_if6 = NULL;
+		ip6tx.tx_nexthop = dst6;
+		ip6tx.tx_imo6 = NULL;
+		ip6tx.tx_pmtudisc = 0;
+		ip6tx.tx_dontroute = 0;
+		ip6tx.tx_rawoutput = 0;
+		ip6tx.tx_mtu = ifp->if_mtu;
+		ip6tx.tx_opt = NULL;
 
-                /*
-                 * currently "to <if>" and "to <if>:ip#" are not supported
-                 * for IPv6
-                 */
-                return ip6_output(&ip6tx);
+		*mpp = NULL;
+
+		/*
+		 * currently "to <if>" and "to <if>:ip#" are not supported
+		 * for IPv6
+		 */
+		return ip6_output(&ip6tx);
 	}
 # endif
 	/*
@@ -1082,7 +1084,7 @@ fr_info_t *fin;
 /* ------------------------------------------------------------------------ */
 void fr_slowtimer __P((void *ptr))
 {
-        READ_ENTER(&ipf_global);
+	READ_ENTER(&ipf_global);
 
 	if (fr_running == 1) {
 		fr_fragexpire();

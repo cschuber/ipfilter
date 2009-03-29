@@ -1567,12 +1567,12 @@ frdest_t *fdp;
 #  endif
 # endif
 		if ((error == 0) && (m0->m_pkthdr.len <= mtu)) {
-			*mpp = NULL;
 # if __NetBSD_Version__ >= 499001100
 			error = nd6_output(ifp, ifp, *mpp, satocsin6(dst), rt);
 # else
 			error = nd6_output(ifp, ifp, *mpp, dst6, rt);
 # endif
+			*mpp = NULL;
 		} else {
 			error = EMSGSIZE;
 		}
