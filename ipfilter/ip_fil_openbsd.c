@@ -862,9 +862,9 @@ ipf_fastroute6(m0, mpp, fin, fdp)
 			mtu = nd_ifinfo[ifp->if_index].linkmtu;
 #endif
 			if (m0->m_pkthdr.len <= mtu) {
-				*mpp = NULL;
-				error = nd6_output(ifp, fin->fin_ifp, m0,
+				error = nd6_output(ifp, fin->fin_ifp, *mpp,
 						   dst6, ro->ro_rt);
+				*mpp = NULL;
 			} else {
 				error = EMSGSIZE;
 			}

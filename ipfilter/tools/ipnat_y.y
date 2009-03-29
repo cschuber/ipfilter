@@ -82,7 +82,7 @@ static	int	addname __P((ipnat_t **, char *));
 	u_32_t	num;
 	struct {
 		i6addr_t	a;
-		int		v;
+		int		f;
 	} ipa;
 	frentry_t	fr;
 	frtuc_t	*frt;
@@ -184,7 +184,7 @@ eol:	| ';'
 
 map:	mapit ifnames addr tlate rhsaddr proxy mapoptions
 				{ nat->in_v[0] = $3.v;
-				  if ($3.v != 0 && $3.v != $5.v && $5.v != 0)
+				  if ($3.f != 0 && $3.f != $5.f && $5.f != 0)
 					yyerror("3.address family mismatch");
 				  if (nat->in_v[0] == 0 && $5.v != 0)
 					nat->in_v[0] = $5.v;
@@ -205,7 +205,7 @@ map:	mapit ifnames addr tlate rhsaddr proxy mapoptions
 				  setmapifnames();
 				}
 	| mapit ifnames addr tlate rhsaddr mapport mapoptions
-				{ if ($3.v != $5.v && $3.v != 0 && $5.v != 0)
+				{ if ($3.f != $5.f && $3.f != 0 && $5.f != 0)
 					yyerror("4.address family mismatch");
 				  if (nat->in_v[1] == 0 && $5.v != 0)
 					nat->in_v[1] = $5.v;
@@ -237,8 +237,8 @@ map:	mapit ifnames addr tlate rhsaddr proxy mapoptions
 				  setmapifnames();
 				}
 	| mapit ifnames mapfrom tlate rhsaddr proxy mapoptions
-				{ nat->in_v[0] = $3;
-				  if ($3 != 0 && $5.v != 0 && $3 != $5.v)
+				{ nat->in_v[0] = ftov($3);
+				  if ($3 != 0 && $5.f != 0 && $3 != $5.f)
 					yyerror("5.address family mismatch");
 				  if (nat->in_v[0] == 0 && $5.v != 0)
 					nat->in_v[0] = $5.v;
@@ -254,12 +254,12 @@ map:	mapit ifnames addr tlate rhsaddr proxy mapoptions
 				  setmapifnames();
 				}
 	| no mapit ifnames mapfrom setproto ';'
-				{ nat->in_v[0] = $4;
+				{ nat->in_v[0] = ftov($4);
 				  setmapifnames();
 				}
 	| mapit ifnames mapfrom tlate rhsaddr mapport mapoptions
-				{ nat->in_v[0] = $3;
-				  if ($3 != 0 && $5.v != 0 && $3 != $5.v)
+				{ nat->in_v[0] = ftov($3);
+				  if ($3 != 0 && $5.f != 0 && $3 != $5.f)
 					yyerror("6.address family mismatch");
 				  if (nat->in_v[0] == 0 && $5.v != 0)
 					nat->in_v[0] = $5.v;
@@ -279,7 +279,7 @@ map:	mapit ifnames addr tlate rhsaddr proxy mapoptions
 mapblock:
 	mapblockit ifnames addr tlate addr ports mapoptions
 				{ nat->in_v[0] = $3.v;
-				  if ($3.v != 0 && $5.v != 0 && $3.v != $5.v)
+				  if ($3.f != 0 && $5.f != 0 && $3.f != $5.f)
 					yyerror("7.address family mismatch");
 				  if (nat->in_v[0] == 0 && $5.v != 0)
 					nat->in_v[0] = $5.v;
@@ -312,12 +312,12 @@ mapblock:
 	;
 
 redir:	rdrit ifnames addr dport tlate dip nport setproto rdroptions
-				{ if ($6 != 0 && $3.v != 0 && $6 != $3.v)
+				{ if ($6 != 0 && $3.f != 0 && $6 != $3.f)
 					yyerror("21.address family mismatch");
-				  if ($3.v != 0)
-					nat->in_v[0] = $3.v;
+				  if ($3.v != AF_UNSPEC)
+					nat->in_v[0] = ftov($3.f);
 				  else
-					nat->in_v[0] = $6;
+					nat->in_v[0] = ftov($6);
 				  nat->in_odstatype = $3.t;
 				  bcopy(&$3.a, &nat->in_odst.na_addr[0],
 					sizeof($3.a));
@@ -327,7 +327,7 @@ redir:	rdrit ifnames addr dport tlate dip nport setproto rdroptions
 				  setrdrifnames();
 				}
 	| no rdrit ifnames addr dport setproto ';'
-				{ nat->in_v[0] = $4.v;
+				{ nat->in_v[0] = ftov($4.f);
 				  nat->in_odstatype = $4.t;
 				  bcopy(&$4.a, &nat->in_odst.na_addr[0],
 					sizeof($4.a));
@@ -339,14 +339,14 @@ redir:	rdrit ifnames addr dport tlate dip nport setproto rdroptions
 	| rdrit ifnames rdrfrom tlate dip nport setproto rdroptions
 				{ if ($5 != 0 && $3 != 0 && $5 != $3)
 					yyerror("20.address family mismatch");
-				  if ($3 != 0)
-					nat->in_v[0] = $3;
+				  if ($3 != AF_UNSPEC)
+					nat->in_v[0] = ftov($3);
 				  else
-					nat->in_v[0] = $5;
+					nat->in_v[0] = ftov($5);
 				  setrdrifnames();
 				}
 	| no rdrit ifnames rdrfrom setproto ';'
-				{ nat->in_v[0] = $4;
+				{ nat->in_v[0] = ftov($4);
 
 				  setrdrifnames();
 				}
@@ -598,18 +598,16 @@ setproto:
 	;
 
 rhsaddr:
-	addr				{ $$.t = $1.t;
-					  $$.a = $1.a;
-					  $$.m = $1.m;
-					  $$.v = $1.v;
+	addr				{ $$ = $1;
 					  yyexpectaddr = 0;
 					}
 	| hostname '-' hostname
 					{ $$.t = FRI_RANGE;
-					  if ($1.v != $3.v)
+					  if ($1.f != $3.f)
 						yyerror("8.address family "
 							"mismatch");
-					  $$.v = $1.v;
+					  $$.f = $1.f;
+					  $$.v = ftov($1.f);
 					  $$.a = $1.a;
 					  $$.m = $3.a;
 					  nat->in_flags |= IPN_SIPRANGE;
@@ -617,10 +615,11 @@ rhsaddr:
 					}
 	| IPNY_RANGE hostname '-' hostname
 					{ $$.t = FRI_RANGE;
-					  if ($2.v != $4.v)
+					  if ($2.f != $4.f)
 						yyerror("9.address family "
 							"mismatch");
-					  $$.v = $2.v;
+					  $$.f = $2.f;
+					  $$.v = ftov($2.f);
 					  $$.a = $2.a;
 					  $$.m = $4.a;
 					  nat->in_flags |= IPN_SIPRANGE;
@@ -631,10 +630,10 @@ rhsaddr:
 dip:
 	hostname ',' { yyexpectaddr = 1; } hostname
 					{ nat->in_flags |= IPN_SPLIT;
-					  if ($1.v != $4.v)
+					  if ($1.f != $4.f)
 						yyerror("10.address family "
 							"mismatch");
-					  $$ = $1.v;
+					  $$ = $1.f;
 					  nat->in_ndstip6 = $1.a;
 					  nat->in_ndstmsk6 = $4.a;
 					  nat->in_ndstatype = FRI_SPLIT;
@@ -645,18 +644,18 @@ dip:
 				  nat->in_ndstmsk6 = $1.m;
 				  nat->in_ndst.na_atype = $1.t;
 				  yyexpectaddr = 0;
-				  if ($1.v == 4)
+				  if ($1.f == AF_INET)
 					bits = count4bits($1.m.in4.s_addr);
 				  else
 					bits = count6bits($1.m.i6);
-				  if (($1.v == 4) && (bits != 0) &&
+				  if (($1.f == AF_INET) && (bits != 0) &&
 				      (bits != 32)) {
 					yyerror("dest ip bitmask not /32");
-				  } else if (($1.v == 6) && (bits != 0) &&
-					     (bits != 128)) {
+				  } else if (($1.f == AF_INET6) &&
+					     (bits != 0) && (bits != 128)) {
 					yyerror("dest ip bitmask not /128");
 				  }
-				  $$ = $1.v;
+				  $$ = $1.f;
 				}
 	;
 
@@ -666,8 +665,8 @@ rhdaddr:
 					}
 	| hostname '-' hostname		{ bzero(&$$, sizeof($$));
 					  $$.t = FRI_RANGE;
-					  if ($1.v != 0 && $3.v != 0 &&
-					      $1.v != $3.v)
+					  if ($1.f != 0 && $3.f != 0 &&
+					      $1.f != $3.f)
 						yyerror("11.address family "
 							"mismatch");
 					  $$.a = $1.a;
@@ -678,8 +677,8 @@ rhdaddr:
 	| IPNY_RANGE hostname '-' hostname
 					{ bzero(&$$, sizeof($$));
 					  $$.t = FRI_RANGE;
-					  if ($2.v != 0 && $4.v != 0 &&
-					      $2.v != $4.v)
+					  if ($2.f != 0 && $4.f != 0 &&
+					      $2.f != $4.f)
 						yyerror("12.address family "
 							"mismatch");
 					  $$.a = $2.a;
@@ -879,7 +878,7 @@ saddr:	addr				{ nat->in_osrcatype = $1.t;
 					  bcopy(&$1.m,
 						&nat->in_osrc.na_addr[1],
 						sizeof($1.m));
-					  $$ = $1.v;
+					  $$ = $1.f;
 					}
 	;
 
@@ -899,7 +898,7 @@ daddr:	addr				{ nat->in_odstatype = $1.t;
 					  bcopy(&$1.m,
 						&nat->in_odst.na_addr[1],
 						sizeof($1.m));
-					  $$ = $1.v;
+					  $$ = $1.f;
 					}
 	;
 
@@ -910,10 +909,11 @@ addr:	IPNY_ANY			{ yyexpectaddr = 0;
 	| hostname			{ bzero(&$$, sizeof($$));
 					  $$.a = $1.a;
 					  $$.t = FRI_NORMAL;
-					  $$.v = $1.v;
-					  if ($$.v == 4) {
+					  $$.v = ftov($1.f);
+					  $$.f = $1.f;
+					  if ($$.f == AF_INET) {
 						  $$.m.in4.s_addr = 0xffffffff;
-					  } else {
+					  } else if ($$.f == AF_INET6) {
 						  $$.m.i6[0] = 0xffffffff;
 						  $$.m.i6[1] = 0xffffffff;
 						  $$.m.i6[2] = 0xffffffff;
@@ -925,21 +925,17 @@ addr:	IPNY_ANY			{ yyexpectaddr = 0;
 					{ bzero(&$$, sizeof($$));
 					  $$.a = $1.a;
 					  $$.t = FRI_NORMAL;
-					  if ($1.v == 4)
-						  ntomask(AF_INET, $3,
-							  (u_32_t *)&$$.m);
-					  else
-						  ntomask(AF_INET6, $3,
-							  (u_32_t *)&$$.m);
+					  ntomask($$.f, $3, (u_32_t *)&$$.m);
 					  $$.a.i6[0] &= $$.m.i6[0];
 					  $$.a.i6[1] &= $$.m.i6[1];
 					  $$.a.i6[2] &= $$.m.i6[2];
 					  $$.a.i6[3] &= $$.m.i6[3];
-					  $$.v = $1.v;
+					  $$.f = $1.f;
+					  $$.v = ftov($1.f);
 					  yyexpectaddr = 0;
 					}
 	| hostname slash ipaddr		{ bzero(&$$, sizeof($$));
-					  if ($1.v != $3.v) {
+					  if ($1.f != $3.f) {
 						yyerror("1.address family "
 							"mismatch");
 					  }
@@ -950,7 +946,8 @@ addr:	IPNY_ANY			{ yyexpectaddr = 0;
 					  $$.a.i6[1] &= $$.m.i6[1];
 					  $$.a.i6[2] &= $$.m.i6[2];
 					  $$.a.i6[3] &= $$.m.i6[3];
-					  $$.v = $1.v;
+					  $$.f = $1.f;
+					  $$.v = ftov($1.f);
 					  yyexpectaddr = 0;
 					}
 	| hostname slash hexnumber	{ bzero(&$$, sizeof($$));
@@ -958,10 +955,11 @@ addr:	IPNY_ANY			{ yyexpectaddr = 0;
 					  $$.m.in4.s_addr = htonl($3);
 					  $$.t = FRI_NORMAL;
 					  $$.a.in4.s_addr &= $$.m.in4.s_addr;
+					  $$.f = AF_INET;
 					  $$.v = 4;
 					}
 	| hostname mask ipaddr		{ bzero(&$$, sizeof($$));
-					  if ($1.v != $3.v) {
+					  if ($1.f != $3.f) {
 						yyerror("2.address family "
 							"mismatch");
 					  }
@@ -972,7 +970,8 @@ addr:	IPNY_ANY			{ yyexpectaddr = 0;
 					  $$.a.i6[1] &= $$.m.i6[1];
 					  $$.a.i6[2] &= $$.m.i6[2];
 					  $$.a.i6[3] &= $$.m.i6[3];
-					  $$.v = $1.v;
+					  $$.f = $1.f;
+					  $$.v = ftov($1.f);
 					  yyexpectaddr = 0;
 					}
 	| hostname mask hexnumber	{ bzero(&$$, sizeof($$));
@@ -980,6 +979,7 @@ addr:	IPNY_ANY			{ yyexpectaddr = 0;
 					  $$.m.in4.s_addr = htonl($3);
 					  $$.t = FRI_NORMAL;
 					  $$.a.in4.s_addr &= $$.m.in4.s_addr;
+					  $$.f = AF_INET;
 					  $$.v = 4;
 					}
 	| pool slash YY_NUMBER		{ bzero(&$$, sizeof($$));
@@ -1127,13 +1127,15 @@ hexnumber:
 hostname:
 	YY_STR				{ bzero(&$$, sizeof($$));
 					  i6addr_t addr;
-					  if (gethost(4, $1, &addr) == 0) {
+					  if (gethost(AF_INET, $1,
+						      &addr) == 0) {
 						$$.a = addr;
-						$$.v = 4;
+						$$.f = AF_INET;
 					  } else
-					  if (gethost(6, $1, &addr) == 0) {
+					  if (gethost(AF_INET6, $1,
+						      &addr) == 0) {
 						$$.a = addr;
-						$$.v = 6;
+						$$.f = AF_INET6;
 					  } else {
 						FPRINTF(stderr,
 							"Unknown host '%s'\n",
@@ -1144,16 +1146,16 @@ hostname:
 	| YY_NUMBER			{ bzero(&$$, sizeof($$));
 					  $$.a.in4.s_addr = htonl($1);
 					  if ($$.a.in4.s_addr != 0)
-						$$.v = 4;
+						$$.f = AF_INET;
 					}
 	| ipv4				{ $$ = $1; }
 	| YY_IPV6			{ bzero(&$$, sizeof($$));
 					  $$.a = $1;
-					  $$.v = 6;
+					  $$.f = AF_INET6;
 					}
 	| YY_NUMBER YY_IPV6		{ bzero(&$$, sizeof($$));
 					  $$.a = $2;
-					  $$.v = 6;
+					  $$.f = AF_INET6;
 					}
 	;
 
@@ -1174,7 +1176,7 @@ range:
 
 ipaddr:	ipv4				{ $$ = $1; }
 	| YY_IPV6			{ $$.a = $1;
-					  $$.v = 6;
+					  $$.f = AF_INET6;
 					}
 	;
 
@@ -1186,7 +1188,7 @@ ipv4:	YY_NUMBER '.' YY_NUMBER '.' YY_NUMBER '.' YY_NUMBER
 		  bzero((char *)&$$, sizeof($$));
 		  $$.a.in4.s_addr = ($1 << 24) | ($3 << 16) | ($5 << 8) | $7;
 		  $$.a.in4.s_addr = htonl($$.a.in4.s_addr);
-		  $$.v = 4;
+		  $$.f = AF_INET;
 		}
 	;
 

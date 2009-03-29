@@ -134,7 +134,7 @@ struct	ipopt_names	{
 typedef struct  alist_s {
 	struct	alist_s	*al_next;
 	int		al_not;
-	int		al_v;
+	int		al_family;
 	i6addr_t	al_i6addr;
 	i6addr_t	al_i6mask;
 } alist_t;
@@ -241,6 +241,7 @@ extern char *fac_toname __P((int));
 extern int fac_findname __P((char *));
 extern void fill6bits __P((int, u_int *));
 extern wordtab_t *findword __P((wordtab_t *, char *));
+extern int ftov __P((int));
 extern char *ipf_geterror __P((int, ioctlfunc_t *));
 extern int genmask __P((int, char *, i6addr_t *));
 extern int gethost __P((int, char *, i6addr_t *));
@@ -373,6 +374,7 @@ extern void printstatefield __P((ipstate_t *, int));
 extern void printstatefieldhdr __P((int));
 extern int sendtrap_v1_0 __P((int, char *, char *, int, time_t));
 extern int sendtrap_v2_0 __P((int, char *, char *, int, time_t));
+extern int vtof __P((int));
 
 extern void set_variable __P((char *, char *));
 extern char *get_variable __P((char *, char **, int));

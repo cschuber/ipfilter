@@ -54,7 +54,7 @@ static	u_32_t	tx_hostnum(host, resolved)
 	if (ISDIGIT(*host))
 		return inet_addr(host);
 
-	if (gethost(4, host, &ipa) == -1) {
+	if (gethost(AF_INET, host, &ipa) == -1) {
 		*resolved = -1;
 		fprintf(stderr, "can't resolve hostname: %s\n", host);
 		return 0;

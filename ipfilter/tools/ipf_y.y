@@ -77,11 +77,11 @@ static	struct	wordtab logwords[33];
 %union	{
 	char	*str;
 	u_32_t	num;
-	struct	in_addr	ipa;
 	frentry_t	fr;
 	frtuc_t	*frt;
 	struct	alist_s	*alist;
 	u_short	port;
+	struct	in_addr	ip4;
 	struct	{
 		u_short	p1;
 		u_short	p2;
@@ -90,13 +90,18 @@ static	struct	wordtab logwords[33];
 	struct	{
 		int		type;
 		int		ifpos;
+		int		f;
 		int		v;
 		int		lif;
 		union	i6addr	a;
 		union	i6addr	m;
 		char		*name;
 	} ipp;
-	union	i6addr	ip6;
+	struct	{
+		i6addr_t	adr;
+		int		f;
+	} adr;
+	i6addr_t	ip6;
 	struct	{
 		char	*if1;
 		char	*if2;
@@ -107,9 +112,9 @@ static	struct	wordtab logwords[33];
 %type	<port>	portnum
 %type	<num>	facility priority icmpcode seclevel secname icmptype
 %type	<num>	opt compare range opttype flagset optlist ipv6hdrlist ipv6hdr
-%type	<num>	portc porteq
-%type	<ipa>	hostname ipv4 ipv4mask ipv4_16 ipv4_24 maskopts
-%type	<ip6>	ipv6mask
+%type	<num>	portc porteq ipmask
+%type	<ip4>	ipv4 ipv4_16 ipv4_24
+%type	<adr>	hostname
 %type	<ipp>	addr ipaddr
 %type	<str>	servicename name interfacename groupname
 %type	<pc>	portrange portcomp
@@ -637,17 +642,9 @@ dup:	IPFY_DUPTO name
 	| IPFY_DUPTO name duptoseparator hostname
 	{ int idx = addname(&fr, $2);
 	  fr->fr_dif.fd_name = idx;
-	  fr->fr_family = AF_INET;
-	  fr->fr_flags |= FR_DUP;
-	  fr->fr_dif.fd_ip = $4;
-	  yyexpectaddr = 0;
-	  free($2);
-	}
-	| IPFY_DUPTO name duptoseparator YY_IPV6
-	{ int idx = addname(&fr, $2);
-	  fr->fr_dif.fd_name = idx;
-	  fr->fr_dif.fd_ip6 = $4;
-	  fr->fr_family = AF_INET6;
+	  fr->fr_dif.fd_ip6 = $4.adr;
+	  if (fr->fr_family == AF_UNSPEC && $4.f != AF_UNSPEC)
+		fr->fr_family = $4.f;
 	  fr->fr_flags |= FR_DUP;
 	  yyexpectaddr = 0;
 	  free($2);
@@ -675,16 +672,9 @@ proute:	routeto name
 	| routeto name duptoseparator hostname
 	{ int idx = addname(&fr, $2);
 	  fr->fr_tif.fd_name = idx;
-	  fr->fr_tif.fd_ip = $4;
-	  fr->fr_family = AF_INET;
-	  yyexpectaddr = 0;
-	  free($2);
-	}
-	| routeto name duptoseparator YY_IPV6
-	{ int idx = addname(&fr, $2);
-	  fr->fr_tif.fd_name = idx;
-	  fr->fr_tif.fd_ip6 = $4;
-	  fr->fr_family = AF_INET6;
+	  fr->fr_tif.fd_ip6 = $4.adr;
+	  if (fr->fr_family == AF_UNSPEC && $4.f != AF_UNSPEC)
+		fr->fr_family = $4.f;
 	  yyexpectaddr = 0;
 	  free($2);
 	}
@@ -709,16 +699,9 @@ replyto:
 	| IPFY_REPLY_TO name duptoseparator hostname
 	{ int idx = addname(&fr, $2);
 	  fr->fr_rif.fd_name = idx;
-	  fr->fr_rif.fd_ip = $4;
-	  fr->fr_family = AF_INET;
-	  free($2);
-	}
-	| IPFY_REPLY_TO name duptoseparator YY_IPV6
-	{ int idx = addname(&fr, $2);
-	  fr->fr_rif.fd_name = idx;
-	  fr->fr_rif.fd_ip6 = $4;
-	  fr->fr_family = AF_INET6;
-	  yyexpectaddr = 0;
+	  fr->fr_rif.fd_ip6 = $4.adr;
+	  if (fr->fr_family == AF_UNSPEC && $4.f != AF_UNSPEC)
+		fr->fr_family = $4.f;
 	  free($2);
 	}
 	;
@@ -819,7 +802,8 @@ to:	IPFY_TO				{ if (fr == NULL)
 						printf("set yyexpectaddr\n");
 					  yycont = &yyexpectaddr;
 					  yysetdict(addrwords);
-					  resetaddr(); }
+					  resetaddr();
+					}
 	;
 
 with:	| andwith withlist
@@ -871,11 +855,9 @@ srcobject:
 srcaddr:
 	addr	{ DOREM(fr->fr_ip.fi_src = $1.a; \
 			fr->fr_mip.fi_src = $1.m; \
-			if ($1.v != 0) { \
-				fr->fr_family = ($1.v == 6)?AF_INET6:AF_INET;\
-				fr->fr_ip.fi_v = $1.v; \
-				fr->fr_mip.fi_v = 0xf; \
-			} \
+			fr->fr_family = $1.f; \
+			fr->fr_ip.fi_v = $1.v; \
+			fr->fr_mip.fi_v = 0xf; \
 			fr->fr_satype = $1.type; \
 			if ($1.ifpos != -1) { \
 				fr->fr_ipf->fri_sifpidx = $1.ifpos; \
@@ -887,11 +869,9 @@ srcaddr:
 srcaddrlist:
 	addr	{ DOREM(fr->fr_ip.fi_src = $1.a; \
 			fr->fr_mip.fi_src = $1.m; \
-			if ($1.v != 0) { \
-				fr->fr_family = ($1.v == 6)?AF_INET6:AF_INET;\
-				fr->fr_ip.fi_v = $1.v; \
-				fr->fr_mip.fi_v = 0xf; \
-			} \
+			fr->fr_family = $1.f; \
+			fr->fr_ip.fi_v = $1.v; \
+			fr->fr_mip.fi_v = 0xf; \
 			fr->fr_satype = $1.type; \
 			if ($1.ifpos != -1) { \
 				fr->fr_ipf->fri_sifpidx = $1.ifpos; \
@@ -900,11 +880,9 @@ srcaddrlist:
 	| srcaddrlist lmore addr
 		{ DOREM(fr->fr_ip.fi_src = $3.a; \
 			fr->fr_mip.fi_src = $3.m; \
-			if ($3.v != 0) { \
-				fr->fr_family = ($3.v == 6)?AF_INET6:AF_INET;\
-				fr->fr_ip.fi_v = $3.v; \
-				fr->fr_mip.fi_v = 0xf; \
-			} \
+			fr->fr_family = $3.f; \
+			fr->fr_ip.fi_v = $3.v; \
+			fr->fr_mip.fi_v = 0xf; \
 			fr->fr_satype = $3.type; \
 			if ($3.ifpos != -1) { \
 				fr->fr_ipf->fri_sifpidx = $3.ifpos; \
@@ -958,13 +936,18 @@ dstobject:
 	;
 
 dstaddr:
-	addr	{ DOREM(fr->fr_ip.fi_dst = $1.a; \
+	addr	{ if (($1.f != AF_UNSPEC) && (frc->fr_family != AF_UNSPEC) &&
+		      ($1.f != frc->fr_family))
+			yyerror("src/dst address family mismatch");
+		  if (frc->fr_family != AF_UNSPEC && $1.f == AF_UNSPEC) {
+			$1.f = frc->fr_family;
+			$1.v = frc->fr_ip.fi_v;
+		  }
+		  DOREM(fr->fr_ip.fi_dst = $1.a; \
 			fr->fr_mip.fi_dst = $1.m; \
-			if ($1.v != 0) { \
-				fr->fr_family = ($1.v == 6)?AF_INET6:AF_INET;\
-				fr->fr_ip.fi_v = $1.v; \
-				fr->fr_mip.fi_v = 0xf; \
-			} \
+			fr->fr_family = $1.f; \
+			fr->fr_ip.fi_v = $1.v; \
+			fr->fr_mip.fi_v = 0xf; \
 			fr->fr_datype = $1.type; \
 			if ($1.ifpos != -1) { \
 				fr->fr_ipf->fri_difpidx = $1.ifpos; \
@@ -974,26 +957,36 @@ dstaddr:
 	;
 
 dstaddrlist:
-	addr	{ DOREM(fr->fr_ip.fi_dst = $1.a; \
+	addr	{ if (($1.f != AF_UNSPEC) && (frc->fr_family != AF_UNSPEC) &&
+		      ($1.f != frc->fr_family))
+			yyerror("src/dst address family mismatch");
+		  if (frc->fr_family != AF_UNSPEC && $1.f == AF_UNSPEC) {
+			$1.f = frc->fr_family;
+			$1.v = frc->fr_family;
+		  }
+		  DOREM(fr->fr_ip.fi_dst = $1.a; \
 			fr->fr_mip.fi_dst = $1.m; \
-			if ($1.v != 0) { \
-				fr->fr_family = ($1.v == 6)?AF_INET6:AF_INET;\
-				fr->fr_ip.fi_v = $1.v; \
-				fr->fr_mip.fi_v = 0xf; \
-			} \
+			fr->fr_family = $1.f; \
+			fr->fr_ip.fi_v = $1.v; \
+			fr->fr_mip.fi_v = 0xf; \
 			fr->fr_datype = $1.type; \
 			if ($1.ifpos != -1) { \
 				fr->fr_ipf->fri_difpidx = $1.ifpos; \
 			})
 		}
 	| dstaddrlist lmore addr
-		{ DOREM(fr->fr_ip.fi_dst = $3.a; \
+		{ if (($3.f != AF_UNSPEC) && (frc->fr_family != AF_UNSPEC) &&
+		      ($3.f != frc->fr_family))
+			yyerror("src/dst address family mismatch");
+		  if (frc->fr_family != AF_UNSPEC && $3.f == AF_UNSPEC) {
+			$3.f = frc->fr_family;
+			$3.v = frc->fr_family;
+		  }
+		  DOREM(fr->fr_ip.fi_dst = $3.a; \
 			fr->fr_mip.fi_dst = $3.m; \
-			if ($3.v != 0) { \
-				fr->fr_family = ($3.v == 6)?AF_INET6:AF_INET;\
-				fr->fr_ip.fi_v = $3.v; \
-				fr->fr_mip.fi_v = 0xf; \
-			} \
+			fr->fr_family = $3.f; \
+			fr->fr_ip.fi_v = $3.v; \
+			fr->fr_mip.fi_v = 0xf; \
 			fr->fr_datype = $3.type; \
 			if ($3.ifpos != -1) { \
 				fr->fr_ipf->fri_difpidx = $3.ifpos; \
@@ -1044,6 +1037,7 @@ addr:	pool '/' YY_NUMBER		{ pooled = 1;
 					  yyexpectaddr = 0;
 					  $$.type = FRI_LOOKUP;
 					  $$.v = 0;
+					  $$.f = AF_UNSPEC;
 					  $$.a.iplookuptype = IPLT_POOL;
 					  $$.a.iplookupsubtype = 0;
 					  $$.a.iplookupnum = $3; }
@@ -1058,6 +1052,7 @@ addr:	pool '/' YY_NUMBER		{ pooled = 1;
 					}
 			poollist ')'	{ yyexpectaddr = 0;
 					  $$.v = 0;
+					  $$.f = AF_UNSPEC;
 					  $$.type = FRI_LOOKUP;
 					  $$.a.iplookuptype = IPLT_POOL;
 					  $$.a.iplookupsubtype = 0;
@@ -1066,6 +1061,7 @@ addr:	pool '/' YY_NUMBER		{ pooled = 1;
 	| hash '/' YY_NUMBER		{ hashed = 1;
 					  yyexpectaddr = 0;
 					  $$.v = 0;
+					  $$.f = AF_UNSPEC;
 					  $$.type = FRI_LOOKUP;
 					  $$.a.iplookuptype = IPLT_HASH;
 					  $$.a.iplookupsubtype = 0;
@@ -1074,6 +1070,7 @@ addr:	pool '/' YY_NUMBER		{ pooled = 1;
 	| hash '/' YY_STR		{ hashed = 1;
 					  $$.type = FRI_LOOKUP;
 					  $$.v = 0;
+					  $$.f = AF_UNSPEC;
 					  $$.a.iplookuptype = IPLT_HASH;
 					  $$.a.iplookupsubtype = 1;
 					  $$.a.iplookupname = addname(&fr, $3);
@@ -1083,24 +1080,13 @@ addr:	pool '/' YY_NUMBER		{ pooled = 1;
 					}
 			addrlist ')'	{ yyexpectaddr = 0;
 					  $$.v = 0;
+					  $$.f = AF_UNSPEC;
 					  $$.type = FRI_LOOKUP;
 					  $$.a.iplookuptype = IPLT_HASH;
 					  $$.a.iplookupsubtype = 0;
 					  $$.a.iplookupnum = makehash($5);
 					}
 	| ipaddr			{ $$ = $1;
-					  if ((fr->fr_family == AF_INET) &&
-					      ($1.v == 6)) {
-						yyerror("address family mix");
-					  }
-					  if ((fr->fr_family == AF_INET6) &&
-					      ($1.v == 4)) {
-						yyerror("address family mix");
-					  }
-					  if ($1.v == 4)
-						fr->fr_family = AF_INET;
-					  else if ($1.v == 6)
-						fr->fr_family = AF_INET6;
 					  yyexpectaddr = 0; }
 	;
 
@@ -1109,34 +1095,26 @@ ipaddr:	IPFY_ANY			{ bzero(&($$), sizeof($$));
 					  yyresetdict();
 					  yyexpectaddr = 0;
 					}
-	| hostname			{ $$.a.in4 = $1;
-					  $$.m.in4_addr = 0xffffffff;
-					  $$.v = 4;
+	| hostname			{ $$.a = $1.adr;
+					  $$.f = $1.f;
+					  if ($1.f == AF_INET6)
+						  fill6bits(128, $$.m.i6);
+					  else if ($1.f == AF_INET)
+						  fill6bits(32, $$.m.i6);
+					  $$.v = ftov($1.f);
 					  $$.type = FRI_NORMAL;
 					  yyexpectaddr = 0;
 					}
 	| hostname			{ yyresetdict(); }
 		maskspace		{ yysetdict(maskwords); }
-		ipv4mask		{ $$.m.in4_addr = $5.s_addr;
-					  $$.a.in4_addr = $1.s_addr;
-					  $$.a.in4_addr &= $5.s_addr;
-					  $$.v = 4;
-					  $$.type = ifpflag;
-					  yyresetdict();
-					  yyexpectaddr = 0;
-					}
-	| YY_IPV6			{ $$.a = $1;
-					  fill6bits(128, (u_32_t *)&$$.m);
-					  $$.v = 6;
-					  $$.type = FRI_NORMAL;
-					  yyresetdict();
-					  yyexpectaddr = 0;
-					}
-	| YY_IPV6			{ yyresetdict(); }
-		maskspace		{ yysetdict(maskwords); }
-		ipv6mask		{ $$.a = $1;
-					  $$.m = $5;
-					  $$.v = 6;
+		ipmask			{ ntomask($1.f, $5, $$.m.i6);
+					  $$.a = $1.adr;
+					  $$.a.i6[0] &= $$.m.i6[0];
+					  $$.a.i6[1] &= $$.m.i6[1];
+					  $$.a.i6[2] &= $$.m.i6[2];
+					  $$.a.i6[3] &= $$.m.i6[3];
+					  $$.f = $1.f;
+					  $$.v = ftov($1.f);
 					  $$.type = ifpflag;
 					  yyresetdict();
 					  yyexpectaddr = 0;
@@ -1163,11 +1141,11 @@ maskspace:
 	| IPFY_MASK
 	;
 
-ipv4mask:
-	ipv4				{ $$ = $1; }
-	| YY_HEX			{ $$.s_addr = htonl($1); }
-	| YY_NUMBER			{ ntomask(AF_INET, $1, (u_32_t *)&$$);}
-	| maskopts			{ $$ = $1; }
+ipmask:	ipv4				{ $$ = count4bits($1.s_addr); }
+	| YY_HEX			{ $$ = count4bits(htonl($1)); }
+	| YY_NUMBER			{ $$ = $1; }
+	| YY_IPV6			{ $$ = count6bits($1.i6); }
+	| maskopts			{ $$ = 0; }
 	;
 
 maskopts:
@@ -1178,21 +1156,18 @@ maskopts:
 					  }
 					}
 	| IPFY_NETWORK			{ if (ifpflag == FRI_DYNAMIC) {
-						$$.s_addr = 0;
 						ifpflag = FRI_NETWORK;
 					  } else {
 						YYERROR;
 					  }
 					}
 	| IPFY_NETMASKED		{ if (ifpflag == FRI_DYNAMIC) {
-						$$.s_addr = 0;
 						ifpflag = FRI_NETMASKED;
 					  } else {
 						YYERROR;
 					  }
 					}
 	| IPFY_PEER			{ if (ifpflag == FRI_DYNAMIC) {
-						$$.s_addr = 0;
 						ifpflag = FRI_PEERADDR;
 					  } else {
 						YYERROR;
@@ -1200,52 +1175,34 @@ maskopts:
 					}
 	;
 
-ipv6mask:
-	YY_NUMBER			{ ntomask(AF_INET6, $1, $$.i6); }
-	| IPFY_BROADCAST		{ if (ifpflag == FRI_DYNAMIC) {
-						bzero(&$$, sizeof($$));
-						ifpflag = FRI_BROADCAST;
-					  } else
-						YYERROR;
-					}
-	| IPFY_NETWORK			{ if (ifpflag == FRI_DYNAMIC) {
-						bzero(&$$, sizeof($$));
-						ifpflag = FRI_BROADCAST;
-					  } else
-						YYERROR;
-					}
-	| IPFY_NETMASKED		{ if (ifpflag == FRI_DYNAMIC) {
-						bzero(&$$, sizeof($$));
-						ifpflag = FRI_BROADCAST;
-					  } else
-						YYERROR;
-					}
-	| IPFY_PEER			{ if (ifpflag == FRI_DYNAMIC) {
-						bzero(&$$, sizeof($$));
-						ifpflag = FRI_BROADCAST;
-					  } else
-						YYERROR;
-					}
-	;
-
 hostname:
-	ipv4				{ $$ = $1; }
-	| YY_NUMBER			{ $$.s_addr = $1; }
-	| YY_HEX			{ $$.s_addr = $1; }
-	| YY_STR			{ $$.s_addr = lookuphost($1);
+	ipv4				{ $$.adr.in4 = $1;
+					  $$.f = AF_INET;
+					}
+	| YY_NUMBER			{ $$.adr.in4_addr = $1;
+					  $$.f = AF_INET;
+					}
+	| YY_HEX			{ $$.adr.in4_addr = $1;
+					  $$.f = AF_INET;
+					}
+	| YY_STR			{ $$.adr.in4_addr = lookuphost($1);
+					  $$.f = AF_INET;
 					  free($1);
+					}
+	| YY_IPV6			{ $$.adr = $1;
+					  $$.f = AF_INET6;
 					}
 	;
 
 addrlist:
 	ipaddr		{ $$ = newalist(NULL);
-			  $$->al_v = $1.v;
+			  $$->al_family = $1.f;
 			  $$->al_i6addr = $1.a;
 			  $$->al_i6mask = $1.m;
 			}
 	| addrlist ',' { yyexpectaddr = 1; } ipaddr
 			{ $$ = newalist($1);
-			  $$->al_v = $4.v;
+			  $$->al_family = $4.f;
 			  $$->al_i6addr = $4.a;
 			  $$->al_i6mask = $4.m;
 			}
@@ -1259,26 +1216,26 @@ hash:	IPFY_HASH	{ yyexpectaddr = 0; yycont = NULL; yyresetdict(); }
 
 poollist:
 	ipaddr		{ $$ = newalist(NULL);
-			  $$->al_v = $1.v;
+			  $$->al_family = $1.f;
 			  $$->al_i6addr = $1.a;
 			  $$->al_i6mask = $1.m;
 			}
 	| '!' ipaddr	{ $$ = newalist(NULL);
 			  $$->al_not = 1;
-			  $$->al_v = $2.v;
+			  $$->al_family = $2.f;
 			  $$->al_i6addr = $2.a;
 			  $$->al_i6mask = $2.m;
 			}
 	| poollist ',' ipaddr
 			{ $$ = newalist($1);
-			  $$->al_v = $3.v;
+			  $$->al_family = $3.f;
 			  $$->al_i6addr = $3.a;
 			  $$->al_i6mask = $3.m;
 			}
 	| poollist ',' '!' ipaddr
 			{ $$ = newalist($1);
 			  $$->al_not = 1;
-			  $$->al_v = $4.v;
+			  $$->al_family = $4.f;
 			  $$->al_i6addr = $4.a;
 			  $$->al_i6mask = $4.m;
 			}
@@ -1332,9 +1289,11 @@ itype:	seticmptype icmptype
 	;
 
 seticmptype:
-	IPFY_ICMPTYPE				{ setipftype();
-						  yysetdict(NULL);
-						}
+	IPFY_ICMPTYPE			{ setipftype();
+					  if (frc->fr_family == AF_UNSPEC)
+					      frc->fr_family = AF_INET;
+					  yysetdict(NULL);
+					}
 	;
 
 icode:	| seticmpcode icmpcode
@@ -1594,6 +1553,7 @@ opt:
 	| IPFY_IPOPT_SEC		{ $$ = getoptbyvalue(IPOPT_SECURITY); }
 	| IPFY_IPOPT_LSRR		{ $$ = getoptbyvalue(IPOPT_LSRR); }
 	| IPFY_IPOPT_ESEC		{ $$ = getoptbyvalue(IPOPT_E_SEC); }
+	| IPFY_IPOPT_CIPSO 		{ $$ = getoptbyvalue(IPOPT_CIPSO); }
 	| IPFY_IPOPT_CIPSO doi		{ $$ = getoptbyvalue(IPOPT_CIPSO); }
 	| IPFY_IPOPT_SATID		{ $$ = getoptbyvalue(IPOPT_SATID); }
 	| IPFY_IPOPT_SSRR		{ $$ = getoptbyvalue(IPOPT_SSRR); }
@@ -2165,7 +2125,7 @@ char *name;
 		}
 	}
 
-	if (gethost(4, name, &addr) == -1) {
+	if (gethost(AF_INET, name, &addr) == -1) {
 		fprintf(stderr, "unknown name \"%s\"\n", name);
 		return 0;
 	}
@@ -2191,7 +2151,7 @@ char *phrase;
 			fprintf(stderr, "cannot mix IPF and BPF matching\n");
 			return;
 		}
-		fr->fr_family = (v == 4) ? AF_INET : AF_INET6;
+		fr->fr_family = vtof(v);
 		fr->fr_type = FR_T_BPFOPC;
 
 		if (!strncmp(phrase, "0x", 2)) {
@@ -2359,7 +2319,7 @@ alist_t *list;
 		return 0;
 
 	for (n = top, a = list; (n != NULL) && (a != NULL); a = a->al_next) {
-		if (a->al_v == AF_INET6) {
+		if (a->al_family == AF_INET6) {
 			n->ipe_family = AF_INET6;
 			n->ipe_addr = a->al_i6addr;
 			n->ipe_mask = a->al_i6mask;

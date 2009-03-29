@@ -8,8 +8,8 @@
 
 #include "ipf.h"
 
-int gethost(v, name, hostp)
-	int v;
+int gethost(family, name, hostp)
+	int family;
 	char *name;
 	i6addr_t *hostp;
 {
@@ -18,11 +18,11 @@ int gethost(v, name, hostp)
 	u_32_t addr;
 
 	if (!strcmp(name, "test.host.dots")) {
-		if (v == 4) {
+		if (family == AF_INET) {
 			hostp->in4.s_addr = htonl(0xfedcba98);
 		}
 #ifdef USE_INET6
-		if (v == 6) {
+		if (family == AF_INET6) {
 			hostp->i6[0] = 0xfe80aa55;
 			hostp->i6[1] = 0x12345678;
 			hostp->i6[2] = 0x5a5aa5a5;
@@ -35,7 +35,7 @@ int gethost(v, name, hostp)
 	if (!strcmp(name, "<thishost>"))
 		name = thishost;
 
-	if (v == 4) {
+	if (family == AF_INET) {
 		h = gethostbyname(name);
 		if (h != NULL) {
 			if ((h->h_addr != NULL) &&
@@ -53,7 +53,7 @@ int gethost(v, name, hostp)
 		}
 	}
 #ifdef USE_INET6
-	if (v == 6) {
+	if (family == AF_INET6) {
 		struct addrinfo hints, *res;
 		struct sockaddr_in6 *sin6;
 

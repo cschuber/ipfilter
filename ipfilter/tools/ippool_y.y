@@ -632,7 +632,7 @@ char *url;
 		if (hlist == NULL)
 			return NULL;
 
-		if (gethost(hlist->al_v, url, &hlist->al_i6addr) == -1) {
+		if (gethost(hlist->al_family, url, &hlist->al_i6addr) == -1) {
 			yyerror("Unknown hostname");
 		}
 	}
@@ -645,12 +645,7 @@ char *url;
 		if (h == NULL)
 			break;
 
-		if (a->al_v == 4)
-			h->ipe_family = AF_INET;
-#ifdef USE_INET6
-		else if (a->al_v == 6)
-			h->ipe_family = AF_INET6;
-#endif
+		h->ipe_family = a->al_family;
 		bcopy((char *)&a->al_addr, (char *)&h->ipe_addr,
 		      sizeof(h->ipe_addr));
 		bcopy((char *)&a->al_mask, (char *)&h->ipe_mask,
@@ -685,7 +680,7 @@ char *url;
 		if (hlist == NULL)
 			return NULL;
 
-		if (gethost(hlist->al_v, url, &hlist->al_i6addr) == -1) {
+		if (gethost(hlist->al_family, url, &hlist->al_i6addr) == -1) {
 			yyerror("Unknown hostname");
 		}
 	}
@@ -698,13 +693,13 @@ char *url;
 		if (p == NULL)
 			break;
 
-		if (a->al_v == 4) {
+		if (a->al_family == AF_INET) {
 			p->ipn_addr.adf_family = AF_INET;
 			p->ipn_addr.adf_len = 8;
 			p->ipn_mask.adf_family = AF_INET;
 			p->ipn_mask.adf_len = 8;
 #ifdef USE_INET6
-		} else if (a->al_v == 6) {
+		} else if (a->al_family == AF_INET6) {
 			p->ipn_addr.adf_family = AF_INET6;
 			p->ipn_addr.adf_len = 20;
 			p->ipn_mask.adf_family = AF_INET6;

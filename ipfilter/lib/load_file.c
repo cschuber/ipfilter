@@ -43,7 +43,12 @@ load_file(char *filename)
 			return NULL;
 		}
 
-		*s = '\0';
+		/*
+		 * Remove trailing spaces
+		 */
+		for (; ISSPACE(*s); s--)
+			*s = '\0';
+
 		s = strchr(line, '\r');
 		if (s != NULL)
 			*s = '\0';
@@ -58,12 +63,13 @@ load_file(char *filename)
 		/*
 		 * Remove comment markers
 		 */
-		for (s = t; *s; s++) {
-			if (*s == '#')
-				*s = '\0';
+		s = strchr(t, '#');
+		if (s != NULL) {
+			*s = '\0';
+			if (s == t)
+				continue;
 		}
-		if (!*t)
-			continue;
+
 		/*
 		 * Trim off tailing white spaces
 		 */
@@ -71,19 +77,17 @@ load_file(char *filename)
 		while (ISSPACE(*s))
 			*s-- = '\0';
 
-		if (ISDIGIT(*t)) {
-			a = alist_new(4, t);
-			if (a != NULL) {
-				a->al_not = not;
-				if (rbot != NULL)
-					rbot->al_next = a;
-				else
-					rtop = a;
-				rbot = a;
-			}
+		a = alist_new(AF_UNSPEC, t);
+		if (a != NULL) {
+			a->al_not = not;
+			if (rbot != NULL)
+				rbot->al_next = a;
+			else
+				rtop = a;
+			rbot = a;
 		} else {
-			fprintf(stderr, "%s: unrecognised content line %d\n",
-				filename, linenum);
+			fprintf(stderr, "%s:%d unrecognised content :%s\n",
+				filename, linenum, t);
 		}
 	}
 	fclose(fp);

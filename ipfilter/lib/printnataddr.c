@@ -42,6 +42,7 @@ printnataddr(v, base, addr, ifidx)
 		break;
 #endif
 	default :
+		printf("{v=%d}", v);
 		break;
 	}
 }

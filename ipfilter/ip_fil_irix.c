@@ -408,6 +408,8 @@ ipf_send_ip(fin, m, mpp)
 		ip6_t *ip6 = (ip6_t *)ip;
 
 		ip6->ip6_hlim = 127;
+		m = *mpp;
+		*mpp = NULL;
 
 		return ip6_output(m, NULL, NULL, 0, NULL, NULL);
 	}
