@@ -19,7 +19,9 @@
 #if !defined(_KERNEL)
 # include <stdio.h>
 # include <stdlib.h>
-# include <stdbool.h>
+# ifdef _STDC_C99
+#  include <stdbool.h>
+# endif
 # include <string.h>
 # define _KERNEL
 # ifdef __OpenBSD__

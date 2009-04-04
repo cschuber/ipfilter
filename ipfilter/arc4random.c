@@ -1,4 +1,3 @@
-#ifdef NEED_LOCAL_RAND
 /*-
  * THE BEER-WARE LICENSE
  *
@@ -39,6 +38,7 @@
 # include "md5.h"
 #endif
 
+#ifdef NEED_LOCAL_RAND
 #if !defined(__GNUC__)
 # define __inline
 #endif

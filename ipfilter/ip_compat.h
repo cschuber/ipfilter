@@ -198,8 +198,10 @@ struct ip6_ext {
 
 # if SOLARIS2 >= 6
 #  include <sys/atomic.h>
+typedef	uint8_t		u_int8_t;
 typedef	uint32_t	u_32_t;
 # else
+typedef	unsigned char	u_int8_t;
 typedef unsigned int	u_32_t;
 # endif
 # define	U_32_T	1
