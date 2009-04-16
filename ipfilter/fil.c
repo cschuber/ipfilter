@@ -8011,7 +8011,7 @@ ipf_getnextrule(softc, t, ptr)
 		/*
 		 * Copy out data and clean up references and token as needed.
 		 */
-		error = COPYOUT(next, dst, sizeof(*next));
+		error = COPYOUT(next, dst, next->fr_size);
 		if (error != 0) {
 			softc->ipf_interror = 89;
 			return EFAULT;
@@ -8022,7 +8022,7 @@ ipf_getnextrule(softc, t, ptr)
 		} else {
 			if (fr != NULL)
 				(void) ipf_derefrule(softc, &fr);
-			dst += sizeof(*next);
+			dst += next->fr_size;
 			if (next->fr_data != NULL) {
 				error = COPYOUT(next->fr_data, dst,
 						next->fr_dsize);
