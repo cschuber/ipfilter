@@ -842,7 +842,7 @@ static void printlivelist(fiop, out, set, fp, group, comment)
 
 		printfr(fp, ioctl);
 		if (opts & OPT_VERBOSE) {
-			binprint(fp, sizeof(*fp));
+			binprint(fp, fp->fr_size);
 			if (fp->fr_data != NULL && fp->fr_dsize > 0)
 				binprint(fp->fr_data, fp->fr_dsize);
 		}
@@ -952,7 +952,7 @@ static void printdeadlist(fiop, out, set, fp, group, comment)
 
 		printfr(fp, ioctl);
 		if (opts & OPT_DEBUG) {
-			binprint(fp, sizeof(*fp));
+			binprint(fp, fp->fr_size);
 			if (fb.fr_data != NULL && fb.fr_dsize > 0)
 				binprint(fb.fr_data, fb.fr_dsize);
 		}
