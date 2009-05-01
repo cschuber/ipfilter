@@ -49,6 +49,7 @@ case "$1" in
 			fi
 			kmadmin -L ipf
 			set_device_files
+			ipf -E
 			if [ -r ${IPF_CONF} ]; then
 				BLOCK_DEFAULT=`/sbin/ipf -V | grep Default | \
 					       awk '{print $2}'`
@@ -80,6 +81,7 @@ case "$1" in
 		if [ x$pid != x ] ; then
 			kill -TERM $pid
 		fi
+		ipf -D
 		kmadmin -U ipf
 		;;
 
