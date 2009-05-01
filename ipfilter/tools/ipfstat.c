@@ -818,7 +818,7 @@ static void printlivelist(fiop, out, set, fp, group, comment)
 				continue;
 		}
 		if (fp->fr_data != NULL)
-			fp->fr_data = (char *)fp + sizeof(*fp);
+			fp->fr_data = (char *)fp + fp->fr_size;
 
 		n++;
 
@@ -907,7 +907,7 @@ static void printdeadlist(fiop, out, set, fp, group, comment)
 
 	for (n = 1; fp; fp = fb.fr_next, n++) {
 		if (kmemcpy((char *)&fb, (u_long)fb.fr_next,
-			    sizeof(fb)) == -1) {
+			    fb.fr_size) == -1) {
 			perror("kmemcpy");
 			return;
 		}
