@@ -1968,7 +1968,7 @@ ipf_nat_getent(softc, data, getlock)
 	 */
 	if (nat->nat_ptr != NULL)
 		bcopy((char *)nat->nat_ptr, (char *)&ipn->ipn_ipnat,
-		      sizeof(ipn->ipn_ipnat));
+		      ipn->ipn_ipnat.in_size);
 
 	/*
 	 * If we also know the NAT entry has an associated filter rule,
@@ -2128,15 +2128,15 @@ ipf_nat_putent(softc, data, getlock)
 	 */
 	in = ipnn->ipn_nat.nat_ptr;
 	if (in != NULL) {
-		KMALLOC(in, ipnat_t *);
+		KMALLOCS(in, ipnat_t *, ipnn->ipn_ipnat.in_size);
 		nat->nat_ptr = in;
 		if (in == NULL) {
 			softc->ipf_interror = 60038;
 			error = ENOMEM;
 			goto junkput;
 		}
-		bzero((char *)in, offsetof(struct ipnat, in_space));
-		bcopy((char *)&ipnn->ipn_ipnat, (char *)in, sizeof(*in));
+		bcopy((char *)&ipnn->ipn_ipnat, (char *)in,
+		      ipnn->ipn_ipnat.in_size);
 		in->in_use = 1;
 		in->in_flags |= IPN_DELETE;
 
@@ -6917,7 +6917,7 @@ ipf_nat_getnext(softc, t, itp)
 			break;
 
 		case IPFGENITER_IPNAT :
-			error = COPYOUT(nextipnat, dst, sizeof(*nextipnat));
+			error = COPYOUT(nextipnat, dst, nextipnat->in_size);
 			if (error != 0) {
 				softc->ipf_interror = 60050;
 				error = EFAULT;
@@ -6935,7 +6935,7 @@ ipf_nat_getnext(softc, t, itp)
 					ipf_freetoken(softc, t);
 					break;
 				}
-				dst += sizeof(*nextipnat);
+				dst += nextipnat->in_size;
 				ipn = nextipnat;
 				nextipnat = nextipnat->in_next;
 			}
