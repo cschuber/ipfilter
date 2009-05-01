@@ -7993,13 +7993,13 @@ ipf_nat_nextaddrinit(softc, base, na, initial, ifp)
 	{
 	case FRI_LOOKUP :
 		if (na->na_subtype == 0) {
-			na->na_ptr = ipf_lookup_res_num(softc, na->na_type,
-							IPL_LOGNAT,
+			na->na_ptr = ipf_lookup_res_num(softc, IPL_LOGNAT,
+							na->na_type,
 							na->na_num,
 							&na->na_func);
 		} else if (na->na_subtype == 1) {
-			na->na_ptr = ipf_lookup_res_name(softc, na->na_type,
-							 IPL_LOGNAT,
+			na->na_ptr = ipf_lookup_res_name(softc, IPL_LOGNAT,
+							 na->na_type,
 							 base + na->na_num,
 							 &na->na_func);
 		}

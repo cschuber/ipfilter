@@ -127,8 +127,10 @@ static int ipf_nat6_icmpquerytype __P((int));
 static int ipf_nat6_out __P((fr_info_t *, nat_t *, int, u_32_t));
 static int ipf_nat6_in __P((fr_info_t *, nat_t *, int, u_32_t));
 static int ipf_nat6_builddivertmp __P((ipf_nat_softc_t *, ipnat_t *));
-static int ipf_nat6_nextaddrinit __P((ipf_main_softc_t *, nat_addr_t *, int, void *));
-static int ipf_nat6_insert __P((ipf_main_softc_t *, ipf_nat_softc_t *, nat_t *));
+static int ipf_nat6_nextaddrinit __P((ipf_main_softc_t *, char *,
+				      nat_addr_t *, int, void *));
+static int ipf_nat6_insert __P((ipf_main_softc_t *, ipf_nat_softc_t *,
+				nat_t *));
 
 
 #define	NINCLSIDE6(y,x)	ATOMIC_INCL(softn->ipf_nat_stats.ns_side6[y].x)
@@ -167,19 +169,23 @@ ipf_nat6_ruleaddrinit(softc, softn, n)
 	/*
 	 * Initialise all of the address fields.
 	 */
-	error = ipf_nat6_nextaddrinit(softc, &n->in_osrc, 1, n->in_ifps[idx]);
+	error = ipf_nat6_nextaddrinit(softc, n->in_names, &n->in_osrc, 1,
+				      n->in_ifps[idx]);
 	if (error != 0)
 		return error;
 
-	error = ipf_nat6_nextaddrinit(softc, &n->in_odst, 1, n->in_ifps[idx]);
+	error = ipf_nat6_nextaddrinit(softc, n->in_names, &n->in_odst, 1,
+				      n->in_ifps[idx]);
 	if (error != 0)
 		return error;
 
-	error = ipf_nat6_nextaddrinit(softc, &n->in_nsrc, 1, n->in_ifps[idx]);
+	error = ipf_nat6_nextaddrinit(softc, n->in_names, &n->in_nsrc, 1,
+				      n->in_ifps[idx]);
 	if (error != 0)
 		return error;
 
-	error = ipf_nat6_nextaddrinit(softc, &n->in_ndst, 1, n->in_ifps[idx]);
+	error = ipf_nat6_nextaddrinit(softc, n->in_names, &n->in_ndst, 1,
+				      n->in_ifps[idx]);
 	if (error != 0)
 		return error;
 
@@ -4260,6 +4266,7 @@ ipf_nat6_nextaddr(fin, na, old, dst)
 /* Function:    ipf_nat6_nextaddrinit                                       */
 /* Returns:     int - 0 == success, else error number                       */
 /* Parameters:  na(I)      - NAT address information for generating new addr*/
+/*              base(I)    - start of where to find strings                 */
 /*              initial(I) - flag indicating if it is the first call for    */
 /*                           this "na" structure.                           */
 /*              ifp(I)     - network interface to derive address            */
@@ -4276,8 +4283,9 @@ ipf_nat6_nextaddr(fin, na, old, dst)
 /* come out of ipf_nat6_nextaddr() will be.                                 */
 /* ------------------------------------------------------------------------ */
 static int
-ipf_nat6_nextaddrinit(softc, na, initial, ifp)
+ipf_nat6_nextaddrinit(softc, base, na, initial, ifp)
 	ipf_main_softc_t *softc;
+	char *base;
 	nat_addr_t *na;
 	int initial;
 	void *ifp;
@@ -4285,11 +4293,20 @@ ipf_nat6_nextaddrinit(softc, na, initial, ifp)
 	switch (na->na_atype)
 	{
 	case FRI_LOOKUP :
-		if (na->na_ptr == NULL) {
-			na->na_ptr = ipf_lookup_res_num(softc, na->na_type,
-							IPL_LOGNAT,
-						        na->na_num,
-						        &na->na_func);
+		if (na->na_subtype == 0) {
+			na->na_ptr = ipf_lookup_res_num(softc, IPL_LOGNAT,
+							na->na_type,
+							na->na_num,
+							&na->na_func);
+		} else if (na->na_subtype == 1) {
+			na->na_ptr = ipf_lookup_res_name(softc, IPL_LOGNAT,
+							 na->na_type,
+							 base + na->na_num,
+							 &na->na_func);
+		}
+		if (na->na_func == NULL) {
+			softc->ipf_interror = 160056;
+			return ESRCH;
 		}
 		if (na->na_ptr == NULL) {
 			softc->ipf_interror = 160056;

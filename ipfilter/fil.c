@@ -148,8 +148,9 @@ static	int		ipf_flushlist __P((ipf_main_softc_t *, int, minor_t,
 static	int		ipf_flush_groups __P((ipf_main_softc_t *,
 					      int, int, int));
 static	ipfunc_t	ipf_findfunc __P((ipfunc_t));
-static	void		*ipf_findlookup __P((ipf_main_softc_t *, frentry_t *,
-					     i6addr_t *, lookupfunc_t *));
+static	void		*ipf_findlookup __P((ipf_main_softc_t *, int,
+					     frentry_t *, i6addr_t *,
+					     lookupfunc_t *));
 static	frentry_t	*ipf_firewall __P((fr_info_t *, u_32_t *));
 static	int		ipf_fr_matcharray __P((fr_info_t *, int *));
 static	int		ipf_frruleiter __P((ipf_main_softc_t *, void *, int,
@@ -5036,7 +5037,7 @@ frrequest(softc, unit, req, data, set, makecopy)
 			}
 			break;
 		case FRI_LOOKUP :
-			fp->fr_srcptr = ipf_findlookup(softc, fp,
+			fp->fr_srcptr = ipf_findlookup(softc, unit, fp,
 						       &fp->fr_src6,
 						       &fp->fr_srcfunc);
 			if (fp->fr_srcfunc == NULL) {
@@ -5067,7 +5068,7 @@ frrequest(softc, unit, req, data, set, makecopy)
 			}
 			break;
 		case FRI_LOOKUP :
-			fp->fr_dstptr = ipf_findlookup(softc, fp,
+			fp->fr_dstptr = ipf_findlookup(softc, unit, fp,
 						       &fp->fr_dst6,
 						       &fp->fr_dstfunc);
 			if (fp->fr_dstfunc == NULL) {
@@ -5487,6 +5488,7 @@ ipf_rule_expire_insert(softc, f, set)
 /* Function:   ipf_findlookup                                               */
 /* Returns:    NULL = failure, else success                                 */
 /* Parameters: softc(I) - pointer to soft context main structure            */
+/*             unit(I)  - ipf device we want to find match for              */
 /*             fp(I)    - rule for which lookup is for                      */
 /*             addrp(I) - pointer to lookup information in address struct   */
 /*             funcp(I) - where to store the lookup function                */
@@ -5498,8 +5500,9 @@ ipf_rule_expire_insert(softc, f, set)
 /* the packet matching quicker.                                             */
 /* ------------------------------------------------------------------------ */
 static void *
-ipf_findlookup(softc, fr, addrp, funcp)
+ipf_findlookup(softc, unit, fr, addrp, funcp)
 	ipf_main_softc_t *softc;
+	int unit;
 	frentry_t *fr;
 	i6addr_t *addrp;
 	lookupfunc_t *funcp;
@@ -5509,17 +5512,15 @@ ipf_findlookup(softc, fr, addrp, funcp)
 	switch (addrp->iplookupsubtype)
 	{
 	case 0 :
-		ptr = ipf_lookup_res_num(softc, addrp->iplookuptype,
-					 IPL_LOGIPF, addrp->iplookupnum,
-					 funcp);
+		ptr = ipf_lookup_res_num(softc, unit, addrp->iplookuptype,
+					 addrp->iplookupnum, funcp);
 		break;
 	case 1 :
 		if (addrp->iplookupname < 0)
 			break;
 		if (addrp->iplookupname >= fr->fr_namelen)
 			break;
-		ptr = ipf_lookup_res_name(softc, addrp->iplookuptype,
-					  IPL_LOGIPF,
+		ptr = ipf_lookup_res_name(softc, unit, addrp->iplookuptype,
 					  fr->fr_names + addrp->iplookupname,
 					  funcp);
 		break;

@@ -2005,20 +2005,20 @@ ipf_state_add(softc, fin, stsave, flags)
 		(void) ipf_frag_new(softc, fin, pass);
 	fdp = &fr->fr_tifs[0];
 	if (fdp->fd_type == FRD_DSTLIST)
-		fdp->fd_ptr = ipf_lookup_res_name(softc, IPLT_DSTLIST,
-						  IPL_LOGIPF,
+		fdp->fd_ptr = ipf_lookup_res_name(softc, IPL_LOGIPF,
+						  IPLT_DSTLIST,
 						  fr->fr_names + fdp->fd_name,
 						  NULL);
 	fdp = &fr->fr_tifs[1];
 	if (fdp->fd_type == FRD_DSTLIST)
-		fdp->fd_ptr = ipf_lookup_res_name(softc, IPLT_DSTLIST,
-						  IPL_LOGIPF,
+		fdp->fd_ptr = ipf_lookup_res_name(softc, IPL_LOGIPF,
+						  IPLT_DSTLIST,
 						  fr->fr_names + fdp->fd_name,
 						  NULL);
 	fdp = &fr->fr_dif;
 	if (fdp->fd_type == FRD_DSTLIST)
-		fdp->fd_ptr = ipf_lookup_res_name(softc, IPLT_DSTLIST,
-						  IPL_LOGIPF,
+		fdp->fd_ptr = ipf_lookup_res_name(softc, IPL_LOGIPF,
+						  IPLT_DSTLIST,
 						  fr->fr_names + fdp->fd_name,
 						  NULL);
 

@@ -824,8 +824,8 @@ ipf_lookup_deltok(softc, data, uid, ctx)
 /* Function:    ipf_lookup_res_num                                          */
 /* Returns:     void * - NULL = failure, else success.                      */
 /* Parameters:  softc(I) - pointer to soft context main structure           */
-/*              type(I)     - type of lookup these parameters are for.      */
 /*              unit(I)     - device for which this is for                  */
+/*              type(I)     - type of lookup these parameters are for.      */
 /*              number(I)   - table number to use when searching            */
 /*              funcptr(IO) - pointer to pointer for storing IP address     */
 /*                            searching function.                           */
@@ -836,10 +836,10 @@ ipf_lookup_deltok(softc, data, uid, ctx)
 /* or not the "table" number exists.                                        */
 /* ------------------------------------------------------------------------ */
 void *
-ipf_lookup_res_num(softc, type, unit, number, funcptr)
+ipf_lookup_res_num(softc, unit, type, number, funcptr)
 	ipf_main_softc_t *softc;
-	u_int type;
 	int unit;
+	u_int type;
 	u_int number;
 	lookupfunc_t *funcptr;
 {
@@ -851,7 +851,7 @@ ipf_lookup_res_num(softc, type, unit, number, funcptr)
 	(void) sprintf(name, "%u", number);
 #endif
 
-	return ipf_lookup_res_name(softc, type, unit, name, funcptr);
+	return ipf_lookup_res_name(softc, unit, type, name, funcptr);
 }
 
 
@@ -859,8 +859,8 @@ ipf_lookup_res_num(softc, type, unit, number, funcptr)
 /* Function:    ipf_lookup_res_name                                         */
 /* Returns:     void * - NULL = failure, else success.                      */
 /* Parameters:  softc(I) - pointer to soft context main structure           */
-/*              type(I)     - type of lookup these parameters are for.      */
 /*              unit(I)     - device for which this is for                  */
+/*              type(I)     - type of lookup these parameters are for.      */
 /*              name(I)     - table name to use when searching              */
 /*              funcptr(IO) - pointer to pointer for storing IP address     */
 /*                            searching function.                           */
@@ -871,10 +871,10 @@ ipf_lookup_res_num(softc, type, unit, number, funcptr)
 /* or not the "table" number exists.                                        */
 /* ------------------------------------------------------------------------ */
 void *
-ipf_lookup_res_name(softc, type, unit, name, funcptr)
+ipf_lookup_res_name(softc, unit, type, name, funcptr)
 	ipf_main_softc_t *softc;
-	u_int type;
 	int unit;
+	u_int type;
 	char *name;
 	lookupfunc_t *funcptr;
 {

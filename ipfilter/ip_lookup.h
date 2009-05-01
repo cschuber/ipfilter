@@ -133,8 +133,10 @@ extern int ipf_lookup_ioctl __P((ipf_main_softc_t *, caddr_t, ioctlcmd_t, int, i
 extern void ipf_lookup_main_unload __P((void));
 extern void ipf_lookup_deref __P((ipf_main_softc_t *, int, void *));
 extern void ipf_lookup_iterderef __P((ipf_main_softc_t *, u_32_t, void *));
-extern void *ipf_lookup_res_name __P((ipf_main_softc_t *, u_int, int, char *, lookupfunc_t *));
-extern void *ipf_lookup_res_num __P((ipf_main_softc_t *, u_int, int, u_int, lookupfunc_t *));
+extern void *ipf_lookup_res_name __P((ipf_main_softc_t *, int, u_int, char *,
+				      lookupfunc_t *));
+extern void *ipf_lookup_res_num __P((ipf_main_softc_t *, int, u_int, u_int,
+				     lookupfunc_t *));
 extern void ipf_lookup_soft_destroy __P((ipf_main_softc_t *, void *));
 extern void *ipf_lookup_soft_create __P((ipf_main_softc_t *));
 extern int ipf_lookup_soft_init __P((ipf_main_softc_t *, void *));
