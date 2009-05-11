@@ -43,7 +43,7 @@ struct	ipftcphdr	{
 	__u32	th_seq;
 	__u32	th_ack;
 # if defined(__i386__) || defined(__MIPSEL__) || defined(__alpha__) ||\
-	defined(__vax__)
+	defined(__vax__)  || defined(__x86_64__)
 	__u8	th_res:4;
 	__u8	th_off:4;
 #else
