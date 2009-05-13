@@ -611,11 +611,17 @@ void *ctx;
 
 		SPL_SCHED(s);
 		token = ipf_findtoken(IPFGENITER_STATE, uid, ctx);
-		if (token != NULL)
+		if (token != NULL) {
 			error = fr_stateiter(token, &iter);
-		else
+			WRITE_ENTER(&ipf_tokens);
+			if (token->ipt_data == NULL)
+				ipf_freetoken(token);
+			else
+				ipf_dereftoken(token);
+			RWLOCK_EXIT(&ipf_tokens);
+		} else {
 			error = ESRCH;
-		RWLOCK_EXIT(&ipf_tokens);
+		}
 		SPL_X(s);
 		break;
 	    }
@@ -4368,14 +4374,13 @@ ipfgeniter_t *itp;
 		error = COPYOUT(next, dst, sizeof(*next));
 		if (error != 0)
 			error = EFAULT;
-		if (token->ipt_data == NULL) {
-			ipf_freetoken(token);
+		if (token->ipt_data != NULL) {
 			break;
 		} else {
 			if (is != NULL)
 				fr_statederef(&is);
 			if (next->is_next == NULL) {
-				ipf_freetoken(token);
+				token->ipt_data = NULL;
 				break;
 			}
 		}

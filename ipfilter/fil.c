@@ -6668,8 +6668,6 @@ void *ptr;
 
 	WRITE_ENTER(&ipf_tokens);
 	for (it = ipftokenhead; it != NULL; it = it->ipt_next) {
-		if (it->ipt_alive == 0)
-			continue;
 		if (ptr == it->ipt_ctx && type == it->ipt_type &&
 		    uid == it->ipt_uid)
 			break;
@@ -6685,7 +6683,7 @@ void *ptr;
 		it->ipt_uid = uid;
 		it->ipt_type = type;
 		it->ipt_next = NULL;
-		it->ipt_alive = 1;
+		it->ipt_ref = 2;
 	} else {
 		if (new != NULL) {
 			KFREE(new);
@@ -6693,6 +6691,7 @@ void *ptr;
 		}
 
 		ipf_unlinktoken(it);
+		it->ipt_ref++;
 	}
 	it->ipt_pnext = ipftokentail;
 	*ipftokentail = it;
@@ -6701,7 +6700,7 @@ void *ptr;
 
 	it->ipt_die = fr_ticks + 2;
 
-	MUTEX_DOWNGRADE(&ipf_tokens);
+	RWLOCK_EXIT(&ipf_tokens);
 
 	return it;
 }
@@ -6711,6 +6710,7 @@ void *ptr;
 /* Function:    ipf_unlinktoken                                             */
 /* Returns:     None.                                                       */
 /* Parameters:  token(I) - pointer to token structure                       */
+/* Write Locks: ipf_tokens                                                  */
 /*                                                                          */
 /* This function unlinks a token structure from the linked list of tokens   */
 /* that "own" it.  The head pointer never needs to be explicitly adjusted   */
@@ -6729,22 +6729,25 @@ ipftoken_t *token;
 }
 
 
+
 /* ------------------------------------------------------------------------ */
-/* Function:    ipf_freetoken                                               */
+/* Function:    ipf_dereftoken                                              */
 /* Returns:     None.                                                       */
 /* Parameters:  token(I) - pointer to token structure                       */
+/* Write Locks: ipf_tokens                                                  */
 /*                                                                          */
-/* This function unlinks a token from the linked list and on the path to    */
-/* free'ing the data, it calls the dereference function that is associated  */
-/* with the type of data pointed to by the token as it is considered to     */
-/* hold a reference to it.                                                  */
+/* Drop the reference count on the token structure and if it drops to zero, */
+/* call the dereference function for the token type because it is then      */
+/* possible to free the token data structure.                               */
 /* ------------------------------------------------------------------------ */
-void ipf_freetoken(token)
+void ipf_dereftoken(token)
 ipftoken_t *token;
 {
 	void *data, **datap;
 
-	ipf_unlinktoken(token);
+	token->ipt_ref--;
+	if (token->ipt_ref > 0)
+		return;
 
 	data = token->ipt_data;
 	datap = &data;
@@ -6794,6 +6797,25 @@ ipftoken_t *token;
 	}
 
 	KFREE(token);
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_freetoken                                               */
+/* Returns:     None.                                                       */
+/* Parameters:  token(I) - pointer to token structure                       */
+/* Write Locks: ipf_tokens                                                  */
+/*                                                                          */
+/* This function unlinks a token from the linked list and does a dereference*/
+/* on it to encourage it to be freed.                                       */
+/* ------------------------------------------------------------------------ */
+void ipf_freetoken(token)
+ipftoken_t *token;
+{
+
+	ipf_unlinktoken(token);
+
+	ipf_dereftoken(token);
 }
 
 
@@ -6898,7 +6920,6 @@ int ipf_getnextrule(ipftoken_t *t, void *ptr)
 		if (error != 0)
 			return EFAULT;
 		if (t->ipt_data == NULL) {
-			ipf_freetoken(t);
 			break;
 		} else {
 			if (fr != NULL)
@@ -6948,11 +6969,17 @@ int uid;
 	int error;
 
 	token = ipf_findtoken(IPFGENITER_IPF, uid, ctx);
-	if (token != NULL)
+	if (token != NULL) {
 		error = ipf_getnextrule(token, data);
-	else
+		WRITE_ENTER(&ipf_tokens);
+		if (token->ipt_data == NULL)
+			ipf_freetoken(token);
+		else
+			ipf_dereftoken(token);
+		RWLOCK_EXIT(&ipf_tokens);
+	} else {
 		error = EFAULT;
-	RWLOCK_EXIT(&ipf_tokens);
+	}
 
 	return error;
 }
@@ -7014,6 +7041,12 @@ int uid;
 	if (token != NULL) {
 		token->ipt_subtype = iter.igi_type;
 		error = ipf_geniter(token, &iter);
+		WRITE_ENTER(&ipf_tokens);
+		if (token->ipt_data == NULL)
+			ipf_freetoken(token);
+		else
+			ipf_dereftoken(token);
+		RWLOCK_EXIT(&ipf_tokens);
 	} else
 		error = EFAULT;
 	RWLOCK_EXIT(&ipf_tokens);

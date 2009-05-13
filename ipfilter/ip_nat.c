@@ -911,9 +911,14 @@ void *ctx;
 		if (error == 0) {
 			token = ipf_findtoken(iter.igi_type, uid, ctx);
 			if (token != NULL) {
-				error  = nat_iterator(token, &iter);
+				error = nat_iterator(token, &iter);
+				WRITE_ENTER(&ipf_tokens);
+				if (token->ipt_data == NULL)
+					ipf_freetoken(token);
+				else
+					ipf_dereftoken(token);
+				RWLOCK_EXIT(&ipf_tokens);
 			}
-			RWLOCK_EXIT(&ipf_tokens);
 		}
 		SPL_X(s);
 		break;
@@ -5165,17 +5170,14 @@ ipfgeniter_t *itp;
 			error = COPYOUT(nexthm, dst, sizeof(*nexthm));
 			if (error != 0)
 				error = EFAULT;
-			if (t->ipt_data == NULL) {
-				ipf_freetoken(t);
-				break;
-			} else {
+			if (t->ipt_data != NULL) {
 				if (hm != NULL) {
 					WRITE_ENTER(&ipf_nat);
 					fr_hostmapdel(&hm);
 					RWLOCK_EXIT(&ipf_nat);
 				}
 				if (nexthm->hm_next == NULL) {
-					ipf_freetoken(t);
+					t->ipt_data = NULL;
 					break;
 				}
 				dst += sizeof(*nexthm);
@@ -5188,17 +5190,14 @@ ipfgeniter_t *itp;
 			error = COPYOUT(nextipnat, dst, sizeof(*nextipnat));
 			if (error != 0)
 				error = EFAULT;
-			if (t->ipt_data == NULL) {
-				ipf_freetoken(t);
-				break;
-			} else {
+			if (t->ipt_data != NULL) {
 				if (ipn != NULL) {
 					WRITE_ENTER(&ipf_nat);
 					fr_ipnatderef(&ipn);
 					RWLOCK_EXIT(&ipf_nat);
 				}
 				if (nextipnat->in_next == NULL) {
-					ipf_freetoken(t);
+					t->ipt_data = NULL;
 					break;
 				}
 				dst += sizeof(*nextipnat);
@@ -5211,15 +5210,12 @@ ipfgeniter_t *itp;
 			error = COPYOUT(nextnat, dst, sizeof(*nextnat));
 			if (error != 0)
 				error = EFAULT;
-			if (t->ipt_data == NULL) {
-				ipf_freetoken(t);
-				break;
-			} else {
+			if (t->ipt_data != NULL) {
 				if (nat != NULL) {
 					fr_natderef(&nat);
 				}
 				if (nextnat->nat_next == NULL) {
-					ipf_freetoken(t);
+					t->ipt_data = NULL;
 					break;
 				}	
 				dst += sizeof(*nextnat);

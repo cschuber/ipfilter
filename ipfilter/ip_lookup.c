@@ -613,6 +613,9 @@ void *ctx;
 		err = EINVAL;
 		break;
 	}
+
+	WRITE_ENTER(&ipf_tokens);
+	ipf_dereftoken(token);
 	RWLOCK_EXIT(&ipf_tokens);
 	SPL_X(s);
 

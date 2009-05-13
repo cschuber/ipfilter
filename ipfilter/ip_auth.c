@@ -425,11 +425,17 @@ void *ctx;
 
 		SPL_SCHED(s);
 		token = ipf_findtoken(IPFGENITER_AUTH, uid, ctx);
-		if (token != NULL)
+		if (token != NULL) {
 			error = fr_authgeniter(token, &iter);
-		else
+			WRITE_ENTER(&ipf_tokens);
+			if (token->ipt_data == NULL)
+				ipf_freetoken(token);
+			else
+				ipf_dereftoken(token);
+			RWLOCK_EXIT(&ipf_tokens);
+		} else {
 			error = ESRCH;
-		RWLOCK_EXIT(&ipf_tokens);
+		}
 		SPL_X(s);
 
 		break;
@@ -798,16 +804,14 @@ ipfgeniter_t *itp;
 	/*
 	 * Clean up reference and token.
 	 */
-	if (token->ipt_data == NULL) {
-		ipf_freetoken(token);
-	} else {
+	if (token->ipt_data != NULL) {
 		if (fae != NULL) {
 			WRITE_ENTER(&ipf_auth);
 			fr_authderef(&fae);
 			RWLOCK_EXIT(&ipf_auth);
 		}
 		if (next->fae_next == NULL)
-			ipf_freetoken(token);
+			token->ipt_data = NULL;
 	}
 	return error;
 }

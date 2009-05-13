@@ -1221,7 +1221,7 @@ typedef struct ipftoken {
 	int		ipt_type;
 	int		ipt_uid;
 	int		ipt_subtype;
-	int		ipt_alive;
+	int		ipt_ref;
 } ipftoken_t;
 
 
@@ -1516,6 +1516,7 @@ extern	int		fr_tcpudpchk __P((fr_info_t *, frtuc_t *));
 extern	int		fr_verifysrc __P((fr_info_t *fin));
 extern	int		fr_zerostats __P((void *));
 extern	ipftoken_t	*ipf_findtoken __P((int, int, void *));
+extern	void		ipf_dereftoken __P((ipftoken_t *));
 extern	int		ipf_getnextrule __P((ipftoken_t *, void *));
 extern	void		ipf_expiretokens __P((void));
 extern	void		ipf_freetoken __P((ipftoken_t *));
