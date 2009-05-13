@@ -489,7 +489,8 @@ int ipfdetach(void)
 	SPL_NET(s);
 
 #if (__NetBSD_Version__ >= 104010000)
-	callout_stop(&fr_slowtimer_ch);
+	if (fr_running > 0)
+		callout_stop(&fr_slowtimer_ch);
 #else
 	untimeout(fr_slowtimer, NULL);
 #endif /* NetBSD */
