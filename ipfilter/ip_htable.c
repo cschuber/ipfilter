@@ -1327,16 +1327,14 @@ ipf_htable_iter_next(softc, arg, token, ilp)
 			softc->ipf_interror = 30011;
 			err = EFAULT;
 		}
-		if (token->ipt_data == NULL) {
-			ipf_freetoken(softc, token);
-		} else {
+		if (token->ipt_data != NULL) {
 			if (iph != NULL) {
 				WRITE_ENTER(&softc->ipf_poolrw);
 				ipf_htable_deref(softc, softh, iph);
 				RWLOCK_EXIT(&softc->ipf_poolrw);
 			}
 			if (nextiph->iph_next == NULL)
-				ipf_freetoken(softc, token);
+				token->ipt_data = NULL;
 		}
 		break;
 
@@ -1346,16 +1344,14 @@ ipf_htable_iter_next(softc, arg, token, ilp)
 			softc->ipf_interror = 30012;
 			err = EFAULT;
 		}
-		if (token->ipt_data == NULL) {
-			ipf_freetoken(softc, token);
-		} else {
+		if (token->ipt_data != NULL) {
 			if (node != NULL) {
 				WRITE_ENTER(&softc->ipf_poolrw);
 				ipf_htent_deref(softc, node);
 				RWLOCK_EXIT(&softc->ipf_poolrw);
 			}
 			if (nextnode->ipe_next == NULL)
-				ipf_freetoken(softc, token);
+				token->ipt_data = NULL;
 		}
 		break;
 	}

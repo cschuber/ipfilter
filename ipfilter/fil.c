@@ -7693,7 +7693,7 @@ ipf_resolvenic(softc, name, v)
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    ipf_expiretokens                                            */
+/* Function:    ipf_token_expire                                            */
 /* Returns:     None.                                                       */
 /* Parameters:  None.                                                       */
 /*                                                                          */
@@ -7701,7 +7701,7 @@ ipf_resolvenic(softc, name, v)
 /* have been held for too long and need to be freed up.                     */
 /* ------------------------------------------------------------------------ */
 void
-ipf_expiretokens(softc)
+ipf_token_expire(softc)
 	ipf_main_softc_t *softc;
 {
 	ipftoken_t *it;
@@ -7711,14 +7711,14 @@ ipf_expiretokens(softc)
 		if (it->ipt_die > softc->ipf_ticks)
 			break;
 
-		ipf_freetoken(softc, it);
+		ipf_token_free(softc, it);
 	}
 	RWLOCK_EXIT(&softc->ipf_tokens);
 }
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    ipf_deltoken                                                */
+/* Function:    ipf_token_del                                                */
 /* Returns:     int     - 0 = success, else error                           */
 /* Parameters:  type(I) - the token type to match                           */
 /*              uid(I)  - uid owning the token                              */
@@ -7726,10 +7726,10 @@ ipf_expiretokens(softc)
 /*                                                                          */
 /* This function looks for a a token in the current list that matches up    */
 /* the fields (type, uid, ptr).  If none is found, ESRCH is returned, else  */
-/* call ipf_freetoken() to remove it from the list.                         */
+/* call ipf_token_free() to remove it from the list.                         */
 /* ------------------------------------------------------------------------ */
 int
-ipf_deltoken(softc, type, uid, ptr)
+ipf_token_del(softc, type, uid, ptr)
 	ipf_main_softc_t *softc;
 	int type, uid;
 	void *ptr;
@@ -7744,7 +7744,7 @@ ipf_deltoken(softc, type, uid, ptr)
 	for (it = softc->ipf_token_head; it != NULL; it = it->ipt_next)
 		if (ptr == it->ipt_ctx && type == it->ipt_type &&
 		    uid == it->ipt_uid) {
-			ipf_freetoken(softc, it);
+			ipf_token_free(softc, it);
 			softc->ipf_interror = 83;
 			error = 0;
 			break;
@@ -7756,7 +7756,7 @@ ipf_deltoken(softc, type, uid, ptr)
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    ipf_findtoken                                               */
+/* Function:    ipf_token_find                                               */
 /* Returns:     ipftoken_t * - NULL if no memory, else pointer to token     */
 /* Parameters:  type(I) - the token type to match                           */
 /*              uid(I)  - uid owning the token                              */
@@ -7766,12 +7766,9 @@ ipf_deltoken(softc, type, uid, ptr)
 /* matches the tuple (type, uid, ptr).  If one cannot be found then one is  */
 /* allocated.  If one is found then it is moved to the top of the list of   */
 /* currently active tokens.                                                 */
-/*                                                                          */
-/* NOTE: It is by design that this function returns holding a read lock on  */
-/*       ipf_tokens.  Callers must make sure they release it!               */
 /* ------------------------------------------------------------------------ */
 ipftoken_t *
-ipf_findtoken(softc, type, uid, ptr)
+ipf_token_find(softc, type, uid, ptr)
 	ipf_main_softc_t *softc;
 	int type, uid;
 	void *ptr;
@@ -7782,8 +7779,6 @@ ipf_findtoken(softc, type, uid, ptr)
 
 	WRITE_ENTER(&softc->ipf_tokens);
 	for (it = softc->ipf_token_head; it != NULL; it = it->ipt_next) {
-		if (it->ipt_alive == 0)
-			continue;
 		if (ptr == it->ipt_ctx && type == it->ipt_type &&
 		    uid == it->ipt_uid)
 			break;
@@ -7799,7 +7794,7 @@ ipf_findtoken(softc, type, uid, ptr)
 		it->ipt_uid = uid;
 		it->ipt_type = type;
 		it->ipt_next = NULL;
-		it->ipt_alive = 1;
+		it->ipt_ref = 2;
 	} else {
 		if (new != NULL) {
 			KFREE(new);
@@ -7807,6 +7802,7 @@ ipf_findtoken(softc, type, uid, ptr)
 		}
 
 		ipf_token_unlink(softc, it);
+		it->ipt_ref++;
 	}
 	it->ipt_pnext = softc->ipf_token_tail;
 	*softc->ipf_token_tail = it;
@@ -7815,7 +7811,7 @@ ipf_findtoken(softc, type, uid, ptr)
 
 	it->ipt_die = softc->ipf_ticks + 2;
 
-	MUTEX_DOWNGRADE(&softc->ipf_tokens);
+	RWLOCK_EXIT(&softc->ipf_tokens);
 
 	return it;
 }
@@ -7825,6 +7821,7 @@ ipf_findtoken(softc, type, uid, ptr)
 /* Function:    ipf_token_unlink                                             */
 /* Returns:     None.                                                       */
 /* Parameters:  token(I) - pointer to token structure                       */
+/* Write Locks: ipf_tokens                                                  */
 /*                                                                          */
 /* This function unlinks a token structure from the linked list of tokens   */
 /* that "own" it.  The head pointer never needs to be explicitly adjusted   */
@@ -7846,23 +7843,25 @@ ipf_token_unlink(softc, token)
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    ipf_freetoken                                               */
+/* Function:    ipf_token_deref                                             */
 /* Returns:     None.                                                       */
 /* Parameters:  token(I) - pointer to token structure                       */
+/* Write Locks: ipf_tokens                                                  */
 /*                                                                          */
-/* This function unlinks a token from the linked list and on the path to    */
-/* free'ing the data, it calls the dereference function that is associated  */
-/* with the type of data pointed to by the token as it is considered to     */
-/* hold a reference to it.                                                  */
+/* Drop the reference count on the token structure and if it drops to zero, */
+/* call the dereference function for the token type because it is then      */
+/* possible to free the token data structure.                               */
 /* ------------------------------------------------------------------------ */
 void
-ipf_freetoken(softc, token)
+ipf_token_deref(softc, token)
 	ipf_main_softc_t *softc;
 	ipftoken_t *token;
 {
 	void *data, **datap;
 
-	ipf_token_unlink(softc, token);
+	token->ipt_ref--;
+	if (token->ipt_ref > 0)
+		return;
 
 	data = token->ipt_data;
 	datap = &data;
@@ -7902,6 +7901,27 @@ ipf_freetoken(softc, token)
 	}
 
 	KFREE(token);
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_token_free                                              */
+/* Returns:     None.                                                       */
+/* Parameters:  token(I) - pointer to token structure                       */
+/* Write Locks: ipf_tokens                                                  */
+/*                                                                          */
+/* This function unlinks a token from the linked list and does a dereference*/
+/* on it to encourage it to be freed.                                       */
+/* ------------------------------------------------------------------------ */
+void
+ipf_token_free(softc, token)
+	ipf_main_softc_t *softc;
+	ipftoken_t *token;
+{
+
+	ipf_token_unlink(softc, token);
+
+	ipf_token_deref(softc, token);
 }
 
 
@@ -8018,7 +8038,6 @@ ipf_getnextrule(softc, t, ptr)
 			return EFAULT;
 		}
 		if (t->ipt_data == NULL) {
-			ipf_freetoken(softc, t);
 			break;
 		} else {
 			if (fr != NULL)
@@ -8035,7 +8054,7 @@ ipf_getnextrule(softc, t, ptr)
 				}
 			}
 			if (next->fr_next == NULL) {
-				ipf_freetoken(softc, t);
+				t->ipt_data = NULL;
 				break;
 			}
 		}
@@ -8071,14 +8090,19 @@ ipf_frruleiter(softc, data, uid, ctx)
 	ipftoken_t *token;
 	int error;
 
-	token = ipf_findtoken(softc, IPFGENITER_IPF, uid, ctx);
+	token = ipf_token_find(softc, IPFGENITER_IPF, uid, ctx);
 	if (token != NULL) {
 		error = ipf_getnextrule(softc, token, data);
 	} else {
+		WRITE_ENTER(&softc->ipf_tokens);
+		if (token->ipt_data == NULL)
+			ipf_token_free(softc, token);
+		else
+			ipf_token_deref(softc, token);
+		RWLOCK_EXIT(&softc->ipf_tokens);
 		softc->ipf_interror = 91;
 		error = EFAULT;
 	}
-	RWLOCK_EXIT(&softc->ipf_tokens);
 
 	return error;
 }
@@ -8136,15 +8160,20 @@ ipf_genericiter(softc, data, uid, ctx)
 	if (error != 0)
 		return error;
 
-	token = ipf_findtoken(softc, iter.igi_type, uid, ctx);
+	token = ipf_token_find(softc, iter.igi_type, uid, ctx);
 	if (token != NULL) {
 		token->ipt_subtype = iter.igi_type;
 		error = ipf_geniter(softc, token, &iter);
 	} else {
+		WRITE_ENTER(&softc->ipf_tokens);
+		if (token->ipt_data == NULL)
+			ipf_token_free(softc, token);
+		else
+			ipf_token_deref(softc, token);
+		RWLOCK_EXIT(&softc->ipf_tokens);
 		softc->ipf_interror = 93;
 		error = EFAULT;
 	}
-	RWLOCK_EXIT(&softc->ipf_tokens);
 
 	return error;
 }
@@ -8423,7 +8452,7 @@ ipf_ipf_ioctl(softc, data, cmd, mode, uid, ctx)
 		error = BCOPYIN(data, &tmp, sizeof(tmp));
 		if (error == 0) {
 			SPL_SCHED(s);
-			error = ipf_deltoken(softc, tmp, uid, ctx);
+			error = ipf_token_del(softc, tmp, uid, ctx);
 			SPL_X(s);
 		}
 		break;

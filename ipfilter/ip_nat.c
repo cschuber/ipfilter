@@ -1380,9 +1380,15 @@ ipf_nat_ioctl(softc, data, cmd, mode, uid, ctx)
 			break;
 
 		SPL_SCHED(s);
-		token = ipf_findtoken(softc, iter.igi_type, uid, ctx);
+		token = ipf_token_find(softc, iter.igi_type, uid, ctx);
 		if (token != NULL) {
 			error  = ipf_nat_iterator(softc, token, &iter);
+			WRITE_ENTER(&softc->ipf_tokens);
+			if (token->ipt_data == NULL)
+				ipf_token_free(softc, token);
+			else
+				ipf_token_deref(softc, token);
+			RWLOCK_EXIT(&softc->ipf_tokens);
 		}
 		RWLOCK_EXIT(&softc->ipf_tokens);
 		SPL_X(s);
@@ -1393,7 +1399,7 @@ ipf_nat_ioctl(softc, data, cmd, mode, uid, ctx)
 		error = BCOPYIN(data, &arg, sizeof(arg));
 		if (error == 0) {
 			SPL_SCHED(s);
-			error = ipf_deltoken(softc, arg, uid, ctx);
+			error = ipf_token_del(softc, arg, uid, ctx);
 			SPL_X(s);
 		} else {
 			softc->ipf_interror = 60019;
@@ -6897,17 +6903,14 @@ ipf_nat_getnext(softc, t, itp)
 				softc->ipf_interror = 60049;
 				error = EFAULT;
 			}
-			if (t->ipt_data == NULL) {
-				ipf_freetoken(softc, t);
-				break;
-			} else {
+			if (t->ipt_data != NULL) {
 				if (hm != NULL) {
 					WRITE_ENTER(&softc->ipf_nat);
 					ipf_nat_hostmapdel(&hm);
 					RWLOCK_EXIT(&softc->ipf_nat);
 				}
 				if (nexthm->hm_next == NULL) {
-					ipf_freetoken(softc, t);
+					t->ipt_data = NULL;
 					break;
 				}
 				dst += sizeof(*nexthm);
@@ -6922,17 +6925,14 @@ ipf_nat_getnext(softc, t, itp)
 				softc->ipf_interror = 60050;
 				error = EFAULT;
 			}
-			if (t->ipt_data == NULL) {
-				ipf_freetoken(softc, t);
-				break;
-			} else {
+			if (t->ipt_data != NULL) {
 				if (ipn != NULL) {
 					WRITE_ENTER(&softc->ipf_nat);
 					ipf_nat_rulederef(softc, &ipn);
 					RWLOCK_EXIT(&softc->ipf_nat);
 				}
 				if (nextipnat->in_next == NULL) {
-					ipf_freetoken(softc, t);
+					t->ipt_data = NULL;
 					break;
 				}
 				dst += nextipnat->in_size;
@@ -6947,15 +6947,12 @@ ipf_nat_getnext(softc, t, itp)
 				softc->ipf_interror = 60051;
 				error = EFAULT;
 			}
-			if (t->ipt_data == NULL) {
-				ipf_freetoken(softc, t);
-				break;
-			} else {
+			if (t->ipt_data != NULL) {
 				if (nat != NULL) {
 					ipf_nat_deref(softc, &nat);
 				}
 				if (nextnat->nat_next == NULL) {
-					ipf_freetoken(softc, t);
+					t->ipt_data = NULL;
 					break;
 				}
 				dst += sizeof(*nextnat);

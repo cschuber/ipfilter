@@ -803,9 +803,15 @@ ipf_state_ioctl(softc, data, cmd, mode, uid, ctx)
 			break;
 
 		SPL_SCHED(s);
-		token = ipf_findtoken(softc, IPFGENITER_STATE, uid, ctx);
+		token = ipf_token_find(softc, IPFGENITER_STATE, uid, ctx);
 		if (token != NULL) {
 			error = ipf_state_iter(softc, token, &iter);
+			WRITE_ENTER(&softc->ipf_tokens);
+			if (token->ipt_data == NULL)
+				ipf_token_free(softc, token);
+			else
+				ipf_token_deref(softc, token);
+			RWLOCK_EXIT(&softc->ipf_tokens);
 		} else {
 			softc->ipf_interror = 100018;
 			error = ESRCH;
@@ -826,7 +832,7 @@ ipf_state_ioctl(softc, data, cmd, mode, uid, ctx)
 			error = EFAULT;
 		} else {
 			SPL_SCHED(s);
-			error = ipf_deltoken(softc, arg, uid, ctx);
+			error = ipf_token_del(softc, arg, uid, ctx);
 			SPL_X(s);
 		}
 		break;
@@ -5067,14 +5073,11 @@ ipf_state_iter(softc, token, itp)
 			softc->ipf_interror = 100030;
 			error = EFAULT;
 		}
-		if (token->ipt_data == NULL) {
-			ipf_freetoken(softc, token);
-			break;
-		} else {
+		if (token->ipt_data != NULL) {
 			if (is != NULL)
 				ipf_state_deref(softc, &is);
 			if (next->is_next == NULL) {
-				ipf_freetoken(softc, token);
+				token->ipt_data = NULL;
 				break;
 			}
 		}

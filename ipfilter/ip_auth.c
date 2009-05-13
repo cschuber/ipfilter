@@ -615,14 +615,19 @@ ipf_auth_ioctl(softc, data, cmd, mode, uid, ctx)
 			break;
 
 		SPL_SCHED(s);
-		token = ipf_findtoken(softc, IPFGENITER_AUTH, uid, ctx);
+		token = ipf_token_find(softc, IPFGENITER_AUTH, uid, ctx);
 		if (token != NULL)
 			error = ipf_auth_geniter(softc, token, &iter);
 		else {
+			WRITE_ENTER(&softc->ipf_tokens);
+			if (token->ipt_data == NULL)
+				ipf_token_free(softc, token);
+			else
+				ipf_token_deref(softc, token);
+			RWLOCK_EXIT(&softc->ipf_tokens);
 			softc->ipf_interror = 10001;
 			error = ESRCH;
 		}
-		RWLOCK_EXIT(&softc->ipf_tokens);
 		SPL_X(s);
 
 		break;
@@ -970,16 +975,14 @@ ipf_auth_geniter(softc, token, itp)
 	/*
 	 * Clean up reference and token.
 	 */
-	if (token->ipt_data == NULL) {
-		ipf_freetoken(softc, token);
-	} else {
+	if (token->ipt_data != NULL) {
 		if (fae != NULL) {
 			WRITE_ENTER(&softa->ipf_authlk);
 			ipf_auth_deref(&fae);
 			RWLOCK_EXIT(&softa->ipf_authlk);
 		}
 		if (next->fae_next == NULL)
-			ipf_freetoken(softc, token);
+			token->ipt_data = NULL;
 	}
 	return error;
 }

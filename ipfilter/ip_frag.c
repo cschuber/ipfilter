@@ -1157,7 +1157,7 @@ ipf_slowtimer(ptr)
 
 	READ_ENTER(&softc->ipf_global);
 
-	ipf_expiretokens(softc);
+	ipf_token_expire(softc);
 	ipf_frag_expire(softc);
 	ipf_state_expire(softc);
 	ipf_nat_expire(softc);
@@ -1309,9 +1309,7 @@ ipf_frag_next(softc, token, itp, top, tail
 		softc->ipf_interror = 20002;
 		error = EFAULT;
 	}
-        if (token->ipt_data == NULL) {
-                ipf_freetoken(softc, token);
-        } else {
+        if (token->ipt_data != NULL) {
                 if (frag != NULL)
 #ifdef USE_MUTEXES
                         ipf_frag_deref(softc, &frag, lock);
@@ -1319,7 +1317,7 @@ ipf_frag_next(softc, token, itp, top, tail
                         ipf_frag_deref(softc, &frag);
 #endif
                 if (next->ipfr_next == NULL)
-                        ipf_freetoken(softc, token);
+                        token->ipt_data = NULL;
         }
         return error;
 }

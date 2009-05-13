@@ -1497,7 +1497,7 @@ typedef struct ipftoken {
 	int		ipt_type;
 	int		ipt_uid;
 	int		ipt_subtype;
-	int		ipt_alive;
+	int		ipt_ref;
 } ipftoken_t;
 
 
@@ -1868,15 +1868,16 @@ extern	frentry_t 	*ipf_srcgrpmap __P((fr_info_t *, u_32_t *));
 extern	int		ipf_tcpudpchk __P((fr_ip_t *, frtuc_t *));
 extern	int		ipf_verifysrc __P((fr_info_t *fin));
 extern	int		ipf_zerostats __P((ipf_main_softc_t *, char *));
-extern	ipftoken_t	*ipf_findtoken __P((ipf_main_softc_t *, int, int,
-					    void *));
 extern	int		ipf_getnextrule __P((ipf_main_softc_t *, ipftoken_t *,
 					     void *));
-extern	void		ipf_expiretokens __P((ipf_main_softc_t *));
-extern	void		ipf_freetoken __P((ipf_main_softc_t *, ipftoken_t *));
-extern	int		ipf_deltoken __P((ipf_main_softc_t *, int, int,
-					  void *));
 extern	int		ipf_sync __P((ipf_main_softc_t *, void *));
+extern	void		ipf_token_deref __P((ipf_main_softc_t *, ipftoken_t *));
+extern	void		ipf_token_expire __P((ipf_main_softc_t *));
+extern	ipftoken_t	*ipf_token_find __P((ipf_main_softc_t *, int, int,
+					    void *));
+extern	void		ipf_token_free __P((ipf_main_softc_t *, ipftoken_t *));
+extern	int		ipf_token_del __P((ipf_main_softc_t *, int, int,
+					  void *));
 extern	int		ipf_genericiter __P((ipf_main_softc_t *, void *,
 					     int, void *));
 #ifdef	IPFILTER_LOOKUP
