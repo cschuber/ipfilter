@@ -886,16 +886,14 @@ ipflookupiter_t *ilp;
 		err = COPYOUT(nextipo, ilp->ili_data, sizeof(*nextipo));
 		if (err != 0)
 			err = EFAULT;
-		if (token->ipt_data == NULL) {
-			ipf_freetoken(token);
-		} else {
+		if (token->ipt_data != NULL) {
 			if (ipo != NULL) {
 				WRITE_ENTER(&ip_poolrw);
 				ip_pool_deref(ipo);
 				RWLOCK_EXIT(&ip_poolrw);
 			}
 			if (nextipo->ipo_next == NULL)
-				ipf_freetoken(token);
+				token->ipt_data = NULL;
 		}
 		break;
 
@@ -903,16 +901,14 @@ ipflookupiter_t *ilp;
 		err = COPYOUT(nextnode, ilp->ili_data, sizeof(*nextnode));
 		if (err != 0)
 			err = EFAULT;
-		if (token->ipt_data == NULL) {
-			ipf_freetoken(token);
-		} else {
+		if (token->ipt_data != NULL) {
 			if (node != NULL) {
 				WRITE_ENTER(&ip_poolrw);
 				ip_pool_node_deref(node);
 				RWLOCK_EXIT(&ip_poolrw);
 			}
 			if (nextnode->ipn_next == NULL)
-				ipf_freetoken(token);
+				token->ipt_data = NULL;
 		}
 		break;
 	}

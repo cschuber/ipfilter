@@ -994,9 +994,7 @@ ipfrwlock_t *lock;
 	error = COPYOUT(next, itp->igi_data, sizeof(*next));
 	if (error != 0)
 		error = EFAULT;
-	if (token->ipt_data == NULL) {
-		ipf_freetoken(token);
-	} else {
+	if (token->ipt_data != NULL) {
 		if (frag != NULL)
 #ifdef USE_MUTEXES
 			fr_fragderef(&frag, lock);
@@ -1004,7 +1002,7 @@ ipfrwlock_t *lock;
 			fr_fragderef(&frag);
 #endif
 		if (next->ipfr_next == NULL)
-			ipf_freetoken(token);
+			token->ipt_data = NULL;
 	}
 	return error;
 }
