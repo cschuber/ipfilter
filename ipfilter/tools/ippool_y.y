@@ -431,13 +431,15 @@ poolline:
 					  resetlexer();
 					  use_inet6 = 0;
 					}
-	| IPT_POOL unit '/' IPT_GROUPMAP '(' IPT_NAME YY_STR ';' ')'
+	| IPT_GROUPMAP '(' IPT_NAME YY_STR ';' inout ';' ')'
 	  '{' setgrouplist '}'
 					{ bzero((char *)&ipht, sizeof(ipht));
-					  strncpy(ipht.iph_name, $7,
+					  strncpy(ipht.iph_name, $4,
 						  sizeof(ipht.iph_name));
-					  ipht.iph_unit = $2;
-					  load_hash(&ipht, $11, poolioctl);
+					  ipht.iph_type = IPHASH_GROUPMAP;
+					  ipht.iph_unit = IPL_LOGIPF;
+					  ipht.iph_flags = $6;
+					  load_hash(&ipht, $10, poolioctl);
 					  resetlexer();
 					  use_inet6 = 0;
 					}
