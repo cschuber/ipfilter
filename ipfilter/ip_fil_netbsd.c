@@ -449,7 +449,8 @@ ipfdetach(softc)
 	SPL_NET(s);
 
 #if (__NetBSD_Version__ >= 104010000)
-	callout_stop(&softc->ipf_slow_ch);
+	if (softc->ipf_running > 0)
+		callout_stop(&softc->ipf_slow_ch);
 #else
 	untimeout(ipf_slowtimer, NULL);
 #endif /* NetBSD */
