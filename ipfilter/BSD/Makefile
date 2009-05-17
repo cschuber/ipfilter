@@ -257,6 +257,10 @@ ipfrule.ko.5: ip_rulesx.o $(MLR)
 	ld -Bshareable -d -warn-common -o $(LKMR:S/.5$//) $(.TARGET:S/.ko/.kld/)
 .else
 	ld -warn-common -r -d -o $(.TARGET:S/.5$//) ip_rulesx.o $(MLR)
+	nm -g $(.TARGET:S/.5$//) | \
+	    awk '/^[^[:space:]]+ [^AU] (.*)$$/ { print ($$2=="C" ? "-N" : "-L") $$3 }' | \
+	    xargs -J% objcopy % $(.TARGET:S/.5$//)
+
 .endif
 
 ipfrule.ko: ip_rulesx.o $(MLR)
@@ -271,6 +275,9 @@ ipf.ko.5 ipl.ko.5: $(MODOBJS)
 	ld -Bshareable -d -warn-common -o $(LKM:S/.5$//) $(.TARGET:S/.ko/.kld/)
 .else
 	ld -warn-common -r -d -o $(.TARGET:S/.5$//) $(MODOBJS)
+	nm -g $(.TARGET:S/.5$//) | \
+	    awk '/^[^[:space:]]+ [^AU] (.*)$$/ { print ($$2=="C" ? "-N" : "-L") $$3 }' | \
+	    xargs -J% objcopy % $(.TARGET:S/.5$//)
 .endif
 
 ipf.ko ipl.ko: $(MODOBJS)
@@ -522,16 +529,22 @@ install:
 .else
 	-if [ -d /boot/kernel -a -f ipf.ko ] ; then \
 		if [ -f /boot/kernel/ipl.ko ] ; then \
-			objcopy --only-keep-debug ipf.ko /boot/kernel/ipl.ko.symbols; \
-			objcopy --strip-debug ipf.ko /boot/kernel/ipl.ko; \
+			objcopy --only-keep-debug ipf.ko 
+			    /boot/kernel/ipl.ko.symbols; \
+			objcopy --strip-debug \
+			    --add-gnu-debuglink=ipl.ko.symbols  \
+			    ipf.ko /boot/kernel/ipl.ko; \
 		else \
-			objcopy --only-keep-debug ipf.ko /boot/kernel/ipf.ko.symbols; \
-			objcopy --strip-debug ipf.ko /boot/kernel/ipf.ko; \
+			objcopy --only-keep-debug ipf.ko \
+			    /boot/kernel/ipf.ko.symbols; \
+			objcopy --strip-debug \
+			    --add-gnu-debuglink=ipl.ko.symbols \
+			    ipf.ko /boot/kernel/ipf.ko; \
 		fi \
 	fi
 	-if [ -d /boot/kernel -a -f ipfrule.ko ] ; then \
 		objcopy --only-keep-debug ipfrule.ko /boot/kernel/ipfrule.ko.symbols; \
-		objcopy --strip-debug ipfrule.ko /boot/kernel/ipfrule.ko; \
+		objcopy --strip-debug --add-gnu-debuglink=ipfrule.ko.symbols ipfrule.ko /boot/kernel/ipfrule.ko; \
 	fi
 .endif
 	-if [ -d /usr/lkm -a -f if_ipl.o ] ; then \
