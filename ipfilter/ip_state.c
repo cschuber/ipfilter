@@ -2062,6 +2062,13 @@ u_32_t cmask;
 	u_32_t cflx;
 	void *ifp;
 
+	/*
+	 * If a connection is about to be deleted, no packets
+	 * are allowed to match it.
+	 */
+	if (is->is_sti.tqe_ifq == &ips_deletetq)
+		continue;
+
 	rev = IP6_NEQ(&is->is_dst, dst);
 	ifp = fin->fin_ifp;
 	out = fin->fin_out;
@@ -2655,13 +2662,6 @@ icmp6again:
 		hvm = DOUBLE_HASH(hv);
 		for (isp = &ips_table[hvm]; ((is = *isp) != NULL); ) {
 			isp = &is->is_hnext;
-			/*
-			 * If a connection is about to be deleted, no packets
-			 * are allowed to match it.
-			 */
-			if (is->is_sti.tqe_ifq == &ips_deletetq)
-				continue;
-
 			if ((is->is_p != pr) || (is->is_v != v))
 				continue;
 			is = fr_matchsrcdst(fin, is, &src, &dst, NULL, FI_CMP);
