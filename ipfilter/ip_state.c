@@ -2067,7 +2067,7 @@ u_32_t cmask;
 	 * are allowed to match it.
 	 */
 	if (is->is_sti.tqe_ifq == &ips_deletetq)
-		continue;
+		return NULL;
 
 	rev = IP6_NEQ(&is->is_dst, dst);
 	ifp = fin->fin_ifp;
