@@ -1340,13 +1340,14 @@ static void *qif_illrouteto(int v, void *dst)
 
 		sin6.sin6_family = AF_INET6;
 		memcpy(&sin6.sin6_addr, dst, sizeof(sin6.sin6_addr));
-		return (void *)net_routeto(ipfipv6, (struct sockaddr *)&sin6);
+		return (void *)net_routeto(ipfipv6, NULL,
+					   (struct sockaddr *)&sin6);
 	}
 # endif
 
 	sin.sin_family = AF_INET;
 	sin.sin_addr = *(struct in_addr *)dst;
-	return (void *)net_routeto(ipfipv4, (struct sockaddr *)&sin);
+	return (void *)net_routeto(ipfipv4, NULL, (struct sockaddr *)&sin);
 }
 
 

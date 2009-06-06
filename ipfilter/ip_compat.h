@@ -224,8 +224,9 @@ typedef unsigned int	u_32_t;
 #  else
 #   include <sys/neti.h>
 
-extern net_data_t ipfipv4;
-extern net_data_t ipfipv6;
+extern net_handle_t ipfipv4;
+extern net_handle_t ipfipv6;
+
 
 typedef struct qpktinfo {
         void		*qpi_data;

@@ -192,9 +192,9 @@ static	size_t	hdrsizes[57][2] = {
 static dev_info_t *ipf_dev_info = NULL;
 
 #if defined(_INET_IP_STACK_H)
-static hook_t ipfhook;
-static int ipf_hook(hook_event_token_t, hook_data_t, netstack_t *);
-net_data_t ipfipv4, ipfipv6;
+static hook_t *ipfhook;
+static int ipf_hook(hook_event_token_t, hook_data_t, void *);
+net_handle_t ipfipv4, ipfipv6;
 #endif
 
 
@@ -326,20 +326,22 @@ ddi_attach_cmd_t cmd;
 			cmn_err(CE_WARN, "IP Filter: %s(pfh_sync) failed",
 				"pfil_add_hook");
 #else
-		HOOK_INIT(&ipfhook, ipf_hook, "ipf_v4");
+		HOOK_INIT(ipfhook, ipf_hook, "ipf_v4", NULL);
 
-		if (!(ipfipv4 = net_lookup(NHF_INET, GLOBAL_NETSTACKID)))
+		ipfipv4 = net_protocol_lookup(0, NHF_INET);
+		if (ipfipv4 == NULL)
 			goto attach_failed;
-		if (net_register_hook(ipfipv4, NH_PHYSICAL_IN, &ipfhook))
+		if (net_hook_register(ipfipv4, NH_PHYSICAL_IN, ipfhook))
 			goto attach_failed;
-		if (net_register_hook(ipfipv4, NH_PHYSICAL_OUT, &ipfhook))
+		if (net_hook_register(ipfipv4, NH_PHYSICAL_OUT, ipfhook))
 			goto attach_failed;
 # ifdef USE_INET6
-		if (!(ipfipv6 = net_lookup(NHF_INET6, GLOBAL_NETSTACKID)))
+		ipfipv6 = net_protocol_lookup(0, NHF_INET6);
+		if (ipfipv6 == NULL)
 			goto attach_failed;
-		if (net_register_hook(ipfipv6, NH_PHYSICAL_IN, &ipfhook))
+		if (net_hook_register(ipfipv6, NH_PHYSICAL_IN, ipfhook))
 			goto attach_failed;
-		if (net_register_hook(ipfipv6, NH_PHYSICAL_OUT, &ipfhook))
+		if (net_hook_register(ipfipv6, NH_PHYSICAL_OUT, ipfhook))
 			goto attach_failed;
 # endif
 #endif
@@ -414,16 +416,16 @@ ddi_detach_cmd_t cmd;
 			cmn_err(CE_WARN, "IP Filter: %s(pfh_sync) failed",
 				"pfil_remove_hook");
 #else
-		if (net_unregister_hook(ipfipv4, NH_PHYSICAL_IN, &ipfhook))
+		if (net_hook_unregister(ipfipv4, NH_PHYSICAL_IN, ipfhook))
 			cmn_err(CE_WARN, "IP Filter: v4-IN unregister failed");
-		if (net_unregister_hook(ipfipv4, NH_PHYSICAL_OUT, &ipfhook))
+		if (net_hook_unregister(ipfipv4, NH_PHYSICAL_OUT, ipfhook))
 			cmn_err(CE_WARN, "IP Filter: v4-OUT unregister failed");
 		if (net_release(ipfipv4))
 			cmn_err(CE_WARN, "IP Filter: v4 net_release failed");
 # ifdef USE_INET6
-		if (net_unregister_hook(ipfipv6, NH_PHYSICAL_IN, &ipfhook))
+		if (net_hook_unregister(ipfipv6, NH_PHYSICAL_IN, ipfhook))
 			cmn_err(CE_WARN, "IP Filter: v6-IN unregister failed");
-		if (net_unregister_hook(ipfipv6, NH_PHYSICAL_OUT, &ipfhook))
+		if (net_hook_unregister(ipfipv6, NH_PHYSICAL_OUT, ipfhook))
 			cmn_err(CE_WARN, "IP Filter: v6-OUT unregister failed");
 		if (net_release(ipfipv6))
 			cmn_err(CE_WARN, "IP Filter: v6 net_release failed");
@@ -565,7 +567,8 @@ dev_info_t *dip;
 
 	err = DDI_SUCCESS;
 	ipft = ipf_tuneables;
-	for (ipft = ipf_tuneables; (name = ipft->ipft_name) != NULL; ipft++) {
+	for (ipft = ipf_tuneables; (name = (char *)ipft->ipft_name) != NULL;
+	     ipft++) {
 		one = 1;
 		i32p = NULL;
 		err = ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip,
@@ -640,7 +643,7 @@ struct pollhead **phpp;
 
 #if defined(_INET_IP_STACK_H)
 static int
-ipf_hook(hook_event_token_t event, hook_data_t data, netstack_t *stp)
+ipf_hook(hook_event_token_t event, hook_data_t data, void *stp)
 {
 	hook_pkt_event_t *hpe;
 	qpktinfo_t qpi;
