@@ -2586,7 +2586,7 @@ ipf_matchsrcdst(fin, is, src, dst, tcp, cmask)
 	 * are allowed to match it.
 	 */
 	if (is->is_sti.tqe_ifq == &softs->ipf_state_deletetq)
-		continue;
+		return NULL;
 
 	rev = IP6_NEQ(&is->is_dst, dst);
 	ifp = fin->fin_ifp;
