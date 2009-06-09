@@ -3555,17 +3555,20 @@ int flags;
 	dir = fin->fin_rev;
 	tcpflags = tcp->th_flags;
 	dlen = fin->fin_dlen - (TCP_OFF(tcp) << 2);
+	ostate = tqe->tqe_state[1 - dir];
+	nstate = tqe->tqe_state[dir];
 
 	if (tcpflags & TH_RST) {
 		if (!(tcpflags & TH_PUSH) && !dlen)
 			nstate = IPF_TCPS_CLOSED;
 		else
 			nstate = IPF_TCPS_CLOSE_WAIT;
+
+		if (ostate <= IPF_TCPS_ESTABLISHED) {
+			tqe->tqe_state[1 - dir] = IPF_TCPS_CLOSE_WAIT;
+		}
 		rval = 1;
 	} else {
-		ostate = tqe->tqe_state[1 - dir];
-		nstate = tqe->tqe_state[dir];
-
 		switch (nstate)
 		{
 		case IPF_TCPS_LISTEN: /* 0 */
