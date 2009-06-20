@@ -10,11 +10,49 @@
 # and especially those who have found the time to port IP Filter to new
 # platforms.
 #
+4.1.32 - Release 20 June 2009
+
+2741019 Lingering states (Established/Listen - 5/0) in state table
+
+2790920 Solaris U7 breaks ipfilter compilation
+
+2790910 OOW issue on Solaris 10 v4.1.9
+
+2706155 Reference to .symbol file missing in ipf.ko on FreeBSD/AMD64
+
+2787870 4.1.32rc2 ipfstat -nio causes oops on Fedora 10
+
+2785189 Networking stops on x86_64 RHEL ES4 U6 (2.6.9-67.ELsmp)
+
+2702887 use of PBR/fastroute causes panic with ipv6
+
+2671913 regression test in7 fails to execute
+
+2706137 FreeBSD/AMD64 build is still broken in 4.1.32 RC5
+
 4.1.32 RC5 - Release 20 March 2009
+
+2657365 IPFilter 4.1.32 RC4 fails to compile on FreeBSD7/AMD64
+
+2650040 cannot compile updated kernel source for 4.10
 
 4.1.32 RC4 - Release 28 February 2009
 
 4.1.32 RC3 - Release 23 February 2009
+
+2598625 parsing empty config file results in an error
+
+2698656 test parsing empty config files
+
+2597956 not all pointers in a clone are reset
+
+2543934 nat_t gets assigned ifp too early
+
+2539808 Compiling with Solaris10 patch 138889-03 fails
+
+2535795 No need to always bump fr_ref
+
+2535778 Bad IPv6 packets droped by default
 
 4.1.32 RC1 - Release 1 January 2009
 
