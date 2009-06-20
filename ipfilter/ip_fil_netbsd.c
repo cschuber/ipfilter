@@ -1288,7 +1288,6 @@ frdest_t *fdp;
 		case 0 :
 			break;
 		case 1 :
-			fr_natderef((nat_t **)&fin->fin_nat);
 			ip->ip_sum = 0;
 			break;
 		case -1 :
