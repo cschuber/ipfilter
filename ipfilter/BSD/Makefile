@@ -247,7 +247,7 @@ radix_u.o: $(TOP)/md5.c $(TOP)/radix_ipf.h
 bpf_filter_u.o: $(TOP)/bpf_filter.c $(TOP)/pcap-ipf.h
 	$(CC) $(CCARGS) $(EXTRA) -c $(TOP)/bpf_filter.c -o $@
 
-if_ipl.o: $(MODOBJS)
+if_ipl.o: $(MODOBJS) 
 	ld -r $(MODOBJS) -o $(LKM)
 	${RM} -f if_ipl
 
@@ -280,7 +280,7 @@ ipf.ko.5 ipl.ko.5: $(MODOBJS)
 	    xargs -J% objcopy % $(.TARGET:S/.5$//)
 .endif
 
-ipf.ko ipl.ko: $(MODOBJS)
+ipf.ko ipl.ko: $(MODOBJS) 
 	gensetdefs $(MODOBJS)
 	$(CC) $(KCARGS) -c setdef0.c
 	$(CC) $(KCARGS) -c setdef1.c
@@ -470,7 +470,7 @@ iptrafcon: $(IPTRAFCON) $(OBJ)/libipf.a
 .l.c:
 
 clean:
-	${RM} -f ../ipf ../ipnat ../ipmon ../ippool ../ipftest
+	${RM} -f ../ipf ../ipnat ../ipmon ../ippool ../ipftest 
 	${RM} -f ../ipscan ../ipsyncm ../ipsyncs
 	${RM} -f *.core *.o *.a ipt ipfstat ipf ipfstat ipftest ipmon
 	${RM} -f if_ipl ipnat ipfrule.ko* ipf.kld* ipfrule.kld*
@@ -529,17 +529,17 @@ install:
 .else
 	-if [ -d /boot/kernel -a -f ipf.ko ] ; then \
 		if [ -f /boot/kernel/ipl.ko ] ; then \
-			objcopy --only-keep-debug ipf.ko 
-			    /boot/kernel/ipl.ko.symbols; \
+			objcopy --only-keep-debug ipf.ko ipl.ko.symbols; \
 			objcopy --strip-debug \
-			    --add-gnu-debuglink=ipl.ko.symbols  \
-			    ipf.ko /boot/kernel/ipl.ko; \
+			    --add-gnu-debuglink=ipl.ko.symbols ipf.ko ipl.ko; \
+			cp ipl.ko /boot/kernel/ipl.ko; \
+			cp ipl.ko.symbols /boot/kernel/ipl.ko.symbols; \
 		else \
-			objcopy --only-keep-debug ipf.ko \
-			    /boot/kernel/ipf.ko.symbols; \
+			objcopy --only-keep-debug ipf.ko ipf.ko.symbols; \
 			objcopy --strip-debug \
-			    --add-gnu-debuglink=ipl.ko.symbols \
-			    ipf.ko /boot/kernel/ipf.ko; \
+			    --add-gnu-debuglink=ipf.ko.symbols ipf.ko ipf_.ko; \
+			cp ipf_.ko /boot/kernel/ipf.ko; \
+			cp ipf.ko.symbols /boot/kernel/ipf.ko.symbols; \
 		fi \
 	fi
 	-if [ -d /boot/kernel -a -f ipfrule.ko ] ; then \
