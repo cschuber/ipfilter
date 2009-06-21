@@ -229,9 +229,10 @@ $(OBJ)/ipfrule: $(OBJ)/ip_rulesx.o $(OBJ)/mlso_rule.o
 	ld -r $(OBJ)/ip_rulesx.o $(OBJ)/mlso_rule.o -o $@
 
 $(OBJ)/ipf: $(MODOBJS)
-	if [ -f /kernel/misc/neti -o -f /kernel/misc/*/neti ] ; then \
+	if [ -f /kernel/misc/neti -o -f /kernel/misc/sparcv9/neti ] ; then \
 		echo "netinfo Linking"; \
-		ld -dy -Ndrv/ip -Nmisc/neti -Nmisc/md5 -r $(MODOBJS) -o $@; \
+		ld -dy -Ndrv/ip -Nmisc/neti -Nmisc/hook -Nmisc/md5 \
+		   -r $(MODOBJS) -o $@; \
 	else \
 		echo "PFIL Linking"; \
 		ld -dy -Ndrv/ip -Ndrv/pfil -Nmisc/md5 -r $(MODOBJS) -o $@; \

@@ -420,15 +420,17 @@ ddi_detach_cmd_t cmd;
 			cmn_err(CE_WARN, "IP Filter: v4-IN unregister failed");
 		if (net_hook_unregister(ipfipv4, NH_PHYSICAL_OUT, ipfhook))
 			cmn_err(CE_WARN, "IP Filter: v4-OUT unregister failed");
-		if (net_release(ipfipv4))
-			cmn_err(CE_WARN, "IP Filter: v4 net_release failed");
+		if (net_protocol_release(ipfipv4))
+			cmn_err(CE_WARN,
+				"IP Filter: v4 net_protocol_release failed");
 # ifdef USE_INET6
 		if (net_hook_unregister(ipfipv6, NH_PHYSICAL_IN, ipfhook))
 			cmn_err(CE_WARN, "IP Filter: v6-IN unregister failed");
 		if (net_hook_unregister(ipfipv6, NH_PHYSICAL_OUT, ipfhook))
 			cmn_err(CE_WARN, "IP Filter: v6-OUT unregister failed");
-		if (net_release(ipfipv6))
-			cmn_err(CE_WARN, "IP Filter: v6 net_release failed");
+		if (net_protocol_release(ipfipv6))
+			cmn_err(CE_WARN,
+				"IP Filter: v6 net_protocol_release failed");
 # endif
 #endif
 
