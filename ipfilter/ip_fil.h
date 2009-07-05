@@ -1862,7 +1862,6 @@ extern	int		ipf_matchicmpqueryreply __P((int, icmpinfo_t *,
 extern	u_32_t		ipf_newisn __P((fr_info_t *));
 extern	u_short		ipf_nextipid __P((fr_info_t *));
 extern	void		ipf_rule_expire __P((ipf_main_softc_t *));
-extern	int		ipf_rulen __P((ipf_main_softc_t *, int, frentry_t *));
 extern	int		ipf_scanlist __P((fr_info_t *, u_32_t));
 extern	frentry_t 	*ipf_srcgrpmap __P((fr_info_t *, u_32_t *));
 extern	int		ipf_tcpudpchk __P((fr_ip_t *, frtuc_t *));

@@ -3977,51 +3977,11 @@ ipf_getrulen(softc, unit, group, n)
 	fg = ipf_findgroup(softc, group, unit, softc->ipf_active, NULL);
 	if (fg == NULL)
 		return NULL;
-	for (fr = fg->fg_head; fr && n; fr = fr->fr_next, n--)
+	for (fr = fg->fg_start; fr && n; fr = fr->fr_next, n--)
 		;
 	if (n != 0)
 		return NULL;
 	return fr;
-}
-
-
-/* ------------------------------------------------------------------------ */
-/* Function:    ipf_rulen                                                   */
-/* Returns:     int - >= 0 - rule number, -1 == search failed               */
-/* Parameters:  unit(I) - device for which to count the rule's number       */
-/*              fr(I)   - pointer to rule to match                          */
-/*                                                                          */
-/* Return the number for a rule on a specific filtering device.             */
-/* ------------------------------------------------------------------------ */
-int
-ipf_rulen(softc, unit, fr)
-	ipf_main_softc_t *softc;
-	int unit;
-	frentry_t *fr;
-{
-	frentry_t *fh;
-	frgroup_t *fg;
-	u_32_t n = 0;
-	char *gname;
-	char grp[1];
-
-	if (fr == NULL)
-		return -1;
-	if (fr->fr_group == -1) {
-		grp[0] = '\0';
-		gname = grp;
-	} else {
-		gname = FR_NAME(fr, fr_group);
-	}
-	fg = ipf_findgroup(softc, gname, unit, softc->ipf_active, NULL);
-	if (fg == NULL)
-		return -1;
-	for (fh = fg->fg_head; fh; n++, fh = fh->fr_next)
-		if (fh == fr)
-			break;
-	if (fh == NULL)
-		return -1;
-	return n;
 }
 
 
