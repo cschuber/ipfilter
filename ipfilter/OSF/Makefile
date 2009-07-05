@@ -301,6 +301,9 @@ tru64.o: $(TOP)/tru64.c $(TOP)/ip_compat.h $(TOP)/ip_fil.h
 md5.o: $(TOP)/md5.c $(TOP)/md5.h
 	$(CC) $(DFLAGS) -c $(TOP)/md5.c -o $@
 
+arc4random.o: $(TOP)/arc4random.c $(TOP)/md5.h
+	$(CC) $(DFLAGS) -DNEED_LOCAL_RAND=1 -c $(TOP)/arc4random.c -o $@
+
 ipmon: $(IPMON) ./libipf.a
 	$(CC) $(CCARGS) $(LOGFAC) $(IPMON) -o $@ $(LIBS) -ll
 
