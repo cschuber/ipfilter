@@ -3442,41 +3442,11 @@ u_32_t n;
 	fg = fr_findgroup(group, unit, fr_active, NULL);
 	if (fg == NULL)
 		return NULL;
-	for (fr = fg->fg_head; fr && n; fr = fr->fr_next, n--)
+	for (fr = fg->fg_start; fr && n; fr = fr->fr_next, n--)
 		;
 	if (n != 0)
 		return NULL;
 	return fr;
-}
-
-
-/* ------------------------------------------------------------------------ */
-/* Function:    fr_rulen                                                    */
-/* Returns:     int - >= 0 - rule number, -1 == search failed               */
-/* Parameters:  unit(I) - device for which to count the rule's number       */
-/*              fr(I)   - pointer to rule to match                          */
-/*                                                                          */
-/* Return the number for a rule on a specific filtering device.             */
-/* ------------------------------------------------------------------------ */
-int fr_rulen(unit, fr)
-int unit;
-frentry_t *fr;
-{
-	frentry_t *fh;
-	frgroup_t *fg;
-	u_32_t n = 0;
-
-	if (fr == NULL)
-		return -1;
-	fg = fr_findgroup(fr->fr_group, unit, fr_active, NULL);
-	if (fg == NULL)
-		return -1;
-	for (fh = fg->fg_head; fh; n++, fh = fh->fr_next)
-		if (fh == fr)
-			break;
-	if (fh == NULL)
-		return -1;
-	return n;
 }
 
 

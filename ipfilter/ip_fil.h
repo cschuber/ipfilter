@@ -1509,7 +1509,6 @@ extern	int		fr_matchicmpqueryreply __P((int, icmpinfo_t *,
 extern	u_32_t		fr_newisn __P((fr_info_t *));
 extern	u_short		fr_nextipid __P((fr_info_t *));
 extern	int	ipf_queueflush __P((ipftq_delete_fn_t, ipftq_t *, ipftq_t *));
-extern	int		fr_rulen __P((int, frentry_t *));
 extern	int		fr_scanlist __P((fr_info_t *, u_32_t));
 extern	frentry_t 	*fr_srcgrpmap __P((fr_info_t *, u_32_t *));
 extern	int		fr_tcpudpchk __P((fr_info_t *, frtuc_t *));
