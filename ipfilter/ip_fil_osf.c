@@ -1294,7 +1294,7 @@ int len;
 			return NULL;
 		}
 
-		if (ms == n || n == NULL)
+		if (n == NULL)
 			*fin->fin_mp = m;
 
 		while (M_LEN(m) == 0) {
