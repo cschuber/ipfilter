@@ -1125,8 +1125,9 @@ hexnumber:
 	;
 
 hostname:
-	YY_STR				{ bzero(&$$, sizeof($$));
-					  i6addr_t addr;
+	YY_STR				{ i6addr_t addr;
+
+					  bzero(&$$, sizeof($$));
 					  if (gethost(AF_INET, $1,
 						      &addr) == 0) {
 						$$.a = addr;
