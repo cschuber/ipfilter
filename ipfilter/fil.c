@@ -662,7 +662,6 @@ static INLINE int frpr_fragment6(fin)
 fr_info_t *fin;
 {
 	struct ip6_frag *frag;
-	int extoff = 0;
 
 	fin->fin_flx |= FI_FRAG;
 
@@ -670,33 +669,33 @@ fr_info_t *fin;
 	 * A fragmented IPv6 packet implies that there must be something
 	 * else after the fragment.
 	 */
-	if (frpr_ipv6exthdr(fin, 0, IPPROTO_FRAGMENT) == IPPROTO_NONE)
-		goto badv6frag;
-
-	extoff = (char *)fin->fin_dp - (char *)fin->fin_exthdr;
-
-	if (frpr_pullup(fin, sizeof(*frag)) == -1)
-		goto badv6frag;
-
-	fin->fin_exthdr = (char *)fin->fin_dp - extoff;
-	frag = fin->fin_exthdr;
-	/*
-	 * Fragment but no fragmentation info set?  Bad packet...
-	 */
-	if (frag->ip6f_offlg == 0) {
-badv6frag:
-		fin->fin_dp = (char *)fin->fin_dp - extoff;
-		fin->fin_dlen += extoff;
+	if (frpr_ipv6exthdr(fin, 0, IPPROTO_FRAGMENT) == IPPROTO_NONE) {
 		fin->fin_flx |= FI_BAD;
 		return IPPROTO_NONE;
 	}
 
+	frag = fin->fin_exthdr;
+
+	/*
+	 * If this fragment isn't the last then the packet length must
+	 * be a multiple of 8.
+	 */
+	if ((frag->ip6f_offlg & IP6F_MORE_FRAG) != 0) {
+		fin->fin_flx |= FI_MOREFRAG;
+
+		if ((fin->fin_plen & 0x7) != 0)
+			fin->fin_flx |= FI_BAD;
+	}
+
+	/*
+	 * Fragment but no fragmentation info set?  Bad packet...
+	 */
+	if (frag->ip6f_offlg == 0)
+		fin->fin_flx |= FI_BAD;
+
 	fin->fin_off = ntohs(frag->ip6f_offlg & IP6F_OFF_MASK);
 	if (fin->fin_off != 0)
 		fin->fin_flx |= FI_FRAGBODY;
-
-	if (frag->ip6f_offlg & IP6F_MORE_FRAG)
-		fin->fin_flx |= FI_MOREFRAG;
 
 	return frag->ip6f_nxt;
 }
