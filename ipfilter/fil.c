@@ -818,17 +818,6 @@ ipf_pr_fragment6(fin)
 		return IPPROTO_NONE;
 	}
 
-	if (ipf_pr_pullup(fin, sizeof(*frag)) == -1) {
-		LBUMP(ipf_stats[fin->fin_out].fr_v6_frag_pullup);
-		return IPPROTO_NONE;
-	}
-
-	if ((int)(fin->fin_dlen - sizeof(*frag)) < 0) {
-		LBUMP(ipf_stats[fin->fin_out].fr_v6_frag_size);
-		fin->fin_flx |= FI_SHORT;
-		return IPPROTO_NONE;
-	}
-
 	if ((fin->fin_plen & 7) != 0) {
 		/*
 		 * Any fragment that isn't the last fragment must have its
@@ -837,6 +826,12 @@ ipf_pr_fragment6(fin)
 		if (ntohs(frag->ip6f_offlg) & 1)
 			fin->fin_flx |= FI_BAD;
 	}
+
+	/*
+	 * Fragment but no fragmentation info set?  Bad packet...
+	 */
+	if (frag->ip6f_offlg == 0)
+		fin->fin_flx |= FI_BAD;
 
 	fin->fin_fraghdr = frag;
 	fin->fin_id = frag->ip6f_ident;
