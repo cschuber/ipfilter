@@ -830,7 +830,7 @@ ipf_pr_fragment6(fin)
 	/*
 	 * Fragment but no fragmentation info set?  Bad packet...
 	 */
-	if (frag->ip6f_offlg == 0)
+	if (ntohs(frag->ip6f_offlg & 0xfff9) == 0)
 		fin->fin_flx |= FI_BAD;
 
 	fin->fin_fraghdr = frag;
