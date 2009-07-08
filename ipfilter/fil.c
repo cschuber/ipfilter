@@ -690,7 +690,7 @@ fr_info_t *fin;
 	/*
 	 * Fragment but no fragmentation info set?  Bad packet...
 	 */
-	if (frag->ip6f_offlg == 0)
+	if (frag->ip6f_offlg & (IP6F_MORE_FRAG|IP6F_OFF_MASK)) == 0)
 		fin->fin_flx |= FI_BAD;
 
 	fin->fin_off = ntohs(frag->ip6f_offlg & IP6F_OFF_MASK);
