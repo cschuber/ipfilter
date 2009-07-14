@@ -415,7 +415,7 @@ fr_info_t *fin;
 	fin->fin_id = (u_short)(ip6->ip6_flow & 0xffff);
 
 	hdrcount = 0;
-	while (go && !(fin->fin_flx & (FI_BAD|FI_SHORT))) {
+	while (go && !(fin->fin_flx & FI_SHORT)) {
 		switch (p)
 		{
 		case IPPROTO_UDP :
@@ -632,12 +632,6 @@ fr_info_t *fin;
 		 * which means it must be a multiple of 2 lots of 8 in length.
 		 */
 		fin->fin_flx |= FI_BAD;
-		/*
-		 * Compensate for the changes made in frpr_ipv6exthdr()
-		 */
-		fin->fin_dlen += 8 + (hdr->ip6e_len << 3);
-		fin->fin_dp = hdr;
-		return IPPROTO_NONE;
 	}
 
 	return hdr->ip6e_nxt;
@@ -669,10 +663,9 @@ fr_info_t *fin;
 	 * A fragmented IPv6 packet implies that there must be something
 	 * else after the fragment.
 	 */
-	if (frpr_ipv6exthdr(fin, 0, IPPROTO_FRAGMENT) == IPPROTO_NONE) {
-		fin->fin_flx |= FI_BAD;
+	if (frpr_ipv6exthdr(fin, 0, IPPROTO_FRAGMENT) == IPPROTO_NONE)
 		return IPPROTO_NONE;
-	}
+
 
 	frag = fin->fin_exthdr;
 
@@ -690,7 +683,7 @@ fr_info_t *fin;
 	/*
 	 * Fragment but no fragmentation info set?  Bad packet...
 	 */
-	if (frag->ip6f_offlg & (IP6F_MORE_FRAG|IP6F_OFF_MASK)) == 0)
+	if ((frag->ip6f_offlg & (IP6F_MORE_FRAG|IP6F_OFF_MASK)) == 0)
 		fin->fin_flx |= FI_BAD;
 
 	fin->fin_off = ntohs(frag->ip6f_offlg & IP6F_OFF_MASK);
