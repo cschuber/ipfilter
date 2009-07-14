@@ -483,7 +483,7 @@ ipf_pr_ipv6hdr(fin)
 	fin->fin_id = 0;
 
 	hdrcount = 0;
-	while (go && !(fin->fin_flx & (FI_BAD|FI_SHORT))) {
+	while (go && !(fin->fin_flx & FI_SHORT)) {
 		switch (p)
 		{
 		case IPPROTO_UDP :
