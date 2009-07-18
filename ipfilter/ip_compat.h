@@ -1173,12 +1173,12 @@ typedef	unsigned int	u_32_t;
 /*                            L I N U X                                    */
 /* ----------------------------------------------------------------------- */
 #if defined(linux) && !defined(OS_RECOGNISED)
-#include <linux/version.h>
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,23)
-# include <linux/autoconf.h>
-#else
-# include <linux/config.h>
-#endif
+
+# include <linux/version.h>
+# if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,10)
+#  include <linux/config.h>
+# endif
+
 # if (LINUX >= 20600) && defined(_KERNEL)
 #  define	 HDR_T_PRIVATE	1
 # endif
@@ -1191,6 +1191,16 @@ struct ip6_ext {
 # endif
 
 # ifdef _KERNEL
+#  include <asm/byteorder.h>
+#  ifdef __LITTLE_ENDIAN
+#   define	LITTLE_ENDIAN	1
+#   define	BIG_ENDIAN	0
+#   define	BYTE_ORDER	LITTLE_ENDIAN
+#  else
+#   define	LITTLE_ENDIAN	0
+#   define	BIG_ENDIAN	1
+#   define	BYTE_ORDER	BIG_ENDIAN
+#  endif
 #  define	IPF_PANIC(x,y)	if (x) { printf y; panic("ipf_panic"); }
 #  define	COPYIN(a,b,c)	copy_from_user((caddr_t)(b), (caddr_t)(a), (c))
 #  define	COPYOUT(a,b,c)	copy_to_user((caddr_t)(b), (caddr_t)(a), (c))
@@ -1262,6 +1272,8 @@ extern	mb_t	*m_pullup __P((mb_t *, int));
 #  define	bcopy(s,d,z)	memmove(d, s, z)
 #  define	bzero(s,z)	memset(s, 0, z)
 #  define	bcmp(a,b,z)	memcmp(a, b, z)
+#  define	ipf_random	random32
+#  define	arc4random	random32
 
 #  define	ifnet		net_device
 #  define	if_xname	name
@@ -1274,8 +1286,12 @@ extern	mb_t	*m_pullup __P((mb_t *, int));
 				    in_interrupt() ? GFP_ATOMIC : GFP_KERNEL)
 #  define	KFREES(x,s)	kfree(x)
 
-#  define GETIFP(n,v)	dev_get_by_name(n)
-
+#  if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,23)
+#   define	f_uid		f_owner.uid
+#   define	GETIFP(n,v)	dev_get_by_name(&init_net,n)
+#  else
+#   define	GETIFP(n,v)	dev_get_by_name(n)
+#  endif
 # else
 #  include <net/ethernet.h>
 
@@ -1323,6 +1339,10 @@ extern	int	uiomove __P((caddr_t, size_t, int, struct uio *));
 
 # define	UIO_READ	1
 # define	UIO_WRITE	2
+
+# if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,23)) && !defined(_KERNEL)
+typedef int		fmode_t;
+# endif
 
 typedef	u_long		ioctlcmd_t;
 typedef	int		minor_t;

@@ -651,7 +651,7 @@ void *ctx;
 	ipnat_t natd;
 	SPL_INT(s);
 
-#if (BSD >= 199306) && defined(_KERNEL)
+#if defined(BSD) && (BSD >= 199306) && defined(_KERNEL)
 # if defined(__NetBSD_Version__) && (__NetBSD_Version__ >= 399002000)
 	if ((mode & FWRITE) &&
 	     kauth_authorize_network(curlwp->l_cred, KAUTH_NETWORK_FIREWALL,

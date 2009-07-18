@@ -1446,7 +1446,7 @@ extern	void	*fr_resolvenic __P((char *, int));
 extern	int	fr_send_icmp_err __P((int, fr_info_t *, int));
 extern	int	fr_send_reset __P((fr_info_t *));
 #if  (defined(__FreeBSD_version) && (__FreeBSD_version < 501000)) || \
-    !defined(_KERNEL)
+    !defined(_KERNEL) || defined(linux)
 extern	int	ppsratecheck __P((struct timeval *, int *, int));
 #endif
 extern	ipftq_t	*fr_addtimeoutqueue __P((ipftq_t **, u_int));

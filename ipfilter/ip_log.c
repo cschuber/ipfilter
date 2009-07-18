@@ -608,7 +608,8 @@ struct uio *uio;
 # endif /* SOLARIS */
 	}
 
-# if (BSD >= 199101) || defined(__FreeBSD__) || defined(__osf__)
+# if (defined(BSD) && (BSD >= 199101)) || defined(__FreeBSD__) || \
+     defined(__osf__)
 	uio->uio_rw = UIO_READ;
 # endif
 

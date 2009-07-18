@@ -64,8 +64,13 @@ LOGFAC=-DLOGFAC=LOG_LOCAL0
 # By default IPFilter looks for /usr/src/linux, but you may have to change
 # it to /usr/src/linux-2.4 or similar.
 #
-LINUXKERNEL=/usr/src/linux
+LINUXKERNEL=/usr/src/kernels/2.6.29.5-191.fc11.i586
 LINUX=`uname -r | awk -F. ' { printf"%d",$$1;for(i=1;i<NF&&i<3;i++){printf("%02d",$$(i+1));}}'`
+#
+#
+#
+#BUILDROOT=/usr/src/redhat/BUILD/ipfilter
+BUILDROOT=${HOME}/rpmbuild/BUILDROOT/ipfilter-4.1.32-1.i386
 
 #
 # All of the compile-time options are here, used for compiling the userland
@@ -360,7 +365,7 @@ linux: include
 #	(cd Linux; make -f Makefile.ipsend build LINUX=$(LINUX) TOP=.. "CC=$(CC)" $(MFLAGS); cd ..)
 
 install-linux: linux
-	(cd Linux/; make LINUX=$(LINUX) TOP=.. "DEBUG=-g" "CC=$(CC)" $(MFLAGS) OBJ=$(CPUDIR) install ; cd ..)
+	(cd Linux/; make LINUX=$(LINUX) TOP=.. "DEBUG=-g" "CC=$(CC)" $(MFLAGS) OBJ=$(CPUDIR) ROOTDIR=$(BUILDROOT) install ; cd ..)
 
 install-bsd:
 	(cd BSD/$(CPUDIR); make install "TOP=../.." $(MFLAGS); cd ..)
@@ -406,4 +411,3 @@ mdb:
 	       -DIPFILTER_SCAN -DIPFILTER_LKM -DSOLARIS2=10 -n ipf_mdb -k \
 	       -I/home/dr146992/pfil -I/home/dr146992/ipf -f \
 	       /usr/include/netinet/in_systm.h,/usr/include/sys/ethernet.h,/usr/include/netinet/in.h,/usr/include/netinet/ip.h,/usr/include/netinet/ip_var.h,/usr/include/netinet/tcp.h,/usr/include/netinet/tcpip.h,/usr/include/netinet/ip_icmp.h,/usr/include/netinet/udp.h,ip_compat.h,ip_fil.h,ip_nat.h,ip_state.h,ip_proxy.h,ip_scan.h
-

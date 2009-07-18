@@ -103,7 +103,7 @@ ipflkm:
 	if [ $(LINUX) -lt 20499 ] ; then \
 		make $(OBJ)/ipfilter.o; \
 	else \
-		(cd $(OBJ); unset MAKEFLAGS; make -C "$(MODDIR)/build" SUBDIRS="`pwd`" TOP="`pwd`/../.."  CPUDIR="$(CPUDIR)" EXTRA_CFLAGS="$(EXTRA_CFLAGS)" OBJ= modules); \
+		(cd $(OBJ); unset MAKEFLAGS; make -k -C "$(MODDIR)/build" SUBDIRS="`pwd`" TOP="`pwd`/../.."  CPUDIR="$(CPUDIR)" EXTRA_CFLAGS="$(EXTRA_CFLAGS)" OBJ= modules); \
 	fi
 
 $(OBJ)/ipfstat: $(FILS) $(OBJ)/libipf.a $(TOP)/ip_fil.h $(TOP)/ipf.h \

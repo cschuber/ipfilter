@@ -1,8 +1,13 @@
 #ifndef __IPF_LINUX_H__
 #define __IPF_LINUX_H__
 
-#include <linux/config.h>
 #include <linux/version.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,18)
+# include <linux/autoconf.h>
+# include <linux/poll.h>
+#else
+# include <linux/config.h>
+#endif
 #ifndef CONFIG_NETFILTER
 # define CONFIG_NETFILTER
 #endif
@@ -36,6 +41,10 @@
 # define	ipftcphdr	tcphdr
 # define	ipfudphdr	udphdr
 #endif
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,10)
+extern int ip_finish_output(struct sk_buff *skb);
+#endif
+
 
 struct	ipftcphdr	{
 	__u16	th_sport;

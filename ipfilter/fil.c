@@ -3015,7 +3015,7 @@ void *l4hdr;
 	}
 # else /* MENTAT */
 #  if defined(BSD) || defined(sun)
-#   if BSD >= 199103
+#   if defined(BSD) && (BSD >= 199103)
 	m->m_data += hlen;
 #   else
 	m->m_off += hlen;
@@ -3160,8 +3160,9 @@ nodata:
 }
 
 
-#if defined(_KERNEL) && ( ((BSD < 199103) && !defined(MENTAT)) || \
-    defined(__sgi) ) && !defined(linux) && !defined(_AIX51)
+#if defined(_KERNEL) && ( ((defined(BSD) && (BSD < 199103)) && \
+    !defined(MENTAT)) || defined(__sgi) ) && \
+    !defined(linux) && !defined(_AIX51)
 /*
  * Copyright (c) 1982, 1986, 1988, 1991, 1993
  *	The Regents of the University of California.  All rights reserved.

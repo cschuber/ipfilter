@@ -228,7 +228,7 @@ int ip_pool_init()
 
 	bzero((char *)&ipoolstat, sizeof(ipoolstat));
 
-#if (!defined(_KERNEL) || (BSD < 199306))
+#if (!defined(_KERNEL) || !defined(BSD) || (BSD < 199306))
 	rn_init();
 #endif
 	return 0;
@@ -256,7 +256,7 @@ void ip_pool_fini()
 		}
 	}
 
-#if (!defined(_KERNEL) || (BSD < 199306))
+#if (!defined(_KERNEL) || !defined(BSD) || (BSD < 199306))
 	rn_fini();
 #endif
 }
@@ -955,8 +955,8 @@ void *data;
 }
 
 
-# if defined(_KERNEL) && ((BSD >= 198911) && !defined(__osf__) && \
-      !defined(__hpux) && !defined(__sgi))
+# if defined(_KERNEL) && (defined(BSD) && (BSD >= 198911) && \
+      !defined(__osf__) && !defined(__hpux) && !defined(__sgi))
 static int
 rn_freenode(struct radix_node *n, void *p)
 {

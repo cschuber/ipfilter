@@ -1,10 +1,27 @@
 
 The Linux 2.4 and 2.6 series of kernels are supported by this software.
 
-Building has been tested on RedHat 9 and SUSE 9.x, although your results may vary.
+Building has been tested on RedHat 9 and SUSE 9.x, although your results
+may vary.
 
-You will need to have your kernel source in /usr/src/linux to build IPFilter.
+In general, you will need to have your kernel source in /usr/src/linux
+to build IPFilter but different Linux projects may differ.  See below.
 
+Projects
+========
+
+Fedora
+------
+For Fedora, point your web browser at this URL and follow the instructions:
+http://fedoraproject.org/wiki/Building_a_custom_kernel
+
+For me, following the instructions put all of the kernel source code (for
+Fedora 11) in $HOME/rpmbuild. As an example of the directory I used, see
+BUILDROOT in Makefile.
+
+
+Building IPFilter
+=================
 The steps required are as follows:
 
 1. Create the binaries
@@ -15,8 +32,9 @@ make linux
 
 make install-linux
 
-3. In an ideal world, this step wouldn't be required.  At this point you need to locate
-the actual RPM file as the rpmbuild failed in the previous step.  Now run:
+3. In an ideal world, this step wouldn't be required.  At this point you
+need to locate the actual RPM file as the rpmbuild failed in the previous
+step.  Now run:
 
 rpm -i /path/to/ipfilter.rpm
 
