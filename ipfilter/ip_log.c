@@ -130,17 +130,8 @@ struct file;
 #  include	<machine/sys/user.h>
 #  include	<sys/kthread_iface.h>
 #  define	READ_COLLISION	0x001
-
-iplog_select_t	iplog_ss[IPL_LOGMAX+1];
-
 extern int selwait;
 # endif /* IPL_SELECT */
-
-# ifdef _KERNEL
-#  if defined(linux)
-wait_queue_head_t	iplh_linux[IPL_LOGSIZE];
-#  endif
-# endif
 
 typedef struct ipf_log_softc_s {
 	ipfmutex_t	ipl_mutex[IPL_LOGSIZE];
@@ -148,7 +139,7 @@ typedef struct ipf_log_softc_s {
 	kcondvar_t	ipl_wait[IPL_LOGSIZE];
 # endif
 # if defined(linux) && defined(_KERNEL)
-	waitqueue	iplh_linux[IPL_LOGSIZE];
+	wait_queue_head_t	iplh_linux[IPL_LOGSIZE];
 # endif
 # if defined(__hpux) && defined(_KERNEL)
 	iplog_select_t	ipl_ss[IPL_LOGSIZE];
@@ -436,9 +427,8 @@ ipf_log_pkt(fin, flags)
 #  endif
 	COPYIFNAME(fin->fin_v, ifp, ipfl.fl_ifname);
 # else
-#  if (defined(NetBSD) && (NetBSD <= 1991011) && (NetBSD >= 199603)) || \
-      (defined(OpenBSD) && (OpenBSD >= 199603)) || defined(linux) || \
-      (defined(__FreeBSD__) && (__FreeBSD_version >= 501113))
+#  if (defined(NetBSD) && (NetBSD  <= 1991011) && (NetBSD >= 199603)) || \
+      OPENBSD_GE_REV(199603) || defined(linux) || FREEBSD_GE_REV(501113)
 	COPYIFNAME(fin->fin_v, ifp, ipfl.fl_ifname);
 #  else
 	ipfl.fl_unit = (u_int)ifp->if_unit;
@@ -735,7 +725,8 @@ ipf_log_read(softc, unit, uio)
 # endif /* SOLARIS */
 	}
 
-# if (BSD >= 199101) || defined(__FreeBSD__) || defined(__osf__)
+# if (defined(BSD) && (BSD >= 199101)) || defined(__FreeBSD__) || \
+     defined(__osf__)
 	uio->uio_rw = UIO_READ;
 # endif
 

@@ -83,7 +83,7 @@ struct file;
 #ifdef	USE_INET6
 #include <netinet/icmp6.h>
 #endif
-#if (__FreeBSD_version >= 300000)
+#if FREEBSD_GE_REV(300000)
 # include <sys/malloc.h>
 # if defined(_KERNEL) && !defined(IPFILTER_LKM)
 #  include <sys/libkern.h>
@@ -362,7 +362,7 @@ ipf_state_soft_init(softc, arg)
 		/*
 		 * XXX - ipf_state_seed[X] should be a random number of sorts.
 		 */
-#if  (__FreeBSD_version >= 400000)
+#if  FREEBSD_GE_REV(400000)
 		softs->ipf_state_seed[i] = arc4random();
 #else
 		softs->ipf_state_seed[i] = ((u_long)softs->ipf_state_seed + i) *

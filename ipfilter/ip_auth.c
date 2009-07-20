@@ -65,6 +65,10 @@ struct file;
 #if defined(_KERNEL) && defined(__NetBSD__) && (__NetBSD_Version__ >= 104000000)
 # include <sys/proc.h>
 #endif
+#if defined(__NetBSD_Version__) &&  (__NetBSD_Version__ >= 400000) && \
+     !defined(_KERNEL)
+# include <stdbool.h>
+#endif
 #include <net/if.h>
 #ifdef sun
 # include <net/af.h>

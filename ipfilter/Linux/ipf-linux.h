@@ -1,8 +1,13 @@
 #ifndef __IPF_LINUX_H__
 #define __IPF_LINUX_H__
 
-#include <linux/config.h>
 #include <linux/version.h>
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,18)
+# include <linux/autoconf.h>
+# include <linux/poll.h>
+#else
+# include <linux/config.h>
+#endif
 #ifndef CONFIG_NETFILTER
 # define CONFIG_NETFILTER
 #endif
@@ -162,12 +167,12 @@ typedef	struct	ipfudphdr	udphdr_t;
 #include "ip_state.h"
 #include "ip_nat.h"
 #include "ip_proxy.h"
+#include "ip_sync.h"
 #include "ip_frag.h"
-#ifdef	IPFILTER_LOOKUP
-# include "ip_lookup.h"
-# include "ip_pool.h"
-# include "ip_htable.h"
-#endif
+#include "ip_lookup.h"
+#include "ip_dstlist.h"
+#include "ip_pool.h"
+#include "ip_htable.h"
 #ifdef  IPFILTER_SYNC
 # include "netinet/ip_sync.h"
 #endif

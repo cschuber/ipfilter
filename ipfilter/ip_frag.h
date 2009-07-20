@@ -93,16 +93,6 @@ extern	int	ipf_frag_pkt_next __P((ipf_main_softc_t *, ipftoken_t *,
 extern	void	ipf_frag_nat_deref __P((ipf_main_softc_t *, void *));
 extern	int	ipf_frag_nat_next __P((ipf_main_softc_t *, ipftoken_t *,
 				       ipfgeniter_t *));
-
-#if     defined(_KERNEL) && ((BSD >= 199306) || SOLARIS || defined(__sgi) \
-	        || defined(__osf__) || (defined(__sgi) && (IRIX >= 60500)))
-# if defined(SOLARIS2) && (SOLARIS2 < 7)
-extern	void	ipf_slowtimer __P((void));
-# else
-extern	void	ipf_slowtimer __P((void *));
-# endif
-#else
-extern	int	ipf_slowtimer __P((void *));
-#endif
+extern	void	ipf_slowtimer __P((ipf_main_softc_t *));
 
 #endif	/* __IP_FRAG_H__ */

@@ -52,18 +52,20 @@
     (!defined(IPFILTER_LKM) || (__NetBSD_Version__ >= 399000100))
 # define	IPFILTER_M_IPFILTER
 #endif
-#if defined(OpenBSD) && (OpenBSD >= 200206) && \
+#if !defined(USE_INET6)
+# if defined(OpenBSD) && (OpenBSD >= 200206) && \
     !defined(_KERNEL) && !defined(USE_INET6)
-# define	USE_INET6
-#endif
-#if defined(__osf__)
-# define	USE_INET6	1
-#endif
-#if defined(linux) && (!defined(_KERNEL) || defined(CONFIG_IPV6))
-# define	USE_INET6
-#endif
-#if defined(HPUXREV) && (HPUXREV >= 1111)
-# define	USE_INET6
+#  define	USE_INET6
+# endif
+# if defined(__osf__)
+#  define	USE_INET6	1
+# endif
+# if defined(linux) && (!defined(_KERNEL) || defined(CONFIG_IPV6))
+#  define	USE_INET6
+# endif
+# if defined(HPUXREV) && (HPUXREV >= 1111)
+#  define	USE_INET6
+# endif
 #endif
 
 #if defined(BSD) && (BSD < 199103) && defined(__osf__)
@@ -130,6 +132,31 @@ struct file;
 #  undef KERNEL
 # endif
 #endif
+
+#define	NETBSD_GE_REV(x)	(defined(__NetBSD_Version__) && \
+				 (__NetBSD_Version__ >= (x)))
+#define	NETBSD_GT_REV(x)	(defined(__NetBSD_Version__) && \
+				 (__NetBSD_Version__ > (x)))
+#define	NETBSD_LT_REV(x)	(defined(__NetBSD_Version__) && \
+				 (__NetBSD_Version__ < (x)))
+#define	FREEBSD_GE_REV(x)	(defined(__FreeBSD_version) && \
+				 (__FreeBSD_version >= (x)))
+#define	FREEBSD_GT_REV(x)	(defined(__FreeBSD_version) && \
+				 (__FreeBSD_version > (x)))
+#define	FREEBSD_LT_REV(x)	(defined(__FreeBSD_version) && \
+				 (__FreeBSD_version < (x)))
+#define	BSDOS_GE_REV(x)		(defined(_BSDI_VERSION) && \
+				 (_BSDI_VERSION >= (x)))
+#define	BSDOS_GT_REV(x)		(defined(_BSDI_VERSION) && \
+				 (_BSDI_VERSION > (x)))
+#define	BSDOS_LT_REV(x)		(defined(_BSDI_VERSION) && \
+				 (_BSDI_VERSION < (x)))
+#define	OPENBSD_GE_REV(x)	(defined(OpenBSD) && (OpenBSD >= (x)))
+#define	OPENBSD_GT_REV(x)	(defined(OpenBSD) && (OpenBSD > (x)))
+#define	OPENBSD_LT_REV(x)	(defined(OpenBSD) && (OpenBSD < (x)))
+#define	BSD_GE_YEAR(x)		(defined(BSD) && (BSD >= (x)))
+#define	BSD_GT_YEAR(x)		(defined(BSD) && (BSD > (x)))
+#define	BSD_LT_YEAR(x)		(defined(BSD) && (BSD < (x)))
 
 
 /* ----------------------------------------------------------------------- */
@@ -228,10 +255,8 @@ typedef unsigned int	u_32_t;
 #   endif /* SOLARIS2 == 6 */
 #   define	ATOMIC_INC64(x)		atomic_add_64((uint64_t*)&(x), 1)
 #   define	ATOMIC_INC32(x)		atomic_add_32((uint32_t*)&(x), 1)
-#   define	ATOMIC_INC16(x)		atomic_add_16((uint16_t*)&(x), 1)
 #   define	ATOMIC_DEC64(x)		atomic_add_64((uint64_t*)&(x), -1)
 #   define	ATOMIC_DEC32(x)		atomic_add_32((uint32_t*)&(x), -1)
-#   define	ATOMIC_DEC16(x)		atomic_add_16((uint16_t*)&(x), -1)
 #  else
 #   define	ATOMIC_INC(x)		{ mutex_enter(&softc->ipf_rw); (x)++; \
 					  mutex_exit(&softc->ipf_rw); }
@@ -418,10 +443,8 @@ typedef	struct	iplog_select_s {
 #   endif
 #   define	ATOMIC_INC64(x)		lock_and_incr_int64(&softc->ipf_rw.ipf_lk, &(x), 1)
 #   define	ATOMIC_INC32(x)		lock_and_incr_int32(&softc->ipf_rw.ipf_lk, &(x), 1)
-#   define	ATOMIC_INC16(x)		lock_and_incr_int16(&softc->ipf_rw.ipf_lk, &(x), 1)
 #   define	ATOMIC_DEC64(x)		lock_and_incr_int64(&softc->ipf_rw.ipf_lk, &(x), -1)
 #   define	ATOMIC_DEC32(x)		lock_and_incr_int32(&softc->ipf_rw.ipf_lk, &(x), -1)
-#   define	ATOMIC_DEC16(x)		lock_and_incr_int16(&softc->ipf_rw.ipf_lk, &(x), -1)
 #  else /* 0 */
 #   define	ATOMIC_INC64(x)		{ MUTEX_ENTER(&softc->ipf_rw); (x)++; \
 					  MUTEX_EXIT(&softc->ipf_rw); }
@@ -596,11 +619,9 @@ typedef struct {
 #   define	ATOMIC_INCL(x)		atomicAddUlong(&(x), 1)
 #   define	ATOMIC_INC64(x)		atomicAddUint64(&(x), 1)
 #   define	ATOMIC_INC32(x)		atomicAddUint(&(x), 1)
-#   define	ATOMIC_INC16		ATOMIC_INC
 #   define	ATOMIC_DECL(x)		atomicAddUlong(&(x), -1)
 #   define	ATOMIC_DEC64(x)		atomicAddUint64(&(x), -1)
 #   define	ATOMIC_DEC32(x)		atomicAddUint(&(x), -1)
-#   define	ATOMIC_DEC16		ATOMIC_DEC
 #   undef	MUTEX_INIT
 #   define	MUTEX_INIT(x, y)	mutex_init(&(x)->ipf_lk,  \
 						   MUTEX_DEFAULT, y)
@@ -702,10 +723,6 @@ typedef struct mbuf mb_t;
 #  define	ATOMIC_DEC64(x)		atomic_decq((uint64_t*)&(x))
 #  define	ATOMIC_INC32(x)		atomic_incl((uint32_t*)&(x))
 #  define	ATOMIC_DEC32(x)		atomic_decl((uint32_t*)&(x))
-#  define	ATOMIC_INC16(x)		{ simple_lock(&softc->ipf_rw); (x)++; \
-					  simple_unlock(&softc->ipf_rw); }
-#  define	ATOMIC_DEC16(x)		{ simple_lock(&softc->ipf_rw); (x)--; \
-					  simple_unlock(&softc->ipf_rw); }
 #  define	ATOMIC_INCL(x)		atomic_incl((uint32_t*)&(x))
 #  define	ATOMIC_DECL(x)		atomic_decl((uint32_t*)&(x))
 #  define	ATOMIC_INC(x)		{ simple_lock(&softc->ipf_rw); (x)++; \
@@ -793,6 +810,9 @@ typedef unsigned int    u_32_t;
 # if defined(_KERNEL)
 #  include <sys/systm.h>
 #  include <sys/malloc.h>
+#  if (__NetBSD_Version__ > 500000000)
+#   include <sys/kauth.h>
+#  endif
 # else
 #  include <stddef.h>
 #  include <stdbool.h>
@@ -1024,11 +1044,9 @@ typedef	u_int32_t	u_32_t;
 #   define	ATOMIC_INCL(x)		atomic_add_long(&(x), 1)
 #   define	ATOMIC_INC64(x)		ATOMIC_INC(x)
 #   define	ATOMIC_INC32(x)		atomic_add_32((u_int *)&(x), 1)
-#   define	ATOMIC_INC16(x)		atomic_add_16(&(x), 1)
 #   define	ATOMIC_DECL(x)		atomic_add_long(&(x), -1)
 #   define	ATOMIC_DEC64(x)		ATOMIC_DEC(x)
 #   define	ATOMIC_DEC32(x)		atomic_add_32((u_int *)&(x), -1)
-#   define	ATOMIC_DEC16(x)		atomic_add_16(&(x), -1)
 #   define	SPL_X(x)	;
 #   define	SPL_NET(x)	;
 #   define	SPL_IMP(x)	;
@@ -1188,8 +1206,7 @@ typedef	unsigned int	u_32_t;
 /*                            L I N U X                                    */
 /* ----------------------------------------------------------------------- */
 #if defined(linux) && !defined(OS_RECOGNISED)
-#include <linux/config.h>
-#include <linux/version.h>
+# include <linux/version.h>
 # if (LINUX >= 20600) && defined(_KERNEL)
 #  define	 HDR_T_PRIVATE	1
 # endif
@@ -1202,6 +1219,16 @@ struct ip6_ext {
 # endif
 
 # ifdef _KERNEL
+#  include <asm/byteorder.h>
+#  ifdef __LITTLE_ENDIAN
+#   define BIG_ENDIAN		0
+#   define LITTLE_ENDIAN	1
+#   define BYTE_ORDER		LITTLE_ENDIAN
+#  else
+#   define BIG_ENDIAN		1
+#   define LITTLE_ENDIAN	0
+#   define BYTE_ORDER		BIG_ENDIAN
+#  endif
 #  define	IPF_PANIC(x,y)	if (x) { printf y; panic("ipf_panic"); }
 #  define	COPYIN(a,b,c)	copy_from_user((caddr_t)(b), (caddr_t)(a), (c))
 #  define	COPYOUT(a,b,c)	copy_to_user((caddr_t)(b), (caddr_t)(a), (c))
@@ -1229,22 +1256,25 @@ struct ip6_ext {
 #  define	RW_DESTROY(x)		do { } while (0)
 #  define	RWLOCK_EXIT(x)		ipf_rw_exit(x)
 #  define	MUTEX_DOWNGRADE(x)	ipf_rw_downgrade(x)
-#  define	ATOMIC_INCL(x)		MUTEX_ENTER(&softc->ipf_rw); (x)++; \
-					MUTEX_EXIT(&softc->ipf_rw)
-#  define	ATOMIC_DECL(x)		MUTEX_ENTER(&softc->ipf_rw); (x)--; \
-					MUTEX_EXIT(&softc->ipf_rw)
-#  define	ATOMIC_INC64(x)		MUTEX_ENTER(&softc->ipf_rw); (x)++; \
-					MUTEX_EXIT(&softc->ipf_rw)
-#  define	ATOMIC_INC32(x)		MUTEX_ENTER(&softc->ipf_rw); (x)++; \
-					MUTEX_EXIT(&softc->ipf_rw)
-#  define	ATOMIC_INC16(x)		MUTEX_ENTER(&softc->ipf_rw); (x)++; \
-					MUTEX_EXIT(&softc->ipf_rw)
-#  define	ATOMIC_DEC64(x)		MUTEX_ENTER(&softc->ipf_rw); (x)--; \
-					MUTEX_EXIT(&softc->ipf_rw)
-#  define	ATOMIC_DEC32(x)		MUTEX_ENTER(&softc->ipf_rw); (x)--; \
-					MUTEX_EXIT(&softc->ipf_rw)
-#  define	ATOMIC_DEC16(x)		MUTEX_ENTER(&softc->ipf_rw); (x)--; \
-					MUTEX_EXIT(&softc->ipf_rw)
+#  define	ATOMIC_INCL(x)		atomic_long_inc((atomic_long_t *)&(x))
+#  define	ATOMIC_DECL(x)		atomic_long_dec((atomic_long_t *)&(x))
+#  define	ATOMIC_INC32(x)		atomic_inc((atomic_t *)&(x))
+#  define	ATOMIC_DEC32(x)		atomic_dec((atomic_t *)&(x))
+#  ifdef CONFIG_X86_32
+#   define	ATOMIC_INC64(x)		do { MUTEX_ENTER(&softc->ipf_rw); \
+					     (x)++; \
+					     MUTEX_EXIT(&softc->ipf_rw); \
+					} while (0)
+#   define	ATOMIC_DEC64(x)		do { MUTEX_ENTER(&softc->ipf_rw); \
+					     (x)--; \
+					     MUTEX_EXIT(&softc->ipf_rw); \
+					} while (0)
+#  else
+#   define	ATOMIC_INC64(x)		atomic64_inc((atomic64_t *)&(x))
+#   define	ATOMIC_DEC64(x)		atomic64_dec((atomic64_t *)&(x))
+#  endif
+#  define	U_QUAD_T		u_int64_t
+#  define	QUAD_T			int64_t
 #  define	SPL_SCHED(x)		do { } while (0)
 #  define	SPL_IMP(x)		do { } while (0)
 #  define	SPL_NET(x)		do { } while (0)
@@ -1265,12 +1295,24 @@ extern	mb_t	*m_pullup __P((mb_t *, int));
 								GFP_KERNEL)
 #  define	MSGDSIZE(m)	(m)->len
 #  define	M_LEN(m)	(m)->len
+#  define	M_DUP(m)	skb_copy((m), in_interrupt() ? GFP_ATOMIC : \
+								GFP_KERNEL)
+#  define	PREP_MB_T(f, m)	do { \
+					(m)->next = *(f)->fin_mp; \
+					*(fin)->fin_mp = (m); \
+					(f)->fin_m = (m); \
+				} while (0)
+#  define	ALLOC_MB_T(m,l)	(m) = alloc_skb((l), \
+						in_interrupt() ? GFP_ATOMIC : \
+								 GFP_KERNEL)
 
 #  define	splnet(x)	;
 #  define	printf		printk
 #  define	bcopy(s,d,z)	memmove(d, s, z)
 #  define	bzero(s,z)	memset(s, 0, z)
 #  define	bcmp(a,b,z)	memcmp(a, b, z)
+#  define	ipf_random	random32
+#  define	arc4random	random32
 
 #  define	ifnet		net_device
 #  define	if_xname	name
@@ -1283,9 +1325,14 @@ extern	mb_t	*m_pullup __P((mb_t *, int));
 				    in_interrupt() ? GFP_ATOMIC : GFP_KERNEL)
 #  define	KFREES(x,s)	kfree(x)
 
-#  define GETIFP(n,v)	dev_get_by_name(n)
-#  define GETIFMTU_4(x)	((struct net_device *)x)->mtu
-#  define GETIFMTU_6(x)	((struct net_device *)x)->mtu
+#  if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,23)
+#   define	f_uid		f_owner.uid
+#   define	GETIFP(n,v)	dev_get_by_name(&init_net, n)
+#  else
+#   define	GETIFP(n,v)	dev_get_by_name(n)
+#  endif
+#  define	GETIFMTU_4(x)	((struct net_device *)x)->mtu
+#  define	GETIFMTU_6(x)	((struct net_device *)x)->mtu
 
 # else
 #  include <net/ethernet.h>
@@ -1334,6 +1381,10 @@ extern	int	uiomove __P((caddr_t, size_t, int, struct uio *));
 
 # define	UIO_READ	1
 # define	UIO_WRITE	2
+
+# if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,23)) && !defined(_KERNEL)
+typedef int		fmode_t;
+# endif
 
 typedef	u_long		ioctlcmd_t;
 typedef	int		minor_t;
@@ -1666,7 +1717,7 @@ extern void eMrwlock_downgrade __P((eMrwlock_t *, char *, int));
  * On BSD's use quad_t as a guarantee for getting at least a 64bit sized
  * object.
  */
-#if !defined(__amd64__) && defined(BSD) && (BSD > 199306)
+#if !defined(__amd64__) && BSD_GT_YEAR(199306)
 # define	USE_QUAD_T
 # define	U_QUAD_T	u_quad_t
 # define	QUAD_T		quad_t
@@ -1704,16 +1755,14 @@ typedef	struct ip6_hdr	ip6_t;
 #  define	COPYDATA	m_copydata
 #  define	COPYBACK	m_copyback
 # endif
-# if (BSD >= 199306) || defined(__FreeBSD__)
+# if BSD_GE_YEAR(199306) || defined(__FreeBSD__)
 #  if (defined(__NetBSD_Version__) && (__NetBSD_Version__ < 105180000)) || \
        defined(__FreeBSD__) || (defined(OpenBSD) && (OpenBSD < 200206)) || \
        defined(_BSDI_VERSION)
 #   include <vm/vm.h>
 #  endif
-#  if !defined(__FreeBSD__) || (defined (__FreeBSD_version) && \
-      (__FreeBSD_version >= 300000))
-#   if (defined(__NetBSD_Version__) && (__NetBSD_Version__ >= 105180000)) || \
-       (defined(OpenBSD) && (OpenBSD >= 200111))
+#  if !defined(__FreeBSD__) || FREEBSD_GE_REV(300000)
+#   if NETBSD_GE_REV(105180000) || OPENBSD_GE_REV(200111)
 #    include <uvm/uvm_extern.h>
 #   else
 #    include <vm/vm_extern.h>
@@ -1764,7 +1813,7 @@ MALLOC_DECLARE(M_IPFILTER);
 
 # if !defined(USE_MUTEXES) && !defined(SPL_NET)
 #  if (defined(NetBSD) && (NetBSD <= 1991011) && (NetBSD >= 199407)) || \
-      (defined(OpenBSD) && (OpenBSD >= 200006))
+      OPENBSD_GE_REV(200006)
 #   define	SPL_NET(x)	x = splsoftnet()
 #  else
 #   define	SPL_IMP(x)	x = splimp()
@@ -1919,11 +1968,9 @@ extern	char	*ipf_getifname __P((struct ifnet *, char *));
 # define	ATOMIC_INCL		ATOMIC_INC
 # define	ATOMIC_INC64		ATOMIC_INC
 # define	ATOMIC_INC32		ATOMIC_INC
-# define	ATOMIC_INC16		ATOMIC_INC
 # define	ATOMIC_DECL		ATOMIC_DEC
 # define	ATOMIC_DEC64		ATOMIC_DEC
 # define	ATOMIC_DEC32		ATOMIC_DEC
-# define	ATOMIC_DEC16		ATOMIC_DEC
 #endif
 
 #ifndef HDR_T_PRIVATE
@@ -1990,7 +2037,7 @@ typedef	struct	tcpiphdr	tcpiphdr_t;
 #define	TCPF_ALL	(TH_FIN|TH_SYN|TH_RST|TH_PUSH|TH_ACK|TH_URG|\
 			 TH_ECN|TH_CWR)
 
-#if (BSD >= 199306) && !defined(m_act)
+#if BSD_GE_YEAR(199306) && !defined(m_act)
 # define	m_act	m_nextpkt
 #endif
 

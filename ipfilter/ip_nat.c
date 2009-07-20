@@ -16,8 +16,8 @@
 #include <sys/param.h>
 #include <sys/time.h>
 #include <sys/file.h>
-#if defined(_KERNEL) && defined(__NetBSD_Version__) && \
-    (__NetBSD_Version__ >= 399002000)
+#if defined(_KERNEL) && \
+    (defined(__NetBSD_Version) && (__NetBSD_Version >= 399002000))
 # include <sys/kauth.h>
 #endif
 #if !defined(_KERNEL)
@@ -31,7 +31,8 @@ struct file;
 # include <sys/uio.h>
 # undef ipf_nat_KERNEL
 #endif
-#if defined(_KERNEL) && (__FreeBSD_version >= 220000)
+#if defined(_KERNEL) && \
+    defined(__FreeBSD_version) && (__FreeBSD_version >= 220000)
 # include <sys/filio.h>
 # include <sys/fcntl.h>
 #else
@@ -95,7 +96,7 @@ extern struct ifnet vpnif;
 #include "netinet/ip_lookup.h"
 #include "netinet/ip_dstlist.h"
 #include "netinet/ip_sync.h"
-#if (__FreeBSD_version >= 300000)
+#if FREEBSD_GE_REV(300000)
 # include <sys/malloc.h>
 #endif
 #ifdef HAS_SYS_MD5_H
@@ -1046,8 +1047,8 @@ ipf_nat_ioctl(softc, data, cmd, mode, uid, ctx)
 	ipnat_t natd;
 	SPL_INT(s);
 
-#if (BSD >= 199306) && defined(_KERNEL)
-# if defined(__NetBSD_Version__) && (__NetBSD_Version__ >= 399002000)
+#if BSD_GE_YEAR(199306) && defined(_KERNEL)
+# if NETBSD_GE_REV(399002000)
 	if ((mode & FWRITE) &&
 	     kauth_authorize_network(curlwp->l_cred, KAUTH_NETWORK_FIREWALL,
 				     KAUTH_REQ_NETWORK_FIREWALL_FW,

@@ -123,6 +123,15 @@ struct file;
 # include <sys/malloc.h>
 #endif
 #include "netinet/ipl.h"
+
+#if defined(__NetBSD__) && (__NetBSD_Version__ >= 104230000)
+# include <sys/callout.h>
+extern struct callout ipf_slowtimer_ch;
+#endif
+#if defined(__OpenBSD__)
+# include <sys/timeout.h>
+extern struct timeout ipf_slowtimer_ch;
+#endif
 /* END OF INCLUDES */
 
 #if !defined(lint)
@@ -3538,7 +3547,7 @@ fr_cksum(m, ip, l4proto, l4hdr, l3len)
 	}
 # else /* MENTAT */
 #  if defined(BSD) || defined(sun)
-#   if BSD >= 199103
+#   if BSD_GE_YEAR(199103)
 	m->m_data += hlen;
 #   else
 	m->m_off += hlen;
@@ -3682,7 +3691,7 @@ nodata:
 	return sum2;
 }
 
-#if defined(_KERNEL) && ( ((BSD < 199103) && !defined(MENTAT)) || \
+#if defined(_KERNEL) && ( (BSD_LT_YEAR(199103) && !defined(MENTAT)) || \
     defined(__sgi) ) && !defined(linux) && !defined(_AIX51)
 
 /*
@@ -5592,10 +5601,10 @@ ipf_resolvefunc(softc, data)
 }
 
 
-#if !defined(_KERNEL) || (!defined(__NetBSD__) && !defined(__OpenBSD__) && !defined(__FreeBSD__)) || \
-    (defined(__FreeBSD__) && (__FreeBSD_version < 501000)) || \
-    (defined(__NetBSD__) && (__NetBSD_Version__ < 105000000)) || \
-    (defined(__OpenBSD__) && (OpenBSD < 200006))
+#if !defined(_KERNEL) || (!defined(__NetBSD__) && !defined(__OpenBSD__) && \
+     !defined(__FreeBSD__)) || \
+    FREEBSD_LT_REV(501000) || NETBSD_LT_REV(105000000) || \
+    OPENBSD_LT_REV(200006)
 /*
  * From: NetBSD
  * ppsratecheck(): packets (or events) per second limitation.
@@ -7471,77 +7480,6 @@ ipf_ipftune(softc, cmd, data)
 
 	return error;
 }
-
-
-/* ------------------------------------------------------------------------ */
-/* Function:    ipf_initialise                                              */
-/* Returns:     int - 0 == success,  < 0 == failure                         */
-/* Parameters:  None.                                                       */
-/*                                                                          */
-/* Call of the initialise functions for all the various subsystems inside   */
-/* of IPFilter.  If any of them should fail, return immeadiately a failure  */
-/* BUT do not try to recover from the error here.                           */
-/* ------------------------------------------------------------------------ */
-#if 0
-int
-ipf_initialise(void)
-{
-	int i;
-
-#ifdef IPFILTER_LOG
-	i = ipf_log_init();
-	if (i < 0)
-		return -10 + i;
-#endif
-	i = ipf_nat_init();
-	if (i < 0)
-		return -20 + i;
-
-	i = ipf_state_init();
-	if (i < 0)
-		return -30 + i;
-
-	i = ipf_auth_init();
-	if (i < 0)
-		return -40 + i;
-
-	i = ipf_frag_init();
-	if (i < 0)
-		return -50 + i;
-
-	i = ipf_proxy_init();
-	if (i < 0)
-		return -60 + i;
-
-	i = ipf_sync_init();
-	if (i < 0)
-		return -70 + i;
-#ifdef IPFILTER_SCAN
-	i = ipf_scan_init();
-	if (i < 0)
-		return -80 + i;
-#endif
-	i = ipf_lookup_init();
-	if (i < 0)
-		return -90 + i;
-#ifdef IPFILTER_COMPILED
-	ipfrule_add();
-#endif
-	return 0;
-}
-#endif
-
-
-/* ------------------------------------------------------------------------ */
-/* Function:    ipf_deinitialise                                            */
-/* Returns:     None.                                                       */
-/* Parameters:  None.                                                       */
-/*                                                                          */
-/* Call all the various subsystem cleanup routines to deallocate memory or  */
-/* destroy locks or whatever they've done that they need to now undo.       */
-/* The order here IS important as there are some cross references of        */
-/* internal data structures.                                                */
-/* ------------------------------------------------------------------------ */
 
 
 /* ------------------------------------------------------------------------ */
@@ -9995,4 +9933,32 @@ ipf_rb_ht_init(head)
 	host_track_t *head;
 {
 	RB_INIT(&head->ht_root);
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_slowtimer                                               */
+/* Returns:     Nil                                                         */
+/* Parameters:  ptr(I) - pointer to main ipf soft context structure         */
+/*                                                                          */
+/* Slowly expire held state for fragments.  Timeouts are set * in           */
+/* expectation of this being called twice per second.                       */
+/* ------------------------------------------------------------------------ */
+void
+ipf_slowtimer(softc)
+	ipf_main_softc_t *softc;
+{
+
+	ipf_token_expire(softc);
+	ipf_frag_expire(softc);
+	ipf_state_expire(softc);
+	ipf_nat_expire(softc);
+	ipf_auth_expire(softc);
+	ipf_lookup_expire(softc);
+	ipf_rule_expire(softc);
+	ipf_sync_expire(softc);
+	softc->ipf_ticks++;
+#   if defined(__OpenBSD__)
+	timeout_add(&ipf_slowtimer_ch, hz/2);
+#   endif
 }

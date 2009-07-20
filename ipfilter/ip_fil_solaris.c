@@ -64,6 +64,12 @@ static	void	ipf_fixl4sum __P((fr_info_t *));
 static	void	*ipf_routeto __P((fr_info_t *, int, void *));
 static	int	ipf_sendpkt __P((ipf_main_softc_t *, int, void *, mblk_t *,
 				 struct ip *, void *));
+static	void	ipf_call_slow_timer __P((ipf_main_softc_t *));
+#if (SOLARIS2 < 7)
+static	void	ipf_timer_func __P((void));
+#else
+static	void	ipf_timer_func __P((void *));
+#endif
 
 #if !defined(FW_HOOKS)
 # if SOLARIS2 >= 7

@@ -104,6 +104,26 @@ ipfattach()
 }
 
 
+static void
+ipf_timer_func(ptr)
+	void *ptr;
+{
+	ipf_main_softc_t *softc = ptr;
+	int s;
+
+	SPL_NET(s);
+
+	if (softc->ipf_running > 0)
+		ipf_slowtimer(softc);
+
+	if (softc->ipf_running == -1 || softc->ipf_running == 1)
+		timeout(ipf_timer_func, &ipfmain,
+			(hz / IPF_HZ_DIVIDE) * IPF_HZ_MULT);
+
+	SPL_X(s);
+}
+
+
 /*
  * Disable the filter by removing the hooks from the IP input/output
  * stream.

@@ -147,8 +147,8 @@ ipf_detach()
 	if (ipf_savep != NULL)
 		ipf_checkp = ipf_savep;
 	ipf_savep = NULL;
-	(void) frflush(IPL_LOGIPF, FR_INQUE|FR_OUTQUE|FR_INACTIVE);
-	(void) frflush(IPL_LOGIPF, FR_INQUE|FR_OUTQUE);
+	(void) frflush(&ipfmain, IPL_LOGIPF, FR_INQUE|FR_OUTQUE|FR_INACTIVE);
+	(void) frflush(&ipfmain, IPL_LOGIPF, FR_INQUE|FR_OUTQUE);
 
 	ipf_ipfilter_detach();
 
@@ -194,7 +194,8 @@ ipfioctl(dev, cmd, data, mode, cp, rp)
 
 	SPL_NET(s);
 
-	error = ipf_ioctlswitch(unit, data, cmd, mode, cp->cr_uid, curproc);
+	error = ipf_ioctlswitch(&ipfmain, unit, data, cmd, mode,
+				cp->cr_uid, curproc);
 	if (error != -1) {
 		SPL_X(s);
 		return error;

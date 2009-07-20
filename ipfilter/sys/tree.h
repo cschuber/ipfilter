@@ -303,6 +303,13 @@ struct name {								\
 	(root)->rbh_root = NULL;					\
 } while (/*CONSTCOND*/ 0)
 
+/*
+ * Undef for Linux
+ */
+#undef	RB_BLACK
+#undef	RB_RED
+#undef	RB_ROOT
+
 #define RB_BLACK	0
 #define RB_RED		1
 #define RB_ENTRY(type)							\
