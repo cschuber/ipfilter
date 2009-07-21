@@ -5076,9 +5076,9 @@ ipf_state_iter(softc, token, itp)
 			softc->ipf_interror = 100030;
 			error = EFAULT;
 		}
+		if (is != NULL)
+			ipf_state_deref(softc, &is);
 		if (token->ipt_data != NULL) {
-			if (is != NULL)
-				ipf_state_deref(softc, &is);
 			if (next->is_next == NULL) {
 				token->ipt_data = NULL;
 				break;

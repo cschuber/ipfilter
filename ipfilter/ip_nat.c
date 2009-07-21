@@ -6904,12 +6904,12 @@ ipf_nat_getnext(softc, t, itp)
 				softc->ipf_interror = 60049;
 				error = EFAULT;
 			}
+			if (hm != NULL) {
+				WRITE_ENTER(&softc->ipf_nat);
+				ipf_nat_hostmapdel(&hm);
+				RWLOCK_EXIT(&softc->ipf_nat);
+			}
 			if (t->ipt_data != NULL) {
-				if (hm != NULL) {
-					WRITE_ENTER(&softc->ipf_nat);
-					ipf_nat_hostmapdel(&hm);
-					RWLOCK_EXIT(&softc->ipf_nat);
-				}
 				if (nexthm->hm_next == NULL) {
 					t->ipt_data = NULL;
 					break;
@@ -6926,12 +6926,12 @@ ipf_nat_getnext(softc, t, itp)
 				softc->ipf_interror = 60050;
 				error = EFAULT;
 			}
+			if (ipn != NULL) {
+				WRITE_ENTER(&softc->ipf_nat);
+				ipf_nat_rulederef(softc, &ipn);
+				RWLOCK_EXIT(&softc->ipf_nat);
+			}
 			if (t->ipt_data != NULL) {
-				if (ipn != NULL) {
-					WRITE_ENTER(&softc->ipf_nat);
-					ipf_nat_rulederef(softc, &ipn);
-					RWLOCK_EXIT(&softc->ipf_nat);
-				}
 				if (nextipnat->in_next == NULL) {
 					t->ipt_data = NULL;
 					break;
@@ -6948,10 +6948,10 @@ ipf_nat_getnext(softc, t, itp)
 				softc->ipf_interror = 60051;
 				error = EFAULT;
 			}
+			if (nat != NULL) {
+				ipf_nat_deref(softc, &nat);
+			}
 			if (t->ipt_data != NULL) {
-				if (nat != NULL) {
-					ipf_nat_deref(softc, &nat);
-				}
 				if (nextnat->nat_next == NULL) {
 					t->ipt_data = NULL;
 					break;
