@@ -1230,6 +1230,7 @@ static void topipstates(saddr, daddr, sport, dport, protocol, ver,
 	int i, j, winy, tsentry, maxx, maxy, redraw = 0, ret = 0;
 	int len, srclen, dstlen, forward = 1, c = 0;
 	ips_stat_t ipsst, *ipsstp = &ipsst;
+	int token_type = IPFGENITER_STATE;
 	statetop_t *tstable = NULL, *tp;
 	const char *errstr = "";
 	ipstate_t ips;
@@ -1377,6 +1378,7 @@ static void topipstates(saddr, daddr, sport, dport, protocol, ver,
 			}
 		}
 
+		(void) ioctl(state_fd, SIOCIPFDELTOK, &token_type);
 
 		/* sort the array */
 		if (tsentry != -1) {
