@@ -827,26 +827,26 @@ ipf_pr_fragment6(fin)
 		return IPPROTO_NONE;
 	}
 
-	if ((fin->fin_plen & 7) != 0) {
+	if ((frag->ip6f_offlg & IP6F_MORE_FRAG) != 0) {
 		/*
 		 * Any fragment that isn't the last fragment must have its
 		 * length as a multiple of 8.
 		 */
-		if (ntohs(frag->ip6f_offlg) & 1)
+		if ((fin->fin_plen & 7) != 0)
 			fin->fin_flx |= FI_BAD;
 	}
 
-	/*
-	 * Fragment but no fragmentation info set?  Bad packet...
-	 */
-	if (ntohs(frag->ip6f_offlg & 0xfff9) == 0)
-		fin->fin_flx |= FI_BAD;
-
 	fin->fin_fraghdr = frag;
 	fin->fin_id = frag->ip6f_ident;
-	fin->fin_off = ntohs(frag->ip6f_offlg) & 0xfff8;
+	fin->fin_off = ntohs(frag->ip6f_offlg & IP6F_OFF_MASK);
 	if (fin->fin_off != 0)
 		fin->fin_flx |= FI_FRAGBODY;
+
+	/*
+	 * Jumbograms aren't handled, so the max. length is 64k
+	 */
+	if ((fin->fin_off << 3) + fin->fin_dlen > 65535)
+		  fin->fin_flx |= FI_BAD;
 
 	/*
 	 * We don't know where the transport layer header (or whatever is next
