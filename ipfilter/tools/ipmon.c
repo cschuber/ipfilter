@@ -1045,10 +1045,16 @@ int	blen;
 	(void) sprintf(t, "%s", ifname);
 	t += strlen(t);
 # if defined(MENTAT) || defined(linux)
-	if (ISALPHA(*(t - 1))) {
-		sprintf(t, "%d", ipf->fl_unit);
-		t += strlen(t);
-	}
+#  if defined(linux)
+	/*
+	 * On Linux, the loopback interface is just "lo", not "lo0".
+	 */
+	if (strcmp(ifname, "lo") != 0)
+#  endif
+		if (ISALPHA(*(t - 1))) {
+			sprintf(t, "%d", ipf->fl_unit);
+			t += strlen(t);
+		}
 # endif
 	}
 #else
