@@ -666,7 +666,6 @@ fr_info_t *fin;
 	if (frpr_ipv6exthdr(fin, 0, IPPROTO_FRAGMENT) == IPPROTO_NONE)
 		return IPPROTO_NONE;
 
-
 	frag = fin->fin_exthdr;
 
 	/*
@@ -680,15 +679,15 @@ fr_info_t *fin;
 			fin->fin_flx |= FI_BAD;
 	}
 
-	/*
-	 * Fragment but no fragmentation info set?  Bad packet...
-	 */
-	if ((frag->ip6f_offlg & (IP6F_MORE_FRAG|IP6F_OFF_MASK)) == 0)
-		fin->fin_flx |= FI_BAD;
-
 	fin->fin_off = ntohs(frag->ip6f_offlg & IP6F_OFF_MASK);
 	if (fin->fin_off != 0)
 		fin->fin_flx |= FI_FRAGBODY;
+
+	/*
+	 * Jumbograms aren't handled, so the max. length is 64k
+	 */
+	if ((fin->fin_off << 3) + fin->fin_dlen > 65535)
+		fin->fin_flx |= FI_BAD;
 
 	return frag->ip6f_nxt;
 }
