@@ -5170,12 +5170,12 @@ ipfgeniter_t *itp;
 			error = COPYOUT(nexthm, dst, sizeof(*nexthm));
 			if (error != 0)
 				error = EFAULT;
+			if (hm != NULL) {
+				WRITE_ENTER(&ipf_nat);
+				fr_hostmapdel(&hm);
+				RWLOCK_EXIT(&ipf_nat);
+			}
 			if (t->ipt_data != NULL) {
-				if (hm != NULL) {
-					WRITE_ENTER(&ipf_nat);
-					fr_hostmapdel(&hm);
-					RWLOCK_EXIT(&ipf_nat);
-				}
 				if (nexthm->hm_next == NULL) {
 					t->ipt_data = NULL;
 					break;
@@ -5190,12 +5190,12 @@ ipfgeniter_t *itp;
 			error = COPYOUT(nextipnat, dst, sizeof(*nextipnat));
 			if (error != 0)
 				error = EFAULT;
+			if (ipn != NULL) {
+				WRITE_ENTER(&ipf_nat);
+				fr_ipnatderef(&ipn);
+				RWLOCK_EXIT(&ipf_nat);
+			}
 			if (t->ipt_data != NULL) {
-				if (ipn != NULL) {
-					WRITE_ENTER(&ipf_nat);
-					fr_ipnatderef(&ipn);
-					RWLOCK_EXIT(&ipf_nat);
-				}
 				if (nextipnat->in_next == NULL) {
 					t->ipt_data = NULL;
 					break;
@@ -5210,10 +5210,10 @@ ipfgeniter_t *itp;
 			error = COPYOUT(nextnat, dst, sizeof(*nextnat));
 			if (error != 0)
 				error = EFAULT;
+			if (nat != NULL) {
+				fr_natderef(&nat);
+			}
 			if (t->ipt_data != NULL) {
-				if (nat != NULL) {
-					fr_natderef(&nat);
-				}
 				if (nextnat->nat_next == NULL) {
 					t->ipt_data = NULL;
 					break;

@@ -4377,11 +4377,13 @@ ipfgeniter_t *itp;
 		error = COPYOUT(next, dst, sizeof(*next));
 		if (error != 0)
 			error = EFAULT;
+
+		if (is != NULL)
+			fr_statederef(&is);
+
 		if (token->ipt_data != NULL) {
 			break;
 		} else {
-			if (is != NULL)
-				fr_statederef(&is);
 			if (next->is_next == NULL) {
 				token->ipt_data = NULL;
 				break;
