@@ -19,7 +19,8 @@
  *	ported to ipfilter 3.4.20 by Michael Grant mg-ipf@grant.org
  */
 
-#if __FreeBSD_version >= 220000 && defined(_KERNEL)
+#if defined(_KERNEL) && \
+    defined(__FreeBSD_Version) && (__FreeBSD_Version >= 220000)
 # include <sys/fcntl.h>
 # include <sys/filio.h>
 #else
@@ -276,7 +277,7 @@ ipf_p_h245_out(arg, fin, aps, nat)
 					 ip->ip_src, ip->ip_dst);
 		if (nat2 == NULL) {
 			struct ip newip;
-			struct udphdr udp;
+			udphdr_t udp;
 
 			bcopy((caddr_t)ip, (caddr_t)&newip, sizeof(newip));
 			newip.ip_len = htons(fin->fin_hlen + sizeof(udp));

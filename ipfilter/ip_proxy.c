@@ -84,11 +84,10 @@ struct file;
 # include <sys/malloc.h>
 #endif
 
-#include "netinet/ip_ftp_pxy.c"
-#include "netinet/ip_rcmd_pxy.c"
-
 /* END OF INCLUDES */
 
+#include "netinet/ip_ftp_pxy.c"
+#include "netinet/ip_rcmd_pxy.c"
 #include "netinet/ip_pptp_pxy.c"
 #if defined(_KERNEL)
 # include "netinet/ip_irc_pxy.c"

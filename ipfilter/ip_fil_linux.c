@@ -1062,6 +1062,62 @@ mb_t *m;
 }
 
 
+/*
+ * Copy data from a buffer back into the indicated mbuf chain,
+ * starting "off" bytes from the beginning, extending the mbuf
+ * chain if necessary.
+ */
+void
+m_copyback(m0, off0, len0, cp)
+	mb_t *m0;
+	int off0;
+	int len0;
+	caddr_t cp;
+{
+	mb_t *m = m0, *n;
+	int totlen = 0;
+	int mlen;
+	int off = off0;
+	int len = len0;
+
+	if (m0 == 0)
+		return;
+	while (off > (mlen = m->len)) {
+		off -= mlen;
+		totlen += mlen;
+		if (m->next == 0) {
+			n = alloc_skb(off, in_interrupt() ? GFP_ATOMIC :
+							    GFP_KERNEL);
+			if (n == 0)
+				return;
+			n->len = off;
+			m->next = n;
+		}
+		m = m->next;
+	}
+	while (len > 0) {
+		mlen = MIN(m->len - off, len);
+		bcopy(cp, off + mtod(m, caddr_t), (unsigned)mlen);
+		cp += mlen;
+		len -= mlen;
+		mlen += off;
+		off = 0;
+		totlen += mlen;
+		if (len == 0)
+			break;
+		if (m->next == 0) {
+			n = alloc_skb(len, in_interrupt() ? GFP_ATOMIC :
+							    GFP_KERNEL);
+			if (n == 0)
+				return;
+			n->len = len;
+			m->next = n;
+		}
+		m = m->next;
+	}
+}
+
+
 static void
 ipf_timer_func(unsigned long value)
 {
