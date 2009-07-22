@@ -31,7 +31,7 @@ MFLAGS="BINDEST=$(BINDEST)" "SBINDEST=$(SBINDEST)" "MANDIR=$(MANDIR)" \
 	'CFLAGS=$(CFLAGS) $(SOLARIS2)' "IPFLKM=$(IPFLKM)" \
 	"IPFLOG=$(IPFLOG)" "LOGFAC=$(LOGFAC)" "POLICY=$(POLICY)" \
 	"SOLARIS2=$(SOLARIS2)" "DEBUG=$(DEBUG)" "DCPU=$(CPU)" \
-	"CPUDIR=$(CPUDIR)" "LOOKUP=$(LOOKUP)" "SYNC=$(SYNC)"
+	"CPUDIR=$(CPUDIR)" "LOOKUP=$(LOOKUP)" "XID=$(XID)" "SYNC=$(SYNC)"
 LIBS=-L. -lipf $(LIBBPF)
 #
 ########## ########## ########## ########## ########## ########## ##########
@@ -45,7 +45,7 @@ MODOBJS=ip_fil.o fil.o ml_ipl.o ip_nat.o ip_frag.o ip_state.o ip_proxy.o \
 	ip_auth.o ip_log.o ip_pool.o ip_htable.o ip_lookup.o ip_rules.o \
 	ip_scan.o ip_sync.o ip_nat6.o ip_dstlist.o radix.o
 #	ip_trafcon.o
-DFLAGS=$(IPFLKM) $(IPFLOG) $(LOOKUP) $(SYNC) $(DEF) $(DLKM) $(IPFBPF)
+DFLAGS=$(IPFLKM) $(IPFLOG) $(LOOKUP) $(XID) $(SYNC) $(DEF) $(DLKM) $(IPFBPF)
 IPF=ipf.o ipfcomp.o ipf_y.o ipf_l.o bpf_filter_u.o
 IPT=ipftest.o fil_u.o ip_frag_u.o ip_state_u.o ip_nat_u.o ip_nat6_u.o \
     ip_proxy_u.o ip_auth_u.o ip_htable_u.o ip_lookup_u.o ip_pool_u.o \
@@ -265,16 +265,8 @@ ipflkm.o: $(MODOBJS)
 	${RM} -f ipflkm
 
 ipfrule.ko.5: ip_rulesx.o $(MLR)
-.if ${MACHINE_ARCH} != amd64
 	ld -warn-common -r -d -o $(.TARGET:S/.ko/.kld/) ip_rulesx.o $(MLR)
 	ld -Bshareable -d -warn-common -o $(LKMR:S/.5$//) $(.TARGET:S/.ko/.kld/)
-.else
-	ld -warn-common -r -d -o $(.TARGET:S/.5$//) ip_rulesx.o $(MLR)
-	nm -g $(.TARGET:S/.5$//) | \
-	    awk '/^[^[:space:]]+ [^AU] (.*)$$/ { print ($$2=="C" ? "-N" : "-L") $$3 }' | \
-	    xargs -J% objcopy % $(.TARGET:S/.5$//)
-
-.endif
 
 ipfrule.ko: ip_rulesx.o $(MLR)
 	gensetdefs ip_rulesx.o $(MLR)
@@ -288,9 +280,6 @@ ipf.ko.5 ipl.ko.5: $(MODOBJS)
 	ld -Bshareable -d -warn-common -o $(LKM:S/.5$//) $(.TARGET:S/.ko/.kld/)
 .else
 	ld -warn-common -r -d -o $(.TARGET:S/.5$//) $(MODOBJS)
-	nm -g $(.TARGET:S/.5$//) | \
-	    awk '/^[^[:space:]]+ [^AU] (.*)$$/ { print ($$2=="C" ? "-N" : "-L") $$3 }' | \
-	    xargs -J% objcopy % $(.TARGET:S/.5$//)
 .endif
 
 ipf.ko ipl.ko: $(MODOBJS)
@@ -554,27 +543,6 @@ install:
 	-if [ -d /boot/kernel -a -f ipfrule.ko ] ; then \
 		cp ipfrule.ko /boot/kernel; \
 	fi
-.else
-	-if [ -d /boot/kernel -a -f ipf.ko ] ; then \
-		if [ -f /boot/kernel/ipl.ko ] ; then \
-			objcopy --only-keep-debug ipf.ko 
-			    /boot/kernel/ipl.ko.symbols; \
-			objcopy --strip-debug \
-			    --add-gnu-debuglink=ipl.ko.symbols  \
-			    ipf.ko /boot/kernel/ipl.ko; \
-		else \
-			objcopy --only-keep-debug ipf.ko \
-			    /boot/kernel/ipf.ko.symbols; \
-			objcopy --strip-debug \
-			    --add-gnu-debuglink=ipl.ko.symbols \
-			    ipf.ko /boot/kernel/ipf.ko; \
-		fi \
-	fi
-	-if [ -d /boot/kernel -a -f ipfrule.ko ] ; then \
-		objcopy --only-keep-debug ipfrule.ko /boot/kernel/ipfrule.ko.symbols; \
-		objcopy --strip-debug --add-gnu-debuglink=ipfrule.ko.symbols ipfrule.ko /boot/kernel/ipfrule.ko; \
-	fi
-.endif
 	-if [ -d /usr/lkm -a -f ipflkm.o ] ; then \
 		cp ipflkm.o /usr/lkm; \
 	fi

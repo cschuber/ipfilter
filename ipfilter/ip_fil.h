@@ -11,20 +11,20 @@
 #define	__IP_FIL_H__
 
 #include "netinet/ip_compat.h"
-#if NETBSD_GE_REV(104040000)
+#if (__NetBSD_Version__ >= 104040000)
 # include <sys/callout.h>
 #endif
 #if defined(BSD) && defined(_KERNEL)
-# if NETBSD_LT_REV(399000000) || defined(__osf__) || FREEBSD_LT_REV(500043)
+# if (defined(__NetBSD__) && (__NetBSD_Version__ < 399000000)) || \
+      defined(__osf__) || \
+	    (defined(__FreeBSD_version) && (__FreeBSD_version < 500043))
 #  include <sys/select.h>
 # else
 #  include <sys/selinfo.h>
 # endif
 #endif
 
-#if !defined(linux) || !defined(_KERNEL)
-# include <netinet/in.h>
-#endif
+#include "netinet/in.h"
 #include "sys/tree.h"
 
 #ifndef	SOLARIS
@@ -450,10 +450,12 @@ typedef	struct	fr_info	{
 #define	fin_sport	fin_fi.fi_ports[0]
 #define	fin_dport	fin_fi.fi_ports[1]
 #define	fin_tcpf	fin_fi.fi_tcpf
-#define	fin_src6	fin_fi.fi_src
-#define	fin_dst6	fin_fi.fi_dst
-#define	fin_srcip6	fin_fi.fi_src.in6
-#define	fin_dstip6	fin_fi.fi_dst.in6
+#ifdef USE_INET6
+# define	fin_src6	fin_fi.fi_src
+# define	fin_dst6	fin_fi.fi_dst
+# define	fin_srcip6	fin_fi.fi_src.in6
+# define	fin_dstip6	fin_fi.fi_dst.in6
+#endif
 
 #define	IPF_IN		0
 #define	IPF_OUT		1
@@ -1082,7 +1084,7 @@ typedef	struct	friostat	{
 	u_long		f_rb_no_mem;
 	u_long		f_rb_node_max;
 	u_32_t		f_ticks;
-	int		f_locks[IPL_LOGSIZE];
+	int		f_locks[IPL_LOGMAX];
 	int		f_defpass;	/* default pass - from fr_pass */
 	int		f_active;	/* 1 or 0 - active rule set */
 	int		f_running;	/* 1 if running, else 0 */
@@ -1495,7 +1497,7 @@ typedef struct ipftoken {
 	int		ipt_type;
 	int		ipt_uid;
 	int		ipt_subtype;
-	int		ipt_ref;
+	int		ipt_alive;
 } ipftoken_t;
 
 
@@ -1600,14 +1602,10 @@ typedef struct ipf_main_softc_s {
 	frentry_t	*ipf_rule_explist[2];
 	ipftoken_t	*ipf_token_head;
 	ipftoken_t	**ipf_token_tail;
-#if defined(__FreeBSD_version) && (__FreeBSD_version >= 300000) && \
-    defined(_KERNEL)
+#if (__FreeBSD_version >= 300000) && defined(_KERNEL)
 	struct callout_handle ipf_slow_ch;
 #endif
-#if defined(linux) && defined(_KERNEL)
-	struct timer_list	ipf_timer;
-#endif
-#if NETBSD_GE_REV(104040000)
+#if (__NetBSD_Version__ >= 104040000)
 	struct callout	ipf_slow_ch;
 #endif
 #if SOLARIS
@@ -1619,7 +1617,7 @@ typedef struct ipf_main_softc_s {
 #endif
 #if defined(_KERNEL)
 # if SOLARIS
-	struct pollhead	ipf_poll_head[IPL_LOGSIZE];
+	struct pollhead	ipf_poll_head[IPL_LOGMAX];
 	void		*ipf_dip;
 #  if defined(INSTANCES)
 	int		ipf_get_loopback;
@@ -1638,12 +1636,7 @@ typedef struct ipf_main_softc_s {
 	hook_t		ipf_hk_loop_v6_out;
 #  endif
 # else
-#  if defined(linux) && defined(_KERNEL)
-	struct poll_table_struct	ipf_selwait[IPL_LOGSIZE];
-	wait_queue_head_t		iplh_linux[IPL_LOGSIZE];
-#  else
-	struct selinfo	ipf_selwait[IPL_LOGSIZE];
-#  endif
+	struct selinfo	ipf_selwait[IPL_LOGMAX];
 # endif
 #endif
 	void		*ipf_slow;
@@ -1698,10 +1691,10 @@ extern	void	ipfilter_sgi_intfsync __P((void));
 #   ifdef	IPFILTER_LKM
 extern	int	ipf_identify __P((char *));
 #   endif
-#   if BSDOS_GE_REV(199510) || FREEBSD_GE_REV(220000) || \
-      (defined(NetBSD) && (NetBSD >= 199511)) || defined(__OpenBSD__)
-#    if defined(__NetBSD__) || BSDOS_GE_REV(199701) || \
-       defined(__OpenBSD__) || FREEBSD_GE_REV(300000)
+#   if (_BSDI_VERSION >= 199510) || (__FreeBSD_version >= 220000) || \
+      (NetBSD >= 199511) || defined(__OpenBSD__)
+#    if defined(__NetBSD__) || (_BSDI_VERSION >= 199701) || \
+       defined(__OpenBSD__) || (__FreeBSD_version >= 300000)
 #     if (__FreeBSD_version >= 500024)
 #      if (__FreeBSD_version >= 502116)
 extern	int	ipfioctl __P((struct cdev*, u_long, caddr_t, int, struct thread *));
@@ -1709,10 +1702,10 @@ extern	int	ipfioctl __P((struct cdev*, u_long, caddr_t, int, struct thread *));
 extern	int	ipfioctl __P((dev_t, u_long, caddr_t, int, struct thread *));
 #      endif /* __FreeBSD_version >= 502116 */
 #     else
-#      if  NETBSD_GE_REV(499001000)
+#      if  (__NetBSD_Version__ >= 499001000)
 extern	int	ipfioctl __P((dev_t, u_long, void *, int, struct lwp *));
 #       else
-#       if  NETBSD_GE_REV(399001400)
+#       if  (__NetBSD_Version__ >= 399001400)
 extern	int	ipfioctl __P((dev_t, u_long, caddr_t, int, struct lwp *));
 #       else
 extern	int	ipfioctl __P((dev_t, u_long, caddr_t, int, struct proc *));
@@ -1782,8 +1775,7 @@ extern	int	ipf_resolvefunc __P((ipf_main_softc_t *, void *));
 extern	void	*ipf_resolvenic __P((ipf_main_softc_t *, char *, int));
 extern	int	ipf_send_icmp_err __P((int, fr_info_t *, int));
 extern	int	ipf_send_reset __P((fr_info_t *));
-#if  (defined(__FreeBSD_version) && (__FreeBSD_version < 501000)) || \
-     !defined(_KERNEL) || defined(linux)
+#if  (__FreeBSD_version < 501000) || !defined(_KERNEL)
 extern	int	ppsratecheck __P((struct timeval *, int *, int));
 #endif
 extern	void	ipf_apply_timeout __P((ipftq_t *, u_int));
@@ -1870,21 +1862,21 @@ extern	int		ipf_matchicmpqueryreply __P((int, icmpinfo_t *,
 extern	u_32_t		ipf_newisn __P((fr_info_t *));
 extern	u_short		ipf_nextipid __P((fr_info_t *));
 extern	void		ipf_rule_expire __P((ipf_main_softc_t *));
+extern	int		ipf_rulen __P((ipf_main_softc_t *, int, frentry_t *));
 extern	int		ipf_scanlist __P((fr_info_t *, u_32_t));
 extern	frentry_t 	*ipf_srcgrpmap __P((fr_info_t *, u_32_t *));
 extern	int		ipf_tcpudpchk __P((fr_ip_t *, frtuc_t *));
 extern	int		ipf_verifysrc __P((fr_info_t *fin));
 extern	int		ipf_zerostats __P((ipf_main_softc_t *, char *));
+extern	ipftoken_t	*ipf_findtoken __P((ipf_main_softc_t *, int, int,
+					    void *));
 extern	int		ipf_getnextrule __P((ipf_main_softc_t *, ipftoken_t *,
 					     void *));
-extern	int		ipf_sync __P((ipf_main_softc_t *, void *));
-extern	void		ipf_token_deref __P((ipf_main_softc_t *, ipftoken_t *));
-extern	void		ipf_token_expire __P((ipf_main_softc_t *));
-extern	ipftoken_t	*ipf_token_find __P((ipf_main_softc_t *, int, int,
-					    void *));
-extern	void		ipf_token_free __P((ipf_main_softc_t *, ipftoken_t *));
-extern	int		ipf_token_del __P((ipf_main_softc_t *, int, int,
+extern	void		ipf_expiretokens __P((ipf_main_softc_t *));
+extern	void		ipf_freetoken __P((ipf_main_softc_t *, ipftoken_t *));
+extern	int		ipf_deltoken __P((ipf_main_softc_t *, int, int,
 					  void *));
+extern	int		ipf_sync __P((ipf_main_softc_t *, void *));
 extern	int		ipf_genericiter __P((ipf_main_softc_t *, void *,
 					     int, void *));
 #ifdef	IPFILTER_LOOKUP

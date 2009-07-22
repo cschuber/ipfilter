@@ -116,7 +116,6 @@ case "$1" in
 #		[ -n "$ipfruleid" ] && modunload -i $ipfruleid 2>/dev/null
 #		[ -n "$ipfid" ] && modunload -i $ipfid 2>/dev/null
 		/sbin/sysconfig -c ipfilter
-		ipf -E
 		load_ippool_config
 		load_ipf_config
 		load_ipnat_config
@@ -127,7 +126,6 @@ case "$1" in
 		getids
 		[ -n "$pid" ] && kill -TERM $pid
 		/bin/rm -f $PIDFILE
-		ipf -D
 #		[ -n "$ipfruleid" ] && modunload -i $ipfruleid 2>/dev/null
 #		[ -n "$ipfid" ] && modunload -i $ipfid
 		;;

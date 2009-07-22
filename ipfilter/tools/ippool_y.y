@@ -431,15 +431,13 @@ poolline:
 					  resetlexer();
 					  use_inet6 = 0;
 					}
-	| IPT_GROUPMAP '(' IPT_NAME YY_STR ';' inout ';' ')'
+	| IPT_POOL unit '/' IPT_GROUPMAP '(' IPT_NAME YY_STR ';' ')'
 	  '{' setgrouplist '}'
 					{ bzero((char *)&ipht, sizeof(ipht));
-					  strncpy(ipht.iph_name, $4,
+					  strncpy(ipht.iph_name, $7,
 						  sizeof(ipht.iph_name));
-					  ipht.iph_type = IPHASH_GROUPMAP;
-					  ipht.iph_unit = IPL_LOGIPF;
-					  ipht.iph_flags = $6;
-					  load_hash(&ipht, $10, poolioctl);
+					  ipht.iph_unit = $2;
+					  load_hash(&ipht, $11, poolioctl);
 					  resetlexer();
 					  use_inet6 = 0;
 					}
@@ -634,7 +632,7 @@ char *url;
 		if (hlist == NULL)
 			return NULL;
 
-		if (gethost(hlist->al_family, url, &hlist->al_i6addr) == -1) {
+		if (gethost(hlist->al_v, url, &hlist->al_i6addr) == -1) {
 			yyerror("Unknown hostname");
 		}
 	}
@@ -647,7 +645,12 @@ char *url;
 		if (h == NULL)
 			break;
 
-		h->ipe_family = a->al_family;
+		if (a->al_v == 4)
+			h->ipe_family = AF_INET;
+#ifdef USE_INET6
+		else if (a->al_v == 6)
+			h->ipe_family = AF_INET6;
+#endif
 		bcopy((char *)&a->al_addr, (char *)&h->ipe_addr,
 		      sizeof(h->ipe_addr));
 		bcopy((char *)&a->al_mask, (char *)&h->ipe_mask,
@@ -682,7 +685,7 @@ char *url;
 		if (hlist == NULL)
 			return NULL;
 
-		if (gethost(hlist->al_family, url, &hlist->al_i6addr) == -1) {
+		if (gethost(hlist->al_v, url, &hlist->al_i6addr) == -1) {
 			yyerror("Unknown hostname");
 		}
 	}
@@ -695,13 +698,13 @@ char *url;
 		if (p == NULL)
 			break;
 
-		if (a->al_family == AF_INET) {
+		if (a->al_v == 4) {
 			p->ipn_addr.adf_family = AF_INET;
 			p->ipn_addr.adf_len = 8;
 			p->ipn_mask.adf_family = AF_INET;
 			p->ipn_mask.adf_len = 8;
 #ifdef USE_INET6
-		} else if (a->al_family == AF_INET6) {
+		} else if (a->al_v == 6) {
 			p->ipn_addr.adf_family = AF_INET6;
 			p->ipn_addr.adf_len = 20;
 			p->ipn_mask.adf_family = AF_INET6;

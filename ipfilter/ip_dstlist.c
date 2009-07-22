@@ -61,14 +61,13 @@ struct file;
 #include "netinet/ip_nat.h"
 #include "netinet/ip_lookup.h"
 #include "netinet/ip_dstlist.h"
-
-/* END OF INCLUDES */
-
 #ifdef HAS_SYS_MD5_H
 # include <sys/md5.h>
 #else
 # include "md5.h"
 #endif
+
+/* END OF INCLUDES */
 
 #if !defined(lint)
 static const char rcsid[] = "@(#)$Id$";

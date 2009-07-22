@@ -27,7 +27,6 @@ LIBOBJS=$(DEST)/addicmp.o \
      $(DEST)/fill6bits.o \
      $(DEST)/findword.o \
      $(DEST)/freembt.o \
-     $(DEST)/ftov.o \
      $(DEST)/genmask.o \
      $(DEST)/gethost.o \
      $(DEST)/geticmptype.o \
@@ -143,7 +142,6 @@ LIBOBJS=$(DEST)/addicmp.o \
      $(DEST)/tcp_flags.o \
      $(DEST)/var.o \
      $(DEST)/verbose.o \
-     $(DEST)/vtof.o \
      $(DEST)/v6ionames.o \
      $(DEST)/v6optvalue.o
 
@@ -192,8 +190,6 @@ $(DEST)/flags.o: $(LIBSRC)/flags.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/flags.c -o $@
 $(DEST)/freembt.o: $(LIBSRC)/freembt.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/freembt.c -o $@
-$(DEST)/ftov.o: $(LIBSRC)/ftov.c $(INCDEP)
-	$(CC) $(CCARGS) -c $(LIBSRC)/ftov.c -o $@
 $(DEST)/genmask.o: $(LIBSRC)/genmask.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/genmask.c -o $@
 $(DEST)/gethost.o: $(LIBSRC)/gethost.c $(INCDEP)
@@ -436,8 +432,6 @@ $(DEST)/save_nothing.o: $(LIBSRC)/save_nothing.c $(TOP)/ipl.h
 	$(CC) $(CCARGS) -c $(LIBSRC)/save_nothing.c -o $@
 $(DEST)/save_syslog.o: $(LIBSRC)/save_syslog.c $(TOP)/ipl.h
 	$(CC) $(CCARGS) -c $(LIBSRC)/save_syslog.c -o $@
-$(DEST)/vtof.o: $(LIBSRC)/vtof.c $(INCDEP)
-	$(CC) $(CCARGS) -c $(LIBSRC)/vtof.c -o $@
 $(DEST)/save_v1trap.o: $(LIBSRC)/save_v1trap.c $(TOP)/ipl.h
 	$(CC) $(CCARGS) -c $(LIBSRC)/save_v1trap.c -o $@
 $(DEST)/save_v2trap.o: $(LIBSRC)/save_v2trap.c $(TOP)/ipl.h

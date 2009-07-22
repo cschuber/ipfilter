@@ -30,8 +30,7 @@ struct file;
 # include <sys/uio.h>
 # undef _KERNEL
 #endif
-#if defined(_KERNEL) && \
-    defined(__FreeBSD_version) && (__FreeBSD_version >= 220000)
+#if defined(_KERNEL) && (__FreeBSD_version >= 220000)
 # include <sys/filio.h>
 # include <sys/fcntl.h>
 #else
@@ -82,6 +81,24 @@ struct file;
 #include "netinet/ip_lookup.h"
 #include "netinet/ip_proxy.h"
 #include "netinet/ip_sync.h"
+#if (__FreeBSD_version >= 300000)
+# include <sys/malloc.h>
+# if defined(_KERNEL)
+#  ifndef IPFILTER_LKM
+#   include <sys/libkern.h>
+#   include <sys/systm.h>
+#  endif
+extern struct callout_handle ipf_slowtimer_ch;
+# endif
+#endif
+#if defined(__NetBSD__) && (__NetBSD_Version__ >= 104230000)
+# include <sys/callout.h>
+extern struct callout ipf_slowtimer_ch;
+#endif
+#if defined(__OpenBSD__)
+# include <sys/timeout.h>
+extern struct timeout ipf_slowtimer_ch;
+#endif
 /* END OF INCLUDES */
 
 #if !defined(lint)
@@ -1119,6 +1136,67 @@ ipf_frag_expire(softc)
 
 
 /* ------------------------------------------------------------------------ */
+/* Function:    ipf_slowtimer                                               */
+/* Returns:     Nil                                                         */
+/* Parameters:  ptr(I) - pointer to main ipf soft context structure         */
+/*                                                                          */
+/* Slowly expire held state for fragments.  Timeouts are set * in           */
+/* expectation of this being called twice per second.                       */
+/* ------------------------------------------------------------------------ */
+#if !defined(_KERNEL) || (!SOLARIS && !defined(__hpux) && !defined(__sgi) && \
+			  !defined(__osf__))
+# if (BSD < 199103) || !defined(_KERNEL)
+int
+# else
+void
+# endif
+ipf_slowtimer(ptr)
+	void *ptr;
+{
+	ipf_main_softc_t *softc = ptr;
+
+	READ_ENTER(&softc->ipf_global);
+
+	ipf_expiretokens(softc);
+	ipf_frag_expire(softc);
+	ipf_state_expire(softc);
+	ipf_nat_expire(softc);
+	ipf_auth_expire(softc);
+	ipf_lookup_expire(softc);
+	ipf_rule_expire(softc);
+	ipf_sync_expire(softc);
+	softc->ipf_ticks++;
+	if (softc->ipf_running <= 0)
+		goto done;
+# ifdef _KERNEL
+#  if defined(__NetBSD__) && (__NetBSD_Version__ >= 104240000)
+	callout_reset(&softc->ipf_slow_ch, hz / 2, ipf_slowtimer, ptr);
+#  else
+#   if defined(__OpenBSD__)
+	timeout_add(&ipf_slowtimer_ch, hz/2);
+#   else
+#    if (__FreeBSD_version >= 300000)
+	softc->ipf_slow_ch = timeout(ipf_slowtimer, ptr, hz/2);
+#    else
+#     ifdef linux
+	;
+#     else
+	timeout(ipf_slowtimer, ptr, hz/2);
+#     endif
+#    endif /* FreeBSD */
+#   endif /* OpenBSD */
+#  endif /* NetBSD */
+# endif
+done:
+	RWLOCK_EXIT(&softc->ipf_global);
+# if (BSD < 199103) || !defined(_KERNEL)
+	return 0;
+# endif
+}
+#endif /* !SOLARIS && !defined(__hpux) && !defined(__sgi) */
+
+
+/* ------------------------------------------------------------------------ */
 /* Function:    ipf_frag_pkt_next                                           */
 /* ------------------------------------------------------------------------ */
 int
@@ -1231,7 +1309,9 @@ ipf_frag_next(softc, token, itp, top, tail
 		softc->ipf_interror = 20002;
 		error = EFAULT;
 	}
-        if (token->ipt_data != NULL) {
+        if (token->ipt_data == NULL) {
+                ipf_freetoken(softc, token);
+        } else {
                 if (frag != NULL)
 #ifdef USE_MUTEXES
                         ipf_frag_deref(softc, &frag, lock);
@@ -1239,7 +1319,7 @@ ipf_frag_next(softc, token, itp, top, tail
                         ipf_frag_deref(softc, &frag);
 #endif
                 if (next->ipfr_next == NULL)
-                        token->ipt_data = NULL;
+                        ipf_freetoken(softc, token);
         }
         return error;
 }

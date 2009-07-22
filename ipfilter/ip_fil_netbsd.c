@@ -104,7 +104,6 @@ static  int     ipfclose(dev_t dev, int flags);
 static  int     ipfread(dev_t, struct uio *, int ioflag);
 static  int     ipfwrite(dev_t, struct uio *, int ioflag);
 static  int     ipfpoll(dev_t, int events, PROC_T *);
-static	void	ipf_timer_func __P((void *ptr));
 
 const struct cdevsw ipl_cdevsw = {
 	ipfopen, ipfclose, ipfread, ipfwrite, ipfioctl,
@@ -301,13 +300,13 @@ ipfattach(softc)
 	if ((softc->ipf_running > 0) || (ipf_checkp == ipf_check)) {
 		printf("IP Filter: already initialized\n");
 		SPL_X(s);
-		softc->ipf_interror = 130017;
+		ipfmain.ipf_interror = 130017;
 		return EBUSY;
 	}
 
 	if (ipf_init_all(softc) < 0) {
 		SPL_X(s);
-		softc->ipf_interror = 130015;
+		ipfmain.ipf_interror = 130015;
 		return EIO;
 	}
 
@@ -331,7 +330,7 @@ ipfattach(softc)
 #   endif
 	   ) {
 		SPL_X(s);
-		softc->ipf_interror = 130016;
+		ipfmain.ipf_interror = 130016;
 		return ENODEV;
 	}
 
@@ -345,7 +344,7 @@ ipfattach(softc)
 			      &inetsw[ip_protox[IPPROTO_IP]].pr_pfh);
 #  endif
 	if (error) {
-		softc->ipf_interror = 130013;
+		ipfmain.ipf_interror = 130013;
 		goto pfil_error;
 	}
 # else
@@ -371,7 +370,7 @@ ipfattach(softc)
 	if (error) {
 		pfil_remove_hook((void *)ipf_check, PFIL_IN|PFIL_OUT,
 				 &inetsw[ip_protox[IPPROTO_IP]].pr_pfh);
-		softc->ipf_interror = 130014;
+		ipfmain.ipf_interror = 130014;
 		goto pfil_error;
 	}
 #  endif
@@ -407,9 +406,9 @@ ipfattach(softc)
 	callout_init(&softc->ipf_slow_ch);
 # endif
 	callout_reset(&softc->ipf_slow_ch, (hz / IPF_HZ_DIVIDE) * IPF_HZ_MULT,
-		     ipf_timer_func, softc);
+		     ipf_slowtimer, softc);
 #else
-	timeout(ipf_timer_func, softc, (hz / IPF_HZ_DIVIDE) * IPF_HZ_MULT);
+	timeout(ipf_slowtimer, softc, (hz / IPF_HZ_DIVIDE) * IPF_HZ_MULT);
 #endif
 	return 0;
 
@@ -419,32 +418,6 @@ pfil_error:
 	ipf_fini_all(softc);
 	return error;
 #endif
-}
-
-static void
-ipf_timer_func(ptr)
-	void *ptr;
-{
-	ipf_main_softc_t *softc = ptr;
-	SPL_INT(s);
-
-	SPL_NET(s);
-	READ_ENTER(&softc->ipf_global);
-
-	if (softc->ipf_running > 0)
-		ipf_slowtimer(softc);
-
-	if (softc->ipf_running == -1 || softc->ipf_running == 1) {
-#if NETBSD_GE_REV(104240000)
-		callout_reset(&softc->ipf_slow_ch, hz / 2,
-			      ipf_timer_func, softc);
-#else
-		timeout(ipf_timer_func, softc,
-			(hz / IPF_HZ_DIVIDE) * IPF_HZ_MULT);
-#endif
-	}
-	RWLOCK_EXIT(&softc->ipf_global);
-	SPL_X(s);
 }
 
 
@@ -476,8 +449,7 @@ ipfdetach(softc)
 	SPL_NET(s);
 
 #if (__NetBSD_Version__ >= 104010000)
-	if (softc->ipf_running > 0)
-		callout_stop(&softc->ipf_slow_ch);
+	callout_stop(&softc->ipf_slow_ch);
 #else
 	untimeout(ipf_slowtimer, NULL);
 #endif /* NetBSD */
@@ -1381,12 +1353,12 @@ ipf_fastroute6(m0, mpp, fin, fdp)
 		mtu = ife->nd_ifinfo[ifp->if_index].linkmtu;
 # endif
 		if ((error == 0) && (m0->m_pkthdr.len <= mtu)) {
+			*mpp = NULL;
 # if __NetBSD_Version__ >= 499001100
 			error = nd6_output(ifp, ifp, *mpp, satocsin6(dst), rt);
 # else
 			error = nd6_output(ifp, ifp, *mpp, dst6, rt);
 # endif
-			*mpp = NULL;
 		} else {
 			error = EMSGSIZE;
 		}

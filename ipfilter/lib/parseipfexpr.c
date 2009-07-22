@@ -161,7 +161,7 @@ int *parseipfexpr(line, errorptr)
 				} else {
 					mask.in4.s_addr = 0xffffffff;
 				}
-				if (gethost(AF_INET, s, &addr) == -1) {
+				if (gethost(4, s, &addr) == -1) {
 					error = "gethost failed";
 					goto parseerror;
 				}
@@ -190,7 +190,7 @@ int *parseipfexpr(line, errorptr)
 					mask.i6[2] = 0xffffffff;
 					mask.i6[3] = 0xffffffff;
 				}
-				if (gethost(AF_INET6, s, &addr) == -1) {
+				if (gethost(6, s, &addr) == -1) {
 					error = "gethost failed";
 					goto parseerror;
 				}

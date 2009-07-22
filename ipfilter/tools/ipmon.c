@@ -135,7 +135,7 @@ static	char	**udp_ports = NULL;
 static	char	**tcp_ports = NULL;
 
 
-#define	HOSTNAMEV4(b)	hostname(AF_INET, (u_32_t *)&(b))
+#define	HOSTNAMEV4(b)	hostname(4, (u_32_t *)&(b))
 
 #ifndef	LOGFAC
 #define	LOGFAC	LOG_LOCAL0
@@ -636,8 +636,8 @@ static void print_natlog(conf, buf, blen)
 	int blen;
 {
 	static u_32_t seqnum = 0;
-	int res, i, len, family;
 	struct natlog *nl;
+	int res, i, len;
 	struct tm *tm;
 	iplog_t	*ipl;
 	char *proto;
@@ -761,28 +761,33 @@ static void print_natlog(conf, buf, blen)
 
 	proto = getlocalproto(nl->nl_p[0]);
 
-	family = vtof(nl->nl_v[0]);
-
 	if (simple == 1) {
-		sprintf(t, "%s,%s <- -> ", hostname(family, nl->nl_osrcip.i6),
+		sprintf(t, "%s,%s <- -> ",
+			hostname(nl->nl_v[0], nl->nl_osrcip.i6),
 			portlocalname(res, proto, (u_int)nl->nl_osrcport));
 		t += strlen(t);
-		sprintf(t, "%s,%s ", hostname(family, nl->nl_nsrcip.i6),
+		sprintf(t, "%s,%s ",
+			hostname(nl->nl_v[0], nl->nl_nsrcip.i6),
 			portlocalname(res, proto, (u_int)nl->nl_nsrcport));
 		t += strlen(t);
-		sprintf(t, "[%s,%s]", hostname(family, nl->nl_odstip.i6),
+		sprintf(t, "[%s,%s]",
+			hostname(nl->nl_v[0], nl->nl_odstip.i6),
 			portlocalname(res, proto, (u_int)nl->nl_odstport));
 	} else {
-		sprintf(t, "%s,%s ", hostname(family, nl->nl_osrcip.i6),
+		sprintf(t, "%s,%s ",
+			hostname(nl->nl_v[0], nl->nl_osrcip.i6),
 			portlocalname(res, proto, (u_int)nl->nl_osrcport));
 		t += strlen(t);
-		sprintf(t, "%s,%s <- -> ", hostname(family, nl->nl_odstip.i6),
+		sprintf(t, "%s,%s <- -> ",
+			hostname(nl->nl_v[0], nl->nl_odstip.i6),
 			portlocalname(res, proto, (u_int)nl->nl_odstport));
 		t += strlen(t);
-		sprintf(t, "%s,%s ", hostname(family, nl->nl_nsrcip.i6),
+		sprintf(t, "%s,%s ",
+			hostname(nl->nl_v[0], nl->nl_nsrcip.i6),
 			portlocalname(res, proto, (u_int)nl->nl_nsrcport));
 		t += strlen(t);
-		sprintf(t, "%s,%s", hostname(family, nl->nl_ndstip.i6),
+		sprintf(t, "%s,%s",
+			hostname(nl->nl_v[0], nl->nl_ndstip.i6),
 			portlocalname(res, proto, (u_int)nl->nl_ndstport));
 	}
 	t += strlen(t);
@@ -820,9 +825,9 @@ static void print_statelog(conf, buf, blen)
 	int blen;
 {
 	static u_32_t seqnum = 0;
-	int res, i, len, family;
 	struct ipslog *sl;
 	char *t, *proto;
+	int res, i, len;
 	struct tm *tm;
 	iplog_t *ipl;
 
@@ -857,8 +862,6 @@ static void print_statelog(conf, buf, blen)
 	t += strlen(t);
 	sprintf(t, ".%-.6ld ", (long)ipl->ipl_usec);
 	t += strlen(t);
-
-	family = vtof(sl->isl_v);
 
 	switch (sl->isl_type)
 	{
@@ -909,29 +912,33 @@ static void print_statelog(conf, buf, blen)
 
 	if (sl->isl_p == IPPROTO_TCP || sl->isl_p == IPPROTO_UDP) {
 		sprintf(t, "%s,%s -> ",
-			hostname(family, (u_32_t *)&sl->isl_src),
+			hostname(sl->isl_v, (u_32_t *)&sl->isl_src),
 			portlocalname(res, proto, (u_int)sl->isl_sport));
 		t += strlen(t);
 		sprintf(t, "%s,%s PR %s",
-			hostname(family, (u_32_t *)&sl->isl_dst),
+			hostname(sl->isl_v, (u_32_t *)&sl->isl_dst),
 			portlocalname(res, proto, (u_int)sl->isl_dport), proto);
 	} else if (sl->isl_p == IPPROTO_ICMP) {
-		sprintf(t, "%s -> ", hostname(family, (u_32_t *)&sl->isl_src));
+		sprintf(t, "%s -> ", hostname(sl->isl_v,
+					      (u_32_t *)&sl->isl_src));
 		t += strlen(t);
 		sprintf(t, "%s PR icmp %d",
-			hostname(family, (u_32_t *)&sl->isl_dst),
+			hostname(sl->isl_v, (u_32_t *)&sl->isl_dst),
 			sl->isl_itype);
 	} else if (sl->isl_p == IPPROTO_ICMPV6) {
-		sprintf(t, "%s -> ", hostname(family, (u_32_t *)&sl->isl_src));
+		sprintf(t, "%s -> ", hostname(sl->isl_v,
+					      (u_32_t *)&sl->isl_src));
 		t += strlen(t);
 		sprintf(t, "%s PR icmpv6 %d",
-			hostname(family, (u_32_t *)&sl->isl_dst),
+			hostname(sl->isl_v, (u_32_t *)&sl->isl_dst),
 			sl->isl_itype);
 	} else {
-		sprintf(t, "%s -> ", hostname(family, (u_32_t *)&sl->isl_src));
+		sprintf(t, "%s -> ",
+			hostname(sl->isl_v, (u_32_t *)&sl->isl_src));
 		t += strlen(t);
 		sprintf(t, "%s PR %s",
-			hostname(family, (u_32_t *)&sl->isl_dst), proto);
+			hostname(sl->isl_v, (u_32_t *)&sl->isl_dst),
+			proto);
 	}
 	t += strlen(t);
 	if (sl->isl_tag != FR_NOLOGTAG) {
@@ -1034,7 +1041,7 @@ static void print_ipflog(conf, buf, blen)
 	int blen;
 {
 	static u_32_t seqnum = 0;
-	int i, f, lvl, res, len, off, plen, ipoff, defaction;
+	int i, v, lvl, res, len, off, plen, ipoff, defaction;
 	struct icmp *icmp;
 	struct icmp *ic;
 	char *t, *proto;
@@ -1070,7 +1077,15 @@ static void print_ipflog(conf, buf, blen)
 
 	ipf = (ipflog_t *)((char *)buf + sizeof(*ipl));
 	ip = (ip_t *)((char *)ipf + sizeof(*ipf));
-	f = ipf->fl_family;
+	if (ipf->fl_family == AF_INET) {
+		v = 4;
+#ifdef	USE_INET6
+	} else if (ipf->fl_family == AF_INET6) {
+		v = 6;
+#endif
+	} else {
+		v = 0;
+	}
 	res = (ipmonopts & IPMON_RESOLVE) ? 1 : 0;
 	t = line;
 	*t = '\0';
@@ -1103,16 +1118,10 @@ static void print_ipflog(conf, buf, blen)
 	sprintf(t, "%s", ifname);
 	t += strlen(t);
 # if defined(MENTAT) || defined(linux)
-#  if defined(linux)
-	/*
-	 * On Linux, the loopback interface is just "lo", not "lo0".
-	 */
-	if (strcmp(ifname, "lo") != 0)
-#  endif
-		if (ISALPHA(*(t - 1))) {
-			sprintf(t, "%d", ipf->fl_unit);
-			t += strlen(t);
-		}
+	if (ISALPHA(*(t - 1))) {
+		sprintf(t, "%d", ipf->fl_unit);
+		t += strlen(t);
+	}
 # endif
 	}
 #else
@@ -1169,17 +1178,8 @@ static void print_ipflog(conf, buf, blen)
 	*t++ = ' ';
 	*t = '\0';
 
-	if (f == AF_INET) {
-		hl = IP_HL(ip) << 2;
-		ipoff = ntohs(ip->ip_off);
-		off = ipoff & IP_OFFMASK;
-		p = (u_short)ip->ip_p;
-		s = (u_32_t *)&ip->ip_src;
-		d = (u_32_t *)&ip->ip_dst;
-		plen = ntohs(ip->ip_len);
-	} else
+	if (v == 6) {
 #ifdef	USE_INET6
-	if (f == AF_INET6) {
 		off = 0;
 		ipoff = 0;
 		hl = sizeof(ip6_t);
@@ -1211,9 +1211,19 @@ static void print_ipflog(conf, buf, blen)
 				break;
 			}
 		}
-	} else
+#else
+		sprintf(t, "ipv6");
+		goto printipflog;
 #endif
-	{
+	} else if (v == 4) {
+		hl = IP_HL(ip) << 2;
+		ipoff = ntohs(ip->ip_off);
+		off = ipoff & IP_OFFMASK;
+		p = (u_short)ip->ip_p;
+		s = (u_32_t *)&ip->ip_src;
+		d = (u_32_t *)&ip->ip_dst;
+		plen = ntohs(ip->ip_len);
+	} else {
 		goto printipflog;
 	}
 	proto = getlocalproto(p);
@@ -1221,11 +1231,11 @@ static void print_ipflog(conf, buf, blen)
 	if ((p == IPPROTO_TCP || p == IPPROTO_UDP) && !off) {
 		tp = (tcphdr_t *)((char *)ip + hl);
 		if (!(ipf->fl_lflags & FI_SHORT)) {
-			sprintf(t, "%s,%s -> ", hostname(f, s),
+			sprintf(t, "%s,%s -> ", hostname(v, s),
 				portlocalname(res, proto, (u_int)tp->th_sport));
 			t += strlen(t);
 			sprintf(t, "%s,%s PR %s len %hu %hu",
-				hostname(f, d),
+				hostname(v, d),
 				portlocalname(res, proto, (u_int)tp->th_dport),
 				proto, hl, plen);
 			t += strlen(t);
@@ -1246,26 +1256,24 @@ static void print_ipflog(conf, buf, blen)
 			}
 			*t = '\0';
 		} else {
-			sprintf(t, "%s -> ", hostname(f, s));
+			sprintf(t, "%s -> ", hostname(v, s));
 			t += strlen(t);
 			sprintf(t, "%s PR %s len %hu %hu",
-				hostname(f, d), proto, hl, plen);
+				hostname(v, d), proto, hl, plen);
 		}
-#if defined(AF_INET6) && defined(IPPROTO_ICMPV6)
-	} else if ((p == IPPROTO_ICMPV6) && !off && (f == AF_INET6)) {
+	} else if ((p == IPPROTO_ICMPV6) && !off && (v == 6)) {
 		ic = (struct icmp *)((char *)ip + hl);
-		sprintf(t, "%s -> ", hostname(f, s));
+		sprintf(t, "%s -> ", hostname(v, s));
 		t += strlen(t);
 		sprintf(t, "%s PR icmpv6 len %hu %hu icmpv6 %s",
-			hostname(f, d), hl, plen,
+			hostname(v, d), hl, plen,
 			icmpname6(ic->icmp_type, ic->icmp_code));
-#endif
-	} else if ((p == IPPROTO_ICMP) && !off && (f == AF_INET)) {
+	} else if ((p == IPPROTO_ICMP) && !off && (v == 4)) {
 		ic = (struct icmp *)((char *)ip + hl);
-		sprintf(t, "%s -> ", hostname(f, s));
+		sprintf(t, "%s -> ", hostname(v, s));
 		t += strlen(t);
 		sprintf(t, "%s PR icmp len %hu %hu icmp %s",
-			hostname(f, d), hl, plen,
+			hostname(v, d), hl, plen,
 			icmpname(ic->icmp_type, ic->icmp_code));
 		if (ic->icmp_type == ICMP_UNREACH ||
 		    ic->icmp_type == ICMP_SOURCEQUENCH ||
@@ -1332,10 +1340,10 @@ static void print_ipflog(conf, buf, blen)
 
 		}
 	} else {
-		sprintf(t, "%s -> ", hostname(f, s));
+		sprintf(t, "%s -> ", hostname(v, s));
 		t += strlen(t);
 		sprintf(t, "%s PR %s len %hu (%hu)",
-			hostname(f, d), proto, hl, plen);
+			hostname(v, d), proto, hl, plen);
 		t += strlen(t);
 		if (off & IP_OFFMASK)
 			sprintf(t, " (frag %d:%hu@%hu%s%s)",

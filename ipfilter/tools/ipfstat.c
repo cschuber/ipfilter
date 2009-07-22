@@ -818,7 +818,7 @@ static void printlivelist(fiop, out, set, fp, group, comment)
 				continue;
 		}
 		if (fp->fr_data != NULL)
-			fp->fr_data = (char *)fp + fp->fr_size;
+			fp->fr_data = (char *)fp + sizeof(*fp);
 
 		n++;
 
@@ -842,7 +842,7 @@ static void printlivelist(fiop, out, set, fp, group, comment)
 
 		printfr(fp, ioctl);
 		if (opts & OPT_VERBOSE) {
-			binprint(fp, fp->fr_size);
+			binprint(fp, sizeof(*fp));
 			if (fp->fr_data != NULL && fp->fr_dsize > 0)
 				binprint(fp->fr_data, fp->fr_dsize);
 		}
@@ -907,7 +907,7 @@ static void printdeadlist(fiop, out, set, fp, group, comment)
 
 	for (n = 1; fp; fp = fb.fr_next, n++) {
 		if (kmemcpy((char *)&fb, (u_long)fb.fr_next,
-			    fb.fr_size) == -1) {
+			    sizeof(fb)) == -1) {
 			perror("kmemcpy");
 			return;
 		}
@@ -952,7 +952,7 @@ static void printdeadlist(fiop, out, set, fp, group, comment)
 
 		printfr(fp, ioctl);
 		if (opts & OPT_DEBUG) {
-			binprint(fp, fp->fr_size);
+			binprint(fp, sizeof(*fp));
 			if (fb.fr_data != NULL && fb.fr_dsize > 0)
 				binprint(fb.fr_data, fb.fr_dsize);
 		}
@@ -1230,7 +1230,6 @@ static void topipstates(saddr, daddr, sport, dport, protocol, ver,
 	int i, j, winy, tsentry, maxx, maxy, redraw = 0, ret = 0;
 	int len, srclen, dstlen, forward = 1, c = 0;
 	ips_stat_t ipsst, *ipsstp = &ipsst;
-	int token_type = IPFGENITER_STATE;
 	statetop_t *tstable = NULL, *tp;
 	const char *errstr = "";
 	ipstate_t ips;
@@ -1378,7 +1377,6 @@ static void topipstates(saddr, daddr, sport, dport, protocol, ver,
 			}
 		}
 
-		(void) ioctl(state_fd, SIOCIPFDELTOK, &token_type);
 
 		/* sort the array */
 		if (tsentry != -1) {

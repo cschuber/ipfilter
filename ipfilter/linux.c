@@ -1,14 +1,30 @@
 
 #include "ipf-linux.h"
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,10)
-# include <linux/devfs_fs_kernel.h>
+#include <linux/devfs_fs_kernel.h>
+
+#ifdef CONFIG_PROC_FS
+#include <linux/proc_fs.h>
 #endif
+
+extern wait_queue_head_t	iplh_linux[IPL_LOGSIZE];
 
 #ifdef MODULE
 MODULE_SUPPORTED_DEVICE("ipf");
 MODULE_AUTHOR("Darren Reed");
 MODULE_DESCRIPTION("IP-Filter Firewall");
 MODULE_LICENSE("(C)Copyright 2003-2004 Darren Reed");
+
+MODULE_PARM(ipf_flags, "i");
+MODULE_PARM(ipf_control_forwarding, "i");
+MODULE_PARM(ipf_update_ipid, "i");
+MODULE_PARM(ipf_chksrc, "i");
+MODULE_PARM(ipf_pass, "i");
+#ifdef STES
+MODULE_PARM(ipstate_logging, "i");
+MODULE_PARM(nat_logging, "i");
+#endif
+MODULE_PARM(ipl_suppress, "i");
+MODULE_PARM(ipl_logall, "i");
 #endif
 
 static int ipf_open(struct inode *, struct file *);
@@ -43,10 +59,9 @@ static	devfs_handle_t	dh[IPL_LOGSIZE];
 #endif
 static	int		ipfmajor = 0;
 
-ipf_main_softc_t	ipfmain;
 
-int
-uiomove(address, nbytes, rwflag, uiop)
+
+int uiomove(address, nbytes, rwflag, uiop)
 	caddr_t address;
 	size_t nbytes;
 	int rwflag;
@@ -68,13 +83,12 @@ uiomove(address, nbytes, rwflag, uiop)
 		}
 	}
 	if (err)
-		return -EFAULT;
+		return EFAULT;
 	return 0;
 }
 
 
-static int
-ipf_open(struct inode *in, struct file *fp)
+static int ipf_open(struct inode *in, struct file *fp)
 {
 	int unit, err;
 
@@ -105,8 +119,8 @@ ipf_open(struct inode *in, struct file *fp)
 }
 
 
-static ssize_t
-ipf_write(struct file *fp, const char *buf, size_t count, loff_t *posp)
+static ssize_t ipf_write(struct file *fp, const char *buf, size_t count,
+			loff_t *posp)
 {
 	struct inode *i;
 	int unit, err;
@@ -126,15 +140,14 @@ ipf_write(struct file *fp, const char *buf, size_t count, loff_t *posp)
 	uio.uio_offset = *posp;
 	uio.uio_resid = count;
 
-	err = ipf_sync_write(&ipfmain, &uio);
+	err = ipf_sync_write(&uio);
 	if (err > 0)
 		err = -err;
 	return err;
 }
 
 
-static ssize_t
-ipf_read(struct file *fp, char *buf, size_t count, loff_t *posp)
+static ssize_t ipf_read(struct file *fp, char *buf, size_t count, loff_t *posp)
 {
 	struct inode *i;
 	int unit, err;
@@ -154,10 +167,10 @@ ipf_read(struct file *fp, char *buf, size_t count, loff_t *posp)
 	switch (unit)
 	{
 	case IPL_LOGSYNC :
-		err = ipf_sync_read(&ipfmain, &uio);
+		err = ipf_sync_read(&uio);
 		break;
 	default :
-		err = ipf_log_read(&ipfmain, unit, &uio);
+		err = ipf_log_read(unit, &uio);
 		if (err == 0)
 			return count - uio.uio_resid;
 		break;
@@ -170,8 +183,7 @@ ipf_read(struct file *fp, char *buf, size_t count, loff_t *posp)
 
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
-static u_int
-ipf_poll(struct file *fp, poll_table *wait)
+static u_int ipf_poll(struct file *fp, poll_table *wait)
 {
 	struct inode *i;
 	u_int revents;
@@ -183,7 +195,7 @@ ipf_poll(struct file *fp, poll_table *wait)
 	if (unit < 0 || unit > IPL_LOGMAX)
 		return 0;
 
-	poll_wait(fp, &ipfmain.iplh_linux[unit], wait);
+	poll_wait(fp, &iplh_linux[unit], wait);
 
 	switch (unit)
 	{
@@ -214,10 +226,20 @@ ipf_poll(struct file *fp, poll_table *wait)
 #endif
 
 
-static int
-ipfilter_init(void)
+#ifdef	CONFIG_PROC_FS
+static int ipf_proc_info(char *buffer, char **start, off_t offset, int len)
 {
-	char *defpass;
+	snprintf(buffer, len, "ipfmajor %d", ipfmajor);
+	buffer[len - 1] = '\0';
+	return strlen(buffer);
+}
+#endif
+
+static int ipfilter_init(void)
+{
+#ifdef	CONFIG_DEVFS_FS
+	char *s;
+#endif
 	int i;
 
 	ipfmajor = register_chrdev(0, "ipf", &ipf_fops);
@@ -228,8 +250,6 @@ ipfilter_init(void)
 
 #ifdef	CONFIG_DEVFS_FS
 	for (i = 0; ipf_devfiles[i] != NULL; i++) {
-		char *s;
-
 		s = strrchr(ipf_devfiles[i], '/');
 		if (s != NULL) {
 # if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
@@ -243,60 +263,72 @@ ipfilter_init(void)
 	}
 #endif
 
-	i = ipf_load_all();
-	if (i != 0)
-		return i;
+	ipf_load_all();
 
 	ipf_create_all(&ipfmain);
 
-	i = ipfattach(&ipfmain);
+	i = ipfattach();
+
+#ifdef	CONFIG_PROC_FS
+	if (i == 0) {
+		struct proc_dir_entry *ipfproc;
+		char *defpass;
+
+		ipfproc = proc_net_create("ipfilter", 0, ipf_proc_info);
+# ifndef __GENKSYMS__
+		if (ipfproc != NULL)
+			ipfproc->owner = THIS_MODULE;
+# endif
+		if (FR_ISPASS(ipf_pass))
+			defpass = "pass";
+		else if (FR_ISBLOCK(ipf_pass))
+			defpass = "block";
+		else
+			defpass = "no-match -> block";
+
+		printk(KERN_INFO "%s initialized.  Default = %s all, "
+		       "Logging = %s%s\n",
+			ipfilter_version, defpass,
+# ifdef IPFILTER_LOG
+			"enabled",
+# else
+			"disabled",
+# endif
+# ifdef IPFILTER_COMPILED
+			" (COMPILED)"
+# else
+			""
+# endif
+			);
+
+		ipf_running = 1;
+	}
+#else
+	printf("IPFilter: device major number: %d\n", ipfmajor);
+#endif /* CONFIG_PROC_FS */
 
 	if (i != 0) {
 		ipf_destroy_all(&ipfmain);
 		ipf_unload_all();
-		return i;
 	}
 
-	if (FR_ISPASS(ipfmain.ipf_pass))
-		defpass = "pass";
-	else if (FR_ISBLOCK(ipfmain.ipf_pass))
-		defpass = "block";
-	else
-		defpass = "no-match -> block";
-
-	printk(KERN_INFO "%s initialized.  Default = %s all, Logging = %s%s\n",
-	       ipfilter_version, defpass,
-# ifdef IPFILTER_LOG
-		"enabled",
-# else
-		"disabled",
-# endif
-# ifdef IPFILTER_COMPILED
-		" (COMPILED)"
-# else
-		""
-# endif
-		);
-
-	ipfmain.ipf_running = 1;
-
-	return 0;
+	return i;
 }
 
 
-static int
-ipfilter_fini(void)
+static int ipfilter_fini(void)
 {
 	int result;
 #ifdef	CONFIG_DEVFS_FS
+	char *s;
 	int i;
 #endif
 
-	if (ipfmain.ipf_refcnt)
-		return -EBUSY;
+	if (ipf_refcnt)
+		return EBUSY;
 
-	if (ipfmain.ipf_running >= 0) {
-		result = ipfdetach(&ipfmain);
+	if (ipf_running >= 0) {
+		result = ipfdetach();
 		if (result != 0) {
 			if (result > 0)
 				result = -result;
@@ -307,13 +339,14 @@ ipfilter_fini(void)
 		}
 	}
 
-	ipfmain.ipf_running = -2;
+	ipf_running = -2;
+#ifdef CONFIG_PROC_FS
+	proc_net_remove("ipfilter");
+#endif
 
 
 #ifdef	CONFIG_DEVFS_FS
 	for (i = 0; ipf_devfiles[i] != NULL; i++) {
-		char *s;
-
 		s = strrchr(ipf_devfiles[i], '/');
 		if (s != NULL)
 # if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
@@ -332,8 +365,7 @@ ipfilter_fini(void)
 }
 
 
-static int __init
-ipf_init(void)
+static int __init ipf_init(void)
 {
 	int result;
 

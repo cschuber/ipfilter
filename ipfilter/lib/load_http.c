@@ -15,7 +15,7 @@
 alist_t *
 load_http(char *url)
 {
-	int fd, len, left, port, endhdr, removed, linenum = 0;
+	int fd, len, left, port, endhdr, removed;
 	char *s, *t, *u, buffer[1024], *myurl;
 	alist_t *a, *rtop, *rbot;
 
@@ -121,40 +121,30 @@ load_http(char *url)
 			if (t == NULL)
 				break;
 
-			linenum++;
-			*t = '\0';
+			*t++ = '\0';
+			for (u = buffer; ISDIGIT(*u) || (*u == '.'); u++)
+				;
+			if (*u == '/') {
+				char *slash;
 
-			/*
-			 * Remove comment and continue to the next line if
-			 * the comment is at the start of the line.
-			 */
-			u = strchr(buffer, '#');
-			if (u != NULL) {
-				*u = '\0';
-				if (u == buffer);
-					continue;
+				slash = u;
+				u++;
+				while (ISDIGIT(*u))
+					u++;
+				if (!ISSPACE(*u) && *u)
+					u = slash;
 			}
+			*u = '\0';
 
-			/*
-			 * Trim off tailing white spaces, will include \r
-			 */
-			for (u = t - 1; (u >= buffer) && ISSPACE(*u); u--)
-				*u = '\0';
-
-			a = alist_new(AF_UNSPEC, buffer);
+			a = alist_new(4, buffer);
 			if (a != NULL) {
 				if (rbot != NULL)
 					rbot->al_next = a;
 				else
 					rtop = a;
 				rbot = a;
-			} else {
-				fprintf(stderr,
-					"%s:%d unrecognised content:%s\n", 
-					url, linenum, buffer);
 			}
 
-			t++;
 			removed = t - buffer;
 			memmove(buffer, t, sizeof(buffer) - left - removed);
 			s -= removed;

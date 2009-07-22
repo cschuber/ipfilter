@@ -63,7 +63,7 @@ MODOBJS=$(OBJ)/linux.o $(OBJ)/ip_fil.o $(OBJ)/fil.o $(OBJ)/ip_nat.o \
 	$(OBJ)/ip_frag.o $(OBJ)/ip_scan.o $(OBJ)/ip_sync.o $(OBJ)/ip_nat6.o \
 	$(OBJ)/ip_state.o $(OBJ)/ip_proxy.o $(OBJ)/ip_auth.o \
 	$(OBJ)/ip_lookup.o $(OBJ)/ip_pool.o $(OBJ)/ip_htable.o \
-	$(OBJ)/ip_dstlist.o $(OBJ)/ip_log.o $(OBJ)/radix.o $(OBJ)/md5.o
+	$(OBJ)/ip_log.o $(OBJ)/radix.o
 KCCARGS=$(KCFLAGS) -D_BSD_SOURCE=1 $(IPFLKM) $(DEF) $(DLKM) -march=$(ARCH) \
 	$(INC) -iwithprefix include -I. $(LOOKUP) $(XID) $(IPFLOG)
 IPF=$(OBJ)/ipf.o $(OBJ)/ipfcomp.o $(OBJ)/ipf_y.o $(OBJ)/ipf_l.o
@@ -73,7 +73,7 @@ IPT=$(OBJ)/ipftest.o $(OBJ)/ip_fil_u.o $(OBJ)/ip_state_u.o \
     $(OBJ)/ip_proxy_u.o $(OBJ)/ip_auth_u.o $(OBJ)/ip_log_u.o \
     $(OBJ)/ippool_y.o $(OBJ)/ippool_l.o $(OBJ)/ipnat_y.o $(OBJ)/ipnat_l.o \
     $(OBJ)/ipf_y.o $(OBJ)/ipf_l.o $(OBJ)/radix_u.o $(OBJ)/md5_u.o \
-    $(OBJ)/ip_dstlist_u.o $(OBJ)/ip_scan_u.o $(OBJ)/ip_sync_u.o
+    $(OBJ)/ip_scan_u.o $(OBJ)/ip_sync_u.o
 #	$(OBJ)/ip_trafcon_u.o
 IPNAT=$(OBJ)/ipnat.o $(OBJ)/ipnat_y.o $(OBJ)/ipnat_l.o
 IPMON=$(OBJ)/ipmon.o $(OBJ)/ipmon_y.o $(OBJ)/ipmon_l.o
@@ -103,7 +103,7 @@ ipflkm:
 	if [ $(LINUX) -lt 20499 ] ; then \
 		make $(OBJ)/ipfilter.o; \
 	else \
-		(cd $(OBJ); pwd; unset MAKEFLAGS; make -C "$(MODDIR)/build" SUBDIRS="`pwd`" TOP="../.."  CPUDIR="$(CPUDIR)" EXTRA_CFLAGS="$(EXTRA_CFLAGS)" OBJ= modules); \
+		(cd $(OBJ); unset MAKEFLAGS; make -C "$(MODDIR)/build" SUBDIRS="`pwd`" TOP="`pwd`/../.."  CPUDIR="$(CPUDIR)" EXTRA_CFLAGS="$(EXTRA_CFLAGS)" OBJ= modules); \
 	fi
 
 $(OBJ)/ipfstat: $(FILS) $(OBJ)/libipf.a $(TOP)/ip_fil.h $(TOP)/ipf.h \
@@ -286,10 +286,6 @@ $(OBJ)/ip_htable_u.o: $(TOP)/ip_htable.c $(TOP)/ip_htable.h \
 	$(TOP)/ip_compat.h $(TOP)/ip_fil.h
 	$(CC) $(CCARGS) -c $(TOP)/ip_htable.c -o $@
 
-$(OBJ)/ip_dstlist_u.o: $(TOP)/ip_dstlist.c $(TOP)/ip_dstlist.h \
-	$(TOP)/ip_compat.h $(TOP)/ip_fil.h
-	$(CC) $(CCARGS) -c $(TOP)/ip_dstlist.c -o $@
-
 $(OBJ)/ip_lookup_u.o: $(TOP)/ip_lookup.c $(TOP)/ip_lookup.h \
 	$(TOP)/ip_compat.h $(TOP)/ip_fil.h
 	$(CC) $(CCARGS) -c $(TOP)/ip_lookup.c -o $@
@@ -371,15 +367,6 @@ ip_htable.c: $(TOP)/ip_htable.c Makefile
 	echo '#include "ipf-linux.h"' >> $@
 	sed -ne '/END OF INCLUDES/,$$p' $< >> $@
 
-$(OBJ)/ip_dstlist.o: ip_dstlist.c $(TOP)/ip_dstlist.h $(TOP)/ip_compat.h \
-	$(TOP)/ip_fil.h ipf-linux.h
-	$(CC) $(KCCARGS) -c ip_dstlist.c -o $@
-
-ip_dstlist.c: $(TOP)/ip_dstlist.c Makefile
-	sed -e '/^#/,$$d' $< > $@
-	echo '#include "ipf-linux.h"' >> $@
-	sed -ne '/END OF INCLUDES/,$$p' $< >> $@
-
 $(OBJ)/ip_pool.o: ip_pool.c $(TOP)/ip_pool.h $(TOP)/ip_compat.h \
 	$(TOP)/ip_fil.h ipf-linux.h
 	$(CC) $(KCCARGS) -c ip_pool.c -o $@
@@ -418,9 +405,6 @@ ip_log.c: $(TOP)/ip_log.c Makefile
 $(OBJ)/radix.o: radix.c $(TOP)/radix_ipf.h ipf-linux.h
 	$(CC) $(KCCARGS) -c radix.c -o $@
 
-$(OBJ)/md5.o: $(TOP)/md5.c $(TOP)/md5.h
-	$(CC) $(KCCARGS) -c $(TOP)/md5.c -o $@
-
 radix.c: $(TOP)/radix.c Makefile
 	sed -e '/^#/,$$d' $< > $@
 	echo '#include "ipf-linux.h"' >> $@
@@ -444,7 +428,7 @@ $(OBJ)/ip_fil.o: $(TOP)/ip_fil_linux.c $(TOP)/ip_compat.h $(TOP)/ip_fil.h \
 	$(CC) $(KCCARGS) -c $(TOP)/ip_fil_linux.c -o $@
 
 $(OBJ)/ipmon: $(IPMON) $(OBJ)/libipf.a
-	$(CC) $(CCARGS) $(IPMON) -o $@ $(LIBS) $(LEXLIB) -ldl
+	$(CC) $(CCARGS) $(IPMON) -o $@ $(LIBS) $(LEXLIB)
 
 $(OBJ)/ipmon.o: $(TOOL)/ipmon.c $(TOP)/ipmon.h
 	$(CC) $(CCARGS) $(LOGFAC) -c $(TOOL)/ipmon.c -o $@

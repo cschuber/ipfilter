@@ -110,9 +110,6 @@ typedef struct ipf_sync_softc_s {
 #if SOLARIS && defined(_KERNEL)
 	kcondvar_t	ipslwait;
 #endif
-#if defined(linux) && defined(_KERNEL)
-	wait_queue_head_t	sl_tail_linux;
-#endif
 	synclist_t	**syncstatetab;
 	synclist_t	**syncnattab;
 	synclogent_t	*synclog;
@@ -445,7 +442,7 @@ ipf_sync_write(softc, uio)
 
 	int err = 0;
 
-#  if BSD_GE_YEAR(199306) || defined(__FreeBSD__) || defined(__osf__)
+#  if (BSD >= 199306) || defined(__FreeBSD__) || defined(__osf__)
 	uio->uio_rw = UIO_WRITE;
 #  endif
 
@@ -593,13 +590,12 @@ ipf_sync_read(softc, uio)
 		return EINVAL;
 	}
 
-#  if BSD_GE_YEAR(199306) || defined(__FreeBSD__) || defined(__osf__)
+#  if (BSD >= 199306) || defined(__FreeBSD__) || defined(__osf__)
 	uio->uio_rw = UIO_READ;
 #  endif
 
 	MUTEX_ENTER(&softs->ipsl_mutex);
-	while ((softs->sl_tail == softs->sl_idx) &&
-	       (softs->su_tail == softs->su_idx)) {
+	while ((softs->sl_tail == softs->sl_idx) && (softs->su_tail == softs->su_idx)) {
 #  if defined(_KERNEL)
 #   if SOLARIS
 		if (!cv_wait_sig(&softs->ipslwait, &softs->ipsl_mutex.ipf_lk)) {

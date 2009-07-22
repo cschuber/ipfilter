@@ -35,10 +35,7 @@ start() {
 		mknod /dev/$i c $ipfdev $minor
 		minor=`expr $minor + 1`
 	done
-	msg=`/sbin/ipf -E 2>&1`
-	RETVAL=$?
-	logit $RETVAL ipf "$msg"
-	if [ $RETVAL -eq 0 -a -f $IPFCONF ] ; then
+	if [ -f $IPFCONF ] ; then
 		msg=`/sbin/ipf -f $IPFCONF 2>&1`
 		RETVAL=$?
 		logit $RETVAL ipf "$msg"
@@ -70,7 +67,7 @@ stop() {
 	echo -n $"Shutting down IPFilter: "
 	killproc ipmon
 	RETVAL=$?
-	[ $RETVAL -eq 0 ] && /sbin/ipf -D && /sbin/modprobe -r ipfilter 2>&1 >/dev/null
+	[ $RETVAL -eq 0 ] && /sbin/modprobe -r ipfilter 2>&1 >/dev/null
 	echo
 	return $RETVAL
 }

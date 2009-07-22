@@ -33,15 +33,10 @@
  ***********************************************************************
  */
 
-#if defined(linux) && defined(_KERNEL)
-extern void *memcpy(void *, const void *, unsigned long);
-# define	bcopy(a,b,c)	memcpy(b,a,c)
+#if defined(_KERNEL) && !defined(__sgi)
+# include <sys/systm.h>
 #else
-# if defined(_KERNEL) && !defined(__sgi)
-#  include <sys/systm.h>
-# else
-#  include <string.h>
-# endif
+# include <string.h>
 #endif
 
 #include "md5.h"

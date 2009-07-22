@@ -638,7 +638,7 @@ ipf_fastroute(m0, mpp, fin, fdp)
                         dst->sin6_addr = fin->fin_daddr6;
                 }
 
-                ip6tx.tx_mbuf = *mpp;
+                ip6tx.tx_mbuf = m0;
                 ip6tx.tx_ip6 = (ip6_t *)ip;
                 ip6tx.tx_ro = ro;
                 ip6tx.tx_if6 = NULL;
@@ -649,8 +649,6 @@ ipf_fastroute(m0, mpp, fin, fdp)
                 ip6tx.tx_rawoutput = 0;
                 ip6tx.tx_mtu = ifp->if_mtu;
                 ip6tx.tx_opt = NULL;
-
-		*mpp = NULL;
 
                 /*
                  * currently "to <if>" and "to <if>:ip#" are not supported

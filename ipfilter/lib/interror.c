@@ -17,7 +17,7 @@ typedef	struct	{
 
 static ipf_error_entry_t *find_error __P((int));
 
-#define	IPF_NUM_ERRORS	448
+#define	IPF_NUM_ERRORS	445
 
 /*
  * NO REUSE OF NUMBERS!
@@ -339,9 +339,6 @@ log" },
 	{	60069,	"new source lookup type is not dstlist" },
 	{	60070,	"cannot allocate NAT rule scratch space" },
 	{	60071,	"new destination lookup type is not dstlist" },
-	{	60072,	"function not found for lookup (ipv6)" },
-	{	60073,	"unknown lookup group for next address (ipv6)" },
-	{	60074,	"unknwon next address type (ipv6)" },
 /* -------------------------------------------------------------------------- */
 	{	70001,	"incorrect object size to get pool stats" },
 	{	70002,	"could not malloc memory for new pool node" },

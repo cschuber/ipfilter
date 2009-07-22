@@ -715,8 +715,9 @@ ipf_lookup_iterate(softc, data, uid, ctx)
 	}
 
 	SPL_SCHED(s);
-	token = ipf_token_find(softc, iter.ili_key, uid, ctx);
+	token = ipf_findtoken(softc, iter.ili_key, uid, ctx);
 	if (token == NULL) {
+		RWLOCK_EXIT(&softc->ipf_tokens);
 		SPL_X(s);
 		softc->ipf_interror = 50040;
 		return ESRCH;
@@ -730,16 +731,13 @@ ipf_lookup_iterate(softc, data, uid, ctx)
 			break;
 		}
 	}
+	RWLOCK_EXIT(&softc->ipf_tokens);
 	SPL_X(s);
 
 	if (i == MAX_BACKENDS) {
 		softc->ipf_interror = 50041;
 		err = EINVAL;
 	}
-
-	WRITE_ENTER(&softc->ipf_tokens);
-	ipf_token_deref(softc, token);
-	RWLOCK_EXIT(&softc->ipf_tokens);
 
 	return err;
 }
@@ -816,7 +814,7 @@ ipf_lookup_deltok(softc, data, uid, ctx)
 	SPL_SCHED(s);
 	error = BCOPYIN(data, &key, sizeof(key));
 	if (error == 0)
-		error = ipf_token_del(softc, key, uid, ctx);
+		error = ipf_deltoken(softc, key, uid, ctx);
 	SPL_X(s);
 	return error;
 }
@@ -826,8 +824,8 @@ ipf_lookup_deltok(softc, data, uid, ctx)
 /* Function:    ipf_lookup_res_num                                          */
 /* Returns:     void * - NULL = failure, else success.                      */
 /* Parameters:  softc(I) - pointer to soft context main structure           */
-/*              unit(I)     - device for which this is for                  */
 /*              type(I)     - type of lookup these parameters are for.      */
+/*              unit(I)     - device for which this is for                  */
 /*              number(I)   - table number to use when searching            */
 /*              funcptr(IO) - pointer to pointer for storing IP address     */
 /*                            searching function.                           */
@@ -838,10 +836,10 @@ ipf_lookup_deltok(softc, data, uid, ctx)
 /* or not the "table" number exists.                                        */
 /* ------------------------------------------------------------------------ */
 void *
-ipf_lookup_res_num(softc, unit, type, number, funcptr)
+ipf_lookup_res_num(softc, type, unit, number, funcptr)
 	ipf_main_softc_t *softc;
-	int unit;
 	u_int type;
+	int unit;
 	u_int number;
 	lookupfunc_t *funcptr;
 {
@@ -853,7 +851,7 @@ ipf_lookup_res_num(softc, unit, type, number, funcptr)
 	(void) sprintf(name, "%u", number);
 #endif
 
-	return ipf_lookup_res_name(softc, unit, type, name, funcptr);
+	return ipf_lookup_res_name(softc, type, unit, name, funcptr);
 }
 
 
@@ -861,8 +859,8 @@ ipf_lookup_res_num(softc, unit, type, number, funcptr)
 /* Function:    ipf_lookup_res_name                                         */
 /* Returns:     void * - NULL = failure, else success.                      */
 /* Parameters:  softc(I) - pointer to soft context main structure           */
-/*              unit(I)     - device for which this is for                  */
 /*              type(I)     - type of lookup these parameters are for.      */
+/*              unit(I)     - device for which this is for                  */
 /*              name(I)     - table name to use when searching              */
 /*              funcptr(IO) - pointer to pointer for storing IP address     */
 /*                            searching function.                           */
@@ -873,10 +871,10 @@ ipf_lookup_res_num(softc, unit, type, number, funcptr)
 /* or not the "table" number exists.                                        */
 /* ------------------------------------------------------------------------ */
 void *
-ipf_lookup_res_name(softc, unit, type, name, funcptr)
+ipf_lookup_res_name(softc, type, unit, name, funcptr)
 	ipf_main_softc_t *softc;
-	int unit;
 	u_int type;
+	int unit;
 	char *name;
 	lookupfunc_t *funcptr;
 {

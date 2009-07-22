@@ -19,9 +19,7 @@
 #if !defined(_KERNEL)
 # include <stdio.h>
 # include <stdlib.h>
-# ifdef _STDC_C99
-#  include <stdbool.h>
-# endif
+# include <stdbool.h>
 # include <string.h>
 # define _KERNEL
 # ifdef __OpenBSD__
@@ -64,10 +62,6 @@ struct file;
 #endif
 #if defined(_KERNEL) && defined(__NetBSD__) && (__NetBSD_Version__ >= 104000000)
 # include <sys/proc.h>
-#endif
-#if defined(__NetBSD_Version__) &&  (__NetBSD_Version__ >= 400000) && \
-     !defined(_KERNEL)
-# include <stdbool.h>
 #endif
 #include <net/if.h>
 #ifdef sun
@@ -619,19 +613,14 @@ ipf_auth_ioctl(softc, data, cmd, mode, uid, ctx)
 			break;
 
 		SPL_SCHED(s);
-		token = ipf_token_find(softc, IPFGENITER_AUTH, uid, ctx);
+		token = ipf_findtoken(softc, IPFGENITER_AUTH, uid, ctx);
 		if (token != NULL)
 			error = ipf_auth_geniter(softc, token, &iter);
 		else {
-			WRITE_ENTER(&softc->ipf_tokens);
-			if (token->ipt_data == NULL)
-				ipf_token_free(softc, token);
-			else
-				ipf_token_deref(softc, token);
-			RWLOCK_EXIT(&softc->ipf_tokens);
 			softc->ipf_interror = 10001;
 			error = ESRCH;
 		}
+		RWLOCK_EXIT(&softc->ipf_tokens);
 		SPL_X(s);
 
 		break;
@@ -979,14 +968,16 @@ ipf_auth_geniter(softc, token, itp)
 	/*
 	 * Clean up reference and token.
 	 */
-	if (token->ipt_data != NULL) {
+	if (token->ipt_data == NULL) {
+		ipf_freetoken(softc, token);
+	} else {
 		if (fae != NULL) {
 			WRITE_ENTER(&softa->ipf_authlk);
 			ipf_auth_deref(&fae);
 			RWLOCK_EXIT(&softa->ipf_authlk);
 		}
 		if (next->fae_next == NULL)
-			token->ipt_data = NULL;
+			ipf_freetoken(softc, token);
 	}
 	return error;
 }

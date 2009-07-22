@@ -309,7 +309,7 @@ maketrap_v1(community, buffer, bufsize, msg, msglen, ipaddr, code, when)
 	u_char *s = buffer, *t, *pdulen, *varlen;
 	int basesize = 73;
 	u_short len;
-	int trapmsglen;
+	int trapmsglen;;
 	int pdulensz;
 	int varlensz;
 	int baselensz;

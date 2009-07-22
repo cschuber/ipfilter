@@ -8,8 +8,8 @@
 
 #include "ipf.h"
 
-char *hostname(family, ip)
-	int family;
+char *hostname(v, ip)
+	int v;
 	void *ip;
 {
 	static char hostbuf[MAXHOSTNAMELEN+1];
@@ -19,14 +19,14 @@ char *hostname(family, ip)
 
 	memset(&ipa, 0, sizeof(ipa));	/* XXX gcc */
 
-	if (family == AF_INET) {
+	if (v == 4) {
 		ipa.s_addr = *(u_32_t *)ip;
 		if (ipa.s_addr == htonl(0xfedcba98))
 			return "test.host.dots";
 	}
 
 	if ((opts & OPT_NORESOLVE) == 0) {
-		if (family == AF_INET) {
+		if (v == 4) {
 			hp = gethostbyaddr(ip, 4, AF_INET);
 			if (hp != NULL && hp->h_name != NULL &&
 			    *hp->h_name != '\0') {
@@ -45,7 +45,7 @@ char *hostname(family, ip)
 		}
 	}
 
-	if (family == AF_INET) {
+	if (v == 4) {
 		return inet_ntoa(ipa);
 	}
 #ifdef  USE_INET6

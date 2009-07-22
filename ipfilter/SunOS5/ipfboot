@@ -168,7 +168,6 @@ case "$1" in
 		if [ -f /usr/kernel/drv/ipfrule ] ; then
 			modload /usr/kernel/drv/ipfrule
 		fi
-		ipf -E
 		load_ippool_config
 		load_ipf_config
 		load_ipnat_config
@@ -179,7 +178,6 @@ case "$1" in
 		getids
 		[ -n "$pid" ] && kill -TERM $pid
 		/bin/rm -f $PIDFILE
-		ipf -D
 		[ -n "$ipfruleid" ] && modunload -i $ipfruleid 2>/dev/null
 		[ -n "$ipfid" ] && modunload -i $ipfid
 		;;

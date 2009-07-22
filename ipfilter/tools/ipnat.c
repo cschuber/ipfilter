@@ -506,9 +506,8 @@ void dostats_live(fd, nsp, opts, filter)
 	int fd, opts, *filter;
 {
 	ipfgeniter_t iter;
-	char buffer[2000];
 	ipfobj_t obj;
-	ipnat_t	*ipn;
+	ipnat_t	ipn;
 	nat_t nat;
 	int i;
 
@@ -520,8 +519,7 @@ void dostats_live(fd, nsp, opts, filter)
 
 	iter.igi_type = IPFGENITER_IPNAT;
 	iter.igi_nitems = 1;
-	iter.igi_data = buffer;
-	ipn = (ipnat_t *)buffer;
+	iter.igi_data = &ipn;
 
 	/*
 	 * Show list of NAT rules and NAT sessions ?
@@ -532,9 +530,9 @@ void dostats_live(fd, nsp, opts, filter)
 			if (ioctl(fd, SIOCGENITER, &obj) == -1)
 				break;
 			if (opts & OPT_HITS)
-				printf("%lu ", ipn->in_hits);
-			printnat(ipn, opts & (OPT_DEBUG|OPT_VERBOSE));
-			nsp->ns_list = ipn->in_next;
+				printf("%lu ", ipn.in_hits);
+			printnat(&ipn, opts & (OPT_DEBUG|OPT_VERBOSE));
+			nsp->ns_list = ipn.in_next;
 		}
 	}
 

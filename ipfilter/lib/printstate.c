@@ -28,7 +28,7 @@ printstate(sp, opts, now)
 	else
 		PRINTF("%d", sp->is_p);
 
-	PRINTF(" src:%s", hostname(sp->is_family, &sp->is_src.in4));
+	PRINTF(" src:%s", hostname(sp->is_v, &sp->is_src.in4));
 	if (sp->is_p == IPPROTO_UDP || sp->is_p == IPPROTO_TCP) {
 		if (sp->is_flags & IS_WSPORT)
 			PRINTF(",*");
@@ -36,7 +36,7 @@ printstate(sp, opts, now)
 			PRINTF(",%d", ntohs(sp->is_sport));
 	}
 
-	PRINTF(" dst:%s", hostname(sp->is_family, &sp->is_dst.in4));
+	PRINTF(" dst:%s", hostname(sp->is_v, &sp->is_dst.in4));
 	if (sp->is_p == IPPROTO_UDP || sp->is_p == IPPROTO_TCP) {
 		if (sp->is_flags & IS_WDPORT)
 			PRINTF(",*");

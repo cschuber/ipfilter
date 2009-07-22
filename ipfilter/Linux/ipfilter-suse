@@ -41,7 +41,6 @@ start() {
 		mknod /dev/$i c $ipfdev $minor
 		minor=`expr $minor + 1`
 	done
-	/sbin/ipf -E
 	if [ -f $IPFCONF ] ; then
 		msg=`/sbin/ipf -f $IPFCONF 2>&1`
 		rc=$?

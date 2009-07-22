@@ -1,3 +1,4 @@
+#ifdef NEED_LOCAL_RAND
 /*-
  * THE BEER-WARE LICENSE
  *
@@ -7,7 +8,7 @@
  *
  * Dan Moschuk
  */
-#if !defined(SOLARIS2) && !defined(__osf__)
+#if !defined(SOLARIS2)
 # include <sys/cdefs.h>
 #endif
 
@@ -21,9 +22,7 @@
 # include <sys/libkern.h>
 #endif
 #include <sys/lock.h>
-#ifndef __osf__
-# include <sys/mutex.h>
-#endif
+#include <sys/mutex.h>
 #include <sys/time.h>
 
 #if defined(SOLARIS2) && (SOLARIS2 < 9)
@@ -31,9 +30,6 @@
 #endif
 #include <sys/socket.h>
 #include <net/if.h>
-#ifdef __osf__
-# include <net/route.h>
-#endif
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include "netinet/ip_compat.h"
@@ -43,7 +39,6 @@
 # include "md5.h"
 #endif
 
-#ifdef NEED_LOCAL_RAND
 #if !defined(__GNUC__)
 # define __inline
 #endif

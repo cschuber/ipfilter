@@ -23,27 +23,21 @@
 #include <linux/random.h>
 #include <asm/ioctls.h>
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,10)
-extern int sysctl_ip_default_ttl;
+#ifdef STES
+/* in kernel 2.6.21 no longer exported / static to net/ipv4/ip_output.c */
 #endif
+extern int sysctl_ip_default_ttl;
 
-extern	ipf_main_softc_t	ipfmain;
-
-static void	ipf_timer_func(unsigned long);
+static	int	ipf_zerostats __P((caddr_t));
 static	int	ipf_send_ip __P((fr_info_t *, struct sk_buff *, struct sk_buff **));
 
 ipfmutex_t	ipl_mutex, ipf_auth_mx, ipf_rw, ipf_stinsert;
 ipfmutex_t	ipf_nat_new, ipf_natio, ipf_timeoutlock;
 ipfrwlock_t	ipf_mutex, ipf_global, ipf_ipidfrag, ipf_frcache, ipf_tokens;
 ipfrwlock_t	ipf_frag, ipf_state, ipf_nat, ipf_natfrag, ipf_authlk;
+struct timer_list       ipf_timer;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,23)
-extern int ip_finish_output(struct sk_buff *);
-
-static u_int ipf_linux_inout __P((u_int, struct sk_buff *, const struct net_device *, const struct net_device *, int (*okfn)(struct sk_buff *)));
-#else
 static u_int ipf_linux_inout __P((u_int, struct sk_buff **, const struct net_device *, const struct net_device *, int (*okfn)(struct sk_buff *)));
-#endif
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 static struct nf_hook_ops ipf_hooks[] = {
@@ -51,22 +45,14 @@ static struct nf_hook_ops ipf_hooks[] = {
 		.hook		= ipf_linux_inout,
 		.owner		= THIS_MODULE,
 		.pf		= PF_INET,
-# if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,23)
-		.hooknum	= NF_INET_PRE_ROUTING,
-# else
 		.hooknum	= NF_IP_PRE_ROUTING,
-# endif
 		.priority	= 200,
 	},
 	{
 		.hook		= ipf_linux_inout,
 		.owner		= THIS_MODULE,
 		.pf		= PF_INET,
-# if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,23)
-		.hooknum	= NF_INET_POST_ROUTING,
-# else
 		.hooknum	= NF_IP_POST_ROUTING,
-# endif
 		.priority	= 200,
 	},
 # ifdef USE_INET6
@@ -74,22 +60,14 @@ static struct nf_hook_ops ipf_hooks[] = {
 		.hook		= ipf_linux_inout,
 		.owner		= THIS_MODULE,
 		.pf		= PF_INET6,
-# if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,23)
-		.hooknum	= NF_INET_PRE_ROUTING,
-# else
 		.hooknum	= NF_IP_PRE_ROUTING,
-# endif
 		.priority	= 200,
 	},
 	{
 		.hook		= ipf_linux_inout,
 		.owner		= THIS_MODULE,
 		.pf		= PF_INET6,
-# if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,23)
-		.hooknum	= NF_INET_POST_ROUTING,
-# else
 		.hooknum	= NF_IP_POST_ROUTING,
-# endif
 		.priority	= 200,
 	}
 # endif
@@ -144,7 +122,7 @@ ipf_ioctl(struct inode *in, struct file *fp, u_int cmd, u_long arg)
 	if (unit < 0 || unit > IPL_LOGMAX)
 		return -ENXIO;
 
-	if (ipfmain.ipf_running <= 0) {
+	if (ipf_running <= 0) {
 		if (unit != IPL_LOGIPF)
 			return -EIO;
 		if (cmd != SIOCIPFGETNEXT && cmd != SIOCIPFGET &&
@@ -157,7 +135,7 @@ ipf_ioctl(struct inode *in, struct file *fp, u_int cmd, u_long arg)
 	mode = fp->f_mode;
 	data = (caddr_t)arg;
 
-	error = ipf_ioctlswitch(&ipfmain, unit, data, cmd, mode, fp->f_uid, fp);
+	error = ipf_ioctlswitch(unit, data, cmd, mode, fp->f_uid, fp);
 	if (error != -1) {
 		SPL_X(s);
 		if (error > 0)
@@ -177,18 +155,8 @@ ipf_newisn(fr_info_t *fin)
 {
 	u_32_t isn;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,23)
-	i6addr_t dst, src;
-
-	bcopy(&fin->fin_dst, &dst, sizeof(dst));
-	bcopy(&fin->fin_src, &src, sizeof(src));
-
-	isn = secure_tcpv6_sequence_number(&dst.in4.s_addr, &src.in4.s_addr,
-					   fin->fin_dport, fin->fin_sport);
-#else
 	isn = secure_tcp_sequence_number(fin->fin_daddr, fin->fin_saddr,
 					 fin->fin_dport, fin->fin_sport);
-#endif
 	return isn;
 }
 
@@ -286,11 +254,7 @@ ipf_send_ip(fr_info_t *fin, struct sk_buff *sk, struct sk_buff **skp)
 		ip->ip_hl = sizeof(*oip) >> 2;
 		ip->ip_tos = oip->ip_tos;
 		ip->ip_id = 0;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,10)
 		ip->ip_ttl = sysctl_ip_default_ttl;
-#else
-		ip->ip_ttl = IPDEFTTL;
-#endif
 		ip->ip_sum = 0;
 		ip->ip_off = 0x4000;	/* IP_DF */
 		hlen = sizeof(*ip);
@@ -384,24 +348,12 @@ ipf_send_icmp_err(int type, fr_info_t *fin, int isdst)
 
 	bzero(MTOD(m, char *), (size_t)sz);
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,23)
-	skb_put(m, hlen);
-	skb_set_network_header(m,hlen);
-	ip = (ip_t *)ip_hdr(m);
-#else
 	m->nh.iph = (struct iphdr *)skb_put(m, hlen);
 	ip = (ip_t *)m->nh.iph;
-#endif
 	ip->ip_v = fin->fin_v;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,23)
-	skb_put(m, hlen + 4 + dlen);
-	skb_set_transport_header(m, hlen + 4 + dlen);
-	icmp = (icmphdr_t *)icmp_hdr(m);
-#else
 	m->h.icmph = (struct icmphdr *)skb_put(m, hlen + 4 + dlen);
 	icmp = (icmphdr_t *)m->h.icmph;
-#endif
 	icmp->icmp_type = type & 0xff;
 	icmp->icmp_code = code & 0xff;
 #ifdef	icmp_nextmtu
@@ -623,13 +575,9 @@ ipf_fastroute(mb_t *xmin, mb_t **mp, fr_info_t *fin, frdest_t *fdp)
 	case 4 :
 		ip->ip_sum = ip_fast_csum((u_char *)ip, ip->ip_hl);
 
-		NF_HOOK(PF_INET,
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,23)
-			NF_INET_LOCAL_OUT,
-#else
-			NF_IP_LOCAL_OUT,
-#endif
-			xmin, NULL, ifp, ip_finish_output);
+		/*dumpskbuff(xmin);*/
+		NF_HOOK(PF_INET, NF_IP_LOCAL_OUT, xmin, NULL,
+			ifp, ip_finish_output);
 		err = 0;
 		break;
 
@@ -660,11 +608,7 @@ ipf_ifpaddr(ipf_main_softc_t *softc, int v, int atype, void *ifptr,
 		return -1;
 
 	dev = ifptr;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,23)
-	ifp = __in_dev_get_rtnl(dev);
-#else
 	ifp = __in_dev_get(dev);
-#endif
 
 	if (v == 4)
 		inp->in4.s_addr = 0;
@@ -705,19 +649,40 @@ m_copydata(mb_t *m, int off, int len, caddr_t cp)
 }
 
 
-int ipfattach(ipf_main_softc_t *softc)
+static int
+ipf_zerostats(caddr_t data)
+{
+	friostat_t fio;
+	int error;
+
+	ipf_getstat(&fio);
+	error = copyoutptr(&fio, data, sizeof(fio));
+	if (error) {
+		softc->ipf_interror = 9999XXX;
+		return EFAULT;
+	}
+
+	bzero((char *)ipf_stats, sizeof(*ipf_stats) * 2);
+
+	return 0;
+}
+
+
+int ipfattach()
 {
 	int err, i;
 
 	SPL_NET(s);
-	if (softc->ipf_running > 0) {
+	if (ipf_running > 0) {
 		SPL_X(s);
 		return -EBUSY;
 	}
 
-	MUTEX_INIT(&softc->ipf_rw, "ipf rw mutex");
-	MUTEX_INIT(&softc->ipf_timeoutlock, "ipf timeout lock mutex");
-	RWLOCK_INIT(&softc->ipf_tokens, "ipf token rwlock");
+	MUTEX_INIT(&ipfmain.ipf_rw, "ipf rw mutex");
+	MUTEX_INIT(&ipfmain.ipl_mutex, "ipf log mutex");
+	MUTEX_INIT(&ipfmain.ipf_timeoutlock, "ipf timeout lock mutex");
+	RWLOCK_INIT(&ipfmain.ipf_ipidfrag, "ipf IP NAT-Frag rwlock");
+	RWLOCK_INIT(&ipfmain.ipf_tokens, "ipf token rwlock");
 
 	for (i = 0; i < sizeof(ipf_hooks)/sizeof(ipf_hooks[0]); i++) {
 		err = nf_register_hook(&ipf_hooks[i]);
@@ -725,11 +690,11 @@ int ipfattach(ipf_main_softc_t *softc)
 			return err;
 	}
 
-	if (ipf_init_all(softc) < 0) {
+	if (ipf_initialise() < 0) {
 		for (i = 0; i < sizeof(ipf_hooks)/sizeof(ipf_hooks[0]); i++)
 			nf_unregister_hook(&ipf_hooks[i]);
 		SPL_X(s);
-		return -EIO;
+		return EIO;
 	}
 
 #ifdef notyet
@@ -739,45 +704,46 @@ int ipfattach(ipf_main_softc_t *softc)
 
 	SPL_X(s);
 
-	init_timer(&softc->ipf_timer);
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,23)
-	softc->ipf_timer.function = ipf_timer_func;
-	softc->ipf_timer.data = (unsigned long)softc;
-#else
-	softc->ipf_timer.function = ipf_timer_func;
-	softc->ipf_timer.data = softc;
+#ifdef STES
+	/* timeout(ipf_slowtimer, NULL, (hz / IPF_HZ_DIVIDE) * IPF_HZ_MULT); */
+	init_timer(&ipf_timer);
+	ipf_timer.function = ipf_slowtimer;
+	ipf_timer.data = &ipfmain;
+	ipf_timer.expires = (HZ / IPF_HZ_DIVIDE) * IPF_HZ_MULT;
+	add_timer(&ipf_timer);
+	mod_timer(&ipf_timer, HZ/2 + jiffies);
 #endif
-	softc->ipf_timer.expires = (HZ / IPF_HZ_DIVIDE) * IPF_HZ_MULT;
-	add_timer(&softc->ipf_timer);
-	mod_timer(&softc->ipf_timer, HZ/2 + jiffies);
 
 	return 0;
 }
 
-int ipfdetach(ipf_main_softc_t *softc)
+int ipfdetach()
 {
 	int i;
 
-	del_timer(&softc->ipf_timer);
+	del_timer(&ipf_timer);
 
 	SPL_NET(s);
 
 	for (i = 0; i < sizeof(ipf_hooks)/sizeof(ipf_hooks[0]); i++)
 		nf_unregister_hook(&ipf_hooks[i]);
+	/* untimeout(ipf_slowtimer, NULL); */
 
 #ifdef notyet
 	if (ipf_control_forwarding & 2)
 		ipv4_devconf.forwarding = 0;
 #endif
 
-	ipf_fini_all(softc);
+	ipf_deinitialise();
 
-	(void) ipf_flush(softc, IPL_LOGIPF, FR_INQUE|FR_OUTQUE|FR_INACTIVE);
-	(void) ipf_flush(softc, IPL_LOGIPF, FR_INQUE|FR_OUTQUE);
+	(void) ipf_flush(IPL_LOGIPF, FR_INQUE|FR_OUTQUE|FR_INACTIVE);
+	(void) ipf_flush(IPL_LOGIPF, FR_INQUE|FR_OUTQUE);
 
-	MUTEX_DESTROY(&softc->ipf_timeoutlock);
-	MUTEX_DESTROY(&softc->ipf_rw);
-	RW_DESTROY(&softc->ipf_tokens);
+	MUTEX_DESTROY(&ipfmain.ipf_timeoutlock);
+	MUTEX_DESTROY(&ipfmain.ipl_mutex);
+	MUTEX_DESTROY(&ipfmain.ipf_rw);
+	RW_DESTROY(&ipfmain.ipf_tokens);
+	RW_DESTROY(&ipfmain.ipf_ipidfrag);
 
 	SPL_X(s);
 
@@ -788,11 +754,7 @@ int ipfdetach(ipf_main_softc_t *softc)
 static u_int
 ipf_linux_inout(hooknum, skbp, inifp, outifp, okfn)
 	u_int hooknum;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,23)
-	struct sk_buff *skbp;
-#else
 	struct sk_buff **skbp;
-#endif
 	const struct net_device *inifp, *outifp;
 	int (*okfn)(struct sk_buff *);
 {
@@ -810,11 +772,7 @@ ipf_linux_inout(hooknum, skbp, inifp, outifp, okfn)
 	} else
 		return NF_DROP;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,23)
-	sk = skbp;
-#else
 	sk = *skbp;
-#endif
 	ip = MTOD(sk, ip_t *);
 	if (ip->ip_v == 4) {
 		hlen = ip->ip_hl << 2;
@@ -824,15 +782,13 @@ ipf_linux_inout(hooknum, skbp, inifp, outifp, okfn)
 #endif
 	} else
 		return NF_DROP;
-	result = ipf_check(&ipfmain, ip, hlen, (struct net_device *)ifp, dir, &sk);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,23)
-	*skbp = sk;
-#endif
+	result = ipf_check(ip, hlen, (struct net_device *)ifp, dir, skbp);
+
 	/*
 	 * This is kind of not always right...*skbp == NULL might really be
 	 * a drop but Linux expects *skbp != NULL for NF_DROP.
 	 */
-	if (sk == NULL)
+	if (*skbp == NULL)
 		return NF_STOLEN;
 
 	if (result != 0)
@@ -853,7 +809,7 @@ ipf_read_enter(ipfrwlock_t *rwlk)
 		*((int *)rwlk->ipf_magic) = 1;
 	}
 #endif
-	read_lock_bh(&rwlk->ipf_lk);
+	read_lock(&rwlk->ipf_lk);
 	ATOMIC_INC32(rwlk->ipf_isr);
 }
 
@@ -869,7 +825,7 @@ ipf_write_enter(ipfrwlock_t *rwlk)
 		*((int *)rwlk->ipf_magic) = 1;
 	}
 #endif
-	write_lock_bh(&rwlk->ipf_lk);
+	write_lock(&rwlk->ipf_lk);
 	rwlk->ipf_isw = 1;
 }
 
@@ -887,10 +843,10 @@ ipf_rw_exit(ipfrwlock_t *rwlk)
 #endif
 	if (rwlk->ipf_isw > 0) {
 		rwlk->ipf_isw = 0;
-		write_unlock_bh(&rwlk->ipf_lk);
+		write_unlock(&rwlk->ipf_lk);
 	} else if (rwlk->ipf_isr > 0) {
 		ATOMIC_DEC32(rwlk->ipf_isr);
-		read_unlock_bh(&rwlk->ipf_lk);
+		read_unlock(&rwlk->ipf_lk);
 	} else {
 		panic("rwlk->ipf_isw %d isr %d rwlk %p name [%s]\n",
 		      rwlk->ipf_isw, rwlk->ipf_isr, rwlk, rwlk->ipf_lname);
@@ -990,7 +946,7 @@ m_pullup(mb_t *m, int len)
 void *
 ipf_pullup(mb_t *xmin, fr_info_t *fin, int len)
 {
-	int dpoff, ipoff;
+	int out = fin->fin_out, dpoff, ipoff;
 	mb_t *m = xmin;
 	char *ip;
 
@@ -1027,7 +983,6 @@ ipf_pullup(mb_t *xmin, fr_info_t *fin, int len)
 }
 
 
-#ifndef ipf_random
 /*
  * In the face of no kernel random function, this is implemented...it is
  * not meant to be random, just a fill in.
@@ -1042,12 +997,40 @@ ipf_random()
 
 	GETKTIME(&tv);
 	last *= tv.tv_usec + calls++;
-	last += (int)&range * ipfmain.ipf_ticks;
+	last += (int)&range * ipf_ticks;
 	number = last + tv.tv_sec;
 	return number;
 }
-#endif
 
+#ifdef STES
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_slowtimer                                               */
+/* Returns:     Nil                                                         */
+/* Parameters:  Nil                                                         */
+/*                                                                          */
+/* Slowly expire held state for fragments.  Timeouts are set * in           */
+/* expectation of this being called twice per second.                       */
+/* ------------------------------------------------------------------------ */
+void ipf_slowtimer(long value)
+{
+	READ_ENTER(&ipfmain.ipf_global);
+
+	ipf_expiretokens(&ipfmain);
+	ipf_frag_expire(&ipfmain);
+	ipf_state_expire(&ipfmain);
+	ipf_nat_expire(&ipfmain);
+	ipf_auth_expire(&ipfmain);
+	ipf_lookup_expire(&ipfmain);
+	ipf_rule_expire(&ipfmain);
+	ipf_ticks++;
+	if (ipf_running <= 0)
+		goto done;
+	mod_timer(&ipf_timer, HZ/2 + jiffies);
+
+done:
+	RWLOCK_EXIT(&ipfmain.ipf_global);
+}
+#endif
 
 int ipf_inject(fin, m)
 fr_info_t *fin;
@@ -1061,75 +1044,3 @@ mb_t *m;
 	return EINVAL;
 }
 
-
-/*
- * Copy data from a buffer back into the indicated mbuf chain,
- * starting "off" bytes from the beginning, extending the mbuf
- * chain if necessary.
- */
-void
-m_copyback(m0, off0, len0, cp)
-	mb_t *m0;
-	int off0;
-	int len0;
-	caddr_t cp;
-{
-	mb_t *m = m0, *n;
-	int totlen = 0;
-	int mlen;
-	int off = off0;
-	int len = len0;
-
-	if (m0 == 0)
-		return;
-	while (off > (mlen = m->len)) {
-		off -= mlen;
-		totlen += mlen;
-		if (m->next == 0) {
-			n = alloc_skb(off, in_interrupt() ? GFP_ATOMIC :
-							    GFP_KERNEL);
-			if (n == 0)
-				return;
-			n->len = off;
-			m->next = n;
-		}
-		m = m->next;
-	}
-	while (len > 0) {
-		mlen = MIN(m->len - off, len);
-		bcopy(cp, off + mtod(m, caddr_t), (unsigned)mlen);
-		cp += mlen;
-		len -= mlen;
-		mlen += off;
-		off = 0;
-		totlen += mlen;
-		if (len == 0)
-			break;
-		if (m->next == 0) {
-			n = alloc_skb(len, in_interrupt() ? GFP_ATOMIC :
-							    GFP_KERNEL);
-			if (n == 0)
-				return;
-			n->len = len;
-			m->next = n;
-		}
-		m = m->next;
-	}
-}
-
-
-static void
-ipf_timer_func(unsigned long value)
-{
-	ipf_main_softc_t *softc = (ipf_main_softc_t *)value;
-
-	READ_ENTER(&softc->ipf_global);
-
-	if (softc->ipf_running > 0)
-		ipf_slowtimer(softc);
-
-	if (softc->ipf_running == -1 || softc->ipf_running == 1)
-		mod_timer(&softc->ipf_timer, HZ/2 + jiffies);
-
-	RWLOCK_EXIT(&softc->ipf_global);
-}

@@ -664,18 +664,6 @@ rdr le0 from 1.1.1.0/24 to 192.2.2.1 port 80 -> 127.0.0.1 3128 tcp
 .fi
 .PP
 Then no packets will match the 2nd rule, they'll all match the first.
-.SH IPv6
-.PP
-In all of the examples above, where an IPv4 address is present, an IPv6
-address can also be used. All rules must use either IPv4 addresses with
-both halves of the NAT rule or IPv6 addresses for both halves. Mixing
-IPv6 addresses with IPv4 addresses, in a single rule, will result in an
-error.
-.PP
-For shorthand notations such as "0/32", the equivalent for IPv6 is
-"0/128". IPFilter will treat any netmask greater than 32 as an
-implicit direction that the address should be IPv6, not IPv4.
-To be unambiguous with 0/0, for IPv6 use ::0/0.
 .SH KERNEL PROXIES
 .PP
 IP Filter comes with a few, simple, proxies built into the code that is loaded
@@ -714,9 +702,6 @@ H.323 - Experimental
 .TP
 Real Audio (PNA) - Aging
 .TP
-DNS - Developmental
-(map ... proxy port 53 dns/udp { block .cnn.com; })
-.TP
 IPsec - Developmental
 (map ... proxy port 500 ipsec/tcp)
 .TP
@@ -724,8 +709,6 @@ netbios - Experimental
 .TP
 R-command - Mature
 (map ... proxy port shell rcmd/tcp)
-.SH KERNEL PROXIES
-.PP
 .SH FILES
 /dev/ipnat
 .br

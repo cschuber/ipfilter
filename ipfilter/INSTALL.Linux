@@ -1,43 +1,18 @@
 
-The Linux 2.4 and 2.6 series of kernels are supported by this software.
+David Stes notes on Ipfilter for Linux
+--------------------------------------
 
-Building has been tested on RedHat 9 and SUSE 9.x, although your results
-may vary.
+Darren Reed ported ipfilter to Linux RedHat 9 and SuSE 9.x.
 
-In general, you will need to have your kernel source in /usr/src/linux
-to build IPFilter but different Linux projects may differ.  See below.
+I had relatively good results on Linux Slackware (which is what I use)
+with version 4.1.27 of ipfilter, on Slackware 10.0.
 
-Projects
-========
+I also ported 4.1.27 to Slackware 12.0 and 4.1.27 worked on Linux 2.6.21-5.
 
-Fedora
-------
-For Fedora, point your web browser at this URL and follow the instructions:
-http://fedoraproject.org/wiki/Building_a_custom_kernel
+Darren Reed didn't mind adding my fixes to the ipfilter 5.x branch, so
+we are working now on making ipfilter 5.x support Slackware 12.0 with its
+2.6.21-5 kernel.
 
-For me, following the instructions put all of the kernel source code (for
-Fedora 11) in $HOME/rpmbuild. As an example of the directory I used, see
-BUILDROOT in Makefile.
+David Stes
+Email: stes@pandora.be
 
-
-Building IPFilter
-=================
-The steps required are as follows:
-
-1. Create the binaries
-
-make linux
-
-2. Create the RPM file
-
-make install-linux
-
-3. In an ideal world, this step wouldn't be required.  At this point you
-need to locate the actual RPM file as the rpmbuild failed in the previous
-step.  Now run:
-
-rpm -i /path/to/ipfilter.rpm
-
-At this point IPFilter should be installed and ready to use.
-
-Darren

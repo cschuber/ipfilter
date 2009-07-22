@@ -120,7 +120,6 @@ extern	struct	protosw	inetsw[];
 
 static	int	(*ipf_savep) __P((void *, ip_t *, int, void *, int, struct mbuf **));
 static	int	ipf_send_ip __P((fr_info_t *, mb_t *, mb_t **));
-static void	ipf_timer_func __P((void *arg));
 int		ipf_locks_done = 0;
 
 ipf_main_softc_t ipfmain;
@@ -206,31 +205,6 @@ int ipf_identify(s)
 #endif /* IPFILTER_LKM */
 
 
-static void
-ipf_timer_func(arg)
-	void *arg;
-{
-	ipf_main_softc_t *softc = arg;
-	SPL_INT(s);
-
-	SPL_NET(s);
-	READ_ENTER(&softc->ipf_global);
-
-        if (softc->ipf_running > 0)
-		ipf_slowtimer(softc);
-
-	if (softc->ipf_running == -1 || softc->ipf_running == 1) {
-#if FREEBSD_GE_REV(300000)
-		softc->ipf_slow_ch = timeout(ipf_timer_func, softc, hz/2);
-#else
-		timeout(ipf_timer_func, softc, hz/2);
-#endif
-	}
-	RWLOCK_EXIT(&softc->ipf_global);
-	SPL_X(s);
-}
-
-
 int
 ipfattach(softc)
 	ipf_main_softc_t *softc;
@@ -264,10 +238,10 @@ ipfattach(softc)
 
 	SPL_X(s);
 #if (__FreeBSD_version >= 300000)
-	softc->ipf_slow_ch = timeout(ipf_timer_func, softc,
+	softc->ipf_slow_ch = timeout(ipf_slowtimer, softc,
 				     (hz / IPF_HZ_DIVIDE) * IPF_HZ_MULT);
 #else
-	timeout(ipf_timer_func, softc, (hz / IPF_HZ_DIVIDE) * IPF_HZ_MULT);
+	timeout(ipf_slowtimer, softc, (hz / IPF_HZ_DIVIDE) * IPF_HZ_MULT);
 #endif
 	return 0;
 }
@@ -292,10 +266,10 @@ ipfdetach(softc)
 
 #if (__FreeBSD_version >= 300000)
 	if (softc->ipf_slow_ch.callout != NULL)
-		untimeout(ipf_timer_func, softc, softc->ipf_slow_ch);
+		untimeout(ipf_slowtimer, softc, softc->ipf_slow_ch);
 	bzero(&softc->ipf_slow, sizeof(softc->ipf_slow));
 #else
-	untimeout(ipf_timer_func, softc);
+	untimeout(ipf_slowtimer, softc);
 #endif /* FreeBSD */
 
 #ifndef NETBSD_PF
@@ -807,11 +781,10 @@ ipf_fastroute(m0, mpp, fin, fdp)
 		 * currently "to <if>" and "to <if>:ip#" are not supported
 		 * for IPv6
 		 */
-		*mpp = NULL;
 #if  (__FreeBSD_version >= 490000)
-		return ip6_output(m, NULL, NULL, 0, NULL, NULL, NULL);
+		return ip6_output(m0, NULL, NULL, 0, NULL, NULL, NULL);
 #else
-		return ip6_output(m, NULL, NULL, 0, NULL, NULL);
+		return ip6_output(m0, NULL, NULL, 0, NULL, NULL);
 #endif
 	}
 #endif

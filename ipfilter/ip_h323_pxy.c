@@ -19,6 +19,15 @@
  *	ported to ipfilter 3.4.20 by Michael Grant mg-ipf@grant.org
  */
 
+#if __FreeBSD_version >= 220000 && defined(_KERNEL)
+# include <sys/fcntl.h>
+# include <sys/filio.h>
+#else
+# ifndef linux
+#  include <sys/ioctl.h>
+# endif
+#endif
+
 #define IPF_H323_PROXY
 
 void  ipf_p_h323_main_load __P((void));
@@ -267,7 +276,7 @@ ipf_p_h245_out(arg, fin, aps, nat)
 					 ip->ip_src, ip->ip_dst);
 		if (nat2 == NULL) {
 			struct ip newip;
-			udphdr_t udp;
+			struct udphdr udp;
 
 			bcopy((caddr_t)ip, (caddr_t)&newip, sizeof(newip));
 			newip.ip_len = htons(fin->fin_hlen + sizeof(udp));

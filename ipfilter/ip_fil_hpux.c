@@ -491,7 +491,7 @@ ipf_ifpaddr(softc, v, atype, qifptr, inp, inpmask)
 
 
 #ifdef	IPL_SELECT
-extern	iplog_select_t	iplog_ss[IPL_LOGSIZE];
+extern	iplog_select_t	iplog_ss[IPL_LOGMAX+1];
 extern	int		selwait;
 
 /*

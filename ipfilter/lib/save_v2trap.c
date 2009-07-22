@@ -311,7 +311,7 @@ maketrap_v2(community, buffer, bufsize, msg, msglen, ipaddr, code, when)
 	u_char *varlen;
 	int basesize = 77;
 	u_short len;
-	int trapmsglen;
+	int trapmsglen;;
 	int pdulensz;
 	int varlensz;
 	int baselensz;

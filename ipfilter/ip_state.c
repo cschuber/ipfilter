@@ -83,7 +83,7 @@ struct file;
 #ifdef	USE_INET6
 #include <netinet/icmp6.h>
 #endif
-#if FREEBSD_GE_REV(300000)
+#if (__FreeBSD_version >= 300000)
 # include <sys/malloc.h>
 # if defined(_KERNEL) && !defined(IPFILTER_LKM)
 #  include <sys/libkern.h>
@@ -362,7 +362,7 @@ ipf_state_soft_init(softc, arg)
 		/*
 		 * XXX - ipf_state_seed[X] should be a random number of sorts.
 		 */
-#if  FREEBSD_GE_REV(400000)
+#if  (__FreeBSD_version >= 400000)
 		softs->ipf_state_seed[i] = arc4random();
 #else
 		softs->ipf_state_seed[i] = ((u_long)softs->ipf_state_seed + i) *
@@ -803,15 +803,9 @@ ipf_state_ioctl(softc, data, cmd, mode, uid, ctx)
 			break;
 
 		SPL_SCHED(s);
-		token = ipf_token_find(softc, IPFGENITER_STATE, uid, ctx);
+		token = ipf_findtoken(softc, IPFGENITER_STATE, uid, ctx);
 		if (token != NULL) {
 			error = ipf_state_iter(softc, token, &iter);
-			WRITE_ENTER(&softc->ipf_tokens);
-			if (token->ipt_data == NULL)
-				ipf_token_free(softc, token);
-			else
-				ipf_token_deref(softc, token);
-			RWLOCK_EXIT(&softc->ipf_tokens);
 		} else {
 			softc->ipf_interror = 100018;
 			error = ESRCH;
@@ -832,7 +826,7 @@ ipf_state_ioctl(softc, data, cmd, mode, uid, ctx)
 			error = EFAULT;
 		} else {
 			SPL_SCHED(s);
-			error = ipf_token_del(softc, arg, uid, ctx);
+			error = ipf_deltoken(softc, arg, uid, ctx);
 			SPL_X(s);
 		}
 		break;
@@ -2011,20 +2005,20 @@ ipf_state_add(softc, fin, stsave, flags)
 		(void) ipf_frag_new(softc, fin, pass);
 	fdp = &fr->fr_tifs[0];
 	if (fdp->fd_type == FRD_DSTLIST)
-		fdp->fd_ptr = ipf_lookup_res_name(softc, IPL_LOGIPF,
-						  IPLT_DSTLIST,
+		fdp->fd_ptr = ipf_lookup_res_name(softc, IPLT_DSTLIST,
+						  IPL_LOGIPF,
 						  fr->fr_names + fdp->fd_name,
 						  NULL);
 	fdp = &fr->fr_tifs[1];
 	if (fdp->fd_type == FRD_DSTLIST)
-		fdp->fd_ptr = ipf_lookup_res_name(softc, IPL_LOGIPF,
-						  IPLT_DSTLIST,
+		fdp->fd_ptr = ipf_lookup_res_name(softc, IPLT_DSTLIST,
+						  IPL_LOGIPF,
 						  fr->fr_names + fdp->fd_name,
 						  NULL);
 	fdp = &fr->fr_dif;
 	if (fdp->fd_type == FRD_DSTLIST)
-		fdp->fd_ptr = ipf_lookup_res_name(softc, IPL_LOGIPF,
-						  IPLT_DSTLIST,
+		fdp->fd_ptr = ipf_lookup_res_name(softc, IPLT_DSTLIST,
+						  IPL_LOGIPF,
 						  fr->fr_names + fdp->fd_name,
 						  NULL);
 
@@ -2580,13 +2574,6 @@ ipf_matchsrcdst(fin, is, src, dst, tcp, cmask)
 	u_short sp, dp;
 	u_32_t cflx;
 	void *ifp;
-
-	/*
-	 * If a connection is about to be deleted, no packets
-	 * are allowed to match it.
-	 */
-	if (is->is_sti.tqe_ifq == &softs->ipf_state_deletetq)
-		return NULL;
 
 	rev = IP6_NEQ(&is->is_dst, dst);
 	ifp = fin->fin_ifp;
@@ -3250,6 +3237,13 @@ icmp6again:
 		for (isp = &softs->ipf_state_table[hvm];
 		     ((is = *isp) != NULL); ) {
 			isp = &is->is_hnext;
+			/*
+			 * If a connection is about to be deleted, no packets
+			 * are allowed to match it.
+			 */
+			if (is->is_sti.tqe_ifq == &softs->ipf_state_deletetq)
+				continue;
+
 			if ((is->is_p != pr) || (is->is_v != v))
 				continue;
 			is = ipf_matchsrcdst(fin, is, &src, &dst, NULL, FI_CMP);
@@ -4212,20 +4206,17 @@ ipf_tcp_age(tqe, fin, tqtab, flags, ok)
 	dir = fin->fin_rev;
 	tcpflags = tcp->th_flags;
 	dlen = fin->fin_dlen - (TCP_OFF(tcp) << 2);
-	ostate = tqe->tqe_state[1 - dir];
-	nstate = tqe->tqe_state[dir];
 
 	if (tcpflags & TH_RST) {
 		if (!(tcpflags & TH_PUSH) && !dlen)
 			nstate = IPF_TCPS_CLOSED;
 		else
 			nstate = IPF_TCPS_CLOSE_WAIT;
-
-		if (ostate <= IPF_TCPS_ESTABLISHED) {
-			tqe->tqe_state[1 - dir] = IPF_TCPS_CLOSE_WAIT;
-		}
 		rval = 1;
 	} else {
+		ostate = tqe->tqe_state[1 - dir];
+		nstate = tqe->tqe_state[dir];
+
 		switch (nstate)
 		{
 		case IPF_TCPS_LISTEN: /* 0 */
@@ -5076,11 +5067,14 @@ ipf_state_iter(softc, token, itp)
 			softc->ipf_interror = 100030;
 			error = EFAULT;
 		}
-		if (is != NULL)
-			ipf_state_deref(softc, &is);
-		if (token->ipt_data != NULL) {
+		if (token->ipt_data == NULL) {
+			ipf_freetoken(softc, token);
+			break;
+		} else {
+			if (is != NULL)
+				ipf_state_deref(softc, &is);
 			if (next->is_next == NULL) {
-				token->ipt_data = NULL;
+				ipf_freetoken(softc, token);
 				break;
 			}
 		}

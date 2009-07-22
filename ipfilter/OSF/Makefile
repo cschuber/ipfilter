@@ -45,10 +45,9 @@ RM=/bin/rm
 CHMOD=/bin/chmod
 INSTALL=$(TOP)/bsdinstall
 #
-MODOBJS=md5.o arc4random.o tru64.o radix.o \
-	ip_fil.o fil.o ip_nat.o ip_frag.o ip_state.o ip_nat6.o \
+MODOBJS=ip_fil.o fil.o md5.o ip_nat.o ip_frag.o ip_state.o ip_nat6.o \
 	ip_proxy.o ip_auth.o ip_log.o ip_pool.o ip_htable.o ip_lookup.o \
-	ip_dstlist.o ip_sync.o ip_scan.o ip_rules.o
+	ip_dstlist.o ip_sync.o ip_scan.o ip_rules.o radix.o tru64.o
 DFLAGS=$(DEBUG) -DTRU64=$(TRU64) $(IPFLKM) $(IPFLOG) $(DEF) $(CFLAGS) $(DLKM) \
 	$(IPFBPF) $(LOOKUP) $(XID) -I.
 IPF=ipf.o ipfcomp.o ipf_y.o ipf_l.o
@@ -301,9 +300,6 @@ tru64.o: $(TOP)/tru64.c $(TOP)/ip_compat.h $(TOP)/ip_fil.h
 
 md5.o: $(TOP)/md5.c $(TOP)/md5.h
 	$(CC) $(DFLAGS) -c $(TOP)/md5.c -o $@
-
-arc4random.o: $(TOP)/arc4random.c $(TOP)/md5.h
-	$(CC) $(DFLAGS) -DNEED_LOCAL_RAND=1 -c $(TOP)/arc4random.c -o $@
 
 ipmon: $(IPMON) ./libipf.a
 	$(CC) $(CCARGS) $(LOGFAC) $(IPMON) -o $@ $(LIBS) -ll

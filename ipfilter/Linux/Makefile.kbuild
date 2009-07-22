@@ -8,9 +8,9 @@ CONFIG_IPFILTER=m
 # For Linux
 #
 CPUTYPE:=$(shell uname -m | sed -e 's/i.86/i386/' -e 's/sun4u/sparc64/' -e 's/arm.*/arm/' -e 's/sa110/arm/')
-ARCH:=$(shell uname -m | sed -e 's/i.86/i386/')
+ARCH:=$(shell uname -m)
 OBJ=.
-TOP=../..
+TOP=..
 CPU:=$(shell uname -i)
 KREV:=$(shell uname -r)
 MODDIR=/lib/modules/$(KREV)
@@ -25,7 +25,7 @@ MODOBJS=$(OBJ)/linuxm.o $(OBJ)/ip_film.o $(OBJ)/fil.o $(OBJ)/ip_nat.o \
 	$(OBJ)/ip_frag.o $(OBJ)/ip_scan.o $(OBJ)/ip_sync.o \
 	$(OBJ)/ip_state.o $(OBJ)/ip_proxy.o $(OBJ)/ip_auth.o \
 	$(OBJ)/ip_lookup.o $(OBJ)/ip_pool.o $(OBJ)/ip_htable.o \
-	$(OBJ)/ip_dstlist.o $(OBJ)/ip_log.o $(OBJ)/radix.o $(OBJ)/md5.o
+	$(OBJ)/ip_log.o $(OBJ)/radix.o
 
 obj-$(CONFIG_IPFILTER) += ipfilter.o
 ipfilter-objs =$(MODOBJS)
@@ -84,11 +84,6 @@ ip_htable.c $(obj)//ip_htable.c: $(TOP)/ip_htable.c Makefile
 	echo '#include "ipf-linux.h"' >> $@
 	sed -ne '/END OF INCLUDES/,$$p' $< >> $@
 
-ip_dstlist.c $(obj)//ip_dstlist.c: $(TOP)/ip_dstlist.c Makefile
-	sed -e '/^#/,$$d' $< > $@
-	echo '#include "ipf-linux.h"' >> $@
-	sed -ne '/END OF INCLUDES/,$$p' $< >> $@
-
 ip_pool.c $(obj)//ip_pool.c: $(TOP)/ip_pool.c Makefile
 	sed -e '/^#/,$$d' $< > $@
 	echo '#include "ipf-linux.h"' >> $@
@@ -104,6 +99,8 @@ ip_sync.c $(obj)//ip_sync.c: $(TOP)/ip_sync.c Makefile
 	echo '#include "ipf-linux.h"' >> $@
 	sed -ne '/END OF INCLUDES/,$$p' $< >> $@
 
+$(OBJ)/ip_log.o: ip_log.c $(TOP)/ip_compat.h $(TOP)/ip_fil.h $(obj)/../ipf-linux.h
+
 ip_log.c $(obj)//ip_log.c: $(TOP)/ip_log.c Makefile
 	sed -e '/^#/,$$d' $< > $@
 	echo '#include "ipf-linux.h"' >> $@
@@ -117,10 +114,6 @@ radix.c $(obj)//radix.c: $(TOP)/radix.c Makefile
 ip_rules.c: $(TOP)/rules/ip_rules $(TOP)/tools/ipfcomp.o $(OBJ)/ipf
 	$(OBJ)/ipf -cc -nf $(TOP)/rules/ip_rules
 
-md5.c $(obj)//md5.c: $(TOP)/md5.c Makefile
-	/bin/rm -f md5.c
-	cp $< $@
-
 $(TOP)/ip_rules.h: ip_rules.c
 	if [ ! -f $(TOP)/ip_rules.h ] ; then \
 		/bin/mv -f ip_rules.h $(TOP); \
@@ -128,8 +121,6 @@ $(TOP)/ip_rules.h: ip_rules.c
 		touch $(TOP)/ip_rules.h; \
 	fi
 
-$(OBJ)/ip_log.o: ip_log.c $(TOP)/ip_compat.h $(TOP)/ip_fil.h \
-	$(obj)/../ipf-linux.h
 $(obj)//linuxm.o: $(obj)/linuxm.c
 $(obj)//fil.o: $(obj)/fil.c $(TOP)/ip_fil.h $(TOP)/ipf.h $(TOP)/ip_compat.h \
 	$(obj)/../ipf-linux.h
@@ -140,8 +131,6 @@ $(obj)//ip_frag.o: $(obj)/ip_frag.c $(TOP)/ip_frag.h $(TOP)/ip_compat.h \
 	$(TOP)/ip_fil.h $(obj)/../ipf-linux.h
 $(obj)//ip_htable.o: $(obj)/ip_htable.c $(TOP)/ip_htable.h $(TOP)/ip_compat.h \
 	$(TOP)/ip_fil.h $(obj)/../ipf-linux.h
-$(obj)//ip_dstlist.o: $(obj)/ip_dstlist.c $(TOP)/ip_dstlist.h \
-	$(TOP)/ip_compat.h $(TOP)/ip_fil.h $(obj)/../ipf-linux.h
 $(obj)//ip_lookup.o: $(obj)/ip_lookup.c $(TOP)/ip_lookup.h $(TOP)/ip_compat.h \
 	$(TOP)/ip_fil.h $(obj)/../ipf-linux.h
 $(obj)//ip_nat.o: $(obj)/ip_nat.c $(TOP)/ip_nat.h $(TOP)/ip_compat.h \
@@ -157,7 +146,6 @@ $(obj)//ip_state.o: $(obj)/ip_state.c $(TOP)/ip_state.h $(TOP)/ip_compat.h \
 $(obj)//ip_sync.o: $(obj)/ip_sync.c $(TOP)/ip_sync.h $(TOP)/ip_compat.h \
 	$(TOP)/ip_fil.h $(obj)/../ipf-linux.h
 $(obj)//radix.o: $(obj)/radix.c $(TOP)/radix_ipf.h $(obj)/../ipf-linux.h
-$(obj)//md5.o: md5.c $(TOP)/md5.h
 $(obj)/$(CPUDIR)/linux.o: $(obj)/$(CPUDIR)/linux.c
 $(obj)/$(CPUDIR)/fil.o: $(obj)/$(CPUDIR)/fil.c $(TOP)/ip_fil.h $(TOP)/ipf.h \
 	$(TOP)/ip_compat.h $(obj)/../ipf-linux.h
@@ -168,9 +156,6 @@ $(obj)/$(CPUDIR)/ip_frag.o: $(obj)/$(CPUDIR)/ip_frag.c $(TOP)/ip_frag.h \
 	$(TOP)/ip_compat.h $(TOP)/ip_fil.h $(obj)/../ipf-linux.h
 $(obj)/$(CPUDIR)/ip_htable.o: $(obj)/$(CPUDIR)/ip_htable.c $(TOP)/ip_htable.h \
 	$(TOP)/ip_compat.h $(TOP)/ip_fil.h $(obj)/../ipf-linux.h
-$(obj)/$(CPUDIR)/ip_dstlist.o: $(obj)/$(CPUDIR)/ip_dstlist.c \
-	$(TOP)/ip_dstlist.h $(TOP)/ip_compat.h $(TOP)/ip_fil.h \
-	$(obj)/../ipf-linux.h
 $(obj)/$(CPUDIR)/ip_lookup.o: $(obj)/$(CPUDIR)/ip_lookup.c $(TOP)/ip_lookup.h \
 	$(TOP)/ip_compat.h $(TOP)/ip_fil.h $(obj)/../ipf-linux.h
 $(obj)/$(CPUDIR)/ip_nat.o: $(obj)/$(CPUDIR)/ip_nat.c $(TOP)/ip_nat.h \
@@ -188,7 +173,6 @@ $(obj)/$(CPUDIR)/ip_sync.o: $(obj)/$(CPUDIR)/ip_sync.c $(TOP)/ip_sync.h \
 	$(TOP)/ip_compat.h $(TOP)/ip_fil.h $(obj)/../ipf-linux.h
 $(obj)/$(CPUDIR)/radix.o: $(obj)/$(CPUDIR)/radix.c $(TOP)/radix_ipf.h \
 	ipf-linux.h
-$(obj)/$(CPUDIR)/md5.o: md5.c $(TOP)/md5.h
 
 $(obj)/$(CPUDIR)/linuxm.c $(obj)//linuxm.c: $(TOP)/linux.c
 	@if [ ! -h $@ ] ; then ln -s $< $@; fi

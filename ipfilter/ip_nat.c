@@ -16,8 +16,8 @@
 #include <sys/param.h>
 #include <sys/time.h>
 #include <sys/file.h>
-#if defined(_KERNEL) && \
-    (defined(__NetBSD_Version) && (__NetBSD_Version >= 399002000))
+#if defined(_KERNEL) && defined(__NetBSD_Version__) && \
+    (__NetBSD_Version__ >= 399002000)
 # include <sys/kauth.h>
 #endif
 #if !defined(_KERNEL)
@@ -31,8 +31,7 @@ struct file;
 # include <sys/uio.h>
 # undef ipf_nat_KERNEL
 #endif
-#if defined(_KERNEL) && \
-    defined(__FreeBSD_version) && (__FreeBSD_version >= 220000)
+#if defined(_KERNEL) && (__FreeBSD_version >= 220000)
 # include <sys/filio.h>
 # include <sys/fcntl.h>
 #else
@@ -96,7 +95,7 @@ extern struct ifnet vpnif;
 #include "netinet/ip_lookup.h"
 #include "netinet/ip_dstlist.h"
 #include "netinet/ip_sync.h"
-#if FREEBSD_GE_REV(300000)
+#if (__FreeBSD_version >= 300000)
 # include <sys/malloc.h>
 #endif
 #ifdef HAS_SYS_MD5_H
@@ -1047,8 +1046,8 @@ ipf_nat_ioctl(softc, data, cmd, mode, uid, ctx)
 	ipnat_t natd;
 	SPL_INT(s);
 
-#if BSD_GE_YEAR(199306) && defined(_KERNEL)
-# if NETBSD_GE_REV(399002000)
+#if (BSD >= 199306) && defined(_KERNEL)
+# if defined(__NetBSD_Version__) && (__NetBSD_Version__ >= 399002000)
 	if ((mode & FWRITE) &&
 	     kauth_authorize_network(curlwp->l_cred, KAUTH_NETWORK_FIREWALL,
 				     KAUTH_REQ_NETWORK_FIREWALL_FW,
@@ -1381,15 +1380,9 @@ ipf_nat_ioctl(softc, data, cmd, mode, uid, ctx)
 			break;
 
 		SPL_SCHED(s);
-		token = ipf_token_find(softc, iter.igi_type, uid, ctx);
+		token = ipf_findtoken(softc, iter.igi_type, uid, ctx);
 		if (token != NULL) {
 			error  = ipf_nat_iterator(softc, token, &iter);
-			WRITE_ENTER(&softc->ipf_tokens);
-			if (token->ipt_data == NULL)
-				ipf_token_free(softc, token);
-			else
-				ipf_token_deref(softc, token);
-			RWLOCK_EXIT(&softc->ipf_tokens);
 		}
 		RWLOCK_EXIT(&softc->ipf_tokens);
 		SPL_X(s);
@@ -1400,7 +1393,7 @@ ipf_nat_ioctl(softc, data, cmd, mode, uid, ctx)
 		error = BCOPYIN(data, &arg, sizeof(arg));
 		if (error == 0) {
 			SPL_SCHED(s);
-			error = ipf_token_del(softc, arg, uid, ctx);
+			error = ipf_deltoken(softc, arg, uid, ctx);
 			SPL_X(s);
 		} else {
 			softc->ipf_interror = 60019;
@@ -1975,7 +1968,7 @@ ipf_nat_getent(softc, data, getlock)
 	 */
 	if (nat->nat_ptr != NULL)
 		bcopy((char *)nat->nat_ptr, (char *)&ipn->ipn_ipnat,
-		      ipn->ipn_ipnat.in_size);
+		      sizeof(ipn->ipn_ipnat));
 
 	/*
 	 * If we also know the NAT entry has an associated filter rule,
@@ -2135,15 +2128,15 @@ ipf_nat_putent(softc, data, getlock)
 	 */
 	in = ipnn->ipn_nat.nat_ptr;
 	if (in != NULL) {
-		KMALLOCS(in, ipnat_t *, ipnn->ipn_ipnat.in_size);
+		KMALLOC(in, ipnat_t *);
 		nat->nat_ptr = in;
 		if (in == NULL) {
 			softc->ipf_interror = 60038;
 			error = ENOMEM;
 			goto junkput;
 		}
-		bcopy((char *)&ipnn->ipn_ipnat, (char *)in,
-		      ipnn->ipn_ipnat.in_size);
+		bzero((char *)in, offsetof(struct ipnat, in_space));
+		bcopy((char *)&ipnn->ipn_ipnat, (char *)in, sizeof(*in));
 		in->in_use = 1;
 		in->in_flags |= IPN_DELETE;
 
@@ -6904,14 +6897,17 @@ ipf_nat_getnext(softc, t, itp)
 				softc->ipf_interror = 60049;
 				error = EFAULT;
 			}
-			if (hm != NULL) {
-				WRITE_ENTER(&softc->ipf_nat);
-				ipf_nat_hostmapdel(&hm);
-				RWLOCK_EXIT(&softc->ipf_nat);
-			}
-			if (t->ipt_data != NULL) {
+			if (t->ipt_data == NULL) {
+				ipf_freetoken(softc, t);
+				break;
+			} else {
+				if (hm != NULL) {
+					WRITE_ENTER(&softc->ipf_nat);
+					ipf_nat_hostmapdel(&hm);
+					RWLOCK_EXIT(&softc->ipf_nat);
+				}
 				if (nexthm->hm_next == NULL) {
-					t->ipt_data = NULL;
+					ipf_freetoken(softc, t);
 					break;
 				}
 				dst += sizeof(*nexthm);
@@ -6921,22 +6917,25 @@ ipf_nat_getnext(softc, t, itp)
 			break;
 
 		case IPFGENITER_IPNAT :
-			error = COPYOUT(nextipnat, dst, nextipnat->in_size);
+			error = COPYOUT(nextipnat, dst, sizeof(*nextipnat));
 			if (error != 0) {
 				softc->ipf_interror = 60050;
 				error = EFAULT;
 			}
-			if (ipn != NULL) {
-				WRITE_ENTER(&softc->ipf_nat);
-				ipf_nat_rulederef(softc, &ipn);
-				RWLOCK_EXIT(&softc->ipf_nat);
-			}
-			if (t->ipt_data != NULL) {
+			if (t->ipt_data == NULL) {
+				ipf_freetoken(softc, t);
+				break;
+			} else {
+				if (ipn != NULL) {
+					WRITE_ENTER(&softc->ipf_nat);
+					ipf_nat_rulederef(softc, &ipn);
+					RWLOCK_EXIT(&softc->ipf_nat);
+				}
 				if (nextipnat->in_next == NULL) {
-					t->ipt_data = NULL;
+					ipf_freetoken(softc, t);
 					break;
 				}
-				dst += nextipnat->in_size;
+				dst += sizeof(*nextipnat);
 				ipn = nextipnat;
 				nextipnat = nextipnat->in_next;
 			}
@@ -6948,12 +6947,15 @@ ipf_nat_getnext(softc, t, itp)
 				softc->ipf_interror = 60051;
 				error = EFAULT;
 			}
-			if (nat != NULL) {
-				ipf_nat_deref(softc, &nat);
-			}
-			if (t->ipt_data != NULL) {
+			if (t->ipt_data == NULL) {
+				ipf_freetoken(softc, t);
+				break;
+			} else {
+				if (nat != NULL) {
+					ipf_nat_deref(softc, &nat);
+				}
 				if (nextnat->nat_next == NULL) {
-					t->ipt_data = NULL;
+					ipf_freetoken(softc, t);
 					break;
 				}
 				dst += sizeof(*nextnat);
@@ -7991,13 +7993,13 @@ ipf_nat_nextaddrinit(softc, base, na, initial, ifp)
 	{
 	case FRI_LOOKUP :
 		if (na->na_subtype == 0) {
-			na->na_ptr = ipf_lookup_res_num(softc, IPL_LOGNAT,
-							na->na_type,
+			na->na_ptr = ipf_lookup_res_num(softc, na->na_type,
+							IPL_LOGNAT,
 							na->na_num,
 							&na->na_func);
 		} else if (na->na_subtype == 1) {
-			na->na_ptr = ipf_lookup_res_name(softc, IPL_LOGNAT,
-							 na->na_type,
+			na->na_ptr = ipf_lookup_res_name(softc, na->na_type,
+							 IPL_LOGNAT,
 							 base + na->na_num,
 							 &na->na_func);
 		}

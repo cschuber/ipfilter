@@ -123,15 +123,6 @@ struct file;
 # include <sys/malloc.h>
 #endif
 #include "netinet/ipl.h"
-
-#if defined(__NetBSD__) && (__NetBSD_Version__ >= 104230000)
-# include <sys/callout.h>
-extern struct callout ipf_slowtimer_ch;
-#endif
-#if defined(__OpenBSD__)
-# include <sys/timeout.h>
-extern struct timeout ipf_slowtimer_ch;
-#endif
 /* END OF INCLUDES */
 
 #if !defined(lint)
@@ -157,9 +148,8 @@ static	int		ipf_flushlist __P((ipf_main_softc_t *, int, minor_t,
 static	int		ipf_flush_groups __P((ipf_main_softc_t *,
 					      int, int, int));
 static	ipfunc_t	ipf_findfunc __P((ipfunc_t));
-static	void		*ipf_findlookup __P((ipf_main_softc_t *, int,
-					     frentry_t *, i6addr_t *,
-					     lookupfunc_t *));
+static	void		*ipf_findlookup __P((ipf_main_softc_t *, frentry_t *,
+					     i6addr_t *, lookupfunc_t *));
 static	frentry_t	*ipf_firewall __P((fr_info_t *, u_32_t *));
 static	int		ipf_fr_matcharray __P((fr_info_t *, int *));
 static	int		ipf_frruleiter __P((ipf_main_softc_t *, void *, int,
@@ -492,7 +482,7 @@ ipf_pr_ipv6hdr(fin)
 	fin->fin_id = 0;
 
 	hdrcount = 0;
-	while (go && !(fin->fin_flx & FI_SHORT)) {
+	while (go && !(fin->fin_flx & (FI_BAD|FI_SHORT))) {
 		switch (p)
 		{
 		case IPPROTO_UDP :
@@ -827,26 +817,31 @@ ipf_pr_fragment6(fin)
 		return IPPROTO_NONE;
 	}
 
-	if ((frag->ip6f_offlg & IP6F_MORE_FRAG) != 0) {
+	if (ipf_pr_pullup(fin, sizeof(*frag)) == -1) {
+		LBUMP(ipf_stats[fin->fin_out].fr_v6_frag_pullup);
+		return IPPROTO_NONE;
+	}
+
+	if ((int)(fin->fin_dlen - sizeof(*frag)) < 0) {
+		LBUMP(ipf_stats[fin->fin_out].fr_v6_frag_size);
+		fin->fin_flx |= FI_SHORT;
+		return IPPROTO_NONE;
+	}
+
+	if ((fin->fin_plen & 7) != 0) {
 		/*
 		 * Any fragment that isn't the last fragment must have its
 		 * length as a multiple of 8.
 		 */
-		if ((fin->fin_plen & 7) != 0)
+		if (ntohs(frag->ip6f_offlg) & 1)
 			fin->fin_flx |= FI_BAD;
 	}
 
 	fin->fin_fraghdr = frag;
 	fin->fin_id = frag->ip6f_ident;
-	fin->fin_off = ntohs(frag->ip6f_offlg & IP6F_OFF_MASK);
+	fin->fin_off = ntohs(frag->ip6f_offlg) & 0xfff8;
 	if (fin->fin_off != 0)
 		fin->fin_flx |= FI_FRAGBODY;
-
-	/*
-	 * Jumbograms aren't handled, so the max. length is 64k
-	 */
-	if ((fin->fin_off << 3) + fin->fin_dlen > 65535)
-		  fin->fin_flx |= FI_BAD;
 
 	/*
 	 * We don't know where the transport layer header (or whatever is next
@@ -3547,7 +3542,7 @@ fr_cksum(m, ip, l4proto, l4hdr, l3len)
 	}
 # else /* MENTAT */
 #  if defined(BSD) || defined(sun)
-#   if BSD_GE_YEAR(199103)
+#   if BSD >= 199103
 	m->m_data += hlen;
 #   else
 	m->m_off += hlen;
@@ -3691,7 +3686,7 @@ nodata:
 	return sum2;
 }
 
-#if defined(_KERNEL) && ( (BSD_LT_YEAR(199103) && !defined(MENTAT)) || \
+#if defined(_KERNEL) && ( ((BSD < 199103) && !defined(MENTAT)) || \
     defined(__sgi) ) && !defined(linux) && !defined(_AIX51)
 
 /*
@@ -3981,11 +3976,51 @@ ipf_getrulen(softc, unit, group, n)
 	fg = ipf_findgroup(softc, group, unit, softc->ipf_active, NULL);
 	if (fg == NULL)
 		return NULL;
-	for (fr = fg->fg_start; fr && n; fr = fr->fr_next, n--)
+	for (fr = fg->fg_head; fr && n; fr = fr->fr_next, n--)
 		;
 	if (n != 0)
 		return NULL;
 	return fr;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_rulen                                                   */
+/* Returns:     int - >= 0 - rule number, -1 == search failed               */
+/* Parameters:  unit(I) - device for which to count the rule's number       */
+/*              fr(I)   - pointer to rule to match                          */
+/*                                                                          */
+/* Return the number for a rule on a specific filtering device.             */
+/* ------------------------------------------------------------------------ */
+int
+ipf_rulen(softc, unit, fr)
+	ipf_main_softc_t *softc;
+	int unit;
+	frentry_t *fr;
+{
+	frentry_t *fh;
+	frgroup_t *fg;
+	u_32_t n = 0;
+	char *gname;
+	char grp[1];
+
+	if (fr == NULL)
+		return -1;
+	if (fr->fr_group == -1) {
+		grp[0] = '\0';
+		gname = grp;
+	} else {
+		gname = FR_NAME(fr, fr_group);
+	}
+	fg = ipf_findgroup(softc, gname, unit, softc->ipf_active, NULL);
+	if (fg == NULL)
+		return -1;
+	for (fh = fg->fg_head; fh; n++, fh = fh->fr_next)
+		if (fh == fr)
+			break;
+	if (fh == NULL)
+		return -1;
+	return n;
 }
 
 
@@ -5001,7 +5036,7 @@ frrequest(softc, unit, req, data, set, makecopy)
 			}
 			break;
 		case FRI_LOOKUP :
-			fp->fr_srcptr = ipf_findlookup(softc, unit, fp,
+			fp->fr_srcptr = ipf_findlookup(softc, fp,
 						       &fp->fr_src6,
 						       &fp->fr_srcfunc);
 			if (fp->fr_srcfunc == NULL) {
@@ -5032,7 +5067,7 @@ frrequest(softc, unit, req, data, set, makecopy)
 			}
 			break;
 		case FRI_LOOKUP :
-			fp->fr_dstptr = ipf_findlookup(softc, unit, fp,
+			fp->fr_dstptr = ipf_findlookup(softc, fp,
 						       &fp->fr_dst6,
 						       &fp->fr_dstfunc);
 			if (fp->fr_dstfunc == NULL) {
@@ -5452,7 +5487,6 @@ ipf_rule_expire_insert(softc, f, set)
 /* Function:   ipf_findlookup                                               */
 /* Returns:    NULL = failure, else success                                 */
 /* Parameters: softc(I) - pointer to soft context main structure            */
-/*             unit(I)  - ipf device we want to find match for              */
 /*             fp(I)    - rule for which lookup is for                      */
 /*             addrp(I) - pointer to lookup information in address struct   */
 /*             funcp(I) - where to store the lookup function                */
@@ -5464,9 +5498,8 @@ ipf_rule_expire_insert(softc, f, set)
 /* the packet matching quicker.                                             */
 /* ------------------------------------------------------------------------ */
 static void *
-ipf_findlookup(softc, unit, fr, addrp, funcp)
+ipf_findlookup(softc, fr, addrp, funcp)
 	ipf_main_softc_t *softc;
-	int unit;
 	frentry_t *fr;
 	i6addr_t *addrp;
 	lookupfunc_t *funcp;
@@ -5476,15 +5509,17 @@ ipf_findlookup(softc, unit, fr, addrp, funcp)
 	switch (addrp->iplookupsubtype)
 	{
 	case 0 :
-		ptr = ipf_lookup_res_num(softc, unit, addrp->iplookuptype,
-					 addrp->iplookupnum, funcp);
+		ptr = ipf_lookup_res_num(softc, addrp->iplookuptype,
+					 IPL_LOGIPF, addrp->iplookupnum,
+					 funcp);
 		break;
 	case 1 :
 		if (addrp->iplookupname < 0)
 			break;
 		if (addrp->iplookupname >= fr->fr_namelen)
 			break;
-		ptr = ipf_lookup_res_name(softc, unit, addrp->iplookuptype,
+		ptr = ipf_lookup_res_name(softc, addrp->iplookuptype,
+					  IPL_LOGIPF,
 					  fr->fr_names + addrp->iplookupname,
 					  funcp);
 		break;
@@ -5601,10 +5636,10 @@ ipf_resolvefunc(softc, data)
 }
 
 
-#if !defined(_KERNEL) || (!defined(__NetBSD__) && !defined(__OpenBSD__) && \
-     !defined(__FreeBSD__)) || \
-    FREEBSD_LT_REV(501000) || NETBSD_LT_REV(105000000) || \
-    OPENBSD_LT_REV(200006)
+#if !defined(_KERNEL) || (!defined(__NetBSD__) && !defined(__OpenBSD__) && !defined(__FreeBSD__)) || \
+    (defined(__FreeBSD__) && (__FreeBSD_version < 501000)) || \
+    (defined(__NetBSD__) && (__NetBSD_Version__ < 105000000)) || \
+    (defined(__OpenBSD__) && (OpenBSD < 200006))
 /*
  * From: NetBSD
  * ppsratecheck(): packets (or events) per second limitation.
@@ -7483,6 +7518,77 @@ ipf_ipftune(softc, cmd, data)
 
 
 /* ------------------------------------------------------------------------ */
+/* Function:    ipf_initialise                                              */
+/* Returns:     int - 0 == success,  < 0 == failure                         */
+/* Parameters:  None.                                                       */
+/*                                                                          */
+/* Call of the initialise functions for all the various subsystems inside   */
+/* of IPFilter.  If any of them should fail, return immeadiately a failure  */
+/* BUT do not try to recover from the error here.                           */
+/* ------------------------------------------------------------------------ */
+#if 0
+int
+ipf_initialise(void)
+{
+	int i;
+
+#ifdef IPFILTER_LOG
+	i = ipf_log_init();
+	if (i < 0)
+		return -10 + i;
+#endif
+	i = ipf_nat_init();
+	if (i < 0)
+		return -20 + i;
+
+	i = ipf_state_init();
+	if (i < 0)
+		return -30 + i;
+
+	i = ipf_auth_init();
+	if (i < 0)
+		return -40 + i;
+
+	i = ipf_frag_init();
+	if (i < 0)
+		return -50 + i;
+
+	i = ipf_proxy_init();
+	if (i < 0)
+		return -60 + i;
+
+	i = ipf_sync_init();
+	if (i < 0)
+		return -70 + i;
+#ifdef IPFILTER_SCAN
+	i = ipf_scan_init();
+	if (i < 0)
+		return -80 + i;
+#endif
+	i = ipf_lookup_init();
+	if (i < 0)
+		return -90 + i;
+#ifdef IPFILTER_COMPILED
+	ipfrule_add();
+#endif
+	return 0;
+}
+#endif
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_deinitialise                                            */
+/* Returns:     None.                                                       */
+/* Parameters:  None.                                                       */
+/*                                                                          */
+/* Call all the various subsystem cleanup routines to deallocate memory or  */
+/* destroy locks or whatever they've done that they need to now undo.       */
+/* The order here IS important as there are some cross references of        */
+/* internal data structures.                                                */
+/* ------------------------------------------------------------------------ */
+
+
+/* ------------------------------------------------------------------------ */
 /* Function:    ipf_zerostats                                               */
 /* Returns:     int - 0 = success, else failure                             */
 /* Parameters:  data(O) - pointer to pointer for copying data back to       */
@@ -7586,7 +7692,7 @@ ipf_resolvenic(softc, name, v)
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    ipf_token_expire                                            */
+/* Function:    ipf_expiretokens                                            */
 /* Returns:     None.                                                       */
 /* Parameters:  None.                                                       */
 /*                                                                          */
@@ -7594,7 +7700,7 @@ ipf_resolvenic(softc, name, v)
 /* have been held for too long and need to be freed up.                     */
 /* ------------------------------------------------------------------------ */
 void
-ipf_token_expire(softc)
+ipf_expiretokens(softc)
 	ipf_main_softc_t *softc;
 {
 	ipftoken_t *it;
@@ -7604,14 +7710,14 @@ ipf_token_expire(softc)
 		if (it->ipt_die > softc->ipf_ticks)
 			break;
 
-		ipf_token_free(softc, it);
+		ipf_freetoken(softc, it);
 	}
 	RWLOCK_EXIT(&softc->ipf_tokens);
 }
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    ipf_token_del                                                */
+/* Function:    ipf_deltoken                                                */
 /* Returns:     int     - 0 = success, else error                           */
 /* Parameters:  type(I) - the token type to match                           */
 /*              uid(I)  - uid owning the token                              */
@@ -7619,10 +7725,10 @@ ipf_token_expire(softc)
 /*                                                                          */
 /* This function looks for a a token in the current list that matches up    */
 /* the fields (type, uid, ptr).  If none is found, ESRCH is returned, else  */
-/* call ipf_token_free() to remove it from the list.                         */
+/* call ipf_freetoken() to remove it from the list.                         */
 /* ------------------------------------------------------------------------ */
 int
-ipf_token_del(softc, type, uid, ptr)
+ipf_deltoken(softc, type, uid, ptr)
 	ipf_main_softc_t *softc;
 	int type, uid;
 	void *ptr;
@@ -7637,7 +7743,7 @@ ipf_token_del(softc, type, uid, ptr)
 	for (it = softc->ipf_token_head; it != NULL; it = it->ipt_next)
 		if (ptr == it->ipt_ctx && type == it->ipt_type &&
 		    uid == it->ipt_uid) {
-			ipf_token_free(softc, it);
+			ipf_freetoken(softc, it);
 			softc->ipf_interror = 83;
 			error = 0;
 			break;
@@ -7649,7 +7755,7 @@ ipf_token_del(softc, type, uid, ptr)
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    ipf_token_find                                               */
+/* Function:    ipf_findtoken                                               */
 /* Returns:     ipftoken_t * - NULL if no memory, else pointer to token     */
 /* Parameters:  type(I) - the token type to match                           */
 /*              uid(I)  - uid owning the token                              */
@@ -7659,9 +7765,12 @@ ipf_token_del(softc, type, uid, ptr)
 /* matches the tuple (type, uid, ptr).  If one cannot be found then one is  */
 /* allocated.  If one is found then it is moved to the top of the list of   */
 /* currently active tokens.                                                 */
+/*                                                                          */
+/* NOTE: It is by design that this function returns holding a read lock on  */
+/*       ipf_tokens.  Callers must make sure they release it!               */
 /* ------------------------------------------------------------------------ */
 ipftoken_t *
-ipf_token_find(softc, type, uid, ptr)
+ipf_findtoken(softc, type, uid, ptr)
 	ipf_main_softc_t *softc;
 	int type, uid;
 	void *ptr;
@@ -7672,6 +7781,8 @@ ipf_token_find(softc, type, uid, ptr)
 
 	WRITE_ENTER(&softc->ipf_tokens);
 	for (it = softc->ipf_token_head; it != NULL; it = it->ipt_next) {
+		if (it->ipt_alive == 0)
+			continue;
 		if (ptr == it->ipt_ctx && type == it->ipt_type &&
 		    uid == it->ipt_uid)
 			break;
@@ -7687,7 +7798,7 @@ ipf_token_find(softc, type, uid, ptr)
 		it->ipt_uid = uid;
 		it->ipt_type = type;
 		it->ipt_next = NULL;
-		it->ipt_ref = 2;
+		it->ipt_alive = 1;
 	} else {
 		if (new != NULL) {
 			KFREE(new);
@@ -7695,7 +7806,6 @@ ipf_token_find(softc, type, uid, ptr)
 		}
 
 		ipf_token_unlink(softc, it);
-		it->ipt_ref++;
 	}
 	it->ipt_pnext = softc->ipf_token_tail;
 	*softc->ipf_token_tail = it;
@@ -7704,7 +7814,7 @@ ipf_token_find(softc, type, uid, ptr)
 
 	it->ipt_die = softc->ipf_ticks + 2;
 
-	RWLOCK_EXIT(&softc->ipf_tokens);
+	MUTEX_DOWNGRADE(&softc->ipf_tokens);
 
 	return it;
 }
@@ -7714,7 +7824,6 @@ ipf_token_find(softc, type, uid, ptr)
 /* Function:    ipf_token_unlink                                             */
 /* Returns:     None.                                                       */
 /* Parameters:  token(I) - pointer to token structure                       */
-/* Write Locks: ipf_tokens                                                  */
 /*                                                                          */
 /* This function unlinks a token structure from the linked list of tokens   */
 /* that "own" it.  The head pointer never needs to be explicitly adjusted   */
@@ -7736,25 +7845,23 @@ ipf_token_unlink(softc, token)
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    ipf_token_deref                                             */
+/* Function:    ipf_freetoken                                               */
 /* Returns:     None.                                                       */
 /* Parameters:  token(I) - pointer to token structure                       */
-/* Write Locks: ipf_tokens                                                  */
 /*                                                                          */
-/* Drop the reference count on the token structure and if it drops to zero, */
-/* call the dereference function for the token type because it is then      */
-/* possible to free the token data structure.                               */
+/* This function unlinks a token from the linked list and on the path to    */
+/* free'ing the data, it calls the dereference function that is associated  */
+/* with the type of data pointed to by the token as it is considered to     */
+/* hold a reference to it.                                                  */
 /* ------------------------------------------------------------------------ */
 void
-ipf_token_deref(softc, token)
+ipf_freetoken(softc, token)
 	ipf_main_softc_t *softc;
 	ipftoken_t *token;
 {
 	void *data, **datap;
 
-	token->ipt_ref--;
-	if (token->ipt_ref > 0)
-		return;
+	ipf_token_unlink(softc, token);
 
 	data = token->ipt_data;
 	datap = &data;
@@ -7794,27 +7901,6 @@ ipf_token_deref(softc, token)
 	}
 
 	KFREE(token);
-}
-
-
-/* ------------------------------------------------------------------------ */
-/* Function:    ipf_token_free                                              */
-/* Returns:     None.                                                       */
-/* Parameters:  token(I) - pointer to token structure                       */
-/* Write Locks: ipf_tokens                                                  */
-/*                                                                          */
-/* This function unlinks a token from the linked list and does a dereference*/
-/* on it to encourage it to be freed.                                       */
-/* ------------------------------------------------------------------------ */
-void
-ipf_token_free(softc, token)
-	ipf_main_softc_t *softc;
-	ipftoken_t *token;
-{
-
-	ipf_token_unlink(softc, token);
-
-	ipf_token_deref(softc, token);
 }
 
 
@@ -7925,17 +8011,18 @@ ipf_getnextrule(softc, t, ptr)
 		/*
 		 * Copy out data and clean up references and token as needed.
 		 */
-		error = COPYOUT(next, dst, next->fr_size);
+		error = COPYOUT(next, dst, sizeof(*next));
 		if (error != 0) {
 			softc->ipf_interror = 89;
 			return EFAULT;
 		}
 		if (t->ipt_data == NULL) {
+			ipf_freetoken(softc, t);
 			break;
 		} else {
 			if (fr != NULL)
 				(void) ipf_derefrule(softc, &fr);
-			dst += next->fr_size;
+			dst += sizeof(*next);
 			if (next->fr_data != NULL) {
 				error = COPYOUT(next->fr_data, dst,
 						next->fr_dsize);
@@ -7947,7 +8034,7 @@ ipf_getnextrule(softc, t, ptr)
 				}
 			}
 			if (next->fr_next == NULL) {
-				t->ipt_data = NULL;
+				ipf_freetoken(softc, t);
 				break;
 			}
 		}
@@ -7983,19 +8070,14 @@ ipf_frruleiter(softc, data, uid, ctx)
 	ipftoken_t *token;
 	int error;
 
-	token = ipf_token_find(softc, IPFGENITER_IPF, uid, ctx);
+	token = ipf_findtoken(softc, IPFGENITER_IPF, uid, ctx);
 	if (token != NULL) {
 		error = ipf_getnextrule(softc, token, data);
 	} else {
-		WRITE_ENTER(&softc->ipf_tokens);
-		if (token->ipt_data == NULL)
-			ipf_token_free(softc, token);
-		else
-			ipf_token_deref(softc, token);
-		RWLOCK_EXIT(&softc->ipf_tokens);
 		softc->ipf_interror = 91;
 		error = EFAULT;
 	}
+	RWLOCK_EXIT(&softc->ipf_tokens);
 
 	return error;
 }
@@ -8053,20 +8135,15 @@ ipf_genericiter(softc, data, uid, ctx)
 	if (error != 0)
 		return error;
 
-	token = ipf_token_find(softc, iter.igi_type, uid, ctx);
+	token = ipf_findtoken(softc, iter.igi_type, uid, ctx);
 	if (token != NULL) {
 		token->ipt_subtype = iter.igi_type;
 		error = ipf_geniter(softc, token, &iter);
 	} else {
-		WRITE_ENTER(&softc->ipf_tokens);
-		if (token->ipt_data == NULL)
-			ipf_token_free(softc, token);
-		else
-			ipf_token_deref(softc, token);
-		RWLOCK_EXIT(&softc->ipf_tokens);
 		softc->ipf_interror = 93;
 		error = EFAULT;
 	}
+	RWLOCK_EXIT(&softc->ipf_tokens);
 
 	return error;
 }
@@ -8345,7 +8422,7 @@ ipf_ipf_ioctl(softc, data, cmd, mode, uid, ctx)
 		error = BCOPYIN(data, &tmp, sizeof(tmp));
 		if (error == 0) {
 			SPL_SCHED(s);
-			error = ipf_token_del(softc, tmp, uid, ctx);
+			error = ipf_deltoken(softc, tmp, uid, ctx);
 			SPL_X(s);
 		}
 		break;
@@ -9933,32 +10010,4 @@ ipf_rb_ht_init(head)
 	host_track_t *head;
 {
 	RB_INIT(&head->ht_root);
-}
-
-
-/* ------------------------------------------------------------------------ */
-/* Function:    ipf_slowtimer                                               */
-/* Returns:     Nil                                                         */
-/* Parameters:  ptr(I) - pointer to main ipf soft context structure         */
-/*                                                                          */
-/* Slowly expire held state for fragments.  Timeouts are set * in           */
-/* expectation of this being called twice per second.                       */
-/* ------------------------------------------------------------------------ */
-void
-ipf_slowtimer(softc)
-	ipf_main_softc_t *softc;
-{
-
-	ipf_token_expire(softc);
-	ipf_frag_expire(softc);
-	ipf_state_expire(softc);
-	ipf_nat_expire(softc);
-	ipf_auth_expire(softc);
-	ipf_lookup_expire(softc);
-	ipf_rule_expire(softc);
-	ipf_sync_expire(softc);
-	softc->ipf_ticks++;
-#   if defined(__OpenBSD__)
-	timeout_add(&ipf_slowtimer_ch, hz/2);
-#   endif
 }
