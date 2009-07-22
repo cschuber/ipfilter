@@ -145,7 +145,7 @@ struct file;
 #  include	<sys/kthread_iface.h>
 #  define	READ_COLLISION	0x001
 
-iplog_select_t	iplog_ss[IPL_LOGMAX+1];
+iplog_select_t	iplog_ss[IPL_LOGSIZE];
 
 extern int selwait;
 # endif /* IPL_SELECT */

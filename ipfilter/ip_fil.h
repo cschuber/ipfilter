@@ -1548,8 +1548,8 @@ extern	int	ipl_logsize;
 extern	u_long	fr_ticks;
 extern	fr_info_t	frcache[2][8];
 extern	char	ipfilter_version[];
-extern	iplog_t	**iplh[IPL_LOGMAX+1], *iplt[IPL_LOGMAX+1];
-extern	int	iplused[IPL_LOGMAX + 1];
+extern	iplog_t	**iplh[IPL_LOGSIZE], *iplt[IPL_LOGSIZE];
+extern	int	iplused[IPL_LOGSIZE];
 extern	struct frentry *ipfilter[2][2], *ipacct[2][2];
 #ifdef	USE_INET6
 extern	struct frentry *ipfilter6[2][2], *ipacct6[2][2];
