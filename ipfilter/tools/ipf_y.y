@@ -64,7 +64,7 @@ static	int		ipffd = -1;
 static	int		*yycont = NULL;
 static	ioctlfunc_t	ipfioctls[IPL_LOGSIZE];
 static	addfunc_t	ipfaddfunc = NULL;
-static	struct	wordtab ipfwords[];
+static	struct	wordtab ipfwords[106];
 static	struct	wordtab	addrwords[4];
 static	struct	wordtab	maskwords[5];
 static	struct	wordtab icmpcodewords[17];
@@ -1716,7 +1716,7 @@ ipv4:	ipv4_24 '.' YY_NUMBER
 %%
 
 
-static	struct	wordtab ipfwords[] = {
+static	struct	wordtab ipfwords[106] = {
 	{ "age",			IPFY_AGE },
 	{ "ah",				IPFY_AH },
 	{ "all",			IPFY_ALL },
