@@ -1259,6 +1259,7 @@ extern	mb_t	*m_pullup __P((mb_t *, int));
 #  define	mbuf	sk_buff
 
 #  define	mtod(m, t)	((t)(m)->data)
+#  define	m_adj(m, x)	skb_trim((m), (m)->len + (x))
 #  define	m_data		data
 #  define	m_len		len
 #  define	m_next		next

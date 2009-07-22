@@ -87,6 +87,8 @@ struct file;
 # include <sys/malloc.h>
 #endif
 
+/* END OF INCLUDES */
+
 #include "netinet/ip_ftp_pxy.c"
 #include "netinet/ip_rcmd_pxy.c"
 # include "netinet/ip_pptp_pxy.c"
@@ -98,8 +100,6 @@ struct file;
 #endif
 #include "netinet/ip_ipsec_pxy.c"
 #include "netinet/ip_rpcb_pxy.c"
-
-/* END OF INCLUDES */
 
 #if !defined(lint)
 static const char rcsid[] = "@(#)$Id$";
