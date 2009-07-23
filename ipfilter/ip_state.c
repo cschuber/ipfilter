@@ -72,6 +72,9 @@ struct file;
 #endif
 #include <netinet/udp.h>
 #include <netinet/ip_icmp.h>
+#if !defined(_KERNEL)
+# include "ipf.h"
+#endif
 #include "netinet/ip_compat.h"
 #include "netinet/ip_fil.h"
 #include "netinet/ip_nat.h"
@@ -5532,8 +5535,6 @@ ipf_state_add_tq(softc, ttl)
 
 
 #ifndef _KERNEL
-# include "ipf.h"
-
 /*
  * Display the built up state table rules and mapping entries.
  */
