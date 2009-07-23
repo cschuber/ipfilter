@@ -41,7 +41,7 @@ struct file;
 #if defined(_KERNEL)
 # include <sys/systm.h>
 #else
-# include <stdio.h>
+# include "ipf.h"
 #endif
 #include <netinet/in.h>
 #include <net/if.h>
@@ -1489,7 +1489,6 @@ ipf_htable_expire(softc, arg)
 
 
 #ifndef _KERNEL
-# include "ipf.h"
 
 /* ------------------------------------------------------------------------ */
 /*                                                                          */

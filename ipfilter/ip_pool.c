@@ -59,6 +59,9 @@ struct file;
 #include <sys/socket.h>
 #include <net/if.h>
 #include <netinet/in.h>
+#if !defined(_KERNEL)
+# include "ipf.h"
+#endif
 
 #include "netinet/ip_compat.h"
 #include "netinet/ip_fil.h"
@@ -1425,8 +1428,6 @@ ipf_pool_expire(softc, arg)
 
 
 #ifndef _KERNEL
-# include "ipf.h"
-
 void
 ipf_pool_dump(softc, arg)
 	ipf_main_softc_t *softc;

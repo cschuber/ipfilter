@@ -45,6 +45,8 @@ struct file;
 # if !defined(__SVR4) && !defined(__svr4__)
 #  include <sys/mbuf.h>
 # endif
+#else
+# include "ipf.h"
 #endif
 #include <netinet/in.h>
 
@@ -947,8 +949,6 @@ ipf_lookup_find_htable(softc, unit, name)
 
 
 #ifndef _KERNEL
-# include "ipf.h"
-
 void
 ipf_lookup_dump(softc, arg)
 	ipf_main_softc_t *softc;
