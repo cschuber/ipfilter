@@ -192,7 +192,7 @@ ip_rules.o: ip_rules.c $(TOP)/ip_rules.h
 
 ip_proxy.o: $(TOP)/ip_proxy.c $(TOP)/ip_proxy.h $(TOP)/ip_compat.h \
 	$(TOP)/ip_ftp_pxy.c $(TOP)/ip_rcmd_pxy.c $(TOP)/ip_raudio_pxy.c \
-	$(TOP)/ip_rpcb_pxy.c $(TOP)/ip_nat.h
+	$(TOP)/ip_tftp_pxy.c $(TOP)/ip_rpcb_pxy.c $(TOP)/ip_nat.h
 	$(CC) $(CCARGS) $(DFLAGS) -c $(TOP)/ip_proxy.c -o $@
 
 ip_auth.o: $(TOP)/ip_auth.c $(TOP)/ip_auth.h $(TOP)/ip_compat.h
@@ -235,7 +235,8 @@ ip_trafcon_u.o: $(TOP)/ip_trafcon.c $(TOP)/ip_compat.h $(TOP)/ip_fil.h \
 
 ip_proxy_u.o: $(TOP)/ip_proxy.c $(TOP)/ip_proxy.h $(TOP)/ip_compat.h \
 	$(TOP)/ip_ftp_pxy.c $(TOP)/ip_rcmd_pxy.c $(TOP)/ip_raudio_pxy.c \
-	$(TOP)/ip_rpcb_pxy.c $(TOP)/ip_ipsec_pxy.c $(TOP)/ip_nat.h
+	$(TOP)/ip_rpcb_pxy.c $(TOP)/ip_ipsec_pxy.c $(TOP)/ip_tftp_pxy.c \
+	$(TOP)/ip_nat.h
 	$(CC) $(CCARGS) $(EXTRA) -c $(TOP)/ip_proxy.c -o $@
 
 ip_auth_u.o: $(TOP)/ip_auth.c $(TOP)/ip_auth.h $(TOP)/ip_compat.h

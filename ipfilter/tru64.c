@@ -76,12 +76,13 @@ void	ipfilter_clock(void *arg);
 int	ipfilteropen(dev_t, int, int);
 int	ipfilterread(dev_t, struct uio *, int);
 int	ipfilterclose(dev_t, int, int);
-int	ipfilterwrite(dev_t, int, int);
+int	ipfilterwrite(dev_t, struct uio *);
 int	ipfilterioctl(dev_t, u_int, caddr_t, int);
 
 extern	int	nodev(), nulldev();
 extern	task_t	first_task;
 extern	ipfrwlock_t	ipf_tru64;
+extern	void	ipf_timer_func __P((void *));
 
 struct	dsent	ipfilter_devsw_entry = {
 	ipfilteropen,
@@ -634,7 +635,7 @@ ipfilter_attach(void)
 		return EIO;
 	}
 
-        if ((status = ipf_create_all(&ipfmain)) < 0) {
+        if (ipf_create_all(&ipfmain) == NULL) {
 		SPL_X(s);
 #ifdef IPFDEBUG
 		printf("ipf_create_all() == %d\n", status);
@@ -1212,7 +1213,7 @@ void ipfilter_timer()
 		if (ipfmain.ipf_running == 0)
 			break;
 		simple_unlock(&ipfdelaylock);
-		ipf_slowtimer(&ipfmain);
+		ipf_timer_func(&ipfmain);
 		simple_lock(&ipfdelaylock);
 	}
 

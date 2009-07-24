@@ -177,7 +177,7 @@ ip_nat6_u.o: $(TOP)/ip_nat6.c $(TOP)/ip_nat.h $(TOP)/ip_compat.h $(TOP)/ip_fil.h
 ip_proxy_u.o: $(TOP)/ip_proxy.c $(TOP)/ip_proxy.h $(TOP)/ip_compat.h \
 	$(TOP)/ip_ftp_pxy.c $(TOP)/ip_rcmd_pxy.c $(TOP)/ip_raudio_pxy.c \
 	$(TOP)/ip_rpcb_pxy.c $(TOP)/ip_ipsec_pxy.c $(TOP)/ip_nat.h \
-	$(TOP)/ip_fil.h
+	$(TOP)/ip_tftp_pxy.c $(TOP)/ip_fil.h
 	$(CC) $(CCARGS) $(EXTRA) -c $(TOP)/ip_proxy.c -o $@
 
 ip_frag_u.o: $(TOP)/ip_frag.c $(TOP)/ip_frag.h $(TOP)/ip_compat.h \
@@ -266,7 +266,7 @@ ip_state.o: $(TOP)/ip_state.c $(TOP)/ip_state.h $(TOP)/ip_compat.h \
 ip_proxy.o: $(TOP)/ip_proxy.c $(TOP)/ip_proxy.h $(TOP)/ip_compat.h \
 	$(TOP)/ip_ftp_pxy.c $(TOP)/ip_rcmd_pxy.c $(TOP)/ip_raudio_pxy.c \
 	$(TOP)/ip_rpcb_pxy.c $(TOP)/ip_ipsec_pxy.c $(TOP)/ip_nat.h \
-	$(TOP)/ip_nat.h $(TOP)/ip_fil.h
+	$(TOP)/ip_tftp_pxy.c $(TOP)/ip_nat.h $(TOP)/ip_fil.h
 	$(CC) $(DFLAGS) -c $(TOP)/ip_proxy.c -o $@
 
 ip_auth.o: $(TOP)/ip_auth.c $(TOP)/ip_auth.h $(TOP)/ip_compat.h \

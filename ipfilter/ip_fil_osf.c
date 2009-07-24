@@ -120,8 +120,6 @@ ipfattach(softc)
 
 	SPL_X(s);
 
-	/* timeout(ipf_slowtimer, &ipfmain, (hz / IPF_HZ_DIVIDE) * IPF_HZ_MULT); */
-
 	return 0;
 }
 
@@ -143,8 +141,6 @@ ipfdetach(softc)
 
 	if (softc->ipf_control_forwarding & 2)
 		ipforwarding = 0;
-
-	/* untimeout(ipf_slowtimer, NULL); */
 
 	ipf_fini_all(softc);
 
@@ -173,13 +169,13 @@ ipfioctl(dev, cmd, data, mode)
 
 	unit = minor(dev);
 	if ((IPL_LOGMAX < unit) || (unit < 0)) {
-		softc->ipf_interror = 130002;
+		ipfmain.ipf_interror = 130002;
 		return ENXIO;
 	}
 
 	if (ipfmain.ipf_running <= 0) {
 		if (unit != IPL_LOGIPF) {
-			softc->ipf_interror = 130003;
+			ipfmain.ipf_interror = 130003;
 			return EIO;
 		}
 		if (cmd != (ioctlcmd_t)SIOCIPFGETNEXT &&
@@ -189,7 +185,7 @@ ipfioctl(dev, cmd, data, mode)
 		    cmd != (ioctlcmd_t)SIOCGETFS &&
 		    cmd != (ioctlcmd_t)SIOCGETFF &&
 		    cmd != (ioctlcmd_t)SIOCIPFINTERROR) {
-			softc->ipf_interror = 130004;
+			ipfmain.ipf_interror = 130004;
 			return EIO;
 		}
 	}
@@ -1007,22 +1003,14 @@ ipf_newisn(fin)
 /* expectation of this being called twice per second.                       */
 /* ------------------------------------------------------------------------ */
 void
-ipf_slowtimer __P((void *ptr))
+ipf_timer_func __P((void *ptr))
 {
 	ipf_main_softc_t *softc = ptr;
 
         READ_ENTER(&softc->ipf_global);
 
-	if (softc->ipf_running == 1) {
-		ipf_expiretokens(softc);
-		ipf_frag_expire(softc);
-		ipf_state_expire(softc);
-		ipf_nat_expire(softc);
-		ipf_auth_expire(softc);
-		ipf_lookup_expire(softc);
-		ipf_rule_expire(softc);
-		softc->ipf_ticks++;
-	}
+	if (softc->ipf_running == 1)
+		ipf_slowtimer(softc);
 
 	RWLOCK_EXIT(&softc->ipf_global);
 }
@@ -1276,20 +1264,88 @@ ipf_inject(fin, m)
 
 
 /*
- * In the face of no kernel random function, this is implemented...it is
- * not meant to be random, just a fill in.
+ * Copy a packet header mbuf chain into a completely new chain, including
+ * copying any mbuf clusters.  Use this instead of m_copypacket() when
+ * you need a writable copy of an mbuf chain.  
+ */
+struct mbuf *
+m_dup(struct mbuf *m, int how)
+{
+	struct mbuf **p, *top = NULL;
+	int remain, moff, nsize;
+
+	if (m == NULL)
+		return (NULL);
+
+	/* While there's more data, get a new mbuf, tack it on, and fill it */
+	remain = m->m_pkthdr.len;
+	moff = 0;
+	p = &top;
+	while (remain > 0 || top == NULL) {     /* allow m->m_pkthdr.len == 0 */
+		struct mbuf *n; 
+
+		/* Get the next new mbuf */
+		if (remain >= MINCLSIZE) {
+			n = m_getcl(how, m->m_type, 0);
+			nsize = MCLBYTES;
+		} else {
+			n = m_get(how, m->m_type);
+			nsize = MLEN;
+		}
+		if (n == NULL)
+			goto nospace;
+
+		if (top == NULL) {              /* First one, must be PKTHDR */
+			if (!m_dup_pkthdr(n, m, how)) {
+				m_free(n);
+				goto nospace;
+			}
+			if ((n->m_flags & M_EXT) == 0)
+				nsize = MHLEN;
+		}
+		n->m_len = 0;
+
+		/* Link it into the new chain */
+		*p = n;
+		p = &n->m_next;
+
+		/* Copy data from original mbuf(s) into new mbuf */
+		while (n->m_len < nsize && m != NULL) {
+			int chunk = min(nsize - n->m_len, m->m_len - moff);
+
+			bcopy(m->m_data + moff, n->m_data + n->m_len, chunk);
+			moff += chunk;
+			n->m_len += chunk;
+			remain -= chunk;
+			if (moff == m->m_len) {
+				m = m->m_next;
+				moff = 0;
+			}
+		}
+
+		/* Check correct total mbuf length */
+		KASSERT((remain > 0 && m != NULL) || (remain == 0 && m == NULL),
+			("%s: bogus m_pkthdr.len", __func__));
+	}
+	return (top);
+
+nospace:
+	m_freem(top);
+	return (NULL);
+}
+
+
+/*
+ * Duplicate "from"'s mbuf pkthdr in "to".
+ * "from" must have M_PKTHDR set, and "to" must be empty.
+ * In particular, this does a deep copy of the packet tags.
  */
 int
-ipf_random()
+m_dup_pkthdr(struct mbuf *to, struct mbuf *from, int how)
 {
-	static int last = 0;
-	static int calls = 0;
-	struct timeval tv;
-	int number;
-
-	GETKTIME(&tv);
-	last *= tv.tv_usec + calls++;
-	last += (int)&range * ipfmain.ipf_ticks;
-	number = last + tv.tv_sec;
-	return number;
+	to->m_flags = (from->m_flags & M_COPYFLAGS) | (to->m_flags & M_EXT);
+	if ((to->m_flags & M_EXT) == 0)
+		to->m_data = to->m_pktdat;
+	to->m_pkthdr = from->m_pkthdr;  
+	return (0);
 }

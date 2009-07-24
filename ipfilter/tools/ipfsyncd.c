@@ -667,5 +667,6 @@ printsynchdr(sh)
 {
 
 	printf("v:%d p:%d num:%d len:%d magic:%x", sh->sm_v, sh->sm_p,
-	       ntohl(sh->sm_num), ntohl(sh->sm_len), ntohl(sh->sm_magic));
+	       (u_int)ntohl(sh->sm_num), (u_int)ntohl(sh->sm_len),
+	       (u_int)ntohl(sh->sm_magic));
 }

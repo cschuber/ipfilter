@@ -4,7 +4,7 @@
 #
 # Copyright:	Copyright (c) 2000 Darren Reed
 #
-# Description:	PSF for IP FIlter 5.0.6
+# Description:	PSF for IP FIlter 6.0.0
 #
 # $Id$
 
@@ -37,16 +37,16 @@ bundle
 	is_reference	false
 	vendor_tag	IPFilter
 	hp_srdo		swtype=O;user=B;bundle_type=O
-	contents	IPF-RUN,r=A.05.00.06,a=HP-UX_HPREV_32/64,v=IPFilter
+	contents	IPF-RUN,r=A.06.00.00,a=HP-UX_HPREV_32/64,v=IPFilter
 end # bundle IPF
 
 # Product definition(s):
 product
 	tag		IPF-RUN
-	title		IP Filter 5.0.6
+	title		IP Filter 6.0.0
 	description	Firewall/NAT
 	copyright	< ../../SunOS5/copyright
-	revision	A.05.00.06
+	revision	A.06.00.00
 	architecture	HP-UX_HPREV_32/64
 	machine_type	9000/[678]??:*
 	os_name		HP-UX
