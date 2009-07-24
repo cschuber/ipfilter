@@ -64,14 +64,6 @@ static	int		ipffd = -1;
 static	int		*yycont = NULL;
 static	ioctlfunc_t	ipfioctls[IPL_LOGSIZE];
 static	addfunc_t	ipfaddfunc = NULL;
-static	struct	wordtab ipfwords[106];
-static	struct	wordtab	addrwords[4];
-static	struct	wordtab	maskwords[5];
-static	struct	wordtab icmpcodewords[17];
-static	struct	wordtab ipv4optwords[25];
-static	struct	wordtab ipv4secwords[9];
-static	struct	wordtab ipv6optwords[9];
-static	struct	wordtab logwords[33];
 
 %}
 %union	{
@@ -1716,7 +1708,7 @@ ipv4:	ipv4_24 '.' YY_NUMBER
 %%
 
 
-static	struct	wordtab ipfwords[106] = {
+static	struct	wordtab ipfwords[] = {
 	{ "age",			IPFY_AGE },
 	{ "ah",				IPFY_AH },
 	{ "all",			IPFY_ALL },
@@ -1828,14 +1820,14 @@ static	struct	wordtab ipfwords[106] = {
 	{ NULL,				0 }
 };
 
-static	struct	wordtab	addrwords[4] = {
+static	struct	wordtab	addrwords[] = {
 	{ "any",			IPFY_ANY },
 	{ "hash",			IPFY_HASH },
 	{ "pool",			IPFY_POOL },
 	{ NULL,				0 }
 };
 
-static	struct	wordtab	maskwords[5] = {
+static	struct	wordtab	maskwords[] = {
 	{ "broadcast",			IPFY_BROADCAST },
 	{ "netmasked",			IPFY_NETMASKED },
 	{ "network",			IPFY_NETWORK },
@@ -1843,7 +1835,7 @@ static	struct	wordtab	maskwords[5] = {
 	{ NULL,				0 }
 };
 
-static	struct	wordtab icmpcodewords[17] = {
+static	struct	wordtab icmpcodewords[] = {
 	{ "cutoff-preced",		IPFY_ICMPC_CUTPRE },
 	{ "filter-prohib",		IPFY_ICMPC_FLTPRO },
 	{ "isolate",			IPFY_ICMPC_ISOLATE },
@@ -1863,7 +1855,7 @@ static	struct	wordtab icmpcodewords[17] = {
 	{ NULL,				0 },
 };
 
-static	struct	wordtab ipv4optwords[25] = {
+static	struct	wordtab ipv4optwords[] = {
 	{ "addext",			IPFY_IPOPT_ADDEXT },
 	{ "cipso",			IPFY_IPOPT_CIPSO },
 	{ "dps",			IPFY_IPOPT_DPS },
@@ -1891,7 +1883,7 @@ static	struct	wordtab ipv4optwords[25] = {
 	{ NULL,				0 },
 };
 
-static	struct	wordtab ipv4secwords[9] = {
+static	struct	wordtab ipv4secwords[] = {
 	{ "confid",			IPFY_SEC_CONF },
 	{ "reserv-1",			IPFY_SEC_RSV1 },
 	{ "reserv-2",			IPFY_SEC_RSV2 },
@@ -1903,7 +1895,7 @@ static	struct	wordtab ipv4secwords[9] = {
 	{ NULL,				0 },
 };
 
-static	struct	wordtab ipv6optwords[9] = {
+static	struct	wordtab ipv6optwords[] = {
 	{ "dstopts",			IPFY_IPV6OPT_DSTOPTS },
 	{ "esp",			IPFY_IPV6OPT_ESP },
 	{ "frag",			IPFY_IPV6OPT_FRAG },
@@ -1915,7 +1907,7 @@ static	struct	wordtab ipv6optwords[9] = {
 	{ NULL,				0 },
 };
 
-static	struct	wordtab logwords[33] = {
+static	struct	wordtab logwords[] = {
 	{ "kern",			IPFY_FAC_KERN },
 	{ "user",			IPFY_FAC_USER },
 	{ "mail",			IPFY_FAC_MAIL },
