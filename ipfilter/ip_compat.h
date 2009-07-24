@@ -753,9 +753,11 @@ typedef struct mbuf mb_t;
 #  define	MSGDSIZE(x)	mbufchainlen(x)
 #  define	M_LEN(x)	(x)->m_len
 #  define	M_COPY(x)	m_copy((x), 0, M_COPYALL)
+#  define	M_DUP(x)	m_copy((x), 0, M_COPYALL)
 #  define	GETKTIME(x)	microtime((struct timeval *)x)
 #  define	IFNAME(x)	((struct ifnet *)x)->if_name
 #  define	IPF_PANIC(x,y)	if (x) { printf y; panic("ipf_panic"); }
+#  define	selinfo		sel_queue
 typedef struct mbuf mb_t;
 # endif /* _KERNEL */
 
