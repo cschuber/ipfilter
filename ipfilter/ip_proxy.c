@@ -86,6 +86,7 @@ struct file;
 
 /* END OF INCLUDES */
 
+#include "netinet/ip_dns_pxy.c"
 #include "netinet/ip_ftp_pxy.c"
 #include "netinet/ip_tftp_pxy.c"
 #include "netinet/ip_rcmd_pxy.c"
@@ -198,9 +199,12 @@ static	aproxy_t	ips_proxies[] = {
 #endif
 #ifdef	IPF_DNS_PROXY
 	{ NULL, NULL, "dns", (char)IPPROTO_UDP, 0, 0, 0,
-	  ipf_p_dns_init, ipf_p_dns_fini, ipf_p_dns_new, ipf_p_ipsec_del,
+	  NULL, NULL,
+	  ipf_p_dns_soft_create, ipf_p_dns_soft_destroy,
+	  NULL, NULL,
+	  ipf_p_dns_new, ipf_p_ipsec_del,
 	  ipf_p_dns_inout, ipf_p_dns_inout, ipf_p_dns_match,
-	  NULL, NULL, NULL, NULL },
+	  ipf_p_dns_ctl, NULL, NULL, NULL },
 #endif
 #ifdef	IPF_PPTP_PROXY
 	{ NULL, NULL, "pptp", (char)IPPROTO_TCP, 0, 0, 0,
@@ -581,7 +585,7 @@ ipf_proxy_ctl(softc, arg, ctl)
 		softc->ipf_interror = 80002;
 		error = ENXIO;
 	} else {
-		error = (*a->apr_ctl)(a->apr_soft, a, ctl);
+		error = (*a->apr_ctl)(softc, a->apr_soft, ctl);
 		if ((error != 0) && (softp->ips_proxy_debug > 1))
 			printf("ipf_proxy_ctl: %s/%d ctl error %d\n",
 				a->apr_label, a->apr_p, error);

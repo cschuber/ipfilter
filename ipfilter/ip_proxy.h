@@ -109,12 +109,15 @@ typedef	struct	aproxy	{
 	void	(* apr_destroy) __P((ipf_main_softc_t *, void *));
 	int	(* apr_init) __P((ipf_main_softc_t *, void *));
 	void	(* apr_fini) __P((ipf_main_softc_t *, void *));
-	int	(* apr_new) __P((void *, fr_info_t *, ap_session_t *, struct nat *));
+	int	(* apr_new) __P((void *, fr_info_t *, ap_session_t *,
+				 struct nat *));
 	void	(* apr_del) __P((ipf_main_softc_t *, ap_session_t *));
-	int	(* apr_inpkt) __P((void *, fr_info_t *, ap_session_t *, struct nat *));
-	int	(* apr_outpkt) __P((void *, fr_info_t *, ap_session_t *, struct nat *));
+	int	(* apr_inpkt) __P((void *, fr_info_t *, ap_session_t *,
+				   struct nat *));
+	int	(* apr_outpkt) __P((void *, fr_info_t *, ap_session_t *,
+				    struct nat *));
 	int	(* apr_match) __P((fr_info_t *, ap_session_t *, struct nat *));
-	int	(* apr_ctl) __P((void *, struct aproxy *, struct ap_control *));
+	int	(* apr_ctl) __P((ipf_main_softc_t *, void *, ap_ctl_t *));
 	int	(* apr_clear) __P((struct aproxy *));
 	int	(* apr_flush) __P((struct aproxy *, int));
 	void	*apr_soft;
@@ -209,7 +212,7 @@ typedef	struct rcmdinfo	{
 typedef struct dnsinfo {
         ipfmutex_t	dnsi_lock;
 	u_short		dnsi_id;
-	u_char		dnsi_buffer[512];
+	char		dnsi_buffer[512];
 } dnsinfo_t;
 
 
