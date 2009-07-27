@@ -118,7 +118,7 @@ static	int	addname __P((ipnat_t **, char *));
 %token	IPNY_TCP IPNY_UDP IPNY_TCPUDP IPNY_STICKY IPNY_MSSCLAMP IPNY_TAG
 %token	IPNY_TLATE IPNY_POOL IPNY_HASH IPNY_NO IPNY_REWRITE IPNY_PROTO
 %token	IPNY_ON IPNY_SRC IPNY_DST IPNY_IN IPNY_OUT IPNY_DIVERT IPNY_ENCAP
-%token	IPNY_RANDOM IPNY_HASHMD5 IPNY_CONFIG IPNY_ALLOW IPNY_DENY IPNY_DNS
+%token	IPNY_CONFIG IPNY_ALLOW IPNY_DENY IPNY_DNS
 %token	IPNY_SEQUENTIAL IPNY_DSTLIST
 %type	<port> portspec
 %type	<num> hexnumber compare range proto
@@ -1222,7 +1222,6 @@ static	wordtab_t	yywords[] = {
 	{ "frag",	IPNY_FRAG },
 	{ "from",	IPNY_FROM },
 	{ "hash",	IPNY_HASH },
-	{ "hash-md5",	IPNY_HASHMD5 },
 	{ "icmpidmap",	IPNY_ICMPIDMAP },
 	{ "in",		IPNY_IN },
 	{ "mask",	IPNY_MASK },
@@ -1239,7 +1238,6 @@ static	wordtab_t	yywords[] = {
 	{ "ports",	IPNY_PORTS },
 	{ "proto",	IPNY_PROTO },
 	{ "proxy",	IPNY_PROXY },
-	{ "random",	IPNY_RANDOM },
 	{ "range",	IPNY_RANGE },
 	{ "rewrite",	IPNY_REWRITE },
 	{ "rdr",	IPNY_RDR },
