@@ -1218,8 +1218,8 @@ struct ip6_ext {
 #  define	KRWLOCK_T		rwlock_t
 #  define	KMUTEX_T		spinlock_t
 #  define	MUTEX_INIT(x,y)		spin_lock_init(&(x)->ipf_lk)
-#  define	MUTEX_ENTER(x)		spin_lock(&(x)->ipf_lk)
-#  define	MUTEX_EXIT(x)		spin_unlock(&(x)->ipf_lk)
+#  define	MUTEX_ENTER(x)		spin_lock_bh(&(x)->ipf_lk)
+#  define	MUTEX_EXIT(x)		spin_unlock_bh(&(x)->ipf_lk)
 #  define	MUTEX_DESTROY(x)	do { } while (0)
 #  define	MUTEX_NUKE(x)		bzero(&(x)->ipf_lk, sizeof((x)->ipf_lk))
 #  define	READ_ENTER(x)		ipf_read_enter(x)
