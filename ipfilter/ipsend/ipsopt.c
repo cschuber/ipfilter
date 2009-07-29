@@ -26,15 +26,6 @@ static const char rcsid[] = "@(#)$Id$";
 #include "ipsend.h"
 
 
-#ifndef	__P
-# ifdef	__STDC__
-#  define	__P(x)	x
-# else
-#  define	__P(x)	()
-# endif
-#endif
-
-
 struct ipopt_names ionames[] = {
 	{ IPOPT_EOL,	0x01,	1, "eol" },
 	{ IPOPT_NOP,	0x02,	1, "nop" },

@@ -40,13 +40,6 @@
 #include "netinet/ip_compat.h"
 #include "netinet/ip_fil.h"
 
-#ifndef __P
-# ifdef __STDC__
-#  define	__P(x)	x
-# else
-#  define	__P(x)	()
-# endif
-#endif
 #ifndef __STDC__
 # undef		const
 # define	const
@@ -59,11 +52,11 @@
 #include <sys/device.h>
 #include <sys/sysconfig.h>
 
-void loadipf __P((int major, int minor, dev_t devno, char *));
-void unloadipf __P((int major, int minor, dev_t devno));
-void queryipf __P((int major, int minor, dev_t devno));
-int checkarg __P((int, char *arg));
-void usage __P((char *));
+void loadipf(int major, int minor, dev_t devno, char *);
+void unloadipf(int major, int minor, dev_t devno);
+void queryipf(int major, int minor, dev_t devno);
+int checkarg(int, char *arg);
+void usage(char *);
 
 static	char	*ipf_devfiles[] = { IPL_NAME, IPNAT_NAME, IPSTATE_NAME,
 				    IPAUTH_NAME, IPSYNC_NAME, IPSCAN_NAME,

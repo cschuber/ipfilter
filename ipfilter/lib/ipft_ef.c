@@ -30,9 +30,9 @@ static const char sccsid[] = "@(#)ipft_ef.c	1.6 2/4/96 (C)1995 Darren Reed";
 static const char rcsid[] = "@(#)$Id$";
 #endif
 
-static	int	etherf_open __P((char *));
-static	int	etherf_close __P((void));
-static	int	etherf_readip __P((mb_t *, char **, int *));
+static	int	etherf_open(char *);
+static	int	etherf_close(void);
+static	int	etherf_readip(mb_t *, char **, int *);
 
 struct	ipread	etherf = { etherf_open, etherf_close, etherf_readip, 0 };
 

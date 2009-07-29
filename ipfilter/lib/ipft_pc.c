@@ -69,11 +69,11 @@ static	struct	llc	llcs[] = {
 	{ -1, -1, -1, -1 }
 };
 
-static	int	pcap_open __P((char *));
-static	int	pcap_close __P((void));
-static	int	pcap_readip __P((mb_t *, char **, int *));
-static	void	swap_hdr __P((pcaphdr_t *));
-static	int	pcap_read_rec __P((struct pcap_pkthdr *));
+static	int	pcap_open(char *);
+static	int	pcap_close(void);
+static	int	pcap_readip(mb_t *, char **, int *);
+static	void	swap_hdr(pcaphdr_t *);
+static	int	pcap_read_rec(struct pcap_pkthdr *);
 
 static	int	pfd = -1, swapped = 0;
 static	struct llc	*llcp = NULL;

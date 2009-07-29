@@ -40,12 +40,12 @@ static	struct	llc	llcs[SDL_MAX+1] = {
 	{ 0, 0, 0 },	/* SDL_OTHER */
 };
 
-static	int	snoop_open __P((char *));
-static	int	snoop_close __P((void));
-static	int	snoop_readip __P((mb_t *, char **, int *));
+static	int	snoop_open(char *);
+static	int	snoop_close(void);
+static	int	snoop_readip(mb_t *, char **, int *);
 
 static	int	sfd = -1, s_type = -1;
-static	int	snoop_read_rec __P((struct snooppkt *));
+static	int	snoop_read_rec(struct snooppkt *);
 
 struct	ipread	snoop = { snoop_open, snoop_close, snoop_readip, 0 };
 

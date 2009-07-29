@@ -63,15 +63,8 @@ static const char rcsid[] = "@(#)$Id$";
 #include <arpa/inet.h>
 #include <ctype.h>
 
-#ifndef	__P
-# ifdef	__STDC__
-#  define	__P(x)	x
-# else
-#  define	__P(x)	()
-# endif
-#endif
 #ifndef linux
-int inet_aton __P((const char *, struct in_addr *));
+int inet_aton(const char *, struct in_addr *);
 
 /*
  * Because the ctype(3) posix definition, if used "safely" in code everywhere,

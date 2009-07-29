@@ -1,8 +1,8 @@
 #include "ipf.h"
 
-static void printport __P((int *));
-static void printhosts __P((int *));
-static void printsingle __P((int *));
+static void printport(int *);
+static void printhosts(int *);
+static void printsingle(int *);
 
 
 void

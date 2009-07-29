@@ -59,7 +59,7 @@ ipfmutex_t	ipf_nat_new, ipf_natio, ipf_timeoutlock;
 ipfrwlock_t	ipf_frag, ipf_state, ipf_nat, ipf_natfrag, ipf_auth;
 ipfrwlock_t	ipf_global, ipf_mutex, ipf_ipidfrag, ipf_frcache, ipf_tokens;
 
-int     (*ipf_checkp) __P((struct ip *, int, void *, int, mb_t **));
+int     (*ipf_checkp)(struct ip *, int, void *, int, mb_t **);
 
 #ifdef IPFILTER_LKM
 static int *ipff_addr = 0;

@@ -66,13 +66,13 @@
 #include "netinet/ip_rules.h"
 
 
-int	xxxinit __P((struct lkm_table *, int, int));
+int	xxxinit(struct lkm_table *, int, int);
 
 #if !defined(__FreeBSD_version) || (__FreeBSD_version < 220000)
 MOD_DEV(IPL_VERSION, LM_DT_CHAR, -1, &ipldevsw);
 #endif
 
-static int ipfrule_ioctl __P((struct lkm_table *, int));
+static int ipfrule_ioctl(struct lkm_table *, int);
 
 #if defined(__FreeBSD_version) && (__FreeBSD_version < 220000)
 
@@ -101,7 +101,7 @@ static struct lkm_misc _module = {
 #  endif
 
 
-int ipfrule __P((struct lkm_table *, int, int));
+int ipfrule(struct lkm_table *, int, int);
 
 
 int ipfrule(lkmtp, cmd, ver)

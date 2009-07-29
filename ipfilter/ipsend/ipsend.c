@@ -32,7 +32,7 @@ static const char rcsid[] = "@(#)$Id$";
 
 extern	char	*optarg;
 extern	int	optind;
-extern	void	iplang __P((FILE *));
+extern	void	iplang(FILE *);
 
 char	options[68];
 int	opts;
@@ -59,10 +59,10 @@ char	default_device[] = "le0";
 #endif /* linux */
 
 
-static	void	usage __P((char *));
-static	void	do_icmp __P((ip_t *, char *));
+static	void	usage(char *);
+static	void	do_icmp(ip_t *, char *);
 void udpcksum(ip_t *, struct udphdr *, int);
-int	main __P((int, char **));
+int	main(int, char **);
 
 
 static	void	usage(prog)

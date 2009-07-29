@@ -400,18 +400,18 @@ short cfroots[] = {
 };
 
 /* pseudo-devices */
-extern void loopattach __P((int));
-extern void ptyattach __P((int));
-extern void slattach __P((int));
-extern void apppattach __P((int));
-extern void pifattach __P((int));
-extern void bpfilterattach __P((int));
-extern void rdattach __P((int));
-extern void tunattach __P((int));
-extern void apmattach __P((int));
-extern void ssattach __P((int));
-extern void csattach __P((int));
-extern void vndattach __P((int));
+extern void loopattach(int);
+extern void ptyattach(int);
+extern void slattach(int);
+extern void apppattach(int);
+extern void pifattach(int);
+extern void bpfilterattach(int);
+extern void rdattach(int);
+extern void tunattach(int);
+extern void apmattach(int);
+extern void ssattach(int);
+extern void csattach(int);
+extern void vndattach(int);
 
 struct pdevinit pdevinit[] = {
 	{ loopattach, 1 },

@@ -56,7 +56,7 @@ static const char rcsid[] = "@(#)$Id$";
 #endif
 #include "netinet/ip_pool.h"
 #include <sys/kernel.h>
-extern	int	ip_optcopy __P((struct ip *, struct ip *));
+extern	int	ip_optcopy(struct ip *, struct ip *);
 
 #ifdef IPFILTER_M_IPFILTER
 MALLOC_DEFINE(M_IPFILTER, "IP Filter", "IP Filter packet filter data structures");
@@ -70,11 +70,11 @@ extern int ip6_getpmtu(struct route_in6 *, struct route_in6 *,
 		       struct ifnet *, struct in6_addr *, u_long *);
 #endif
 
-static	int	(*ipf_savep) __P((ip_t *, int, void *, int, struct mbuf **));
-static	int	ipf_send_ip __P((fr_info_t *, mb_t *, mb_t **));
+static	int	(*ipf_savep)(ip_t *, int, void *, int, struct mbuf **);
+static	int	ipf_send_ip(fr_info_t *, mb_t *, mb_t **);
 #ifdef	USE_INET6
-static int ipf_fastroute6 __P((struct mbuf *, struct mbuf **,
-			       fr_info_t *, frdest_t *));
+static int ipf_fastroute6(struct mbuf *, struct mbuf **,
+			  fr_info_t *, frdest_t *);
 #endif
 
 #include <sys/timeout.h>
@@ -84,7 +84,7 @@ struct timeout ipf_slowtimer_ch;
 /*
  * We provide the ipf_checkp name just to minimize changes later.
  */
-int (*ipf_checkp) __P((ip_t *ip, int hlen, void *ifp, int out, mb_t **mp));
+int (*ipf_checkp)(ip_t *ip, int hlen, void *ifp, int out, mb_t **mp);
 
 
 #if	defined(IPFILTER_LKM)
@@ -542,7 +542,7 @@ ipf_send_icmp_err(type, fin, dst)
 
 
 #if !defined(IPFILTER_LKM)
-void iplinit __P((void));
+void iplinit(void);
 
 void
 iplinit()

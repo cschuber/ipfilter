@@ -157,12 +157,11 @@ typedef	struct ipf_auth_softc_s {
 } ipf_auth_softc_t;
 
 
-static void ipf_auth_deref __P((frauthent_t **));
-static int ipf_auth_geniter __P((ipf_main_softc_t *, ipftoken_t *,
-				 ipfgeniter_t *));
-static int ipf_auth_reply __P((ipf_main_softc_t *, ipf_auth_softc_t *, char *));
-static int ipf_auth_wait __P((ipf_main_softc_t *, ipf_auth_softc_t *, char *));
-static int ipf_auth_flush __P((void *));
+static void ipf_auth_deref(frauthent_t **);
+static int ipf_auth_geniter(ipf_main_softc_t *, ipftoken_t *, ipfgeniter_t *);
+static int ipf_auth_reply(ipf_main_softc_t *, ipf_auth_softc_t *, char *);
+static int ipf_auth_wait(ipf_main_softc_t *, ipf_auth_softc_t *, char *);
+static int ipf_auth_flush(void *);
 
 
 /* ------------------------------------------------------------------------ */

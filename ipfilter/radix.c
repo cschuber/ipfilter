@@ -40,13 +40,6 @@
     !defined(__hpux) && !defined(__sgi)
 #include <sys/cdefs.h>
 #endif
-#ifndef __P
-# ifdef __STDC__
-#  define       __P(x)  x
-# else
-#  define       __P(x)  ()
-# endif
-#endif
 #ifdef __osf__
 # define CONST
 # define _IPV6_SWTAB_H
@@ -59,7 +52,7 @@
 #ifdef	_KERNEL
 #include <sys/systm.h>
 #else
-void panic __P((char *str));
+void panic(char *str);
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdarg.h>
@@ -110,14 +103,14 @@ static u_char normal_chars[] = {0, 0x80, 0xc0, 0xe0, 0xf0, 0xf8, 0xfc, 0xfe, 0xf
 
 #define Bcmp(a, b, l) (l == 0 ? 0 : bcmp((void *)(a), (void *)(b), (u_long)l))
 
-static int ipf_rn_satisfies_leaf __P((radix_softc_t *, u_char *, struct ipf_radix_node *, int));
-static int ipf_rn_lexobetter __P((void *, void *));
-static struct ipf_radix_mask *ipf_rn_new_ipf_radix_mask __P((radix_softc_t *, struct ipf_radix_node *,
-    struct ipf_radix_mask *));
-static int ipf_rn_freenode __P((void *, struct ipf_radix_node *, void *));
+static int ipf_rn_satisfies_leaf(radix_softc_t *, u_char *, struct ipf_radix_node *, int);
+static int ipf_rn_lexobetter(void *, void *);
+static struct ipf_radix_mask *ipf_rn_new_ipf_radix_mask(radix_softc_t *,
+    struct ipf_radix_node *, struct ipf_radix_mask *);
+static int ipf_rn_freenode(void *, struct ipf_radix_node *, void *);
 #if defined(AIX) && !defined(_KERNEL)
-struct ipf_radix_node *ipf_rn_match __P((void *, struct ipf_radix_node_head *));
-struct ipf_radix_node *ipf_rn_addmask __P((radix_softc_t *, void *, int, int));
+struct ipf_radix_node *ipf_rn_match(void *, struct ipf_radix_node_head *);
+struct ipf_radix_node *ipf_rn_addmask(radix_softc_t *, void *, int, int);
 #define	Bcopy(x, y, z)	bcopy(x, y, z)
 #endif
 
@@ -964,7 +957,7 @@ out:
 int
 ipf_rn_walktree(soft, h, f, w)
 	struct ipf_radix_node_head *h;
-	int (*f) __P((void *, struct ipf_radix_node *, void *));
+	int (*f)(void *, struct ipf_radix_node *, void *);
 	void *soft, *w;
 {
 	radix_softc_t *softr = soft;

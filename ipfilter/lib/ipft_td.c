@@ -38,10 +38,10 @@ static const char sccsid[] = "@(#)ipft_td.c	1.8 2/4/96 (C)1995 Darren Reed";
 static const char rcsid[] = "@(#)$Id$";
 #endif
 
-static	int	tcpd_open __P((char *));
-static	int	tcpd_close __P((void));
-static	int	tcpd_readip __P((mb_t *, char **, int *));
-static	int	count_dots __P((char *));
+static	int	tcpd_open(char *);
+static	int	tcpd_close(void);
+static	int	tcpd_readip(mb_t *, char **, int *);
+static	int	count_dots(char *);
 
 struct	ipread	tcpd = { tcpd_open, tcpd_close, tcpd_readip, 0 };
 

@@ -64,7 +64,7 @@ static const char rcsid[] = "@(#)$Id$";
 #undef radix_node_head
 #include "md5.h"
 #include <sys/kernel.h>
-extern	int	ip_optcopy __P((struct ip *, struct ip *));
+extern	int	ip_optcopy(struct ip *, struct ip *);
 extern	int	udp_ttl;
 extern	int	ipdefttl;
 extern	int	ipforwarding;
@@ -73,7 +73,7 @@ extern	ipf_main_softc_t	ipfmain;
 
 /* #undef	IPFDEBUG	*/
 
-static	int	ipf_send_ip __P((fr_info_t *, mb_t *, mb_t **));
+static	int	ipf_send_ip(fr_info_t *, mb_t *, mb_t **);
 
 ipfmutex_t	ipf_rw, ipl_mutex, ipf_auth_mx, ipf_timeoutlock;
 ipfmutex_t	ipf_nat_new, ipf_natio, ipf_stinsert;
@@ -560,7 +560,7 @@ ipf_send_icmp_err(type, fin, dst)
 }
 
 
-void iplinit __P((void));
+void iplinit(void);
 
 void iplinit()
 {
@@ -1003,7 +1003,7 @@ ipf_newisn(fin)
 /* expectation of this being called twice per second.                       */
 /* ------------------------------------------------------------------------ */
 void
-ipf_timer_func __P((void *ptr))
+ipf_timer_func(void *ptr)
 {
 	ipf_main_softc_t *softc = ptr;
 

@@ -56,8 +56,8 @@ char	default_device[] = "lan0";
 # endif
 #endif
 
-static	void	usage __P((char *));
-int	main __P((int, char **));
+static	void	usage(char *);
+int	main(int, char **);
 
 
 static void usage(prog)

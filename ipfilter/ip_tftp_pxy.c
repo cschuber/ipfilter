@@ -8,14 +8,14 @@
 
 #define IPF_TFTP_PROXY
 
-void ipf_p_tftp_main_load __P((void));
-void ipf_p_tftp_main_unload __P((void));
-int ipf_p_tftp_new __P((void *, fr_info_t *, ap_session_t *, nat_t *));
-int ipf_p_tftp_out __P((void *, fr_info_t *, ap_session_t *, nat_t *));
-int ipf_p_tftp_in __P((void *, fr_info_t *, ap_session_t *, nat_t *));
-int ipf_p_tftp_client __P((fr_info_t *, ap_session_t *, nat_t *));
-int ipf_p_tftp_server __P((fr_info_t *, ap_session_t *, nat_t *));
-int ipf_p_tftp_backchannel __P((fr_info_t *, ap_session_t *, nat_t *));
+void ipf_p_tftp_main_load(void);
+void ipf_p_tftp_main_unload(void);
+int ipf_p_tftp_new(void *, fr_info_t *, ap_session_t *, nat_t *);
+int ipf_p_tftp_out(void *, fr_info_t *, ap_session_t *, nat_t *);
+int ipf_p_tftp_in(void *, fr_info_t *, ap_session_t *, nat_t *);
+int ipf_p_tftp_client(fr_info_t *, ap_session_t *, nat_t *);
+int ipf_p_tftp_server(fr_info_t *, ap_session_t *, nat_t *);
+int ipf_p_tftp_backchannel(fr_info_t *, ap_session_t *, nat_t *);
 
 static	frentry_t	tftpfr;
 

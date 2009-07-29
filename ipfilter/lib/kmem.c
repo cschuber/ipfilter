@@ -64,8 +64,8 @@ typedef	int *	kvm_t;
 static	kvm_t	kvm_f = NULL;
 static	char	*kvm_errstr = NULL;
 
-kvm_t kvm_open __P((char *, char *, char *, int, char *));
-int kvm_read __P((kvm_t, u_long, char *, size_t));
+kvm_t kvm_open(char *, char *, char *, int, char *);
+int kvm_read(kvm_t, u_long, char *, size_t);
 
 kvm_t kvm_open(kernel, core, swap, mode, errstr)
 	char *kernel, *core, *swap;
