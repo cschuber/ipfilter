@@ -1314,8 +1314,14 @@ extern	mb_t	*m_pullup __P((mb_t *, int));
 #  define	bcopy(s,d,z)	memmove(d, s, z)
 #  define	bzero(s,z)	memset(s, 0, z)
 #  define	bcmp(a,b,z)	memcmp(a, b, z)
-#  define	ipf_random	random32
-#  define	arc4random	random32
+#  if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,23)
+#   define	ipf_random	random32
+#   define	arc4random	random32
+#  else
+#   include <linux/random.h>
+#   define	ipf_random	get_random_int
+#   define	arc4random	get_random_int
+#  endif
 
 #  define	ifnet		net_device
 #  define	if_xname	name
