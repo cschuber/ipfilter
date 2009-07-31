@@ -159,7 +159,7 @@ int ipfattach()
 	SPL_X(s);
 	/* timeout(fr_slowtimer, NULL, (hz / IPF_HZ_DIVIDE) * IPF_HZ_MULT); */
 	init_timer(&ipf_timer);
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,23)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,18)
 	ipf_timer.function = (void (*)(unsigned long))fr_slowtimer;
 	ipf_timer.data = 0;
 #else
@@ -730,7 +730,7 @@ struct in_addr *inp, *inpmask;
 		return -1;
 
 	dev = ifptr;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,23)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,18)
 	ifp = __in_dev_get_rtnl(dev);
 #else
 	ifp = __in_dev_get(dev);
