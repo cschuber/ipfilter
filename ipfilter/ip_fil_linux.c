@@ -660,7 +660,7 @@ ipf_ifpaddr(ipf_main_softc_t *softc, int v, int atype, void *ifptr,
 		return -1;
 
 	dev = ifptr;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,23)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,18)
 	ifp = __in_dev_get_rtnl(dev);
 #else
 	ifp = __in_dev_get(dev);
@@ -740,7 +740,7 @@ int ipfattach(ipf_main_softc_t *softc)
 	SPL_X(s);
 
 	init_timer(&softc->ipf_timer);
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,23)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,18)
 	softc->ipf_timer.function = ipf_timer_func;
 	softc->ipf_timer.data = (unsigned long)softc;
 #else
