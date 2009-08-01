@@ -27,9 +27,11 @@ ipfrwlock_t	ipf_mutex, ipf_global, ipf_ipidfrag, ipf_frcache, ipf_tokens;
 ipfrwlock_t	ipf_frag, ipf_state, ipf_nat, ipf_natfrag, ipf_auth;
 struct timer_list	ipf_timer;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,23)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,18)
 extern int ip_finish_output(struct sk_buff *);
+#endif
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,23)
 static u_int ipf_linux_inout __P((u_int, struct sk_buff *, const struct net_device *, const struct net_device *, int (*okfn)(struct sk_buff *)));
 #else
 static u_int ipf_linux_inout __P((u_int, struct sk_buff **, const struct net_device *, const struct net_device *, int (*okfn)(struct sk_buff *)));
