@@ -119,7 +119,7 @@ ip_rules.c: $(TOP)/rules/ip_rules $(TOP)/tools/ipfcomp.o $(OBJ)/ipf
 
 md5.c $(obj)//md5.c: $(TOP)/md5.c Makefile
 	/bin/rm -f md5.c
-	cp $< $@
+	cp $< $(obj)//md5.c
 
 $(TOP)/ip_rules.h: ip_rules.c
 	if [ ! -f $(TOP)/ip_rules.h ] ; then \
