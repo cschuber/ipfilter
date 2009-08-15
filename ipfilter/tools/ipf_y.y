@@ -885,7 +885,7 @@ addr:	pool '/' YY_NUMBER		{ pooled = 1;
 					  $$.a.iplookuptype = IPLT_HASH;
 					  $$.a.iplookupsubtype = 0;
 					  $$.a.iplookupnum = $3; }
-	| hash '/' YY_STR		{ pooled = 1;
+	| hash '/' YY_STR		{ hashed = 1;
 					  $$.a.iplookuptype = IPLT_HASH;
 					  $$.a.iplookupsubtype = 1;
 					  strncpy($$.a.iplookupname, $3,
