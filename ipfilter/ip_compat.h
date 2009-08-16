@@ -698,16 +698,16 @@ typedef struct mbuf mb_t;
 #  define	ATOMIC_DEC64(x)		atomic_decq((uint64_t*)&(x))
 #  define	ATOMIC_INC32(x)		atomic_incl((uint32_t*)&(x))
 #  define	ATOMIC_DEC32(x)		atomic_decl((uint32_t*)&(x))
-#  define	ATOMIC_INC16(x)		{ simple_lock(&ipf_rw); (x)++; \
-					  simple_unlock(&ipf_rw); }
-#  define	ATOMIC_DEC16(x)		{ simple_lock(&ipf_rw); (x)--; \
-					  simple_unlock(&ipf_rw); }
+#  define	ATOMIC_INC16(x)		{ simple_lock(&ipf_rw.ipf_lk); (x)++; \
+					  simple_unlock(&ipf_rw.ipf_lk); }
+#  define	ATOMIC_DEC16(x)		{ simple_lock(&ipf_rw.ipf_lk); (x)--; \
+					  simple_unlock(&ipf_rw.ipf_lk); }
 #  define	ATOMIC_INCL(x)		atomic_incl((uint32_t*)&(x))
 #  define	ATOMIC_DECL(x)		atomic_decl((uint32_t*)&(x))
-#  define	ATOMIC_INC(x)		{ simple_lock(&ipf_rw); (x)++; \
-					  simple_unlock(&ipf_rw); }
-#  define	ATOMIC_DEC(x)		{ simple_lock(&ipf_rw); (x)--; \
-					  simple_unlock(&ipf_rw); }
+#  define	ATOMIC_INC(x)		{ simple_lock(&ipf_rw.ipf_lk); (x)++; \
+					  simple_unlock(&ipf_rw.ipf_lk); }
+#  define	ATOMIC_DEC(x)		{ simple_lock(&ipf_rw.ipf_lk); (x)--; \
+					  simple_unlock(&ipf_rw.ipf_lk); }
 #  define	SPL_SCHED(x)		;
 #  define	SPL_NET(x)		;
 #  define	SPL_IMP(x)		;

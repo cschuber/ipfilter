@@ -72,7 +72,7 @@ void	ipfilter_clock(void *arg);
 int	ipfilteropen(dev_t, int, int);
 int	ipfilterread(dev_t, struct uio *, int);
 int	ipfilterclose(dev_t, int, int);
-int	ipfilterwrite(dev_t, int, int);
+int	ipfilterwrite(dev_t, struct uio *);
 int	ipfilterioctl(dev_t, u_int, caddr_t, int);
 
 extern	int	nodev(), nulldev();
