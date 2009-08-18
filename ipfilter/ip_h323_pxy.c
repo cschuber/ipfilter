@@ -258,6 +258,8 @@ nat_t *nat;
 			udp.uh_sport = port;
 
 			bcopy((caddr_t)fin, (caddr_t)&fi, sizeof(fi));
+			fi.fin_state = NULL;
+			fi.fin_nat = NULL;
 			fi.fin_fi.fi_p = IPPROTO_UDP;
 			fi.fin_data[0] = port;
 			fi.fin_data[1] = 0;
