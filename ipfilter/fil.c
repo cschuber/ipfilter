@@ -5422,6 +5422,7 @@ void *data, *ctx;
 /*
  * This array defines the expected size of objects coming into the kernel
  * for the various recognised object types.
+ * 1 = minimum size, not absolute size
  */
 static	int	fr_objbytes[IPFOBJ_COUNT][2] = {
 	{ 1,	sizeof(struct frentry) },		/* frentry */
@@ -5465,6 +5466,7 @@ int type;
 {
 	ipfobj_t obj;
 	int error = 0;
+	int size;
 
 	if ((type < 0) || (type >= IPFOBJ_COUNT))
 		return EINVAL;
@@ -5476,31 +5478,27 @@ int type;
 	if (obj.ipfo_type != type)
 		return EINVAL;
 
-#ifndef	IPFILTER_COMPAT
-	if ((fr_objbytes[type][0] & 1) != 0) {
-		if (obj.ipfo_size < fr_objbytes[type][1])
+	if (obj.ipfo_rev == IPFILTER_VERSION) {
+		if ((fr_objbytes[type][0] & 1) != 0) {
+			if (obj.ipfo_size < fr_objbytes[type][1])
+				return EINVAL;
+			size =  fr_objbytes[type][1];
+		} else if (obj.ipfo_size == fr_objbytes[type][1]) {
+			size =  obj.ipfo_size;
+		} else {
 			return EINVAL;
-	} else if (obj.ipfo_size != fr_objbytes[type][1]) {
+		}
+		error = COPYIN(obj.ipfo_ptr, ptr, size);
+	} else {
+#ifdef	IPFILTER_COMPAT
+		/* XXX compatibility hook here */
+		/* error = hook(&obj, ptr) */
 		return EINVAL;
-	}
 #else
-	if (obj.ipfo_rev != IPFILTER_VERSION)
-		/* XXX compatibility hook here */
-		;
-	if ((fr_objbytes[type][0] & 1) != 0) {
-		if (obj.ipfo_size < fr_objbytes[type][1])
-			/* XXX compatibility hook here */
-			return EINVAL;
-	} else if (obj.ipfo_size != fr_objbytes[type][1])
-		/* XXX compatibility hook here */
 		return EINVAL;
 #endif
-
-	if ((fr_objbytes[type][0] & 1) != 0) {
-		error = COPYIN(obj.ipfo_ptr, ptr, fr_objbytes[type][1]);
-	} else {
-		error = COPYIN(obj.ipfo_ptr, ptr, obj.ipfo_size);
 	}
+
 	if (error != 0)
 		error = EFAULT;
 	return error;
@@ -5531,8 +5529,6 @@ int type, sz;
 
 	if ((type < 0) || (type >= IPFOBJ_COUNT))
 		return EINVAL;
-	if (((fr_objbytes[type][0] & 1) == 0) || (sz < fr_objbytes[type][1]))
-		return EINVAL;
 
 	error = BCOPYIN(data, &obj, sizeof(obj));
 	if (error != 0)
@@ -5541,19 +5537,22 @@ int type, sz;
 	if (obj.ipfo_type != type)
 		return EINVAL;
 
-#ifndef	IPFILTER_COMPAT
-	if (obj.ipfo_size != sz)
-		return EINVAL;
-#else
-	if (obj.ipfo_rev != IPFILTER_VERSION)
-		/* XXX compatibility hook here */
-		;
-	if (obj.ipfo_size != sz)
-		/* XXX compatibility hook here */
-		return EINVAL;
-#endif
+	if (obj.ipfo_rev == IPFILTER_VERSION) {
+		if (((fr_objbytes[type][0] & 1) == 0) ||
+		    (sz < fr_objbytes[type][1]))
+			return EINVAL;
 
-	error = COPYIN(obj.ipfo_ptr, ptr, sz);
+		error = COPYIN(obj.ipfo_ptr, ptr, sz);
+	} else {
+#ifdef	IPFILTER_COMPAT
+		/* XXX compatibility hook here */
+		/* error = hook(&obj, ptr) */
+		error = EINVAL;
+#else
+		error = EINVAL;
+#endif
+	}
+
 	if (error != 0)
 		error = EFAULT;
 	return error;
@@ -5582,9 +5581,7 @@ int type, sz;
 	ipfobj_t obj;
 	int error;
 
-	if ((type < 0) || (type >= IPFOBJ_COUNT) ||
-	    ((fr_objbytes[type][0] & 1) == 0) ||
-	    (sz < fr_objbytes[type][1]))
+	if ((type < 0) || (type >= IPFOBJ_COUNT))
 		return EINVAL;
 
 	error = BCOPYIN(data, &obj, sizeof(obj));
@@ -5594,19 +5591,22 @@ int type, sz;
 	if (obj.ipfo_type != type)
 		return EINVAL;
 
-#ifndef	IPFILTER_COMPAT
-	if (obj.ipfo_size != sz)
+	if (obj.ipfo_rev == IPFILTER_VERSION) {
+		if (((fr_objbytes[type][0] & 1) == 0) ||
+		    (sz < fr_objbytes[type][1]))
+			return EINVAL;
+
+		error = COPYOUT(ptr, obj.ipfo_ptr, sz);
+	} else {
+#ifdef	IPFILTER_COMPAT
+		/* XXX compatibility hook here */
+		/* error = hook(&obj, ptr) */
 		return EINVAL;
 #else
-	if (obj.ipfo_rev != IPFILTER_VERSION)
-		/* XXX compatibility hook here */
-		;
-	if (obj.ipfo_size != sz)
-		/* XXX compatibility hook here */
 		return EINVAL;
+	}
 #endif
 
-	error = COPYOUT(ptr, obj.ipfo_ptr, sz);
 	if (error != 0)
 		error = EFAULT;
 	return error;
@@ -5642,26 +5642,25 @@ int type;
 	if (obj.ipfo_type != type)
 		return EINVAL;
 
-#ifndef	IPFILTER_COMPAT
-	if ((fr_objbytes[type][0] & 1) != 0) {
-		if (obj.ipfo_size < fr_objbytes[type][1])
+	if (obj.ipfo_rev == IPFILTER_VERSION) {
+		if ((fr_objbytes[type][0] & 1) != 0) {
+			if (obj.ipfo_size < fr_objbytes[type][1])
+				return EINVAL;
+		} else if (obj.ipfo_size != fr_objbytes[type][1]) {
 			return EINVAL;
-	} else if (obj.ipfo_size != fr_objbytes[type][1])
+		}
+
+		error = COPYOUT(ptr, obj.ipfo_ptr, obj.ipfo_size);
+	} else {
+#ifdef	IPFILTER_COMPAT
+		/* XXX compatibility hook here */
+		/* error = hook(&obj, ptr, fr_objbytes[type]); */
 		return EINVAL;
 #else
-	if (obj.ipfo_rev != IPFILTER_VERSION)
-		/* XXX compatibility hook here */
-		;
-	if ((fr_objbytes[type][0] & 1) != 0) {
-		if (obj.ipfo_size < fr_objbytes[type][1])
-			/* XXX compatibility hook here */
-			return EINVAL;
-	} else if (obj.ipfo_size != fr_objbytes[type][1])
-		/* XXX compatibility hook here */
 		return EINVAL;
 #endif
+	}
 
-	error = COPYOUT(ptr, obj.ipfo_ptr, obj.ipfo_size);
 	if (error != 0)
 		error = EFAULT;
 	return error;
