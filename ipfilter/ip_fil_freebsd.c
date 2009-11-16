@@ -141,7 +141,9 @@ struct	selinfo	ipfselwait[IPL_LOGSIZE];
 # include <sys/conf.h>
 # if defined(NETBSD_PF)
 #  include <net/pfil.h>
-#  include <netinet/ipprotosw.h>
+#  if (__FreeBSD_version < 800000)
+#   include <netinet/ipprotosw.h>
+#  endif
 /*
  * We provide the fr_checkp name just to minimize changes later.
  */
@@ -323,7 +325,11 @@ int mode;
 	SPL_INT(s);
 
 #if (BSD >= 199306) && defined(_KERNEL)
+# if (__FreeBSD_version >= 500034)
+	if (securelevel_ge(p->p_cred, 3) && (mode & FWRITE))
+# else
 	if ((securelevel >= 3) && (mode & FWRITE))
+# endif
 		return EPERM;
 #endif
 
@@ -1049,7 +1055,12 @@ frdest_t *fdp;
 		if (!ip->ip_sum)
 			ip->ip_sum = in_cksum(m, hlen);
 		error = (*ifp->if_output)(ifp, m, (struct sockaddr *)dst,
-					  ro->ro_rt);
+#if (__FreeBSD_version < 800000)
+			    ro->ro_rt
+#else
+			    ro
+#endif
+			);
 		goto done;
 	}
 	/*
@@ -1130,7 +1141,13 @@ sendorfree:
 		m->m_act = 0;
 		if (error == 0)
 			error = (*ifp->if_output)(ifp, m,
-			    (struct sockaddr *)dst, ro->ro_rt);
+			    (struct sockaddr *)dst,
+#if (__FreeBSD_version < 800000)
+			    ro->ro_rt
+#else
+			    ro
+#endif
+			    );
 		else
 			FREE_MB_T(m);
 	}
