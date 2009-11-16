@@ -3714,7 +3714,7 @@ void *ifp;
 			fr->fr_ifas[i] = fr_resolvenic(fr->fr_ifnames[i], v);
 		}
 
-		if (fr->fr_type == FR_T_IPF) {
+		if ((fr->fr_type & ~FR_T_BUILTIN) == FR_T_IPF) {
 			if (fr->fr_satype != FRI_NORMAL &&
 			    fr->fr_satype != FRI_LOOKUP) {
 				(void)fr_ifpaddr(v, fr->fr_satype,
@@ -3748,15 +3748,15 @@ void *ifp;
 		}
 
 #ifdef	IPFILTER_LOOKUP
-		if (fr->fr_type == FR_T_IPF && fr->fr_satype == FRI_LOOKUP &&
-		    fr->fr_srcptr == NULL) {
+		if (((fr->fr_type & FR_T_BUILTIN) == FR_T_IPF) &&
+		    (fr->fr_satype == FRI_LOOKUP) && (fr->fr_srcptr == NULL)) {
 			fr->fr_srcptr = fr_resolvelookup(fr->fr_srctype,
 							 fr->fr_srcsubtype,
 							 &fr->fr_slookup,
 							 &fr->fr_srcfunc);
 		}
-		if (fr->fr_type == FR_T_IPF && fr->fr_datype == FRI_LOOKUP &&
-		    fr->fr_dstptr == NULL) {
+		if (((fr->fr_type & FR_T_BUILTIN) == FR_T_IPF) &&
+		    (fr->fr_datype == FRI_LOOKUP) && (fr->fr_dstptr == NULL)) {
 			fr->fr_dstptr = fr_resolvelookup(fr->fr_dsttype,
 							 fr->fr_dstsubtype,
 							 &fr->fr_dlookup,
@@ -4151,7 +4151,7 @@ int set, makecopy;
 caddr_t data;
 {
 	frentry_t frd, *fp, *f, **fprev, **ftail;
-	int error = 0, in, v;
+	int error = 0, in, v, need_free = 0;
 	void *ptr, *uptr;
 	u_int *p, *pp;
 	frgroup_t *fg;
@@ -4163,7 +4163,7 @@ caddr_t data;
 		error = fr_inobj(data, fp, IPFOBJ_FRENTRY);
 		if (error)
 			return EFAULT;
-		if ((fp->fr_flags & FR_T_BUILTIN) != 0)
+		if ((fp->fr_type & FR_T_BUILTIN) != 0)
 			return EINVAL;
 		fp->fr_ref = 0;
 		fp->fr_flags |= FR_COPIED;
@@ -4273,7 +4273,6 @@ caddr_t data;
 				error = EFAULT;
 		} else {
 			ptr = uptr;
-			error = 0;
 		}
 		if (error != 0) {
 			KFREES(ptr, fp->fr_dsize);
@@ -4285,24 +4284,20 @@ caddr_t data;
 
 	/*
 	 * Perform per-rule type sanity checks of their members.
+	 * All code after this needs to be aware that allocated memory
+	 * may need to be free'd before exiting. 
 	 */
 	switch (fp->fr_type & ~FR_T_BUILTIN)
 	{
 #if defined(IPFILTER_BPF)
 	case FR_T_BPFOPC :
-		if (fp->fr_dsize == 0)
-			return EINVAL;
-		if (!bpf_validate(ptr, fp->fr_dsize/sizeof(struct bpf_insn))) {
-			if (makecopy && fp->fr_data != NULL) {
-				KFREES(fp->fr_data, fp->fr_dsize);
-			}
-			return EINVAL;
-		}
+		if (!bpf_validate(ptr, fp->fr_dsize/sizeof(struct bpf_insn)))
+			goto exit_INVAL_free;
 		break;
 #endif
 	case FR_T_IPF :
 		if (fp->fr_dsize != sizeof(fripf_t))
-			return EINVAL;
+			goto exit_INVAL_free;
 
 		/*
 		 * Allowing a rule with both "keep state" and "with oow" is
@@ -4310,7 +4305,7 @@ caddr_t data;
 		 * fail with the out of window (oow) flag set.
 		 */
 		if ((fp->fr_flags & FR_KEEPSTATE) && (fp->fr_flx & FI_OOW))
-			return EINVAL;
+			goto exit_INVAL_free;
 
 		switch (fp->fr_satype)
 		{
@@ -4319,12 +4314,8 @@ caddr_t data;
 		case FRI_NETWORK :
 		case FRI_NETMASKED :
 		case FRI_PEERADDR :
-			if (fp->fr_sifpidx < 0 || fp->fr_sifpidx > 3) {
-				if (makecopy && fp->fr_data != NULL) {
-					KFREES(fp->fr_data, fp->fr_dsize);
-				}
-				return EINVAL;
-			}
+			if (fp->fr_sifpidx < 0 || fp->fr_sifpidx > 3)
+				goto exit_INVAL_free;
 			break;
 #ifdef	IPFILTER_LOOKUP
 		case FRI_LOOKUP :
@@ -4332,8 +4323,10 @@ caddr_t data;
 							 fp->fr_srcsubtype,
 							 &fp->fr_slookup,
 							 &fp->fr_srcfunc);
-			if (fp->fr_srcptr == NULL)
-				return ESRCH;
+			if (fp->fr_srcptr == NULL) {
+				error = ESRCH;
+				goto exit_free;
+			}
 			break;
 #endif
 		default :
@@ -4347,12 +4340,8 @@ caddr_t data;
 		case FRI_NETWORK :
 		case FRI_NETMASKED :
 		case FRI_PEERADDR :
-			if (fp->fr_difpidx < 0 || fp->fr_difpidx > 3) {
-				if (makecopy && fp->fr_data != NULL) {
-					KFREES(fp->fr_data, fp->fr_dsize);
-				}
-				return EINVAL;
-			}
+			if (fp->fr_difpidx < 0 || fp->fr_difpidx > 3)
+				goto exit_INVAL_free;
 			break;
 #ifdef	IPFILTER_LOOKUP
 		case FRI_LOOKUP :
@@ -4360,8 +4349,10 @@ caddr_t data;
 							 fp->fr_dstsubtype,
 							 &fp->fr_dlookup,
 							 &fp->fr_dstfunc);
-			if (fp->fr_dstptr == NULL)
-				return ESRCH;
+			if (fp->fr_dstptr == NULL) {
+				error = ESRCH;
+				goto exit_free;
+			}
 			break;
 #endif
 		default :
@@ -4369,16 +4360,19 @@ caddr_t data;
 		}
 		break;
 	case FR_T_NONE :
-		break;
 	case FR_T_CALLFUNC :
-		break;
 	case FR_T_COMPIPF :
 		break;
 	default :
+exit_INVAL_free:
+		error = EINVAL;
+#ifdef IPFILTER_LOOKUP
+exit_free:
+#endif
 		if (makecopy && fp->fr_data != NULL) {
 			KFREES(fp->fr_data, fp->fr_dsize);
 		}
-		return EINVAL;
+		return error;
 	}
 
 	/*
@@ -4468,11 +4462,8 @@ caddr_t data;
 			}
 		}
 
-		if ((ptr != NULL) && (makecopy != 0)) {
-			KFREES(ptr, fp->fr_dsize);
-		}
-		RWLOCK_EXIT(&ipf_mutex);
-		return error;
+		need_free = 1;
+		goto done;
 	}
 
 	if (!f) {
@@ -4493,7 +4484,6 @@ caddr_t data;
 			}
 			f = NULL;
 			ptr = NULL;
-			error = 0;
 		} else if (req == (ioctlcmd_t)SIOCINAFR ||
 			   req == (ioctlcmd_t)SIOCINIFR) {
 			while ((f = *fprev) != NULL) {
@@ -4513,7 +4503,6 @@ caddr_t data;
 			}
 			f = NULL;
 			ptr = NULL;
-			error = 0;
 		}
 	}
 
@@ -4546,6 +4535,7 @@ caddr_t data;
 			    (f->fr_isc != (struct ipscan *)-1))
 				ipsc_detachfr(f);
 #endif
+			need_free = 1;
 			if (unit == IPL_LOGAUTH) {
 				error = fr_preauthcmd(req, f, ftail);
 				goto done;
@@ -4605,8 +4595,18 @@ caddr_t data;
 	}
 done:
 	RWLOCK_EXIT(&ipf_mutex);
-	if ((ptr != NULL) && (error != 0) && (makecopy != 0)) {
-		KFREES(ptr, fp->fr_dsize);
+	if (error != 0 || need_free != 0) {
+		if ((ptr != NULL) && (makecopy != 0)) {
+			KFREES(ptr, fp->fr_dsize);
+		}
+#ifdef IPFILTER_LOOKUP
+		if ((fp->fr_type & ~FR_T_BUILTIN) == FR_T_IPF) {
+			if (fp->fr_satype == FRI_LOOKUP)
+				ip_lookup_deref(fp->fr_srctype, fp->fr_srcptr);
+			if (fp->fr_datype == FRI_LOOKUP)
+				ip_lookup_deref(fp->fr_dsttype, fp->fr_dstptr);
+		}
+#endif
 	}
 	return (error);
 }
@@ -4779,9 +4779,11 @@ frentry_t **frp;
 		MUTEX_DESTROY(&fr->fr_lock);
 
 #ifdef IPFILTER_LOOKUP
-		if (fr->fr_type == FR_T_IPF && fr->fr_satype == FRI_LOOKUP)
+		if ((fr->fr_type & ~FR_T_BUILTIN) == FR_T_IPF &&
+		    fr->fr_satype == FRI_LOOKUP)
 			ip_lookup_deref(fr->fr_srctype, fr->fr_srcptr);
-		if (fr->fr_type == FR_T_IPF && fr->fr_datype == FRI_LOOKUP)
+		if ((fr->fr_type & ~FR_T_BUILTIN) == FR_T_IPF &&
+		    fr->fr_datype == FRI_LOOKUP)
 			ip_lookup_deref(fr->fr_dsttype, fr->fr_dstptr);
 #endif
 
