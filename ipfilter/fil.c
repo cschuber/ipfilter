@@ -6440,7 +6440,8 @@ ipf_inobj(softc, data, ptr, type)
 	int type;
 {
 	ipfobj_t obj;
-	int error = 0;
+	int error;
+	int size;
 
 	if ((type < 0) || (type >= IPFOBJ_COUNT)) {
 		softc->ipf_interror = 49;
@@ -6458,38 +6459,32 @@ ipf_inobj(softc, data, ptr, type)
 		return EINVAL;
 	}
 
-#ifndef	IPFILTER_COMPAT
-	if ((ipf_objbytes[type][0] & 1) != 0) {
-		if (obj.ipfo_size < ipf_objbytes[type][1]) {
-			softc->ipf_interror = 51;
+	if (obj.ipfo_rev == IPFILTER_VERSION) {
+		if ((ipf_objbytes[type][0] & 1) != 0) {
+			if (obj.ipfo_size < ipf_objbytes[type][1]) {
+				softc->ipf_interror = 51;
+				return EINVAL;
+			}
+			size =  ipf_objbytes[type][1];
+		} else if (obj.ipfo_size == ipf_objbytes[type][1]) {
+			size =  ipf_objbytes[type][1];
+		} else {
+			softc->ipf_interror = 52;
 			return EINVAL;
 		}
-	} else if (obj.ipfo_size != ipf_objbytes[type][1]) {
-		softc->ipf_interror = 52;
+		error = COPYIN(obj.ipfo_ptr, ptr, size);
+	} else {
+#ifdef  IPFILTER_COMPAT
+		/* XXX compatibility hook here */
+		/* error = hook(&obj, ptr) */
+		softc->ipf_interror = 53;
 		return EINVAL;
-	}
 #else
-	if (obj.ipfo_rev != IPFILTER_VERSION)
-		/* XXX compatibility hook here */
-		;
-	if ((ipf_objbytes[type][0] & 1) != 0) {
-		if (obj.ipfo_size < ipf_objbytes[type][1]) {
-			/* XXX compatibility hook here */
-			softc->ipf_interror = 53;
-			return EINVAL;
-		}
-	} else if (obj.ipfo_size != ipf_objbytes[type][1]) {
-		/* XXX compatibility hook here */
 		softc->ipf_interror = 54;
 		return EINVAL;
-	}
 #endif
-
-	if ((ipf_objbytes[type][0] & 1) != 0) {
-		error = COPYIN(obj.ipfo_ptr, ptr, ipf_objbytes[type][1]);
-	} else {
-		error = COPYIN(obj.ipfo_ptr, ptr, obj.ipfo_size);
 	}
+
 	if (error != 0) {
 		softc->ipf_interror = 55;
 		error = EFAULT;
@@ -6527,12 +6522,6 @@ ipf_inobjsz(softc, data, ptr, type, sz)
 		return EINVAL;
 	}
 
-	if (((ipf_objbytes[type][0] & 1) == 0) ||
-	    (sz < ipf_objbytes[type][1])) {
-		softc->ipf_interror = 57;
-		return EINVAL;
-	}
-
 	error = BCOPYIN(data, &obj, sizeof(obj));
 	if (error != 0) {
 		softc->ipf_interror = 125;
@@ -6544,27 +6533,30 @@ ipf_inobjsz(softc, data, ptr, type, sz)
 		return EINVAL;
 	}
 
-#ifndef	IPFILTER_COMPAT
-	if (obj.ipfo_size != sz) {
+	if (obj.ipfo_rev == IPFILTER_VERSION) {
+		if (((ipf_objbytes[type][0] & 1) == 0) ||
+		    (sz < ipf_objbytes[type][1])) {
+			softc->ipf_interror = 57;
+			return EINVAL;
+		}
+		error = COPYIN(obj.ipfo_ptr, ptr, sz);
+	} else {
+#ifdef	IPFILTER_COMPAT
+		/* XXX compatibility hook here */
+		/* error = hook(&obj, ptr) */
 		softc->ipf_interror = 59;
 		return EINVAL;
-	}
 #else
-	if (obj.ipfo_rev != IPFILTER_VERSION)
-		/* XXX compatibility hook here */
-		;
-	if (obj.ipfo_size != sz) {
-		/* XXX compatibility hook here */
 		softc->ipf_interror = 60;
 		return EINVAL;
-	}
 #endif
+	}
 
-	error = COPYIN(obj.ipfo_ptr, ptr, sz);
 	if (error != 0) {
 		softc->ipf_interror = 61;
 		error = EFAULT;
 	}
+
 	return error;
 }
 
@@ -6593,9 +6585,7 @@ ipf_outobjsz(softc, data, ptr, type, sz)
 	ipfobj_t obj;
 	int error;
 
-	if ((type < 0) || (type >= IPFOBJ_COUNT) ||
-	    ((ipf_objbytes[type][0] & 1) == 0) ||
-	    (sz < ipf_objbytes[type][1])) {
+	if ((type < 0) || (type >= IPFOBJ_COUNT)) {
 		softc->ipf_interror = 62;
 		return EINVAL;
 	}
@@ -6611,27 +6601,30 @@ ipf_outobjsz(softc, data, ptr, type, sz)
 		return EINVAL;
 	}
 
-#ifndef	IPFILTER_COMPAT
-	if (obj.ipfo_size != sz) {
+	if (obj.ipfo_rev == IPFILTER_VERSION) {
+		if (((ipf_objbytes[type][0] & 1) == 0) ||
+		    (sz < ipf_objbytes[type][1])) {
+			softc->ipf_interror = 61;
+			return EINVAL;
+		}
+		error = COPYOUT(ptr, obj.ipfo_ptr, sz);
+	} else {
+#ifdef	IPFILTER_COMPAT
+		/* XXX compatibility hook here */
+		/* error = hook(&obj, ptr) */
 		softc->ipf_interror = 64;
 		return EINVAL;
-	}
 #else
-	if (obj.ipfo_rev != IPFILTER_VERSION)
-		/* XXX compatibility hook here */
-		;
-	if (obj.ipfo_size != sz) {
-		/* XXX compatibility hook here */
 		softc->ipf_interror = 65;
 		return EINVAL;
-	}
 #endif
+	}
 
-	error = COPYOUT(ptr, obj.ipfo_ptr, sz);
 	if (error != 0) {
 		softc->ipf_interror = 66;
 		error = EFAULT;
 	}
+
 	return error;
 }
 
@@ -6673,34 +6666,30 @@ ipf_outobj(softc, data, ptr, type)
 		return EINVAL;
 	}
 
-#ifndef	IPFILTER_COMPAT
-	if ((ipf_objbytes[type][0] & 1) != 0) {
-		if (obj.ipfo_size < ipf_objbytes[type][1]) {
-			softc->ipf_interror = 69;
+	if (obj.ipfo_rev == IPFILTER_VERSION) {
+		if ((ipf_objbytes[type][0] & 1) != 0) {
+			if (obj.ipfo_size < ipf_objbytes[type][1]) {
+				softc->ipf_interror = 69;
+				return EINVAL;
+			}
+		} else if (obj.ipfo_size != ipf_objbytes[type][1]) {
+			softc->ipf_interror = 70;
 			return EINVAL;
 		}
-	} else if (obj.ipfo_size != ipf_objbytes[type][1]) {
-		softc->ipf_interror = 70;
+
+		error = COPYOUT(ptr, obj.ipfo_ptr, obj.ipfo_size);
+	} else {
+#ifdef	IPFILTER_COMPAT
+		/* XXX compatibility hook here */
+		/* error = hook(&obj, ptr, ipf_objbytes[type]); */
+		softc->ipf_interror = 71;
 		return EINVAL;
-	}
 #else
-	if (obj.ipfo_rev != IPFILTER_VERSION)
-		/* XXX compatibility hook here */
-		;
-	if ((ipf_objbytes[type][0] & 1) != 0) {
-		if (obj.ipfo_size < ipf_objbytes[type][1]) {
-			/* XXX compatibility hook here */
-			softc->ipf_interror = 71;
-			return EINVAL;
-		}
-	} else if (obj.ipfo_size != ipf_objbytes[type][1]) {
-		/* XXX compatibility hook here */
 		softc->ipf_interror = 72;
 		return EINVAL;
-	}
 #endif
+	}
 
-	error = COPYOUT(ptr, obj.ipfo_ptr, obj.ipfo_size);
 	if (error != 0) {
 		softc->ipf_interror = 73;
 		error = EFAULT;
