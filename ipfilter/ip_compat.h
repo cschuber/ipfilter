@@ -916,6 +916,18 @@ typedef	u_int32_t	u_32_t;
 
 # if defined(_KERNEL)
 #  include <netinet/ip_var.h>
+#  if (__FreeBSD_version >= 500024)
+#   if (__FreeBSD_version >= 500043)
+#    define	p_cred	td_ucred
+#    define	p_uid	td_ucred->cr_ruid
+#   else
+#    define	p_cred	t_proc->p_cred
+#    define	p_uid	t_proc->p_cred->p_ruid
+#   endif
+#  else
+#   define	p_uid	p_cred->p_ruid
+#  endif /* __FreeBSD_version >= 500024 */
+
 #  if (__FreeBSD_version >= 400000)
 /*
  * When #define'd, the 5.2.1 kernel panics when used with the ftp proxy.
@@ -1053,6 +1065,9 @@ extern	int	in_cksum(struct mbuf *, int);
 #  else
 #   define	SPL_SCHED(x)	x = splhigh()
 #  endif /* __FreeBSD_version >= 500043 */
+#  if (__FreeBSD_version >= 500024)
+#   define	GET_MINOR		dev2unit
+#  endif
 #  define	MSGDSIZE(x)	mbufchainlen(x)
 #  define	M_LEN(x)	(x)->m_len
 #  define	M_COPY(x)	m_copy((x), 0, M_COPYALL)

@@ -1050,7 +1050,12 @@ ipf_nat_ioctl(softc, data, cmd, mode, uid, ctx)
 				     KAUTH_REQ_NETWORK_FIREWALL_FW,
 				     NULL, NULL, NULL))
 # else
-	if ((securelevel >= 2) && (mode & FWRITE))
+#  if defined(__FreeBSD_version) && (__FreeBSD_version >= 500034)
+	if (securelevel_ge(curthread->td_ucred, 3) && (mode & FWRITE))
+#  else
+	if ((securelevel >= 3) && (mode & FWRITE))
+#  endif
+		return EPERM;
 # endif
 	{
 		softc->ipf_interror = 60001;

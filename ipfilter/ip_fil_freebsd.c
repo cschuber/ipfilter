@@ -53,7 +53,9 @@ static const char rcsid[] = "@(#)$Id$";
 #if !defined(__hpux)
 # include <sys/mbuf.h>
 #endif
-#include <sys/protosw.h>
+#if (__FreeBSD_version < 800000)
+# include <netinet/ipprotosw.h>
+#endif
 #include <sys/socket.h>
 #if __FreeBSD_version >= 500043
 # include <sys/selinfo.h>
@@ -129,7 +131,6 @@ ipf_main_softc_t ipfmain;
 # include <sys/conf.h>
 # if defined(NETBSD_PF)
 #  include <net/pfil.h>
-#  include <netinet/ipprotosw.h>
 # endif /* NETBSD_PF */
 #endif /* __FreeBSD_version >= 500011 */
 /*
@@ -348,7 +349,12 @@ ipfioctl(dev, cmd, data, mode
 	SPL_INT(s);
 
 #if (BSD >= 199306)
-	if ((securelevel >= 3) && (mode & FWRITE)) {
+# if (__FreeBSD_version >= 500034)
+        if (securelevel_ge(p->p_cred, 3) && (mode & FWRITE))
+# else  
+	if ((securelevel >= 3) && (mode & FWRITE))
+# endif
+	{
 		ipfmain.ipf_interror = 130001;
 		return EPERM;
 	}
@@ -904,7 +910,12 @@ ipf_fastroute(m0, mpp, fin, fdp)
 		if (!ip->ip_sum)
 			ip->ip_sum = in_cksum(m, hlen);
 		error = (*ifp->if_output)(ifp, m, (struct sockaddr *)dst,
-					  ro->ro_rt);
+#if (__FreeBSD_version < 800000)
+			    ro->ro_rt
+#else
+			    ro
+#endif
+			);
 		goto done;
 	}
 	/*
@@ -985,7 +996,13 @@ sendorfree:
 		m->m_act = 0;
 		if (error == 0)
 			error = (*ifp->if_output)(ifp, m,
-			    (struct sockaddr *)dst, ro->ro_rt);
+			    (struct sockaddr *)dst,
+#if (__FreeBSD_version < 800000)
+			    ro->ro_rt
+#else
+			    ro
+#endif
+			    );
 		else
 			FREE_MB_T(m);
 	}
