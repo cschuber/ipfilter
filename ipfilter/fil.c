@@ -157,7 +157,7 @@ static	int		ipf_flushlist(ipf_main_softc_t *, int, minor_t,
 static	int		ipf_flush_groups(ipf_main_softc_t *, int, int, int);
 static	ipfunc_t	ipf_findfunc(ipfunc_t);
 static	void		*ipf_findlookup(ipf_main_softc_t *, int, frentry_t *,
-					i6addr_t *, lookupfunc_t *);
+					i6addr_t *);
 static	frentry_t	*ipf_firewall(fr_info_t *, u_32_t *);
 static	int		ipf_fr_matcharray(fr_info_t *, int *);
 static	int		ipf_frruleiter(ipf_main_softc_t *, void *, int, void *);
