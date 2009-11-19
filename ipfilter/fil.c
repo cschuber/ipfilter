@@ -4327,7 +4327,7 @@ ipf_synclist(softc, fr, ifp)
 			fr->fr_ifas[i] = ipf_resolvenic(softc, name, v);
 		}
 
-		if (fr->fr_type == FR_T_IPF) {
+		if ((fr->fr_type & ~FR_T_BUILTIN) == FR_T_IPF) {
 			if (fr->fr_satype != FRI_NORMAL &&
 			    fr->fr_satype != FRI_LOOKUP) {
 				ifa = ipf_resolvenic(softc, fr->fr_names +
@@ -4362,16 +4362,16 @@ ipf_synclist(softc, fr, ifp)
 				fr->fr_flags |= FR_DUP;
 		}
 
-		if (fr->fr_type == FR_T_IPF && fr->fr_satype == FRI_LOOKUP &&
-		    fr->fr_srcptr == NULL) {
+		if (((fr->fr_type & FR_T_BUILTIN) == FR_T_IPF) &&
+		    (fr->fr_satype == FRI_LOOKUP) && (fr->fr_srcptr == NULL)) {
 			fr->fr_srcptr = ipf_lookup_res_num(softc,
 							   fr->fr_srctype,
 							   IPL_LOGIPF,
 							   fr->fr_srcnum,
 							   &fr->fr_srcfunc);
 		}
-		if (fr->fr_type == FR_T_IPF && fr->fr_datype == FRI_LOOKUP &&
-		    fr->fr_dstptr == NULL) {
+		if (((fr->fr_type & FR_T_BUILTIN) == FR_T_IPF) &&
+		    (fr->fr_datype == FRI_LOOKUP) && (fr->fr_dstptr == NULL)) {
 			fr->fr_dstptr = ipf_lookup_res_num(softc,
 							   fr->fr_dsttype,
 							   IPL_LOGIPF,
@@ -4705,8 +4705,8 @@ frrequest(softc, unit, req, data, set, makecopy)
 	int set, makecopy;
 	caddr_t data;
 {
+	int error = 0, in, family, addrem, need_free = 0;
 	frentry_t frd, *fp, *f, **fprev, **ftail;
-	int error = 0, in, family, addrem;
 	void *ptr, *uptr, *cptr;
 	u_int *p, *pp;
 	frgroup_t *fg;
@@ -4721,7 +4721,7 @@ frrequest(softc, unit, req, data, set, makecopy)
 		if (error) {
 			return error;
 		}
-		if ((fp->fr_flags & FR_T_BUILTIN) != 0) {
+		if ((fp->fr_type & FR_T_BUILTIN) != 0) {
 			softc->ipf_interror = 6;
 			return EINVAL;
 		}
@@ -4946,6 +4946,8 @@ frrequest(softc, unit, req, data, set, makecopy)
 
 	/*
 	 * Perform per-rule type sanity checks of their members.
+	 * All code after this needs to be aware that allocated memory
+	 * may need to be free'd before exiting.
 	 */
 	switch (fp->fr_type & ~FR_T_BUILTIN)
 	{
@@ -4959,10 +4961,19 @@ frrequest(softc, unit, req, data, set, makecopy)
 		if (!bpf_validate(ptr, fp->fr_dsize/sizeof(struct bpf_insn))) {
 			softc->ipf_interror = 20;
 			error = EINVAL;
+			break;
 		}
 		break;
 #endif
 	case FR_T_IPF :
+		/*
+		 * Preparation for error case at the bottom of this function.
+		 */
+		if (fp->fr_datype == FRI_LOOKUP)
+			fp->fr_dstptr = NULL;
+		if (fp->fr_satype == FRI_LOOKUP)
+			fp->fr_srcptr = NULL;
+
 		if (fp->fr_dsize != sizeof(fripf_t)) {
 			softc->ipf_interror = 21;
 			error = EINVAL;
@@ -4994,11 +5005,11 @@ frrequest(softc, unit, req, data, set, makecopy)
 			break;
 		case FRI_LOOKUP :
 			fp->fr_srcptr = ipf_findlookup(softc, unit, fp,
-						       &fp->fr_src6,
-						       &fp->fr_srcfunc);
+						       &fp->fr_src6);
 			if (fp->fr_srcfunc == NULL) {
 				softc->ipf_interror = 132;
 				error = ESRCH;
+				break;
 			}
 			break;
 		case FRI_NORMAL :
@@ -5025,8 +5036,7 @@ frrequest(softc, unit, req, data, set, makecopy)
 			break;
 		case FRI_LOOKUP :
 			fp->fr_dstptr = ipf_findlookup(softc, unit, fp,
-						       &fp->fr_dst6,
-						       &fp->fr_dstfunc);
+						       &fp->fr_dst6);
 			if (fp->fr_dstfunc == NULL) {
 				softc->ipf_interror = 134;
 				error = ESRCH;
@@ -5041,11 +5051,7 @@ frrequest(softc, unit, req, data, set, makecopy)
 		break;
 
 	case FR_T_NONE :
-		break;
-
 	case FR_T_CALLFUNC :
-		break;
-
 	case FR_T_COMPIPF :
 		break;
 
@@ -5208,7 +5214,6 @@ frrequest(softc, unit, req, data, set, makecopy)
 			}
 			f = NULL;
 			ptr = NULL;
-			error = 0;
 		} else if (req == (ioctlcmd_t)SIOCINAFR ||
 			   req == (ioctlcmd_t)SIOCINIFR) {
 			while ((f = *fprev) != NULL) {
@@ -5228,7 +5233,6 @@ frrequest(softc, unit, req, data, set, makecopy)
   			}
   			f = NULL;
   			ptr = NULL;
-			error = 0;
 		}
 	}
 
@@ -5265,6 +5269,7 @@ frrequest(softc, unit, req, data, set, makecopy)
 				ipf_scan_detachfr(f);
 #endif
 
+			need_free = 1;
 			if (unit == IPL_LOGAUTH) {
 				error = ipf_auth_precmd(softc, req, f, ftail);
 				goto done;
@@ -5328,8 +5333,18 @@ frrequest(softc, unit, req, data, set, makecopy)
 done:
 	RWLOCK_EXIT(&softc->ipf_mutex);
 donenolock:
-	if ((error != 0) && (makecopy != 0)) {
-		if (ptr != NULL) {
+	if (need_free || (error != 0)) {
+		if ((fp->fr_type & ~FR_T_BUILTIN) == FR_T_IPF) {
+			if ((fp->fr_satype == FRI_LOOKUP) &&
+			    (fp->fr_srcptr != NULL))
+				ipf_lookup_deref(softc, fp->fr_srctype,
+						 fp->fr_srcptr);
+			if ((fp->fr_datype == FRI_LOOKUP) &&
+			    (fp->fr_dstptr != NULL))
+				ipf_lookup_deref(softc, fp->fr_dsttype,
+						 fp->fr_dstptr);
+		}
+		if ((ptr != NULL) && (makecopy != 0)) {
 			KFREES(ptr, fp->fr_dsize);
 		}
 		KFREES(fp, fp->fr_size);
@@ -5447,21 +5462,19 @@ ipf_rule_expire_insert(softc, f, set)
 /*             unit(I)  - ipf device we want to find match for              */
 /*             fp(I)    - rule for which lookup is for                      */
 /*             addrp(I) - pointer to lookup information in address struct   */
-/*             funcp(I) - where to store the lookup function                */
 /*                                                                          */
 /* When using pools and hash tables to store addresses for matching in      */
 /* rules, it is necessary to resolve both the object referred to by the     */
 /* name or address (and return that pointer) and also provide the means by  */
-/* which to determine if an address belongs to that object (funcp) to make  */
-/* the packet matching quicker.                                             */
+/* which to determine if an address belongs to that object to make the      */
+/* packet matching quicker.                                                 */
 /* ------------------------------------------------------------------------ */
 static void *
-ipf_findlookup(softc, unit, fr, addrp, funcp)
+ipf_findlookup(softc, unit, fr, addrp)
 	ipf_main_softc_t *softc;
 	int unit;
 	frentry_t *fr;
 	i6addr_t *addrp;
-	lookupfunc_t *funcp;
 {
 	void *ptr = NULL;
 
@@ -5469,7 +5482,8 @@ ipf_findlookup(softc, unit, fr, addrp, funcp)
 	{
 	case 0 :
 		ptr = ipf_lookup_res_num(softc, unit, addrp->iplookuptype,
-					 addrp->iplookupnum, funcp);
+					 addrp->iplookupnum,
+					 &addrp->iplookupfunc);
 		break;
 	case 1 :
 		if (addrp->iplookupname < 0)
@@ -5478,7 +5492,7 @@ ipf_findlookup(softc, unit, fr, addrp, funcp)
 			break;
 		ptr = ipf_lookup_res_name(softc, unit, addrp->iplookuptype,
 					  fr->fr_names + addrp->iplookupname,
-					  funcp);
+					  &addrp->iplookupfunc);
 		break;
 	default :
 		break;
@@ -5669,9 +5683,11 @@ ipf_derefrule(softc, frp)
 		MUTEX_EXIT(&fr->fr_lock);
 		MUTEX_DESTROY(&fr->fr_lock);
 
-		if (fr->fr_type == FR_T_IPF && fr->fr_satype == FRI_LOOKUP)
+		if ((fr->fr_type & ~FR_T_BUILTIN) == FR_T_IPF &&
+		    fr->fr_satype == FRI_LOOKUP)
 			ipf_lookup_deref(softc, fr->fr_srctype, fr->fr_srcptr);
-		if (fr->fr_type == FR_T_IPF && fr->fr_datype == FRI_LOOKUP)
+		if ((fr->fr_type & ~FR_T_BUILTIN) == FR_T_IPF &&
+		    fr->fr_datype == FRI_LOOKUP)
 			ipf_lookup_deref(softc, fr->fr_dsttype, fr->fr_dstptr);
 
 		if ((fr->fr_flags & FR_COPIED) != 0) {
