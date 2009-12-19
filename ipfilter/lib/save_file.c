@@ -4,7 +4,7 @@
 static void *file_parse __P((char **));
 static void file_destroy __P((void *));
 static int file_send __P((void *, ipmon_msg_t *));
-static void file_print __P((void *));   
+static void file_print __P((void *));
 static int file_match __P((void *, void *));
 static void *file_dup __P((void *));
 
