@@ -163,7 +163,7 @@ ipf_check_wrapper(void *arg, struct mbuf **mp, struct ifnet *ifp, int dir)
 	if ((*mp)->m_pkthdr.csum_flags & CSUM_DELAY_DATA) {
 		in_delayed_cksum(*mp);
 		(*mp)->m_pkthdr.csum_flags &= ~CSUM_DELAY_DATA;
-	}                
+	}
 # endif /* CSUM_DELAY_DATA */
 
 	/*
@@ -347,7 +347,7 @@ ipfioctl(dev, cmd, data, mode
 #if (BSD >= 199306)
 # if (__FreeBSD_version >= 500034)
         if (securelevel_ge(p->p_cred, 3) && (mode & FWRITE))
-# else  
+# else
 	if ((securelevel >= 3) && (mode & FWRITE))
 # endif
 	{
