@@ -687,6 +687,14 @@ mb_t *m, **mpp;
 	fnew.fin_dp = (char *)ip + hlen;
 	(void) fr_makefrip(hlen, ip, &fnew);
 
+	if (fin->fin_fr != NULL && fin->fin_fr->fr_type == FR_T_IPF) {
+		frdest_t *fdp = &fin->fin_fr->fr_rif;
+
+		if ((fdp->fd_ifp != NULL) &&
+		    (fdp->fd_ifp != (struct ifnet *)-1))
+			return fr_fastroute(m, mpp, &fnew, fdp);
+	}
+
 	return fr_fastroute(m, mpp, &fnew, NULL);
 }
 
