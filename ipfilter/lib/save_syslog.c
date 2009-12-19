@@ -5,7 +5,7 @@
 static void *syslog_parse(char **);
 static void syslog_destroy(void *);
 static int syslog_send(void *, ipmon_msg_t *);
-static void syslog_print(void *);   
+static void syslog_print(void *);
 
 typedef struct syslog_opts_s {
 	int	facpri;

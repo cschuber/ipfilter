@@ -390,6 +390,7 @@ ipf_pool_node_add(softc, arg, op, uid)
 		softc->ipf_interror = 70015;
 		return EFAULT;
 	}
+	node.ipn_uid = uid;
 
 	if (node.ipn_addr.adf_family != node.ipn_mask.adf_family) {
 		softc->ipf_interror = 70016;

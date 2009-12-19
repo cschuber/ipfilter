@@ -311,7 +311,7 @@ extern void printip(int, u_32_t *);
 extern void printlog(struct frentry *);
 extern void printlookup(char *, i6addr_t *addr, i6addr_t *mask);
 extern void printmask(int, u_32_t *);
-extern void printnataddr(int, char *, nat_addr_t *, int);           
+extern void printnataddr(int, char *, nat_addr_t *, int);
 extern void printnatfield(nat_t *, int);
 extern void printnatside(char *, natstat_t *, nat_stat_side_t *);
 extern void printpacket(int, mb_t *);

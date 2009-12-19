@@ -173,7 +173,7 @@ load_http(char *url)
 				rbot = a;
 			} else {
 				fprintf(stderr,
-					"%s:%d unrecognised content:%s\n", 
+					"%s:%d unrecognised content:%s\n",
 					url, linenum, buffer);
 			}
 

@@ -69,17 +69,17 @@ snmpv2_match(ctx1, ctx2)
 	} else
 #endif
 	{
-		if (memcmp(&s1->sin, &s2->sin, sizeof(s1->sin))) 
+		if (memcmp(&s1->sin, &s2->sin, sizeof(s1->sin)))
 			return 1;
 	}
 
-	return 0;       
+	return 0;
 }
 
 
 static void *
 snmpv2_dup(ctx)
-	void *ctx; 
+	void *ctx;
 {
 	snmpv2_opts_t *s = ctx;
 
@@ -94,10 +94,10 @@ snmpv2_print(ctx)
 {
 	snmpv2_opts_t *snmpv2 = ctx;
 
-	printf("%s ", snmpv2->community);      
+	printf("%s ", snmpv2->community);
 #ifdef USE_INET6
 	if (snmpv2->v6 == 1) {
-		char buf[80];   
+		char buf[80];
 
 		printf("%s", inet_ntop(AF_INET6, &snmpv2->sin6.sin6_addr, buf,
 				       sizeof(snmpv2->sin6.sin6_addr)));
@@ -105,7 +105,7 @@ snmpv2_print(ctx)
 #endif
 	{
 		printf("%s", inet_ntoa(snmpv2->sin.sin_addr));
-	}       
+	}
 }
 
 

@@ -190,7 +190,7 @@ ipf_p_dns_new(arg, fin, aps, nat)
 		 */
 		return -1;
 	}
- 
+
 	aps->aps_psiz = sizeof(dnsinfo_t);
 	KMALLOCS(di, dnsinfo_t *, sizeof(dnsinfo_t));
 	if (di == NULL) {

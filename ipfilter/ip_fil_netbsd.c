@@ -112,7 +112,7 @@ const struct cdevsw ipl_cdevsw = {
 #if  (__NetBSD_Version__ >= 200000000)
 	nokqfilter,
 #endif
-#ifdef D_OTHER   
+#ifdef D_OTHER
 	D_OTHER,
 #endif
 };

@@ -239,7 +239,7 @@ ipf_unload()
 		error = ipfdetach(&ipfmain);
 		if (error == 0) {
 			ipf_destroy_all(&ipfmain);
-			ipf_unload_all();      
+			ipf_unload_all();
 		}
 	}
 

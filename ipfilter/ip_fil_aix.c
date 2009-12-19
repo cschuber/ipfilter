@@ -481,8 +481,8 @@ ipfread(dev_t dev, struct uio *uio, chan_t chan, int ext)
 {
 
 	if (ipf_running < 1) {
-		ipfmain.ipf_interror = 130006; 
-		return EIO;  
+		ipfmain.ipf_interror = 130006;
+		return EIO;
 	}
 
 	if (GET_MINOR(dev) == IPL_LOGSYNC)

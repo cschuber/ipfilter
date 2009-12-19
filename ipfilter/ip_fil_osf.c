@@ -1274,7 +1274,7 @@ ipf_inject(fin, m)
 /*
  * Copy a packet header mbuf chain into a completely new chain, including
  * copying any mbuf clusters.  Use this instead of m_copypacket() when
- * you need a writable copy of an mbuf chain.  
+ * you need a writable copy of an mbuf chain.
  */
 struct mbuf *
 m_dup(struct mbuf *m, int how)
@@ -1290,7 +1290,7 @@ m_dup(struct mbuf *m, int how)
 	moff = 0;
 	p = &top;
 	while (remain > 0 || top == NULL) {     /* allow m->m_pkthdr.len == 0 */
-		struct mbuf *n; 
+		struct mbuf *n;
 
 		/* Get the next new mbuf */
 		if (remain >= MINCLSIZE) {
@@ -1354,6 +1354,6 @@ m_dup_pkthdr(struct mbuf *to, struct mbuf *from, int how)
 	to->m_flags = (from->m_flags & M_COPYFLAGS) | (to->m_flags & M_EXT);
 	if ((to->m_flags & M_EXT) == 0)
 		to->m_data = to->m_pktdat;
-	to->m_pkthdr = from->m_pkthdr;  
+	to->m_pkthdr = from->m_pkthdr;
 	return (0);
 }

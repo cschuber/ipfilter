@@ -129,5 +129,5 @@ extern	void	unload_config(void);
 extern	void	dumphex(FILE *, int, char *, int);
 extern	int	check_action(char *, char *, int, int);
 extern	char	*getword(int);
-extern	void	*add_doing(ipmon_saver_t *);   
+extern	void	*add_doing(ipmon_saver_t *);
 

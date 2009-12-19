@@ -797,10 +797,10 @@ int
 ipf_hk_v4_in(tok, data, stack)
 	hook_event_token_t tok;
 	hook_data_t data;
-	netstack_t *stack;
+	void *stack;
 {
 	hook_pkt_event_t *hpe = (hook_pkt_event_t *)data;
-	ipf_main_softc_t *softc = (ipf_main_softc_t *)stack->netstack_ipf;
+	ipf_main_softc_t *softc = (ipf_main_softc_t *)stack;
 	ip_t *ip = hpe->hpe_hdr;
 	qpktinfo_t qpi;
 	int rval;
@@ -829,10 +829,10 @@ int
 ipf_hk_v4_out(tok, data, stack)
 	hook_event_token_t tok;
 	hook_data_t data;
-	netstack_t *stack;
+	void *stack;
 {
 	hook_pkt_event_t *hpe = (hook_pkt_event_t *)data;
-	ipf_main_softc_t *softc = (ipf_main_softc_t *)stack->netstack_ipf;
+	ipf_main_softc_t *softc = (ipf_main_softc_t *)stack;
 	ip_t *ip = hpe->hpe_hdr;
 	qpktinfo_t qpi;
 	int rval;
@@ -861,10 +861,10 @@ int
 ipf_hk_v4_nic(tok, data, stack)
 	hook_event_token_t tok;
 	hook_data_t data;
-	netstack_t *stack;
+	void *stack;
 {
 	hook_nic_event_t *nic = (hook_nic_event_t *)data;
-	ipf_main_softc_t *softc = (ipf_main_softc_t *)stack->netstack_ipf;
+	ipf_main_softc_t *softc = (ipf_main_softc_t *)stack;
 
 	/*
 	 * Should pass the family through...
@@ -896,10 +896,10 @@ int
 ipf_hk_v6_in(tok, data, stack)
 	hook_event_token_t tok;
 	hook_data_t data;
-	netstack_t *stack;
+	void *stack;
 {
 	hook_pkt_event_t *hpe = (hook_pkt_event_t *)data;
-	ipf_main_softc_t *softc = (ipf_main_softc_t *)stack->netstack_ipf;
+	ipf_main_softc_t *softc = (ipf_main_softc_t *)stack;
 	qpktinfo_t qpi;
 	int rval;
 
@@ -927,10 +927,10 @@ int
 ipf_hk_v6_out(tok, data, stack)
 	hook_event_token_t tok;
 	hook_data_t data;
-	netstack_t *stack;
+	void *stack;
 {
 	hook_pkt_event_t *hpe = (hook_pkt_event_t *)data;
-	ipf_main_softc_t *softc = (ipf_main_softc_t *)stack->netstack_ipf;
+	ipf_main_softc_t *softc = (ipf_main_softc_t *)stack;
 	qpktinfo_t qpi;
 	int rval;
 
@@ -958,10 +958,10 @@ int
 ipf_hk_v6_nic(tok, data, stack)
 	hook_event_token_t tok;
 	hook_data_t data;
-	netstack_t *stack;
+	void *stack;
 {
 	hook_nic_event_t *nic = (hook_nic_event_t *)data;
-	ipf_main_softc_t *softc = (ipf_main_softc_t *)stack->netstack_ipf;
+	ipf_main_softc_t *softc = (ipf_main_softc_t *)stack;
 
 	switch (nic->hne_event)
 	{
@@ -993,7 +993,7 @@ ipf_find_softc(x)
 
 
 static void *
-ipf_netstack_create(netstackid_t id, netstack_t *stack)
+ipf_netstack_create(netstackid_t id, void *stack)
 {
 	ipf_main_softc_t *softc;
 
@@ -1048,36 +1048,36 @@ void
 ipf_attach_hooks(softc)
 	ipf_main_softc_t *softc;
 {
-	softc->ipf_nd_v4 = net_lookup(NHF_INET, softc->ipf_idnum);
-	softc->ipf_nd_v6 = net_lookup(NHF_INET6, softc->ipf_idnum);
+	softc->ipf_nd_v4 = net_protocol_lookup(NHF_INET, softc->ipf_idnum);
+	softc->ipf_nd_v6 = net_protocol_lookup(NHF_INET6, softc->ipf_idnum);
 
-	HOOK_INIT(&softc->ipf_hk_v4_in, ipf_hk_v4_in, "ipf_v4_in");
-	if (net_register_hook(softc->ipf_nd_v4, NH_PHYSICAL_IN,
+	HOOK_INIT(softc->ipf_hk_v4_in, ipf_hk_v4_in, "ipf_v4_in");
+	if (net_hook_register(softc->ipf_nd_v4, NH_PHYSICAL_IN,
 			  &softc->ipf_hk_v4_in))
 		cmn_err(CE_WARN, "register-hook(v4-in) failed");
 
-	HOOK_INIT(&softc->ipf_hk_v4_out, ipf_hk_v4_out, "ipf_v4_out");
-	if (net_register_hook(softc->ipf_nd_v4, NH_PHYSICAL_OUT,
+	HOOK_INIT(softc->ipf_hk_v4_out, ipf_hk_v4_out, "ipf_v4_out");
+	if (net_hook_register(softc->ipf_nd_v4, NH_PHYSICAL_OUT,
 			  &softc->ipf_hk_v4_out))
 		cmn_err(CE_WARN, "register-hook(v4-out) failed");
 
-	HOOK_INIT(&softc->ipf_hk_v4_nic, ipf_hk_v4_nic, "ipf_v4_event");
-	if (net_register_hook(softc->ipf_nd_v4, NH_NIC_EVENTS,
+	HOOK_INIT(softc->ipf_hk_v4_nic, ipf_hk_v4_nic, "ipf_v4_event");
+	if (net_hook_register(softc->ipf_nd_v4, NH_NIC_EVENTS,
 			  &softc->ipf_hk_v4_nic))
 		cmn_err(CE_WARN, "register-hook(v4-nic) failed");
 
-	HOOK_INIT(&softc->ipf_hk_v6_in, ipf_hk_v6_in, "ipf_v6_in");
-	if (net_register_hook(softc->ipf_nd_v6, NH_PHYSICAL_IN,
+	HOOK_INIT(softc->ipf_hk_v6_in, ipf_hk_v6_in, "ipf_v6_in");
+	if (net_hook_register(softc->ipf_nd_v6, NH_PHYSICAL_IN,
 			  &softc->ipf_hk_v6_in))
 		cmn_err(CE_WARN, "register-hook(v6-in) failed");
 
-	HOOK_INIT(&softc->ipf_hk_v6_out, ipf_hk_v6_out, "ipf_v6_out");
-	if (net_register_hook(softc->ipf_nd_v6, NH_PHYSICAL_OUT,
+	HOOK_INIT(softc->ipf_hk_v6_out, ipf_hk_v6_out, "ipf_v6_out");
+	if (net_hook_register(softc->ipf_nd_v6, NH_PHYSICAL_OUT,
 			  &softc->ipf_hk_v6_out))
 		cmn_err(CE_WARN, "register-hook(v6-out) failed");
 
-	HOOK_INIT(&softc->ipf_hk_v6_nic, ipf_hk_v6_nic, "ipf_v6_event");
-	if (net_register_hook(softc->ipf_nd_v6, NH_NIC_EVENTS,
+	HOOK_INIT(softc->ipf_hk_v6_nic, ipf_hk_v6_nic, "ipf_v6_event");
+	if (net_hook_register(softc->ipf_nd_v6, NH_NIC_EVENTS,
 			  &softc->ipf_hk_v6_nic))
 		cmn_err(CE_WARN, "register-hook(v6-nic) failed");
 
@@ -1095,16 +1095,16 @@ ipf_detach_hooks(softc)
 		ipf_detach_loopback(softc);
 
 	if (softc->ipf_nd_v4 != NULL) {
-		if (net_unregister_hook(softc->ipf_nd_v4, NH_PHYSICAL_IN,
-				    &softc->ipf_hk_v4_in))
+		if (net_hook_unregister(softc->ipf_nd_v4, NH_PHYSICAL_IN,
+				    softc->ipf_hk_v4_in))
 			cmn_err(CE_WARN, "unregister-hook(v4-in) failed");
 
-		if (net_unregister_hook(softc->ipf_nd_v4, NH_PHYSICAL_OUT,
-				    &softc->ipf_hk_v4_out))
+		if (net_hook_unregister(softc->ipf_nd_v4, NH_PHYSICAL_OUT,
+				    softc->ipf_hk_v4_out))
 			cmn_err(CE_WARN, "unregister-hook(v4-out) failed");
 
-		if (net_unregister_hook(softc->ipf_nd_v4, NH_NIC_EVENTS,
-				    &softc->ipf_hk_v4_nic))
+		if (net_hook_unregister(softc->ipf_nd_v4, NH_NIC_EVENTS,
+				    softc->ipf_hk_v4_nic))
 			cmn_err(CE_WARN, "unregister-hook(v4-nic) failed");
 
 		net_release(softc->ipf_nd_v4);
@@ -1112,16 +1112,16 @@ ipf_detach_hooks(softc)
 	}
 
 	if (softc->ipf_nd_v6 != NULL) {
-		if (net_unregister_hook(softc->ipf_nd_v6, NH_PHYSICAL_IN,
-				    &softc->ipf_hk_v6_in))
+		if (net_hook_unregister(softc->ipf_nd_v6, NH_PHYSICAL_IN,
+				    softc->ipf_hk_v6_in))
 			cmn_err(CE_WARN, "unregister-hook(v6-in) failed");
 
-		if (net_unregister_hook(softc->ipf_nd_v6, NH_PHYSICAL_OUT,
-				    &softc->ipf_hk_v6_out))
+		if (net_hook_unregister(softc->ipf_nd_v6, NH_PHYSICAL_OUT,
+				    softc->ipf_hk_v6_out))
 			cmn_err(CE_WARN, "unregister-hook(v6-out) failed");
 
-		if (net_unregister_hook(softc->ipf_nd_v6, NH_NIC_EVENTS,
-				    &softc->ipf_hk_v6_nic))
+		if (net_hook_unregister(softc->ipf_nd_v6, NH_NIC_EVENTS,
+				    softc->ipf_hk_v6_nic))
 			cmn_err(CE_WARN, "unregister-hook(v6-nic) failed");
 
 		net_release(softc->ipf_nd_v6);
@@ -1158,24 +1158,24 @@ ipf_attach_loopback(softc)
 	ipf_main_softc_t *softc;
 {
 
-	HOOK_INIT(&softc->ipf_hk_loop_v4_in, ipf_hk_v4_in, "ipf_v4_loop_in");
-	if (net_register_hook(softc->ipf_nd_v4, NH_LOOPBACK_IN,
-			      &softc->ipf_hk_loop_v4_in))
+	HOOK_INIT(softc->ipf_hk_loop_v4_in, ipf_hk_v4_in, "ipf_v4_loop_in");
+	if (net_hook_register(softc->ipf_nd_v4, NH_LOOPBACK_IN,
+			      softc->ipf_hk_loop_v4_in))
 		cmn_err(CE_WARN, "register-hook(v4-loop_in) failed");
 
-	HOOK_INIT(&softc->ipf_hk_loop_v4_out, ipf_hk_v4_out, "ipf_v4_loop_out");
-	if (net_register_hook(softc->ipf_nd_v4, NH_LOOPBACK_OUT,
-			      &softc->ipf_hk_loop_v4_out))
+	HOOK_INIT(softc->ipf_hk_loop_v4_out, ipf_hk_v4_out, "ipf_v4_loop_out");
+	if (net_hook_register(softc->ipf_nd_v4, NH_LOOPBACK_OUT,
+			      softc->ipf_hk_loop_v4_out))
 		cmn_err(CE_WARN, "register-hook(v4-loop_out) failed");
 
-	HOOK_INIT(&softc->ipf_hk_loop_v6_in, ipf_hk_v6_in, "ipf_v6_loop_in");
-	if (net_register_hook(softc->ipf_nd_v6, NH_LOOPBACK_IN,
-			      &softc->ipf_hk_loop_v6_in))
+	HOOK_INIT(softc->ipf_hk_loop_v6_in, ipf_hk_v6_in, "ipf_v6_loop_in");
+	if (net_hook_register(softc->ipf_nd_v6, NH_LOOPBACK_IN,
+			      softc->ipf_hk_loop_v6_in))
 		cmn_err(CE_WARN, "register-hook(v6-loop_in) failed");
 
-	HOOK_INIT(&softc->ipf_hk_loop_v6_out, ipf_hk_v6_out, "ipf_v6_loop_out");
-	if (net_register_hook(softc->ipf_nd_v6, NH_LOOPBACK_OUT,
-			      &softc->ipf_hk_loop_v6_out))
+	HOOK_INIT(softc->ipf_hk_loop_v6_out, ipf_hk_v6_out, "ipf_v6_loop_out");
+	if (net_hook_register(softc->ipf_nd_v6, NH_LOOPBACK_OUT,
+			      softc->ipf_hk_loop_v6_out))
 		cmn_err(CE_WARN, "register-hook(v6-loop_out) failed");
 }
 
@@ -1185,20 +1185,20 @@ ipf_detach_loopback(softc)
 	ipf_main_softc_t *softc;
 {
 
-	if (net_unregister_hook(softc->ipf_nd_v4, NH_LOOPBACK_IN,
-				&softc->ipf_hk_loop_v4_in))
+	if (net_hook_unregister(softc->ipf_nd_v4, NH_LOOPBACK_IN,
+				softc->ipf_hk_loop_v4_in))
 		cmn_err(CE_WARN, "unregister-hook(v4-loop_in) failed");
 
-	if (net_unregister_hook(softc->ipf_nd_v4, NH_LOOPBACK_OUT,
-				&softc->ipf_hk_loop_v4_out))
+	if (net_hook_unregister(softc->ipf_nd_v4, NH_LOOPBACK_OUT,
+				softc->ipf_hk_loop_v4_out))
 		cmn_err(CE_WARN, "unregister-hook(v4-loop_out) failed");
 
-	if (net_unregister_hook(softc->ipf_nd_v6, NH_LOOPBACK_IN,
-				&softc->ipf_hk_loop_v6_in))
+	if (net_hook_unregister(softc->ipf_nd_v6, NH_LOOPBACK_IN,
+				softc->ipf_hk_loop_v6_in))
 		cmn_err(CE_WARN, "unregister-hook(v6-loop_in) failed");
 
-	if (net_unregister_hook(softc->ipf_nd_v6, NH_LOOPBACK_OUT,
-				&softc->ipf_hk_loop_v6_out))
+	if (net_hook_unregister(softc->ipf_nd_v6, NH_LOOPBACK_OUT,
+				softc->ipf_hk_loop_v6_out))
 		cmn_err(CE_WARN, "unregister-hook(v6-loop_out) failed");
 }
 #endif
