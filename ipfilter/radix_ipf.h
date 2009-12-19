@@ -29,14 +29,6 @@
 #if !defined(_RADIX_IPF_H_)
 #define	_RADIX_IPF_H_
 
-#ifndef __P
-# ifdef __STDC__
-#  define	__P(x)  x
-# else
-#  define	__P(x)  ()
-# endif
-#endif
-
 /*
  * Radix search tree node layout.
  */
@@ -121,24 +113,26 @@ struct ipf_radix_node_head {
 	int	rnh_addrsize;		/* permit, but not require fixed keys */
 	int	rnh_pktsize;		/* permit, but not require fixed keys */
 	struct	ipf_radix_node *(*rnh_addaddr)	/* add based on sockaddr */
-		__P((void *soft, void *v, void *mask,
-		     struct ipf_radix_node_head *head, struct ipf_radix_node nodes[]));
+		(void *soft, void *v, void *mask,
+		 struct ipf_radix_node_head *head,
+		 struct ipf_radix_node nodes[]);
 	struct	ipf_radix_node *(*rnh_addpkt)	/* add based on packet hdr */
-		__P((void *v, void *mask,
-		     struct ipf_radix_node_head *head, struct ipf_radix_node nodes[]));
+		(void *v, void *mask,
+		 struct ipf_radix_node_head *head,
+		 struct ipf_radix_node nodes[]);
 	struct	ipf_radix_node *(*rnh_deladdr)	/* remove based on sockaddr */
-		__P((void *, void *v, void *mask, struct ipf_radix_node_head *));
+		(void *, void *v, void *mask, struct ipf_radix_node_head *);
 	struct	ipf_radix_node *(*rnh_delpkt)	/* remove based on packet hdr */
-		__P((void *v, void *mask, struct ipf_radix_node_head *head));
+		(void *v, void *mask, struct ipf_radix_node_head *head);
 	struct	ipf_radix_node *(*rnh_matchaddr)	/* locate based on sockaddr */
-		__P((void *soft, void *v, struct ipf_radix_node_head *head));
+		(void *soft, void *v, struct ipf_radix_node_head *head);
 	struct	ipf_radix_node *(*rnh_lookup)	/* locate based on sockaddr */
-		__P((void *, void *v, void *mask, struct ipf_radix_node_head *));
+		(void *, void *v, void *mask, struct ipf_radix_node_head *);
 	struct	ipf_radix_node *(*rnh_matchpkt)	/* locate based on packet hdr */
-		__P((void *v, struct ipf_radix_node_head *head));
+		(void *v, struct ipf_radix_node_head *head);
 	int	(*rnh_walktree)			/* traverse tree */
-		__P((void *, struct ipf_radix_node_head *,
-		     int (*)(void *, struct ipf_radix_node *, void *), void *));
+		(void *, struct ipf_radix_node_head *,
+		 int (*)(void *, struct ipf_radix_node *, void *), void *);
 	struct	ipf_radix_node rnh_nodes[3];	/* empty tree for common case */
 };
 
@@ -155,27 +149,28 @@ struct ipf_radix_node_head {
 # endif
 #endif
 
-void	 *ipf_rn_create __P((void));
-void	 ipf_rn_destroy __P((void *));
-void	 ipf_rn_init __P((void *));
-void	 ipf_rn_fini __P((void *));
-int	 ipf_rn_inithead __P((void *, void **, int));
-void	 ipf_rn_freehead __P((void *, struct ipf_radix_node_head *));
-int	 ipf_rn_inithead0 __P((void *, struct ipf_radix_node_head *, int));
-int	 ipf_rn_refines __P((void *, void *));
-int	 ipf_rn_walktree __P((void *, struct ipf_radix_node_head *,
-			  int (*)(void *, struct ipf_radix_node *, void *), void *));
+void	 *ipf_rn_create(void);
+void	 ipf_rn_destroy(void *);
+void	 ipf_rn_init(void *);
+void	 ipf_rn_fini(void *);
+int	 ipf_rn_inithead(void *, void **, int);
+void	 ipf_rn_freehead(void *, struct ipf_radix_node_head *);
+int	 ipf_rn_inithead0(void *, struct ipf_radix_node_head *, int);
+int	 ipf_rn_refines(void *, void *);
+int	 ipf_rn_walktree(void *, struct ipf_radix_node_head *,
+			 int (*)(void *, struct ipf_radix_node *, void *),
+			 void *);
 struct ipf_radix_node
-	 *ipf_rn_addmask __P((void *, void *, int, int)),
-	 *ipf_rn_addroute __P((void *, void *, void *, struct ipf_radix_node_head *,
-			struct ipf_radix_node [2])),
-	 *ipf_rn_delete __P((void *, void *, void *, struct ipf_radix_node_head *)),
-	 *ipf_rn_insert __P((void *, void *, struct ipf_radix_node_head *, int *,
-			struct ipf_radix_node [2])),
-	 *ipf_rn_lookup __P((void *, void *, void *, struct ipf_radix_node_head *)),
-	 *ipf_rn_match __P((void *, void *, struct ipf_radix_node_head *)),
-	 *ipf_rn_newpair __P((void *, int, struct ipf_radix_node[2])),
-	 *ipf_rn_search __P((void *, struct ipf_radix_node *)),
-	 *ipf_rn_search_m __P((void *, struct ipf_radix_node *, void *));
+	 *ipf_rn_addmask(void *, void *, int, int),
+	 *ipf_rn_addroute(void *, void *, void *, struct ipf_radix_node_head *,
+			  struct ipf_radix_node [2]),
+	 *ipf_rn_delete(void *, void *, void *, struct ipf_radix_node_head *),
+	 *ipf_rn_insert(void *, void *, struct ipf_radix_node_head *, int *,
+			struct ipf_radix_node [2]),
+	 *ipf_rn_lookup(void *, void *, void *, struct ipf_radix_node_head *),
+	 *ipf_rn_match(void *, void *, struct ipf_radix_node_head *),
+	 *ipf_rn_newpair(void *, int, struct ipf_radix_node[2]),
+	 *ipf_rn_search(void *, struct ipf_radix_node *),
+	 *ipf_rn_search_m(void *, struct ipf_radix_node *, void *);
 
 #endif /* _RADIX_IPF_H_ */

@@ -41,7 +41,7 @@
 extern	int	errno;
 
 
-int	xxxinit __P((u_int, struct vddrv *, caddr_t, struct vdstat *));
+int	xxxinit(u_int, struct vddrv *, caddr_t, struct vdstat *);
 
 int	ipl_major = 0;
 

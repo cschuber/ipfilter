@@ -12,7 +12,7 @@ BINDEST=/usr/local/bin
 SBINDEST=/sbin
 MANDIR=/usr/local/man
 #To test prototyping
-#CC=gcc -Wstrict-prototypes -Wmissing-prototypes -Wunused -Wuninitialized
+CC=gcc -Wstrict-prototypes -Wmissing-prototypes -Wunused -Wuninitialized
 #CC=gcc
 #CC=cc -Dconst=
 DEBUG=-g
@@ -29,18 +29,6 @@ IPFLKM=-DIPFILTER_LKM
 # To enable logging of blocked/passed packets...
 #
 IPFLOG=-DIPFILTER_LOG
-
-#
-# To enable XID (transaction ID) filtering of RPC calls
-# Experimental extension by stes@pandora.be
-# Recommended value: disabled
-#
-# XID=-DIPFILTER_XID
-
-# To enable lookup
-
-LOOKUP=-DIPFILTER_LOOKUP
-
 #
 # To enable loading filter rules compiled to C code...
 #
@@ -48,7 +36,7 @@ LOOKUP=-DIPFILTER_LOOKUP
 #
 # To enable synchronisation between IPFilter hosts
 #
-#SYNC=-DIPFILTER_SYNC
+SYNC=-DIPFILTER_SYNC
 #
 # The facility you wish to log messages from ipmon to syslogd with.
 #
@@ -89,7 +77,7 @@ ALLOPTS=-DIPFILTER_LOG -DIPFILTER_LOOKUP \
 #
 # Uncomment the next 3 lines if you want to view the state table a la top(1)
 # (requires that you have installed ncurses).
-# STATETOP_CFLAGS=-DSTATETOP
+#STATETOP_CFLAGS=-DSTATETOP
 #
 # Where to find the ncurses include files (if not in default path),
 #
@@ -98,13 +86,13 @@ ALLOPTS=-DIPFILTER_LOG -DIPFILTER_LOOKUP \
 #
 # How to link the ncurses library
 #
-# STATETOP_LIB=-L/opt/sfw/lib -lncurses
+#STATETOP_LIB=-lncurses
 #STATETOP_LIB=-L/usr/local/lib -lncurses
 
 #
 # Uncomment this when building IPv6 capability.
 #
-#INET6=-DUSE_INET6
+INET6=-DUSE_INET6
 #
 # For packets which don't match any pass rules or any block rules, set either
 # FR_PASS or FR_BLOCK (respectively).  It defaults to FR_PASS if left
@@ -121,7 +109,7 @@ MFLAGS1='CFLAGS=$(CFLAGS) $(ARCHINC) $(SOLARIS2) $(SGIREV) $(INET6)' \
         'STATETOP_CFLAGS=$(STATETOP_CFLAGS)' "BPFILTER=$(BPFILTER)" \
         'STATETOP_INC=$(STATETOP_INC)' 'STATETOP_LIB=$(STATETOP_LIB)' \
 	"BITS=$(BITS)" "OBJ=$(OBJ)" "LOOKUP=$(LOOKUP)" "COMPIPF=$(COMPIPF)" \
-	"XID=$(XID)" 'SYNC=$(SYNC)' 'ALLOPTS=$(ALLOPTS)' 'LIBBPF=$(LIBBPF)'
+	'SYNC=$(SYNC)' 'ALLOPTS=$(ALLOPTS)' 'LIBBPF=$(LIBBPF)'
 MFLAGS=$(MFLAGS1) "IPFLKM=$(IPFLKM)"
 MACHASSERT=`/bin/ls -1 /usr/sys/*/mach_assert.h | head -1`
 #

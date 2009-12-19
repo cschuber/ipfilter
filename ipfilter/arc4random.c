@@ -16,7 +16,7 @@
 #ifdef __FreeBSD__
 # include <sys/kernel.h>
 #endif
-#if !defined(__osf__)
+#ifndef __osf__
 # include <sys/random.h>
 #endif
 #ifdef __FreeBSD__

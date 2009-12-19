@@ -139,24 +139,22 @@ ipf_main_softc_t	ipfmain;
 static	struct	ifnet **ifneta = NULL;
 static	int	nifs = 0;
 
-static	void	ipf_setifpaddr __P((struct ifnet *, char *));
-void	init_ifp __P((void));
+static	void	ipf_setifpaddr(struct ifnet *, char *);
+void	init_ifp(void);
 #if defined(__sgi) && (IRIX < 60500)
-static int 	no_output __P((struct ifnet *, struct mbuf *,
-			       struct sockaddr *));
-static int	write_output __P((struct ifnet *, struct mbuf *,
-				  struct sockaddr *));
+static int 	no_output(struct ifnet *, struct mbuf *, struct sockaddr *);
+static int	write_output(struct ifnet *, struct mbuf *, struct sockaddr *);
 #else
 # if TRU64 >= 1885
-static int 	no_output __P((struct ifnet *, struct mbuf *,
-			       struct sockaddr *, struct rtentry *, char *));
-static int	write_output __P((struct ifnet *, struct mbuf *,
-				  struct sockaddr *, struct rtentry *, char *));
+static int 	no_output(struct ifnet *, struct mbuf *,
+			  struct sockaddr *, struct rtentry *, char *);
+static int	write_output(struct ifnet *, struct mbuf *,
+			     struct sockaddr *, struct rtentry *, char *);
 # else
-static int 	no_output __P((struct ifnet *, struct mbuf *,
-			       struct sockaddr *, struct rtentry *));
-static int	write_output __P((struct ifnet *, struct mbuf *,
-				  struct sockaddr *, struct rtentry *));
+static int 	no_output(struct ifnet *, struct mbuf *,
+			  struct sockaddr *, struct rtentry *);
+static int	write_output(struct ifnet *, struct mbuf *,
+			     struct sockaddr *, struct rtentry *);
 # endif
 #endif
 
@@ -598,6 +596,7 @@ m_freem(m)
 	return;
 }
 
+
 void
 m_copydata(m, off, len, cp)
 	mb_t *m;
@@ -606,6 +605,7 @@ m_copydata(m, off, len, cp)
 {
 	bcopy((char *)m + off, cp, len);
 }
+
 
 int
 ipfuiomove(buf, len, rwflag, uio)

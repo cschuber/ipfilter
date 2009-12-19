@@ -71,11 +71,11 @@ extern	int	tcp_ttl;
 extern	toid_t	ipf_timer_id;
 #endif
 
-static	int	(*ipf_savep) __P((ip_t *, int, void *, int, struct mbuf **));
-static	int	ipf_send_ip __P((fr_info_t *, struct mbuf *, struct mbuf **));
-static	int	ipfopen __P((dev_t *, int, int, cred_t *));
-static	int	ipfclose __P((dev_t *, int, int, cred_t *));
-static	int	ipfread __P((dev_t, struct uio *, cred_t *));
+static	int	(*ipf_savep)(ip_t *, int, void *, int, struct mbuf **);
+static	int	ipf_send_ip(fr_info_t *, struct mbuf *, struct mbuf **);
+static	int	ipfopen(dev_t *, int, int, cred_t *);
+static	int	ipfclose(dev_t *, int, int, cred_t *);
+static	int	ipfread(dev_t, struct uio *, cred_t *);
 
 
 int

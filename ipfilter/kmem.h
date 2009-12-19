@@ -8,16 +8,9 @@
 #ifndef	__KMEM_H__
 #define	__KMEM_H__
 
-#ifndef	__P
-# ifdef	__STDC__
-#  define	__P(x)	x
-# else
-#  define	__P(x)	()
-# endif
-#endif
-extern	int	openkmem __P((char *, char *));
-extern	int	kmemcpy __P((char *, long, int));
-extern	int	kstrncpy __P((char *, long, int));
+extern	int	openkmem(char *, char *);
+extern	int	kmemcpy(char *, long, int);
+extern	int	kstrncpy(char *, long, int);
 
 #if defined(__NetBSD__) || defined(__OpenBSD)
 # include <paths.h>

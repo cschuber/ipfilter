@@ -60,29 +60,28 @@
 #endif
 
 
-static	int	ipf_getinfo __P((dev_info_t *, ddi_info_cmd_t,
-				 void *, void **));
+static	int	ipf_getinfo(dev_info_t *, ddi_info_cmd_t, void *, void **);
 #if SOLARIS2 < 10
-static	int	ipf_identify __P((dev_info_t *));
+static	int	ipf_identify(dev_info_t *);
 #endif
-static	int	ipf_attach __P((dev_info_t *, ddi_attach_cmd_t));
-static	int	ipf_detach __P((dev_info_t *, ddi_detach_cmd_t));
-static 	int	ipfpoll __P((dev_t, short, int, short *, struct pollhead **));
+static	int	ipf_attach(dev_info_t *, ddi_attach_cmd_t);
+static	int	ipf_detach(dev_info_t *, ddi_detach_cmd_t);
+static 	int	ipfpoll(dev_t, short, int, short *, struct pollhead **);
 static	char	*ipf_devfiles[] = { IPL_NAME, IPNAT_NAME, IPSTATE_NAME,
 				    IPAUTH_NAME, IPSYNC_NAME, IPSCAN_NAME,
 				    IPLOOKUP_NAME, NULL };
-static	int	ipfclose __P((dev_t, int, int, cred_t *));
-static	int	ipfopen __P((dev_t *, int, int, cred_t *));
-static	int	ipfread __P((dev_t, struct uio *, cred_t *));
-static	int	ipfwrite __P((dev_t, struct uio *, cred_t *));
-static	int	ipf_property_update __P((dev_info_t *));
-static	void	ipf_stack_init __P((void));
-static	void	ipf_stack_fini __P((void));
+static	int	ipfclose(dev_t, int, int, cred_t *);
+static	int	ipfopen(dev_t *, int, int, cred_t *);
+static	int	ipfread(dev_t, struct uio *, cred_t *);
+static	int	ipfwrite(dev_t, struct uio *, cred_t *);
+static	int	ipf_property_update(dev_info_t *);
+static	void	ipf_stack_init(void);
+static	void	ipf_stack_fini(void);
 #if !defined(INSTANCES)
-static	int	ipf_qifsync __P((ip_t *, int, void *, int, void *, mblk_t **));
+static	int	ipf_qifsync(ip_t *, int, void *, int, void *, mblk_t **);
 #else
-static	void	ipf_attach_loopback __P((ipf_main_softc_t *));
-static	void	ipf_detach_loopback __P((ipf_main_softc_t *));
+static	void	ipf_attach_loopback(ipf_main_softc_t *);
+static	void	ipf_detach_loopback(ipf_main_softc_t *);
 #endif
 
 

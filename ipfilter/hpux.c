@@ -47,21 +47,21 @@ struct uio;
 
 extern	int	ipf_running;
 extern	int	ipf_flags;
-extern	int	ipf_check __P(());
+extern	int	ipf_check();
 
 extern ipnat_t *nat_list;
 
 static	char	*ipf_devfiles[] = { IPL_NAME, IPNAT_NAME, IPSTATE_NAME,
 				    IPAUTH_NAME, IPSYNC_NAME, IPLOOKUP_NAME,
 				    NULL };
-static	int	(*ipf_ip_inp) __P((queue_t *, mblk_t *)) = NULL;
+static	int	(*ipf_ip_inp)(queue_t *, mblk_t *) = NULL;
 
 
-static	int	ipf_slowtimer __P((void));
+static	int	ipf_slowtimer(void);
 struct	callout	*ipf_timer_id = NULL;
 struct	callout	*synctimeoutid = NULL;
 #ifdef	IPFDEBUG
-void	printiri __P((irinfo_t *));
+void	printiri(irinfo_t *);
 #endif /* IPFDEBUG */
 
 static	int	ipf_install(void);	/* Install Routine - Biswajit */
@@ -625,6 +625,7 @@ int ipfread(dev, uio)
 #endif /* IPFILTER_LOG */
 
 
+#if 0
 /*
  * ipfread/ipflog
  * both of these must operate with at least splnet() lest they be
@@ -647,3 +648,4 @@ int ipfwrite(dev, uio, cp)
 		return ENXIO;
 	return ipfsync_write(uio);
 }
+#endif /* IPFILTER_SYNC */

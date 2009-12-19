@@ -83,7 +83,7 @@
 #define	VOP_LEASE	LEASE_CHECK
 #endif
 
-int	xxxinit __P((struct lkm_table *, int, int));
+int	xxxinit(struct lkm_table *, int, int);
 
 #ifdef  SYSCTL_OID
 int sysctl_ipf_int SYSCTL_HANDLER_ARGS;
@@ -159,7 +159,7 @@ static struct   cdevsw  ipfdevsw =
 MOD_DEV(IPL_VERSION, LM_DT_CHAR, -1, &ipfdevsw);
 
 extern struct cdevsw cdevsw[];
-extern int vd_unuseddev __P((void));
+extern int vd_unuseddev(void);
 extern int nchrdev;
 #else
 
@@ -175,19 +175,19 @@ static struct cdevsw ipf_cdevsw = {
 };
 #endif
 
-static void ipf_drvinit __P((void *));
+static void ipf_drvinit(void *);
 
 #ifdef ACTUALLY_LKM_NOT_KERNEL
-static  int     if_ipf_unload __P((struct lkm_table *, int));
-static  int     if_ipf_load __P((struct lkm_table *, int));
-static  int     if_ipf_remove __P((void));
+static  int     if_ipf_unload(struct lkm_table *, int);
+static  int     if_ipf_load(struct lkm_table *, int);
+static  int     if_ipf_remove(void);
 static  int     ipf_major = CDEV_MAJOR;
 
-static int ipfaction __P((struct lkm_table *, int));
+static int ipfaction(struct lkm_table *, int);
 static char *ipf_devfiles[] = { IPL_NAME, IPL_NAT, IPL_STATE, IPL_AUTH,
 				IPL_SCAN, IPL_SYNC, IPL_POOL, NULL };
 
-extern	int	lkmenodev __P((void));
+extern	int	lkmenodev(void);
 
 static int ipfaction(lkmtp, cmd)
 	struct lkm_table *lkmtp;
@@ -257,7 +257,7 @@ static int ipfaction(lkmtp, cmd)
 }
 
 
-static int if_ipf_remove __P((void))
+static int if_ipf_remove(void)
 {
 	char *name;
 	struct nameidata nd;
@@ -389,7 +389,7 @@ static struct lkm_dev _module = {
 #  endif
 
 
-int if_ipf __P((struct lkm_table *, int, int));
+int if_ipf(struct lkm_table *, int, int);
 
 
 int if_ipf(lkmtp, cmd, ver)
@@ -405,7 +405,7 @@ int if_ipf(lkmtp, cmd, ver)
 # endif /* IPFILTER_LKM */
 static ipf_devsw_installed = 0;
 
-static void ipf_drvinit __P((void *unused))
+static void ipf_drvinit(void *unused)
 {
 	dev_t dev;
 # ifdef	DEVFS

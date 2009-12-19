@@ -59,16 +59,16 @@ static const char rcsid[] = "@(#)$Id$";
 # include "md5.h"
 #endif
 
-static	int	ipf_send_ip __P((fr_info_t *fin, mblk_t *m, mblk_t **mp));
-static	void	ipf_fixl4sum __P((fr_info_t *));
-static	void	*ipf_routeto __P((fr_info_t *, int, void *));
-static	int	ipf_sendpkt __P((ipf_main_softc_t *, int, void *, mblk_t *,
-				 struct ip *, void *));
-static	void	ipf_call_slow_timer __P((ipf_main_softc_t *));
+static	int	ipf_send_ip(fr_info_t *fin, mblk_t *m, mblk_t **mp);
+static	void	ipf_fixl4sum(fr_info_t *);
+static	void	*ipf_routeto(fr_info_t *, int, void *);
+static	int	ipf_sendpkt(ipf_main_softc_t *, int, void *, mblk_t *,
+			    struct ip *, void *);
+static	void	ipf_call_slow_timer(ipf_main_softc_t *);
 #if (SOLARIS2 < 7)
-static	void	ipf_timer_func __P((void));
+static	void	ipf_timer_func(void);
 #else
-static	void	ipf_timer_func __P((void *));
+static	void	ipf_timer_func(void *);
 #endif
 
 #if !defined(FW_HOOKS)
@@ -88,8 +88,8 @@ u_long		*ip_forwarding = NULL;
 # endif
 extern	ipf_main_softc_t	ipfmain;
 #else
-extern	void	ipf_attach_hooks __P((ipf_main_softc_t *));
-extern	void	ipf_detach_hooks __P((ipf_main_softc_t *));
+extern	void	ipf_attach_hooks(ipf_main_softc_t *);
+extern	void	ipf_detach_hooks(ipf_main_softc_t *);
 #endif
 
 
@@ -202,9 +202,8 @@ ipfattach(softc)
 	}
 #endif
 
-	softc->ipf_slow_ch = timeout(ipf_slowtimer, softc,
-				     drv_usectohz(1000000 * IPF_HZ_MULT /
-						  IPF_HZ_DIVIDE));
+	softc->ipf_slow_ch = timeout(ipf_timer_func, softc,
+				     drv_usectohz(500000));
 
         if (ipf_init_all(softc) < 0)
 		return EIO;
@@ -900,35 +899,34 @@ ipf_verifysrc(fin)
 #endif
 
 
-void
 #if (SOLARIS2 < 7)
-ipf_slowtimer()
-#else
-/*ARGSUSED*/
-ipf_slowtimer __P((void *ptr))
-#endif
+static void
+ipf_timer_func()
 {
-	ipf_main_softc_t *softc = ptr;
+	ipf_call_slow_timer(&ipfmain);
+}
+#else
+void
+/*ARGSUSED*/
+ipf_timer_func(ptr)
+	void *ptr;
+{
+	ipf_call_slow_timer(ptr);
+}
+#endif
 
+static void
+ipf_call_slow_timer(softc)
+	ipf_main_softc_t *softc;
+{
 	READ_ENTER(&softc->ipf_global);
-	if (softc->ipf_running <= 0) {
-		RWLOCK_EXIT(&softc->ipf_global);
-		return;
-	}
 
-	ipf_expiretokens(softc);
-	ipf_frag_expire(softc);
-	ipf_state_expire(softc);
-	ipf_nat_expire(softc);
-	ipf_auth_expire(softc);
-	ipf_lookup_expire(softc);
-	ipf_rule_expire(softc);
-	softc->ipf_ticks++;
+	if (softc->ipf_running > 0)
+		ipf_slowtimer(softc);
+
 	if (softc->ipf_running == -1 || softc->ipf_running == 1)
-		softc->ipf_slow_ch = timeout(ipf_slowtimer, ptr,
-					     drv_usectohz(1000000 *
-							  IPF_HZ_MULT /
-							  IPF_HZ_DIVIDE));
+		softc->ipf_slow_ch = timeout(ipf_timer_func, softc,
+					     drv_usectohz(500000));
 	else
 		softc->ipf_slow_ch = NULL;
 	RWLOCK_EXIT(&softc->ipf_global);

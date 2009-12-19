@@ -9,7 +9,7 @@
 
 #include <linux/version.h>
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
-# define __irq_h        1       /* stop it being included! */
+# define __irq_h	1	/* stop it being included! */
 #else
 # define _LINUX_TCP_H
 #endif
@@ -30,7 +30,7 @@ extern int sysctl_ip_default_ttl;
 extern	ipf_main_softc_t	ipfmain;
 
 static void	ipf_timer_func(unsigned long);
-static	int	ipf_send_ip __P((fr_info_t *, struct sk_buff *, struct sk_buff **));
+static	int	ipf_send_ip(fr_info_t *, struct sk_buff *, struct sk_buff **);
 
 ipfmutex_t	ipl_mutex, ipf_auth_mx, ipf_rw, ipf_stinsert;
 ipfmutex_t	ipf_nat_new, ipf_natio, ipf_timeoutlock;
@@ -42,9 +42,9 @@ extern int ip_finish_output(struct sk_buff *);
 #endif
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,23)
-static u_int ipf_linux_inout __P((u_int, struct sk_buff *, const struct net_device *, const struct net_device *, int (*okfn)(struct sk_buff *)));
+static u_int ipf_linux_inout(u_int, struct sk_buff *, const struct net_device *, const struct net_device *, int (*okfn)(struct sk_buff *));
 #else
-static u_int ipf_linux_inout __P((u_int, struct sk_buff **, const struct net_device *, const struct net_device *, int (*okfn)(struct sk_buff *)));
+static u_int ipf_linux_inout(u_int, struct sk_buff **, const struct net_device *, const struct net_device *, int (*okfn)(struct sk_buff *));
 #endif
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)

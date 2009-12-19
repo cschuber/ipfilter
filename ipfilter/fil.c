@@ -147,54 +147,47 @@ extern	int	opts;
 extern	int	blockreason;
 #endif /* _KERNEL */
 
-static	INLINE int	ipf_check_ipf __P((fr_info_t *, frentry_t *, int));
-static	u_32_t		ipf_checkcipso __P((fr_info_t *, u_char *, int));
-static	u_32_t		ipf_checkripso __P((u_char *));
-static	u_32_t		ipf_decaps __P((fr_info_t *, u_32_t, int));
-static	frentry_t	*ipf_dolog __P((fr_info_t *, u_32_t *));
-static	int		ipf_flushlist __P((ipf_main_softc_t *, int, minor_t,
-					   int *, frentry_t **));
-static	int		ipf_flush_groups __P((ipf_main_softc_t *,
-					      int, int, int));
-static	ipfunc_t	ipf_findfunc __P((ipfunc_t));
-static	void		*ipf_findlookup __P((ipf_main_softc_t *, int,
-					     frentry_t *, i6addr_t *));
-static	frentry_t	*ipf_firewall __P((fr_info_t *, u_32_t *));
-static	int		ipf_fr_matcharray __P((fr_info_t *, int *));
-static	int		ipf_frruleiter __P((ipf_main_softc_t *, void *, int,
-					    void *));
-static	int		ipf_funcinit __P((ipf_main_softc_t *, frentry_t *fr));
-static	int		ipf_geniter __P((ipf_main_softc_t *, ipftoken_t *,
-					 ipfgeniter_t *));
-static	int		ipf_grpmapinit __P((struct ipf_main_softc_s *,
-					    frentry_t *));
-static	int		ipf_portcheck __P((frpcmp_t *, u_32_t));
-static	INLINE int	ipf_pr_ah __P((fr_info_t *));
-static	INLINE void	ipf_pr_esp __P((fr_info_t *));
-static	INLINE void	ipf_pr_gre __P((fr_info_t *));
-static	INLINE void	ipf_pr_udp __P((fr_info_t *));
-static	INLINE void	ipf_pr_tcp __P((fr_info_t *));
-static	INLINE void	ipf_pr_icmp __P((fr_info_t *));
-static	INLINE void	ipf_pr_ipv4hdr __P((fr_info_t *));
-static	INLINE void	ipf_pr_short __P((fr_info_t *, int));
-static	INLINE int	ipf_pr_tcpcommon __P((fr_info_t *));
-static	INLINE int	ipf_pr_udpcommon __P((fr_info_t *));
-static	void		ipf_rule_delete __P((ipf_main_softc_t *, frentry_t *f,
-					     int, int));
-static	void		ipf_rule_expire_insert __P((ipf_main_softc_t *,
-						    frentry_t *, int));
-static	void		ipf_synclist __P((ipf_main_softc_t *, frentry_t *,
-					  void *));
-static	ipftuneable_t	*ipf_tune_findbyname __P((ipftuneable_t *,
-						  const char *));
-static	ipftuneable_t	*ipf_tune_findbycookie __P((ipftuneable_t **, void *,
-						    void **));
-static	void		ipf_token_unlink __P((ipf_main_softc_t *,
-					      ipftoken_t *));
-static	int		ipf_updateipid __P((fr_info_t *));
-static	int		ipf_settimeout __P((struct ipf_main_softc_s *,
-					    struct ipftuneable *,
-					    ipftuneval_t *));
+static	INLINE int	ipf_check_ipf(fr_info_t *, frentry_t *, int);
+static	u_32_t		ipf_checkcipso(fr_info_t *, u_char *, int);
+static	u_32_t		ipf_checkripso(u_char *);
+static	u_32_t		ipf_decaps(fr_info_t *, u_32_t, int);
+static	frentry_t	*ipf_dolog(fr_info_t *, u_32_t *);
+static	int		ipf_flushlist(ipf_main_softc_t *, int, minor_t,
+				      int *, frentry_t **);
+static	int		ipf_flush_groups(ipf_main_softc_t *, int, int, int);
+static	ipfunc_t	ipf_findfunc(ipfunc_t);
+static	void		*ipf_findlookup(ipf_main_softc_t *, int, frentry_t *,
+					i6addr_t *);
+static	frentry_t	*ipf_firewall(fr_info_t *, u_32_t *);
+static	int		ipf_fr_matcharray(fr_info_t *, int *);
+static	int		ipf_frruleiter(ipf_main_softc_t *, void *, int, void *);
+static	int		ipf_funcinit(ipf_main_softc_t *, frentry_t *fr);
+static	int		ipf_geniter(ipf_main_softc_t *, ipftoken_t *,
+				    ipfgeniter_t *);
+static	int		ipf_grpmapinit(struct ipf_main_softc_s *, frentry_t *);
+static	int		ipf_portcheck(frpcmp_t *, u_32_t);
+static	INLINE int	ipf_pr_ah(fr_info_t *);
+static	INLINE void	ipf_pr_esp(fr_info_t *);
+static	INLINE void	ipf_pr_gre(fr_info_t *);
+static	INLINE void	ipf_pr_udp(fr_info_t *);
+static	INLINE void	ipf_pr_tcp(fr_info_t *);
+static	INLINE void	ipf_pr_icmp(fr_info_t *);
+static	INLINE void	ipf_pr_ipv4hdr(fr_info_t *);
+static	INLINE void	ipf_pr_short(fr_info_t *, int);
+static	INLINE int	ipf_pr_tcpcommon(fr_info_t *);
+static	INLINE int	ipf_pr_udpcommon(fr_info_t *);
+static	void		ipf_rule_delete(ipf_main_softc_t *, frentry_t *f,
+					int, int);
+static	void		ipf_rule_expire_insert(ipf_main_softc_t *,
+					       frentry_t *, int);
+static	void		ipf_synclist(ipf_main_softc_t *, frentry_t *, void *);
+static	ipftuneable_t	*ipf_tune_findbyname(ipftuneable_t *, const char *);
+static	ipftuneable_t	*ipf_tune_findbycookie(ipftuneable_t **, void *,
+					       void **);
+static	void		ipf_token_unlink(ipf_main_softc_t *, ipftoken_t *);
+static	int		ipf_updateipid(fr_info_t *);
+static	int		ipf_settimeout(struct ipf_main_softc_s *,
+				       struct ipftuneable *, ipftuneval_t *);
 
 
 /*
@@ -315,7 +308,7 @@ static ipftuneable_t ipf_main_tuneables[] = {
 		stsizeof(ipf_main_softc_t, ipf_chksrc),
 		0,			NULL,	NULL },
 	{ { (void *)offsetof(ipf_main_softc_t, ipf_minttl) },
-		"min_ttl",		0,	4,
+		"min_ttl",		0,	1,
 		stsizeof(ipf_main_softc_t, ipf_minttl),
 		0,			NULL,	NULL },
 	{ { (void *)offsetof(ipf_main_softc_t, ipf_icmpminfragmtu) },
@@ -326,12 +319,6 @@ static ipftuneable_t ipf_main_tuneables[] = {
 		"default_pass",		0,	0xffffffff,
 		stsizeof(ipf_main_softc_t, ipf_pass),
 		0,			NULL,	NULL },
-#ifdef IPFILTER_XID
-	{ { (void *)offsetof(ipf_main_softc_t, ipf_xid_debug) },
-		"xid_debug",	0,	10,
-		stsizeof(ipf_main_softc_t, ipf_xid_debug),
-		0,			NULL,	NULL },
-#endif
 	{ { (void *)offsetof(ipf_main_softc_t, ipf_tcpidletimeout) },
 		"tcp_idle_timeout",	1,	0x7fffffff,
 		stsizeof(ipf_main_softc_t, ipf_tcpidletimeout),
@@ -411,20 +398,20 @@ static ipftuneable_t ipf_main_tuneables[] = {
  * adding more code to a growing switch statement.
  */
 #ifdef USE_INET6
-static	INLINE int	ipf_pr_ah6 __P((fr_info_t *));
-static	INLINE void	ipf_pr_esp6 __P((fr_info_t *));
-static	INLINE void	ipf_pr_gre6 __P((fr_info_t *));
-static	INLINE void	ipf_pr_udp6 __P((fr_info_t *));
-static	INLINE void	ipf_pr_tcp6 __P((fr_info_t *));
-static	INLINE void	ipf_pr_icmp6 __P((fr_info_t *));
-static	INLINE void	ipf_pr_ipv6hdr __P((fr_info_t *));
-static	INLINE void	ipf_pr_short6 __P((fr_info_t *, int));
-static	INLINE int	ipf_pr_hopopts6 __P((fr_info_t *));
-static	INLINE int	ipf_pr_mobility6 __P((fr_info_t *));
-static	INLINE int	ipf_pr_routing6 __P((fr_info_t *));
-static	INLINE int	ipf_pr_dstopts6 __P((fr_info_t *));
-static	INLINE int	ipf_pr_fragment6 __P((fr_info_t *));
-static	INLINE struct ip6_ext *ipf_pr_ipv6exthdr __P((fr_info_t *, int, int));
+static	INLINE int	ipf_pr_ah6(fr_info_t *);
+static	INLINE void	ipf_pr_esp6(fr_info_t *);
+static	INLINE void	ipf_pr_gre6(fr_info_t *);
+static	INLINE void	ipf_pr_udp6(fr_info_t *);
+static	INLINE void	ipf_pr_tcp6(fr_info_t *);
+static	INLINE void	ipf_pr_icmp6(fr_info_t *);
+static	INLINE void	ipf_pr_ipv6hdr(fr_info_t *);
+static	INLINE void	ipf_pr_short6(fr_info_t *, int);
+static	INLINE int	ipf_pr_hopopts6(fr_info_t *);
+static	INLINE int	ipf_pr_mobility6(fr_info_t *);
+static	INLINE int	ipf_pr_routing6(fr_info_t *);
+static	INLINE int	ipf_pr_dstopts6(fr_info_t *);
+static	INLINE int	ipf_pr_fragment6(fr_info_t *);
+static	INLINE struct ip6_ext *ipf_pr_ipv6exthdr(fr_info_t *, int, int);
 
 
 /* ------------------------------------------------------------------------ */
@@ -1292,64 +1279,6 @@ ipf_pr_icmp(fin)
 	ipf_checkv4sum(fin);
 }
 
-/* ------------------------------------------------------------------------ */
-/* Function:    ipf_pr_tcpxid                                            */
-/* Returns:     int    - 0 = header ok, 1 = bad packet, -1 = buffer error   */
-/* Parameters:  fin(I) - pointer to packet information                      */
-/*                                                                          */
-/* Obtain for a TCP packet that is containing a RPC (call/response) header  */
-/* the RPC program number or XID (transaction ID) of the response           */
-/*                                                                          */
-/* Theoretically what we should do is collect bytes of the RPC header in a  */
-/* buffer and then obtain the XID from that buffer, because it is incorrect */
-/* to assume that the RPC header fits in a TCP packet in all cases          */
-/*                                                                          */
-/* However, because in most cases the RPC header fits in a IP packet        */
-/* the approach that we currently use works in 'most' cases (for now)       */
-/* ------------------------------------------------------------------------ */
-
-#ifdef IPFILTER_XID
-int ipf_pr_tcpxid(fin)
-	fr_info_t *fin;
-{
-	char *s;
-	int tlen;
-	uint32_t xid;
-	uint32_t prog;
-	tcphdr_t *tcp;
-	fr_xdr_callhdr_t *rpc;
-	ipf_main_softc_t *softc = fin->fin_main_soft;
-
-	tcp = fin->fin_dp;
-	tlen = TCP_OFF(tcp) << 2;
-
-	/* need TCP header + TCP optionss (if any) + RPC header */
-	if (ipf_pr_pullup(fin,sizeof(*tcp) + sizeof(*rpc) == -1)) {
-		return -1;
-	}
-
-	if (tlen < sizeof(tcphdr_t)) {
-		return -1;
-	}
-
-	s = (char *)tcp + tlen + 4;
-	rpc = (fr_xdr_callhdr_t *)s;
-
-	xid = ntohl(rpc->xid);
-	prog = ntohl(rpc->prog);
-
-	if (softc->ipf_xid_debug==8) {
-		char *sen = (fin->fin_out)?"in":"out";
-		printf("tcp %s xid %u rpc prog %u\n",sen,xid,prog);
-	}
-
-	fin->fin_xid = xid;
-	fin->fin_prog = prog;
-
-	return 0;
-}
-
-#endif /* IPFILTER_XID */
 
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_pr_tcpcommon                                            */
@@ -1535,10 +1464,6 @@ ipf_pr_udpcommon(fin)
 	fr_info_t *fin;
 {
 	udphdr_t *udp;
-#ifdef IPFILTER_XID
-	int is_rpc = 1;
-	fr_xdr_callhdr_t *rpc;
-#endif
 
 	fin->fin_flx |= FI_TCPUDP;
 
@@ -1551,39 +1476,10 @@ ipf_pr_udpcommon(fin)
 			return 1;
 		}
 
-#ifdef IPFILTER_XID
-		if (ipf_pr_pullup(fin, sizeof(*rpc)) == -1) {
-			is_rpc = 0;  /* it is a not the size of an RPC packet */
-		}
-#endif
-
 		udp = fin->fin_dp;
 
 		fin->fin_sport = ntohs(udp->uh_sport);
 		fin->fin_dport = ntohs(udp->uh_dport);
-
-#ifdef IPFILTER_XID
-		if (is_rpc) {
-			u_char *s;
-			uint32_t xid;
-			uint32_t prog;
-			ipf_main_softc_t *softc = fin->fin_main_soft;
-
-			s = (u_char *)fin->fin_dp + sizeof(*udp);
-			rpc = (fr_xdr_callhdr_t *)s;
-
-			xid = ntohl(rpc->xid);
-			prog = ntohl(rpc->prog);
-
-			if (softc->ipf_xid_debug==9) {
-				char *intf = (fin->fin_out)?"out":"in";
-				printf("udp %s xid %u rpc prog %u\n",intf,xid,prog);
-			}
-
-			fin->fin_xid = xid;
-			fin->fin_prog = prog;
-		}
-#endif /* IPFILTER_XID */
 	}
 
 	return 0;
@@ -3690,9 +3586,9 @@ nodata:
 	return sum2;
 }
 
+
 #if defined(_KERNEL) && ( (BSD_LT_YEAR(199103) && !defined(MENTAT)) || \
     defined(__sgi) ) && !defined(linux) && !defined(_AIX51)
-
 /*
  * Copyright (c) 1982, 1986, 1988, 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -3816,7 +3712,6 @@ out:
 #endif
 	return;
 }
-
 #endif /* (_KERNEL) && ( ((BSD < 199103) && !MENTAT) || __sgi) */
 
 
@@ -9222,10 +9117,6 @@ ipf_main_soft_create(arg)
 	softc->ipf_icmpminfragmtu = 68;
 	softc->ipf_flags = IPF_LOGGING;
 
-#ifdef IPFILTER_XID
-	softc->ipf_xid_debug = 0;
-#endif
-
 	return softc;
 }
 
@@ -9453,13 +9344,11 @@ ipf_create_all(arg)
 		return NULL;
 	}
 
-#ifdef IPFILTER_SYNC
 	softc->ipf_sync_soft = ipf_sync_soft_create(softc);
 	if (softc->ipf_sync_soft == NULL) {
 		ipf_destroy_all(softc);
 		return NULL;
 	}
-#endif
 
 	softc->ipf_state_soft = ipf_state_soft_create(softc);
 	if (softc->ipf_state_soft == NULL) {
@@ -9536,12 +9425,10 @@ ipf_destroy_all(softc)
 		softc->ipf_proxy_soft = NULL;
 	}
 
-#ifdef IPFILTER_SYNC
 	if (softc->ipf_sync_soft != NULL) {
 		ipf_sync_soft_destroy(softc, softc->ipf_sync_soft);
 		softc->ipf_sync_soft = NULL;
 	}
-#endif
 
 	if (softc->ipf_lookup_soft != NULL) {
 		ipf_lookup_soft_destroy(softc, softc->ipf_lookup_soft);
@@ -9579,10 +9466,8 @@ ipf_init_all(softc)
 	if (ipf_lookup_soft_init(softc, softc->ipf_lookup_soft) == -1)
 		return -1;
 
-#ifdef IPFILTER_SYNC
 	if (ipf_sync_soft_init(softc, softc->ipf_sync_soft) == -1)
 		return -1;
-#endif
 
 	if (ipf_state_soft_init(softc, softc->ipf_state_soft) == -1)
 		return -1;
@@ -9631,10 +9516,8 @@ ipf_fini_all(softc)
 	if (ipf_state_soft_fini(softc, softc->ipf_state_soft) == -1)
 		return -1;
 
-#ifdef IPFILTER_SYNC
 	if (ipf_sync_soft_fini(softc, softc->ipf_sync_soft) == -1)
 		return -1;
-#endif
 
 	if (ipf_lookup_soft_fini(softc, softc->ipf_lookup_soft) == -1)
 		return -1;
@@ -9703,9 +9586,9 @@ ipf_rule_expire(softc)
  * more than one use, I'd be using a .c file implementation fof a red-
  * -black tree.
  */
-static int ipf_ht_node_cmp __P((struct host_node_s *, struct host_node_s *));
-static void ipf_ht_node_make_key __P((host_track_t *, host_node_t *, int,
-				      i6addr_t *));
+static int ipf_ht_node_cmp(struct host_node_s *, struct host_node_s *);
+static void ipf_ht_node_make_key(host_track_t *, host_node_t *, int,
+				 i6addr_t *);
 
 RB_PROTOTYPE(ipf_rb, host_node_s, hn_entry, ipf_ht_node_cmp);
 RB_GENERATE(ipf_rb, host_node_s, hn_entry, ipf_ht_node_cmp);

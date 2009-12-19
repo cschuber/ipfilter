@@ -48,7 +48,7 @@
 #include "netinet/ip_pool.h"
 #include "md5.h"
 #include <sys/kernel.h>
-extern	int	ip_optcopy __P((struct ip *, struct ip *));
+extern	int	ip_optcopy(struct ip *, struct ip *);
 
 #if !defined(lint)
 static const char sccsid[] = "@(#)ip_fil.c	2.41 6/5/96 (C) 1993-2000 Darren Reed";
@@ -58,8 +58,8 @@ static const char rcsid[] = "@(#)$Id$";
 extern	struct	protosw	inetsw[];
 extern	int	ip_forwarding;
 
-static	int	(*ipf_savep) __P((ip_t *, int, void *, int, struct mbuf **));
-static	int	ipf_send_ip __P((fr_info_t *, mb_t *, mb_t **));
+static	int	(*ipf_savep)(ip_t *, int, void *, int, struct mbuf **);
+static	int	ipf_send_ip(fr_info_t *, mb_t *, mb_t **);
 
 
 #if defined(IPFILTER_LKM)
@@ -431,7 +431,7 @@ ipf_send_icmp_err(type, fin, dst)
 
 
 #if !defined(IPFILTER_LKM)
-int iplinit __P((void));
+int iplinit(void);
 
 int
 iplinit()
