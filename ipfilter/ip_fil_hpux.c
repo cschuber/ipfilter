@@ -218,7 +218,7 @@ int mode;
 #ifdef IPFILTER_LOOKUP
 		case IPL_LOGLOOKUP :
 #endif
-#ifdef IPFILTER_SYNC  
+#ifdef IPFILTER_SYNC
 		case IPL_LOGSYNC :
 #endif
 #ifdef IPFILTER_SCAN
@@ -226,7 +226,7 @@ int mode;
 #endif
 			error = 0;
 			break;
-		default :  
+		default :
 			error = ENXIO;
 			break;
 		}
@@ -818,10 +818,10 @@ int len;
 }
 
 
-/*  
- * m0 - pointer to mbuf where the IP packet starts  
- * mpp - pointer to the mbuf pointer that is the start of the mbuf chain  
- */  
+/*
+ * m0 - pointer to mbuf where the IP packet starts
+ * mpp - pointer to the mbuf pointer that is the start of the mbuf chain
+ */
 int fr_fastroute(mb, mpp, fin, fdp)
 mblk_t *mb, **mpp;
 fr_info_t *fin;

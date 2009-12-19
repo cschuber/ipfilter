@@ -108,7 +108,7 @@ static const char rcsid[] = "@(#)$Id$";
 #ifdef	IPFILTER_SYNC
 # if SOLARIS && defined(_KERNEL)
 extern	struct pollhead	iplpollhead[IPL_LOGSIZE];
-# endif 
+# endif
 
 ipfmutex_t	ipf_syncadd, ipsl_mutex;
 ipfrwlock_t	ipf_syncstate, ipf_syncnat;

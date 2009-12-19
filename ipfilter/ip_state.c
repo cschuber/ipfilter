@@ -925,7 +925,7 @@ ipf_state_matchipv4addrs(is1, is2)
 
 	if (is1->is_saddr == is2->is_saddr && is1->is_daddr == is2->is_daddr)
 		rv = 2;
-	else if (is1->is_saddr == is2->is_daddr && 
+	else if (is1->is_saddr == is2->is_daddr &&
 	    is1->is_daddr == is2->is_saddr) {
 		/* force strong match for ICMP protocol */
 		rv = (is1->is_p == IPPROTO_ICMP) ? 2 : 1;
@@ -952,8 +952,8 @@ ipf_state_matchipv6addrs(is1, is2)
 {
 	int	rv;
 
-	if (IP6_EQ(&is1->is_src, &is2->is_src) && 
-	    IP6_EQ(&is1->is_dst, &is2->is_dst))  
+	if (IP6_EQ(&is1->is_src, &is2->is_src) &&
+	    IP6_EQ(&is1->is_dst, &is2->is_dst))
 		rv = 2;
 	else if (IP6_EQ(&is1->is_src, &is2->is_dst) &&
 	    IP6_EQ(&is1->is_dst, &is2->is_src)) {
@@ -1021,10 +1021,10 @@ ipf_state_matchports(ppairs1, ppairs2)
 {
 	int	rv;
 
-	if (ppairs1->us_sport == ppairs2->us_sport && 
+	if (ppairs1->us_sport == ppairs2->us_sport &&
 	    ppairs1->us_dport == ppairs2->us_dport)
 		rv = 2;
-	else if (ppairs1->us_sport == ppairs2->us_dport && 
+	else if (ppairs1->us_sport == ppairs2->us_dport &&
 		    ppairs1->us_dport == ppairs2->us_sport)
 		rv = 1;
 	else
@@ -1986,7 +1986,7 @@ ipstate_t *is;
 	/*
 	 * It has not yet been placed on any timeout queue, so make sure
 	 * all of that data is zero'd out.
-	 */     
+	 */
 	clone->is_sti.tqe_pnext = NULL;
 	clone->is_sti.tqe_next = NULL;
 	clone->is_sti.tqe_ifq = NULL;

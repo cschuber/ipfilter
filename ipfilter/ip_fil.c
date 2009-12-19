@@ -801,12 +801,12 @@ int ipfsync()
 }
 
 
-/*    
+/*
  * This function is not meant to be random, rather just produce a
  * sequence of numbers that isn't linear to show "randomness".
  */
 u_32_t
-ipf_random() 
+ipf_random()
 {
 	static int last = 0xa5a5a5a5;
 	static int calls = 0;

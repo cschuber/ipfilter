@@ -257,7 +257,7 @@ cred_t *cp;
 #ifdef IPFILTER_LOOKUP
 		case IPL_LOGLOOKUP :
 #endif
-#ifdef IPFILTER_SYNC  
+#ifdef IPFILTER_SYNC
 		case IPL_LOGSYNC :
 #endif
 #ifdef IPFILTER_SCAN
@@ -265,7 +265,7 @@ cred_t *cp;
 #endif
 			error = 0;
 			break;
-		default :  
+		default :
 			error = ENXIO;
 			break;
 		}
@@ -680,10 +680,10 @@ register struct mbuf *m0;
 }
 
 
-/*  
- * m0 - pointer to mbuf where the IP packet starts  
- * mpp - pointer to the mbuf pointer that is the start of the mbuf chain  
- */  
+/*
+ * m0 - pointer to mbuf where the IP packet starts
+ * mpp - pointer to the mbuf pointer that is the start of the mbuf chain
+ */
 int fr_fastroute(m0, mpp, fin, fdp)
 struct mbuf *m0, **mpp;
 fr_info_t *fin;

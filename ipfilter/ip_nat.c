@@ -4106,7 +4106,7 @@ u_32_t *passp;
 	if (((fin->fin_flx & FI_ICMPERR) != 0) &&
 	    (nat = nat_icmperror(fin, &nflags, NAT_INBOUND)))
 		/*EMPTY*/;
-	else if ((fin->fin_flx & FI_FRAG) && 
+	else if ((fin->fin_flx & FI_FRAG) &&
 		 (nat = fr_nat_knownfrag(fin)))
 		natadd = 0;
 	else if ((nat = nat_inlookup(fin, nflags|NAT_SEARCH, (u_int)fin->fin_p,
@@ -5221,7 +5221,7 @@ ipfgeniter_t *itp;
 				if (nextnat->nat_next == NULL) {
 					t->ipt_data = NULL;
 					break;
-				}	
+				}
 				dst += sizeof(*nextnat);
 				nat = nextnat;
 				nextnat = nextnat->nat_next;

@@ -887,9 +887,9 @@ typedef	u_int32_t	u_32_t;
 # if defined(_KERNEL)
 #  if (__FreeBSD_version >= 500024)
 #   if (__FreeBSD_version >= 500043)
-#    define     p_cred  td_ucred    
+#    define     p_cred  td_ucred
 #    define     p_uid   td_ucred->cr_ruid
-#   else 
+#   else
 #    define     p_cred  t_proc->p_cred
 #    define     p_uid   t_proc->p_cred->p_ruid
 #   endif

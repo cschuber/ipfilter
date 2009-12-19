@@ -4285,7 +4285,7 @@ caddr_t data;
 	/*
 	 * Perform per-rule type sanity checks of their members.
 	 * All code after this needs to be aware that allocated memory
-	 * may need to be free'd before exiting. 
+	 * may need to be free'd before exiting.
 	 */
 	switch (fp->fr_type & ~FR_T_BUILTIN)
 	{

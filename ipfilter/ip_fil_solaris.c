@@ -312,7 +312,7 @@ cred_t *cred;
 		case IPL_LOGAUTH :
 #ifdef IPFILTER_LOOKUP
 		case IPL_LOGLOOKUP :
-#endif 
+#endif
 #ifdef IPFILTER_SYNC
 		case IPL_LOGSYNC :
 #endif
