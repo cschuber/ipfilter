@@ -310,6 +310,14 @@ ipf_send_ip(fr_info_t *fin, struct sk_buff *sk, struct sk_buff **skp)
 	fnew.fin_dp = (char *)ip + hlen;
 	(void) ipf_makefrip(hlen, ip, &fnew);
 
+	if (fin->fin_fr != NULL && fin->fin_fr->fr_type == FR_T_IPF) {
+		frdest_t *fdp = &fin->fin_fr->fr_rif;
+
+		if ((fdp->fd_ptr != NULL) &&
+		    (fdp->fd_ptr != (struct ifnet *)-1))
+			return ipf_fastroute(m, mpp, &fnew, fdp);
+	}
+
 	return ipf_fastroute(sk, skp, &fnew, NULL);
 }
 
