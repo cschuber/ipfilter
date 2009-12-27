@@ -130,7 +130,9 @@ ipf_p_tftp_backchannel(fin, aps, nat)
 	nat_t *nat;
 {
 	ipf_main_softc_t *softc = fin->fin_main_soft;
+#ifdef USE_MUTEXES
 	ipf_nat_softc_t *softn = softc->ipf_nat_soft;
+#endif
 	struct in_addr swip,swip2;
 	tftpinfo_t *ti;
 	udphdr_t *udp;

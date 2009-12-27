@@ -216,9 +216,11 @@ ipf_p_dns_del(softc, aps)
 	ipf_main_softc_t *softc;
 	ap_session_t *aps;
 {
+#ifdef USE_MUTEXES
 	dnsinfo_t *di = aps->aps_data;
 
 	MUTEX_DESTROY(&di->dnsi_lock);
+#endif
 	KFREES(aps->aps_data, aps->aps_psiz);
 	aps->aps_data = NULL;
 	aps->aps_psiz = 0;
