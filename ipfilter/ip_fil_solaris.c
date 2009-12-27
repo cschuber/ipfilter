@@ -298,7 +298,7 @@ get_unit(soft, name, family)
 	return qf;
 #else
 	ipf_main_softc_t *softc = soft;
-	net_data_t proto;
+	net_handle_t proto;
 
 	if (family == 4)
 		proto = softc->ipf_nd_v4;
@@ -1396,7 +1396,7 @@ ipf_routeto(fin, v, dstip)
 	struct sockaddr_in6 sin6;
 	struct sockaddr_in sin;
 	struct sockaddr *sock;
-	net_data_t proto;
+	net_handle_t proto;
 	int result;
 
 	switch (fin->fin_v)
