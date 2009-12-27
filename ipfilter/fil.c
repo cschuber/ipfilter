@@ -2758,7 +2758,7 @@ ipf_firewall(fin, passp)
 	 */
 	if ((fr != NULL) && (fr->fr_pps != 0) &&
 	    !ppsratecheck(&fr->fr_lastpkt, &fr->fr_curpps, fr->fr_pps)) {
-		pass &= ~(FR_CMDMASK|FR_DUP|FR_RETICMP|FR_RETRST);
+		pass &= ~(FR_CMDMASK|FR_RETICMP|FR_RETRST);
 		pass |= FR_BLOCK;
 		LBUMP(ipf_stats[out].fr_ppshit);
 		fin->fin_reason = 2;
@@ -3235,10 +3235,11 @@ filterdone:
 		 * Generate a duplicated packet first because ipf_fastroute
 		 * can lead to fin_m being free'd... not good.
 		 */
-		if ((pass & FR_DUP) != 0) {
+		fdp = &fr->fr_dif;
+		if ((fdp->fd_ptr != NULL) && (fdp->fd_ptr != (void *)-1)) {
 			mc = M_COPY(fin->fin_m);
 			if (mc != NULL)
-				ipf_fastroute(mc, &mc, fin, &fr->fr_dif);
+				ipf_fastroute(mc, &mc, fin, fdp);
 		}
 
 		fdp = &fr->fr_tifs[fin->fin_rev];
@@ -4353,14 +4354,8 @@ ipf_synclist(softc, fr, ifp)
 			ipf_resolvedest(softc, fr->fr_names, fdp, v);
 
 		fdp = &fr->fr_dif;
-		if ((ifp == NULL) || (fdp->fd_ptr == ifp)) {
+		if ((ifp == NULL) || (fdp->fd_ptr == ifp))
 			ipf_resolvedest(softc, fr->fr_names, fdp, v);
-
-			fr->fr_flags &= ~FR_DUP;
-			if ((fdp->fd_ptr != (void *)-1) &&
-			    (fdp->fd_ptr != NULL))
-				fr->fr_flags |= FR_DUP;
-		}
 
 		if (((fr->fr_type & FR_T_BUILTIN) == FR_T_IPF) &&
 		    (fr->fr_satype == FRI_LOOKUP) && (fr->fr_srcptr == NULL)) {

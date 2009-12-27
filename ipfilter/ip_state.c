@@ -1949,6 +1949,9 @@ ipf_state_add(softc, fin, stsave, flags)
 	}
 #endif /* IPFILTER_XID */
 
+	if (pass & FR_STLOOSE)
+		is->is_flags |= IS_LOOSE;
+
 	if (pass & FR_STSTRICT)
 		is->is_flags |= IS_STRICT;
 
@@ -2184,7 +2187,11 @@ ipf_state_tcp(softc, softs, fin, tcp, is)
 		}
 	}
 
-	ret = ipf_state_tcpinwindow(fin, fdata, tdata, tcp, is->is_flags);
+	if (is->is_flags & IS_LOOSE)
+		ret = 1;
+	else
+		ret = ipf_state_tcpinwindow(fin, fdata, tdata, tcp,
+					    is->is_flags);
 	if (ret > 0) {
 		/*
 		 * Nearing end of connection, start timeout.

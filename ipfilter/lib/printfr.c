@@ -98,7 +98,7 @@ printfr(fp, iocfunc)
 		putchar(' ');
 	}
 
-	if (fp->fr_dif.fd_name != -1 && (fp->fr_flags & FR_DUP))
+	if (fp->fr_dif.fd_name != -1)
 		print_toif("dup-to", fp->fr_names, &fp->fr_dif);
 	if (fp->fr_tif.fd_name != -1)
 		print_toif("to", fp->fr_names, &fp->fr_tif);
@@ -375,6 +375,10 @@ printfr(fp, iocfunc)
 			}
 			if (fp->fr_flags & FR_STSTRICT) {
 				PRINTF("%sstrict", comma);
+				comma = ",";
+			}
+			if (fp->fr_flags & FR_STLOOSE) {
+				PRINTF("%sloose", comma);
 				comma = ",";
 			}
 			if (fp->fr_flags & FR_NEWISN) {

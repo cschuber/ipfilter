@@ -834,7 +834,7 @@ typedef	struct	frentry {
 #define	FR_LOGBODY	0x10000	/* Log the body */
 #define	FR_LOGFIRST	0x20000	/* Log the first byte if state held */
 #define	FR_LOGORBLOCK	0x40000	/* block the packet if it can't be logged */
-#define	FR_DUP		0x80000	/* duplicate packet */
+#define	FR_STLOOSE	0x80000	/* loose state checking */
 #define	FR_FRSTRICT	0x100000	/* strict frag. cache */
 #define	FR_STSTRICT	0x200000	/* strict keep state */
 #define	FR_NEWISN	0x400000	/* new ISN for outgoing TCP */

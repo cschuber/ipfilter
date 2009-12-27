@@ -8,4 +8,5 @@ pass out on ppp0(!) in-via le0(!) proto tcp from any to any keep state # count 0
 pass in on ed0(!),vx0(!) out-via vx0(!),ed0(!) proto udp from any to any keep state # count 0
 pass in inet proto tcp from any port > 1024 to 127.0.0.1/32 port = 1024 keep state # count 0
 pass in proto tcp from any to any flags S/FSRPAU keep state (limit 101,strict,newisn,no-icmp-err,age 600/600) # count 0
+pass in proto tcp from any to any flags S/FSRPAU keep state (limit 101,loose,newisn,no-icmp-err,age 600/600) # count 0
 pass in proto udp from any to any keep state (sync,age 10/20) # count 0
