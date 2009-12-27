@@ -144,7 +144,7 @@ static	addfunc_t	ipfaddfunc = NULL;
 %token	IPFY_IPOPTS IPFY_SHORT IPFY_NAT IPFY_BADSRC IPFY_LOWTTL IPFY_FRAG
 %token	IPFY_MBCAST IPFY_BAD IPFY_BADNAT IPFY_OOW IPFY_NEWISN IPFY_NOICMPERR
 %token	IPFY_KEEP IPFY_STATE IPFY_FRAGS IPFY_LIMIT IPFY_STRICT IPFY_AGE
-%token	IPFY_SYNC IPFY_FRAGBODY IPFY_ICMPHEAD IPFY_NOLOG
+%token	IPFY_SYNC IPFY_FRAGBODY IPFY_ICMPHEAD IPFY_NOLOG IPFY_LOOSE
 %token	IPFY_MAX_SRCS IPFY_MAX_PER_SRC
 %token	IPFY_IPOPT_NOP IPFY_IPOPT_RR IPFY_IPOPT_ZSU IPFY_IPOPT_MTUP
 %token	IPFY_IPOPT_MTUR IPFY_IPOPT_ENCODE IPFY_IPOPT_TS IPFY_IPOPT_TR
@@ -621,14 +621,12 @@ vianame:
 dup:	IPFY_DUPTO name
 	{ int idx = addname(&fr, $2);
 	  fr->fr_dif.fd_name = idx;
-	  fr->fr_flags |= FR_DUP;
 	  free($2);
 	}
 	| IPFY_DUPTO IPFY_DSTLIST '/' name
 	{ int idx = addname(&fr, $4);
 	  fr->fr_dif.fd_name = idx;
 	  fr->fr_dif.fd_type = FRD_DSTLIST;
-	  fr->fr_flags |= FR_DUP;
 	  free($4);
 	}
 	| IPFY_DUPTO name duptoseparator hostname
@@ -637,7 +635,6 @@ dup:	IPFY_DUPTO name
 	  fr->fr_dif.fd_ip6 = $4.adr;
 	  if (fr->fr_family == AF_UNSPEC && $4.f != AF_UNSPEC)
 		fr->fr_family = $4.f;
-	  fr->fr_flags |= FR_DUP;
 	  yyexpectaddr = 0;
 	  free($2);
 	}
@@ -1360,8 +1357,17 @@ stateopt:
 	IPFY_LIMIT YY_NUMBER	{ DOALL(fr->fr_statemax = $2;) }
 	| IPFY_STRICT		{ DOALL(if (fr->fr_proto != IPPROTO_TCP) { \
 						YYERROR; \
-					  } else \
+					} else if (fr->fr_flags & FR_STLOOSE) {\
+						YYERROR; \
+					} else \
 						fr->fr_flags |= FR_STSTRICT;)
+				}
+	| IPFY_LOOSE		{ DOALL(if (fr->fr_proto != IPPROTO_TCP) { \
+						YYERROR; \
+					} else if (fr->fr_flags & FR_STSTRICT){\
+						YYERROR; \
+					} else \
+						fr->fr_flags |= FR_STLOOSE;)
 				}
 	| IPFY_NEWISN		{ DOALL(if (fr->fr_proto != IPPROTO_TCP) { \
 						YYERROR; \
@@ -1762,6 +1768,7 @@ static	struct	wordtab ipfwords[] = {
 	{ "level",			IPFY_LEVEL },
 	{ "limit",			IPFY_LIMIT },
 	{ "log",			IPFY_LOG },
+	{ "loose",			IPFY_LOOSE },
 	{ "lowttl",			IPFY_LOWTTL },
 	{ "lt",				YY_CMP_LT },
 	{ "mask",			IPFY_MASK },

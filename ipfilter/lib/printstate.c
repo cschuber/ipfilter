@@ -159,8 +159,16 @@ printstate(sp, opts, now)
 	/* a given; no? */
 	if (sp->is_pass & FR_KEEPSTATE) {
 		PRINTF(" keep state");
-		if (sp->is_pass & FR_STATESYNC)
-			PRINTF(" ( sync )");
+		if (sp->is_pass & (FR_STATESYNC|FR_STSTRICT|FR_STLOOSE)) {
+			PRINTF(" (");
+			if (sp->is_pass & FR_STATESYNC)
+				PRINTF(" sync");
+			if (sp->is_pass & FR_STSTRICT)
+				PRINTF(" strict");
+			if (sp->is_pass & FR_STLOOSE)
+				PRINTF(" loose");
+			PRINTF(" )");
+		}
 	}
 	PRINTF("\n");
 

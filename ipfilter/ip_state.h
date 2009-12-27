@@ -118,6 +118,7 @@ typedef struct ipstate {
 #define	IS_ISNSYN			   0x40000
 #define	IS_ISNACK			   0x80000
 #define	IS_STATESYNC			   0x100000
+#define	IS_LOOSE			   0x200000
 /*
  * IS_SC flags are for scan-operations that need to be recognised in state.
  */
