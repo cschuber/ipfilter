@@ -75,7 +75,7 @@ static const char rcsid[] = "@(#)$Id$";
 #include <sys/kernel.h>
 #include <sys/conf.h>
 #ifdef INET
-extern	int	ip_optcopy(struct ip *, struct ip *);
+extern	int	ip_optcopy __P((struct ip *, struct ip *));
 #endif
 
 #ifdef IPFILTER_M_IPFILTER
@@ -104,7 +104,7 @@ static  int     ipfclose(dev_t dev, int flags);
 static  int     ipfread(dev_t, struct uio *, int ioflag);
 static  int     ipfwrite(dev_t, struct uio *, int ioflag);
 static  int     ipfpoll(dev_t, int events, PROC_T *);
-static	void	ipf_timer_func(void *ptr);
+static	void	ipf_timer_func __P((void *ptr));
 
 const struct cdevsw ipl_cdevsw = {
 	ipfopen, ipfclose, ipfread, ipfwrite, ipfioctl,
@@ -119,11 +119,11 @@ const struct cdevsw ipl_cdevsw = {
 
 ipf_main_softc_t ipfmain;
 
-static	int	(*ipf_savep)(void *, ip_t *, int, void *, int, struct mbuf **);
-static	int	ipf_send_ip(fr_info_t *, mb_t *, mb_t **);
+static	int	(*ipf_savep) __P((void *, ip_t *, int, void *, int, struct mbuf **));
+static	int	ipf_send_ip __P((fr_info_t *, mb_t *, mb_t **));
 #ifdef USE_INET6
-static int ipf_fastroute6(struct mbuf *, struct mbuf **,
-			  fr_info_t *, frdest_t *);
+static int ipf_fastroute6 __P((struct mbuf *, struct mbuf **,
+			      fr_info_t *, frdest_t *));
 #endif
 
 #if defined(NETBSD_PF)
@@ -131,7 +131,7 @@ static int ipf_fastroute6(struct mbuf *, struct mbuf **,
 /*
  * We provide the ipf_checkp name just to minimize changes later.
  */
-int (*ipf_checkp)(void *, ip_t *ip, int hlen, void *ifp, int out, mb_t **mp);
+int (*ipf_checkp) __P((void *, ip_t *ip, int hlen, void *ifp, int out, mb_t **mp));
 #endif /* NETBSD_PF */
 
 #if defined(__NetBSD_Version__) && (__NetBSD_Version__ >= 105110000)
@@ -798,14 +798,6 @@ ipf_send_ip(fin, m, mpp)
 	fnew.fin_hlen = hlen;
 	fnew.fin_dp = (char *)ip + hlen;
 	(void) ipf_makefrip(hlen, ip, &fnew);
-
-	if (fin->fin_fr != NULL && fin->fin_fr->fr_type == FR_T_IPF) {
-		frdest_t *fdp = &fin->fin_fr->fr_rif;
-
-		if ((fdp->fd_ptr != NULL) &&
-		    (fdp->fd_ptr != (struct ifnet *)-1))
-			return ipf_fastroute(m, mpp, &fnew, fdp);
-	}
 
 	return ipf_fastroute(m, mpp, &fnew, NULL);
 }

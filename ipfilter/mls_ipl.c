@@ -43,25 +43,25 @@ static const char sccsid[] = "@(#)mls_ipl.c	2.6 10/15/95 (C) 1993-2000 Darren Re
 static const char rcsid[] = "@(#)$Id$";
 #endif
 
-extern	int	ipfdetach(void);
+extern	int	ipfdetach __P((void));
 #ifndef	IPFILTER_LOG
 #define	ipfread	nulldev
 #endif
-extern	int	nulldev(void);
+extern	int	nulldev __P((void));
 extern	int	errno;
 
-extern int nodev(void);
+extern int nodev __P((void));
 
-static	int	unload(void);
-static	int	ipf_attach(void);
-int	xxxinit(u_int, struct vddrv *, caddr_t, struct vdstat *);
+static	int	unload __P((void));
+static	int	ipf_attach __P((void));
+int	xxxinit __P((u_int, struct vddrv *, caddr_t, struct vdstat *));
 static	char	*ipf_devfiles[] = { IPL_NAME, IPNAT_NAME, IPSTATE_NAME,
 				    IPAUTH_NAME, IPSYNC_NAME, IPSCAN_NAME,
 				    IPLOOKUP_NAME, NULL };
-static	int	ipfopen(dev_t, int);
-static	int	ipfclose(dev_t, int);
-static	int	ipfread(dev_t, struct uio *);
-static	int	ipfwrite(dev_t, struct uio *);
+static	int	ipfopen __P((dev_t, int));
+static	int	ipfclose __P((dev_t, int));
+static	int	ipfread __P((dev_t, struct uio *));
+static	int	ipfwrite __P((dev_t, struct uio *));
 
 
 struct	cdevsw	ipfdevsw =
@@ -128,7 +128,7 @@ struct vdldrv vd =
 };
 #endif /* sun4m */
 
-extern int vd_unuseddev(void);
+extern int vd_unuseddev __P((void));
 extern struct cdevsw cdevsw[];
 extern int nchrdev;
 

@@ -24,6 +24,7 @@ static const char rcsid[] = "@(#)$Id$";
 #include <sys/socket.h>
 #include <sys/sysmacros.h>
 #include <sys/syslog.h>
+#include <sys/select.h>
 #include <io/common/pt.h>
 #include <io/common/devdriver.h>
 #include <io/common/devio.h>
@@ -70,7 +71,7 @@ void	ipfilter_in_control(struct socket *, u_int, caddr_t *, struct ifnet *);
 void	ipfilter_ip_input(struct mbuf *m);
 int	ipfilter_ip_output(struct ifnet *, struct mbuf *, struct in_route *,
 			   int, struct ip_moptions *);
-void	ipfilter_configure_callback(int, int, int, int);
+void	ipfilter_configure_callback __P((int, int, int, int));
 void	ipfilter_timer(void);
 void	ipfilter_clock(void *arg);
 int	ipfilteropen(dev_t, int, int);
@@ -82,7 +83,7 @@ int	ipfilterioctl(dev_t, u_int, caddr_t, int);
 extern	int	nodev(), nulldev();
 extern	task_t	first_task;
 extern	ipfrwlock_t	ipf_tru64;
-extern	void	ipf_timer_func(void *);
+extern	void	ipf_timer_func __P((void *));
 
 struct	dsent	ipfilter_devsw_entry = {
 	ipfilteropen,
@@ -155,9 +156,9 @@ static u_char ipfilter_unused[300] = "";
 static thread_t ipf_timeout = 0;
 
 /* protos for functions used in configuration */
-void ipfilter_print_attr_error(cfg_attr_t *);
-void ipfilter_preconfig_callback(int, int, ulong, ulong);
-void ipfilter_postconfig_callback(int, int, ulong, ulong);
+void ipfilter_print_attr_error __P((cfg_attr_t *));
+void ipfilter_preconfig_callback __P((int, int, ulong, ulong));
+void ipfilter_postconfig_callback __P((int, int, ulong, ulong));
 
 
 struct firewall_stat {

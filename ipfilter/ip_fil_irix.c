@@ -71,11 +71,11 @@ extern	int	tcp_ttl;
 extern	toid_t	ipf_timer_id;
 #endif
 
-static	int	(*ipf_savep)(ip_t *, int, void *, int, struct mbuf **);
-static	int	ipf_send_ip(fr_info_t *, struct mbuf *, struct mbuf **);
-static	int	ipfopen(dev_t *, int, int, cred_t *);
-static	int	ipfclose(dev_t *, int, int, cred_t *);
-static	int	ipfread(dev_t, struct uio *, cred_t *);
+static	int	(*ipf_savep) __P((ip_t *, int, void *, int, struct mbuf **));
+static	int	ipf_send_ip __P((fr_info_t *, struct mbuf *, struct mbuf **));
+static	int	ipfopen __P((dev_t *, int, int, cred_t *));
+static	int	ipfclose __P((dev_t *, int, int, cred_t *));
+static	int	ipfread __P((dev_t, struct uio *, cred_t *));
 
 
 int
@@ -430,14 +430,6 @@ ipf_send_ip(fin, m, mpp)
 	fnew.fin_hlen = hlen;
 	fnew.fin_dp = (char *)ip + hlen;
 	(void) ipf_makefrip(hlen, ip, &fnew);
-
-	if (fin->fin_fr != NULL && fin->fin_fr->fr_type == FR_T_IPF) {
-		frdest_t *fdp = &fin->fin_fr->fr_rif;
-
-		if ((fdp->fd_ptr != NULL) &&
-		    (fdp->fd_ptr != (struct ifnet *)-1))
-			return ipf_fastroute(m, mpp, &fnew, fdp);
-	}
 
 	return ipf_fastroute(m, mpp, &fnew, NULL);
 }

@@ -21,20 +21,20 @@
 
 #define IPF_H323_PROXY
 
-void  ipf_p_h323_main_load(void);
-void  ipf_p_h323_main_unload(void);
-int  ipf_p_h323_new(void *, fr_info_t *, ap_session_t *, nat_t *);
-void ipf_p_h323_del(ipf_main_softc_t *, ap_session_t *);
-int  ipf_p_h323_in(void *, fr_info_t *, ap_session_t *, nat_t *);
+void  ipf_p_h323_main_load __P((void));
+void  ipf_p_h323_main_unload __P((void));
+int  ipf_p_h323_new __P((void *, fr_info_t *, ap_session_t *, nat_t *));
+void ipf_p_h323_del __P((ipf_main_softc_t *, ap_session_t *));
+int  ipf_p_h323_in __P((void *, fr_info_t *, ap_session_t *, nat_t *));
 
-int  ipf_p_h245_new(void *, fr_info_t *, ap_session_t *, nat_t *);
-int  ipf_p_h245_out(void *, fr_info_t *, ap_session_t *, nat_t *);
+int  ipf_p_h245_new __P((void *, fr_info_t *, ap_session_t *, nat_t *));
+int  ipf_p_h245_out __P((void *, fr_info_t *, ap_session_t *, nat_t *));
 
 static	frentry_t	h323_fr;
 
 int	h323_proxy_init = 0;
 
-static int find_port(int, caddr_t, int datlen, int *, u_short *);
+static int find_port __P((int, caddr_t, int datlen, int *, u_short *));
 
 
 static int

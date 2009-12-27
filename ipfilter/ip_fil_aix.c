@@ -56,7 +56,7 @@ static const char rcsid[] = "@(#)$Id$";
 #endif
 #include "netinet/ip_pool.h"
 #ifdef INET
-extern	int	ip_optcopy(struct ip *, struct ip *);
+extern	int	ip_optcopy __P((struct ip *, struct ip *));
 #endif
 
 /*
@@ -76,29 +76,29 @@ outbound_fw
 */
 
 
-static	int	(*fr_savep)(ip_t *, int, void *, int, struct mbuf **);
-static	int	fr_send_ip(fr_info_t *, mb_t *, mb_t **);
+static	int	(*fr_savep) __P((ip_t *, int, void *, int, struct mbuf **));
+static	int	fr_send_ip __P((fr_info_t *, mb_t *, mb_t **));
 #ifdef KMUTEX_T
 extern  ipfmutex_t	ipf_rw;
 extern	ipfrwlock_t	ipf_mutex;
 #endif
 #ifdef USE_INET6
-static int ipfr_fastroute6(struct mbuf *, struct mbuf **,
-			   fr_info_t *, frdest_t *);
+static int ipfr_fastroute6 __P((struct mbuf *, struct mbuf **,
+				fr_info_t *, frdest_t *));
 #endif
 
 #include <sys/conf.h>
 #include <sys/device.h>
 
-void ipf_check_inbound(struct ifnet *, struct mbuf *, inbound_fw_args_t *);
-int ipf_check_outbound(struct ifnet *, struct mbuf *, outbound_fw_args_t *);
+void ipf_check_inbound __P((struct ifnet *, struct mbuf *, inbound_fw_args_t *));
+int ipf_check_outbound __P((struct ifnet *, struct mbuf *, outbound_fw_args_t *));
 
-int ipfopen(dev_t, u_long, chan_t, int);
-int ipfclose(dev_t, chan_t);
-int ipfread(dev_t, struct uio *, chan_t, int);
-int ipfwrite(dev_t, struct uio *, chan_t, int);
-int ipfioctl(dev_t, int, caddr_t, int);
-int ipfconfig(dev_t, int, struct uio *);
+int ipfopen __P((dev_t, u_long, chan_t, int));
+int ipfclose __P((dev_t, chan_t));
+int ipfread __P((dev_t, struct uio *, chan_t, int));
+int ipfwrite __P((dev_t, struct uio *, chan_t, int));
+int ipfioctl __P((dev_t, int, caddr_t, int));
+int ipfconfig __P((dev_t, int, struct uio *));
 
 ipfmutex_t	ipl_mutex, ipf_auth_mx, ipf_rw, ipf_stinsert;
 ipfmutex_t	ipf_nat_new, ipf_natio, ipf_timeoutlock;
@@ -680,14 +680,6 @@ ipf_send_ip(fin, m, mpp)
 	fnew.fin_hlen = hlen;
 	fnew.fin_dp = (char *)ip + hlen;
 	(void) ipf_makefrip(hlen, ip, &fnew);
-
-	if (fin->fin_fr != NULL && fin->fin_fr->fr_type == FR_T_IPF) {
-		frdest_t *fdp = &fin->fin_fr->fr_rif;
-
-		if ((fdp->fd_ptr != NULL) &&
-		    (fdp->fd_ptr != (struct ifnet *)-1))
-			return ipf_fastroute(m, mpp, &fnew, fdp);
-	}
 
 	return ipf_fastroute(m, mpp, &fnew, NULL);
 }

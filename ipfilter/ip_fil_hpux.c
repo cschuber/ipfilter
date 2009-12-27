@@ -89,7 +89,7 @@ ipfdetach()
 
 
 int
-ipfattach(void)
+ipfattach __P((void))
 {
 	int i;
 

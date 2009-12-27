@@ -39,17 +39,17 @@
 #endif
 
 
-extern	int	lkmenodev(void);
+extern	int	lkmenodev __P((void));
 
 #if OpenBSD >= 200311
-int	if_ipf_lkmentry(struct lkm_table *, int, int);
+int	if_ipf_lkmentry __P((struct lkm_table *, int, int));
 #else
-int	if_ipf(struct lkm_table *, int, int);
+int	if_ipf __P((struct lkm_table *, int, int));
 #endif
-static	int	ipf_unload(void);
-static	int	ipf_load(void);
-static	int	ipf_remove(void);
-static	int	ipfaction(struct lkm_table *, int);
+static	int	ipf_unload __P((void));
+static	int	ipf_load __P((void));
+static	int	ipf_remove __P((void));
+static	int	ipfaction __P((struct lkm_table *, int));
 static	char	*ipf_devfiles[] = { IPL_NAME, IPNAT_NAME, IPSTATE_NAME,
 				    IPAUTH_NAME, IPSYNC_NAME, IPSCAN_NAME,
 				    IPLOOKUP_NAME, NULL };
@@ -73,7 +73,7 @@ int	ipf_major = 0;
 
 MOD_DEV(IPL_VERSION, LM_DT_CHAR, -1, &ipfdevsw);
 
-extern int vd_unuseddev(void);
+extern int vd_unuseddev __P((void));
 extern struct cdevsw cdevsw[];
 extern int nchrdev;
 
@@ -89,7 +89,7 @@ int if_ipf(lkmtp, cmd, ver)
 	DISPATCH(lkmtp, cmd, ver, ipfaction, ipfaction, ipfaction);
 }
 
-int lkmexists(struct lkm_table *); /* defined in /sys/kern/kern_lkm.c */
+int lkmexists __P((struct lkm_table *)); /* defined in /sys/kern/kern_lkm.c */
 
 static int ipfaction(lkmtp, cmd)
 	struct lkm_table *lkmtp;

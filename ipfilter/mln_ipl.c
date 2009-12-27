@@ -62,17 +62,17 @@
 #endif
 
 
-extern	int	lkmenodev(void);
+extern	int	lkmenodev __P((void));
 
 #if NetBSD >= 199706
-int	ipflkm_lkmentry(struct lkm_table *, int, int);
+int	ipflkm_lkmentry __P((struct lkm_table *, int, int));
 #else
-int	xxxinit(struct lkm_table *, int, int);
+int	xxxinit __P((struct lkm_table *, int, int));
 #endif
-static	int	ipf_unload(void);
-static	int	ipf_load(void);
-static	int	ipf_remove(void);
-static	int	ipfaction(struct lkm_table *, int);
+static	int	ipf_unload __P((void));
+static	int	ipf_load __P((void));
+static	int	ipf_remove __P((void));
+static	int	ipfaction __P((struct lkm_table *, int));
 static	char	*ipf_devfiles[] = { IPL_NAME, IPNAT_NAME, IPSTATE_NAME,
 				    IPAUTH_NAME, IPSYNC_NAME, IPSCAN_NAME,
 				    IPLOOKUP_NAME, NULL };
@@ -87,7 +87,7 @@ MOD_DEV(IPL_VERSION, "ipf", NULL, -1, &ipl_cdevsw, -1);
 MOD_DEV(IPL_VERSION, LM_DT_CHAR, -1, &ipldevsw);
 #endif
 
-extern int vd_unuseddev(void);
+extern int vd_unuseddev __P((void));
 extern struct cdevsw cdevsw[];
 extern int nchrdev;
 

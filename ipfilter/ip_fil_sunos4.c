@@ -48,7 +48,7 @@
 #include "netinet/ip_pool.h"
 #include "md5.h"
 #include <sys/kernel.h>
-extern	int	ip_optcopy(struct ip *, struct ip *);
+extern	int	ip_optcopy __P((struct ip *, struct ip *));
 
 #if !defined(lint)
 static const char sccsid[] = "@(#)ip_fil.c	2.41 6/5/96 (C) 1993-2000 Darren Reed";
@@ -58,8 +58,8 @@ static const char rcsid[] = "@(#)$Id$";
 extern	struct	protosw	inetsw[];
 extern	int	ip_forwarding;
 
-static	int	(*ipf_savep)(ip_t *, int, void *, int, struct mbuf **);
-static	int	ipf_send_ip(fr_info_t *, mb_t *, mb_t **);
+static	int	(*ipf_savep) __P((ip_t *, int, void *, int, struct mbuf **));
+static	int	ipf_send_ip __P((fr_info_t *, mb_t *, mb_t **));
 
 
 #if defined(IPFILTER_LKM)
@@ -304,14 +304,6 @@ ipf_send_ip(fin, m, mpp)
 	fnew.fin_dp = (char *)ip + hlen;
 	(void) ipf_makefrip(hlen, ip, &fnew);
 
-	if (fin->fin_fr != NULL && fin->fin_fr->fr_type == FR_T_IPF) {
-		frdest_t *fdp = &fin->fin_fr->fr_rif;
-
-		if ((fdp->fd_ptr != NULL) &&
-		    (fdp->fd_ptr != (struct ifnet *)-1))
-			return ipf_fastroute(m, mpp, &fnew, fdp);
-	}
-
 	return ipf_fastroute(m, mpp, &fnew, NULL);
 }
 
@@ -431,7 +423,7 @@ ipf_send_icmp_err(type, fin, dst)
 
 
 #if !defined(IPFILTER_LKM)
-int iplinit(void);
+int iplinit __P((void));
 
 int
 iplinit()

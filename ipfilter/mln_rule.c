@@ -28,13 +28,13 @@
 #include "ip_rules.h"
 
 
-static int ipfruleaction(struct lkm_table *, int);
+static int ipfruleaction __P((struct lkm_table *, int));
 
 #ifdef IPFILTER_LKM
 # if NetBSD >= 199706
-int	ipfrule_lkmentry(struct lkm_table *, int, int);
+int	ipfrule_lkmentry __P((struct lkm_table *, int, int));
 # else
-int	xxxinit(struct lkm_table *, int, int);
+int	xxxinit __P((struct lkm_table *, int, int));
 # endif
 
 

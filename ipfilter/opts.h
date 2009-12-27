@@ -46,6 +46,14 @@
 #define	OPT_LIST	OPT_SHOWLIST
 
 
+#ifndef __P
+# ifdef	__STDC__
+#  define	__P(x)	x
+# else
+#  define	__P(x)	()
+# endif
+#endif
+
 #if defined(sun) && !SOLARIS
 # define	STRERROR(x)	sys_errlist[x]
 extern	char	*sys_errlist[];

@@ -105,7 +105,7 @@ static const char rcsid[] = "@(#)$Id$";
 #ifdef CSUM_DATA_VALID
 #include <machine/in_cksum.h>
 #endif
-extern	int	ip_optcopy(struct ip *, struct ip *);
+extern	int	ip_optcopy __P((struct ip *, struct ip *));
 
 #if (__FreeBSD_version > 460000)
 extern	int	path_mtu_discovery;
@@ -116,13 +116,9 @@ MALLOC_DEFINE(M_IPFILTER, "IP Filter", "IP Filter packet filter data structures"
 # endif
 
 
-#if !defined(__osf__)
-extern	struct	protosw	inetsw[];
-#endif
-
-static	int	(*ipf_savep)(void *, ip_t *, int, void *, int, struct mbuf **);
-static	int	ipf_send_ip(fr_info_t *, mb_t *, mb_t **);
-static void	ipf_timer_func(void *arg);
+static	int	(*ipf_savep) __P((void *, ip_t *, int, void *, int, struct mbuf **));
+static	int	ipf_send_ip __P((fr_info_t *, mb_t *, mb_t **));
+static void	ipf_timer_func __P((void *arg));
 int		ipf_locks_done = 0;
 
 ipf_main_softc_t ipfmain;
@@ -136,7 +132,7 @@ ipf_main_softc_t ipfmain;
 /*
  * We provide the ipf_checkp name just to minimize changes later.
  */
-int (*ipf_checkp)(void *, ip_t *ip, int hlen, void *ifp, int out, mb_t **mp);
+int (*ipf_checkp) __P((void *, ip_t *ip, int hlen, void *ifp, int out, mb_t **mp));
 
 
 #if (__FreeBSD_version >= 502103)
@@ -558,14 +554,6 @@ ipf_send_ip(fin, m, mpp)
 	fnew.fin_dp = (char *)ip + hlen;
 	(void) ipf_makefrip(hlen, ip, &fnew);
 
-	if (fin->fin_fr != NULL && fin->fin_fr->fr_type == FR_T_IPF) {
-		frdest_t *fdp = &fin->fin_fr->fr_rif;
-
-		if ((fdp->fd_ptr != NULL) &&
-		    (fdp->fd_ptr != (struct ifnet *)-1))
-			return ipf_fastroute(m, mpp, &fnew, fdp);
-	}
-
 	return ipf_fastroute(m, mpp, &fnew, NULL);
 }
 
@@ -750,11 +738,11 @@ ipf_send_icmp_err(type, fin, dst)
 
 #if !defined(IPFILTER_LKM) && (__FreeBSD_version < 300000)
 # if	(BSD < 199306)
-int iplinit(void);
+int iplinit __P((void));
 
 int
 # else
-void iplinit(void);
+void iplinit __P((void));
 
 void
 # endif

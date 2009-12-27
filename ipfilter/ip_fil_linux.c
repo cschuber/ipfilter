@@ -30,7 +30,7 @@ extern int sysctl_ip_default_ttl;
 extern	ipf_main_softc_t	ipfmain;
 
 static void	ipf_timer_func(unsigned long);
-static	int	ipf_send_ip(fr_info_t *, struct sk_buff *, struct sk_buff **);
+static	int	ipf_send_ip __P((fr_info_t *, struct sk_buff *, struct sk_buff **));
 
 ipfmutex_t	ipl_mutex, ipf_auth_mx, ipf_rw, ipf_stinsert;
 ipfmutex_t	ipf_nat_new, ipf_natio, ipf_timeoutlock;
@@ -42,9 +42,9 @@ extern int ip_finish_output(struct sk_buff *);
 #endif
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,23)
-static u_int ipf_linux_inout(u_int, struct sk_buff *, const struct net_device *, const struct net_device *, int (*okfn)(struct sk_buff *));
+static u_int ipf_linux_inout __P((u_int, struct sk_buff *, const struct net_device *, const struct net_device *, int (*okfn)(struct sk_buff *)));
 #else
-static u_int ipf_linux_inout(u_int, struct sk_buff **, const struct net_device *, const struct net_device *, int (*okfn)(struct sk_buff *));
+static u_int ipf_linux_inout __P((u_int, struct sk_buff **, const struct net_device *, const struct net_device *, int (*okfn)(struct sk_buff *)));
 #endif
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
@@ -309,14 +309,6 @@ ipf_send_ip(fr_info_t *fin, struct sk_buff *sk, struct sk_buff **skp)
 	fnew.fin_hlen = hlen;
 	fnew.fin_dp = (char *)ip + hlen;
 	(void) ipf_makefrip(hlen, ip, &fnew);
-
-	if (fin->fin_fr != NULL && fin->fin_fr->fr_type == FR_T_IPF) {
-		frdest_t *fdp = &fin->fin_fr->fr_rif;
-
-		if ((fdp->fd_ptr != NULL) &&
-		    (fdp->fd_ptr != (struct ifnet *)-1))
-			return ipf_fastroute(m, mpp, &fnew, fdp);
-	}
 
 	return ipf_fastroute(sk, skp, &fnew, NULL);
 }

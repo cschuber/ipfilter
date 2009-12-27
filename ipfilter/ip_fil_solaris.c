@@ -59,16 +59,16 @@ static const char rcsid[] = "@(#)$Id$";
 # include "md5.h"
 #endif
 
-static	int	ipf_send_ip(fr_info_t *fin, mblk_t *m, mblk_t **mp);
-static	void	ipf_fixl4sum(fr_info_t *);
-static	void	*ipf_routeto(fr_info_t *, int, void *);
-static	int	ipf_sendpkt(ipf_main_softc_t *, int, void *, mblk_t *,
-			    struct ip *, void *);
-static	void	ipf_call_slow_timer(ipf_main_softc_t *);
+static	int	ipf_send_ip __P((fr_info_t *fin, mblk_t *m, mblk_t **mp));
+static	void	ipf_fixl4sum __P((fr_info_t *));
+static	void	*ipf_routeto __P((fr_info_t *, int, void *));
+static	int	ipf_sendpkt __P((ipf_main_softc_t *, int, void *, mblk_t *,
+				 struct ip *, void *));
+static	void	ipf_call_slow_timer __P((ipf_main_softc_t *));
 #if (SOLARIS2 < 7)
-static	void	ipf_timer_func(void);
+static	void	ipf_timer_func __P((void));
 #else
-static	void	ipf_timer_func(void *);
+static	void	ipf_timer_func __P((void *));
 #endif
 
 #if !defined(FW_HOOKS)
@@ -88,8 +88,8 @@ u_long		*ip_forwarding = NULL;
 # endif
 extern	ipf_main_softc_t	ipfmain;
 #else
-extern	void	ipf_attach_hooks(ipf_main_softc_t *);
-extern	void	ipf_detach_hooks(ipf_main_softc_t *);
+extern	void	ipf_attach_hooks __P((ipf_main_softc_t *));
+extern	void	ipf_detach_hooks __P((ipf_main_softc_t *));
 #endif
 
 
@@ -456,14 +456,6 @@ ipf_send_ip(fr_info_t *fin, mblk_t *m, mb_t **mpp)
 	fnew.fin_hlen = hlen;
 	fnew.fin_dp = (char *)ip + hlen;
 	(void) ipf_makefrip(hlen, ip, &fnew);
-
-	if (fin->fin_fr != NULL && fin->fin_fr->fr_type == FR_T_IPF) {
-		frdest_t *fdp = &fin->fin_fr->fr_rif;
-
-		if ((fdp->fd_ptr != NULL) &&
-		    (fdp->fd_ptr != (struct ifnet *)-1))
-			return ipf_fastroute(m, mpp, &fnew, fdp);
-	}
 
 	i = ipf_fastroute(m, mpp, &fnew, NULL);
 	return i;

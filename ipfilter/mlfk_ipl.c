@@ -46,22 +46,22 @@ static int ipf_modunload(void);
 
 #if (__FreeBSD_version >= 500024)
 # if (__FreeBSD_version >= 502116)
-static	int	ipfopen(struct cdev*, int, int, struct thread *);
-static	int	ipfclose(struct cdev*, int, int, struct thread *);
+static	int	ipfopen __P((struct cdev*, int, int, struct thread *));
+static	int	ipfclose __P((struct cdev*, int, int, struct thread *));
 # else
-static	int	ipfopen(dev_t, int, int, struct thread *);
-static	int	ipfclose(dev_t, int, int, struct thread *);
+static	int	ipfopen __P((dev_t, int, int, struct thread *));
+static	int	ipfclose __P((dev_t, int, int, struct thread *));
 # endif /* __FreeBSD_version >= 502116 */
 #else
-static	int	ipfopen(dev_t, int, int, struct proc *);
-static	int	ipfclose(dev_t, int, int, struct proc *);
+static	int	ipfopen __P((dev_t, int, int, struct proc *));
+static	int	ipfclose __P((dev_t, int, int, struct proc *));
 #endif
 #if (__FreeBSD_version >= 502116)
-static	int	ipfread(struct cdev*, struct uio *, int);
-static	int	ipfwrite(struct cdev*, struct uio *, int);
+static	int	ipfread __P((struct cdev*, struct uio *, int));
+static	int	ipfwrite __P((struct cdev*, struct uio *, int));
 #else
-static	int	ipfread(dev_t, struct uio *, int);
-static	int	ipfwrite(dev_t, struct uio *, int);
+static	int	ipfread __P((dev_t, struct uio *, int));
+static	int	ipfwrite __P((dev_t, struct uio *, int));
 #endif /* __FreeBSD_version >= 502116 */
 
 
