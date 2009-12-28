@@ -697,6 +697,7 @@ typedef	struct	frentry {
 	int	fr_grhead;	/* group # which this rule starts */
 	int	fr_ifnames[4];
 	int	fr_isctag;
+	int	fr_rpc;		/* XID Filtering */ 
 	ipftag_t fr_nattag;
 	frdest_t fr_tifs[2];	/* "to"/"reply-to" interface */
 	frdest_t fr_dif;	/* duplicate packet interface */
