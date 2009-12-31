@@ -1410,7 +1410,7 @@ ipf_routeto(fin, v, dstip)
 	default :
 		return NULL;
 	}
-	return (void *)net_routeto(proto, sock);
+	return (void *)net_routeto(proto, sock, NULL);
 #else
 	return qif_illrouteto(v, dstip);
 #endif
