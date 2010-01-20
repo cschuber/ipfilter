@@ -60,7 +60,7 @@ static const char rcsid[] = "@(#)$Id$";
 static iphtent_t *ipf_iphmfind6 __P((iphtable_t *, i6addr_t *));
 # endif
 static iphtent_t *ipf_iphmfind __P((iphtable_t *, struct in_addr *));
-static int ipf_iphmfindip __P((ipf_main_softc_t *, void *, int, void *));
+static int ipf_iphmfindip __P((ipf_main_softc_t *, void *, int, void *, u_int));
 static int ipf_htable_clear __P((ipf_main_softc_t *, void *, iphtable_t *));
 static int ipf_htable_create __P((ipf_main_softc_t *, void *, iplookupop_t *));
 static int ipf_htable_deref __P((ipf_main_softc_t *, void *, void *));
@@ -1137,14 +1137,16 @@ ipf_iphmfindgroup(softc, tptr, aptr)
 /*              tptr(I)      - pointer to the pool to search                */
 /*              ipversion(I) - IP protocol version (4 or 6)                 */
 /*              aptr(I)      - pointer to address information               */
+/*              bytes(I)     - packet length                                */
 /*                                                                          */
 /* Search the hash table for a given address and return a search result.    */
 /* ------------------------------------------------------------------------ */
 static int
-ipf_iphmfindip(softc, tptr, ipversion, aptr)
+ipf_iphmfindip(softc, tptr, ipversion, aptr, bytes)
 	ipf_main_softc_t *softc;
 	void *tptr, *aptr;
 	int ipversion;
+	u_int bytes;
 {
 	struct in_addr *addr;
 	iphtable_t *iph;
@@ -1168,10 +1170,13 @@ ipf_iphmfindip(softc, tptr, ipversion, aptr)
 		ipe = NULL;
 	}
 
-	if (ipe != NULL)
+	if (ipe != NULL) {
 		rval = 0;
-	else
+		ipe->ipe_hits++;
+		ipe->ipe_bytes += bytes;
+	} else {
 		rval = 1;
+	}
 	RWLOCK_EXIT(&softc->ipf_poolrw);
 	return rval;
 }

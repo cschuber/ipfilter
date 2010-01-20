@@ -4773,7 +4773,7 @@ ipf_nat_match(fin, np)
 		break;
 	case FRI_LOOKUP :
 		match = (*np->in_osrcfunc)(softc, np->in_osrcptr,
-					   4, &fin->fin_saddr);
+					   4, &fin->fin_saddr, fin->fin_plen);
 		break;
 	}
 	match ^= ((np->in_flags & IPN_NOTSRC) != 0);
@@ -4788,7 +4788,7 @@ ipf_nat_match(fin, np)
 		break;
 	case FRI_LOOKUP :
 		match = (*np->in_odstfunc)(softc, np->in_odstptr,
-					   4, &fin->fin_daddr);
+					   4, &fin->fin_daddr, fin->fin_plen);
 		break;
 	}
 
@@ -7809,7 +7809,8 @@ ipf_nat_matchencap(softn, fin, np)
 		break;
 	case FRI_LOOKUP :
 		match = (*np->in_nsrcfunc)(fin->fin_main_soft, np->in_osrcptr,
-					   np->in_v[0], &ip->ip_dst.s_addr);
+					   np->in_v[0], &ip->ip_dst.s_addr,
+					   fin->fin_plen);
 		break;
 	}
 	if (match)
@@ -7823,7 +7824,8 @@ ipf_nat_matchencap(softn, fin, np)
 		break;
 	case FRI_LOOKUP :
 		match = (*np->in_ndstfunc)(fin->fin_main_soft, np->in_odstptr,
-					   np->in_v[0], &ip->ip_src.s_addr);
+					   np->in_v[0], &ip->ip_src.s_addr,
+					   fin->fin_plen);
 		break;
 	}
 	if (match)

@@ -23,7 +23,8 @@ typedef	struct ip_pool_node {
 	int			ipn_info;
 	int			ipn_ref;
 	char			ipn_name[FR_GROUPLEN];
-	u_long			ipn_hits;
+	U_QUAD_T		ipn_hits;
+	U_QUAD_T		ipn_bytes;
 	u_long			ipn_die;
 	struct ip_pool_node	*ipn_next, **ipn_pnext;
 	struct ip_pool_node	*ipn_dnext, **ipn_pdnext;

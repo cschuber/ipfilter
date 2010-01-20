@@ -131,7 +131,8 @@ struct ipscan;
 struct ifnet;
 struct ipf_main_softc_s;
 
-typedef	int	(* lookupfunc_t) __P((struct ipf_main_softc_s *, void *, int, void *));
+typedef	int	(* lookupfunc_t) __P((struct ipf_main_softc_s *, void *,
+				      int, void *, u_int));
 
 /*
  * i6addr is used as a container for both IPv4 and IPv6 addresses, as well

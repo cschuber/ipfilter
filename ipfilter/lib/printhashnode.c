@@ -37,6 +37,13 @@ printhashnode(iph, ipep, copyfunc, opts)
 		printmask(ipe.ipe_family, (u_32_t *)&ipe.ipe_mask.in4_addr);
 		PRINTF("\tRef. Count: %d\tGroup: %s\n", ipe.ipe_ref,
 			ipe.ipe_group);
+#ifdef USE_QUAD_T
+		PRINTF("\tHits: %qu\tBytes: %qu\n",
+		       ipe.ipe_hits, ipe.ipe_bytes);
+#else
+		PRINTF("\tHits: %lu\tBytes: %lu\n",
+		       ipe.ipe_hits, ipe.ipe_bytes);
+#endif
 	} else {
 		putchar(' ');
 		printip(ipe.ipe_family, (u_32_t *)&ipe.ipe_addr.in4_addr);

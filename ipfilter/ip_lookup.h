@@ -104,7 +104,7 @@ typedef struct ipf_lookup {
 	int	(*ipfl_init) __P((ipf_main_softc_t *, void *));
 	void	(*ipfl_fini) __P((ipf_main_softc_t *, void *));
 	int	(*ipfl_addr_find) __P((ipf_main_softc_t *, void *,
-				       int, void *));
+				       int, void *, u_int));
 	size_t	(*ipfl_flush) __P((ipf_main_softc_t *, void *,
 				   iplookupflush_t *));
 	int	(*ipfl_iter_deref) __P((ipf_main_softc_t *, void *,

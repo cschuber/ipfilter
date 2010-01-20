@@ -104,7 +104,8 @@ static int ipf_pool_node_del __P((ipf_main_softc_t *, void *, iplookupop_t *,
 static void ipf_pool_node_deref __P((ipf_pool_softc_t *, ip_pool_node_t *));
 static int ipf_pool_remove_node __P((ipf_pool_softc_t *, ip_pool_t *,
 				     ip_pool_node_t *));
-static int ipf_pool_search __P((ipf_main_softc_t *, void *, int, void *));
+static int ipf_pool_search __P((ipf_main_softc_t *, void *, int,
+				void *, u_int));
 static void *ipf_pool_soft_create __P((ipf_main_softc_t *));
 static void ipf_pool_soft_destroy __P((ipf_main_softc_t *, void *));
 static void ipf_pool_soft_fini __P((ipf_main_softc_t *, void *));
@@ -200,39 +201,39 @@ main(argc, argv)
 #endif
 	ip.in4.s_addr = 0x0a00aabb;
 	printf("search(%#x) = %d (0)\n", ip.in4.s_addr,
-		ipf_pool_search(ipo, 4, &ip));
+		ipf_pool_search(ipo, 4, &ip, 1));
 
 	ip.in4.s_addr = 0x0a000001;
 	printf("search(%#x) = %d (0)\n", ip.in4.s_addr,
-		ipf_pool_search(ipo, 4, &ip));
+		ipf_pool_search(ipo, 4, &ip, 1));
 
 	ip.in4.s_addr = 0x0a000101;
 	printf("search(%#x) = %d (0)\n", ip.in4.s_addr,
-		ipf_pool_search(ipo, 4, &ip));
+		ipf_pool_search(ipo, 4, &ip, 1));
 
 	ip.in4.s_addr = 0x0a010001;
 	printf("search(%#x) = %d (1)\n", ip.in4.s_addr,
-		ipf_pool_search(ipo, 4, &ip));
+		ipf_pool_search(ipo, 4, &ip, 1));
 
 	ip.in4.s_addr = 0x0a010101;
 	printf("search(%#x) = %d (1)\n", ip.in4.s_addr,
-		ipf_pool_search(ipo, 4, &ip));
+		ipf_pool_search(ipo, 4, &ip, 1));
 
 	ip.in4.s_addr = 0x0a010201;
 	printf("search(%#x) = %d (0)\n", ip.in4.s_addr,
-		ipf_pool_search(ipo, 4, &ip));
+		ipf_pool_search(ipo, 4, &ip, 1));
 
 	ip.in4.s_addr = 0x0a010203;
 	printf("search(%#x) = %d (1)\n", ip.in4.s_addr,
-		ipf_pool_search(ipo, 4, &ip));
+		ipf_pool_search(ipo, 4, &ip, 1));
 
 	ip.in4.s_addr = 0x0a01020f;
 	printf("search(%#x) = %d (1)\n", ip.in4.s_addr,
-		ipf_pool_search(ipo, 4, &ip));
+		ipf_pool_search(ipo, 4, &ip, 1));
 
 	ip.in4.s_addr = 0x0b00aabb;
 	printf("search(%#x) = %d (-1)\n", ip.in4.s_addr,
-		ipf_pool_search(ipo, 4, &ip));
+		ipf_pool_search(ipo, 4, &ip, 1));
 
 #ifdef	DEBUG_POOL
 	treeprint(ipo);
@@ -700,15 +701,17 @@ ipf_pool_findeq(softp, ipo, addr, mask)
 /*              tptr(I)    - pointer to the pool to search                  */
 /*              version(I) - IP protocol version (4 or 6)                   */
 /*              dptr(I)    - pointer to address information                 */
+/*              bytes(I)   - length of packet                               */
 /*                                                                          */
 /* Search the pool for a given address and return a search result.          */
 /* ------------------------------------------------------------------------ */
 static int
-ipf_pool_search(softc, tptr, ipversion, dptr)
+ipf_pool_search(softc, tptr, ipversion, dptr, bytes)
 	ipf_main_softc_t *softc;
 	void *tptr;
 	int ipversion;
 	void *dptr;
+	u_int bytes;
 {
 	struct ipf_radix_node *rn;
 	ip_pool_node_t *m;
@@ -747,6 +750,7 @@ ipf_pool_search(softc, tptr, ipversion, dptr)
 	if ((rn != NULL) && ((rn->rn_flags & RNF_ROOT) == 0)) {
 		m = (ip_pool_node_t *)rn;
 		ipo->ipo_hits++;
+		m->ipn_bytes += bytes;
 		m->ipn_hits++;
 		rv = m->ipn_info;
 	}

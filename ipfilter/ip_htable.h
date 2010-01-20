@@ -11,6 +11,8 @@ typedef	struct	iphtent_s	{
 	void		*ipe_ptr;
 	i6addr_t	ipe_addr;
 	i6addr_t	ipe_mask;
+	U_QUAD_T	ipe_hits;
+	U_QUAD_T	ipe_bytes;
 	u_long		ipe_die;
 	int		ipe_uid;
 	int		ipe_ref;
