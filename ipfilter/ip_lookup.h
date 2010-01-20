@@ -103,7 +103,8 @@ typedef struct ipf_lookup {
 	void	(*ipfl_destroy)(ipf_main_softc_t *, void *);
 	int	(*ipfl_init)(ipf_main_softc_t *, void *);
 	void	(*ipfl_fini)(ipf_main_softc_t *, void *);
-	int	(*ipfl_addr_find)(ipf_main_softc_t *, void *, int, void *);
+	int	(*ipfl_addr_find)(ipf_main_softc_t *, void *, int,
+				  void *, u_int);
 	size_t	(*ipfl_flush)(ipf_main_softc_t *, void *, iplookupflush_t *);
 	int	(*ipfl_iter_deref)(ipf_main_softc_t *, void *,
 				   int, int, void *);

@@ -2297,7 +2297,7 @@ ipf_check_ipf(fin, fr, portcmp)
 	 */
 	if (fr->fr_satype == FRI_LOOKUP) {
 		i = (*fr->fr_srcfunc)(fin->fin_main_soft, fr->fr_srcptr,
-				      fi->fi_v, lip);
+				      fi->fi_v, lip, fin->fin_plen);
 		if (i == -1)
 			return 1;
 		lip += 3;
@@ -2336,7 +2336,7 @@ ipf_check_ipf(fin, fr, portcmp)
 	lip++, lm++, ld++;
 	if (fr->fr_datype == FRI_LOOKUP) {
 		i = (*fr->fr_dstfunc)(fin->fin_main_soft, fr->fr_dstptr,
-				      fi->fi_v, lip);
+				      fi->fi_v, lip, fin->fin_plen);
 		if (i == -1)
 			return 1;
 		lip += 3;

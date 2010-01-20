@@ -84,7 +84,8 @@ static void *ipf_dstlist_soft_create(ipf_main_softc_t *);
 static void ipf_dstlist_soft_destroy(ipf_main_softc_t *, void *);
 static int ipf_dstlist_soft_init(ipf_main_softc_t *, void *);
 static void ipf_dstlist_soft_fini(ipf_main_softc_t *, void *);
-static int ipf_dstlist_addr_find(ipf_main_softc_t *, void *, int, void *);
+static int ipf_dstlist_addr_find(ipf_main_softc_t *, void *, int,
+				 void *, u_int);
 static size_t ipf_dstlist_flush(ipf_main_softc_t *, void *, iplookupflush_t *);
 static int ipf_dstlist_iter_deref(ipf_main_softc_t *, void *, int, int, void *);
 static int ipf_dstlist_iter_next(ipf_main_softc_t *, void *, ipftoken_t *,
@@ -230,10 +231,11 @@ ipf_dstlist_soft_fini(softc, arg)
 /* ------------------------------------------------------------------------ */
 /*ARGSUSED*/
 static int
-ipf_dstlist_addr_find(softc, arg1, arg2, arg3)
+ipf_dstlist_addr_find(softc, arg1, arg2, arg3, arg4)
 	ipf_main_softc_t *softc;
 	void *arg1, *arg3;
 	int arg2;
+	u_int arg4;
 {
 	return -1;
 }

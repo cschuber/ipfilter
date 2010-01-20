@@ -38,8 +38,15 @@ printpoolnode(np, opts)
 			inet_ntoa(np->ipn_addr.adf_addr.in4));
 		printmask(np->ipn_addr.adf_family,
 			  (u_32_t *)&np->ipn_mask.adf_addr);
-		PRINTF("\n\t\tHits %lu\tName %s\tRef %d\n",
-			np->ipn_hits, np->ipn_name, np->ipn_ref);
+#ifdef USE_QUAD_T
+		PRINTF("\n\t\tHits %qu\tBytes %qu\tName %s\tRef %d\n",
+			np->ipn_hits, np->ipn_bytes,
+			np->ipn_name, np->ipn_ref);
+#else
+		PRINTF("\n\t\tHits %lu\tBytes %lu\tName %s\tRef %d\n",
+			np->ipn_hits, np->ipn_bytes,
+			np->ipn_name, np->ipn_ref);
+#endif
 	}
 	return np->ipn_next;
 }

@@ -2545,7 +2545,8 @@ ipf_nat6_match(fin, np)
 				    &np->in_osrcip6);
 		break;
 	case FRI_LOOKUP :
-		match = (*np->in_osrcfunc)(fin->fin_main_soft, np->in_osrcptr, 6, &fin->fin_src6);
+		match = (*np->in_osrcfunc)(fin->fin_main_soft, np->in_osrcptr,
+					   6, &fin->fin_src6, fin->fin_plen);
 		break;
 	}
 	match ^= ((np->in_flags & IPN_NOTSRC) != 0);
@@ -2560,7 +2561,8 @@ ipf_nat6_match(fin, np)
 				    &np->in_odstip6);
 		break;
 	case FRI_LOOKUP :
-		match = (*np->in_odstfunc)(fin->fin_main_soft, np->in_odstptr, 6, &fin->fin_dst6);
+		match = (*np->in_odstfunc)(fin->fin_main_soft, np->in_odstptr,
+					   6, &fin->fin_dst6, fin->fin_plen);
 		break;
 	}
 
@@ -4104,7 +4106,7 @@ ipf_nat6_matchencap(fin, np)
 		break;
 	case FRI_LOOKUP :
 		match = (*np->in_osrcfunc)(softc, np->in_osrcptr, np->in_v[0],
-					   &ip6->ip6_dst);
+					   &ip6->ip6_dst, fin->fin_plen);
 		break;
 	}
 	if (match)
@@ -4118,7 +4120,7 @@ ipf_nat6_matchencap(fin, np)
 		break;
 	case FRI_LOOKUP :
 		match = (*np->in_odstfunc)(softc, np->in_odstptr, np->in_v[0],
-					   &ip6->ip6_src);
+					   &ip6->ip6_src, fin->fin_plen);
 		break;
 	}
 	if (match)
