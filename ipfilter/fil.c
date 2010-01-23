@@ -2262,6 +2262,11 @@ u_32_t *passp;
 		if (fin->fin_fr != NULL)
 			pass = fr_scanlist(fin, fr_pass);
 
+		if ((fr != NULL) && (fr->fr_type == FR_T_IPF) &&
+		    ((fr->fr_satype == FRI_LOOKUP) ||
+		     (fr->fr_datype == FRI_LOOKUP)))
+			fin->fin_flx |= FI_DONTCACHE;
+
 		if (((pass & FR_KEEPSTATE) == 0) &&
 		    ((fin->fin_flx & FI_DONTCACHE) == 0)) {
 			WRITE_ENTER(&ipf_frcache);
