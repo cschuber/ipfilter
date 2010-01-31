@@ -135,7 +135,8 @@ ipf_lookup_t ipf_pool_backend = {
 	ipf_pool_find,
 	ipf_pool_select_add_ref,
 	NULL,
-	ipf_pool_expire
+	ipf_pool_expire,
+	NULL
 };
 
 

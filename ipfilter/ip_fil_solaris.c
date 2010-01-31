@@ -51,6 +51,7 @@ static const char rcsid[] = "@(#)$Id$";
 #include "netinet/ip_auth.h"
 #include "netinet/ip_proxy.h"
 #include "netinet/ip_lookup.h"
+#include "netinet/ip_dstlist.h"
 #include <inet/ip_ire.h>
 
 #ifdef HAS_SYS_MD5_H
@@ -956,6 +957,7 @@ ipf_fastroute(mb, mpp, fin, fdp)
 	ipf_main_softc_t *softc = fin->fin_main_soft;
 	struct in_addr dst;
 	qpktinfo_t *qpi;
+	frdest_t node;
 	frentry_t *fr;
 	frdest_t fd;
 	void *dstp;
@@ -973,6 +975,12 @@ ipf_fastroute(mb, mpp, fin, fdp)
 	fr = fin->fin_fr;
 	ip = fin->fin_ip;
 	qpi = fin->fin_qpi;
+
+	if ((fr != NULL) && !(fr->fr_flags & FR_KEEPSTATE) && (fdp != NULL) &&
+	    (fdp->fd_type == FRD_DSTLIST)) {
+		if (ipf_dstlist_select_node(fin, fdp->fd_ptr, NULL, &node) == 0)
+			fdp = &node;
+	}
 
 	/*
 	 * If this is a duplicate mblk then we want ip to point at that

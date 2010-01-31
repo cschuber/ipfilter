@@ -27,7 +27,7 @@ first:
 	-mkdir -p results
 
 # Filtering tests
-ftests: f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22 f24 f25 f26 f27
+ftests: f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22 f24 f25 f26 f27 f28 f29
 
 # Rule parsing tests
 ptests: i1 i2 i3 i4 i5 i6 i7 i8 i9 i10 i11 i12 i13 i14 i15 i16 i17 i18 i19 \
@@ -127,6 +127,12 @@ f26: expected/f26 input/f26 regress/f26
 
 f27: expected/f27 input/f27 regress/f27
 	@/bin/sh ./dotest `awk "/^$@ / { print; } " test.format`
+
+f28: expected/f28 input/f28 regress/f28.ipf regress/f28.pool $(POOLDEP)
+	@/bin/sh ./ptest `awk "/^$@ / { print; } " test.format`
+
+f29: expected/f29 input/f29 regress/f29.ipf regress/f29.pool $(POOLDEP)
+	@/bin/sh ./ptest `awk "/^$@ / { print; } " test.format`
 
 i1: expected/i1 regress/i1
 	@/bin/sh ./itest `awk "/^$@ / { print; } " test.format`
@@ -484,7 +490,7 @@ bpf-f1: expected/bpf-f1 regress/bpf-f1
 
 clean:
 	/bin/rm -f f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17
-	/bin/rm -f f18 f19 f20 f21 f22 f24 f25 f26 f27
+	/bin/rm -f f18 f19 f20 f21 f22 f24 f25 f26 f27 f28 f29
 	/bin/rm -f i1 i2 i3 i4 i5 i6 i7 i8 i9 i10 i11 i12 i13 i14 i15 i16 i17
 	/bin/rm -f i18 i19 i20 i21 i22 i23
 	/bin/rm -f n1 n2 n3 n4 n5 n6 n7 n8 n9 n10 n11 n12 n13 n14 n15 n16 n17 n18 n100 n101 n102 n103 n104 n105 n106 n200 n201 n202

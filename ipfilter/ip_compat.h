@@ -1632,6 +1632,7 @@ extern	void	ipf_rw_downgrade __P((ipfrwlock_t *));
 typedef	struct	mb_s	{
 	struct	mb_s	*mb_next;
 	char		*mb_data;
+	void		*mb_ifp;
 	int		mb_len;
 	int		mb_flags;
 	u_long		mb_buf[2048];

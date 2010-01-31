@@ -45,9 +45,6 @@
 #include <netinet/ip_icmp.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
-#ifdef INSTANCES
-# include <sys/netstack.h>
-#endif
 #include "netinet/ip_compat.h"
 #include "netinet/ipl.h"
 #include "netinet/ip_fil.h"
@@ -55,6 +52,7 @@
 #include "netinet/ip_frag.h"
 #include "netinet/ip_auth.h"
 #include "netinet/ip_state.h"
+#include "netinet/ip_lookup.h"
 #ifdef INSTANCES
 # include <sys/hook_event.h>
 #endif
@@ -76,7 +74,7 @@ static	int	ipfopen __P((dev_t *, int, int, cred_t *));
 static	int	ipfread __P((dev_t, struct uio *, cred_t *));
 static	int	ipfwrite __P((dev_t, struct uio *, cred_t *));
 static	int	ipf_property_update __P((dev_info_t *));
-static	void	ipf_stack_init __P((void));
+static	int	ipf_stack_init __P((void));
 static	void	ipf_stack_fini __P((void));
 #if !defined(INSTANCES)
 static	int	ipf_qifsync __P((ip_t *, int, void *, int, void *, mblk_t **));
@@ -203,42 +201,46 @@ ipf_main_softc_t	*ipf_instances = &ipfmain;
 int
 _init()
 {
-	int ipfinst;
+	int rval;
 
-	ipfinst = mod_install(&modlink1);
+	rval = mod_install(&modlink1);
 #ifdef	IPFDEBUG
-	cmn_err(CE_NOTE, "IP Filter: _init() = %d", ipfinst);
+	cmn_err(CE_NOTE, "IP Filter: _init() = %d", rval);
 #endif
 	if (ipf_load_all() != 0) {
 		(void) mod_remove(&modlink1);
-		ipfinst = DDI_FAILURE;
+		rval = DDI_FAILURE;
 	} else {
 #ifdef	IPFDEBUG
 	cmn_err(CE_NOTE, "IP Filter: ipf_load_all() done\n");
 #endif
-		ipf_stack_init();
+		if (ipf_stack_init() != 0) {
+			ipf_unload_all();
+			(void) mod_remove(&modlink1);
+			rval = DDI_FAILURE;
+		}
 #ifdef	IPFDEBUG
 	cmn_err(CE_NOTE, "IP Filter: ipf_stack_init() done\n");
 #endif
 	}
-	return ipfinst;
+	return rval;
 }
 
 
 int
 _fini(void)
 {
-	int ipfinst;
+	int rval;
 
 	ipf_unload_all();
 
 	ipf_stack_fini();
 
-	ipfinst = mod_remove(&modlink1);
+	rval = mod_remove(&modlink1);
 #ifdef	IPFDEBUG
-	cmn_err(CE_NOTE, "IP Filter: _fini() = %d", ipfinst);
+	cmn_err(CE_NOTE, "IP Filter: _fini() = %d", rval);
 #endif
-	return ipfinst;
+	return rval;
 }
 
 
@@ -480,6 +482,7 @@ ipf_qifsync(ip, hlen, il, out, qif, mp)
 	 */
 	ipf_nat_sync(softc, qif);
 	ipf_state_sync(softc, qif);
+	ipf_lookup_sync(softc, qif);
 	return 0;
 }
 
@@ -778,10 +781,11 @@ ipf_pfil_hooks_remove()
 }
 
 
-static void
+static int
 ipf_stack_init()
 {
 	ipf_create_all(&ipfmain);
+	return (0);
 }
 
 
@@ -795,13 +799,13 @@ ipf_stack_fini()
 
 
 int
-ipf_hk_v4_in(tok, data, stack)
+ipf_hk_v4_in(tok, data, arg)
 	hook_event_token_t tok;
 	hook_data_t data;
-	netstack_t *stack;
+	void *arg;
 {
 	hook_pkt_event_t *hpe = (hook_pkt_event_t *)data;
-	ipf_main_softc_t *softc = (ipf_main_softc_t *)stack->netstack_ipf;
+	ipf_main_softc_t *softc = (ipf_main_softc_t *)arg;
 	ip_t *ip = hpe->hpe_hdr;
 	qpktinfo_t qpi;
 	int rval;
@@ -827,13 +831,13 @@ ipf_hk_v4_in(tok, data, stack)
 
 
 int
-ipf_hk_v4_out(tok, data, stack)
+ipf_hk_v4_out(tok, data, arg)
 	hook_event_token_t tok;
 	hook_data_t data;
-	netstack_t *stack;
+	void *arg;
 {
 	hook_pkt_event_t *hpe = (hook_pkt_event_t *)data;
-	ipf_main_softc_t *softc = (ipf_main_softc_t *)stack->netstack_ipf;
+	ipf_main_softc_t *softc = (ipf_main_softc_t *)arg;
 	ip_t *ip = hpe->hpe_hdr;
 	qpktinfo_t qpi;
 	int rval;
@@ -859,13 +863,13 @@ ipf_hk_v4_out(tok, data, stack)
 
 
 int
-ipf_hk_v4_nic(tok, data, stack)
+ipf_hk_v4_nic(tok, data, arg)
 	hook_event_token_t tok;
 	hook_data_t data;
-	netstack_t *stack;
+	void *arg;
 {
 	hook_nic_event_t *nic = (hook_nic_event_t *)data;
-	ipf_main_softc_t *softc = (ipf_main_softc_t *)stack->netstack_ipf;
+	ipf_main_softc_t *softc = (ipf_main_softc_t *)arg;
 
 	/*
 	 * Should pass the family through...
@@ -894,13 +898,13 @@ ipf_hk_v4_nic(tok, data, stack)
 
 
 int
-ipf_hk_v6_in(tok, data, stack)
+ipf_hk_v6_in(tok, data, arg)
 	hook_event_token_t tok;
 	hook_data_t data;
-	netstack_t *stack;
+	void *arg;
 {
 	hook_pkt_event_t *hpe = (hook_pkt_event_t *)data;
-	ipf_main_softc_t *softc = (ipf_main_softc_t *)stack->netstack_ipf;
+	ipf_main_softc_t *softc = (ipf_main_softc_t *)arg;
 	qpktinfo_t qpi;
 	int rval;
 
@@ -925,13 +929,13 @@ ipf_hk_v6_in(tok, data, stack)
 
 
 int
-ipf_hk_v6_out(tok, data, stack)
+ipf_hk_v6_out(tok, data, arg)
 	hook_event_token_t tok;
 	hook_data_t data;
-	netstack_t *stack;
+	void *arg;
 {
 	hook_pkt_event_t *hpe = (hook_pkt_event_t *)data;
-	ipf_main_softc_t *softc = (ipf_main_softc_t *)stack->netstack_ipf;
+	ipf_main_softc_t *softc = (ipf_main_softc_t *)arg;
 	qpktinfo_t qpi;
 	int rval;
 
@@ -956,13 +960,13 @@ ipf_hk_v6_out(tok, data, stack)
 
 
 int
-ipf_hk_v6_nic(tok, data, stack)
+ipf_hk_v6_nic(tok, data, arg)
 	hook_event_token_t tok;
 	hook_data_t data;
-	netstack_t *stack;
+	void *arg;
 {
 	hook_nic_event_t *nic = (hook_nic_event_t *)data;
-	ipf_main_softc_t *softc = (ipf_main_softc_t *)stack->netstack_ipf;
+	ipf_main_softc_t *softc = (ipf_main_softc_t *)arg;
 
 	switch (nic->hne_event)
 	{
@@ -994,7 +998,7 @@ ipf_find_softc(x)
 
 
 static void *
-ipf_netstack_create(netstackid_t id, netstack_t *stack)
+ipf_instance_create(netid_t id)
 {
 	ipf_main_softc_t *softc;
 
@@ -1011,7 +1015,7 @@ ipf_netstack_create(netstackid_t id, netstack_t *stack)
 
 
 static void
-ipf_netstack_shutdown(netstackid_t id, void *arg)
+ipf_instance_shutdown(netid_t id, void *arg)
 {
 	ipf_main_softc_t *softc = arg;
 
@@ -1020,7 +1024,7 @@ ipf_netstack_shutdown(netstackid_t id, void *arg)
 
 
 static void
-ipf_netstack_destroy(netstackid_t id, void *arg)
+ipf_instance_destroy(netid_t id, void *arg)
 {
 	ipf_main_softc_t *softc = arg;
 
@@ -1030,11 +1034,14 @@ ipf_netstack_destroy(netstackid_t id, void *arg)
 }
 
 
-static void
+static int
 ipf_stack_init()
 {
-	netstack_register(NS_IPF, ipf_netstack_create, ipf_netstack_shutdown,
-	    ipf_netstack_destroy);
+	ipf_inst = net_instance_alloc();
+	ipf_inst->nin_create = ipf_instance_create;
+	ipf_inst->nin_destroy = ipf_instance_destroy;
+	ipf_inst->nin_shutdown = ipf_instance_shutdown;
+	return net_instance_register(ipf_inst);
 }
 
 

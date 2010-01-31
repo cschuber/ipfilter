@@ -411,6 +411,8 @@ typedef	struct	fr_info	{
 	int	fin_reason;		/* why auto blocked */
 	u_int	fin_pktnum;
 	void	*fin_nattag;
+	struct frdest	*fin_dif;
+	struct frdest	*fin_tif;
 	union {
 		ip_t	*fip_ip;
 #ifdef USE_INET6
@@ -1754,7 +1756,7 @@ extern	int	ipf_outobj __P((ipf_main_softc_t *, void *, void *, int));
 extern	int	ipf_outobjsz __P((ipf_main_softc_t *, void *, void *,
 				  int, int));
 extern	void	*ipf_pullup __P((mb_t *, fr_info_t *, int));
-extern	void	ipf_resolvedest __P((ipf_main_softc_t *, char *,
+extern	int	ipf_resolvedest __P((ipf_main_softc_t *, char *,
 				     struct frdest *, int));
 extern	int	ipf_resolvefunc __P((ipf_main_softc_t *, void *));
 extern	void	*ipf_resolvenic __P((ipf_main_softc_t *, char *, int));

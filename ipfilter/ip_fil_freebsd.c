@@ -94,6 +94,8 @@ static const char rcsid[] = "@(#)$Id$";
 #include "netinet/ip_proxy.h"
 #include "netinet/ip_auth.h"
 #include "netinet/ip_sync.h"
+#include "netinet/ip_lookup.h"
+#include "netinet/ip_dstlist.h"
 #ifdef	IPFILTER_SCAN
 #include "netinet/ip_scan.h"
 #endif
@@ -773,6 +775,7 @@ ipf_fastroute(m0, mpp, fin, fdp)
 	struct sockaddr_in *dst;
 	struct route iproute;
 	u_short ip_off;
+	frdest_t node;
 	frentry_t *fr;
 
 	ro = NULL;
@@ -820,6 +823,7 @@ ipf_fastroute(m0, mpp, fin, fdp)
 
 	hlen = fin->fin_hlen;
 	ip = mtod(m0, struct ip *);
+	ifp = NULL;
 
 	/*
 	 * Route packet.
@@ -831,12 +835,18 @@ ipf_fastroute(m0, mpp, fin, fdp)
 	dst->sin_addr = ip->ip_dst;
 
 	fr = fin->fin_fr;
+	if ((fr != NULL) && !(fr->fr_flags & FR_KEEPSTATE) && (fdp != NULL) &&
+	    (fdp->fd_type == FRD_DSTLIST)) {
+		if (ipf_dstlist_select_node(fin, fdp->fd_ptr, NULL, &node) == 0)
+			fdp = &node;
+	}
+
 	if (fdp != NULL)
 		ifp = fdp->fd_ptr;
 	else
 		ifp = fin->fin_ifp;
 
-	if ((ifp == NULL) && (!fr || !(fr->fr_flags & FR_FASTROUTE))) {
+	if ((ifp == NULL) && ((fr == NULL) || !(fr->fr_flags & FR_FASTROUTE))) {
 		error = -2;
 		goto bad;
 	}

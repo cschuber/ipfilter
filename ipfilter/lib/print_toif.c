@@ -33,7 +33,13 @@ print_toif(tag, base, fdp)
 				PRINTF(":%s", inet_ntoa(fdp->fd_ip));
 		putchar(' ');
 		break;
+
+	case FRD_DSTLIST :
+		PRINTF("%s dstlist/%s ", tag, base + fdp->fd_name);
+		break;
+
 	default :
+		PRINTF("%s <%d>", tag, fdp->fd_type);
 		break;
 	}
 }

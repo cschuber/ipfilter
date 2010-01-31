@@ -15,6 +15,7 @@ typedef struct ipf_dstnode {
 	ipfmutex_t		*ipfd_plock;
 	ipfmutex_t		ipfd_lock;
 	frdest_t		ipfd_dest;
+	u_long			ipfd_syncat;
 	int			ipfd_flags;
 	int			ipfd_size;
 	int			ipfd_states;
@@ -62,6 +63,7 @@ typedef	struct dstlist_stat_s {
 
 extern ipf_lookup_t ipf_dstlist_backend;
 
-extern int ipf_dstlist_select_node __P((fr_info_t *, void *, u_32_t *));
+extern int ipf_dstlist_select_node __P((fr_info_t *, void *, u_32_t *,
+					frdest_t *));
 
 #endif /* __IP_DSTLIST_H__ */

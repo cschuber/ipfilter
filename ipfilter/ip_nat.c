@@ -5492,7 +5492,7 @@ ipf_nat_ipfin(fin, passp)
 	switch (ipf_nat_checkin(fin, passp))
 	{
 	case -1 :
-		fin->fin_reason = 13;
+		fin->fin_reason = 14;
 		fr = &ipfnatblock;
 		MUTEX_ENTER(&fr->fr_lock);
 		fr->fr_ref++;
@@ -7928,7 +7928,8 @@ ipf_nat_nextaddr(fin, na, old, dst)
 
 	if (na->na_atype == FRI_LOOKUP) {
 		if (na->na_type == IPLT_DSTLIST) {
-			error = ipf_dstlist_select_node(fin, na->na_ptr, dst);
+			error = ipf_dstlist_select_node(fin, na->na_ptr, dst,
+							NULL);
 		} else {
 			NBUMPSIDE(fin->fin_out, ns_badnextaddr);
 		}

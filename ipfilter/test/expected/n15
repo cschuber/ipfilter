@@ -1,5 +1,5 @@
-< ip #0 40(20) 6 9.9.9.9,10011 > 3.3.3.3,80
-< ip #0 40(20) 6 9.9.9.9,10011 > 2.2.2.2,80
+< le0 ip #0 40(20) 6 9.9.9.9,10011 > 3.3.3.3,80
+12
 List of active MAP/Redirect filters:
 rdr le0 0/0 port 80 -> 3.3.3.3/32 port 80 tcp
 
@@ -21,8 +21,8 @@ Accounting rules configured (set 0, out)
 Accounting rules configured (set 1, in)
 Accounting rules configured (set 1, out)
 -------------------------------
-< ip #0 40(20) 6 9.9.9.9,10011 > 3.3.3.3,80
-< ip #0 40(20) 6 9.9.9.9,10011 > 3.3.3.3,81
+< le0 ip #0 40(20) 6 9.9.9.9,10011 > 3.3.3.3,80
+< le0 ip #0 40(20) 6 9.9.9.9,10011 > 3.3.3.3,81
 List of active MAP/Redirect filters:
 rdr le0 0/0 port 80 -> 3.3.3.3/32 port 80-88 tcp
 

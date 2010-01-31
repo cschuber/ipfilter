@@ -465,6 +465,7 @@ ipf_fastroute(m0, mpp, fin, fdp)
 	struct sockaddr_in *dst;
 	struct route iproute;
 	u_short ip_off;
+	frdest_t node;
 	frentry_t *fr;
 
 	hlen = fin->fin_hlen;
@@ -480,6 +481,11 @@ ipf_fastroute(m0, mpp, fin, fdp)
 	dst->sin_addr = ip->ip_dst;
 
 	fr = fin->fin_fr;
+	if ((fr != NULL) && !(fr->fr_flags & FR_KEEPSTATE) && (fdp != NULL) &&
+	    (fdp->fd_type == FRD_DSTLIST)) {
+		if (ipf_dstlist_select_node(fin, fdp->fd_ptr, NULL, &node) == 0)
+			fdp = &node;
+	}
 	if (fdp != NULL)
 		ifp = fdp->fd_ptr;
 	else

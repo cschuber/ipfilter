@@ -125,7 +125,8 @@ ipf_lookup_t ipf_htable_backend = {
 	ipf_htable_exists,
 	ipf_htable_select_add_ref,
 	NULL,
-	ipf_htable_expire
+	ipf_htable_expire,
+	NULL
 };
 
 

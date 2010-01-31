@@ -75,6 +75,8 @@ typedef struct ipstate {
 	u_32_t	is_rulen;		/* rule number when created */
 	u_32_t	is_s0[2];
 	u_short	is_smsk[2];
+	frdest_t	is_dif;
+	frdest_t	is_tifs[2];
 	char	is_group[FR_GROUPLEN];
 	char	is_sbuf[2][16];
 	char	is_ifname[4][LIFNAMSIZ];
