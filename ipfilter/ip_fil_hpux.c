@@ -37,6 +37,8 @@ static const char rcsid[] = "@(#)$Id$";
 #include "ip_nat.h"
 #include "ip_frag.h"
 #include "ip_auth.h"
+#include "ip_lookup.h"
+#include "ip_dstlist.h"
 
 #include "md5.h"
 
@@ -747,6 +749,7 @@ ipf_fastroute(mb, mpp, fin, fdp)
 	mblk_t *mp, **mps;
 	size_t hlen = 0;
 	qpktinfo_t *qpi;
+	frdest_t node;
 	frentry_t *fr;
 	irinfo_t ir;
 	queue_t *q;
@@ -754,6 +757,7 @@ ipf_fastroute(mb, mpp, fin, fdp)
 	ip_t *ip;
 	int p, i;
 
+	fr = fin->fin_fr;
 	ip = fin->fin_ip;
 	qpi = fin->fin_qpi;
 	/*
@@ -777,6 +781,11 @@ ipf_fastroute(mb, mpp, fin, fdp)
 		*mpp = mp;
 	}
 
+	if ((fr != NULL) && !(fr->fr_flags & FR_KEEPSTATE) && (fdp != NULL) &&
+	    (fdp->fd_type == FRD_DSTLIST)) {
+		if (ipf_dstlist_select_node(fin, fdp->fd_ptr, NULL, &node) == 0)
+			fdp = &node;
+	}
 	ifp = (ifinfo_t *)fdp->fd_ptr;
 	if (fdp && fdp->fd_ip.s_addr)
 		dst = fdp->fd_ip;
@@ -792,7 +801,6 @@ ipf_fastroute(mb, mpp, fin, fdp)
 	if (!mp || !hlen || (i == 0))
 		goto bad_fastroute;
 
-	fr = fin->fin_fr;
 	if ((ifp || (fr && (fr->fr_flags & FR_FASTROUTE)))) {
 		if (ifp && (ir_to_ill(&ir) != ifp))
 			goto bad_fastroute;

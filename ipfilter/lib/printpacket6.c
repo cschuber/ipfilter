@@ -35,6 +35,8 @@ printpacket6(dir, m)
 	else
 		PRINTF("< ");
 
+	PRINTF("%s ", IFNAME(m->mb_ifp));
+
 	PRINTF("ip6/%d %d %#x %d", buf[0] & 0xf, plen, flow, p);
 	PRINTF(" %x:%x:%x:%x:%x:%x:%x:%x",
 		ntohs(addrs[0]), ntohs(addrs[1]), ntohs(addrs[2]),

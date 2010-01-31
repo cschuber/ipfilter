@@ -10,121 +10,7 @@ static const char sccsid[] = "@(#)ip_fil.c	2.41 6/5/96 (C) 1993-2000 Darren Reed
 static const char rcsid[] = "@(#)$Id$";
 #endif
 
-#ifndef	SOLARIS
-#define	SOLARIS	(defined(sun) && (defined(__svr4__) || defined(__SVR4)))
-#endif
-
-#include <sys/param.h>
-#if defined(__FreeBSD__) && !defined(__FreeBSD_version)
-# if defined(IPFILTER_LKM)
-#  ifndef __FreeBSD_cc_version
-#   include <osreldate.h>
-#  else
-#   if __FreeBSD_cc_version < 430000
-#    include <osreldate.h>
-#   endif
-#  endif
-# endif
-#endif
-#include <sys/errno.h>
-#if defined(__hpux) && (HPUXREV >= 1111) && !defined(_KERNEL)
-# include <sys/kern_svcs.h>
-#endif
-#include <sys/types.h>
-#define _KERNEL
-#define KERNEL
-#ifdef __OpenBSD__
-struct file;
-#endif
-#include <sys/uio.h>
-#undef _KERNEL
-#undef KERNEL
-#include <sys/file.h>
-#include <sys/ioctl.h>
-#ifdef __sgi
-# include <sys/ptimers.h>
-#endif
-#include <sys/time.h>
-#if !SOLARIS
-# if (NetBSD > 199609) || (OpenBSD > 199603) || (__FreeBSD_version >= 300000)
-#  include <sys/dirent.h>
-# else
-#  include <sys/dir.h>
-# endif
-#else
-# include <sys/filio.h>
-#endif
-#ifndef linux
-# include <sys/protosw.h>
-#endif
-#include <sys/socket.h>
-
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <ctype.h>
-#include <fcntl.h>
-
-#ifdef __hpux
-# define _NET_ROUTE_INCLUDED
-#endif
-#include <net/if.h>
-#ifdef sun
-# include <net/af.h>
-#endif
-#if __FreeBSD_version >= 300000
-# include <net/if_var.h>
-#endif
-#ifdef __sgi
-#include <sys/debug.h>
-# ifdef IFF_DRVRLOCK /* IRIX6 */
-#include <sys/hashing.h>
-# endif
-#endif
-#include <netinet/in.h>
-#if !(defined(__sgi) && !defined(IFF_DRVRLOCK)) /* IRIX < 6 */ && \
-    !defined(__hpux) && !defined(linux)
-# include <netinet/in_var.h>
-#endif
-#include <netinet/in_systm.h>
-#include <netinet/ip.h>
-#include <netinet/tcp.h>
-#if defined(__osf__)
-# include <netinet/tcp_timer.h>
-#endif
-#if defined(__osf__) || defined(__hpux) || defined(__sgi)
-# include "radix_ipf_local.h"
-# define _RADIX_H_
-#endif
-#include <netinet/udp.h>
-#include <netinet/ip_icmp.h>
-#include <unistd.h>
-#include <syslog.h>
-#include <arpa/inet.h>
-#ifdef __hpux
-# undef _NET_ROUTE_INCLUDED
-#endif
-#include "netinet/ip_compat.h"
-#include "netinet/ip_fil.h"
-#include "netinet/ip_nat.h"
-#include "netinet/ip_frag.h"
-#include "netinet/ip_state.h"
-#include "netinet/ip_proxy.h"
-#include "netinet/ip_auth.h"
-#include "netinet/ip_sync.h"
-#ifdef	IPFILTER_SCAN
-#include "netinet/ip_scan.h"
-#endif
-#include "netinet/ip_pool.h"
-#ifdef IPFILTER_COMPILED
-# include "netinet/ip_rules.h"
-#endif
-#if defined(__FreeBSD_version) && (__FreeBSD_version >= 300000)
-# include <sys/malloc.h>
-#endif
-#if defined(__hpux) || SOLARIS
-struct rtentry;
-#endif
+#include "ipf.h"
 #include "md5.h"
 
 
@@ -229,6 +115,7 @@ ipf_forgetifp(softc, ifp)
 			f->fr_ifa = (void *)-1;
 	RWLOCK_EXIT(&softc->ipf_mutex);
 	ipf_nat_sync(softc, ifp);
+	ipf_lookup_sync(softc, ifp);
 }
 
 
@@ -363,6 +250,9 @@ get_unit(name, family)
 #if (defined(NetBSD) && (NetBSD <= 1991011) && (NetBSD >= 199606)) || \
     (defined(OpenBSD) && (OpenBSD >= 199603)) || defined(linux) || \
     (defined(__FreeBSD__) && (__FreeBSD_version >= 501113))
+
+	if (!*name)
+		return NULL;
 
 	if (name == NULL)
 		name = "anon0";
@@ -515,20 +405,31 @@ ipf_fastroute(m, mpp, fin, fdp)
 	fr_info_t *fin;
 	frdest_t *fdp;
 {
-	struct ifnet *ifp = fdp->fd_ptr;
+	struct ifnet *ifp;
 	ip_t *ip = fin->fin_ip;
+	frdest_t node;
 	int error = 0;
 	frentry_t *fr;
 	void *sifp;
+	int sout;
 
-	if (!ifp)
-		return 0;	/* no routing table out here */
-
+	sifp = fin->fin_ifp;
+	sout = fin->fin_out;
 	fr = fin->fin_fr;
 	ip->ip_sum = 0;
 
+	if (!(fr->fr_flags & FR_KEEPSTATE) && (fdp != NULL) &&
+	    (fdp->fd_type == FRD_DSTLIST)) {
+		bzero(&node, sizeof(node));
+		ipf_dstlist_select_node(fin, fdp->fd_ptr, NULL, &node);
+		fdp = &node;
+	}
+	ifp = fdp->fd_ptr;
+
+	if (ifp == NULL)
+		return 0;	/* no routing table out here */
+
 	if (fin->fin_out == 0) {
-		sifp = fin->fin_ifp;
 		fin->fin_ifp = ifp;
 		fin->fin_out = 1;
 		(void) ipf_acctpkt(fin, NULL);
@@ -552,9 +453,10 @@ ipf_fastroute(m, mpp, fin, fdp)
 			break;
 		}
 
-		fin->fin_ifp = sifp;
-		fin->fin_out = 0;
 	}
+
+	m->mb_ifp = ifp;
+	printpacket(fin->fin_out, m);
 
 #if defined(__sgi) && (IRIX < 60500)
 	(*ifp->if_output)(ifp, (void *)ip, NULL);
@@ -564,7 +466,10 @@ ipf_fastroute(m, mpp, fin, fdp)
 	(*ifp->if_output)(ifp, (void *)m, NULL, 0);
 # endif
 #endif
+	*mpp = NULL;
 done:
+	fin->fin_ifp = sifp;
+	fin->fin_out = sout;
 	return error;
 }
 

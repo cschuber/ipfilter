@@ -537,6 +537,7 @@ ipf_fastroute(mb_t *xmin, mb_t **mp, fr_info_t *fin, frdest_t *fdp)
 	struct net_device *ifp, *sifp;
 	struct in_addr dip;
 	struct rtable *rt;
+	frdest_t node;
 	frentry_t *fr;
 	int err, sout;
 	ip_t *ip;
@@ -546,11 +547,14 @@ ipf_fastroute(mb_t *xmin, mb_t **mp, fr_info_t *fin, frdest_t *fdp)
 	ip = MTOD(xmin, ip_t *);
 	dip = ip->ip_dst;
 
-/*
+	if ((fr != NULL) && !(fr->fr_flags & FR_KEEPSTATE) && (fdp != NULL) &&
+	    (fdp->fd_type == FRD_DSTLIST)) {
+		if (ipf_dstlist_select_node(fin, fdp->fd_ptr, NULL, &node) == 0)
+			fdp = &node;
+	}
 	if (fdp != NULL)
 		ifp = fdp->fd_ifp;
 	else
-*/
 		ifp = fin->fin_ifp;
 
 	if ((ifp == NULL) && ((fr == NULL) || !(fr->fr_flags & FR_FASTROUTE))) {

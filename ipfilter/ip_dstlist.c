@@ -107,6 +107,7 @@ static void *ipf_dstlist_select_ref(void *, int, char *);
 static void ipf_dstlist_node_free(ipf_dstl_softc_t *, ippool_dst_t *, ipf_dstnode_t *);
 static int ipf_dstlist_node_deref(void *, ipf_dstnode_t *);
 static void ipf_dstlist_expire(ipf_main_softc_t *, void *);
+static void ipf_dstlist_sync(ipf_main_softc_t *, void *);
 
 ipf_lookup_t ipf_dstlist_backend = {
 	IPLT_DSTLIST,
@@ -127,7 +128,8 @@ ipf_lookup_t ipf_dstlist_backend = {
 	ipf_dstlist_table_find,
 	ipf_dstlist_select_ref,
 	ipf_dstlist_select_node,
-	ipf_dstlist_expire
+	ipf_dstlist_expire,
+	ipf_dstlist_sync
 };
 
 
@@ -545,6 +547,15 @@ ipf_dstlist_node_add(softc, arg, op, uid)
 	node->ipfd_uid = uid;
 	node->ipfd_states = 0;
 	node->ipfd_ref = 1;
+	node->ipfd_syncat = 0;
+	node->ipfd_dest.fd_name = 0;
+	(void) ipf_resolvedest(softc, node->ipfd_names, &node->ipfd_dest,
+			       AF_INET);
+#ifdef USE_INET6
+	if (node->ipfd_dest.fd_ptr == (void *)-1)
+		(void) ipf_resolvedest(softc, node->ipfd_names,
+				       &node->ipfd_dest, AF_INET6);
+#endif
 
 	softd->stats.ipls_numnodes++;
 
@@ -1188,16 +1199,18 @@ ipf_dstlist_select(fin, d)
 /* reference is currently kept on the node.                                 */
 /* ------------------------------------------------------------------------ */
 int
-ipf_dstlist_select_node(fin, group, addr)
+ipf_dstlist_select_node(fin, group, addr, pfdp)
 	fr_info_t *fin;
 	void *group;
 	u_32_t *addr;
+	frdest_t *pfdp;
 {
 #ifdef USE_MUTEXES
 	ipf_main_softc_t *softc = fin->fin_main_soft;
 #endif
 	ippool_dst_t *d = group;
 	ipf_dstnode_t *node;
+	frdest_t *fdp;
 
 	READ_ENTER(&softc->ipf_poolrw);
 
@@ -1207,14 +1220,22 @@ ipf_dstlist_select_node(fin, group, addr)
 		return -1;
 	}
 
-	if (fin->fin_family == AF_INET) {
-		addr[0] = node->ipfd_dest.fd_addr.adf_addr.i6[0];
-	} else if (fin->fin_family == AF_INET6) {
-		addr[0] = node->ipfd_dest.fd_addr.adf_addr.i6[0];
-		addr[1] = node->ipfd_dest.fd_addr.adf_addr.i6[1];
-		addr[2] = node->ipfd_dest.fd_addr.adf_addr.i6[2];
-		addr[3] = node->ipfd_dest.fd_addr.adf_addr.i6[3];
+	if (pfdp != NULL) {
+		bcopy(&node->ipfd_dest, pfdp, sizeof(*pfdp));
+	} else {
+		if (fin->fin_family == AF_INET) {
+			addr[0] = node->ipfd_dest.fd_addr.adf_addr.i6[0];
+		} else if (fin->fin_family == AF_INET6) {
+			addr[0] = node->ipfd_dest.fd_addr.adf_addr.i6[0];
+			addr[1] = node->ipfd_dest.fd_addr.adf_addr.i6[1];
+			addr[2] = node->ipfd_dest.fd_addr.adf_addr.i6[2];
+			addr[3] = node->ipfd_dest.fd_addr.adf_addr.i6[3];
+		}
 	}
+
+	fdp = &node->ipfd_dest;
+	if (fdp->fd_ptr == NULL)
+		fdp->fd_ptr = fin->fin_ifp;
 
 	MUTEX_ENTER(&node->ipfd_lock);
 	node->ipfd_states++;
@@ -1240,4 +1261,44 @@ ipf_dstlist_expire(softc, arg)
 	void *arg;
 {
 	return;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_dstlist_sync                                            */
+/* Returns:     Nil                                                         */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              arg(I)   - pointer to local context to use                  */
+/*                                                                          */
+/* When a network interface appears or disappears, we need to revalidate    */
+/* all of the network interface names that have been configured as a target */
+/* in a destination list.                                                   */
+/* ------------------------------------------------------------------------ */
+void
+ipf_dstlist_sync(softc, arg)
+	ipf_main_softc_t *softc;
+	void *arg;
+{
+	ipf_dstl_softc_t *softd = arg;
+	ipf_dstnode_t *node;
+	ippool_dst_t *list;
+	int i;
+	int j;
+
+	for (i = 0; i < IPL_LOGMAX; i++) {
+		for (list = softd->dstlist[i]; list != NULL;
+		     list = list->ipld_next) {
+			for (j = 0; j < list->ipld_maxnodes; j++) {
+				node = list->ipld_dests[j];
+				if (node == NULL)
+					continue;
+				if (node->ipfd_dest.fd_name == -1)
+					continue;
+				(void) ipf_resolvedest(softc,
+						       node->ipfd_names,
+						       &node->ipfd_dest,
+						       AF_INET);
+			}
+		}
+	}
 }

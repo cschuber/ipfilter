@@ -82,6 +82,7 @@ struct file;
 #include "netinet/ip_state.h"
 #include "netinet/ip_proxy.h"
 #include "netinet/ip_lookup.h"
+#include "netinet/ip_dstlist.h"
 #include "netinet/ip_sync.h"
 #ifdef	USE_INET6
 #include <netinet/icmp6.h>
@@ -1008,11 +1009,11 @@ ipf_state_putent(softc, softs, data)
 		fr->fr_data = NULL;
 		fr->fr_type = FR_T_NONE;
 
-		ipf_resolvedest(softc, fr->fr_names, &fr->fr_tifs[0],
+		(void) ipf_resolvedest(softc, fr->fr_names, &fr->fr_tifs[0],
 				fr->fr_family);
-		ipf_resolvedest(softc, fr->fr_names, &fr->fr_tifs[1],
+		(void) ipf_resolvedest(softc, fr->fr_names, &fr->fr_tifs[1],
 				fr->fr_family);
-		ipf_resolvedest(softc, fr->fr_names, &fr->fr_dif,
+		(void) ipf_resolvedest(softc, fr->fr_names, &fr->fr_dif,
 				fr->fr_family);
 
 		/*
@@ -1780,9 +1781,8 @@ ipf_state_add(softc, fin, stsave, flags)
 			    TH_SYN &&
 			    (TCP_OFF(tcp) > (sizeof(tcphdr_t) >> 2))) {
 				if (ipf_tcpoptions(softs, fin, tcp,
-					      &is->is_tcp.ts_data[0]) == -1) {
+					      &is->is_tcp.ts_data[0]) == -1)
 					fin->fin_flx |= FI_BAD;
-				}
 			}
 
 			if ((fin->fin_out != 0) && (pass & FR_NEWISN) != 0) {
@@ -2011,24 +2011,32 @@ ipf_state_add(softc, fin, stsave, flags)
 	fin->fin_flx |= FI_STATE;
 	if (fin->fin_flx & FI_FRAG)
 		(void) ipf_frag_new(softc, fin, pass);
+
 	fdp = &fr->fr_tifs[0];
-	if (fdp->fd_type == FRD_DSTLIST)
-		fdp->fd_ptr = ipf_lookup_res_name(softc, IPL_LOGIPF,
-						  IPLT_DSTLIST,
-						  fr->fr_names + fdp->fd_name,
-						  NULL);
+	if (fdp->fd_type == FRD_DSTLIST) {
+		ipf_dstlist_select_node(fin, fdp->fd_ptr, NULL,
+					&is->is_tifs[0]);
+	} else {
+		bcopy(fdp, &is->is_tifs[0], sizeof(*fdp));
+	}
+
 	fdp = &fr->fr_tifs[1];
-	if (fdp->fd_type == FRD_DSTLIST)
-		fdp->fd_ptr = ipf_lookup_res_name(softc, IPL_LOGIPF,
-						  IPLT_DSTLIST,
-						  fr->fr_names + fdp->fd_name,
-						  NULL);
+	if (fdp->fd_type == FRD_DSTLIST) {
+		ipf_dstlist_select_node(fin, fdp->fd_ptr, NULL,
+					&is->is_tifs[1]);
+	} else {
+		bcopy(fdp, &is->is_tifs[1], sizeof(*fdp));
+	}
+	fin->fin_tif = &is->is_tifs[fin->fin_rev];
+
 	fdp = &fr->fr_dif;
-	if (fdp->fd_type == FRD_DSTLIST)
-		fdp->fd_ptr = ipf_lookup_res_name(softc, IPL_LOGIPF,
-						  IPLT_DSTLIST,
-						  fr->fr_names + fdp->fd_name,
-						  NULL);
+	if (fdp->fd_type == FRD_DSTLIST) {
+		ipf_dstlist_select_node(fin, fdp->fd_ptr, NULL,
+					&is->is_dif);
+	} else {
+		bcopy(fdp, &is->is_dif, sizeof(*fdp));
+	}
+	fin->fin_dif = &is->is_dif;
 
 	return 0;
 }
@@ -3612,6 +3620,8 @@ ipf_state_check(fin, passp)
 
 	SBUMP(ipf_state_stats.iss_hits);
 
+	fin->fin_dif = &is->is_dif;
+	fin->fin_tif = &is->is_tifs[fin->fin_rev];
 	fin->fin_flx |= FI_STATE;
 	if ((pass & FR_LOGFIRST) != 0)
 		pass &= ~(FR_LOGFIRST|FR_LOG);
@@ -3764,7 +3774,6 @@ ipf_state_del(softc, is, why)
 	ipf_state_softc_t *softs = softc->ipf_state_soft;
 	int orphan = 1;
 	frentry_t *fr;
-	frdest_t *fdp;
 
 	/*
 	 * Since we want to delete this, remove it from the state table,
@@ -3828,16 +3837,6 @@ ipf_state_del(softc, is, why)
 	fr = is->is_rule;
 	is->is_rule = NULL;
 	if (fr != NULL) {
-		fdp = &fr->fr_tifs[0];
-		if (fdp->fd_type == FRD_DSTLIST)
-			ipf_lookup_deref(softc, IPLT_DSTLIST, fdp->fd_ptr);
-		fdp = &fr->fr_tifs[1];
-		if (fdp->fd_type == FRD_DSTLIST)
-			ipf_lookup_deref(softc, IPLT_DSTLIST, fdp->fd_ptr);
-		fdp = &fr->fr_dif;
-		if (fdp->fd_type == FRD_DSTLIST)
-			ipf_lookup_deref(softc, IPLT_DSTLIST, fdp->fd_ptr);
-
 		if (fr->fr_srctrack.ht_max_nodes != 0) {
 			(void) ipf_ht_node_del(&fr->fr_srctrack,
 					       is->is_family, &is->is_src);

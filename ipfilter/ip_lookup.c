@@ -749,7 +749,7 @@ ipf_lookup_iterate(softc, data, uid, ctx)
 
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_lookup_iterderef                                        */
-/* Returns:     int     - 0 = success, else error                           */
+/* Returns:     void                                                        */
 /* Parameters:  softc(I) - pointer to soft context main structure           */
 /*              type(I)  - backend type to iterate through                  */
 /*              data(I)  - pointer to data from ioctl call                  */
@@ -945,6 +945,35 @@ ipf_lookup_find_htable(softc, unit, name)
 	RWLOCK_EXIT(&softc->ipf_poolrw);
 
 	return tab;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_lookup_sync                                             */
+/* Returns:     void                                                        */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*                                                                          */
+/* This function is the interface that the machine dependent sync functions */
+/* call when a network interface name change occurs. It then calls the sync */
+/* functions of the lookup implementations - if they have one.              */
+/* ------------------------------------------------------------------------ */
+/*ARGSUSED*/
+void
+ipf_lookup_sync(softc, ifp)
+	ipf_main_softc_t *softc;
+	void *ifp;
+{
+	ipf_lookup_softc_t *softl = softc->ipf_lookup_soft;
+	ipf_lookup_t **l;
+	int i;
+
+	READ_ENTER(&softc->ipf_poolrw);
+
+	for (i = 0, l = backends; i < MAX_BACKENDS; i++, l++)
+		if ((*l)->ipfl_sync != NULL)
+			(*(*l)->ipfl_sync)(softc, softl->ipf_back[i]);
+
+	RWLOCK_EXIT(&softc->ipf_poolrw);
 }
 
 

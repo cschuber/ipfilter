@@ -120,8 +120,9 @@ typedef struct ipf_lookup {
 	int	(*ipfl_table_deref)(ipf_main_softc_t *, void *, void *);
 	void	*(*ipfl_table_find)(void *, int, char *);
 	void	*(*ipfl_select_add_ref)(void *, int, char *);
-	int	(*ipfl_select_node)(fr_info_t *, void *, u_32_t *);
+	int	(*ipfl_select_node)(fr_info_t *, void *, u_32_t *, frdest_t *);
 	void	(*ipfl_expire)(ipf_main_softc_t *, void *);
+	void	(*ipfl_sync)(ipf_main_softc_t *, void *);
 } ipf_lookup_t;
 
 extern int ipf_lookup_init(void);
@@ -139,6 +140,7 @@ extern int ipf_lookup_soft_init(ipf_main_softc_t *, void *);
 extern int ipf_lookup_soft_fini(ipf_main_softc_t *, void *);
 extern void *ipf_lookup_find_htable(ipf_main_softc_t *, int, char *);
 extern void ipf_lookup_expire(ipf_main_softc_t *);
+extern void ipf_lookup_sync(ipf_main_softc_t *, void *);
 #ifndef _KERNEL
 extern	void	ipf_lookup_dump(ipf_main_softc_t *, void *);
 #endif

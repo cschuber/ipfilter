@@ -235,6 +235,7 @@ main(argc,argv)
 		/* ipfr_slowtimer(); */
 		blockreason = 0;
 		m = &mb;
+		m->mb_ifp = ifp;
 		m->mb_len = i;
 		i = ipf_check(softc, ip, hlen, ifp, dir, &m);
 		if ((opts & OPT_NAT) == 0)
@@ -287,7 +288,7 @@ main(argc,argv)
 			if (m != NULL)
 				printpacket(dir, m);
 			else
-				printpacket(dir, &mb);
+				PRINTF("%d\n", blockreason);
 		}
 
 		ipf_state_flush(softc, 1, 0);

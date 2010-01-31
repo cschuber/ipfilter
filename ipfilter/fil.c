@@ -111,6 +111,7 @@ struct file;
 # include "netinet/ip_scan.h"
 #endif
 #include "netinet/ip_sync.h"
+#include "netinet/ip_lookup.h"
 #include "netinet/ip_pool.h"
 #include "netinet/ip_htable.h"
 #ifdef IPFILTER_COMPILED
@@ -156,8 +157,8 @@ static	int		ipf_flushlist(ipf_main_softc_t *, int, minor_t,
 				      int *, frentry_t **);
 static	int		ipf_flush_groups(ipf_main_softc_t *, int, int, int);
 static	ipfunc_t	ipf_findfunc(ipfunc_t);
-static	void		*ipf_findlookup(ipf_main_softc_t *, int, frentry_t *,
-					i6addr_t *);
+static	void		*ipf_findlookup(ipf_main_softc_t *, int,
+					frentry_t *, i6addr_t *, i6addr_t *);
 static	frentry_t	*ipf_firewall(fr_info_t *, u_32_t *);
 static	int		ipf_fr_matcharray(fr_info_t *, int *);
 static	int		ipf_frruleiter(ipf_main_softc_t *, void *, int, void *);
@@ -180,7 +181,7 @@ static	void		ipf_rule_delete(ipf_main_softc_t *, frentry_t *f,
 					int, int);
 static	void		ipf_rule_expire_insert(ipf_main_softc_t *,
 					       frentry_t *, int);
-static	void		ipf_synclist(ipf_main_softc_t *, frentry_t *, void *);
+static	int		ipf_synclist(ipf_main_softc_t *, frentry_t *, void *);
 static	ipftuneable_t	*ipf_tune_findbyname(ipftuneable_t *, const char *);
 static	ipftuneable_t	*ipf_tune_findbycookie(ipftuneable_t **, void *,
 					       void **);
@@ -944,7 +945,6 @@ ipf_pr_icmp6(fin)
 			if (IP6_NEQ(&fin->fin_fi.fi_dst,
 				    (i6addr_t *)&ip6->ip6_src))
 				fin->fin_flx |= FI_BAD;
-
 			break;
 		default :
 			break;
@@ -1133,6 +1133,7 @@ ipf_pr_pullup(fin, plen)
 			/*
 			 * Fake ipf_pullup failing
 			 */
+			fin->fin_reason = 19;
 			*fin->fin_mp = NULL;
 			fin->fin_m = NULL;
 			fin->fin_ip = NULL;
@@ -2771,11 +2772,8 @@ ipf_firewall(fin, passp)
 	 */
 	if (FR_ISAUTH(pass)) {
 		if (ipf_auth_new(fin->fin_m, fin) != 0) {
-#ifdef	_KERNEL
 			fin->fin_m = *fin->fin_mp = NULL;
-#else
-			;
-#endif
+			fin->fin_reason = 9;
 			fin->fin_error = 0;
 		} else {
 			softc->ipf_interror = 1;
@@ -3103,6 +3101,10 @@ ipf_check(ctx, ip, hlen, ifp, out
 	}
 
 	fin->fin_fr = fr;
+	if ((fr != NULL) && !(fin->fin_flx & FI_STATE)) {
+		fin->fin_dif = &fr->fr_dif;
+		fin->fin_tif = &fr->fr_tifs[fin->fin_rev];
+	}
 
 	/*
 	 * Only count/translate packets which will be passed on, out the
@@ -3205,6 +3207,7 @@ filterdone:
 			 */
 			if (FR_ISAUTH(pass) && (fin->fin_m != NULL)) {
 				fin->fin_m = *fin->fin_mp = NULL;
+				fin->fin_reason = 20;
 				m = NULL;
 			}
 		} else {
@@ -3235,15 +3238,15 @@ filterdone:
 		 * Generate a duplicated packet first because ipf_fastroute
 		 * can lead to fin_m being free'd... not good.
 		 */
-		fdp = &fr->fr_dif;
-		if ((fdp->fd_ptr != NULL) && (fdp->fd_ptr != (void *)-1)) {
+		fdp = fin->fin_dif;
+		if ((fdp != NULL) && (fdp->fd_ptr != NULL) &&
+		    (fdp->fd_ptr != (void *)-1)) {
 			mc = M_COPY(fin->fin_m);
 			if (mc != NULL)
 				ipf_fastroute(mc, &mc, fin, fdp);
 		}
 
-		fdp = &fr->fr_tifs[fin->fin_rev];
-
+		fdp = fin->fin_tif;
 		if (!out && (pass & FR_FASTROUTE)) {
 			/*
 			 * For fastroute rule, no destination interface defined
@@ -3251,7 +3254,7 @@ filterdone:
 			 */
 			(void) ipf_fastroute(fin->fin_m, mp, fin, NULL);
 			m = *mp = NULL;
-		} else if ((fdp->fd_ptr != NULL) &&
+		} else if ((fdp != NULL) && (fdp->fd_ptr != NULL) &&
 			   (fdp->fd_ptr != (struct ifnet *)-1)) {
 			/* this is for to rules: */
 			ipf_fastroute(fin->fin_m, mp, fin, fdp);
@@ -3288,6 +3291,8 @@ finished:
 #ifdef _KERNEL
 	return (FR_ISPASS(pass)) ? 0 : fin->fin_error;
 #else /* _KERNEL */
+	if (*mp != NULL)
+		(*mp)->mb_ifp = fin->fin_ifp;
 	blockreason = fin->fin_reason;
 	FR_VERBOSE(("fin_flx %#x pass %#x ", fin->fin_flx, pass));
 	/*if ((pass & FR_CMDMASK) == (softc->ipf_pass & FR_CMDMASK))*/
@@ -4292,7 +4297,7 @@ count6bits(msk)
 
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_synclist                                                */
-/* Returns:     void                                                        */
+/* Returns:     int    - 0 = no failures, else indication of first failure  */
 /* Parameters:  fr(I)  - start of filter list to sync interface names for   */
 /*              ifp(I) - interface pointer for limiting sync lookups        */
 /* Write Locks: ipf_mutex                                                   */
@@ -4301,17 +4306,25 @@ count6bits(msk)
 /* pointers.  Where dynamic addresses are used, also update the IP address  */
 /* used in the rule.  The interface pointer is used to limit the lookups to */
 /* a specific set of matching names if it is non-NULL.                      */
+/* Errors can occur when resolving the destination name of to/dup-to fields */
+/* when the name points to a pool and that pool doest not exist. If this    */
+/* does happen then it is necessary to check if there are any lookup refs   */
+/* that need to be dropped before returning with an error.                  */
 /* ------------------------------------------------------------------------ */
-static void
+static int
 ipf_synclist(softc, fr, ifp)
 	ipf_main_softc_t *softc;
 	frentry_t *fr;
 	void *ifp;
 {
+	frentry_t *frt, *start = fr;
 	frdest_t *fdp;
 	char *name;
+	int error;
 	void *ifa;
 	int v, i;
+
+	error = 0;
 
 	for (; fr; fr = fr->fr_next) {
 		v = fr->fr_family;
@@ -4346,16 +4359,25 @@ ipf_synclist(softc, fr, ifp)
 		}
 
 		fdp = &fr->fr_tifs[0];
-		if ((ifp == NULL) || (fdp->fd_ptr == ifp))
-			ipf_resolvedest(softc, fr->fr_names, fdp, v);
+		if ((ifp == NULL) || (fdp->fd_ptr == ifp)) {
+			error = ipf_resolvedest(softc, fr->fr_names, fdp, v);
+			if (error != 0)
+				goto unwind;
+		}
 
 		fdp = &fr->fr_tifs[1];
-		if ((ifp == NULL) || (fdp->fd_ptr == ifp))
-			ipf_resolvedest(softc, fr->fr_names, fdp, v);
+		if ((ifp == NULL) || (fdp->fd_ptr == ifp)) {
+			error = ipf_resolvedest(softc, fr->fr_names, fdp, v);
+			if (error != 0)
+				goto unwind;
+		}
 
 		fdp = &fr->fr_dif;
-		if ((ifp == NULL) || (fdp->fd_ptr == ifp))
-			ipf_resolvedest(softc, fr->fr_names, fdp, v);
+		if ((ifp == NULL) || (fdp->fd_ptr == ifp)) {
+			error = ipf_resolvedest(softc, fr->fr_names, fdp, v);
+			if (error != 0)
+				goto unwind;
+		}
 
 		if (((fr->fr_type & FR_T_BUILTIN) == FR_T_IPF) &&
 		    (fr->fr_satype == FRI_LOOKUP) && (fr->fr_srcptr == NULL)) {
@@ -4374,6 +4396,20 @@ ipf_synclist(softc, fr, ifp)
 							   &fr->fr_dstfunc);
 		}
 	}
+	return 0;
+
+unwind:
+	for (frt = start; frt != fr; fr = fr->fr_next) {
+		if (((frt->fr_type & FR_T_BUILTIN) == FR_T_IPF) &&
+		    (frt->fr_satype == FRI_LOOKUP) && (frt->fr_srcptr != NULL))
+				ipf_lookup_deref(softc, frt->fr_srctype,
+						 frt->fr_srcptr);
+		if (((frt->fr_type & FR_T_BUILTIN) == FR_T_IPF) &&
+		    (frt->fr_datype == FRI_LOOKUP) && (frt->fr_dstptr != NULL))
+				ipf_lookup_deref(softc, frt->fr_dsttype,
+						 frt->fr_dstptr);
+	}
+	return error;
 }
 
 
@@ -4397,21 +4433,22 @@ ipf_sync(softc, ifp)
 # if !SOLARIS
 	ipf_nat_sync(softc, ifp);
 	ipf_state_sync(softc, ifp);
+	ipf_lookup_sync(softc, ifp);
 # endif
 
 	WRITE_ENTER(&softc->ipf_mutex);
-	ipf_synclist(softc, softc->ipf_acct[0][softc->ipf_active], ifp);
-	ipf_synclist(softc, softc->ipf_acct[1][softc->ipf_active], ifp);
-	ipf_synclist(softc, softc->ipf_rules[0][softc->ipf_active], ifp);
-	ipf_synclist(softc, softc->ipf_rules[1][softc->ipf_active], ifp);
+	(void) ipf_synclist(softc, softc->ipf_acct[0][softc->ipf_active], ifp);
+	(void) ipf_synclist(softc, softc->ipf_acct[1][softc->ipf_active], ifp);
+	(void) ipf_synclist(softc, softc->ipf_rules[0][softc->ipf_active], ifp);
+	(void) ipf_synclist(softc, softc->ipf_rules[1][softc->ipf_active], ifp);
 
 	for (i = 0; i < IPL_LOGSIZE; i++) {
 		frgroup_t *g;
 
 		for (g = softc->ipf_groups[i][0]; g != NULL; g = g->fg_next)
-			ipf_synclist(softc, g->fg_start, ifp);
+			(void) ipf_synclist(softc, g->fg_start, ifp);
 		for (g = softc->ipf_groups[i][1]; g != NULL; g = g->fg_next)
-			ipf_synclist(softc, g->fg_start, ifp);
+			(void) ipf_synclist(softc, g->fg_start, ifp);
 	}
 	RWLOCK_EXIT(&softc->ipf_mutex);
 
@@ -5000,7 +5037,8 @@ frrequest(softc, unit, req, data, set, makecopy)
 			break;
 		case FRI_LOOKUP :
 			fp->fr_srcptr = ipf_findlookup(softc, unit, fp,
-						       &fp->fr_src6);
+						       &fp->fr_src6,
+						       &fp->fr_smsk6);
 			if (fp->fr_srcfunc == NULL) {
 				softc->ipf_interror = 132;
 				error = ESRCH;
@@ -5031,7 +5069,8 @@ frrequest(softc, unit, req, data, set, makecopy)
 			break;
 		case FRI_LOOKUP :
 			fp->fr_dstptr = ipf_findlookup(softc, unit, fp,
-						       &fp->fr_dst6);
+						       &fp->fr_dst6,
+						       &fp->fr_dmsk6);
 			if (fp->fr_dstfunc == NULL) {
 				softc->ipf_interror = 134;
 				error = ESRCH;
@@ -5095,7 +5134,9 @@ frrequest(softc, unit, req, data, set, makecopy)
 	/*
 	 * Lookup all the interface names that are part of the rule.
 	 */
-	ipf_synclist(softc, fp, NULL);
+	error = ipf_synclist(softc, fp, NULL);
+	if (error != 0)
+		goto donenolock;
 	fp->fr_statecnt = 0;
 
 	/*
@@ -5457,6 +5498,7 @@ ipf_rule_expire_insert(softc, f, set)
 /*             unit(I)  - ipf device we want to find match for              */
 /*             fp(I)    - rule for which lookup is for                      */
 /*             addrp(I) - pointer to lookup information in address struct   */
+/*             maskp(O) - pointer to lookup information for storage         */
 /*                                                                          */
 /* When using pools and hash tables to store addresses for matching in      */
 /* rules, it is necessary to resolve both the object referred to by the     */
@@ -5465,11 +5507,11 @@ ipf_rule_expire_insert(softc, f, set)
 /* packet matching quicker.                                                 */
 /* ------------------------------------------------------------------------ */
 static void *
-ipf_findlookup(softc, unit, fr, addrp)
+ipf_findlookup(softc, unit, fr, addrp, maskp)
 	ipf_main_softc_t *softc;
 	int unit;
 	frentry_t *fr;
-	i6addr_t *addrp;
+	i6addr_t *addrp, *maskp;
 {
 	void *ptr = NULL;
 
@@ -5478,7 +5520,7 @@ ipf_findlookup(softc, unit, fr, addrp)
 	case 0 :
 		ptr = ipf_lookup_res_num(softc, unit, addrp->iplookuptype,
 					 addrp->iplookupnum,
-					 &addrp->iplookupfunc);
+					 &maskp->iplookupfunc);
 		break;
 	case 1 :
 		if (addrp->iplookupname < 0)
@@ -5487,7 +5529,7 @@ ipf_findlookup(softc, unit, fr, addrp)
 			break;
 		ptr = ipf_lookup_res_name(softc, unit, addrp->iplookuptype,
 					  fr->fr_names + addrp->iplookupname,
-					  &addrp->iplookupfunc);
+					  &maskp->iplookupfunc);
 		break;
 	default :
 		break;
@@ -5668,6 +5710,7 @@ ipf_derefrule(softc, frp)
 	frentry_t **frp;
 {
 	frentry_t *fr;
+	frdest_t *fdp;
 
 	fr = *frp;
 	*frp = NULL;
@@ -5677,6 +5720,19 @@ ipf_derefrule(softc, frp)
 	if (fr->fr_ref == 0) {
 		MUTEX_EXIT(&fr->fr_lock);
 		MUTEX_DESTROY(&fr->fr_lock);
+
+
+		fdp = &fr->fr_tif;
+		if (fdp->fd_type == FRD_DSTLIST)
+			ipf_lookup_deref(softc, IPLT_DSTLIST, fdp->fd_ptr);
+
+		fdp = &fr->fr_rif;
+		if (fdp->fd_type == FRD_DSTLIST)
+			ipf_lookup_deref(softc, IPLT_DSTLIST, fdp->fd_ptr);
+
+		fdp = &fr->fr_dif;
+		if (fdp->fd_type == FRD_DSTLIST)
+			ipf_lookup_deref(softc, IPLT_DSTLIST, fdp->fd_ptr);
 
 		if ((fr->fr_type & ~FR_T_BUILTIN) == FR_T_IPF &&
 		    fr->fr_satype == FRI_LOOKUP)
@@ -6945,6 +7001,7 @@ ipf_coalesce(fin)
 # ifdef MENTAT
 		FREE_MB_T(*fin->fin_mp);
 # endif
+		fin->fin_reason = 21;
 		*fin->fin_mp = NULL;
 		fin->fin_m = NULL;
 		return -1;
@@ -7518,21 +7575,33 @@ ipf_zerostats(softc, data)
 /* found, then set the interface pointer to be -1 as NULL is considered to  */
 /* indicate there is no information at all in the structure.                */
 /* ------------------------------------------------------------------------ */
-void
+int
 ipf_resolvedest(softc, base, fdp, v)
 	ipf_main_softc_t *softc;
 	char *base;
 	frdest_t *fdp;
 	int v;
 {
+	int errval = 0;
 	void *ifp;
 
 	ifp = NULL;
 
 	if (fdp->fd_name != -1) {
-		ifp = GETIFP(base + fdp->fd_name, v);
-		if (ifp == NULL)
-			ifp = (void *)-1;
+		if (fdp->fd_type == FRD_DSTLIST) {
+			ifp = ipf_lookup_res_name(softc, IPL_LOGIPF,
+						  IPLT_DSTLIST,
+						  base + fdp->fd_name,
+						  NULL);
+			if (ifp == NULL) {
+				softc->ipf_interror = 144;
+				errval = ESRCH;
+			}
+		} else {
+			ifp = GETIFP(base + fdp->fd_name, v);
+			if (ifp == NULL)
+				ifp = (void *)-1;
+		}
 	}
 	fdp->fd_ptr = ifp;
 
@@ -7540,6 +7609,7 @@ ipf_resolvedest(softc, base, fdp, v)
 		fdp->fd_local = ipf_deliverlocal(softc, v, ifp, &fdp->fd_ip6);
 	}
 
+	return errval;
 }
 
 

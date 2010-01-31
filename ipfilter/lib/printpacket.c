@@ -66,6 +66,8 @@ printpacket(dir, m)
 	else
 		PRINTF("< ");
 
+	PRINTF("%s ", IFNAME(m->mb_ifp));
+
 	off = ntohs(ip->ip_off);
 	tcp = (struct tcphdr *)((char *)ip + (IP_HL(ip) << 2));
 	PRINTF("ip #%d %d(%d) %d", ntohs(ip->ip_id), ntohs(ip->ip_len),

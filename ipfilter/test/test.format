@@ -107,7 +107,7 @@ ni16 hex hex update_ipid=1
 ni17 text text
 ni18 text text
 ni19 hex hex update_ipid=0
-ni20 hex hex update_ipid=0
+ni20 hex hex update_ipid=0 -D
 ni21 text text
 ni23 text text -D
 p1 text text
@@ -144,3 +144,5 @@ n17_6 hex hex -6
 n13 text text
 n14 text text
 n18 text text -D
+f28 text text
+f29 text text

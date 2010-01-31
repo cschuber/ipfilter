@@ -45,9 +45,6 @@
 #include <netinet/ip_icmp.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
-#ifdef INSTANCES
-# include <sys/netstack.h>
-#endif
 #include "netinet/ip_compat.h"
 #include "netinet/ipl.h"
 #include "netinet/ip_fil.h"
@@ -55,6 +52,7 @@
 #include "netinet/ip_frag.h"
 #include "netinet/ip_auth.h"
 #include "netinet/ip_state.h"
+#include "netinet/ip_lookup.h"
 #ifdef INSTANCES
 # include <sys/hook_event.h>
 #endif
@@ -75,7 +73,7 @@ static	int	ipfopen(dev_t *, int, int, cred_t *);
 static	int	ipfread(dev_t, struct uio *, cred_t *);
 static	int	ipfwrite(dev_t, struct uio *, cred_t *);
 static	int	ipf_property_update(dev_info_t *);
-static	void	ipf_stack_init(void);
+static	int	ipf_stack_init(void);
 static	void	ipf_stack_fini(void);
 #if !defined(INSTANCES)
 static	int	ipf_qifsync(ip_t *, int, void *, int, void *, mblk_t **);
@@ -202,42 +200,46 @@ ipf_main_softc_t	*ipf_instances = &ipfmain;
 int
 _init()
 {
-	int ipfinst;
+	int rval;
 
-	ipfinst = mod_install(&modlink1);
+	rval = mod_install(&modlink1);
 #ifdef	IPFDEBUG
-	cmn_err(CE_NOTE, "IP Filter: _init() = %d", ipfinst);
+	cmn_err(CE_NOTE, "IP Filter: _init() = %d", rval);
 #endif
 	if (ipf_load_all() != 0) {
 		(void) mod_remove(&modlink1);
-		ipfinst = DDI_FAILURE;
+		rval = DDI_FAILURE;
 	} else {
 #ifdef	IPFDEBUG
 	cmn_err(CE_NOTE, "IP Filter: ipf_load_all() done\n");
 #endif
-		ipf_stack_init();
+		if (ipf_stack_init() != 0) {
+			ipf_unload_all();
+			(void) mod_remove(&modlink1);
+			rval = DDI_FAILURE;
+		}
 #ifdef	IPFDEBUG
 	cmn_err(CE_NOTE, "IP Filter: ipf_stack_init() done\n");
 #endif
 	}
-	return ipfinst;
+	return rval;
 }
 
 
 int
 _fini(void)
 {
-	int ipfinst;
+	int rval;
 
 	ipf_unload_all();
 
 	ipf_stack_fini();
 
-	ipfinst = mod_remove(&modlink1);
+	rval = mod_remove(&modlink1);
 #ifdef	IPFDEBUG
-	cmn_err(CE_NOTE, "IP Filter: _fini() = %d", ipfinst);
+	cmn_err(CE_NOTE, "IP Filter: _fini() = %d", rval);
 #endif
-	return ipfinst;
+	return rval;
 }
 
 
@@ -479,6 +481,7 @@ ipf_qifsync(ip, hlen, il, out, qif, mp)
 	 */
 	ipf_nat_sync(softc, qif);
 	ipf_state_sync(softc, qif);
+	ipf_lookup_sync(softc, qif);
 	return 0;
 }
 
@@ -777,10 +780,11 @@ ipf_pfil_hooks_remove()
 }
 
 
-static void
+static int
 ipf_stack_init()
 {
 	ipf_create_all(&ipfmain);
+	return (0);
 }
 
 
@@ -1010,7 +1014,7 @@ ipf_netstack_create(netstackid_t id, void *stack)
 
 
 static void
-ipf_netstack_shutdown(netstackid_t id, void *arg)
+ipf_instance_shutdown(netid_t id, void *arg)
 {
 	ipf_main_softc_t *softc = arg;
 
@@ -1019,7 +1023,7 @@ ipf_netstack_shutdown(netstackid_t id, void *arg)
 
 
 static void
-ipf_netstack_destroy(netstackid_t id, void *arg)
+ipf_instance_destroy(netid_t id, void *arg)
 {
 	ipf_main_softc_t *softc = arg;
 
@@ -1029,11 +1033,14 @@ ipf_netstack_destroy(netstackid_t id, void *arg)
 }
 
 
-static void
+static int
 ipf_stack_init()
 {
-	netstack_register(NS_IPF, ipf_netstack_create, ipf_netstack_shutdown,
-	    ipf_netstack_destroy);
+	ipf_inst = net_instance_alloc();
+	ipf_inst->nin_create = ipf_instance_create;
+	ipf_inst->nin_destroy = ipf_instance_destroy;
+	ipf_inst->nin_shutdown = ipf_instance_shutdown;
+	return net_instance_register(ipf_inst);
 }
 
 

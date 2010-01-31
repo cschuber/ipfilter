@@ -17,7 +17,7 @@ typedef	struct	{
 
 static ipf_error_entry_t *find_error(int);
 
-#define	IPF_NUM_ERRORS	448
+#define	IPF_NUM_ERRORS	449
 
 /*
  * NO REUSE OF NUMBERS!
@@ -169,6 +169,7 @@ static ipf_error_entry_t ipf_errors[IPF_NUM_ERRORS] = {
 	{	141,	"reply-to interface name index incorrect" },
 	{	142,	"could not initialise call now function" },
 	{	143,	"could not initialise call function" },
+	{	144,	"could not find destination list" },
 /* -------------------------------------------------------------------------- */
 	{	10001,	"could not find token for auth iterator" },
 	{	10002,	"write permissions require to add/remove auth rule" },
