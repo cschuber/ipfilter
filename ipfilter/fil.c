@@ -1134,7 +1134,7 @@ ipf_pr_pullup(fin, plen)
 			/*
 			 * Fake ipf_pullup failing
 			 */
-			fin->fin_reason = 19;
+			fin->fin_reason = FRB_PULLUP;
 			*fin->fin_mp = NULL;
 			fin->fin_m = NULL;
 			fin->fin_ip = NULL;
@@ -2588,7 +2588,7 @@ ipf_scanlist(fin, pass)
 				if (passt & FR_LOGORBLOCK) {
 					passt &= ~FR_CMDMASK;
 					passt |= FR_BLOCK|FR_QUICK;
-					fin->fin_reason = 1;
+					fin->fin_reason = FRB_LOGFAIL;
 				}
 			}
 		}
@@ -2763,7 +2763,7 @@ ipf_firewall(fin, passp)
 		pass &= ~(FR_CMDMASK|FR_RETICMP|FR_RETRST);
 		pass |= FR_BLOCK;
 		LBUMP(ipf_stats[out].fr_ppshit);
-		fin->fin_reason = 2;
+		fin->fin_reason = FRB_PPSRATE;
 	}
 
 	/*
@@ -2774,7 +2774,7 @@ ipf_firewall(fin, passp)
 	if (FR_ISAUTH(pass)) {
 		if (ipf_auth_new(fin->fin_m, fin) != 0) {
 			fin->fin_m = *fin->fin_mp = NULL;
-			fin->fin_reason = 9;
+			fin->fin_reason = FRB_AUTHNEW;
 			fin->fin_error = 0;
 		} else {
 			softc->ipf_interror = 1;
@@ -2985,7 +2985,7 @@ ipf_check(ctx, ip, hlen, ifp, out
 		 */
 		if (((ip6_t *)ip)->ip6_plen == 0) {
 			pass = FR_BLOCK|FR_NOMATCH;
-			fin->fin_reason = 3;
+			fin->fin_reason = FRB_JUMBO;
 			goto finished;
 		}
 		fin->fin_family = AF_INET6;
@@ -2997,7 +2997,7 @@ ipf_check(ctx, ip, hlen, ifp, out
 
 	if (ipf_makefrip(hlen, ip, fin) == -1) {
 		pass = FR_BLOCK|FR_NOMATCH;
-		fin->fin_reason = 4;
+		fin->fin_reason = FRB_MAKEFRIP;
 		goto finished;
 	}
 
@@ -3096,7 +3096,7 @@ ipf_check(ctx, ip, hlen, ifp, out
 			if (FR_ISPASS(pass)) {
 				pass &= ~FR_CMDMASK;
 				pass |= FR_BLOCK;
-				fin->fin_reason = 5;
+				fin->fin_reason = FRB_STATEADD;
 			}
 		}
 	}
@@ -3125,7 +3125,7 @@ ipf_check(ctx, ip, hlen, ifp, out
 					LBUMP(ipf_stats[1].fr_ipud);
 					pass &= ~FR_CMDMASK;
 					pass |= FR_BLOCK;
-					fin->fin_reason = 6;
+					fin->fin_reason = FRB_UPDATEIPID;
 				} else {
 					LBUMP(ipf_stats[0].fr_ipud);
 				}
@@ -3208,7 +3208,7 @@ filterdone:
 			 */
 			if (FR_ISAUTH(pass) && (fin->fin_m != NULL)) {
 				fin->fin_m = *fin->fin_mp = NULL;
-				fin->fin_reason = 20;
+				fin->fin_reason = FRB_AUTHCAPTURE;
 				m = NULL;
 			}
 		} else {
@@ -3379,7 +3379,7 @@ logit:
 			    FR_ISPASS(pass)) {
 				pass &= ~FR_CMDMASK;
 				pass |= FR_BLOCK;
-				fin->fin_reason = 7;
+				fin->fin_reason = FRB_LOGFAIL2;
 			}
 		}
 		*passp = pass;
@@ -7069,7 +7069,7 @@ ipf_coalesce(fin)
 # ifdef MENTAT
 		FREE_MB_T(*fin->fin_mp);
 # endif
-		fin->fin_reason = 21;
+		fin->fin_reason = FRB_COALESCE;
 		*fin->fin_mp = NULL;
 		fin->fin_m = NULL;
 		return -1;
@@ -8661,7 +8661,7 @@ ipf_decaps(fin, pass, l5proto)
 cantdecaps:
 		pass &= ~FR_CMDMASK;
 		pass |= FR_BLOCK|FR_QUICK;
-		fin->fin_reason = 8;
+		fin->fin_reason = FRB_DECAPFRIP;
 		return -1;
 	}
 

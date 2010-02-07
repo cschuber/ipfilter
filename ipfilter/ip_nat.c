@@ -4893,7 +4893,6 @@ ipf_nat_ipfout(fin, passp)
 	switch (ipf_nat_checkout(fin, passp))
 	{
 	case -1 :
-		fin->fin_reason = 13;
 		fr = &ipfnatblock;
 		MUTEX_ENTER(&fr->fr_lock);
 		fr->fr_ref++;
@@ -5132,7 +5131,7 @@ outmatchfail:
 		if (passp != NULL) {
 			NBUMPSIDE(1, ns_drop);
 			*passp = FR_BLOCK;
-			fin->fin_reason = 11;
+			fin->fin_reason = FRB_NATV4OUT;
 		}
 		fin->fin_flx |= FI_BADNAT;
 		NBUMPSIDE(1, ns_badnat);
@@ -5491,7 +5490,6 @@ ipf_nat_ipfin(fin, passp)
 	switch (ipf_nat_checkin(fin, passp))
 	{
 	case -1 :
-		fin->fin_reason = 14;
 		fr = &ipfnatblock;
 		MUTEX_ENTER(&fr->fr_lock);
 		fr->fr_ref++;
@@ -5725,7 +5723,7 @@ inmatchfail:
 		if (passp != NULL) {
 			NBUMPSIDE(0, ns_drop);
 			*passp = FR_BLOCK;
-			fin->fin_reason = 12;
+			fin->fin_reason = FRB_NATV4IN;
 		}
 		fin->fin_flx |= FI_BADNAT;
 		NBUMPSIDE(0, ns_badnat);

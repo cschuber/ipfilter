@@ -89,6 +89,28 @@ struct	flags	tcpfl[] = {
 	{ 0, '\0' }
 };
 
+char *reasons[] = {
+	"filter-rule",
+	"log-or-block_1",
+	"pps-rate",
+	"jumbogram",
+	"makefrip-fail",
+	"state_add-fail",
+	"updateipid-fail",
+	"log-or-block_2",
+	"decap-fail",
+	"auth_new-fail",
+	"auth_captured",
+	"coalesce-fail",
+	"pullup-fail",
+	"auth-feedback",
+	"bad-frag",
+	"natv4_out-fail",
+	"natv4_in-fail",
+	"natv6_out-fail",
+	"natv6_in-fail",
+};
+
 #ifdef	MENTAT
 static	char	*pidfile = "/etc/opt/ipf/ipmon.pid";
 #else
@@ -1408,6 +1430,12 @@ printipflog:
 	    FI_MBCAST) {
 			strcpy(t, " mbcast");
 			t += 7;
+	}
+	if (ipf->fl_breason != 0) {
+		strcpy(t, " reason:");
+		t += 8;
+		strcpy(t, reasons[ipf->fl_breason]);
+		t += strlen(reasons[ipf->fl_breason]);
 	}
 	*t++ = '\n';
 	*t++ = '\0';

@@ -367,6 +367,27 @@ typedef	struct {
 	u_char	fda_tcpf;		/* TCP header flags (SYN, ACK, etc) */
 } frdat_t;
 
+typedef enum fr_breasons_e {
+	FRB_LOGFAIL = 1,
+	FRB_PPSRATE,
+	FRB_JUMBO,
+	FRB_MAKEFRIP,
+	FRB_STATEADD,
+	FRB_UPDATEIPID,
+	FRB_LOGFAIL2,
+	FRB_DECAPFRIP,
+	FRB_AUTHNEW,
+	FRB_AUTHCAPTURE,
+	FRB_COALESCE,
+	FRB_PULLUP,
+	FRB_AUTHFEEDBACK,
+	FRB_BADFRAG,
+	FRB_NATV4OUT,
+	FRB_NATV4IN,
+	FRB_NATV6OUT,
+	FRB_NATV6IN
+} fr_breason_t;
+
 typedef	struct	fr_info	{
 	void	*fin_main_soft;
 	void	*fin_ifp;		/* interface packet is `on' */
@@ -400,7 +421,7 @@ typedef	struct	fr_info	{
 	int	fin_depth;		/* Group nesting depth */
 	int	fin_error;		/* Error code to return */
 	int	fin_cksum;		/* -1 = bad, 1 = good, 0 = not done */
-	int	fin_reason;		/* why auto blocked */
+	fr_breason_t	fin_reason;	/* why auto blocked */
 	u_int	fin_pktnum;
 	void	*fin_nattag;
 	struct frdest	*fin_dif;

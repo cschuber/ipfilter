@@ -901,7 +901,7 @@ ipf_frag_known(fin, passp)
 	if (fra != NULL) {
 		if (fin->fin_flx & FI_BAD) {
 			fr = &ipfr_block;
-			fin->fin_reason = 10;
+			fin->fin_reason = FRB_BADFRAG;
 		} else {
 			fr = fra->ipfr_rule;
 		}
