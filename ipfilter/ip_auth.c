@@ -159,7 +159,7 @@ typedef	struct ipf_auth_softc_s {
 
 static void ipf_auth_deref __P((frauthent_t **));
 static int ipf_auth_geniter __P((ipf_main_softc_t *, ipftoken_t *,
-				 ipfgeniter_t *));
+				 ipfgeniter_t *, ipfobj_t *));
 static int ipf_auth_reply __P((ipf_main_softc_t *, ipf_auth_softc_t *, char *));
 static int ipf_auth_wait __P((ipf_main_softc_t *, ipf_auth_softc_t *, char *));
 static int ipf_auth_flush __P((void *));
@@ -613,15 +613,16 @@ ipf_auth_ioctl(softc, data, cmd, mode, uid, ctx)
 	    {
 		ipftoken_t *token;
 		ipfgeniter_t iter;
+		ipfobj_t obj;
 
-		error = ipf_inobj(softc, data, &iter, IPFOBJ_GENITER);
+		error = ipf_inobj(softc, data, &obj, &iter, IPFOBJ_GENITER);
 		if (error != 0)
 			break;
 
 		SPL_SCHED(s);
 		token = ipf_token_find(softc, IPFGENITER_AUTH, uid, ctx);
 		if (token != NULL)
-			error = ipf_auth_geniter(softc, token, &iter);
+			error = ipf_auth_geniter(softc, token, &iter, &obj);
 		else {
 			WRITE_ENTER(&softc->ipf_tokens);
 			if (token->ipt_data == NULL)
@@ -916,13 +917,18 @@ ipf_auth_waiting(softc)
 /* Returns:     int - 0 == success, else error                              */
 /* Parameters:  token(I) - pointer to ipftoken structure                    */
 /*              itp(I)   - pointer to ipfgeniter structure                  */
+/*              objp(I)  - pointer to ipf object destription                */
 /*                                                                          */
+/* Iterate through the list of entries in the auth queue list.              */
+/* objp is used here to get the location of where to do the copy out to.    */
+/* Stomping over various fields with new information will not harm anything */
 /* ------------------------------------------------------------------------ */
 static int
-ipf_auth_geniter(softc, token, itp)
+ipf_auth_geniter(softc, token, itp, objp)
 	ipf_main_softc_t *softc;
 	ipftoken_t *token;
 	ipfgeniter_t *itp;
+	ipfobj_t *objp;
 {
 	ipf_auth_softc_t *softa = softc->ipf_auth_soft;
 	frauthent_t *fae, *next, zero;
@@ -933,9 +939,14 @@ ipf_auth_geniter(softc, token, itp)
 		return EFAULT;
 	}
 
-	if (itp->igi_type != IPFGENITER_AUTH)
+	if (itp->igi_type != IPFGENITER_AUTH) {
 		softc->ipf_interror = 10012;
 		return EINVAL;
+	}
+
+	objp->ipfo_type = IPFOBJ_FRAUTH;
+	objp->ipfo_ptr = itp->igi_data;
+	objp->ipfo_size = sizeof(frauth_t);
 
 	READ_ENTER(&softa->ipf_authlk);
 
@@ -970,11 +981,7 @@ ipf_auth_geniter(softc, token, itp)
 	/*
 	 * Copy out the data and clean up references and token as needed.
 	 */
-	error = COPYOUT(next, itp->igi_data, sizeof(*next));
-	if (error != 0) {
-		softc->ipf_interror = 10013;
-		error = EFAULT;
-	}
+	error = ipf_outobjk(softc, objp, next);
 
 	/*
 	 * Clean up reference and token.
@@ -1042,7 +1049,7 @@ ipf_auth_wait(softc, softa, data)
 	SPL_INT(s);
 
 ipf_auth_ioctlloop:
-	error = ipf_inobj(softc, data, au, IPFOBJ_FRAUTH);
+	error = ipf_inobj(softc, data, NULL, au, IPFOBJ_FRAUTH);
 	if (error != 0)
 		return error;
 
@@ -1172,7 +1179,7 @@ ipf_auth_reply(softc, softa, data)
 	mb_t *m;
 	SPL_INT(s);
 
-	error = ipf_inobj(softc, data, &auth, IPFOBJ_FRAUTH);
+	error = ipf_inobj(softc, data, NULL, &auth, IPFOBJ_FRAUTH);
 	if (error != 0)
 		return error;
 

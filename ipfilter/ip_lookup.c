@@ -703,7 +703,7 @@ ipf_lookup_iterate(softc, data, uid, ctx)
 	int err, i;
 	SPL_INT(s);
 
-	err = ipf_inobj(softc, data, &iter, IPFOBJ_LOOKUPITER);
+	err = ipf_inobj(softc, data, NULL, &iter, IPFOBJ_LOOKUPITER);
 	if (err != 0)
 		return err;
 

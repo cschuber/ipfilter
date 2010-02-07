@@ -201,7 +201,7 @@ static void ipf_fixinisn __P((fr_info_t *, ipstate_t *));
 static void ipf_fixoutisn __P((fr_info_t *, ipstate_t *));
 static void ipf_checknewisn __P((fr_info_t *, ipstate_t *));
 static int ipf_state_iter __P((ipf_main_softc_t *, ipftoken_t *,
-			       ipfgeniter_t *));
+			       ipfgeniter_t *, ipfobj_t *));
 static int ipf_state_gettable __P((ipf_main_softc_t *, ipf_state_softc_t *,
 				   char *));
 static	int ipf_state_tcpinwindow __P((struct fr_info *, struct tcpdata *,
@@ -574,7 +574,7 @@ ipf_state_remove(softc, data)
 	int error;
 
 	sp = &st;
-	error = ipf_inobj(softc, data, &st, IPFOBJ_IPSTATE);
+	error = ipf_inobj(softc, data, NULL, &st, IPFOBJ_IPSTATE);
 	if (error)
 		return EFAULT;
 
@@ -800,15 +800,16 @@ ipf_state_ioctl(softc, data, cmd, mode, uid, ctx)
 	    {
 		ipftoken_t *token;
 		ipfgeniter_t iter;
+		ipfobj_t obj;
 
-		error = ipf_inobj(softc, data, &iter, IPFOBJ_GENITER);
+		error = ipf_inobj(softc, data, &obj, &iter, IPFOBJ_GENITER);
 		if (error != 0)
 			break;
 
 		SPL_SCHED(s);
 		token = ipf_token_find(softc, IPFGENITER_STATE, uid, ctx);
 		if (token != NULL) {
-			error = ipf_state_iter(softc, token, &iter);
+			error = ipf_state_iter(softc, token, &iter, &obj);
 			WRITE_ENTER(&softc->ipf_tokens);
 			if (token->ipt_data == NULL)
 				ipf_token_free(softc, token);
@@ -875,7 +876,7 @@ ipf_state_getent(softc, softs, data)
 	ipstate_save_t ips;
 	int error;
 
-	error = ipf_inobj(softc, data, &ips, IPFOBJ_STATESAVE);
+	error = ipf_inobj(softc, data, NULL, &ips, IPFOBJ_STATESAVE);
 	if (error)
 		return EFAULT;
 
@@ -940,7 +941,7 @@ ipf_state_putent(softc, softs, data)
 	frentry_t *fr;
 	char *name;
 
-	error = ipf_inobj(softc, data, &ips, IPFOBJ_STATESAVE);
+	error = ipf_inobj(softc, data, NULL, &ips, IPFOBJ_STATESAVE);
 	if (error != 0)
 		return error;
 
@@ -4851,10 +4852,11 @@ ipf_state_setqueue(softc, is, rev)
 /* walks through the list of entries in the state table list (softs->ipf_state_list.)    */
 /* ------------------------------------------------------------------------ */
 static int
-ipf_state_iter(softc, token, itp)
+ipf_state_iter(softc, token, itp, obj)
 	ipf_main_softc_t *softc;
 	ipftoken_t *token;
 	ipfgeniter_t *itp;
+	ipfobj_t *obj;
 {
 	ipf_state_softc_t *softs = softc->ipf_state_soft;
 	ipstate_t *is, *next, zero;
@@ -4883,6 +4885,8 @@ ipf_state_iter(softc, token, itp)
 	}
 
 	error = 0;
+	obj->ipfo_type = IPFOBJ_IPSTATE;
+	obj->ipfo_size = sizeof(ipstate_t);
 
 	READ_ENTER(&softc->ipf_state);
 
@@ -4922,10 +4926,9 @@ ipf_state_iter(softc, token, itp)
 		/*
 		 * Copy out data and clean up references and tokens.
 		 */
-		error = COPYOUT(next, dst, sizeof(*next));
+		error = ipf_outobjk(softc, obj, next);
 		if (error != 0) {
 			softc->ipf_interror = 100030;
-			error = EFAULT;
 		}
 		if (token->ipt_data != NULL) {
 			if (is != NULL)
@@ -4966,7 +4969,7 @@ ipf_state_gettable(softc, softs, data)
 	ipftable_t table;
 	int error;
 
-	error = ipf_inobj(softc, data, &table, IPFOBJ_GTABLE);
+	error = ipf_inobj(softc, data, NULL, &table, IPFOBJ_GTABLE);
 	if (error != 0)
 		return error;
 

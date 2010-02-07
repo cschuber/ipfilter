@@ -156,7 +156,7 @@ fil_u.o: $(TOP)/fil.c $(TOP)/ip_fil.h $(TOP)/ipf.h $(TOP)/ip_compat.h \
 
 fil.o: $(TOP)/fil.c $(TOP)/ip_fil.h $(TOP)/ip_compat.h $(TOP)/ipl.h \
 	    $(TOP)/ip_rules.h
-	$(CC) $(KCARGS) $(POLICY) $(DFLAGS) $(IPFBPF) $(COMPIPF) \
+	$(CC) $(KCARGS) $(POLICY) $(DFLAGS) $(IPFBPF) $(COMPIPF) $(COMPATIPF) \
 	    -c $(TOP)/fil.c -o $@
 
 ipf.o: $(TOOL)/ipf.c $(TOP)/ip_fil.h $(TOP)/ipf.h $(TOP)/opts.h
@@ -326,6 +326,11 @@ ip_fil.c:
 
 ip_fil.o: ip_fil.c $(TOP)/ip_fil.h $(TOP)/ip_compat.h $(TOP)/ip_nat.h
 	$(CC) $(KCARGS) $(DFLAGS) $(COMPIPF) -c ip_fil.c -o $@
+
+ip_fil_compat.o: $(TOP)/ip_fil_compat.c $(TOP)/ipl.h $(TOP)/ip_fil.h \
+	$(TOP)/ip_compat.h $(TOP)/ip_nat.h $(TOP)/ip_state.h
+	$(CC) $(KCARGS) $(DFLAGS) $(COMPIPF) $(COMPATIPF) \
+	-c $(TOP)/ip_fil_compat.c -o $@
 
 ip_log.o: $(TOP)/ip_log.c $(TOP)/ip_compat.h $(TOP)/ip_fil.h
 	$(CC) $(KCARGS) $(DFLAGS) -c $(TOP)/ip_log.c -o $@

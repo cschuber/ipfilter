@@ -673,7 +673,7 @@ ipf_proxy_ioctl(softc, data, cmd, mode, ctx)
 	switch (cmd)
 	{
 	case SIOCPROXY :
-		error = ipf_inobj(softc, data, &ctl, IPFOBJ_PROXYCTL);
+		error = ipf_inobj(softc, data, NULL, &ctl, IPFOBJ_PROXYCTL);
 		if (error != 0) {
 			return error;
 		}
