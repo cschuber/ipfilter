@@ -88,6 +88,7 @@ extern struct ifnet vpnif;
 #include <netinet/ip_icmp.h>
 #include "netinet/ip_compat.h"
 #include <netinet/tcpip.h>
+#include "netinet/ipl.h"
 #include "netinet/ip_fil.h"
 #include "netinet/ip_nat.h"
 #include "netinet/ip_frag.h"
@@ -218,14 +219,14 @@ static	int	ipf_nat_finalise(fr_info_t *, nat_t *);
 static	int	ipf_nat_flushtable(ipf_main_softc_t *, ipf_nat_softc_t *);
 static	void	ipf_nat_free_rule(ipf_main_softc_t *, ipf_nat_softc_t *, ipnat_t *);
 static	int	ipf_nat_getnext(ipf_main_softc_t *, ipftoken_t *,
-				ipfgeniter_t *);
+				ipfgeniter_t *, ipfobj_t *);
 static	int	ipf_nat_gettable(ipf_main_softc_t *, ipf_nat_softc_t *, char *);
 static	hostmap_t *ipf_nat_hostmap(ipf_nat_softc_t *, ipnat_t *,
 				   struct in_addr, struct in_addr,
 				   struct in_addr, u_32_t);
 static	int	ipf_nat_icmpquerytype(int);
 static	int	ipf_nat_iterator(ipf_main_softc_t *, ipftoken_t *,
-				 ipfgeniter_t *);
+				 ipfgeniter_t *, ipfobj_t *);
 static	int	ipf_nat_match(fr_info_t *, ipnat_t *);
 static	int	ipf_nat_matcharray(nat_t *, int *, u_long);
 static	int	ipf_nat_matchencap(ipf_nat_softc_t *, fr_info_t *, ipnat_t *);
@@ -1077,7 +1078,8 @@ ipf_nat_ioctl(softc, data, cmd, mode, uid, ctx)
 			bcopy(data, (char *)&natd, sizeof(natd));
 			error = 0;
 		} else {
-			error = ipf_inobj(softc, data, &natd, IPFOBJ_IPNAT);
+			error = ipf_inobj(softc, data, NULL, &natd,
+					  IPFOBJ_IPNAT);
 			if (error != 0)
 				goto done;
 
@@ -1246,7 +1248,7 @@ ipf_nat_ioctl(softc, data, cmd, mode, uid, ctx)
 	    {
 		natlookup_t nl;
 
-		error = ipf_inobj(softc, data, &nl, IPFOBJ_NATLOOKUP);
+		error = ipf_inobj(softc, data, NULL, &nl, IPFOBJ_NATLOOKUP);
 		if (error == 0) {
 			void *ptr;
 
@@ -1376,15 +1378,16 @@ ipf_nat_ioctl(softc, data, cmd, mode, uid, ctx)
 	    {
 		ipfgeniter_t iter;
 		ipftoken_t *token;
+		ipfobj_t obj;
 
-		error = ipf_inobj(softc, data, &iter, IPFOBJ_GENITER);
+		error = ipf_inobj(softc, data, &obj, &iter, IPFOBJ_GENITER);
 		if (error != 0)
 			break;
 
 		SPL_SCHED(s);
 		token = ipf_token_find(softc, iter.igi_type, uid, ctx);
 		if (token != NULL) {
-			error  = ipf_nat_iterator(softc, token, &iter);
+			error  = ipf_nat_iterator(softc, token, &iter, &obj);
 			WRITE_ENTER(&softc->ipf_tokens);
 			if (token->ipt_data == NULL)
 				ipf_token_free(softc, token);
@@ -1919,7 +1922,7 @@ ipf_nat_getent(softc, data, getlock)
 	nat_save_t *ipn, ipns;
 	nat_t *n, *nat;
 
-	error = ipf_inobj(softc, data, &ipns, IPFOBJ_NATSAVE);
+	error = ipf_inobj(softc, data, NULL, &ipns, IPFOBJ_NATSAVE);
 	if (error != 0)
 		return error;
 
@@ -2060,7 +2063,7 @@ ipf_nat_putent(softc, data, getlock)
 	ipnat_t *in;
 	int error;
 
-	error = ipf_inobj(softc, data, &ipn, IPFOBJ_NATSAVE);
+	error = ipf_inobj(softc, data, NULL, &ipn, IPFOBJ_NATSAVE);
 	if (error != 0)
 		return error;
 
@@ -6791,10 +6794,11 @@ ipf_nat_setqueue(softc, softn, nat)
 /* in the list to look at is put back in the ipftoken struture.             */
 /* ------------------------------------------------------------------------ */
 static int
-ipf_nat_getnext(softc, t, itp)
+ipf_nat_getnext(softc, t, itp, objp)
 	ipf_main_softc_t *softc;
 	ipftoken_t *t;
 	ipfgeniter_t *itp;
+	ipfobj_t *objp;
 {
 	ipf_nat_softc_t *softn = softc->ipf_nat_soft;
 	hostmap_t *hm, *nexthm = NULL, zerohm;
@@ -7170,10 +7174,11 @@ ipf_nat_flush_entry(softc, entry)
 /* NAT mappings and the NAT fragment cache.                                 */
 /* ------------------------------------------------------------------------ */
 static int
-ipf_nat_iterator(softc, token, itp)
+ipf_nat_iterator(softc, token, itp, obj)
 	ipf_main_softc_t *softc;
 	ipftoken_t *token;
 	ipfgeniter_t *itp;
+	ipfobj_t *obj;
 {
 	int error;
 
@@ -7189,7 +7194,7 @@ ipf_nat_iterator(softc, token, itp)
 	case IPFGENITER_HOSTMAP :
 	case IPFGENITER_IPNAT :
 	case IPFGENITER_NAT :
-		error = ipf_nat_getnext(softc, token, itp);
+		error = ipf_nat_getnext(softc, token, itp, obj);
 		break;
 
 	case IPFGENITER_NATFRAG :
@@ -8491,7 +8496,7 @@ ipf_nat_gettable(softc, softn, data)
 	ipftable_t table;
 	int error;
 
-	error = ipf_inobj(softc, data, &table, IPFOBJ_GTABLE);
+	error = ipf_inobj(softc, data, NULL, &table, IPFOBJ_GTABLE);
 	if (error != 0)
 		return error;
 

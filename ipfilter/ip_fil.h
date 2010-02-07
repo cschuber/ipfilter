@@ -680,8 +680,13 @@ typedef	struct	frentry {
 
 	/*
 	 * For PPS rate limiting
+	 * fr_lpu is used to always have the same size for this field,
+	 * allocating 64bits for seconds and 32bits for milliseconds.
 	 */
-	struct timeval	fr_lastpkt;
+	union {
+		struct timeval	frp_lastpkt;
+		char	frp_bytes[12];
+	} fr_lpu;
 	int		fr_curpps;
 
 	union	{
@@ -728,6 +733,7 @@ typedef	struct	frentry {
 	char	fr_names[1];
 } frentry_t;
 
+#define	fr_lastpkt	fr_lpu.frp_lastpkt
 #define	fr_caddr	fr_dun.fru_caddr
 #define	fr_data		fr_dun.fru_data
 #define	fr_dfunc	fr_dun.fru_func
@@ -1756,7 +1762,7 @@ extern	int	copyinptr(ipf_main_softc_t *, void *, void *, size_t);
 extern	int	copyoutptr(ipf_main_softc_t *, void *, void *, size_t);
 extern	int	ipf_fastroute(mb_t *, mb_t **, fr_info_t *, frdest_t *);
 extern	int	ipf_inject(fr_info_t *, mb_t *);
-extern	int	ipf_inobj(ipf_main_softc_t *, void *, void *, int);
+extern	int	ipf_inobj(ipf_main_softc_t *, void *, ipfobj_t *, void *, int);
 extern	int	ipf_inobjsz(ipf_main_softc_t *, void *, void *, int, int);
 extern	int	ipf_ioctlswitch(ipf_main_softc_t *, int, void *,
 				ioctlcmd_t, int, int, void *);
@@ -1767,6 +1773,7 @@ extern	int	ipf_matcharray_load(ipf_main_softc_t *, caddr_t,
 					 ipfobj_t *, int **);
 extern	int	ipf_matcharray_verify(int *, int);
 extern	int	ipf_outobj(ipf_main_softc_t *, void *, void *, int);
+extern	int	ipf_outobjk(ipf_main_softc_t *, ipfobj_t *, void *);
 extern	int	ipf_outobjsz(ipf_main_softc_t *, void *, void *, int, int);
 extern	void	*ipf_pullup(mb_t *, fr_info_t *, int);
 extern	int	ipf_resolvedest(ipf_main_softc_t *, char *,
@@ -1844,7 +1851,6 @@ extern	frentry_t 	*ipf_dstgrpmap(fr_info_t *, u_32_t *);
 extern	void		ipf_fixskip(frentry_t **, frentry_t *, int);
 extern	void		ipf_forgetifp(ipf_main_softc_t *, void *);
 extern	frentry_t 	*ipf_getrulen(ipf_main_softc_t *, int, char *, u_32_t);
-extern	void		ipf_getstat(ipf_main_softc_t *, struct friostat *);
 extern	int		ipf_ifpaddr(ipf_main_softc_t *, int, int, void *,
 				    i6addr_t *, i6addr_t *);
 extern	int		ipf_initialise(void);
@@ -1901,6 +1907,10 @@ extern	char	ipfilter_version[];
 extern	int	icmptoicmp6types[ICMP_MAXTYPE+1];
 extern	int	icmptoicmp6unreach[ICMP_MAX_UNREACH];
 extern	int	icmpreplytype6[ICMP6_MAXTYPE + 1];
+#endif
+#ifdef	IPFILTER_COMPAT
+extern	int	ipf_in_compat __P((ipf_main_softc_t *, ipfobj_t *, void *));
+extern	int	ipf_out_compat __P((ipf_main_softc_t *, ipfobj_t *, void *));
 #endif
 extern	int	icmpreplytype4[ICMP_MAXTYPE + 1];
 

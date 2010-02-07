@@ -165,6 +165,7 @@ static	int		ipf_frruleiter(ipf_main_softc_t *, void *, int, void *);
 static	int		ipf_funcinit(ipf_main_softc_t *, frentry_t *fr);
 static	int		ipf_geniter(ipf_main_softc_t *, ipftoken_t *,
 				    ipfgeniter_t *);
+static	void		ipf_getstat(ipf_main_softc_t *, struct friostat *, int);
 static	int		ipf_grpmapinit(struct ipf_main_softc_s *, frentry_t *);
 static	int		ipf_portcheck(frpcmp_t *, u_32_t);
 static	INLINE int	ipf_pr_ah(fr_info_t *);
@@ -4559,15 +4560,23 @@ ipf_lock(data, lockp)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_getstat                                                 */
 /* Returns:     Nil                                                         */
-/* Parameters:  fiop(I)  - pointer to ipfilter stats structure              */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              fiop(I)  - pointer to ipfilter stats structure              */
+/*              rev(I)   - version claim by program doing ioctl             */
 /*                                                                          */
 /* Stores a copy of current pointers, counters, etc, in the friostat        */
 /* structure.                                                               */
+/* If IPFILTER_COMPAT is compiled, we pretend to be whatever version the    */
+/* program is looking for. This ensure that validation of the version it    */
+/* expects will always succeed. Thus kernels with IPFILTER_COMPAT will      */
+/* allow older binaries to work but kernels without it will not.            */
 /* ------------------------------------------------------------------------ */
-void
-ipf_getstat(softc, fiop)
+/*ARGSUSED*/
+static void
+ipf_getstat(softc, fiop, rev)
 	ipf_main_softc_t *softc;
 	friostat_t *fiop;
+	int rev;
 {
 	int i;
 
@@ -4610,8 +4619,17 @@ ipf_getstat(softc, fiop)
 #endif
 	fiop->f_defpass = softc->ipf_pass;
 	fiop->f_features = ipf_features;
+
+#ifdef IPFILTER_COMPAT
+	sprintf(fiop->f_version, "IP Filter: v%d.%d.%d",
+		(rev / 1000000) % 100,
+		(rev / 10000) % 100,
+		(rev / 100) % 100);
+#else
+	rev = rev;
 	(void) strncpy(fiop->f_version, ipfilter_version,
 		       sizeof(fiop->f_version));
+#endif
 }
 
 
@@ -4749,7 +4767,7 @@ frrequest(softc, unit, req, data, set, makecopy)
 	fg = NULL;
 	fp = &frd;
 	if (makecopy != 0) {
-		error = ipf_inobj(softc, data, fp, IPFOBJ_FRENTRY);
+		error = ipf_inobj(softc, data, NULL, fp, IPFOBJ_FRENTRY);
 		if (error) {
 			return error;
 		}
@@ -6439,28 +6457,32 @@ ipf_ioctlswitch(softc, unit, data, cmd, mode, uid, ctx)
 
 /*
  * This array defines the expected size of objects coming into the kernel
- * for the various recognised object types.
+ * for the various recognised object types. The first column is flags (see
+ * below), 2nd column is current size, 3rd column is the version number of
+ * when the current size became current.
+ * Flags:
+ * 1 = minimum size, not absolute size
  */
-static	int	ipf_objbytes[IPFOBJ_COUNT][2] = {
-	{ 1,	sizeof(struct frentry) },		/* frentry */
-	{ 1,	sizeof(struct friostat) },
-	{ 0,	sizeof(struct fr_info) },
-	{ 0,	sizeof(struct ipf_authstat) },
-	{ 0,	sizeof(struct ipfrstat) },
-	{ 1,	sizeof(struct ipnat) },
-	{ 0,	sizeof(struct natstat) },
-	{ 0,	sizeof(struct ipstate_save) },
-	{ 1,	sizeof(struct nat_save) },		/* nat_save */
-	{ 0,	sizeof(struct natlookup) },
-	{ 1,	sizeof(struct ipstate) },		/* ipstate */
-	{ 0,	sizeof(struct ips_stat) },
-	{ 0,	sizeof(struct frauth) },
-	{ 0,	sizeof(struct ipftune) },
-	{ 0,	sizeof(struct nat) },			/* nat_t */
-	{ 0,	sizeof(struct ipfruleiter) },
-	{ 0,	sizeof(struct ipfgeniter) },
-	{ 0,	sizeof(struct ipftable) },
-	{ 0,	sizeof(struct ipflookupiter) },
+static	int	ipf_objbytes[IPFOBJ_COUNT][3] = {
+	{ 1,	sizeof(struct frentry),		4013400 },
+	{ 1,	sizeof(struct friostat),	4013300 },
+	{ 0,	sizeof(struct fr_info),		4013200 },
+	{ 0,	sizeof(struct ipf_authstat),	4010100 },
+	{ 0,	sizeof(struct ipfrstat),	4010100 },
+	{ 1,	sizeof(struct ipnat),		4011400 },
+	{ 0,	sizeof(struct natstat),		4013200 },
+	{ 0,	sizeof(struct ipstate_save),	4013400 },
+	{ 1,	sizeof(struct nat_save),	4013400 },
+	{ 0,	sizeof(struct natlookup),	4010100 },
+	{ 1,	sizeof(struct ipstate),		4011600 },
+	{ 0,	sizeof(struct ips_stat),	4012100 },
+	{ 0,	sizeof(struct frauth),		4013200 },
+	{ 0,	sizeof(struct ipftune),		4010100 },
+	{ 0,	sizeof(struct nat),		4012500 },
+	{ 0,	sizeof(struct ipfruleiter),	4011400 },
+	{ 0,	sizeof(struct ipfgeniter),	4011400 },
+	{ 0,	sizeof(struct ipftable),	4011400 },
+	{ 0,	sizeof(struct ipflookupiter),	4011400 },
 	{ 0,	sizeof(struct ipftq) * IPF_TCP_NSTATES },
 };
 
@@ -6468,18 +6490,24 @@ static	int	ipf_objbytes[IPFOBJ_COUNT][2] = {
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_inobj                                                   */
 /* Returns:     int     - 0 = success, else failure                         */
-/* Parameters:  data(I) - pointer to ioctl data                             */
-/*              ptr(I)  - pointer to store real data in                     */
-/*              type(I) - type of structure being moved                     */
+/* Parameters:  softc(I) - soft context pointerto work with                 */
+/*              data(I)  - pointer to ioctl data                            */
+/*              objp(O)  - where to store ipfobj structure                  */
+/*              ptr(I)   - pointer to data to copy out                      */
+/*              type(I)  - type of structure being moved                    */
 /*                                                                          */
 /* Copy in the contents of what the ipfobj_t points to.  In future, we      */
 /* add things to check for version numbers, sizes, etc, to make it backward */
 /* compatible at the ABI for user land.                                     */
+/* If objp is not NULL then we assume that the caller wants to see what is  */
+/* in the ipfobj_t structure being copied in. As an example, this can tell  */
+/* the caller what version of ipfilter the ioctl program was written to.    */
 /* ------------------------------------------------------------------------ */
 int
-ipf_inobj(softc, data, ptr, type)
+ipf_inobj(softc, data, objp, ptr, type)
 	ipf_main_softc_t *softc;
 	void *data;
+	ipfobj_t *objp;
 	void *ptr;
 	int type;
 {
@@ -6492,46 +6520,44 @@ ipf_inobj(softc, data, ptr, type)
 		return EINVAL;
 	}
 
-	error = BCOPYIN(data, &obj, sizeof(obj));
+	if (objp == NULL)
+		objp = &obj;
+	error = BCOPYIN(data, objp, sizeof(*objp));
 	if (error != 0) {
 		softc->ipf_interror = 124;
 		return EFAULT;
 	}
 
-	if (obj.ipfo_type != type) {
+	if (objp->ipfo_type != type) {
 		softc->ipf_interror = 50;
 		return EINVAL;
 	}
 
-	if (obj.ipfo_rev == IPFILTER_VERSION) {
+	if (objp->ipfo_rev >= ipf_objbytes[type][2]) {
 		if ((ipf_objbytes[type][0] & 1) != 0) {
-			if (obj.ipfo_size < ipf_objbytes[type][1]) {
+			if (objp->ipfo_size < ipf_objbytes[type][1]) {
 				softc->ipf_interror = 51;
 				return EINVAL;
 			}
 			size =  ipf_objbytes[type][1];
-		} else if (obj.ipfo_size == ipf_objbytes[type][1]) {
-			size =  ipf_objbytes[type][1];
+		} else if (objp->ipfo_size == ipf_objbytes[type][1]) {
+			size =  objp->ipfo_size;
 		} else {
 			softc->ipf_interror = 52;
 			return EINVAL;
 		}
-		error = COPYIN(obj.ipfo_ptr, ptr, size);
+		error = COPYIN(objp->ipfo_ptr, ptr, size);
+		if (error != 0) {
+			softc->ipf_interror = 55;
+			error = EFAULT;
+		}
 	} else {
 #ifdef  IPFILTER_COMPAT
-		/* XXX compatibility hook here */
-		/* error = hook(&obj, ptr) */
-		softc->ipf_interror = 53;
-		return EINVAL;
+		error = ipf_in_compat(softc, objp, ptr);
 #else
 		softc->ipf_interror = 54;
-		return EINVAL;
+		error = EINVAL;
 #endif
-	}
-
-	if (error != 0) {
-		softc->ipf_interror = 55;
-		error = EFAULT;
 	}
 	return error;
 }
@@ -6540,10 +6566,11 @@ ipf_inobj(softc, data, ptr, type)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_inobjsz                                                 */
 /* Returns:     int     - 0 = success, else failure                         */
-/* Parameters:  data(I) - pointer to ioctl data                             */
-/*              ptr(I)  - pointer to store real data in                     */
-/*              type(I) - type of structure being moved                     */
-/*              sz(I)   - size of data to copy                              */
+/* Parameters:  softc(I) - soft context pointerto work with                 */
+/*              data(I)  - pointer to ioctl data                            */
+/*              ptr(I)   - pointer to store real data in                    */
+/*              type(I)  - type of structure being moved                    */
+/*              sz(I)    - size of data to copy                             */
 /*                                                                          */
 /* As per ipf_inobj, except the size of the object to copy in is passed in  */
 /* but it must not be smaller than the size defined for the type and the    */
@@ -6577,30 +6604,25 @@ ipf_inobjsz(softc, data, ptr, type, sz)
 		return EINVAL;
 	}
 
-	if (obj.ipfo_rev == IPFILTER_VERSION) {
+	if (obj.ipfo_rev >= ipf_objbytes[type][2]) {
 		if (((ipf_objbytes[type][0] & 1) == 0) ||
 		    (sz < ipf_objbytes[type][1])) {
 			softc->ipf_interror = 57;
 			return EINVAL;
 		}
 		error = COPYIN(obj.ipfo_ptr, ptr, sz);
+		if (error != 0) {
+			softc->ipf_interror = 61;
+			error = EFAULT;
+		}
 	} else {
 #ifdef	IPFILTER_COMPAT
-		/* XXX compatibility hook here */
-		/* error = hook(&obj, ptr) */
-		softc->ipf_interror = 59;
-		return EINVAL;
+		error = ipf_in_compat(softc, &obj, ptr);
 #else
 		softc->ipf_interror = 60;
-		return EINVAL;
+		error = EINVAL;
 #endif
 	}
-
-	if (error != 0) {
-		softc->ipf_interror = 61;
-		error = EFAULT;
-	}
-
 	return error;
 }
 
@@ -6645,30 +6667,25 @@ ipf_outobjsz(softc, data, ptr, type, sz)
 		return EINVAL;
 	}
 
-	if (obj.ipfo_rev == IPFILTER_VERSION) {
+	if (obj.ipfo_rev >= ipf_objbytes[type][2]) {
 		if (((ipf_objbytes[type][0] & 1) == 0) ||
 		    (sz < ipf_objbytes[type][1])) {
 			softc->ipf_interror = 61;
 			return EINVAL;
 		}
 		error = COPYOUT(ptr, obj.ipfo_ptr, sz);
+		if (error != 0) {
+			softc->ipf_interror = 66;
+			error = EFAULT;
+		}
 	} else {
 #ifdef	IPFILTER_COMPAT
-		/* XXX compatibility hook here */
-		/* error = hook(&obj, ptr) */
-		softc->ipf_interror = 64;
-		return EINVAL;
+		error = ipf_out_compat(softc, &obj, ptr);
 #else
 		softc->ipf_interror = 65;
-		return EINVAL;
+		error = EINVAL;
 #endif
 	}
-
-	if (error != 0) {
-		softc->ipf_interror = 66;
-		error = EFAULT;
-	}
-
 	return error;
 }
 
@@ -6710,7 +6727,7 @@ ipf_outobj(softc, data, ptr, type)
 		return EINVAL;
 	}
 
-	if (obj.ipfo_rev == IPFILTER_VERSION) {
+	if (obj.ipfo_rev >= ipf_objbytes[type][2]) {
 		if ((ipf_objbytes[type][0] & 1) != 0) {
 			if (obj.ipfo_size < ipf_objbytes[type][1]) {
 				softc->ipf_interror = 69;
@@ -6722,21 +6739,72 @@ ipf_outobj(softc, data, ptr, type)
 		}
 
 		error = COPYOUT(ptr, obj.ipfo_ptr, obj.ipfo_size);
+		if (error != 0) {
+			softc->ipf_interror = 73;
+			error = EFAULT;
+		}
 	} else {
 #ifdef	IPFILTER_COMPAT
-		/* XXX compatibility hook here */
-		/* error = hook(&obj, ptr, ipf_objbytes[type]); */
-		softc->ipf_interror = 71;
-		return EINVAL;
+		error = ipf_out_compat(softc, &obj, ptr);
 #else
 		softc->ipf_interror = 72;
-		return EINVAL;
+		error = EINVAL;
 #endif
 	}
+	return error;
+}
 
-	if (error != 0) {
-		softc->ipf_interror = 73;
-		error = EFAULT;
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_outobjk                                                 */
+/* Returns:     int     - 0 = success, else failure                         */
+/* Parameters:  obj(I)  - pointer to data description structure             */
+/*              ptr(I)  - pointer to kernel data to copy out                */
+/*                                                                          */
+/* In the above functions, the ipfobj_t structure is copied into the kernel,*/
+/* telling ipfilter how to copy out data. In this instance, the ipfobj_t is */
+/* already populated with information and now we just need to use it.       */
+/* There is no need for this function to have a "type" parameter as there   */
+/* is no point in validating information that comes from the kernel with    */
+/* itself.                                                                  */
+/* ------------------------------------------------------------------------ */
+int ipf_outobjk(softc, obj, ptr)
+	ipf_main_softc_t *softc;
+	ipfobj_t *obj;
+	void *ptr;
+{
+	int type = obj->ipfo_type;
+	int error;
+
+	if ((type < 0) || (type >= IPFOBJ_COUNT)) {
+		softc->ipf_interror = 72;
+		return EINVAL;
+	}
+
+	if (obj->ipfo_rev >= ipf_objbytes[type][2]) {
+		if ((ipf_objbytes[type][0] & 1) != 0) {
+			if (obj->ipfo_size < ipf_objbytes[type][1]) {
+				softc->ipf_interror = 72;
+				return EINVAL;
+			}
+
+		} else if (obj->ipfo_size != ipf_objbytes[type][1]) {
+			softc->ipf_interror = 72;
+			return EINVAL;
+		}
+
+		error = COPYOUT(ptr, obj->ipfo_ptr, obj->ipfo_size);
+		if (error != 0) {
+			softc->ipf_interror = 72;
+			error = EFAULT;
+		}
+	} else {
+#ifdef  IPFILTER_COMPAT
+		error = ipf_out_compat(softc, obj, ptr);
+#else
+		softc->ipf_interror = 72;
+		error = EINVAL;
+#endif
 	}
 	return error;
 }
@@ -7371,7 +7439,7 @@ ipf_ipftune(softc, cmd, data)
 	void *cookie;
 	int error;
 
-	error = ipf_inobj(softc, data, &tu, IPFOBJ_TUNEABLE);
+	error = ipf_inobj(softc, data, NULL, &tu, IPFOBJ_TUNEABLE);
 	if (error != 0)
 		return error;
 
@@ -7546,9 +7614,13 @@ ipf_zerostats(softc, data)
 	caddr_t	data;
 {
 	friostat_t fio;
+	ipfobj_t obj;
 	int error;
 
-	ipf_getstat(softc, &fio);
+	error = ipf_inobj(softc, data, &obj, &fio, IPFOBJ_IPFSTAT);
+	if (error != 0)
+		return error;
+	ipf_getstat(softc, &fio, obj.ipfo_rev);
 	error = ipf_outobj(softc, data, &fio, IPFOBJ_IPFSTAT);
 	if (error != 0)
 		return error;
@@ -7904,6 +7976,7 @@ ipf_getnextrule(softc, t, ptr)
 	int error, count, out;
 	ipfruleiter_t it;
 	frgroup_t *fg;
+	ipfobj_t obj;
 	char *dst;
 
 	if (t == NULL || ptr == NULL) {
@@ -7911,7 +7984,7 @@ ipf_getnextrule(softc, t, ptr)
 		return EFAULT;
 	}
 
-	error = ipf_inobj(softc, ptr, &it, IPFOBJ_IPFITER);
+	error = ipf_inobj(softc, ptr, &obj, &it, IPFOBJ_IPFITER);
 	if (error != 0)
 		return error;
 
@@ -7958,6 +8031,8 @@ ipf_getnextrule(softc, t, ptr)
 		next = fr->fr_next;
 	}
 
+	obj.ipfo_type = IPFOBJ_FRENTRY;
+	obj.ipfo_size = 0;
 	dst = (char *)it.iri_rule;
 	/*
 	 * The ipfruleiter may ask for more than 1 rule at a time to be
@@ -7987,11 +8062,11 @@ ipf_getnextrule(softc, t, ptr)
 		/*
 		 * Copy out data and clean up references and token as needed.
 		 */
-		error = COPYOUT(next, dst, next->fr_size);
-		if (error != 0) {
-			softc->ipf_interror = 89;
-			return EFAULT;
-		}
+		obj.ipfo_size = sizeof(frentry_t);
+		obj.ipfo_ptr = dst;
+		error = ipf_outobjk(softc, &obj, next);
+		if (error != 0)
+			return error;
 		if (t->ipt_data == NULL) {
 			break;
 		} else {
@@ -8111,7 +8186,7 @@ ipf_genericiter(softc, data, uid, ctx)
 	ipfgeniter_t iter;
 	int error;
 
-	error = ipf_inobj(softc, data, &iter, IPFOBJ_GENITER);
+	error = ipf_inobj(softc, data, NULL, &iter, IPFOBJ_GENITER);
 	if (error != 0)
 		return error;
 
@@ -8156,6 +8231,7 @@ ipf_ipf_ioctl(softc, data, cmd, mode, uid, ctx)
 {
 	friostat_t fio;
 	int error, tmp;
+	ipfobj_t obj;
 	SPL_INT(s);
 
 	switch (cmd)
@@ -8274,7 +8350,11 @@ ipf_ipf_ioctl(softc, data, cmd, mode, uid, ctx)
 		break;
 
 	case SIOCGETFS :
-		ipf_getstat(softc, &fio);
+		error = ipf_inobj(softc, (void *)data, &obj, &fio,
+				  IPFOBJ_IPFSTAT);
+		if (error != 0)
+			break;
+		ipf_getstat(softc, &fio, obj.ipfo_rev);
 		error = ipf_outobj(softc, (void *)data, &fio, IPFOBJ_IPFSTAT);
 		break;
 

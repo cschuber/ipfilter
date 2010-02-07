@@ -46,6 +46,10 @@ LOOKUP=-DIPFILTER_LOOKUP
 #
 #COMPIPF=-DIPFILTER_COMPILED
 #
+# To enable IPFilter compatibility with older CLI utilities
+#
+COMPATIPF=-DIPFILTER_COMPAT
+#
 # To enable synchronisation between IPFilter hosts
 #
 #SYNC=-DIPFILTER_SYNC
