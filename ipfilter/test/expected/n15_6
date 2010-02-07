@@ -1,5 +1,5 @@
 < le0 ip6/0 20 0 6 9:9:9:0:0:0:0:9,10011 > 3:0:3:0:0:0:3:3,80
-16
+18
 List of active MAP/Redirect filters:
 rdr le0 any port 80 -> 3:0:3::3:3/128 port 80 tcp
 

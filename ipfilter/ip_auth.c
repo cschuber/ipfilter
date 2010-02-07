@@ -415,7 +415,7 @@ ipf_auth_check(fin, passp)
 			 */
 			if (!(pass = fra->fra_pass) || (FR_ISAUTH(pass))) {
 				pass = FR_BLOCK;
-				fin->fin_reason = 9;
+				fin->fin_reason = FRB_AUTHFEEDBACK;
 			}
 			/*
 			 * Create a dummy rule for the stateful checking to
