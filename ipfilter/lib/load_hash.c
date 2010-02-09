@@ -83,7 +83,7 @@ load_hash(iphp, list, iocfunc)
 			return -1;
 		}
 		iph.iph_list = list;
-		printhash(&iph, bcopywrap, iph.iph_name, opts);
+		printhash(&iph, bcopywrap, iph.iph_name, opts, NULL);
 		free(iph.iph_table);
 		iph.iph_table[0] = NULL;
 

@@ -8,14 +8,16 @@
 
 
 iphtent_t *
-printhashnode(iph, ipep, copyfunc, opts)
+printhashnode(iph, ipep, copyfunc, opts, fields)
 	iphtable_t *iph;
 	iphtent_t *ipep;
 	copyfunc_t copyfunc;
 	int opts;
+	wordtab_t *fields;
 {
 	iphtent_t ipe;
 	u_int hv;
+	int i;
 
 	if ((*copyfunc)(ipep, &ipe, sizeof(ipe)))
 		return NULL;
@@ -31,7 +33,14 @@ printhashnode(iph, ipep, copyfunc, opts)
 	ipe.ipe_mask.i6[2] = htonl(ipe.ipe_mask.i6[2]);
 	ipe.ipe_mask.i6[3] = htonl(ipe.ipe_mask.i6[3]);
 
-	if ((opts & OPT_DEBUG) != 0) {
+	if (fields != NULL) {
+		for (i = 0; fields[i].w_value != 0; i++) {
+			printpoolfield(&ipe, IPLT_HASH, i);
+			if (fields[i + 1].w_value != 0)
+				printf("\t");
+		}
+		printf("\n");
+	} else if ((opts & OPT_DEBUG) != 0) {
 		PRINTF("\t%d\tAddress: %s", hv,
 			inet_ntoa(ipe.ipe_addr.in4));
 		printmask(ipe.ipe_family, (u_32_t *)&ipe.ipe_mask.in4_addr);

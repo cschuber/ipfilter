@@ -22,6 +22,7 @@ LIBOBJS=$(DEST)/addicmp.o \
      $(DEST)/count4bits.o \
      $(DEST)/debug.o \
      $(DEST)/dupmbt.o \
+     $(DEST)/familyname.o \
      $(DEST)/facpri.o \
      $(DEST)/flags.o \
      $(DEST)/fill6bits.o \
@@ -114,6 +115,7 @@ LIBOBJS=$(DEST)/addicmp.o \
      $(DEST)/printnatside.o \
      $(DEST)/printpool.o \
      $(DEST)/printpooldata.o \
+     $(DEST)/printpoolfield.o \
      $(DEST)/printpoolnode.o \
      $(DEST)/printpool_live.o \
      $(DEST)/printproto.o \
@@ -184,6 +186,8 @@ $(DEST)/dupmbt.o: $(LIBSRC)/dupmbt.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/dupmbt.c -o $@
 $(DEST)/facpri.o: $(LIBSRC)/facpri.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/facpri.c -o $@
+$(DEST)/familyname.o: $(LIBSRC)/familyname.c $(INCDEP)
+	$(CC) $(CCARGS) -c $(LIBSRC)/familyname.c -o $@
 $(DEST)/fill6bits.o: $(LIBSRC)/fill6bits.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/fill6bits.c -o $@
 $(DEST)/findword.o: $(LIBSRC)/findword.c $(INCDEP)
@@ -360,6 +364,9 @@ $(DEST)/printpool.o: $(LIBSRC)/printpool.c $(TOP)/ip_fil.h $(TOP)/ip_pool.h
 $(DEST)/printpooldata.o: $(LIBSRC)/printpooldata.c $(TOP)/ip_fil.h \
     $(TOP)/ip_pool.h $(TOP)/ip_lookup.h
 	$(CC) $(CCARGS) -c $(LIBSRC)/printpooldata.c -o $@
+$(DEST)/printpoolfield.o: $(LIBSRC)/printpoolfield.c $(TOP)/ip_fil.h \
+    $(TOP)/ip_pool.h $(TOP)/ip_lookup.h
+	$(CC) $(CCARGS) -c $(LIBSRC)/printpoolfield.c -o $@
 $(DEST)/printpoolnode.o: $(LIBSRC)/printpoolnode.c $(TOP)/ip_fil.h \
     $(TOP)/ip_pool.h $(TOP)/ip_lookup.h
 	$(CC) $(CCARGS) -c $(LIBSRC)/printpoolnode.c -o $@

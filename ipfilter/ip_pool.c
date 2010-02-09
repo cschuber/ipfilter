@@ -1444,6 +1444,6 @@ ipf_pool_dump(softc, arg)
 	for (i = 0; i <= LOOKUP_POOL_MAX; i++)
 		for (ipl = softp->ipf_pool_list[i]; ipl != NULL;
 		     ipl = ipl->ipo_next)
-			printpool(ipl, bcopywrap, NULL, opts);
+			printpool(ipl, bcopywrap, NULL, opts, NULL);
 }
 #endif

@@ -49,7 +49,7 @@ load_pool(plp, iocfunc)
 
 	if ((opts & OPT_VERBOSE) != 0) {
 		pool.ipo_list = plp->ipo_list;
-		(void) printpool(&pool, bcopywrap, pool.ipo_name, opts);
+		(void) printpool(&pool, bcopywrap, pool.ipo_name, opts, NULL);
 		pool.ipo_list = NULL;
 	}
 

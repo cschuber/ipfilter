@@ -8,12 +8,21 @@
 
 
 ip_pool_node_t *
-printpoolnode(np, opts)
+printpoolnode(np, opts, fields)
 	ip_pool_node_t *np;
 	int opts;
+	wordtab_t *fields;
 {
+	int i;
 
-	if ((opts & OPT_DEBUG) == 0) {
+	if (fields != NULL) {
+		for (i = 0; fields[i].w_value != 0; i++) {
+			printpoolfield(np, IPLT_POOL, i);
+			if (fields[i + 1].w_value != 0)
+				printf("\t");
+		}
+		printf("\n");
+	} else if ((opts & OPT_DEBUG) == 0) {
 		putchar(' ');
 		if (np->ipn_info == 1)
 			PRINTF("! ");

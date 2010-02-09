@@ -1505,7 +1505,7 @@ ipf_htable_dump(softc, arg)
 	for (i = 0; i < IPL_LOGSIZE; i++)
 		for (iph = softh->ipf_htables[i]; iph != NULL;
 		     iph = iph->iph_next)
-			printhash(iph, bcopywrap, NULL, opts);
+			printhash(iph, bcopywrap, NULL, opts, NULL);
 
 }
 #endif

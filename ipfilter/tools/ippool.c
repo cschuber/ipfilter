@@ -67,6 +67,8 @@ void	showdstls_live(int, int, ipf_dstl_stat_t *, char *);
 int	opts = 0;
 int	fd = -1;
 int	use_inet6 = 0;
+wordtab_t *pool_fields = NULL;
+int	nohdrfields = 0;
 
 
 void
@@ -78,7 +80,7 @@ usage(prog)
 	fprintf(stderr, "\t-A [-dnv] [-m <name>] [-o <role>] [-S <seed>] [-t <type>]\n");
 	fprintf(stderr, "\t-f <file> [-dnuv]\n");
 	fprintf(stderr, "\t-F [-dv] [-o <role>] [-t <type>]\n");
-	fprintf(stderr, "\t-l [-dv] [-m <name>] [-t <type>]\n");
+	fprintf(stderr, "\t-l [-dv] [-m <name>] [-t <type>] [-O <fields>]\n");
 	fprintf(stderr, "\t-r [-dnv] [-m <name>] [-o <role>] [-t type] -i <ipaddr>[/netmask]\n");
 	fprintf(stderr, "\t-R [-dnv] [-m <name>] [-o <role>] [-t <type>]\n");
 	fprintf(stderr, "\t-s [-dtv] [-M <core>] [-N <namelist>]\n");
@@ -680,6 +682,9 @@ poollist(argc, argv)
 				return -1;
 			}
 			break;
+		case 'O' :
+			pool_fields = parsefields(poolfields, optarg);
+			break;
 		case 'R' :
 			opts |= OPT_NORESOLVE;
 			break;
@@ -747,14 +752,15 @@ poollist_dead(role, poolname, type, kernel, core)
 			ptr = pools[role];
 			while (ptr != NULL) {
 				ptr = printpool(ptr, kmemcpywrap, poolname,
-						opts);
+						opts, pool_fields);
 			}
 		} else {
 			for (role = 0; role <= IPL_LOGMAX; role++) {
 				ptr = pools[role];
 				while (ptr != NULL) {
 					ptr = printpool(ptr, kmemcpywrap,
-							poolname, opts);
+							poolname, opts,
+							pool_fields);
 				}
 			}
 			role = IPL_LOGALL;
@@ -775,14 +781,15 @@ poollist_dead(role, poolname, type, kernel, core)
 			hptr = tables[role];
 			while (hptr != NULL) {
 				hptr = printhash(hptr, kmemcpywrap,
-						 poolname, opts);
+						 poolname, opts, pool_fields);
 			}
 		} else {
 			for (role = 0; role <= IPL_LOGMAX; role++) {
 				hptr = tables[role];
 				while (hptr != NULL) {
 					hptr = printhash(hptr, kmemcpywrap,
-							 poolname, opts);
+							 poolname, opts,
+							 pool_fields);
 				}
 			}
 		}
@@ -933,7 +940,7 @@ showpools_live(fd, role, plstp, poolname)
 			ipferror(fd, "ioctl(SIOCLOOKUPITER)");
 			break;
 		}
-		printpool_live(&pool, fd, poolname, opts);
+		printpool_live(&pool, fd, poolname, opts, pool_fields);
 
 		plstp->ipls_list[role + 1] = pool.ipo_next;
 	}
@@ -969,7 +976,7 @@ showhashs_live(fd, role, htstp, poolname)
 			break;
 		}
 
-		printhash_live(&table, fd, poolname, opts);
+		printhash_live(&table, fd, poolname, opts, pool_fields);
 
 		htstp->iphs_tables = table.iph_next;
 	}
@@ -1005,7 +1012,7 @@ showdstls_live(fd, role, dlstp, poolname)
 			break;
 		}
 
-		printdstl_live(&table, fd, poolname, opts);
+		printdstl_live(&table, fd, poolname, opts, pool_fields);
 
 		dlstp->ipls_list[role] = table.ipld_next;
 	}

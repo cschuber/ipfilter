@@ -51,7 +51,7 @@ load_dstlist(dst, iocfunc, nodes)
 
 	if ((opts & OPT_VERBOSE) != 0) {
 		dest.ipld_dests = dst->ipld_dests;
-		printdstlist(&dest, bcopywrap, dest.ipld_name, opts, nodes);
+		printdstlist(&dest, bcopywrap, dest.ipld_name, opts, nodes, NULL);
 		dest.ipld_dests = NULL;
 	}
 
