@@ -8,11 +8,12 @@
 
 
 ip_pool_t *
-printpool(pp, copyfunc, name, opts)
+printpool(pp, copyfunc, name, opts, fields)
 	ip_pool_t *pp;
 	copyfunc_t copyfunc;
 	char *name;
 	int opts;
+	wordtab_t *fields;
 {
 	ip_pool_node_t *ipnp, *ipnpn, ipn;
 	ip_pool_t ipp;
@@ -44,7 +45,7 @@ printpool(pp, copyfunc, name, opts)
 		putchar(';');
 	} else {
 		for (ipnp = ipp.ipo_list; ipnp != NULL; ) {
-			ipnp = printpoolnode(ipnp, opts);
+			ipnp = printpoolnode(ipnp, opts, fields);
 
 			if ((opts & OPT_DEBUG) == 0) {
 				putchar(';');

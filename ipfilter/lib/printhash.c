@@ -8,11 +8,12 @@
 
 
 iphtable_t *
-printhash(hp, copyfunc, name, opts)
+printhash(hp, copyfunc, name, opts, fields)
 	iphtable_t *hp;
 	copyfunc_t copyfunc;
 	char *name;
 	int opts;
+	wordtab_t *fields;
 {
 	iphtent_t *ipep, **table;
 	iphtable_t iph;
@@ -25,7 +26,8 @@ printhash(hp, copyfunc, name, opts)
 	if ((name != NULL) && strncmp(name, iph.iph_name, FR_GROUPLEN))
 		return iph.iph_next;
 
-	printhashdata(hp, opts);
+	if (fields == NULL)
+		printhashdata(hp, opts);
 
 	if ((hp->iph_flags & IPHASH_DELETE) != 0)
 		PRINTF("# ");
@@ -39,7 +41,7 @@ printhash(hp, copyfunc, name, opts)
 		return NULL;
 
 	for (printed = 0, ipep = iph.iph_list; ipep != NULL; ) {
-		ipep = printhashnode(&iph, ipep, copyfunc, opts);
+		ipep = printhashnode(&iph, ipep, copyfunc, opts, fields);
 		printed++;
 	}
 	if (printed == 0)

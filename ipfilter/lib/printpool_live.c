@@ -12,11 +12,12 @@
 
 
 ip_pool_t *
-printpool_live(pool, fd, name, opts)
+printpool_live(pool, fd, name, opts, fields)
 	ip_pool_t *pool;
 	int fd;
 	char *name;
 	int opts;
+	wordtab_t *fields;
 {
 	ip_pool_node_t entry, *top, *node;
 	ipflookupiter_t iter;
@@ -26,7 +27,8 @@ printpool_live(pool, fd, name, opts)
 	if ((name != NULL) && strncmp(name, pool->ipo_name, FR_GROUPLEN))
 		return pool->ipo_next;
 
-	printpooldata(pool, opts);
+	if (fields == NULL)
+		printpooldata(pool, opts);
 
 	if ((pool->ipo_flags & IPOOL_DELETE) != 0)
 		PRINTF("# ");
@@ -64,7 +66,7 @@ printpool_live(pool, fd, name, opts)
 
 	while (top != NULL) {
 		node = top;
-		(void) printpoolnode(node, opts);
+		(void) printpoolnode(node, opts, fields);
 		if ((opts & OPT_DEBUG) == 0)
 			putchar(';');
 		top = node->ipn_next;

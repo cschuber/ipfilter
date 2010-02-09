@@ -8,12 +8,14 @@
 
 
 ipf_dstnode_t *
-printdstlistnode(inp, copyfunc, opts)
+printdstlistnode(inp, copyfunc, opts, fields)
 	ipf_dstnode_t *inp;
 	copyfunc_t copyfunc;
 	int opts;
+	wordtab_t *fields;
 {
 	ipf_dstnode_t node, *np;
+	int i;
 #ifdef USE_INET6
 	char buf[INET6_ADDRSTRLEN+1];
 	const char *str;
@@ -28,7 +30,14 @@ printdstlistnode(inp, copyfunc, opts)
 	if ((*copyfunc)(inp, np, node.ipfd_size))
 		return NULL;
 
-	if ((opts & OPT_DEBUG) == 0) {
+	if (fields != NULL) {
+		for (i = 0; fields[i].w_value != 0; i++) {
+			printpoolfield(np, IPLT_DSTLIST, i);
+			if (fields[i + 1].w_value != 0)
+				printf("\t");
+		}
+		printf("\n");
+	} else if ((opts & OPT_DEBUG) == 0) {
 		putchar(' ');
 		if (np->ipfd_dest.fd_name != 0)
 			PRINTF("%s:", np->ipfd_names);

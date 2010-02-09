@@ -223,6 +223,7 @@ extern	struct ipopt_names v6ionames[];
 extern	icmptype_t icmptypelist[];
 extern	wordtab_t statefields[];
 extern	wordtab_t natfields[];
+extern	wordtab_t poolfields[];
 
 
 extern int addicmp __P((char ***, struct frentry *, int));
@@ -239,6 +240,7 @@ extern int count6bits __P((u_32_t *));
 extern int count4bits __P((u_32_t));
 extern char *fac_toname __P((int));
 extern int fac_findname __P((char *));
+extern const char *familyname __P((const int));
 extern void fill6bits __P((int, u_int *));
 extern wordtab_t *findword __P((wordtab_t *, char *));
 extern int ftov __P((int));
@@ -309,13 +311,15 @@ extern void printbuf __P((char *, int, int));
 extern void printfieldhdr __P((wordtab_t *, wordtab_t *));
 extern void printfr __P((struct frentry *, ioctlfunc_t));
 extern struct iphtable_s *printhash __P((struct iphtable_s *, copyfunc_t,
-					 char *, int));
-extern struct iphtable_s *printhash_live __P((iphtable_t *, int, char *, int));
-extern ippool_dst_t *printdstl_live __P((ippool_dst_t *, int, char *, int));
+					 char *, int, wordtab_t *));
+extern struct iphtable_s *printhash_live __P((iphtable_t *, int, char *,
+					      int, wordtab_t *));
+extern ippool_dst_t *printdstl_live __P((ippool_dst_t *, int, char *,
+					 int, wordtab_t *));
 extern void printhashdata __P((iphtable_t *, int));
 extern struct iphtent_s *printhashnode __P((struct iphtable_s *,
 					    struct iphtent_s *,
-					    copyfunc_t, int));
+					    copyfunc_t, int, wordtab_t *));
 extern void printhost __P((int, u_32_t *));
 extern void printhostmask __P((int, u_32_t *, u_32_t *));
 extern void printip __P((int, u_32_t *));
@@ -328,16 +332,20 @@ extern void printnatside __P((char *, natstat_t *, nat_stat_side_t *));
 extern void printpacket __P((int, mb_t *));
 extern void printpacket6 __P((int, mb_t *));
 extern struct ippool_dst *printdstlist __P((struct ippool_dst *, copyfunc_t,
-					    char *, int, ipf_dstnode_t *));
+					    char *, int, ipf_dstnode_t *,
+					    wordtab_t *));
 extern void printdstlistdata __P((ippool_dst_t *, int));
-extern ipf_dstnode_t *printdstlistnode __P((ipf_dstnode_t *, copyfunc_t, int));
+extern ipf_dstnode_t *printdstlistnode __P((ipf_dstnode_t *, copyfunc_t,
+					    int, wordtab_t *));
 extern void printdstlistpolicy __P((ippool_policy_t));
 extern struct ip_pool_s *printpool __P((struct ip_pool_s *, copyfunc_t,
-					char *, int));
+					char *, int, wordtab_t *));
 extern struct ip_pool_s *printpool_live __P((struct ip_pool_s *, int,
-					     char *, int));
+					     char *, int, wordtab_t *));
 extern void printpooldata __P((ip_pool_t *, int));
-extern struct ip_pool_node *printpoolnode __P((struct ip_pool_node *, int));
+extern void printpoolfield __P((void *, int, int));
+extern struct ip_pool_node *printpoolnode __P((struct ip_pool_node *,
+					       int, wordtab_t *));
 extern void printproto __P((struct protoent *, int, struct ipnat *));
 extern void printportcmp __P((int, struct frpcmp *));
 extern void printstatefield __P((ipstate_t *, int));
