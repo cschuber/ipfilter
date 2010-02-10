@@ -4380,7 +4380,7 @@ ipf_synclist(softc, fr, ifp)
 				goto unwind;
 		}
 
-		if (((fr->fr_type & FR_T_BUILTIN) == FR_T_IPF) &&
+		if (((fr->fr_type & ~FR_T_BUILTIN) == FR_T_IPF) &&
 		    (fr->fr_satype == FRI_LOOKUP) && (fr->fr_srcptr == NULL)) {
 			fr->fr_srcptr = ipf_lookup_res_num(softc,
 							   fr->fr_srctype,
@@ -4388,7 +4388,7 @@ ipf_synclist(softc, fr, ifp)
 							   fr->fr_srcnum,
 							   &fr->fr_srcfunc);
 		}
-		if (((fr->fr_type & FR_T_BUILTIN) == FR_T_IPF) &&
+		if (((fr->fr_type & ~FR_T_BUILTIN) == FR_T_IPF) &&
 		    (fr->fr_datype == FRI_LOOKUP) && (fr->fr_dstptr == NULL)) {
 			fr->fr_dstptr = ipf_lookup_res_num(softc,
 							   fr->fr_dsttype,
@@ -4401,11 +4401,11 @@ ipf_synclist(softc, fr, ifp)
 
 unwind:
 	for (frt = start; frt != fr; fr = fr->fr_next) {
-		if (((frt->fr_type & FR_T_BUILTIN) == FR_T_IPF) &&
+		if (((frt->fr_type & ~FR_T_BUILTIN) == FR_T_IPF) &&
 		    (frt->fr_satype == FRI_LOOKUP) && (frt->fr_srcptr != NULL))
 				ipf_lookup_deref(softc, frt->fr_srctype,
 						 frt->fr_srcptr);
-		if (((frt->fr_type & FR_T_BUILTIN) == FR_T_IPF) &&
+		if (((frt->fr_type & ~FR_T_BUILTIN) == FR_T_IPF) &&
 		    (frt->fr_datype == FRI_LOOKUP) && (frt->fr_dstptr != NULL))
 				ipf_lookup_deref(softc, frt->fr_dsttype,
 						 frt->fr_dstptr);
