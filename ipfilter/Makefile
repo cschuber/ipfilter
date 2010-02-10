@@ -35,6 +35,10 @@ IPFLOG=-DIPFILTER_LOG
 #
 #COMPIPF=-DIPFILTER_COMPILED
 #
+# To enable IPFilter compatibility with older CLI utilities
+#
+COMPATIPF=-DIPFILTER_COMPAT
+#
 # To enable synchronisation between IPFilter hosts
 #
 #SYNC=-DIPFILTER_SYNC
@@ -114,6 +118,7 @@ MFLAGS1='CFLAGS=$(CFLAGS) $(ARCHINC) $(SOLARIS2) $(SGIREV) $(INET6)' \
         'STATETOP_CFLAGS=$(STATETOP_CFLAGS)' "BPFILTER=$(BPFILTER)" \
         'STATETOP_INC=$(STATETOP_INC)' 'STATETOP_LIB=$(STATETOP_LIB)' \
 	"BITS=$(BITS)" "OBJ=$(OBJ)" "LOOKUP=$(LOOKUP)" "COMPIPF=$(COMPIPF)" \
+	"COMPATIPF=$(COMPATIPF)" \
 	'SYNC=$(SYNC)' 'ALLOPTS=$(ALLOPTS)' 'LIBBPF=$(LIBBPF)'
 MFLAGS=$(MFLAGS1) "IPFLKM=$(IPFLKM)"
 MACHASSERT=`/bin/ls -1 /usr/sys/*/mach_assert.h | head -1`

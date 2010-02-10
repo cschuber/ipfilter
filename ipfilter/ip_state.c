@@ -144,7 +144,7 @@ static ipstate_t *fr_stclone __P((fr_info_t *, tcphdr_t *, ipstate_t *));
 static void fr_fixinisn __P((fr_info_t *, ipstate_t *));
 static void fr_fixoutisn __P((fr_info_t *, ipstate_t *));
 static void fr_checknewisn __P((fr_info_t *, ipstate_t *));
-static int fr_stateiter __P((ipftoken_t *, ipfgeniter_t *));
+static int fr_stateiter __P((ipftoken_t *, ipfgeniter_t *, ipfobj_t *));
 static int fr_stgettable __P((char *));
 
 int fr_stputent __P((caddr_t));
@@ -416,7 +416,7 @@ caddr_t data;
 	int error;
 
 	sp = &st;
-	error = fr_inobj(data, &st, IPFOBJ_IPSTATE);
+	error = fr_inobj(data, NULL, &st, IPFOBJ_IPSTATE);
 	if (error)
 		return EFAULT;
 
@@ -604,15 +604,16 @@ void *ctx;
 	    {
 		ipftoken_t *token;
 		ipfgeniter_t iter;
+		ipfobj_t obj;
 
-		error = fr_inobj(data, &iter, IPFOBJ_GENITER);
+		error = fr_inobj(data, &obj, &iter, IPFOBJ_GENITER);
 		if (error != 0)
 			break;
 
 		SPL_SCHED(s);
 		token = ipf_findtoken(IPFGENITER_STATE, uid, ctx);
 		if (token != NULL) {
-			error = fr_stateiter(token, &iter);
+			error = fr_stateiter(token, &iter, &obj);
 			WRITE_ENTER(&ipf_tokens);
 			if (token->ipt_data == NULL)
 				ipf_freetoken(token);
@@ -671,7 +672,7 @@ caddr_t data;
 	ipstate_save_t ips;
 	int error;
 
-	error = fr_inobj(data, &ips, IPFOBJ_STATESAVE);
+	error = fr_inobj(data, NULL, &ips, IPFOBJ_STATESAVE);
 	if (error != 0)
 		return error;
 
@@ -730,7 +731,7 @@ caddr_t data;
 	frentry_t *fr;
 	char *name;
 
-	error = fr_inobj(data, &ips, IPFOBJ_STATESAVE);
+	error = fr_inobj(data, NULL, &ips, IPFOBJ_STATESAVE);
 	if (error)
 		return EFAULT;
 
@@ -4321,9 +4322,10 @@ int rev;
 /* This function handles the SIOCGENITER ioctl for the state tables and     */
 /* walks through the list of entries in the state table list (ips_list.)    */
 /* ------------------------------------------------------------------------ */
-static int fr_stateiter(token, itp)
+static int fr_stateiter(token, itp, obj)
 ipftoken_t *token;
 ipfgeniter_t *itp;
+ipfobj_t *obj;
 {
 	ipstate_t *is, *next, zero;
 	int error, count;
@@ -4339,6 +4341,8 @@ ipfgeniter_t *itp;
 		return EINVAL;
 
 	error = 0;
+	obj->ipfo_type = IPFOBJ_IPSTATE;
+	obj->ipfo_size = sizeof(ipstate_t);
 
 	READ_ENTER(&ipf_state);
 
@@ -4375,10 +4379,11 @@ ipfgeniter_t *itp;
 		 */
 		RWLOCK_EXIT(&ipf_state);
 
+		obj->ipfo_ptr = dst;
 		/*
 		 * Copy out data and clean up references and tokens.
 		 */
-		error = COPYOUT(next, dst, sizeof(*next));
+		error = fr_outobjk(obj, next);
 		if (error != 0)
 			error = EFAULT;
 
@@ -4421,7 +4426,7 @@ char *data;
 	ipftable_t table;
 	int error;
 
-	error = fr_inobj(data, &table, IPFOBJ_GTABLE);
+	error = fr_inobj(data, NULL, &table, IPFOBJ_GTABLE);
 	if (error != 0)
 		return error;
 

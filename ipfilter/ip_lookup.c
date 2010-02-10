@@ -583,7 +583,7 @@ void *ctx;
 	int err;
 	SPL_INT(s);
 
-	err = fr_inobj(data, &iter, IPFOBJ_LOOKUPITER);
+	err = fr_inobj(data, NULL, &iter, IPFOBJ_LOOKUPITER);
 	if (err != 0)
 		return err;
 

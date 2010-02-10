@@ -44,7 +44,7 @@ INSTALL=install
 #
 MODOBJS=ip_fil.o fil.o ml_ipl.o ip_nat.o ip_frag.o ip_state.o ip_proxy.o \
 	ip_auth.o ip_log.o ip_pool.o ip_htable.o ip_lookup.o ip_rules.o \
-	ip_scan.o ip_sync.o
+	ip_scan.o ip_sync.o ip_fil_compat.o
 #	ip_trafcon.o
 DFLAGS=$(IPFLKM) $(IPFLOG) $(LOOKUP) $(SYNC) $(DEF) $(DLKM) $(IPFBPF)
 IPF=ipf.o ipfcomp.o ipf_y.o ipf_l.o bpf_filter_u.o
@@ -151,7 +151,7 @@ fil_u.o: $(TOP)/fil.c $(TOP)/ip_fil.h $(TOP)/ipf.h $(TOP)/ip_compat.h \
 
 fil.o: $(TOP)/fil.c $(TOP)/ip_fil.h $(TOP)/ip_compat.h $(TOP)/ipl.h \
 	    $(TOP)/ip_rules.h
-	$(CC) $(KCARGS) $(POLICY) $(DFLAGS) $(IPFBPF) $(COMPIPF) \
+	$(CC) $(KCARGS) $(POLICY) $(DFLAGS) $(IPFBPF) $(COMPIPF) $(COMPATIPF) \
 	    -c $(TOP)/fil.c -o $@
 
 ipf.o: $(TOOL)/ipf.c $(TOP)/ip_fil.h $(TOP)/ipf.h $(TOP)/opts.h
@@ -310,6 +310,11 @@ ip_fil.c:
 
 ip_fil.o: ip_fil.c $(TOP)/ip_fil.h $(TOP)/ip_compat.h $(TOP)/ip_nat.h
 	$(CC) $(KCARGS) $(DFLAGS) $(COMPIPF) -c ip_fil.c -o $@
+
+ip_fil_compat.o: $(TOP)/ip_fil_compat.c $(TOP)/ipl.h $(TOP)/ip_fil.h \
+	$(TOP)/ip_compat.h $(TOP)/ip_nat.h $(TOP)/ip_state.h
+	$(CC) $(KCARGS) $(DFLAGS) $(COMPIPF) $(COMPATIPF) \
+	-c $(TOP)/ip_fil_compat.c -o $@
 
 ip_log.o: $(TOP)/ip_log.c $(TOP)/ip_compat.h $(TOP)/ip_fil.h
 	$(CC) $(KCARGS) $(DFLAGS) -c $(TOP)/ip_log.c -o $@

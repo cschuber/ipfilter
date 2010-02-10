@@ -232,6 +232,7 @@ static	int		frflushlist __P((int, minor_t, int *, frentry_t **));
 static	ipfunc_t	fr_findfunc __P((ipfunc_t));
 static	frentry_t	*fr_firewall __P((fr_info_t *, u_32_t *));
 static	int		fr_funcinit __P((frentry_t *fr));
+static	void		fr_getstat __P((struct friostat *, int));
 static	INLINE void	frpr_ah __P((fr_info_t *));
 static	INLINE void	frpr_esp __P((fr_info_t *));
 static	INLINE void	frpr_gre __P((fr_info_t *));
@@ -517,7 +518,7 @@ fr_info_t *fin;
 /*                                                                          */
 /* IPv6 Only                                                                */
 /* This function expects to find an IPv6 extension header at fin_dp.        */
-/* There must be at least 8 bytes of data at fin_dp for there to be a valid */
+/* There must be at least 8 Bytes of data at fin_dp for there to be a valid */
 /* extension header present. If a good one is found, fin_dp is advanced to  */
 /* point at the first piece of data after the extension header, fin_exthdr  */
 /* points to the start of the extension header and the "protocol" of the    */
@@ -3753,14 +3754,14 @@ void *ifp;
 		}
 
 #ifdef	IPFILTER_LOOKUP
-		if (((fr->fr_type & FR_T_BUILTIN) == FR_T_IPF) &&
+		if (((fr->fr_type & ~FR_T_BUILTIN) == FR_T_IPF) &&
 		    (fr->fr_satype == FRI_LOOKUP) && (fr->fr_srcptr == NULL)) {
 			fr->fr_srcptr = fr_resolvelookup(fr->fr_srctype,
 							 fr->fr_srcsubtype,
 							 &fr->fr_slookup,
 							 &fr->fr_srcfunc);
 		}
-		if (((fr->fr_type & FR_T_BUILTIN) == FR_T_IPF) &&
+		if (((fr->fr_type & ~FR_T_BUILTIN) == FR_T_IPF) &&
 		    (fr->fr_datype == FRI_LOOKUP) && (fr->fr_dstptr == NULL)) {
 			fr->fr_dstptr = fr_resolvelookup(fr->fr_dsttype,
 							 fr->fr_dstsubtype,
@@ -3913,8 +3914,9 @@ int *lockp;
 /* Stores a copy of current pointers, counters, etc, in the friostat        */
 /* structure.                                                               */
 /* ------------------------------------------------------------------------ */
-void fr_getstat(fiop)
+static void fr_getstat(fiop, rev)
 friostat_t *fiop;
+int rev;
 {
 	int i, j;
 
@@ -3949,8 +3951,18 @@ friostat_t *fiop;
 #endif
 	fiop->f_defpass = fr_pass;
 	fiop->f_features = fr_features;
+
+
+#ifdef IPFILTER_COMPAT
+	sprintf(fiop->f_version, "IP Filter: v%d.%d.%d",
+		       (rev / 1000000) % 100,
+		       (rev / 10000) % 100,
+		       (rev / 100) % 100);
+#else
+	rev = rev;
 	(void) strncpy(fiop->f_version, ipfilter_version,
 		       sizeof(fiop->f_version));
+#endif
 }
 
 
@@ -4165,7 +4177,7 @@ caddr_t data;
 	fg = NULL;
 	fp = &frd;
 	if (makecopy != 0) {
-		error = fr_inobj(data, fp, IPFOBJ_FRENTRY);
+		error = fr_inobj(data, NULL, fp, IPFOBJ_FRENTRY);
 		if (error)
 			return EFAULT;
 		if ((fp->fr_type & FR_T_BUILTIN) != 0)
@@ -5426,29 +5438,32 @@ void *data, *ctx;
 
 /*
  * This array defines the expected size of objects coming into the kernel
- * for the various recognised object types.
+ * for the various recognised object types. The first column is flags (see
+ * below), 2nd column is current size, 3rd column is the version number of
+ * when the current size became current.
+ * Flags:
  * 1 = minimum size, not absolute size
  */
-static	int	fr_objbytes[IPFOBJ_COUNT][2] = {
-	{ 1,	sizeof(struct frentry) },		/* frentry */
-	{ 0,	sizeof(struct friostat) },
-	{ 0,	sizeof(struct fr_info) },
-	{ 0,	sizeof(struct fr_authstat) },
-	{ 0,	sizeof(struct ipfrstat) },
-	{ 0,	sizeof(struct ipnat) },
-	{ 0,	sizeof(struct natstat) },
-	{ 0,	sizeof(struct ipstate_save) },
-	{ 1,	sizeof(struct nat_save) },		/* nat_save */
-	{ 0,	sizeof(struct natlookup) },
-	{ 1,	sizeof(struct ipstate) },		/* ipstate */
-	{ 0,	sizeof(struct ips_stat) },
-	{ 0,	sizeof(struct frauth) },
-	{ 0,	sizeof(struct ipftune) },
-	{ 0,	sizeof(struct nat) },			/* nat_t */
-	{ 0,	sizeof(struct ipfruleiter) },
-	{ 0,	sizeof(struct ipfgeniter) },
-	{ 0,	sizeof(struct ipftable) },
-	{ 0,	sizeof(struct ipflookupiter) },
+static	int	fr_objbytes[IPFOBJ_COUNT][3] = {
+	{ 1,	sizeof(struct frentry),		4013400 },
+	{ 0,	sizeof(struct friostat),	4013300 },
+	{ 0,	sizeof(struct fr_info),		4013200 },
+	{ 0,	sizeof(struct fr_authstat),	4010100 },
+	{ 0,	sizeof(struct ipfrstat),	4010100 },
+	{ 0,	sizeof(struct ipnat),		4011400 },
+	{ 0,	sizeof(struct natstat),		4013200 },
+	{ 0,	sizeof(struct ipstate_save),	4013400 },
+	{ 1,	sizeof(struct nat_save),	4013400 },
+	{ 0,	sizeof(struct natlookup),	4010100 },
+	{ 1,	sizeof(struct ipstate),		4011600 },
+	{ 0,	sizeof(struct ips_stat),	4012100 },
+	{ 0,	sizeof(struct frauth),		4013200 },
+	{ 0,	sizeof(struct ipftune),		4010100 },
+	{ 0,	sizeof(struct nat),		4012500 },	/* nat_t */
+	{ 0,	sizeof(struct ipfruleiter),	4011400 },	/* Added. */
+	{ 0,	sizeof(struct ipfgeniter),	4011400 },	/* Added. */
+	{ 0,	sizeof(struct ipftable),	4011400 },	/* Added. */
+	{ 0,	sizeof(struct ipflookupiter),	4011400 },	/* Added. */
 	{ 0,	sizeof(struct ipftq) * IPF_TCP_NSTATES },
 };
 
@@ -5457,15 +5472,21 @@ static	int	fr_objbytes[IPFOBJ_COUNT][2] = {
 /* Function:    fr_inobj                                                    */
 /* Returns:     int     - 0 = success, else failure                         */
 /* Parameters:  data(I) - pointer to ioctl data                             */
+/*              objp(O) - where to store ipfobj_t data                      */
 /*              ptr(I)  - pointer to store real data in                     */
 /*              type(I) - type of structure being moved                     */
 /*                                                                          */
 /* Copy in the contents of what the ipfobj_t points to.  In future, we      */
 /* add things to check for version numbers, sizes, etc, to make it backward */
 /* compatible at the ABI for user land.                                     */
+/* Provision of objp is supported to provide the means by which the version */
+/* number from the incoming request can be returned and then used when      */
+/* copying out data. This is essential for IPFILTER_COMPAT when dealing     */
+/* programs compiled against older header files.                            */
 /* ------------------------------------------------------------------------ */
-int fr_inobj(data, ptr, type)
+int fr_inobj(data, objp, ptr, type)
 void *data;
+ipfobj_t *objp;
 void *ptr;
 int type;
 {
@@ -5476,29 +5497,29 @@ int type;
 	if ((type < 0) || (type >= IPFOBJ_COUNT))
 		return EINVAL;
 
-	error = BCOPYIN(data, &obj, sizeof(obj));
+	if (objp == NULL)
+		objp = &obj;
+	error = BCOPYIN(data, objp, sizeof(*objp));
 	if (error != 0)
 		return EFAULT;
 
-	if (obj.ipfo_type != type)
+	if (objp->ipfo_type != type)
 		return EINVAL;
 
-	if (obj.ipfo_rev == IPFILTER_VERSION) {
+	if (objp->ipfo_rev >= fr_objbytes[type][2]) {
 		if ((fr_objbytes[type][0] & 1) != 0) {
-			if (obj.ipfo_size < fr_objbytes[type][1])
+			if (objp->ipfo_size < fr_objbytes[type][1])
 				return EINVAL;
 			size =  fr_objbytes[type][1];
-		} else if (obj.ipfo_size == fr_objbytes[type][1]) {
-			size =  obj.ipfo_size;
+		} else if (objp->ipfo_size == fr_objbytes[type][1]) {
+			size =  objp->ipfo_size;
 		} else {
 			return EINVAL;
 		}
-		error = COPYIN(obj.ipfo_ptr, ptr, size);
+		error = COPYIN(objp->ipfo_ptr, ptr, size);
 	} else {
 #ifdef	IPFILTER_COMPAT
-		/* XXX compatibility hook here */
-		/* error = hook(&obj, ptr) */
-		return EINVAL;
+		error = fr_in_compat(objp, ptr);
 #else
 		return EINVAL;
 #endif
@@ -5542,7 +5563,7 @@ int type, sz;
 	if (obj.ipfo_type != type)
 		return EINVAL;
 
-	if (obj.ipfo_rev == IPFILTER_VERSION) {
+	if (obj.ipfo_rev >= fr_objbytes[type][2]) {
 		if (((fr_objbytes[type][0] & 1) == 0) ||
 		    (sz < fr_objbytes[type][1]))
 			return EINVAL;
@@ -5550,9 +5571,7 @@ int type, sz;
 		error = COPYIN(obj.ipfo_ptr, ptr, sz);
 	} else {
 #ifdef	IPFILTER_COMPAT
-		/* XXX compatibility hook here */
-		/* error = hook(&obj, ptr) */
-		error = EINVAL;
+		error = fr_in_compat(&obj, ptr);
 #else
 		error = EINVAL;
 #endif
@@ -5596,7 +5615,7 @@ int type, sz;
 	if (obj.ipfo_type != type)
 		return EINVAL;
 
-	if (obj.ipfo_rev == IPFILTER_VERSION) {
+	if (obj.ipfo_rev >= fr_objbytes[type][2]) {
 		if (((fr_objbytes[type][0] & 1) == 0) ||
 		    (sz < fr_objbytes[type][1]))
 			return EINVAL;
@@ -5604,13 +5623,11 @@ int type, sz;
 		error = COPYOUT(ptr, obj.ipfo_ptr, sz);
 	} else {
 #ifdef	IPFILTER_COMPAT
-		/* XXX compatibility hook here */
-		/* error = hook(&obj, ptr) */
-		return EINVAL;
+		error = fr_in_compat(&obj, ptr);
 #else
 		return EINVAL;
-	}
 #endif
+	}
 
 	if (error != 0)
 		error = EFAULT;
@@ -5622,7 +5639,7 @@ int type, sz;
 /* Function:    fr_outobj                                                   */
 /* Returns:     int     - 0 = success, else failure                         */
 /* Parameters:  data(I) - pointer to ioctl data                             */
-/*              ptr(I)  - pointer to store real data in                     */
+/*              ptr(I)  - pointer to data to copy out                       */
 /*              type(I) - type of structure being moved                     */
 /*                                                                          */
 /* Copy out the contents of what ptr is to where ipfobj points to.  In      */
@@ -5647,7 +5664,7 @@ int type;
 	if (obj.ipfo_type != type)
 		return EINVAL;
 
-	if (obj.ipfo_rev == IPFILTER_VERSION) {
+	if (obj.ipfo_rev >= fr_objbytes[type][2]) {
 		if ((fr_objbytes[type][0] & 1) != 0) {
 			if (obj.ipfo_size < fr_objbytes[type][1])
 				return EINVAL;
@@ -5656,18 +5673,61 @@ int type;
 		}
 
 		error = COPYOUT(ptr, obj.ipfo_ptr, obj.ipfo_size);
+		if (error != 0)
+			error = EFAULT;
 	} else {
 #ifdef	IPFILTER_COMPAT
-		/* XXX compatibility hook here */
-		/* error = hook(&obj, ptr, fr_objbytes[type]); */
-		return EINVAL;
+		error = fr_out_compat(&obj, ptr);
 #else
-		return EINVAL;
+		error = EINVAL;
 #endif
 	}
+	return error;
+}
 
-	if (error != 0)
-		error = EFAULT;
+
+/* ------------------------------------------------------------------------ */
+/* Function:    fr_outobjk                                                  */
+/* Returns:     int     - 0 = success, else failure                         */
+/* Parameters:  obj(I)  - pointer to data description structure             */
+/*              ptr(I)  - pointer to kernel data to copy out                */
+/*                                                                          */
+/* In the above functions, the ipfobj_t structure is copied into the kernel,*/
+/* telling ipfilter how to copy out data. In this instance, the ipfobj_t is */
+/* already populated with information and now we just need to use it.       */
+/* There is no need for this function to have a "type" parameter as there   */
+/* is no point in validating information that comes from the kernel with    */
+/* itself.                                                                  */
+/* ------------------------------------------------------------------------ */
+int fr_outobjk(obj, ptr)
+ipfobj_t *obj;
+void *ptr;
+{
+	int type = obj->ipfo_type;
+	int error;
+
+	if ((type < 0) || (type >= IPFOBJ_COUNT))
+		return EINVAL;
+
+	if (obj->ipfo_rev >= fr_objbytes[type][2]) {
+		if ((fr_objbytes[type][0] & 1) != 0) {
+			if (obj->ipfo_size < fr_objbytes[type][1])
+				return EINVAL;
+
+		} else if (obj->ipfo_size != fr_objbytes[type][1]) {
+			return EINVAL;
+		}
+
+		error = COPYOUT(ptr, obj->ipfo_ptr, obj->ipfo_size);
+		if (error != 0)
+			error = EFAULT;
+	} else {
+#ifdef	IPFILTER_COMPAT
+		error = fr_out_compat(obj, ptr);
+#else
+		error = EINVAL;
+#endif
+	}
 	return error;
 }
 
@@ -6209,7 +6269,7 @@ void *data;
 	void *cookie;
 	int error;
 
-	error = fr_inobj(data, &tu, IPFOBJ_TUNEABLE);
+	error = fr_inobj(data, NULL, &tu, IPFOBJ_TUNEABLE);
 	if (error != 0)
 		return error;
 
@@ -6464,9 +6524,13 @@ int	fr_zerostats(data)
 void	*data;
 {
 	friostat_t fio;
+	ipfobj_t obj;
 	int error;
 
-	fr_getstat(&fio);
+	error = fr_inobj(data, &obj, &fio, IPFOBJ_IPFSTAT);
+	if (error)
+		return EFAULT;
+	fr_getstat(&fio, obj.ipfo_rev);
 	error = fr_outobj(data, &fio, IPFOBJ_IPFSTAT);
 	if (error)
 		return EFAULT;
@@ -6807,11 +6871,12 @@ int ipf_getnextrule(ipftoken_t *t, void *ptr)
 	int error, count, out;
 	ipfruleiter_t it;
 	frgroup_t *fg;
+	ipfobj_t obj;
 	char *dst;
 
 	if (t == NULL || ptr == NULL)
 		return EFAULT;
-	error = fr_inobj(ptr, &it, IPFOBJ_IPFITER);
+	error = fr_inobj(ptr, &obj, &it, IPFOBJ_IPFITER);
 	if (error != 0)
 		return error;
 	if ((it.iri_inout < 0) || (it.iri_inout > 3))
@@ -6855,6 +6920,8 @@ int ipf_getnextrule(ipftoken_t *t, void *ptr)
 		next = fr->fr_next;
 	}
 
+	obj.ipfo_type = IPFOBJ_FRENTRY;
+	obj.ipfo_size = 0;
 	dst = (char *)it.iri_rule;
 	/*
 	 * The ipfruleiter may ask for more than 1 rule at a time to be
@@ -6884,7 +6951,9 @@ int ipf_getnextrule(ipftoken_t *t, void *ptr)
 		/*
 		 * Copy out data and clean up references and token as needed.
 		 */
-		error = COPYOUT(next, dst, sizeof(*next));
+		obj.ipfo_size = sizeof(frentry_t);
+		obj.ipfo_ptr = dst;
+		error = fr_outobjk(&obj, next);
 		if (error != 0)
 			return EFAULT;
 		if (t->ipt_data == NULL) {
@@ -7001,7 +7070,7 @@ int uid;
 	ipfgeniter_t iter;
 	int error;
 
-	error = fr_inobj(data, &iter, IPFOBJ_GENITER);
+	error = fr_inobj(data, NULL, &iter, IPFOBJ_GENITER);
 	if (error != 0)
 		return error;
 
@@ -7043,6 +7112,7 @@ void *ctx;
 {
 	friostat_t fio;
 	int error, tmp;
+	ipfobj_t obj;
 	SPL_INT(s);
 
 	switch (cmd)
@@ -7143,7 +7213,10 @@ void *ctx;
 		break;
 
 	case SIOCGETFS :
-		fr_getstat(&fio);
+		error = fr_inobj((void *)data, &obj, &fio, IPFOBJ_IPFSTAT);
+		if (error != 0)
+			break;
+		fr_getstat(&fio, obj.ipfo_rev);
 		error = fr_outobj((void *)data, &fio, IPFOBJ_IPFSTAT);
 		break;
 

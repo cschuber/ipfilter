@@ -146,7 +146,7 @@ frentry_t	*ipauth = NULL,
 		*fr_authlist = NULL;
 
 void fr_authderef __P((frauthent_t **));
-int fr_authgeniter __P((ipftoken_t *, ipfgeniter_t *));
+int fr_authgeniter __P((ipftoken_t *, ipfgeniter_t *, ipfobj_t *));
 int fr_authreply __P((char *));
 int fr_authwait __P((char *));
 
@@ -418,15 +418,16 @@ void *ctx;
 	    {
 		ipftoken_t *token;
 		ipfgeniter_t iter;
+		ipfobj_t obj;
 
-		error = fr_inobj(data, &iter, IPFOBJ_GENITER);
+		error = fr_inobj(data, &obj, &iter, IPFOBJ_GENITER);
 		if (error != 0)
 			break;
 
 		SPL_SCHED(s);
 		token = ipf_findtoken(IPFGENITER_AUTH, uid, ctx);
 		if (token != NULL) {
-			error = fr_authgeniter(token, &iter);
+			error = fr_authgeniter(token, &iter, &obj);
 			WRITE_ENTER(&ipf_tokens);
 			if (token->ipt_data == NULL)
 				ipf_freetoken(token);
@@ -751,9 +752,10 @@ int fr_auth_waiting()
 /*              itp(I)   - pointer to ipfgeniter structure                  */
 /*                                                                          */
 /* ------------------------------------------------------------------------ */
-int fr_authgeniter(token, itp)
+int fr_authgeniter(token, itp, obj)
 ipftoken_t *token;
 ipfgeniter_t *itp;
+ipfobj_t *obj;
 {
 	frauthent_t *fae, *next, zero;
 	int error;
@@ -763,6 +765,10 @@ ipfgeniter_t *itp;
 
 	if (itp->igi_type != IPFGENITER_AUTH)
 		return EINVAL;
+
+	obj->ipfo_type = IPFOBJ_FRAUTH;
+	obj->ipfo_ptr = itp->igi_data;
+	obj->ipfo_size = sizeof(frauth_t);
 
 	READ_ENTER(&ipf_auth);
 
@@ -797,7 +803,7 @@ ipfgeniter_t *itp;
 	/*
 	 * Copy out the data and clean up references and token as needed.
 	 */
-	error = COPYOUT(next, itp->igi_data, sizeof(*next));
+	error = fr_outobjk(obj, next);
 	if (error != 0)
 		error = EFAULT;
 
@@ -863,7 +869,7 @@ char *data;
 	SPL_INT(s);
 
 fr_authioctlloop:
-	error = fr_inobj(data, au, IPFOBJ_FRAUTH);
+	error = fr_inobj(data, NULL, au, IPFOBJ_FRAUTH);
 	if (error != 0)
 		return error;
 
@@ -985,7 +991,7 @@ char *data;
 	mb_t *m;
 	SPL_INT(s);
 
-	error = fr_inobj(data, &auth, IPFOBJ_FRAUTH);
+	error = fr_inobj(data, NULL, &auth, IPFOBJ_FRAUTH);
 	if (error != 0)
 		return error;
 
