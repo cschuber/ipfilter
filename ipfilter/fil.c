@@ -3910,9 +3910,14 @@ int *lockp;
 /* Function:    fr_getstat                                                  */
 /* Returns:     Nil                                                         */
 /* Parameters:  fiop(I)  - pointer to ipfilter stats structure              */
+/*              rev(I)   - version of program doing ioctl                   */
 /*                                                                          */
 /* Stores a copy of current pointers, counters, etc, in the friostat        */
 /* structure.                                                               */
+/* If IPFILTER_COMPAT is compiled, we pretend to be whatever version the    */
+/* program is looking for. This ensure that validation of the version it    */
+/* expects will always succeed. Thus kernels with IPFILTER_COMPAT will      */
+/* allow older binaries to work but kernels without it will not.            */
 /* ------------------------------------------------------------------------ */
 static void fr_getstat(fiop, rev)
 friostat_t *fiop;
@@ -5623,7 +5628,7 @@ int type, sz;
 		error = COPYOUT(ptr, obj.ipfo_ptr, sz);
 	} else {
 #ifdef	IPFILTER_COMPAT
-		error = fr_in_compat(&obj, ptr);
+		error = fr_out_compat(&obj, ptr);
 #else
 		return EINVAL;
 #endif
@@ -6529,11 +6534,11 @@ void	*data;
 
 	error = fr_inobj(data, &obj, &fio, IPFOBJ_IPFSTAT);
 	if (error)
-		return EFAULT;
+		return error;
 	fr_getstat(&fio, obj.ipfo_rev);
 	error = fr_outobj(data, &fio, IPFOBJ_IPFSTAT);
 	if (error)
-		return EFAULT;
+		return error;
 
 	WRITE_ENTER(&ipf_mutex);
 	bzero(&frstats, sizeof(frstats));
