@@ -40,7 +40,7 @@ typedef	struct	iplookupflush	{
 	int	iplf_type;	/* IPLT_* */
 	int	iplf_unit;	/* IPL_LOG* */
 	u_int	iplf_arg;
-	size_t	iplf_count;
+	u_int	iplf_count;
 	char	iplf_name[FR_GROUPLEN];
 } iplookupflush_t;
 

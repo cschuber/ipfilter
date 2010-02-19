@@ -881,7 +881,7 @@ typedef	struct	friostat	{
 	struct	frgroup		*f_groups[IPL_LOGSIZE][2];
 	u_long	f_froute[2];
 	u_long	f_ticks;
-	int	f_locks[IPL_LOGMAX];
+	int	f_locks[IPL_LOGSIZE];
 	size_t	f_kmutex_sz;
 	size_t	f_krwlock_sz;
 	int	f_defpass;	/* default pass - from fr_pass */
@@ -1555,7 +1555,7 @@ extern	u_long	fr_ticks;
 extern	fr_info_t	frcache[2][8];
 extern	char	ipfilter_version[];
 extern	iplog_t	**iplh[IPL_LOGSIZE], *iplt[IPL_LOGSIZE];
-extern	int	iplused[IPL_LOGSIZE];
+extern	int	iplused[IPL_LOGMAX + 1];
 extern	struct frentry *ipfilter[2][2], *ipacct[2][2];
 #ifdef	USE_INET6
 extern	struct frentry *ipfilter6[2][2], *ipacct6[2][2];
