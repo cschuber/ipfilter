@@ -1633,16 +1633,16 @@ typedef struct ipf_main_softc_s {
 	u_long		ipf_idnum;
 	net_handle_t	ipf_nd_v4;
 	net_handle_t	ipf_nd_v6;
-	hook_t		ipf_hk_v4_in;
-	hook_t		ipf_hk_v4_out;
-	hook_t		ipf_hk_v4_nic;
-	hook_t		ipf_hk_v6_in;
-	hook_t		ipf_hk_v6_out;
-	hook_t		ipf_hk_v6_nic;
-	hook_t		ipf_hk_loop_v4_in;
-	hook_t		ipf_hk_loop_v4_out;
-	hook_t		ipf_hk_loop_v6_in;
-	hook_t		ipf_hk_loop_v6_out;
+	hook_t		*ipf_hk_v4_in;
+	hook_t		*ipf_hk_v4_out;
+	hook_t		*ipf_hk_v4_nic;
+	hook_t		*ipf_hk_v6_in;
+	hook_t		*ipf_hk_v6_out;
+	hook_t		*ipf_hk_v6_nic;
+	hook_t		*ipf_hk_loop_v4_in;
+	hook_t		*ipf_hk_loop_v4_out;
+	hook_t		*ipf_hk_loop_v6_in;
+	hook_t		*ipf_hk_loop_v6_out;
 #  endif
 # else
 #  if defined(linux) && defined(_KERNEL)
