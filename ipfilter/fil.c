@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 1993-2003 by Darren Reed.
+ * Copyright (C) 1993-2010 by Darren Reed.
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
@@ -6967,7 +6967,7 @@ int ipf_getnextrule(ipftoken_t *t, void *ptr)
 			if (fr != NULL)
 				(void) fr_derefrule(&fr);
 			if (next->fr_data != NULL) {
-				dst += sizeof(*next);
+				dst += obj.ipfo_size;
 				error = COPYOUT(next->fr_data, dst,
 						next->fr_dsize);
 				if (error != 0)

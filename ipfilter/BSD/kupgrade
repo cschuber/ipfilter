@@ -43,7 +43,7 @@ if [ ! -f ip_rules.c -o ! -f ip_rules.h ] ; then
 	fi
 fi
 
-echo -n "Installing "
+echo -n "Installing into $ipfdir "
 for j in auth frag nat proxy scan state sync pool htable lookup rules; do
 	for i in ip_$j.[ch]; do
 		if [ -f "$i" ] ; then
@@ -88,12 +88,12 @@ if [ -f $ipfdir/ip_fil.c ] ; then
 	chmod 644 $ipfdir/ip_fil.c
 fi
 
-for i in ip_fil.h fil.c ip_log.c ip_compat.h ipl.h ip_*_pxy.c; do
+for i in ip_fil.h fil.c ip_log.c ip_compat.h ipl.h ip_*_pxy.c ip_fil_compat.c; do
 	echo -n " $i"
 	cp $i $ipfdir
 	chmod 644 $ipfdir/$i
 done
-echo ""
+echo ". Done."
 echo -n "Installing into /usr/include/netinet"
 for j in auth compat fil frag nat proxy scan state sync pool htable lookup; do
 	i=ip_$j.h
@@ -163,6 +163,10 @@ if [ $os = FreeBSD -a -f /sys/conf/files ] ; then
 			echo "contrib/ipfilter/netinet/ip_$i.c	optional ipfilter inet ipfilter_lookup" >> files
 		fi
 	done
+	grep ip_fil_compat.c files >/dev/null 2>&1
+	if [ $? -ne 0 ] ; then
+		echo 'contrib/ipfilter/netinet/ip_fil_compat.c	optional ipfilter inet ipfilter_compat' >> files
+	fi
 	grep ip_sync.c files >/dev/null 2>&1
 	if [ $? -ne 0 ] ; then
 		echo 'contrib/ipfilter/netinet/ip_sync.c	optional ipfilter inet ipfilter_sync' >> files
@@ -177,6 +181,12 @@ if [ $os = FreeBSD -a -f /sys/conf/files ] ; then
 	fi
 fi
 if [ $os = NetBSD -a -f /sys/conf/files ] ; then
+	if [ -f /sys/netinet/files.ipfilter ] ; then
+		if ! grep -q ip_fil_compat.c /sys/netinet/files.ipfilter; then
+			echo 'file	dist/ipf/netinet/ip_fil_compat.c	ipfilter & ipfilter_compat' >> /sys/netinet/files.ipfilter
+			echo 'defflag	opt_ipfilter.h	IPFILTER_COMPAT' >> /sys/netinet/files.ipfilter
+		fi
+	fi
 	cd /sys/conf
 	if [ ! -f files.preipf4 ] ; then
 		mv files files.preipf4
@@ -216,7 +226,10 @@ if [ $os = OpenBSD -a -f /sys/conf/files ] ; then
 				echo "file	netinet/ip_$i.c	ipfilter & ipfilter_lookup" >> files
 			fi
 		done
-		grep ip_sync.c files >/dev/null 2>&1
+		grep ip_fil_compat.c files >/dev/null 2>&1
+		if [ $? -ne 0 ] ; then
+			echo 'file	netinet/ip_fil_compat.c	ipfilter & ipfilter_compat' >> files
+		fi
 		if [ $? -ne 0 ] ; then
 			echo 'file	netinet/ip_sync.c	ipfilter & ipfilter_sync' >> files
 		fi
@@ -241,7 +254,7 @@ cat | (cd /usr/src/sys/modules/ipfilter; patch) <<__EOF__
   KMOD=	ipl
   SRCS=	mlfk_ipl.c ip_nat.c ip_frag.c ip_state.c ip_proxy.c ip_auth.c \\
 ! 	ip_log.c ip_fil.c fil.c
-
+  
   .if !defined(NOINET6)
   CFLAGS+= -DUSE_INET6
   .endif
@@ -251,8 +264,8 @@ cat | (cd /usr/src/sys/modules/ipfilter; patch) <<__EOF__
   KMOD=	ipl
   SRCS=	mlfk_ipl.c ip_nat.c ip_frag.c ip_state.c ip_proxy.c ip_auth.c \\
 ! 	ip_log.c ip_fil.c fil.c ip_lookup.c ip_pool.c ip_htable.c \\
-! 	ip_sync.c ip_scan.c ip_rules.c
-
+! 	ip_sync.c ip_scan.c ip_rules.c ip_fil_compat.c
+  
   .if !defined(NOINET6)
   CFLAGS+= -DUSE_INET6
   .endif
