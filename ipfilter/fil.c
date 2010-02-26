@@ -8072,7 +8072,7 @@ ipf_getnextrule(softc, t, ptr)
 		} else {
 			if (fr != NULL)
 				(void) ipf_derefrule(softc, &fr);
-			dst += next->fr_size;
+			dst += obj.ipfo_size;
 			if (next->fr_data != NULL) {
 				error = COPYOUT(next->fr_data, dst,
 						next->fr_dsize);
