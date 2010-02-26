@@ -1532,8 +1532,9 @@ void *ptr;
 				break;
 			}
 			frentry_current_to_16(ptr, old);
-			error = COPYOUT(&old, obj->ipfo_ptr, sizeof(old));
+			error = COPYOUT(old, obj->ipfo_ptr, sizeof(*old));
 			KFREE(old);
+			obj->ipfo_size = sizeof(*old);
 		} else {
 			frentry_4_1_0_t *old;
 
@@ -1543,8 +1544,9 @@ void *ptr;
 				break;
 			}
 			frentry_current_to_0(ptr, old);
-			error = COPYOUT(&old, obj->ipfo_ptr, sizeof(old));
+			error = COPYOUT(old, obj->ipfo_ptr, sizeof(*old));
 			KFREE(old);
+			obj->ipfo_size = sizeof(*old);
 		}
 		break;
 
