@@ -2263,6 +2263,7 @@ u_32_t *passp;
 		if (fin->fin_fr != NULL)
 			pass = fr_scanlist(fin, fr_pass);
 
+		fr = fin->fin_fr;
 		if ((fr != NULL) && (fr->fr_type == FR_T_IPF) &&
 		    ((fr->fr_satype == FRI_LOOKUP) ||
 		     (fr->fr_datype == FRI_LOOKUP)))
@@ -2277,7 +2278,6 @@ u_32_t *passp;
 		if ((pass & FR_NOMATCH)) {
 			ATOMIC_INCL(frstats[out].fr_nom);
 		}
-		fr = fin->fin_fr;
 	}
 
 	/*
