@@ -5266,7 +5266,6 @@ ipfobj_t *obj;
 {
 	int error;
 
-printf("nat_iterator\n");
 	if (itp->igi_data == NULL)
 		return EFAULT;
 
