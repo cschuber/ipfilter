@@ -920,6 +920,10 @@ ipaddr:	IPFY_ANY			{ bzero(&($$), sizeof($$));
 					  bcopy(&$1, &$$.a, sizeof($$.a)); }
 		maskspace		{ yysetdict(maskwords); }
 		ipv6mask		{ bcopy(&$5, &$$.m, sizeof($$.m));
+					  $$.a.i6[0] &= $$.m.i6[0];
+					  $$.a.i6[1] &= $$.m.i6[1];
+					  $$.a.i6[2] &= $$.m.i6[2];
+					  $$.a.i6[3] &= $$.m.i6[3];
 					  yyresetdict();
 					  yyexpectaddr = 0; }
 	;
