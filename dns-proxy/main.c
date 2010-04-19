@@ -73,6 +73,7 @@ static void	send_reject(inbound_t *in, int buflen);
 static void	start_logging(char *execname);
 static void	usage(char *prog);
 static void	write_pid(void);
+static action_t	time_ok(timeset_t *tset);
 #ifdef SIGINFO
 static void	dump_status(int info);
 #endif
@@ -451,8 +452,10 @@ check_query(inbound_t *in, int buflen)
 	if (acl == NULL) {
 		rc = Q_BLOCK;
 	} else {
-		rc = check_questions(qip, &in->i_sender, in->i_buffer, buflen);
+		rc = time_ok(acl->acl_times);
 	}
+	if (rc == Q_ALLOW)
+		rc = check_questions(qip, &in->i_sender, in->i_buffer, buflen);
 
 	logit(6, "check_query acl %p rc %d\n", acl, rc);
 
@@ -1440,4 +1443,38 @@ send_reject(inbound_t *in, int buflen)
 
 	(void) sendto(in->i_fd, in->i_buffer, buflen, 0,
 		      (struct sockaddr *)&in->i_sender, sizeof(in->i_sender));
+}
+
+
+/*
+ * Return 0 if the time is ok, -1 if it is not.
+ */
+static action_t
+time_ok(timeset_t *tset)
+{
+	timeentry_t *ent;
+	struct tm *tm;
+	time_t now;
+
+	if (tset == NULL)
+		return (Q_ALLOW);	/* Nothing to enforce = ok */
+
+	now = time(NULL);
+	tm = localtime(&now);
+
+	STAILQ_FOREACH(ent, &tset->ts_entries, te_next) {
+		if (ent->te_days[tm->tm_wday] == 0)
+			continue;
+		if (tm->tm_hour < ent->te_start_hour)
+			continue;
+		if (tm->tm_min < ent->te_start_min)
+			continue;
+		if (tm->tm_hour > ent->te_end_hour)
+			continue;
+		if (tm->tm_min > ent->te_end_min)
+			continue;
+		return (Q_ALLOW);
+	}
+
+	return (Q_BLOCK);
 }

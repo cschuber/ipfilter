@@ -52,10 +52,12 @@ static hostlist_t *host_add(hostlist_t *h1, hostlist_t *h2);
 static name_t *name_add(name_t *n1, name_t *n2);
 static domain_t *domains_new(action_t act, name_t *names);
 static domain_t *domains_add(domain_t *d1, domain_t *d2);
-static acl_t *acl_new(char *, hostlist_t *, name_t *, int, domain_t *);
+static acl_t *acl_new(char *, hostlist_t *, name_t *, timeset_t *,
+		      int, domain_t *);
 static acl_t *acl_find(char *name);
 static void acl_add(acl_t *a);
-static inbound_t *port_new(char *name, hostlist_t *addr, u_short port, portopt_t *options);
+static inbound_t *port_new(char *name, hostlist_t *addr, u_short port,
+			   portopt_t *options);
 static inbound_t *port_find(char *name);
 static void port_add(inbound_t *in);
 static portopt_t *portopt_new(int option, void *arg);
@@ -82,6 +84,9 @@ void acls_dump(struct atop *atop);
 void forwarder_dump(forwarder_t *fr);
 void forwarders_dump(struct frtop *frtop);
 void port_dump(inbound_t *port);
+static timeentry_t *timeentry_new(u_int *, u_int, u_int);
+static timeset_t *timeset_new(char *, timeentry_t *);
+static timeset_t *timeset_find(char *);
 
 %}
 
@@ -102,6 +107,9 @@ void port_dump(inbound_t *port);
 	rrlist_t	*rr;
 	portopt_t	*popt;
 	modopt_t	mopt;
+	timeset_t	*times;
+	timeentry_t	*entry;
+	days_t		days;
 };
 
 %token  <num>   YY_NUMBER YY_HEX YY_ON YY_OFF
@@ -114,6 +122,10 @@ void port_dump(inbound_t *port);
 %token		YY_PRESERVE YY_RECURSION YY_REJECT
 %token		YY_SOURCE YY_STRIP YY_TO YY_TRANSPARENT YY_UDP
 %token		YY_QUESTION YY_ADDITIONAL YY_NAMESERVER YY_ANSWER
+%token		YY_TIMES YY_TIMESET
+
+%token		YY_MONDAY YY_TUESDAY YY_WEDNESDAY YY_THURSDAY YY_FRIDAY
+%token		YY_SATURDAY YY_SUNDAY YY_DAILY YY_WEEKDAYS YY_WEEKEND
 
 %token		YY_Q_A YY_Q_NS YY_Q_MD YY_Q_MF YY_Q_CNAME YY_Q_SOA YY_Q_MB
 %token		YY_Q_MG YY_Q_MR YY_Q_NULL YY_Q_WKS YY_Q_PTR YY_Q_HINFO
@@ -133,9 +145,12 @@ void port_dump(inbound_t *port);
 %type	<mods>	modify
 %type	<mopt>	modopt
 %type	<name>	names hname namelist dnames dname
-%type	<num>	octet mask anyonoff onoff actionword rrtype rtype
+%type	<num>	octet mask anyonoff onoff actionword rrtype rtype day hourmin
 %type	<popt>	portoptionlist portoptions portoption
+%type	<days>	days
 %type	<rr>	rrlist
+%type	<times>	timeset times
+%type	<entry>	timespec timespeclist
 %%
 
 file:	line
@@ -149,6 +164,7 @@ line:	comment
 	| forward ';'		{ forward_add($1); }
 	| forwarders ';'	{ forwarder_add($1); }
 	| modify ';'		{ modify_add($1); }
+	| timeset ';'		{ timeset_add($1); }
 	;
 
 comment:
@@ -162,9 +178,10 @@ assign:	YY_STR '=' { yyvarnext = 1; } YY_STR
 acl:	YY_ACL YY_STR '{' YY_SOURCE '(' { yyexpectaddr = 1; } hlist ')' ';'
 			  { yyexpectaddr = 0; }
 			  YY_PORT '(' namelist ')' ';'
+			  times
 			  YY_RECURSION anyonoff ';';
 			  YY_POLICY '{' actions ';' '}' ';' '}'
-				{ $$ = acl_new($2, $7, $13, $17, $21); }
+				{ $$ = acl_new($2, $7, $13, $16, $18, $22); }
 	;
 
 port:	YY_PORT YY_STR '{' YY_UDP { yyexpectaddr = 1; }
@@ -200,6 +217,15 @@ modify:	YY_MODIFY YY_STR rtype '{' YY_ACL '(' namelist ')' ';'
 					$$->m_recursion = $11;
 				  }
 				}
+	;
+
+times:				{ $$ = NULL; }
+	| YY_TIMES YY_STR ';'	{ $$ = timeset_find($2); }
+	;
+
+timeset:
+	YY_TIMESET YY_STR '{' { yysetdict(weekdays); } timespeclist '}'
+				{ $$ = timeset_new($2, $5); }
 	;
 
 namelist:
@@ -340,6 +366,71 @@ rrtype:	YY_Q_A			{ $$ = T_A; }
 	| '*'			{ $$ = -1; }
 	;
 
+timespeclist:
+	timespec ';'		{ $$ = $1; }
+	| timespeclist ';' timespec ';'
+				{ STAILQ_NEXT($3, te_next) = $1;
+				  $$ = $3;
+				}
+	;
+
+timespec:
+	days hourmin '-' hourmin
+				{ $$ = timeentry_new($1.day, $2, $4); }
+	;
+
+days:	day			{ bzero((char *)&$$, sizeof($$));
+				  $$.day[$1] = 1;
+				}
+	| days ',' day		{ $$.day[0] = $1.day[0];
+				  $$.day[1] = $1.day[1];
+				  $$.day[2] = $1.day[2];
+				  $$.day[3] = $1.day[3];
+				  $$.day[4] = $1.day[4];
+				  $$.day[5] = $1.day[5];
+				  $$.day[6] = $1.day[6];
+				  $$.day[$3] = 1;
+				}
+	| YY_DAILY		{ $$.day[0] = 1;
+				  $$.day[1] = 1;
+				  $$.day[2] = 1;
+				  $$.day[3] = 1;
+				  $$.day[4] = 1;
+				  $$.day[5] = 1;
+				  $$.day[6] = 1;
+				}
+	| YY_WEEKDAYS		{ $$.day[0] = 0;
+				  $$.day[1] = 1;
+				  $$.day[2] = 1;
+				  $$.day[3] = 1;
+				  $$.day[4] = 1;
+				  $$.day[5] = 1;
+				  $$.day[6] = 0;
+				}
+	| YY_WEEKEND		{ bzero((char *)&$$, sizeof($$));
+				  $$.day[0] = 1;
+				  $$.day[6] = 1;
+				}
+	;
+
+day:	YY_MONDAY		{ $$ = 1; }
+	| YY_TUESDAY		{ $$ = 2; }
+	| YY_WEDNESDAY		{ $$ = 3; }
+	| YY_THURSDAY		{ $$ = 4; }
+	| YY_FRIDAY		{ $$ = 5; }
+	| YY_SATURDAY		{ $$ = 6; }
+	| YY_SUNDAY		{ $$ = 0; }
+	;
+
+hourmin:
+	YY_NUMBER ':' YY_NUMBER	{ if ($1 > 23 || $1 < 0)
+					yyerror("bad value for hours");
+				  if ($3 > 59 || $3 < 0)
+					yyerror("bad value for minutes");
+				  $$ = $1 * 100 + $3;
+				}
+	;
+
 ipaddress:
 	octet '.' octet '.' octet '.' octet
 				{ int x = $1 << 24 | $3 << 16 | $5 <<8 | $7;
@@ -389,7 +480,7 @@ mask:
 	;
 %%
 
-static struct wordtab words[31] = {
+static struct wordtab words[33] = {
 	{ "acl",		YY_ACL },
 	{ "additional",		YY_ADDITIONAL },
 	{ "all",		YY_ALL },
@@ -417,6 +508,8 @@ static struct wordtab words[31] = {
 	{ "reject",		YY_REJECT },
 	{ "source",		YY_SOURCE },
 	{ "strip",		YY_STRIP },
+	{ "times",		YY_TIMES },
+	{ "timeset",		YY_TIMESET },
 	{ "to",			YY_TO },
 	{ "transparent",	YY_TRANSPARENT },
 	{ "udp",		YY_UDP },
@@ -529,6 +622,19 @@ static struct wordtab dnsqtpyes[50] = {
 	{ NULL,			0 }
 };
 
+static struct wordtab weekdays[11] = {
+	{ "mon",		YY_MONDAY },
+	{ "tue",		YY_TUESDAY },
+	{ "wed",		YY_WEDNESDAY },
+	{ "thu",		YY_THURSDAY },
+	{ "fri",		YY_FRIDAY },
+	{ "sat",		YY_SATURDAY },
+	{ "sun",		YY_SUNDAY },
+	{ "daily",		YY_DAILY },
+	{ "weekend",		YY_WEEKEND },
+	{ "weekdays",		YY_WEEKDAYS },
+	{ NULL,			0 }
+};
 
 void
 config_init()
@@ -542,6 +648,7 @@ config_init()
 	STAILQ_INIT(&config.c_ports);
 	STAILQ_INIT(&config.c_queries);
 	STAILQ_INIT(&config.c_modifies);
+	STAILQ_INIT(&config.c_timesets);
 	STAILQ_INIT(&config.c_forwards);
 	STAILQ_INIT(&config.c_forwarders);
 
@@ -583,6 +690,77 @@ load_config(char *filename)
 	logit(0, "Configuration loaded\n");
 }
 
+static timeentry_t *
+timeentry_new(u_int *days, u_int start_hm, u_int end_hm)
+{
+	timeentry_t *entry;
+
+	entry = calloc(1, sizeof(*entry));
+	if (entry == NULL) {
+		logit(1, "timeentry_new: cannot allocate memory\n");
+		return (NULL);
+	}
+	entry->te_days[0] = days[0];
+	entry->te_days[1] = days[1];
+	entry->te_days[2] = days[2];
+	entry->te_days[3] = days[3];
+	entry->te_days[4] = days[4];
+	entry->te_days[5] = days[5];
+	entry->te_days[6] = days[6];
+	entry->te_start_hour = start_hm / 100;
+	entry->te_start_min = start_hm % 100;
+	entry->te_end_hour = end_hm / 100;
+	entry->te_end_min = end_hm % 100;
+
+	return (entry);
+}
+
+static timeset_t *
+timeset_find(char *name)
+{
+	timeset_t *set = NULL;
+
+	STAILQ_FOREACH(set, &config.c_timesets, ts_next) {
+		if (!strcmp(set->ts_name, name))
+			break;
+	}
+
+	return (set);
+}
+
+static timeset_t *
+timeset_new(char *name, timeentry_t *times)
+{
+	timeset_t *set;
+	timeentry_t *ent;
+	timeentry_t *next;
+
+	set = calloc(1, sizeof(*set));
+	if (set == NULL) {
+		logit(1, "timset_new: cannot allocate memory\n");
+		return (NULL);
+	}
+
+	set->ts_name = strdup(name);
+
+	STAILQ_INIT(&set->ts_entries);
+
+	for (ent = times; ent != NULL; ent = next) {
+		next = STAILQ_NEXT(ent, te_next);
+		STAILQ_NEXT(ent, te_next) = NULL;
+		STAILQ_INSERT_TAIL(&set->ts_entries, ent, te_next);
+	}
+
+	return (set);
+}
+
+static void
+timeset_add(timeset_t *set)
+{
+	if (set != NULL) {
+		STAILQ_INSERT_TAIL(&config.c_timesets, set, ts_next);
+	}
+}
 
 static rrlist_t *
 rrtype_new(int type)
@@ -758,8 +936,8 @@ acl_find(char *name)
 
 
 static acl_t *
-acl_new(char *name, hostlist_t *hosts, name_t *ports, int recursion,
-	domain_t *domains)
+acl_new(char *name, hostlist_t *hosts, name_t *ports, timeset_t *set,
+	int recursion, domain_t *domains)
 {
 	inlist_t *i, *ilist;
 	hostlist_t *h;
@@ -822,6 +1000,8 @@ acl_new(char *name, hostlist_t *hosts, name_t *ports, int recursion,
 		fprintf(stderr, "acl(%s): could not allocate new acl\n", name);
 		goto badacl;
 	}
+
+	a->acl_times = set;
 	a->acl_name = name;
 	a->acl_recursion = recursion;
 
@@ -1321,6 +1501,97 @@ hosts_dump(struct htop *hosts)
 }
 
 
+static char *
+print_day(int day)
+{
+	switch (day)
+	{
+	case 0 :
+		return ("sun");
+	case 1 :
+		return ("mon");
+	case 2 :
+		return ("tue");
+	case 3 :
+		return ("wed");
+	case 4 :
+		return ("thu");
+	case 5 :
+		return ("fri");
+	case 6 :
+		return ("sat");
+	default :
+		break;
+	}
+
+	return ("???");
+}
+
+
+static void
+timeentry_dump(timeentry_t *entry)
+{
+	u_int *days;
+	int i;
+	int j;
+
+	days = entry->te_days;
+
+	if (days[0] == 1 && days[1] == 0 && days[2] == 0 && days[3] == 0 &&
+	    days[4] == 0 && days[5] == 0 && days[6] == 1) {
+		printf("weekend");
+	} else if (days[0] == 0 && days[1] == 1 && days[2] == 1 &&
+	    days[3] == 1 && days[4] == 1 && days[5] == 1 && days[6] == 0) {
+		printf("weekdays");
+	} else if (days[0] == 1 && days[1] == 1 && days[2] == 1 &&
+	    days[3] == 1 && days[4] == 1 && days[5] == 1 && days[6] == 1) {
+		printf("daily");
+	} else {
+		for (i = 0; i < 7; i++)
+			if (days[i] != 0)
+				break;
+		if (i == 7) {
+			printf("invalid:no-day-selected");
+		} else {
+			print_day(i);
+			if (i < 6) {
+				for (j = i + 1; j <= 6; j++)
+					if (days[j] == 0)
+						break;
+				if (days[j] == 0)
+					j--;
+				if (j - i > 0) {
+					printf("-");
+					print_day(j);
+				}
+			}
+		}
+	}
+
+	printf(" %d:%02d - %d:%02d;",
+	       entry->te_start_hour, entry->te_start_min,
+	       entry->te_end_hour, entry->te_end_min);
+}
+
+
+static void
+timesets_dump(struct tstop *sets)
+{
+	timeentry_t *ent;
+	timeset_t *set;
+
+	STAILQ_FOREACH(set, sets, ts_next) {
+		printf("timeset %s {\n", set->ts_name);
+		STAILQ_FOREACH(ent, &set->ts_entries, te_next) {
+			printf("\t");
+			timeentry_dump(ent);
+			printf("\n");
+		}
+	}
+	printf("};\n");
+}
+
+
 static void
 rrtypes_dump(u_char *rrarray)
 {
@@ -1537,6 +1808,8 @@ acls_dump(struct atop *atop)
 				putchar(',');
 		}
 		printf("); ");
+		if (a->acl_times != NULL)
+			printf("times %s; ", a->acl_times->ts_name);
 		printf("recursion %s; ", onoff_dump(a->acl_recursion));
 		printf("policy {");
 		domains_dump(&a->acl_domains);
@@ -1549,6 +1822,7 @@ void
 config_dump()
 {
 	ports_dump(&config.c_ports);
+	timesets_dump(&config.c_timesets);
 	acls_dump(&config.c_acls);
 	forwarders_dump(&config.c_forwarders);
 	modify_dump(&config.c_modifies);

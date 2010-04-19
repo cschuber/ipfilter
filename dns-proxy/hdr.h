@@ -211,12 +211,38 @@ STAILQ_HEAD(htop, hostlist);
 
 /* -------------------------------------------------- */
 
+typedef struct days_s		{
+	u_int			day[7];
+} days_t;
+
+typedef	struct timeentry	{
+	STAILQ_ENTRY(timeentry)	te_next;
+	u_int			te_days[7];
+	u_int			te_start_hour;
+	u_int			te_start_min;
+	u_int			te_end_hour;
+	u_int			te_end_min;
+} timeentry_t;
+
+STAILQ_HEAD(tetop, timeentry);
+
+typedef struct timeset		{
+	STAILQ_ENTRY(timeset)	ts_next;
+	char			*ts_name;
+	struct tetop		ts_entries;
+} timeset_t;
+
+STAILQ_HEAD(tstop, timeset);
+
+/* -------------------------------------------------- */
+
 typedef	struct acl	{
 	STAILQ_ENTRY(acl)	acl_next;
 	struct htop		acl_sources;
 	struct iltop		acl_ports;
 	struct dtop		acl_domains;
 	char			*acl_name;
+	timeset_t		*acl_times;
 	int			acl_recursion;
 } acl_t;
 
@@ -310,6 +336,7 @@ typedef struct config {
 	struct ftop		c_forwards;
 	struct frtop		c_forwarders;
 	struct mtop		c_modifies;
+	struct tstop		c_timesets;
 	forward_t		*c_currentforward;
 	int			c_natfd;
 	int			c_outfd;

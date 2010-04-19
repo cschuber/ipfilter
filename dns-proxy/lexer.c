@@ -308,7 +308,7 @@ nextchar:
 		isbuilding = 1;
 		goto nextchar;
 	}
-	if (strchr("*=,/;{}()@", c) != NULL) {
+	if (strchr("-*=,/;{}()@", c) != NULL) {
 		if (isbuilding == 1) {
 			yyunputc(c);
 			goto done;

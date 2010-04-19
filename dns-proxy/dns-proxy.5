@@ -79,13 +79,13 @@ rule may specify just one address or many.
 .PP
 The actions that can be taken on a matching name are:
 .TP
-.B allow
+.I allow
 Allow the DNS packet through
 .TP
-.B block
+.I block
 Silently discard the DNS packet
 .TP
-.B reject
+.I reject
 Retrun an error to the querier, indicating that the name does not exist.
 .PP
 When specifying a name with one of \fBallow\fP, \fBblock\fP or \fBreject\fP,
@@ -95,35 +95,37 @@ recognised is a leading '*' at the front of a name.
 Some example lines are as follows:
 .nf
 
-acl 10.1.1.1/32,10.2.2.0/24 port locals { allow .com, .net; };
-acl all port locals { block .microsoft.com; block *cnn.com; };
+acl some { source(10.1.1.1/32,10.2.2.0/24); port (locals);
+	   policy { allow .com, .net; }; };
+acl many { source(*); port (locals);
+	   policy { block .microsoft.com; block *cnn.com; }; };
 .fi
-.SS query
+.SS modify
 The \fBquery\fP line is used to do explicit matching and policy enforcement
 depending on the contents of the DNS query.  These lines are \fBoptional\fP.
 The \fBquery\fP line allows you to match on the following DNS fields:
 .TP
-.B type
-A list of DNS resource record types may be specified.  Abbreviations are
-used and must be present in upper case.  So, for example, the Start of
-Authority record would be reprsented by \fISOA\fP.  A list of \fItypes\fP
-may be given, with each one seperated by a comma.  To match all, an
-asterix (*) can be used.
-.PP
-Following the matching statements, it is possible to specify an action.
-If no action is specified, an empty pair of {}'s must be present and the
-global set of forwarders is used.  An action is either an explicit
-\fBblock\fP, \fBreject\fP, \fBallow\fP or a list of forwarders.  The list
-of forwarders in a \fBquery\fP line is independant of other forwarder lists.
-Thus it is possible to forward DNS queries to different destinations,
-depending on the nature of the query.
+.I recursion
+.TP
+.I keep
+.TP
+.I strip
+.TP
+.I clean
 .PP
 .nf
 
-query type=(AAAA) { forwarders { 2.2.2.1; }; };
-query type=(A,NS) { forwarders { 2.2.2.2; }; };
-# Block ionode IP over DNS (hides in NULL DNS RRs)
-query type=(NULL) { block; };
+modify default question { acl(*); recursion preserve; keep ($safe);
+    strip($bad); clean (*);};
+.fi
+.SS forward
+A \fBforward\fP line joins together a set of \fIacl\fP rules with a set
+of \fIforwarders\fP that have been defined previously.
+.PP
+.nf
+
+forward { acl (local); to (localhost); };
+forward { acl (*); to (default); };
 .fi
 .SH FILES
 /etc/dns-proxy.conf
