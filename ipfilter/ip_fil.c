@@ -12,12 +12,6 @@ static const char rcsid[] = "@(#)$Id$";
 
 #include "ipf.h"
 #include "md5.h"
-
-
-#if !defined(__osf__) && !defined(__linux__)
-extern	struct	protosw	inetsw[];
-#endif
-
 #include "ipt.h"
 
 ipf_main_softc_t	ipfmain;
