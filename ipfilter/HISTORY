@@ -10,42 +10,9 @@
 # and especially those who have found the time to port IP Filter to new
 # platforms.
 #
-get return-rst and return-icmp* and fastroute working on Linux
+5.1 - RELEASED - 9 May 2010
 
-passing of pointers to interface structures wrong for HP-UX/Solaris with
-return-* rules.
-
-Make the solaris boot script able to run on 2.5.1
-
-ippool related files missing from Solaris packages
-
-The name /dev/ippool should be /dev/iplookup
-
-add regression testing for parsing long interface names in nat rules,
-along with mssclamp and tags.  Also add test for mssclamp operation.
-
-ttl displayed for "ipfstat -t" is wrong because ttl is not computed.
-
-parse logical interface names (Sun)
-
-unloading LKMs was only working if they were enabled.
-
-sync'ing up NAT sessions when NICs change should cause NAT rules to
-re-lookup name->pointer mappings
-
-not all of the ippool ioctl's are IOWR and they should be because they
-use the ipfobj_t for passing information in/out of the kernel.  leave the
-old values defined and handle them, for compatibility.
-
-pool stats wrong: ippoolstate used where ipoolstat should be, hash table
-  statistics not reported at all
-
-fr_running not set correctly for OpenBSD when compiled into the kernel
-
-Allow SIOCGETFF while disabled
-
-Fix mssclamp with NAT (pasing and printing of the word, plus wrong bytes
-altered.  How do you say "untested" ?)
+* See WhatsNew50.txt
 
 4.1 - RELEASED - 12 February 2004
 
