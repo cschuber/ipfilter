@@ -3487,9 +3487,9 @@ frentry_t **listp;
 			(void) frflushlist(set, unit, nfreedp, fp->fr_grp);
 		}
 
-		if (fp->fr_grhead != NULL) {
+		if (fp->fr_grhead[0] != '\0') {
 			fr_delgroup(fp->fr_grhead, unit, set);
-			*fp->fr_grhead = '\0';
+			fp->fr_grhead[0] = '\0';
 		}
 
 		ASSERT(fp->fr_ref > 0);
