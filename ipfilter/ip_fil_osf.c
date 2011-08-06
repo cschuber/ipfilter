@@ -447,6 +447,7 @@ ipf_send_icmp_err(type, fin, dst)
 			dst4.s_addr = fin->fin_daddr;
 
 		hlen = sizeof(ip_t);
+		iclen = hlen + offsetof(struct icmp, icmp_ip) + ohlen;
 		if (fin->fin_hlen < fin->fin_plen)
 			xtra = MIN(fin->fin_dlen, 8);
 		else
@@ -457,6 +458,7 @@ ipf_send_icmp_err(type, fin, dst)
 	else if (fin->fin_v == 6) {
 		hlen = sizeof(ip6_t);
 		ohlen = sizeof(ip6_t);
+		iclen = hlen + offsetof(struct icmp, icmp_ip) + ohlen;
 		type = icmptoicmp6types[type];
 		if (type == ICMP6_DST_UNREACH)
 			code = icmptoicmp6unreach[code];
@@ -470,8 +472,8 @@ ipf_send_icmp_err(type, fin, dst)
 			}
 			avail = MCLBYTES;
 		}
-		xtra = MIN(fin->fin_plen,
-			   avail - hlen - sizeof(*icmp) - max_linkhdr);
+		xtra = MIN(fin->fin_plen, avail - iclen - max_linkhdr);
+		xtra = MIN(xtra, IPV6_MMTU - iclen);
 		if (dst == 0) {
 			if (ipf_ifpaddr(&ipfmain, 6, FRI_NORMAL, ifp,
 					&dst6, NULL) == -1) {
@@ -487,7 +489,6 @@ ipf_send_icmp_err(type, fin, dst)
 		return -1;
 	}
 
-	iclen = hlen + sizeof(*icmp) + xtra;
 	avail -= (max_linkhdr + iclen);
 	m->m_data += max_linkhdr;
 	m->m_pkthdr.rcvif = (struct ifnet *)0;
