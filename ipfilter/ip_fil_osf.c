@@ -549,6 +549,7 @@ int dst;
 			dst4.s_addr = fin->fin_daddr;
 
 		hlen = sizeof(ip_t);
+		iclen = hlen + offsetof(struct icmp, icmp_ip) + ohlen;
 		if (fin->fin_hlen < fin->fin_plen)
 			xtra = MIN(fin->fin_dlen, 8);
 		else
@@ -559,6 +560,7 @@ int dst;
 	else if (fin->fin_v == 6) {
 		hlen = sizeof(ip6_t);
 		ohlen = sizeof(ip6_t);
+		iclen = hlen + offsetof(struct icmp, icmp_ip) + ohlen;
 		type = icmptoicmp6types[type];
 		if (type == ICMP6_DST_UNREACH)
 			code = icmptoicmp6unreach[code];
@@ -572,8 +574,8 @@ int dst;
 			}
 			avail = MCLBYTES;
 		}
-		xtra = MIN(fin->fin_plen,
-			   avail - hlen - sizeof(*icmp) - max_linkhdr);
+		xtra = MIN(fin->fin_plen, avail - iclen - max_linkhdr);
+		xtra = MIN(xtra, IPV6_MMTU - iclen);
 		if (dst == 0) {
 			if (fr_ifpaddr(6, FRI_NORMAL, ifp,
 				       (struct in_addr *)&dst6, NULL) == -1) {
@@ -589,7 +591,6 @@ int dst;
 		return -1;
 	}
 
-	iclen = hlen + sizeof(*icmp) + xtra;
 	avail -= (max_linkhdr + iclen);
 	m->m_data += max_linkhdr;
 	m->m_pkthdr.rcvif = (struct ifnet *)0;

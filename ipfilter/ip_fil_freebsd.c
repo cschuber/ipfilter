@@ -788,6 +788,7 @@ int dst;
 
 		hlen = sizeof(ip_t);
 		ohlen = fin->fin_hlen;
+		iclen = hlen + offsetof(struct icmp, icmp_ip) + ohlen;
 		if (fin->fin_hlen < fin->fin_plen)
 			xtra = MIN(fin->fin_dlen, 8);
 		else
@@ -798,12 +799,12 @@ int dst;
 	else if (fin->fin_v == 6) {
 		hlen = sizeof(ip6_t);
 		ohlen = sizeof(ip6_t);
+		iclen = hlen + offsetof(struct icmp, icmp_ip) + ohlen;
 		type = icmptoicmp6types[type];
 		if (type == ICMP6_DST_UNREACH)
 			code = icmptoicmp6unreach[code];
 
-		if (hlen + sizeof(*icmp) + max_linkhdr +
-		    fin->fin_plen > avail) {
+		if (iclen + max_linkhdr + fin->fin_plen > avail) {
 			MCLGET(m, M_DONTWAIT);
 			if ((m->m_flags & M_EXT) == 0) {
 				FREE_MB_T(m);
@@ -811,8 +812,8 @@ int dst;
 			}
 			avail = MCLBYTES;
 		}
-		xtra = MIN(fin->fin_plen,
-			   avail - hlen - sizeof(*icmp) - max_linkhdr);
+		xtra = MIN(fin->fin_plen, avail - iclen - max_linkhdr);
+		xtra = MIN(xtra, IPV6_MMTU - iclen);
 		if (dst == 0) {
 			if (fr_ifpaddr(6, FRI_NORMAL, ifp,
 				       (struct in_addr *)&dst6, NULL) == -1) {
@@ -828,7 +829,6 @@ int dst;
 		return -1;
 	}
 
-	iclen = hlen + sizeof(*icmp);
 	avail -= (max_linkhdr + iclen);
 	if (avail < 0) {
 		FREE_MB_T(m);
