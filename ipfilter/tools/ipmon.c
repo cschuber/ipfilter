@@ -733,7 +733,8 @@ int	blen;
 	}
 	(void) strftime(t, len, "%T", tm);
 	t += strlen(t);
-	(void) sprintf(t, ".%-.6ld @%hd ", ipl->ipl_usec, nl->nl_rule + 1);
+	(void) sprintf(t, ".%-.6ld @%hd ", (long)ipl->ipl_usec,
+		       nl->nl_rule + 1);
 	t += strlen(t);
 
 	if (nl->nl_type == NL_NEWMAP)
@@ -815,7 +816,7 @@ int	blen;
 	}
 	(void) strftime(t, len, "%T", tm);
 	t += strlen(t);
-	(void) sprintf(t, ".%-.6ld ", ipl->ipl_usec);
+	(void) sprintf(t, ".%-.6ld ", (long)ipl->ipl_usec);
 	t += strlen(t);
 
 	switch (sl->isl_type)
@@ -1027,7 +1028,7 @@ int	blen;
 	}
 	(void) strftime(t, len, "%T", tm);
 	t += strlen(t);
-	(void) sprintf(t, ".%-.6ld ", ipl->ipl_usec);
+	(void) sprintf(t, ".%-.6ld ", (long)ipl->ipl_usec);
 	t += strlen(t);
 	if (ipl->ipl_count > 1) {
 		(void) sprintf(t, "%dx ", ipl->ipl_count);
