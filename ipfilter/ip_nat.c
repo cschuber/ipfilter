@@ -2842,8 +2842,8 @@ ipf_nat_newmap(fin, nat, ni)
 			if (np->in_flags & IPN_SEQUENTIAL) {
 				port = np->in_spnext;
 			} else {
-				port = ipf_random() % (np->in_spmax -
-						       np->in_spmin);
+				port = ipf_random() %
+				       (np->in_spmax - np->in_spmin + 1);
 				port += np->in_spmin;
 			}
 			port = htons(port);
