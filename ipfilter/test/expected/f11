@@ -133,7 +133,7 @@ List of active state sessions:
 	forward: pkts in 1 bytes in 28 pkts out 0 bytes out 0
 	backward: pkts in 0 bytes in 0 pkts out 0 bytes out 0
 	pass in keep state	IPv4
-	pkt_flags & 0(0) = 0,		pkt_options & ffffffff = 0, ffffffff = 0 
+	pkt_flags & 0(0) = 0,		pkt_options & ffffffff = 0, 0 = 0 
 	pkt_security & ffff = 0, pkt_auth & ffff = 0
 	is_flx 0x8001 0 0 0
 	interfaces: in X[e1],X[] out X[],X[]
@@ -180,7 +180,7 @@ List of active state sessions:
 	forward: pkts in 1 bytes in 28 pkts out 0 bytes out 0
 	backward: pkts in 0 bytes in 0 pkts out 0 bytes out 0
 	block in keep state	IPv4
-	pkt_flags & 0(0) = 0,		pkt_options & ffffffff = 0, ffffffff = 0 
+	pkt_flags & 0(0) = 0,		pkt_options & ffffffff = 0, 0 = 0 
 	pkt_security & ffff = 0, pkt_auth & ffff = 0
 	is_flx 0x8001 0 0 0
 	interfaces: in X[e1],X[] out X[],X[]
