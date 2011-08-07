@@ -45,7 +45,7 @@ printfieldhdr(words, field)
 			} else {
 				for (t = s; *t != '\0'; t++) {
 					if (ISALPHA(*t) && ISLOWER(*t))
-						*t = toupper(*t);
+						*t = TOUPPER(*t);
 				}
 				PRINTF("%s", s);
 				free(s);

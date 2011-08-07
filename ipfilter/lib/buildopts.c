@@ -21,6 +21,8 @@ u_32_t buildopts(cp, op, len)
 	for (s = strtok(cp, ","); s; s = strtok(NULL, ",")) {
 		if ((t = strchr(s, '=')))
 			*t++ = '\0';
+		else
+			t = "";
 		for (io = ionames; io->on_name; io++) {
 			if (strcasecmp(s, io->on_name) || (msk & io->on_bit))
 				continue;
@@ -35,6 +37,10 @@ u_32_t buildopts(cp, op, len)
 			fprintf(stderr, "unknown IP option name %s\n", s);
 			return 0;
 		}
+	}
+	while ((len & 3) != 3) {
+		*op++ = IPOPT_NOP;
+		len++;
 	}
 	*op++ = IPOPT_EOL;
 	len++;

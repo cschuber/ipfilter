@@ -328,6 +328,7 @@ static	int	parseline(line, ip, ifn, out)
 		if (olen) {
 			bcopy(ipopts, (char *)(ip + 1), olen);
 			IP_HL_A(ip, IP_HL(ip) + (olen >> 2));
+			ip->ip_len += olen;
 		}
 	}
 	if (ip->ip_p == IPPROTO_TCP || ip->ip_p == IPPROTO_UDP)
