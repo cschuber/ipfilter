@@ -2725,9 +2725,7 @@ ipf_firewall(fin, passp)
 	}
 
 	fr = fin->fin_fr;
-
-	if (passp != NULL)
-		*passp = pass;
+	*passp = pass;
 
 	return fr;
 }
