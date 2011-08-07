@@ -39,6 +39,10 @@ char *class;
 				lvl = seclevel(class);
 				*(op - 1) = lvl;
 				break;
+			case IPOPT_RR :
+			case IPOPT_TS :
+				s[IPOPT_OLEN] = IPOPT_MINOFF - 1 + 4;
+				break;
 			case IPOPT_LSRR :
 			case IPOPT_SSRR :
 				ipadr.s_addr = inet_addr(class);
@@ -50,12 +54,6 @@ char *class;
 				bcopy((char *)&val, op, 2);
 				break;
 			}
-		}
-
-		op += io->on_siz - 3;
-		if (len & 3) {
-			*op++ = IPOPT_NOP;
-			len++;
 		}
 	}
 	if (opts & OPT_DEBUG)
