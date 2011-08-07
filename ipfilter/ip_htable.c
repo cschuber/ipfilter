@@ -926,7 +926,10 @@ ipf_htent_insert(softc, arg, iph, ipeo)
 				    ipe->ipe_mask.i6, iph->iph_size);
 	} else
 #endif
+	{
+		KFREE(ipe);
 		return -1;
+	}
 
 	ipe->ipe_owner = iph;
 	ipe->ipe_ref = 1;
