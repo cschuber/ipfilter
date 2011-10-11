@@ -1039,6 +1039,7 @@ static int
 ipf_stack_init()
 {
 	ipf_inst = net_instance_alloc(NETINFO_VERSION);
+	ipf_inst->nin_name = "ipf";
 	ipf_inst->nin_create = ipf_instance_create;
 	ipf_inst->nin_destroy = ipf_instance_destroy;
 	ipf_inst->nin_shutdown = ipf_instance_shutdown;
