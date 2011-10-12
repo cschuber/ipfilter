@@ -118,10 +118,6 @@ MALLOC_DEFINE(M_IPFILTER, "IP Filter", "IP Filter packet filter data structures"
 # endif
 
 
-#if !defined(__osf__)
-extern	struct	protosw	inetsw[];
-#endif
-
 static	int	(*ipf_savep)(void *, ip_t *, int, void *, int, struct mbuf **);
 static	int	ipf_send_ip(fr_info_t *, mb_t *, mb_t **);
 static void	ipf_timer_func(void *arg);
