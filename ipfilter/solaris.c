@@ -64,6 +64,7 @@ static	int	ipf_identify(dev_info_t *);
 #endif
 static	int	ipf_attach(dev_info_t *, ddi_attach_cmd_t);
 static	int	ipf_detach(dev_info_t *, ddi_detach_cmd_t);
+static	int	ipf_detach_instance __P((ipf_main_softc_t *));
 static 	int	ipfpoll(dev_t, short, int, short *, struct pollhead **);
 static	char	*ipf_devfiles[] = { IPL_NAME, IPNAT_NAME, IPSTATE_NAME,
 				    IPAUTH_NAME, IPSYNC_NAME, IPSCAN_NAME,
@@ -364,40 +365,10 @@ ipf_detach(dip, cmd)
 
 	switch (cmd) {
 	case DDI_DETACH:
-		for (tmp = ipf_instances; tmp != NULL; tmp = tmp->ipf_next) {
-			/*
-			 * And no proxy modules loaded.
-			 */
-			if (tmp->ipf_refcnt != 0)
-				break;
-			/*
-			 * If it didn't finish loading or is already
-			 * unloading, fail.
-			 */
-			if (tmp->ipf_running == -2)
+		for (tmp = ipf_instances; tmp != NULL; tmp = tmp->ipf_next)
+			if (ipf_detach_instance(tmp) != DDI_SUCCESS)
 				break;
 
-			/*
-			 * Make sure we're the only one's modifying things.
-			 * With this lock others should just fall out of
-			 * the loop.
-			 */
-			WRITE_ENTER(&tmp->ipf_global);
-			if (tmp->ipf_running == -2) {
-				RWLOCK_EXIT(&tmp->ipf_global);
-				break;
-			}
-			if (tmp->ipf_running == 1)
-				(void) ipfdetach(tmp);
-			tmp->ipf_running = -2;
-
-			RWLOCK_EXIT(&tmp->ipf_global);
-
-			if (tmp->ipf_slow_ch != 0) {
-				(void) untimeout(tmp->ipf_slow_ch);
-				tmp->ipf_slow_ch = 0;
-			}
-		}
 		if (tmp != NULL)
 			break;
 
@@ -1019,7 +990,7 @@ ipf_instance_shutdown(netid_t id, void *arg)
 {
 	ipf_main_softc_t *softc = arg;
 
-	(void) ipf_fini_all(softc);
+	(void) ipf_detach_instance(softc);
 }
 
 
@@ -1217,3 +1188,43 @@ ipf_detach_loopback(softc)
 		cmn_err(CE_WARN, "unregister-hook(v6-loop_out) failed");
 }
 #endif
+
+static int
+ipf_detach_instance(ipf_main_softc_t *softc)
+{
+	/*
+	 * And no proxy modules loaded.
+	 */
+	if (softc->ipf_refcnt != 0)
+		return DDI_FAILURE;
+	/*
+	 * If it didn't finish loading or is already
+	 * unloading, fail.
+	 */
+	if (softc->ipf_running == -2)
+		return DDI_FAILURE;
+
+	/*
+	 * Make sure we're the only one's modifying things.
+	 * With this lock others should just fall out of
+	 * the loop.
+	 */
+	WRITE_ENTER(&softc->ipf_global);
+	if (softc->ipf_running == -2) {
+		RWLOCK_EXIT(&softc->ipf_global);
+		return DDI_FAILURE;
+	}
+	if (softc->ipf_running == 1)
+		(void) ipfdetach(softc);
+	softc->ipf_running = -2;
+
+	RWLOCK_EXIT(&softc->ipf_global);
+
+	if (softc->ipf_slow_ch != 0) {
+		(void) untimeout(softc->ipf_slow_ch);
+		softc->ipf_slow_ch = 0;
+	}
+
+	return DDI_SUCCESS;
+}
+
