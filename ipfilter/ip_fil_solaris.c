@@ -134,9 +134,6 @@ ipfdetach(softc)
 	cmn_err(CE_CONT, "ipfdetach()\n");
 #endif
 
-	(void) ipf_flush(softc, IPL_LOGIPF, FR_INQUE|FR_OUTQUE|FR_INACTIVE);
-	(void) ipf_flush(softc, IPL_LOGIPF, FR_INQUE|FR_OUTQUE);
-
         if (ipf_fini_all(softc) < 0)
 		return EIO;
 

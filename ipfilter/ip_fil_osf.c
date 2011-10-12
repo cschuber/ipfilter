@@ -144,9 +144,6 @@ ipfdetach(softc)
 
 	ipf_fini_all(softc);
 
-	(void) frflush(softc, IPL_LOGIPF, FR_INQUE|FR_OUTQUE|FR_INACTIVE);
-	(void) frflush(softc, IPL_LOGIPF, FR_INQUE|FR_OUTQUE);
-
 	SPL_X(s);
 
 	return 0;

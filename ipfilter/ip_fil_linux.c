@@ -778,9 +778,6 @@ int ipfdetach(ipf_main_softc_t *softc)
 
 	ipf_fini_all(softc);
 
-	(void) ipf_flush(softc, IPL_LOGIPF, FR_INQUE|FR_OUTQUE|FR_INACTIVE);
-	(void) ipf_flush(softc, IPL_LOGIPF, FR_INQUE|FR_OUTQUE);
-
 	MUTEX_DESTROY(&softc->ipf_timeoutlock);
 	MUTEX_DESTROY(&softc->ipf_rw);
 	RW_DESTROY(&softc->ipf_tokens);
