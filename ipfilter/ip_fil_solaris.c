@@ -203,11 +203,10 @@ ipfattach(softc)
 	}
 #endif
 
-	softc->ipf_slow_ch = timeout(ipf_timer_func, softc,
-				     drv_usectohz(500000));
-
         if (ipf_init_all(softc) < 0)
 		return EIO;
+	softc->ipf_slow_ch = timeout(ipf_timer_func, softc,
+				     drv_usectohz(500000));
 
 #if !defined(FW_HOOKS)
 	ipf_set_pfil_hooks();
