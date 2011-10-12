@@ -1132,6 +1132,7 @@ ipf_pr_pullup(fin, plen)
 				LBUMP(ipf_stats[fin->fin_out].fr_pull[1]);
 				return -1;
 			}
+			LBUMP(ipf_stats[fin->fin_out].fr_pull[0]);
 #else
 			LBUMP(ipf_stats[fin->fin_out].fr_pull[1]);
 			/*
@@ -1144,7 +1145,6 @@ ipf_pr_pullup(fin, plen)
 			return -1;
 #endif
 		}
-		LBUMP(ipf_stats[fin->fin_out].fr_pull[0]);
 	}
 	return 0;
 }
