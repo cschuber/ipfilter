@@ -19,6 +19,8 @@ ipf_main_softc_t	ipfmain;
 static	struct	ifnet **ifneta = NULL;
 static	int	nifs = 0;
 
+struct	rtentry;
+
 static	void	ipf_setifpaddr __P((struct ifnet *, char *));
 void	init_ifp __P((void));
 #if defined(__sgi) && (IRIX < 60500)
