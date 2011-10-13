@@ -1399,7 +1399,6 @@ ipf_nat_ioctl(softc, data, cmd, mode, uid, ctx)
 				ipf_token_deref(softc, token);
 			RWLOCK_EXIT(&softc->ipf_tokens);
 		}
-		RWLOCK_EXIT(&softc->ipf_tokens);
 		SPL_X(s);
 		break;
 	    }
