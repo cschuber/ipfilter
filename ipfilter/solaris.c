@@ -64,7 +64,7 @@ static	int	ipf_identify(dev_info_t *);
 #endif
 static	int	ipf_attach(dev_info_t *, ddi_attach_cmd_t);
 static	int	ipf_detach(dev_info_t *, ddi_detach_cmd_t);
-static	int	ipf_detach_instance __P((ipf_main_softc_t *));
+static	int	ipf_detach_instance(ipf_main_softc_t *);
 static 	int	ipfpoll(dev_t, short, int, short *, struct pollhead **);
 static	char	*ipf_devfiles[] = { IPL_NAME, IPNAT_NAME, IPSTATE_NAME,
 				    IPAUTH_NAME, IPSYNC_NAME, IPSCAN_NAME,
