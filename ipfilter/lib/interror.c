@@ -17,7 +17,7 @@ typedef	struct	{
 
 static ipf_error_entry_t *find_error __P((int));
 
-#define	IPF_NUM_ERRORS	449
+#define	IPF_NUM_ERRORS	450
 
 /*
  * NO REUSE OF NUMBERS!
