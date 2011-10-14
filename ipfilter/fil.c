@@ -5232,7 +5232,6 @@ frrequest(softc, unit, req, data, set, makecopy)
 				ipf_scan_detachfr(f);
 #endif
 
-			need_free = 1;
 			if (unit == IPL_LOGAUTH) {
 				error = ipf_auth_precmd(softc, req, f, ftail);
 				goto done;
@@ -5240,13 +5239,7 @@ frrequest(softc, unit, req, data, set, makecopy)
 
 			ipf_rule_delete(softc, f, unit, set);
 
-			if (makecopy != 0) {
-				if (ptr != NULL) {
-					KFREES(ptr, fp->fr_dsize);
-				}
-				KFREES(fp, fp->fr_size);
-				fp = NULL;
-			}
+			need_free = makecopy;
 		}
 	} else {
 		/*
@@ -7692,6 +7685,21 @@ ipf_token_del(softc, type, uid, ptr)
 
 
 /* ------------------------------------------------------------------------ */
+/* Function:    ipf_token_mark_complete                                     */
+/* Returns:     None.                                                       */
+/* Parameters:  token(I) - pointer to token structure                       */
+/*                                                                          */
+/* Mark a token as being ineligable for being found with ipf_token_find     */
+/* ------------------------------------------------------------------------ */
+void
+ipf_token_mark_complete(token)
+	ipftoken_t *token;
+{
+	token->ipt_complete |= 1;
+}
+
+
+/* ------------------------------------------------------------------------ */
 /* Function:    ipf_token_find                                               */
 /* Returns:     ipftoken_t * - NULL if no memory, else pointer to token     */
 /* Parameters:  type(I) - the token type to match                           */
@@ -7715,6 +7723,8 @@ ipf_token_find(softc, type, uid, ptr)
 
 	WRITE_ENTER(&softc->ipf_tokens);
 	for (it = softc->ipf_token_head; it != NULL; it = it->ipt_next) {
+		if (it->ipt_complete == 1)
+			continue;
 		if (ptr == it->ipt_ctx && type == it->ipt_type &&
 		    uid == it->ipt_uid)
 			break;
@@ -7731,6 +7741,7 @@ ipf_token_find(softc, type, uid, ptr)
 		it->ipt_type = type;
 		it->ipt_next = NULL;
 		it->ipt_ref = 2;
+		it->ipt_complete = 0;
 	} else {
 		if (new != NULL) {
 			KFREE(new);
@@ -7992,10 +8003,8 @@ ipf_getnextrule(softc, t, ptr)
 					dst += next->fr_dsize;
 				}
 			}
-			if (next->fr_next == NULL) {
-				t->ipt_data = NULL;
-				break;
-			}
+			if (next->fr_next == NULL)
+				ipf_token_mark_complete(t);
 		}
 
 		if ((count == 1) || (error != 0))
@@ -8032,13 +8041,13 @@ ipf_frruleiter(softc, data, uid, ctx)
 	token = ipf_token_find(softc, IPFGENITER_IPF, uid, ctx);
 	if (token != NULL) {
 		error = ipf_getnextrule(softc, token, data);
-	} else {
 		WRITE_ENTER(&softc->ipf_tokens);
 		if (token->ipt_data == NULL)
 			ipf_token_free(softc, token);
 		else
 			ipf_token_deref(softc, token);
 		RWLOCK_EXIT(&softc->ipf_tokens);
+	} else {
 		softc->ipf_interror = 91;
 		error = EFAULT;
 	}
@@ -8369,7 +8378,8 @@ ipf_ipf_ioctl(softc, data, cmd, mode, uid, ctx)
 		break;
 
 	case SIOCGFRST :
-		error = ipf_outobj(softc, (void *)data, ipf_frag_stats(softc),
+		error = ipf_outobj(softc, (void *)data,
+				   ipf_frag_stats(softc->ipf_frag_soft),
 				   IPFOBJ_FRAGSTAT);
 		break;
 
