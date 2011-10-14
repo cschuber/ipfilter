@@ -333,7 +333,8 @@ $(DEST)/printfieldhdr.o: $(LIBSRC)/printfieldhdr.c $(TOP)/ip_fil.h
 	$(CC) $(CCARGS) -c $(LIBSRC)/printfieldhdr.c -o $@
 $(DEST)/printfr.o: $(LIBSRC)/printfr.c $(TOP)/ip_fil.h
 	$(CC) $(CCARGS) -c $(LIBSRC)/printfr.c -o $@
-$(DEST)/printfraginfo.o: $(LIBSRC)/printfraginfo.c $(TOP)/ip_fil.h
+$(DEST)/printfraginfo.o: $(LIBSRC)/printfraginfo.c $(TOP)/ip_fil.h \
+    $(TOP)/ip_frag.h
 	$(CC) $(CCARGS) -c $(LIBSRC)/printfraginfo.c -o $@
 $(DEST)/printhash.o: $(LIBSRC)/printhash.c $(TOP)/ip_fil.h $(TOP)/ip_htable.h
 	$(CC) $(CCARGS) -c $(LIBSRC)/printhash.c -o $@
