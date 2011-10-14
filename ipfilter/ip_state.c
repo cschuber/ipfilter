@@ -820,7 +820,6 @@ ipf_state_ioctl(softc, data, cmd, mode, uid, ctx)
 			softc->ipf_interror = 100018;
 			error = ESRCH;
 		}
-		RWLOCK_EXIT(&softc->ipf_tokens);
 		SPL_X(s);
 		break;
 	    }
@@ -4924,6 +4923,7 @@ ipf_state_iter(softc, token, itp, obj)
 		 */
 		RWLOCK_EXIT(&softc->ipf_state);
 
+		obj->ipfo_ptr = dst;
 		/*
 		 * Copy out data and clean up references and tokens.
 		 */
@@ -4934,10 +4934,8 @@ ipf_state_iter(softc, token, itp, obj)
 		if (token->ipt_data != NULL) {
 			if (is != NULL)
 				ipf_state_deref(softc, &is);
-			if (next->is_next == NULL) {
-				token->ipt_data = NULL;
-				break;
-			}
+			if (next->is_next == NULL)
+				ipf_token_mark_complete(token);
 		}
 
 		if ((count == 1) || (error != 0))

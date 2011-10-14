@@ -1506,6 +1506,7 @@ typedef struct ipftoken {
 	int		ipt_uid;
 	int		ipt_subtype;
 	int		ipt_ref;
+	int		ipt_complete;
 } ipftoken_t;
 
 
@@ -1893,6 +1894,7 @@ extern	ipftoken_t	*ipf_token_find __P((ipf_main_softc_t *, int, int,
 extern	void		ipf_token_free __P((ipf_main_softc_t *, ipftoken_t *));
 extern	int		ipf_token_del __P((ipf_main_softc_t *, int, int,
 					  void *));
+extern	void		ipf_token_mark_complete __P((ipftoken_t *));
 extern	int		ipf_genericiter __P((ipf_main_softc_t *, void *,
 					     int, void *));
 #ifdef	IPFILTER_LOOKUP

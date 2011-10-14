@@ -1695,7 +1695,7 @@ static void showfrstates(ifsp, ticks)
 				break;
 			ifr.ipfr_ttl -= ticks;
 			printfraginfo("", &ifr);
-		} while (1);
+		} while (ifr.ipfr_next != NULL);
 	} else {
 		for (i = 0; i < IPFT_SIZE; i++)
 			while (ipfrtab[i] != NULL) {
@@ -1724,7 +1724,7 @@ static void showfrstates(ifsp, ticks)
 				break;
 			ifr.ipfr_ttl -= ticks;
 			printfraginfo("NAT: ", &ifr);
-		} while (1);
+		} while (ifr.ipfr_next != NULL);
 	} else {
 		for (i = 0; i < IPFT_SIZE; i++)
 			while (ipfrtab[i] != NULL) {

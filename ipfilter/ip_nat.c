@@ -6917,7 +6917,7 @@ ipf_nat_getnext(softc, t, itp, objp)
 					RWLOCK_EXIT(&softc->ipf_nat);
 				}
 				if (nexthm->hm_next == NULL) {
-					t->ipt_data = NULL;
+					ipf_token_mark_complete(t);
 					break;
 				}
 				dst += sizeof(*nexthm);
@@ -6938,7 +6938,7 @@ ipf_nat_getnext(softc, t, itp, objp)
 					RWLOCK_EXIT(&softc->ipf_nat);
 				}
 				if (nextipnat->in_next == NULL) {
-					t->ipt_data = NULL;
+					ipf_token_mark_complete(t);
 					break;
 				}
 				dst += nextipnat->in_size;
@@ -6957,7 +6957,7 @@ ipf_nat_getnext(softc, t, itp, objp)
 					ipf_nat_deref(softc, &nat);
 				}
 				if (nextnat->nat_next == NULL) {
-					t->ipt_data = NULL;
+					ipf_token_free(softc, t);
 					break;
 				}
 				dst += sizeof(*nextnat);
