@@ -1897,7 +1897,7 @@ extern	void		ipf_token_expire(ipf_main_softc_t *);
 extern	ipftoken_t	*ipf_token_find(ipf_main_softc_t *, int, int, void *);
 extern	void		ipf_token_free(ipf_main_softc_t *, ipftoken_t *);
 extern	int		ipf_token_del(ipf_main_softc_t *, int, int, void *);
-extern	void		ipf_token_mark_complete __P((ipftoken_t *));
+extern	void		ipf_token_mark_complete(ipftoken_t *);
 extern	int		ipf_genericiter(ipf_main_softc_t *, void *,
 					int, void *);
 #ifdef	IPFILTER_LOOKUP
