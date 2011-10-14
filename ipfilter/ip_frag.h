@@ -18,6 +18,8 @@ typedef	struct	ipfr	{
 	void	*ipfr_data;
 	frentry_t *ipfr_rule;
 	u_long	ipfr_ttl;
+	u_int	ipfr_pkts;
+	u_int	ipfr_bytes;
 	u_int	ipfr_badorder;
 	int	ipfr_ref;
 	u_short	ipfr_off;
@@ -37,6 +39,7 @@ typedef	struct	ipfr	{
 	u_short	ipfr_auth;
 	u_32_t	ipfr_id;
 	u_32_t	ipfr_pass;
+	int	ipfr_v;
 } ipfr_t;
 
 #define	ipfr_src	ipfr_source.in4
