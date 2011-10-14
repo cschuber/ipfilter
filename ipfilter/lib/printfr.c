@@ -22,6 +22,7 @@ printfr(fp, iocfunc)
 	u_32_t type;
 	int pr, af;
 	char *s;
+	int hash;
 
 	pr = -2;
 	type = fp->fr_type & ~FR_T_BUILTIN;
@@ -440,12 +441,20 @@ printfr(fp, iocfunc)
 	if (fp->fr_comment != -1)
 		PRINTF(" comment \"%s\"", fp->fr_names + fp->fr_comment);
 
+	hash = 0;
 	if ((fp->fr_flags & FR_KEEPSTATE) && (opts & OPT_VERBOSE)) {
 		PRINTF(" # count %d", fp->fr_statecnt);
 		if (fp->fr_die != 0)
 			PRINTF(" rule-ttl %u", fp->fr_die);
+		hash = 1;
 	} else if (fp->fr_die != 0) {
 		PRINTF(" # rule-ttl %u", fp->fr_die);
+		hash = 1;
+	}
+	if (opts & OPT_VERBOSE) {
+		if (hash == 0)
+			putchar('#');
+		PRINTF(" ref %d", fp->fr_ref);
 	}
 	(void)putchar('\n');
 }
