@@ -993,7 +993,7 @@ ipf_auth_geniter(softc, token, itp, objp)
 			RWLOCK_EXIT(&softa->ipf_authlk);
 		}
 		if (next->fae_next == NULL)
-			token->ipt_data = NULL;
+			ipf_token_mark_complete(token);
 	}
 	return error;
 }

@@ -818,7 +818,6 @@ ipf_state_ioctl(softc, data, cmd, mode, uid, ctx)
 			softc->ipf_interror = 100018;
 			error = ESRCH;
 		}
-		RWLOCK_EXIT(&softc->ipf_tokens);
 		SPL_X(s);
 		break;
 	    }
@@ -1612,6 +1611,7 @@ ipf_state_add(softc, fin, stsave, flags)
 	 * but we don't (automatically) care about it's fragment status as
 	 * this may change.
 	 */
+	fin->fin_rev = IP6_EQ(&is->is_dst, &fin->fin_daddr);
 	is->is_pass = pass;
 	is->is_v = fin->fin_v;
 	is->is_family = fin->fin_family;
@@ -2007,7 +2007,6 @@ ipf_state_add(softc, fin, stsave, flags)
 	if (stsave != NULL)
 		*stsave = is;
 	is->is_me = stsave;
-	fin->fin_rev = IP6_NEQ(&is->is_dst, &fin->fin_daddr);
 	fin->fin_flx |= FI_STATE;
 	if (fin->fin_flx & FI_FRAG)
 		(void) ipf_frag_new(softc, fin, pass);
@@ -2756,6 +2755,7 @@ ipf_matchsrcdst(fin, is, src, dst, tcp, cmask)
 	    ((fin->fin_optmsk & is->is_optmsk[rev]) != is->is_opt[rev]) ||
 	    ((fin->fin_secmsk & is->is_secmsk) != is->is_sec) ||
 	    ((fin->fin_auth & is->is_authmsk) != is->is_auth)) {
+printf("%d.miss-mask %#x %#x\n", rev, is->is_optmsk[rev], is->is_opt[rev]);
 		SINCL(ipf_state_stats.iss_miss_mask);
 		return NULL;
 	}
@@ -5079,6 +5079,7 @@ ipf_state_iter(softc, token, itp, obj)
 		 */
 		RWLOCK_EXIT(&softc->ipf_state);
 
+		obj->ipfo_ptr = dst;
 		/*
 		 * Copy out data and clean up references and tokens.
 		 */

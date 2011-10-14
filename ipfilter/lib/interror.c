@@ -17,7 +17,7 @@ typedef	struct	{
 
 static ipf_error_entry_t *find_error(int);
 
-#define	IPF_NUM_ERRORS	449
+#define	IPF_NUM_ERRORS	450
 
 /*
  * NO REUSE OF NUMBERS!
@@ -193,6 +193,7 @@ static ipf_error_entry_t ipf_errors[IPF_NUM_ERRORS] = {
 /* -------------------------------------------------------------------------- */
 	{	20001,	"invalid frag token data pointer supplied" },
 	{	20002,	"error copying out frag token data" },
+	{	20003,	"can only copy one fragment state entry at a time" },
 /* -------------------------------------------------------------------------- */
 	{	30001,	"incorrect object size to get hash table stats" },
 	{	30002,	"could not malloc memory for new hash table" },

@@ -1336,7 +1336,7 @@ ipf_htable_iter_next(softc, arg, token, ilp)
 				RWLOCK_EXIT(&softc->ipf_poolrw);
 			}
 			if (nextiph->iph_next == NULL)
-				token->ipt_data = NULL;
+				ipf_token_free(softc, token);
 		}
 		break;
 
@@ -1353,7 +1353,7 @@ ipf_htable_iter_next(softc, arg, token, ilp)
 				RWLOCK_EXIT(&softc->ipf_poolrw);
 			}
 			if (nextnode->ipe_next == NULL)
-				token->ipt_data = NULL;
+				ipf_token_free(softc, token);
 		}
 		break;
 	}

@@ -1688,6 +1688,7 @@ static void showfrstates(ifsp, ticks)
 	 * Print out the contents (if any) of the fragment cache table.
 	 */
 	if (live_kernel == 1) {
+		bzero((char *)&ifr, sizeof(ifr));
 		do {
 			if (fetchfrag(ipf_fd, IPFGENITER_FRAG, &ifr) != 0)
 				break;
@@ -1695,7 +1696,7 @@ static void showfrstates(ifsp, ticks)
 				break;
 			ifr.ipfr_ttl -= ticks;
 			printfraginfo("", &ifr);
-		} while (1);
+		} while (ifr.ipfr_next != NULL);
 	} else {
 		for (i = 0; i < IPFT_SIZE; i++)
 			while (ipfrtab[i] != NULL) {
@@ -1717,6 +1718,7 @@ static void showfrstates(ifsp, ticks)
 	}
 
 	if (live_kernel == 1) {
+		bzero((char *)&ifr, sizeof(ifr));
 		do {
 			if (fetchfrag(nat_fd, IPFGENITER_NATFRAG, &ifr) != 0)
 				break;
@@ -1724,7 +1726,7 @@ static void showfrstates(ifsp, ticks)
 				break;
 			ifr.ipfr_ttl -= ticks;
 			printfraginfo("NAT: ", &ifr);
-		} while (1);
+		} while (ifr.ipfr_next != NULL);
 	} else {
 		for (i = 0; i < IPFT_SIZE; i++)
 			while (ipfrtab[i] != NULL) {
