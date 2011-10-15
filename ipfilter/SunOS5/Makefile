@@ -19,8 +19,10 @@ ROOT=$(CPUDIR)/root
 PKGDIR=$(ROOT)/opt/ipf
 PKGMAN=$(PKGDIR)/man
 PKGBIN=$(PKGDIR)/bin/$(OBJ)
-#CTFCONVERT=ctfconvert -i -L VERSION
+#CTFCONVERT=ctfconvert -i -l IPF
 CTFCONVERT=echo
+#CTFMERGE=ctfmerge -l IPF -o
+CTFMERGE=echo
 #
 DEST=$(OBJ)
 TOOL=$(TOP)/tools
@@ -51,7 +53,7 @@ PROTO64=$(PROTO64_$(ARCH))
 CC=gcc -Wall
 DEBUG=-g
 LIBS=-lsocket -lnsl -lelf -L$(OBJ) -lipf $(LIBBPF)
-DEF=-I$(TOP)/../pfil -D_KERNEL -DSUNDDI $(IPFBPF) $(INSTANCE)
+DEF=-I$(TOP)/../pfil -D_KERNEL -DSUNDDI $(IPFBPF) $(INSTANCE) -gdwarf-2
 OBJ=.
 PKG=ipf
 PROTO=prototype
@@ -163,7 +165,8 @@ $(OBJ)/ipsyncs.o: $(TOOL)/ipsyncs.c $(TOP)/ip_sync.h
 tests:
 	(cd test; make )
 
-$(OBJ)/ipfstat.o: $(TOOL)/ipfstat.c $(TOP)/ip_fil.h $(TOP)/ipf.h
+$(OBJ)/ipfstat.o: $(TOOL)/ipfstat.c $(TOP)/ip_fil.h $(TOP)/ipf.h \
+		$(TOP)/ip_state.h $(TOP)/ip_frag.h
 	$(CC) $(CCARGS) $(STATETOP_CFLAGS) $(STATETOP_INC) \
 		-c $(TOOL)/ipfstat.c -o $@
 
@@ -239,6 +242,7 @@ $(OBJ)/ipf: $(MODOBJS)
 	else \
 		ld -dy -Ndrv/ip -Ndrv/pfil -Nmisc/md5 -r $(MODOBJS) -o $@; \
 	fi
+	$(CTFMERGE) $@ $(MODOBJS)
 
 $(OBJ)/md5.o: $(TOP)/md5.c $(TOP)/md5.h
 	$(CC) -I$(TOP) $(DFLAGS) -c $(TOP)/md5.c -o $@
