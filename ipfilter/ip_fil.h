@@ -943,6 +943,7 @@ typedef	struct	ipf_statistics {
 	u_long	fr_v6_gre_pullup;
 	u_long	fr_v6_icmp6_pullup;
 	u_long	fr_v6_rh_bad;
+	u_long	fr_v6_badttl;	/* TTL in packet doesn't reach minimum */
 	u_long	fr_v4_ah_bad;
 	u_long	fr_v4_ah_pullup;
 	u_long	fr_v4_esp_pullup;
@@ -952,6 +953,8 @@ typedef	struct	ipf_statistics {
 	u_long	fr_v4_gre_pullup;
 	u_long	fr_v4_icmp_frag;
 	u_long	fr_v4_icmp_pullup;
+	u_long	fr_v4_badttl;	/* TTL in packet doesn't reach minimum */
+	u_long	fr_v4_badsrc;	/* source received doesn't match route */
 	u_long	fr_badcoalesces;
 	u_long	fr_pass;	/* packets allowed */
 	u_long	fr_block;	/* packets denied */
@@ -971,15 +974,11 @@ typedef	struct	ipf_statistics {
 	u_long	fr_cmiss;	/* cached miss */
 	u_long	fr_tcpbad;	/* TCP checksum check failures */
 	u_long	fr_pull[2];	/* good and bad pullup attempts */
-	u_long	fr_badsrc;	/* source received doesn't match route */
-	u_long	fr_badttl;	/* TTL in packet doesn't reach minimum */
 	u_long	fr_bad;		/* bad IP packets to the filter */
 	u_long	fr_ipv6;	/* IPv6 packets in/out */
 	u_long	fr_ppshit;	/* dropped because of pps ceiling */
 	u_long	fr_ipud;	/* IP id update failures */
 } ipf_statistics_t;
-
-#define	LBUMP(x)	ATOMIC_INCL(softc->x)
 
 /*
  * Log structure.  Each packet header logged is prepended by one of these.

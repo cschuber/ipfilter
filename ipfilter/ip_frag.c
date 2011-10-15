@@ -147,7 +147,8 @@ ipftuneable_t ipf_tuneables[] = {
 		0,			NULL,	NULL }
 };
 
-#define	FBUMP(x)	ATOMIC_INCL(softf->ipfr_stats.x)
+#define	FBUMP(x)	softf->ipfr_stats.x++
+#define	FBUMPD(x)	do { softf->ipfr_stats.x++; DT(x); } while (0)
 
 
 /* ------------------------------------------------------------------------ */
@@ -400,18 +401,18 @@ ipfr_frag_new(softc, softf, fin, pass, table
 	frentry_t *fr;
 
 	if (softf->ipfr_stats.ifs_inuse >= softf->ipfr_size) {
-		FBUMP(ifs_maximum);
+		FBUMPD(ifs_maximum);
 		return NULL;
 	}
 
 	if ((fin->fin_flx & (FI_FRAG|FI_BAD)) != FI_FRAG) {
-		FBUMP(ifs_newbad);
+		FBUMPD(ifs_newbad);
 		return NULL;
 	}
 
 	if (pass & FR_FRSTRICT) {
 		if (fin->fin_off != 0) {
-			FBUMP(ifs_newrestrictnot0);
+			FBUMPD(ifs_newrestrictnot0);
 			return NULL;
 		}
 	}
@@ -453,7 +454,7 @@ ipfr_frag_new(softc, softf, fin, pass, table
 	 */
 	KMALLOC(fran, ipfr_t *);
 	if (fran == NULL) {
-		FBUMP(ifs_nomem);
+		FBUMPD(ifs_nomem);
 		return NULL;
 	}
 
@@ -466,7 +467,7 @@ ipfr_frag_new(softc, softf, fin, pass, table
 		if (!bcmp((char *)&frag.ipfr_ifp, (char *)&fra->ipfr_ifp,
 			  IPFR_CMPSZ)) {
 			RWLOCK_EXIT(lock);
-			FBUMP(ifs_exists);
+			FBUMPD(ifs_exists);
 			KFREE(fra);
 			return NULL;
 		}
@@ -665,12 +666,12 @@ ipf_frag_lookup(softc, softf, fin, table
 	 * other matching packets had been seen.
 	 */
 	if (fin->fin_flx & FI_SHORT) {
-		FBUMP(ifs_short);
+		FBUMPD(ifs_short);
 		return NULL;
 	}
 
 	if ((fin->fin_flx & FI_BAD) != 0) {
-		FBUMP(ifs_bad);
+		FBUMPD(ifs_bad);
 		return NULL;
 	}
 
@@ -717,7 +718,7 @@ ipf_frag_lookup(softc, softf, fin, table
 			off = fin->fin_off >> 3;
 			if (f->ipfr_seen0) {
 				if (off == 0) {
-					FBUMP(ifs_retrans0);
+					FBUMPD(ifs_retrans0);
 					continue;
 				}
 
@@ -726,7 +727,7 @@ ipf_frag_lookup(softc, softf, fin, table
 				 */
 				if ((f->ipfr_firstend != 0) &&
 				    (off < f->ipfr_firstend)) {
-					FBUMP(ifs_overlap);
+					FBUMPD(ifs_overlap);
 					fin->fin_flx |= FI_BAD;
 					break;
 				}
@@ -779,9 +780,9 @@ ipf_frag_lookup(softc, softf, fin, table
 #endif
 			} else {
 				f->ipfr_badorder++;
-				FBUMP(ifs_unordered);
+				FBUMPD(ifs_unordered);
 				if (f->ipfr_pass & FR_FRSTRICT) {
-					FBUMP(ifs_strict);
+					FBUMPD(ifs_strict);
 					continue;
 				}
 			}

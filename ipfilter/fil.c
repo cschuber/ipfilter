@@ -148,6 +148,9 @@ extern	int	opts;
 extern	int	blockreason;
 #endif /* _KERNEL */
 
+#define	LBUMP(x)	softc->x++
+#define	LBUMPD(x, y)	do { softc->x.y++; DT(y); } while (0)
+
 static	INLINE int	ipf_check_ipf __P((fr_info_t *, frentry_t *, int));
 static	u_32_t		ipf_checkcipso __P((fr_info_t *, u_char *, int));
 static	u_32_t		ipf_checkripso __P((u_char *));
@@ -592,7 +595,7 @@ ipf_pr_ipv6hdr(fin)
 	if (fin->fin_m == NULL) {
 		ipf_main_softc_t *softc = fin->fin_main_soft;
 
-		LBUMP(ipf_stats[fin->fin_out].fr_v6_bad);
+		LBUMPD(ipf_stats[fin->fin_out], fr_v6_bad);
 		return;
 	}
 
@@ -606,7 +609,7 @@ ipf_pr_ipv6hdr(fin)
 		ipf_main_softc_t *softc = fin->fin_main_soft;
 
 		fin->fin_flx |= FI_BAD;
-		LBUMP(ipf_stats[fin->fin_out].fr_v6_badfrag);
+		LBUMPD(ipf_stats[fin->fin_out], fr_v6_badfrag);
 		LBUMP(ipf_stats[fin->fin_out].fr_v6_bad);
 	}
 }
@@ -642,12 +645,12 @@ ipf_pr_ipv6exthdr(fin, multiple, proto)
 				/* 8 is default length of extension hdr */
 	if ((fin->fin_dlen - 8) < 0) {
 		fin->fin_flx |= FI_SHORT;
-		LBUMP(ipf_stats[fin->fin_out].fr_v6_ext_short);
+		LBUMPD(ipf_stats[fin->fin_out], fr_v6_ext_short);
 		return NULL;
 	}
 
 	if (ipf_pr_pullup(fin, 8) == -1) {
-		LBUMP(ipf_stats[fin->fin_out].fr_v6_ext_pullup);
+		LBUMPD(ipf_stats[fin->fin_out], fr_v6_ext_pullup);
 		return NULL;
 	}
 
@@ -663,8 +666,8 @@ ipf_pr_ipv6exthdr(fin, multiple, proto)
 	}
 
 	if (shift > fin->fin_dlen) {	/* Nasty extension header length? */
-		LBUMP(ipf_stats[fin->fin_out].fr_v6_ext_hlen);
 		fin->fin_flx |= FI_BAD;
+		LBUMPD(ipf_stats[fin->fin_out], fr_v6_ext_hlen);
 		return NULL;
 	}
 
@@ -767,7 +770,7 @@ ipf_pr_routing6(fin)
 			ipf_main_softc_t *softc = fin->fin_main_soft;
 
 			fin->fin_flx |= FI_BAD;
-			LBUMP(ipf_stats[fin->fin_out].fr_v6_rh_bad);
+			LBUMPD(ipf_stats[fin->fin_out], fr_v6_rh_bad);
 			return IPPROTO_NONE;
 		}
 		break;
@@ -820,7 +823,7 @@ ipf_pr_fragment6(fin)
 
 	frag = (struct ip6_frag *)ipf_pr_ipv6exthdr(fin, 0, IPPROTO_FRAGMENT);
 	if (frag == NULL) {
-		LBUMP(ipf_stats[fin->fin_out].fr_v6_frag_bad);
+		LBUMPD(ipf_stats[fin->fin_out], fr_v6_frag_bad);
 		return IPPROTO_NONE;
 	}
 
@@ -873,7 +876,7 @@ ipf_pr_dstopts6(fin)
 
 	hdr = ipf_pr_ipv6exthdr(fin, 0, IPPROTO_DSTOPTS);
 	if (hdr == NULL) {
-		LBUMP(ipf_stats[fin->fin_out].fr_v6_dst_bad);
+		LBUMPD(ipf_stats[fin->fin_out], fr_v6_dst_bad);
 		return IPPROTO_NONE;
 	}
 	return hdr->ip6e_nxt;
@@ -899,7 +902,7 @@ ipf_pr_icmp6(fin)
 	if (ipf_pr_pullup(fin, ICMP6ERR_MINPKTLEN - sizeof(ip6_t)) == -1) {
 		ipf_main_softc_t *softc = fin->fin_main_soft;
 
-		LBUMP(ipf_stats[fin->fin_out].fr_v6_icmp6_pullup);
+		LBUMPD(ipf_stats[fin->fin_out], fr_v6_icmp6_pullup);
 		return;
 	}
 
@@ -1027,7 +1030,7 @@ ipf_pr_esp6(fin)
 	if ((fin->fin_off == 0) && (ipf_pr_pullup(fin, 8) == -1)) {
 		ipf_main_softc_t *softc = fin->fin_main_soft;
 
-		LBUMP(ipf_stats[fin->fin_out].fr_v6_esp_pullup);
+		LBUMPD(ipf_stats[fin->fin_out], fr_v6_esp_pullup);
 		return;
 	}
 }
@@ -1055,7 +1058,7 @@ ipf_pr_ah6(fin)
 	if (ah == NULL) {
 		ipf_main_softc_t *softc = fin->fin_main_soft;
 
-		LBUMP(ipf_stats[fin->fin_out].fr_v6_ah_bad);
+		LBUMPD(ipf_stats[fin->fin_out], fr_v6_ah_bad);
 		return IPPROTO_NONE;
 	}
 
@@ -1085,7 +1088,7 @@ ipf_pr_gre6(fin)
 	if (ipf_pr_pullup(fin, sizeof(grehdr_t)) == -1) {
 		ipf_main_softc_t *softc = fin->fin_main_soft;
 
-		LBUMP(ipf_stats[fin->fin_out].fr_v6_gre_pullup);
+		LBUMPD(ipf_stats[fin->fin_out], fr_v6_gre_pullup);
 		return;
 	}
 
@@ -1129,6 +1132,7 @@ ipf_pr_pullup(fin, plen)
 		if (M_LEN(fin->fin_m) < plen) {
 #if defined(_KERNEL)
 			if (ipf_pullup(fin->fin_m, fin, plen) == NULL) {
+				DT(ipf_pullup_fail);
 				LBUMP(ipf_stats[fin->fin_out].fr_pull[1]);
 				return -1;
 			}
@@ -1202,12 +1206,12 @@ ipf_pr_icmp(fin)
 	ipf_pr_short(fin, ICMPERR_ICMPHLEN);
 
 	if (fin->fin_off != 0) {
-		LBUMP(ipf_stats[fin->fin_out].fr_v4_icmp_frag);
+		LBUMPD(ipf_stats[fin->fin_out], fr_v4_icmp_frag);
 		return;
 	}
 
 	if (ipf_pr_pullup(fin, ICMPERR_ICMPHLEN) == -1) {
-		LBUMP(ipf_stats[fin->fin_out].fr_v4_icmp_pullup);
+		LBUMPD(ipf_stats[fin->fin_out], fr_v4_icmp_pullup);
 		return;
 	}
 
@@ -1260,7 +1264,7 @@ ipf_pr_icmp(fin)
 	case ICMP_PARAMPROB :
 		fin->fin_flx |= FI_ICMPERR;
 		if (ipf_coalesce(fin) != 1) {
-			LBUMP(ipf_stats[fin->fin_out].fr_icmp_coalesce);
+			LBUMPD(ipf_stats[fin->fin_out], fr_icmp_coalesce);
 			return;
 		}
 
@@ -1311,12 +1315,12 @@ ipf_pr_tcpcommon(fin)
 
 	fin->fin_flx |= FI_TCPUDP;
 	if (fin->fin_off != 0) {
-		LBUMP(ipf_stats[fin->fin_out].fr_tcp_frag);
+		LBUMPD(ipf_stats[fin->fin_out], fr_tcp_frag);
 		return 0;
 	}
 
 	if (ipf_pr_pullup(fin, sizeof(*tcp)) == -1) {
-		LBUMP(ipf_stats[fin->fin_out].fr_tcp_pullup);
+		LBUMPD(ipf_stats[fin->fin_out], fr_tcp_pullup);
 		return -1;
 	}
 
@@ -1327,7 +1331,7 @@ ipf_pr_tcpcommon(fin)
 	}
 
 	if ((fin->fin_flx & FI_SHORT) != 0) {
-		LBUMP(ipf_stats[fin->fin_out].fr_tcp_short);
+		LBUMPD(ipf_stats[fin->fin_out], fr_tcp_short);
 		return 1;
 	}
 
@@ -1337,7 +1341,7 @@ ipf_pr_tcpcommon(fin)
 	 */
 	tlen = TCP_OFF(tcp) << 2;
 	if (tlen < sizeof(tcphdr_t)) {
-		LBUMP(ipf_stats[fin->fin_out].fr_tcp_small);
+		LBUMPD(ipf_stats[fin->fin_out], fr_tcp_small);
 		fin->fin_flx |= FI_BAD;
 		return 1;
 	}
@@ -1397,7 +1401,7 @@ ipf_pr_tcpcommon(fin)
 		}
 	}
 	if (fin->fin_flx & FI_BAD) {
-		LBUMP(ipf_stats[fin->fin_out].fr_tcp_bad_flags);
+		LBUMPD(ipf_stats[fin->fin_out], fr_tcp_bad_flags);
 		return 1;
 	}
 
@@ -1414,7 +1418,7 @@ ipf_pr_tcpcommon(fin)
 	}
 
 	if (ipf_pr_pullup(fin, tlen) == -1) {
-		LBUMP(ipf_stats[fin->fin_out].fr_tcp_pullup);
+		LBUMPD(ipf_stats[fin->fin_out], fr_tcp_pullup);
 		return -1;
 	}
 
@@ -1483,7 +1487,7 @@ ipf_pr_udpcommon(fin)
 			ipf_main_softc_t *softc = fin->fin_main_soft;
 
 			fin->fin_flx |= FI_SHORT;
-			LBUMP(ipf_stats[fin->fin_out].fr_udp_pullup);
+			LBUMPD(ipf_stats[fin->fin_out], fr_udp_pullup);
 			return 1;
 		}
 
@@ -1558,7 +1562,7 @@ ipf_pr_esp(fin)
 		if (ipf_pr_pullup(fin, 8) == -1) {
 			ipf_main_softc_t *softc = fin->fin_main_soft;
 
-			LBUMP(ipf_stats[fin->fin_out].fr_v4_esp_pullup);
+			LBUMPD(ipf_stats[fin->fin_out], fr_v4_esp_pullup);
 		}
 	}
 }
@@ -1585,11 +1589,12 @@ ipf_pr_ah(fin)
 	ipf_pr_short(fin, sizeof(*ah));
 
 	if (((fin->fin_flx & FI_SHORT) != 0) || (fin->fin_off != 0)) {
-		LBUMP(ipf_stats[fin->fin_out].fr_v4_ah_bad);
+		LBUMPD(ipf_stats[fin->fin_out], fr_v4_ah_bad);
 		return IPPROTO_NONE;
 	}
 
 	if (ipf_pr_pullup(fin, sizeof(*ah)) == -1) {
+		DT(fr_v4_ah_pullup_1);
 		LBUMP(ipf_stats[fin->fin_out].fr_v4_ah_pullup);
 		return IPPROTO_NONE;
 	}
@@ -1599,6 +1604,7 @@ ipf_pr_ah(fin)
 	len = (ah->ah_plen + 2) << 2;
 	ipf_pr_short(fin, len);
 	if (ipf_pr_pullup(fin, len) == -1) {
+		DT(fr_v4_ah_pullup_2);
 		LBUMP(ipf_stats[fin->fin_out].fr_v4_ah_pullup);
 		return IPPROTO_NONE;
 	}
@@ -1630,12 +1636,12 @@ ipf_pr_gre(fin)
 	ipf_pr_short(fin, sizeof(grehdr_t));
 
 	if (fin->fin_off != 0) {
-		LBUMP(ipf_stats[fin->fin_out].fr_v4_gre_frag);
+		LBUMPD(ipf_stats[fin->fin_out], fr_v4_gre_frag);
 		return;
 	}
 
 	if (ipf_pr_pullup(fin, sizeof(grehdr_t)) == -1) {
-		LBUMP(ipf_stats[fin->fin_out].fr_v4_gre_pullup);
+		LBUMPD(ipf_stats[fin->fin_out], fr_v4_gre_pullup);
 		return;
 	}
 
@@ -1910,7 +1916,7 @@ ipf_checkcipso(fin, s, ol)
 	int len;
 
 	if (ol < 6 || ol > 40) {
-		LBUMP(ipf_stats[fin->fin_out].fr_v4_cipso_bad);
+		LBUMPD(ipf_stats[fin->fin_out], fr_v4_cipso_bad);
 		fin->fin_flx |= FI_BAD;
 		return 0;
 	}
@@ -1927,7 +1933,7 @@ ipf_checkcipso(fin, s, ol)
 		tag = *t;
 		tlen = *(t + 1);
 		if (tlen > len || tlen < 4 || tlen > 34) {
-			LBUMP(ipf_stats[fin->fin_out].fr_v4_cipso_tlen);
+			LBUMPD(ipf_stats[fin->fin_out], fr_v4_cipso_tlen);
 			fin->fin_flx |= FI_BAD;
 			return 0;
 		}
@@ -2571,9 +2577,9 @@ ipf_scanlist(fin, pass)
 
 				fin->fin_fr = fr;
 				if (ipf_state_add(softc, fin, NULL, 0) == 0) {
-					LBUMP(ipf_stats[out].fr_ads);
+					LBUMPD(ipf_stats[out], fr_ads);
 				} else {
-					LBUMP(ipf_stats[out].fr_bads);
+					LBUMPD(ipf_stats[out], fr_bads);
 					pass = passo;
 					continue;
 				}
@@ -2618,7 +2624,7 @@ ipf_acctpkt(fin, passp)
 		fin->fin_fr = fr;
 		pass = ipf_scanlist(fin, FR_NOMATCH);
 		if (FR_ISACCOUNT(pass)) {
-			LBUMP(ipf_stats[0].fr_acct);
+			LBUMPD(ipf_stats[0], fr_acct);
 		}
 		fin->fin_fr = frsave;
 		bcopy(group, fin->fin_group, FR_GROUPLEN);
@@ -2663,7 +2669,7 @@ ipf_firewall(fin, passp)
 		pass = ipf_scanlist(fin, softc->ipf_pass);
 
 	if ((pass & FR_NOMATCH)) {
-		LBUMP(ipf_stats[out].fr_nom);
+		LBUMPD(ipf_stats[out], fr_nom);
 	}
 	fr = fin->fin_fr;
 
@@ -2674,7 +2680,7 @@ ipf_firewall(fin, passp)
 	    !ppsratecheck(&fr->fr_lastpkt, &fr->fr_curpps, fr->fr_pps)) {
 		pass &= ~(FR_CMDMASK|FR_RETICMP|FR_RETRST);
 		pass |= FR_BLOCK;
-		LBUMP(ipf_stats[out].fr_ppshit);
+		LBUMPD(ipf_stats[out], fr_ppshit);
 		fin->fin_reason = FRB_PPSRATE;
 	}
 
@@ -2921,18 +2927,18 @@ ipf_check(ctx, ip, hlen, ifp, out
 	if (!out) {
 		if (v == 4) {
 			if (softc->ipf_chksrc && !ipf_verifysrc(fin)) {
-				LBUMP(ipf_stats[0].fr_badsrc);
+				LBUMPD(ipf_stats[0].fr_v4_badsrc);
 				fin->fin_flx |= FI_BADSRC;
 			}
 			if (fin->fin_ip->ip_ttl < softc->ipf_minttl) {
-				LBUMP(ipf_stats[0].fr_badttl);
+				LBUMPD(ipf_stats[0], fr_v4_badttl);
 				fin->fin_flx |= FI_LOWTTL;
 			}
 		}
 #ifdef USE_INET6
 		else  if (v == 6) {
 			if (((ip6_t *)ip)->ip6_hlim < softc->ipf_minttl) {
-				LBUMP(ipf_stats[0].fr_badttl);
+				LBUMPD(ipf_stats[0], fr_v6_badttl);
 				fin->fin_flx |= FI_LOWTTL;
 			}
 		}
@@ -2940,7 +2946,7 @@ ipf_check(ctx, ip, hlen, ifp, out
 	}
 
 	if (fin->fin_flx & FI_SHORT) {
-		LBUMP(ipf_stats[out].fr_short);
+		LBUMPD(ipf_stats[out], fr_short);
 	}
 
 	READ_ENTER(&softc->ipf_mutex);
@@ -3263,21 +3269,21 @@ ipf_dolog(fin, passp)
 
 	if ((softc->ipf_flags & FF_LOGNOMATCH) && (pass & FR_NOMATCH)) {
 		pass |= FF_LOGNOMATCH;
-		LBUMP(ipf_stats[out].fr_npkl);
+		LBUMPD(ipf_stats[out], fr_npkl);
 		goto logit;
 
 	} else if (((pass & FR_LOGMASK) == FR_LOGP) ||
 	    (FR_ISPASS(pass) && (softc->ipf_flags & FF_LOGPASS))) {
 		if ((pass & FR_LOGMASK) != FR_LOGP)
 			pass |= FF_LOGPASS;
-		LBUMP(ipf_stats[out].fr_ppkl);
+		LBUMPD(ipf_stats[out], fr_ppkl);
 		goto logit;
 
 	} else if (((pass & FR_LOGMASK) == FR_LOGB) ||
 		   (FR_ISBLOCK(pass) && (softc->ipf_flags & FF_LOGBLOCK))) {
 		if ((pass & FR_LOGMASK) != FR_LOGB)
 			pass |= FF_LOGBLOCK;
-		LBUMP(ipf_stats[out].fr_bpkl);
+		LBUMPD(ipf_stats[out], fr_bpkl);
 
 logit:
 		if (ipf_log_pkt(fin, pass) == -1) {
@@ -6967,7 +6973,7 @@ ipf_coalesce(fin)
 	if (ipf_pullup(fin->fin_m, fin, fin->fin_plen) == NULL) {
 		ipf_main_softc_t *softc = fin->fin_main_soft;
 
-		LBUMP(ipf_stats[fin->fin_out].fr_badcoalesces);
+		LBUMPD(ipf_stats[fin->fin_out], fr_badcoalesces);
 # ifdef MENTAT
 		FREE_MB_T(*fin->fin_mp);
 # endif
@@ -9902,6 +9908,7 @@ ipf_ht_node_add(softc, htp, family, addr)
 			return -1;
 		KMALLOC(h, host_node_t *);
 		if (h == NULL) {
+			DT(ipf_rb_no_mem);
 			LBUMP(ipf_rb_no_mem);
 			return -1;
 		}
@@ -9918,6 +9925,7 @@ ipf_ht_node_add(softc, htp, family, addr)
 	} else {
 		if ((htp->ht_max_per_node != 0) &&
 		    (h->hn_active >= htp->ht_max_per_node)) {
+			DT(ipf_rb_node_max);
 			LBUMP(ipf_rb_node_max);
 			return -1;
 		}

@@ -172,6 +172,7 @@ static ipftuneable_t ipf_state_tuneables[] = {
 
 #define	SINCL(x)	ATOMIC_INCL(softs->x)
 #define	SBUMP(x)	(softs->x)++
+#define	SBUMPD(x, y)	do { (softs->x.y)++; DT(y); } while (0)
 
 #ifdef	USE_INET6
 static ipstate_t *ipf_checkicmp6matchingstate __P((fr_info_t *));
@@ -1546,7 +1547,7 @@ ipf_state_add(softc, fin, stsave, flags)
 			is->is_icmp.ici_type = ic->icmp_type;
 			break;
 		default :
-			SBUMP(ipf_state_stats.iss_icmp6_notquery);
+			SBUMPD(ipf_state_stats, iss_icmp6_notquery);
 			return -2;
 		}
 		break;
@@ -1564,7 +1565,7 @@ ipf_state_add(softc, fin, stsave, flags)
 			hv += (is->is_icmp.ici_id = ic->icmp_id);
 			break;
 		default :
-			SBUMP(ipf_state_stats.iss_icmp_notquery);
+			SBUMPD(ipf_state_stats, iss_icmp_notquery);
 			return -3;
 		}
 		break;
@@ -1596,7 +1597,7 @@ ipf_state_add(softc, fin, stsave, flags)
 		tcp = fin->fin_dp;
 
 		if (tcp->th_flags & TH_RST) {
-			SBUMP(ipf_state_stats.iss_tcp_rstadd);
+			SBUMPD(ipf_state_stats, iss_tcp_rstadd);
 			return -4;
 		}
 
@@ -1917,7 +1918,7 @@ ipf_tcpoptions(softs, fin, tcp, td)
 
 	len = (TCP_OFF(tcp) << 2);
 	if (fin->fin_dlen < len) {
-		SBUMP(ipf_state_stats.iss_tcp_toosmall);
+		SBUMPD(ipf_state_stats, iss_tcp_toosmall);
 		return 0;
 	}
 	len -= sizeof(*tcp);
@@ -1992,7 +1993,7 @@ ipf_tcpoptions(softs, fin, tcp, td)
 		s += ol;
 	}
 	if (retval == -1) {
-		SBUMP(ipf_state_stats.iss_tcp_badopt);
+		SBUMPD(ipf_state_stats, iss_tcp_badopt);
 	}
 	return retval;
 }
@@ -2041,6 +2042,7 @@ ipf_state_tcp(softc, softs, fin, tcp, is)
 				      is->is_sti.tqe_ifq,
 				      &softs->ipf_state_deletetq);
 			MUTEX_EXIT(&is->is_lock);
+			DT1(iss_tcp_closing, ipstate_t *, is);
 			SBUMP(ipf_state_stats.iss_tcp_closing);
 			return 0;
 		}
@@ -2059,6 +2061,7 @@ ipf_state_tcp(softc, softs, fin, tcp, is)
 				  is->is_flags, ret);
 		if (ret == 0) {
 			MUTEX_EXIT(&is->is_lock);
+			DT2(iss_tcp_fsm, fr_info_t *, fin, ipstate_t *, is);
 			SBUMP(ipf_state_stats.iss_tcp_fsm);
 			return 0;
 		}
@@ -2099,6 +2102,7 @@ ipf_state_tcp(softc, softs, fin, tcp, is)
 		}
 		ret = 1;
 	} else {
+		DT2(iss_tcp_oow, fr_info_t *, fin, ipstate_t *, is);
 		SBUMP(ipf_state_stats.iss_tcp_oow);
 		fin->fin_flx |= FI_OOW;
 		ret = 0;
@@ -2236,6 +2240,7 @@ ipf_state_tcpinwindow(fin, fdata, tdata, tcp, flags)
 	 */
 	if ((flags & IS_STRICT) != 0) {
 		if (seq != fdata->td_end) {
+			DT2(iss_tcp_struct, tcpdata_t *, fdata, int, seq);
 			SBUMP(ipf_state_stats.iss_tcp_strict);
 			return 0;
 		}
@@ -2258,6 +2263,7 @@ ipf_state_tcpinwindow(fin, fdata, tdata, tcp, flags)
 	} else if ((seq == fdata->td_maxend) && (ackskew == 0) &&
 	    (fdata->td_winflags & TCP_SACK_PERMIT) &&
 	    (tdata->td_winflags & TCP_SACK_PERMIT)) {
+		DT2(iss_sinsack, tcpdata_t *, fdata, int, seq);
 		SBUMP(ipf_state_stats.iss_winsack);
 		inseq = 1;
 	/*
@@ -2413,6 +2419,7 @@ ipf_state_clone(fin, tcp, is)
 	MUTEX_EXIT(&clone->is_lock);
 	if (is->is_flags & IS_STATESYNC)
 		clone->is_sync = ipf_sync_new(softc, SMC_STATE, fin, clone);
+	DT2(iss_clone, ipstate_t *, is, ipstate_t *, clone);
 	SBUMP(ipf_state_stats.iss_cloned);
 	return clone;
 }
@@ -2485,6 +2492,7 @@ ipf_matchsrcdst(fin, is, src, dst, tcp, cmask)
 		ret = 1;
 
 	if (ret == 0) {
+		DT2(iss_lookup_badifp, fr_info_t *, fin, ipstate_t *, is);
 		SBUMP(ipf_state_stats.iss_lookup_badifp);
 		/* TRACE is, out, rev, idx */
 		return NULL;
@@ -2522,6 +2530,7 @@ ipf_matchsrcdst(fin, is, src, dst, tcp, cmask)
 
 	if (ret == 0) {
 		SBUMP(ipf_state_stats.iss_lookup_badport);
+		DT2(iss_lookup_badport, fr_info_t *, fin, ipstate_t *, is);
 		/* TRACE rev, is, sp, dp, src, dst */
 		return NULL;
 	}
@@ -2722,7 +2731,7 @@ ipf_checkicmpmatchingstate(fin)
 	if ((fin->fin_v != 4) || (fin->fin_hlen != sizeof(ip_t)) ||
 	    (fin->fin_plen < ICMPERR_MINPKTLEN) ||
 	    !(fin->fin_flx & FI_ICMPERR)) {
-		SBUMP(ipf_state_stats.iss_icmp_bad);
+		SBUMPD(ipf_state_stats, iss_icmp_bad);
 		return NULL;
 	}
 	ic = fin->fin_dp;
@@ -2743,6 +2752,7 @@ ipf_checkicmpmatchingstate(fin)
 	 */
 	len = fin->fin_dlen - ICMPERR_ICMPHLEN;
 	if ((len <= 0) || ((IP_HL(oip) << 2) > len)) {
+		DT2(iss_icmp_short, fr_info_t *, fin, struct ip*, oip);
 		SBUMP(ipf_state_stats.iss_icmp_short);
 		return NULL;
 	}
@@ -2838,6 +2848,7 @@ ipf_checkicmpmatchingstate(fin)
 		 * ICMP query's as well, but adding them here seems strange XXX
 		 */
 		if ((ofin.fin_flx & FI_ICMPERR) != 0) {
+			DT1(iss_icmp_icmperr, fr_info_t *, &ofin);
 			SBUMP(ipf_state_stats.iss_icmp_icmperr);
 		    	return NULL;
 		}
@@ -2864,7 +2875,7 @@ ipf_checkicmpmatchingstate(fin)
 				return is;
 		}
 		RWLOCK_EXIT(&softc->ipf_state);
-		SBUMP(ipf_state_stats.iss_icmp_miss);
+		SBUMPD(ipf_state_stats, iss_icmp_miss);
 		return NULL;
 	case IPPROTO_TCP :
 	case IPPROTO_UDP :
@@ -2966,6 +2977,7 @@ ipf_allowstateicmp(fin, is, src)
 		return 1;
 	}
 
+	DT2(iss_icmp_hits, fr_info_t *, fin, ipstate_t *, is);
 	SBUMP(ipf_state_stats.iss_icmp_hits);
 	is->is_icmppkts[i]++;
 
@@ -3414,12 +3426,12 @@ ipf_state_check(fin, passp)
 		if ((fin->fin_out == 0) && (fr->fr_nattag.ipt_num[0] != 0)) {
 			if (fin->fin_nattag == NULL) {
 				RWLOCK_EXIT(&softc->ipf_state);
-				SBUMP(ipf_state_stats.iss_check_notag);
+				SBUMPD(ipf_state_stats, iss_check_notag);
 				return NULL;
 			}
 			if (ipf_matchtag(&fr->fr_nattag, fin->fin_nattag)!=0) {
 				RWLOCK_EXIT(&softc->ipf_state);
-				SBUMP(ipf_state_stats.iss_check_nattag);
+				SBUMPD(ipf_state_stats, iss_check_nattag);
 				return NULL;
 			}
 		}
@@ -4537,6 +4549,7 @@ ipf_checkicmp6matchingstate(fin)
 	 * an ICMP error can never generate an ICMP error in response.
 	 */
 	if (ofin.fin_flx & FI_ICMPERR) {
+		DT1(iss_icmp6_icmperr, fr_info_t *, &ofin);
 		SBUMP(ipf_state_stats.iss_icmp6_icmperr);
 		return NULL;
 	}
@@ -4551,6 +4564,7 @@ ipf_checkicmp6matchingstate(fin)
 		 * ICMP query's as well, but adding them here seems strange XXX
 		 */
 		 if (!(oic->icmp6_type & ICMP6_INFOMSG_MASK)) {
+			DT1(iss_icmp6_notinfo, fr_info_t *, &ofin);
 			SBUMP(ipf_state_stats.iss_icmp6_notinfo);
 			return NULL;
 		}
@@ -4592,7 +4606,7 @@ ipf_checkicmp6matchingstate(fin)
 			}
 		}
 		RWLOCK_EXIT(&softc->ipf_state);
-		SBUMP(ipf_state_stats.iss_icmp6_miss);
+		SBUMPD(ipf_state_stats, iss_icmp6_miss);
 		return NULL;
 	}
 
@@ -4651,7 +4665,7 @@ ipf_checkicmp6matchingstate(fin)
 			return is;
 	}
 	RWLOCK_EXIT(&softc->ipf_state);
-	SBUMP(ipf_state_stats.iss_icmp_miss);
+	SBUMPD(ipf_state_stats, iss_icmp_miss);
 	return NULL;
 }
 #endif
