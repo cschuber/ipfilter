@@ -717,7 +717,7 @@ static void printside(side, frs)
 	PRINTF("%lu\t%s fragment state lost\n", frs->fr_bnfr, side);
 	PRINTF("%lu\t%s packet state kept\n", frs->fr_ads, side);
 	PRINTF("%lu\t%s packet state lost\n", frs->fr_bads, side);
-	PRINTF("%lu\t%s invalid source\n", frs->fr_badsrc, side);
+	PRINTF("%lu\t%s invalid source\n", frs->fr_v4_badsrc, side);
 	PRINTF("%lu\t%s cache hits\n", frs->fr_chit, side);
 	PRINTF("%lu\t%s cache misses\n", frs->fr_cmiss, side);
 	PRINTF("%lu\t%s bad coalesces\n", frs->fr_badcoalesces, side);
