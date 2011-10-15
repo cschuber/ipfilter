@@ -122,6 +122,8 @@ static const char rcsid[] = "@(#)$Id$";
 #define	NBUMP(x)	softn->(x)++
 #define	NINCLSIDE(y,x)	ATOMIC_INCL(softn->ipf_nat_stats.ns_side[y].x)
 #define	NBUMPSIDE(y,x)	softn->ipf_nat_stats.ns_side[y].x++
+#define	NBUMPSIDED(y,x)	do { softn->ipf_nat_stats.ns_side[y].x++; \
+			     DT(x); } while (0)
 
 frentry_t	ipfnatblock;
 
@@ -2738,6 +2740,7 @@ ipf_nat_newmap(fin, nat, ni)
 
 		if ((np->in_nsrcmsk == 0xffffffff) && (np->in_spnext == 0)) {
 			if (l > 0) {
+				DT(ns_exhausted_1);
 				NBUMPSIDE(1, ns_exhausted);
 				return -1;
 			}
@@ -2755,6 +2758,7 @@ ipf_nat_newmap(fin, nat, ni)
 		} else if (np->in_redir & NAT_MAPBLK) {
 			if ((l >= np->in_ppip) || ((l > 0) &&
 			     !(flags & IPN_TCPUDP))) {
+				DT(ns_exhausted_2);
 				NBUMPSIDE(1, ns_exhausted);
 				return -1;
 			}
@@ -2790,6 +2794,7 @@ ipf_nat_newmap(fin, nat, ni)
 			if ((l > 0) ||
 			    ipf_ifpaddr(softc, 4, FRI_NORMAL, fin->fin_ifp,
 				       &in6, NULL) == -1) {
+				DT(ns_new_ifpaddr_1);
 				NBUMPSIDE(1, ns_new_ifpaddr);
 				return -1;
 			}
@@ -2800,6 +2805,7 @@ ipf_nat_newmap(fin, nat, ni)
 			 * 0/0 - use the original source address/port.
 			 */
 			if (l > 0) {
+				DT(ns_exhausted_3);
 				NBUMPSIDE(1, ns_exhausted);
 				return -1;
 			}
@@ -2895,7 +2901,7 @@ ipf_nat_newmap(fin, nat, ni)
 		if ((natl != NULL) &&
 		    (np->in_spnext != 0) && (st_port == np->in_spnext) &&
 		    (np->in_snip != 0) && (st_ip == np->in_snip)) {
-			NBUMPSIDE(1, ns_wrap);
+			NBUMPSIDED(1, ns_wrap);
 			return -1;
 		}
 		l++;
@@ -3026,6 +3032,7 @@ ipf_nat_newrdr(fin, nat, ni)
 		 */
 		if (ipf_ifpaddr(softc, 4, FRI_NORMAL, fin->fin_ifp,
 			       &in6, NULL) == -1) {
+			DT(ns_new_ifpaddr_2);
 			NBUMPSIDE(0, ns_new_ifpaddr);
 			return -1;
 		}
@@ -3075,7 +3082,7 @@ ipf_nat_newrdr(fin, nat, ni)
 	 */
 	if (in.s_addr == 0) {
 		if (nport == dport) {
-			NBUMPSIDE(0, ns_xlate_null);
+			NBUMPSIDED(0, ns_xlate_null);
 			return -1;
 		}
 		in.s_addr = ntohl(fin->fin_daddr);
@@ -3096,6 +3103,7 @@ ipf_nat_newrdr(fin, nat, ni)
 	fin->fin_data[0] = sp;
 	fin->fin_data[1] = dp;
 	if (natl != NULL) {
+		DT2(ns_new_xlate_exists, fr_info_t *, fin, nat_t *, natl);
 		NBUMPSIDE(0, ns_xlate_exists);
 		return -1;
 	}
@@ -3315,6 +3323,7 @@ ipf_nat_add(fin, np, natsave, flags, direction)
 
 	goto done;
 badnat:
+	DT2(ns_badnatnew, fr_info_t *, fin, nat_t *, nat);
 	NBUMPSIDE(fin->fin_out, ns_badnatnew);
 	if ((hm = nat->nat_hm) != NULL)
 		ipf_nat_hostmapdel(&hm);
@@ -3429,7 +3438,7 @@ ipf_nat_finalise(fin, nat)
 		return 0;
 	}
 
-	NBUMPSIDE(fin->fin_out, ns_unfinalised);
+	NBUMPSIDED(fin->fin_out, ns_unfinalised);
 	/*
 	 * nat_insert failed, so cleanup time...
 	 */
@@ -3494,12 +3503,16 @@ ipf_nat_insert(softc, softn, nat)
 
 	if (softn->ipf_nat_stats.ns_side[0].ns_bucketlen[hv0] >=
 	    softn->ipf_nat_maxbucket) {
+		DT1(ns_bucket_max_0, int,
+		    softn->ipf_nat_stats.ns_side[0].ns_bucketlen[hv0]);
 		NBUMPSIDE(0, ns_bucket_max);
 		return -1;
 	}
 
 	if (softn->ipf_nat_stats.ns_side[1].ns_bucketlen[hv1] >=
 	    softn->ipf_nat_maxbucket) {
+		DT1(ns_bucket_max_1, int,
+		    softn->ipf_nat_stats.ns_side[1].ns_bucketlen[hv1]);
 		NBUMPSIDE(1, ns_bucket_max);
 		return -1;
 	}
@@ -4234,10 +4247,12 @@ ipf_nat_inlookup(fin, flags, p, src, mapdst)
 	 */
 find_in_wild_ports:
 	if (!(flags & NAT_TCPUDP) || !(flags & NAT_SEARCH)) {
+		DT(ns_lookup_miss_0);
 		NBUMPSIDE(0, ns_lookup_miss);
 		return NULL;
 	}
 	if (softn->ipf_nat_stats.ns_wilds == 0) {
+		DT(ns_lookup_nowild_0);
 		NBUMPSIDE(0, ns_lookup_nowild);
 		return NULL;
 	}
@@ -4561,10 +4576,12 @@ ipf_nat_outlookup(fin, flags, p, src, dst)
 	 */
 find_out_wild_ports:
 	if (!(flags & NAT_TCPUDP) || !(flags & NAT_SEARCH)) {
+		DT(ns_lookup_miss_1);
 		NBUMPSIDE(1, ns_lookup_miss);
 		return NULL;
 	}
 	if (softn->ipf_nat_stats.ns_wilds == 0) {
+		DT(ns_lookup_nowild_1);
 		NBUMPSIDE(1, ns_lookup_nowild);
 		return NULL;
 	}
