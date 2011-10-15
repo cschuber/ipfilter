@@ -4258,9 +4258,14 @@ caddr_t data;
 	 */
 	ftail = NULL;
 	fprev = NULL;
-	if (unit == IPL_LOGAUTH)
+	if (unit == IPL_LOGAUTH) {
+		if ((fp->fr_tifs[0].fd_ifp != NULL) ||
+		    (fp->fr_tifs[1].fd_ifp != NULL) ||
+		    (fp->fr_dif.fd_ifp != NULL) ||
+		    (fp->fr_flags & (FR_DUP|FR_FASTROUTE)))
+			return EINVAL;
 		fprev = &ipauth;
-	else if (v == 4) {
+	} else if (v == 4) {
 		if (FR_ISACCOUNT(fp->fr_flags))
 			fprev = &ipacct[in][set];
 		else if ((fp->fr_flags & (FR_OUTQUE|FR_INQUE)) != 0)
