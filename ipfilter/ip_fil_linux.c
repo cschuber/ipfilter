@@ -1144,3 +1144,16 @@ ipf_timer_func(unsigned long value)
 
 	RWLOCK_EXIT(&softc->ipf_global);
 }
+
+
+#ifdef USE_INET6
+INLINE void
+ipf_checkv6sum(fin)
+	fr_info_t *fin;
+{
+# ifdef IPFILTER_CKSUM
+	if (fr_checkl4sum(fin) == -1)
+		fin->fin_flx |= FI_BAD;
+# endif
+}
+#endif
