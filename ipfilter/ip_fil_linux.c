@@ -387,7 +387,7 @@ struct sk_buff *sk, **skp;
 
 		if ((fdp->fd_ifp != NULL) &&
 		    (fdp->fd_ifp != (struct ifnet *)-1))
-			return fr_fastroute(m, mpp, &fnew, fdp);
+			return fr_fastroute(sk, skp, &fnew, fdp);
 	}
 
 	return fr_fastroute(sk, skp, &fnew, NULL);
@@ -500,7 +500,7 @@ int isdst;
 		int csz;
 
 		if (isdst == 0) {
-			if (fr_ifpaddr(6, FRI_NORMAL, qif->qf_ill,
+			if (fr_ifpaddr(6, FRI_NORMAL, fin->fin_ifp,
 				       (struct in_addr *)&dst6, NULL) == -1) {
 				FREE_MB_T(m);
 				return -1;
@@ -516,7 +516,7 @@ int isdst;
 		ip6->ip6_src = dst6;
 		ip6->ip6_dst = fin->fin_src6;
 		sz -= offsetof(struct icmp, icmp_ip);
-		bcopy((char *)mb->b_rptr, (char *)&icmp->icmp_ip, sz);
+		bcopy((char *)fin->fin_ip, (char *)&icmp->icmp_ip, sz);
 		icmp->icmp_cksum = csz - sizeof(ip6_t);
 	} else
 #endif
@@ -838,13 +838,13 @@ int (*okfn)(struct sk_buff *);
 	if (sk == NULL)
 		return NF_STOLEN;
 
-	if (result != 0)
-		return NF_DROP;
-
 	if (ip->ip_v == 4) {
 		ip->ip_len = htons(ip->ip_len);
 		ip->ip_off = htons(ip->ip_off);
 	}
+
+	if (result != 0)
+		return NF_DROP;
 	return NF_ACCEPT;
 }
 
