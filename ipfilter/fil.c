@@ -2471,11 +2471,6 @@ ipf_scanlist(fin, pass)
 
 	for (rulen = 0; fr; fr = fnext, rulen++) {
 		fnext = fr->fr_next;
-		if (skip != 0) {
-			FR_VERBOSE(("SKIP %d (%#x)\n", skip, fr->fr_flags));
-			skip--;
-			continue;
-		}
 
 		/*
 		 * In all checks below, a null (zero) value in the
@@ -2605,10 +2600,7 @@ ipf_scanlist(fin, pass)
 		fin->fin_rule = rulen;
 
 		passo = pass;
-		if (FR_ISSKIP(passt)) {
-			skip = fr->fr_arg;
-			continue;
-		} else if ((passt & FR_LOGMASK) != FR_LOG) {
+		if ((passt & FR_LOGMASK) != FR_LOG) {
 			pass = passt;
 		}
 
@@ -4196,37 +4188,6 @@ memstr(src, dst, slen, dlen)
 	}
 	return s;
 }
-/* ------------------------------------------------------------------------ */
-/* Function:    ipf_fixskip                                                 */
-/* Returns:     Nil                                                         */
-/* Parameters:  listp(IO)    - pointer to start of list with skip rule      */
-/*              rp(I)        - rule added/removed with skip in it.          */
-/*              addremove(I) - adjustment (-1/+1) to make to skip count,    */
-/*                             depending on whether a rule was just added   */
-/*                             or removed.                                  */
-/*                                                                          */
-/* Adjust all the rules in a list which would have skip'd past the position */
-/* where we are inserting to skip to the right place given the change.      */
-/* ------------------------------------------------------------------------ */
-void
-ipf_fixskip(listp, rp, addremove)
-	frentry_t **listp, *rp;
-	int addremove;
-{
-	int rules, rn;
-	frentry_t *fp;
-
-	rules = 0;
-	for (fp = *listp; (fp != NULL) && (fp != rp); fp = fp->fr_next)
-		rules++;
-
-	if (!fp)
-		return;
-
-	for (rn = 0, fp = *listp; fp && (fp != rp); fp = fp->fr_next, rn++)
-		if (FR_ISSKIP(fp->fr_flags) && (rn + fp->fr_arg >= rules))
-			fp->fr_arg += addremove;
-}
 
 
 #ifdef	_KERNEL
@@ -5364,8 +5325,6 @@ frrequest(softc, unit, req, data, set, makecopy)
 		fp->fr_pnext = ftail;
 		fp->fr_next = *ftail;
 		*ftail = fp;
-		if (addrem == 0)
-			ipf_fixskip(ftail, fp, 1);
 
 		fp->fr_icmpgrp = NULL;
 		if (fp->fr_icmphead != -1) {
@@ -5446,7 +5405,6 @@ ipf_rule_delete(softc, f, unit, set)
 		f->fr_dnext = NULL;
 	}
 
-	ipf_fixskip(f->fr_pnext, f, -1);
 	if (f->fr_pnext != NULL)
 		*f->fr_pnext = f->fr_next;
 	if (f->fr_next != NULL)

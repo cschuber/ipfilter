@@ -130,7 +130,7 @@ static	addfunc_t	ipfaddfunc = NULL;
 %token	IPFY_HEAD IPFY_GROUP
 %token	IPFY_AUTH IPFY_PREAUTH
 %token	IPFY_LOG IPFY_BODY IPFY_FIRST IPFY_LEVEL IPFY_ORBLOCK IPFY_L5AS
-%token	IPFY_LOGTAG IPFY_MATCHTAG IPFY_SETTAG IPFY_SKIP IPFY_DECAPS
+%token	IPFY_LOGTAG IPFY_MATCHTAG IPFY_SETTAG IPFY_DECAPS
 %token	IPFY_FROM IPFY_ALL IPFY_ANY IPFY_BPFV4 IPFY_BPFV6 IPFY_POOL IPFY_HASH
 %token	IPFY_IPFEXPR IPFY_PPS IPFY_FAMILY IPFY_DSTLIST
 %token	IPFY_ESP IPFY_AH
@@ -327,8 +327,6 @@ action:	block
 	| IPFY_COUNT			{ fr->fr_flags |= FR_ACCOUNT; }
 	| decaps			{ fr->fr_flags |= FR_DECAPSULATE; }
 	| auth
-	| IPFY_SKIP YY_NUMBER		{ fr->fr_flags |= FR_SKIP;
-					  fr->fr_arg = $2; }
 	| IPFY_CALL func
 	| IPFY_CALL IPFY_NOW func	{ fr->fr_flags |= FR_CALLNOW; }
 	;
@@ -1810,7 +1808,6 @@ static	struct	wordtab ipfwords[] = {
 	{ "sec-class",			IPFY_SECCLASS },
 	{ "set",			IPFY_SET },
 	{ "set-tag",			IPFY_SETTAG },
-	{ "skip",			IPFY_SKIP },
 	{ "short",			IPFY_SHORT },
 	{ "state",			IPFY_STATE },
 	{ "state-age",			IPFY_AGE },
