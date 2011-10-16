@@ -426,7 +426,7 @@ ipf_send_icmp_err(int type, fr_info_t *fin, int isdst)
 		int csz;
 
 		if (isdst == 0) {
-			if (ipf_ifpaddr(&ipfmain, 6, FRI_NORMAL, qif->qf_ill,
+			if (ipf_ifpaddr(&ipfmain, 6, FRI_NORMAL, fin->fin_ifp,
 					&dst6, NULL) == -1) {
 				FREE_MB_T(m);
 				return -1;
@@ -442,7 +442,7 @@ ipf_send_icmp_err(int type, fr_info_t *fin, int isdst)
 		ip6->ip6_src = dst6;
 		ip6->ip6_dst = fin->fin_src6;
 		sz -= offsetof(struct icmp, icmp_ip);
-		bcopy((char *)mb->b_rptr, (char *)&icmp->icmp_ip, sz);
+		bcopy((char *)fin->fin_ip, (char *)&icmp->icmp_ip, sz);
 		icmp->icmp_cksum = csz - sizeof(ip6_t);
 	} else
 #endif
