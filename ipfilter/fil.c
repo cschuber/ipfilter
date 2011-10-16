@@ -3015,7 +3015,7 @@ ipf_check(ctx, ip, hlen, ifp, out
 	if (!out) {
 		if (v == 4) {
 			if (softc->ipf_chksrc && !ipf_verifysrc(fin)) {
-				LBUMPD(ipf_stats[0].fr_v4_badsrc);
+				LBUMPD(ipf_stats[0], fr_v4_badsrc);
 				fin->fin_flx |= FI_BADSRC;
 			}
 			if (fin->fin_ip->ip_ttl < softc->ipf_minttl) {
@@ -4955,9 +4955,17 @@ frrequest(softc, unit, req, data, set, makecopy)
 	 */
 	ftail = NULL;
 	fprev = NULL;
-	if (unit == IPL_LOGAUTH)
+	if (unit == IPL_LOGAUTH) {
+                if ((fp->fr_tifs[0].fd_ptr != NULL) ||
+		    (fp->fr_tifs[1].fd_ptr != NULL) ||
+		    (fp->fr_dif.fd_ptr != NULL) ||
+		    (fp->fr_flags & FR_FASTROUTE)) {
+			softc->ipf_interror = 145;
+			error = EINVAL;
+			goto donenolock;
+		}
 		fprev = ipf_auth_rulehead(softc);
-	else {
+	} else {
 		if (FR_ISACCOUNT(fp->fr_flags))
 			fprev = &softc->ipf_acct[in][set];
 		else if ((fp->fr_flags & (FR_OUTQUE|FR_INQUE)) != 0)
