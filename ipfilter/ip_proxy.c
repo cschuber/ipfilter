@@ -86,9 +86,7 @@ struct file;
 
 /* END OF INCLUDES */
 
-#include "netinet/ip_dns_pxy.c"
 #include "netinet/ip_ftp_pxy.c"
-#include "netinet/ip_tftp_pxy.c"
 #include "netinet/ip_rcmd_pxy.c"
 #include "netinet/ip_pptp_pxy.c"
 #if defined(_KERNEL)
