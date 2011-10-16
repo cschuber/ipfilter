@@ -2,8 +2,6 @@
  * Copyright (C) 1993-2001, 2003 by Darren Reed.
  *
  * See the IPFILTER.LICENCE file for details on licencing.
- *
- * Copyright 2008 Sun Microsystems.
  */
 #if defined(KERNEL) || defined(_KERNEL)
 # undef KERNEL
@@ -1251,6 +1249,7 @@ ipf_htable_iter_next(softc, arg, token, ilp)
 	ipf_htable_softc_t *softh = arg;
 	iphtent_t *node, zn, *nextnode;
 	iphtable_t *iph, zp, *nextiph;
+	void *hnext;
 	int err;
 
 	err = 0;
@@ -1261,12 +1260,6 @@ ipf_htable_iter_next(softc, arg, token, ilp)
 
 	READ_ENTER(&softc->ipf_poolrw);
 
-	/*
-	 * Get "previous" entry from the token and find the next entry.
-	 *
-	 * If we found an entry, add a reference to it and update the token.
-	 * Otherwise, zero out data to be returned and NULL out token.
-	 */
 	switch (ilp->ili_otype)
 	{
 	case IPFLOOKUPITER_LIST :
@@ -1285,6 +1278,7 @@ ipf_htable_iter_next(softc, arg, token, ilp)
 			nextiph = &zp;
 			token->ipt_data = NULL;
 		}
+		hnext = nextiph->iph_next;
 		break;
 
 	case IPFLOOKUPITER_NODE :
@@ -1310,24 +1304,20 @@ ipf_htable_iter_next(softc, arg, token, ilp)
 			nextnode = &zn;
 			token->ipt_data = NULL;
 		}
+		hnext = nextnode->ipe_next;
 		break;
 
 	default :
 		softc->ipf_interror = 30010;
 		err = EINVAL;
+		hnext = NULL;
 		break;
 	}
 
-	/*
-	 * Now that we have ref, it's save to give up lock.
-	 */
 	RWLOCK_EXIT(&softc->ipf_poolrw);
 	if (err != 0)
 		return err;
 
-	/*
-	 * Copy out data and clean up references and token as needed.
-	 */
 	switch (ilp->ili_otype)
 	{
 	case IPFLOOKUPITER_LIST :
@@ -1336,14 +1326,10 @@ ipf_htable_iter_next(softc, arg, token, ilp)
 			softc->ipf_interror = 30011;
 			err = EFAULT;
 		}
-		if (token->ipt_data != NULL) {
-			if (iph != NULL) {
-				WRITE_ENTER(&softc->ipf_poolrw);
-				ipf_htable_deref(softc, softh, iph);
-				RWLOCK_EXIT(&softc->ipf_poolrw);
-			}
-			if (nextiph->iph_next == NULL)
-				ipf_token_free(softc, token);
+		if ((iph != NULL) && (nextiph != &zp)) {
+			WRITE_ENTER(&softc->ipf_poolrw);
+			ipf_htable_deref(softc, softh, iph);
+			RWLOCK_EXIT(&softc->ipf_poolrw);
 		}
 		break;
 
@@ -1353,17 +1339,16 @@ ipf_htable_iter_next(softc, arg, token, ilp)
 			softc->ipf_interror = 30012;
 			err = EFAULT;
 		}
-		if (token->ipt_data != NULL) {
-			if (node != NULL) {
-				WRITE_ENTER(&softc->ipf_poolrw);
-				ipf_htent_deref(softc, node);
-				RWLOCK_EXIT(&softc->ipf_poolrw);
-			}
-			if (nextnode->ipe_next == NULL)
-				ipf_token_free(softc, token);
+		if ((node != NULL) && (nextnode != &zn)) {
+			WRITE_ENTER(&softc->ipf_poolrw);
+			ipf_htent_deref(softc, node);
+			RWLOCK_EXIT(&softc->ipf_poolrw);
 		}
 		break;
 	}
+
+	if (hnext != NULL)
+		ipf_token_mark_complete(token);
 
 	return err;
 }

@@ -4874,8 +4874,7 @@ ipf_state_iter(softc, token, itp, obj)
 {
 	ipf_state_softc_t *softs = softc->ipf_state_soft;
 	ipstate_t *is, *next, zero;
-	int error, count;
-	char *dst;
+	int error;
 
 	if (itp->igi_data == NULL) {
 		softc->ipf_interror = 100026;
@@ -4904,10 +4903,6 @@ ipf_state_iter(softc, token, itp, obj)
 
 	READ_ENTER(&softc->ipf_state);
 
-	/*
-	 * Get "previous" entry from the token, and find the next entry
-	 * to be processed.
-	 */
 	is = token->ipt_data;
 	if (is == NULL) {
 		next = softs->ipf_state_list;
@@ -4915,51 +4910,31 @@ ipf_state_iter(softc, token, itp, obj)
 		next = is->is_next;
 	}
 
-	dst = itp->igi_data;
-	for (count = itp->igi_nitems; count > 0; count--) {
-		/*
-		 * If we found an entry, add a reference and update the token.
-		 * Otherwise, zero out data to be returned and NULL out token.
-		 */
-		if (next != NULL) {
-			MUTEX_ENTER(&next->is_lock);
-			next->is_ref++;
-			MUTEX_EXIT(&next->is_lock);
-			token->ipt_data = next;
-		} else {
-			bzero(&zero, sizeof(zero));
-			next = &zero;
-			token->ipt_data = NULL;
-		}
-
-		/*
-		 * Safe to release lock now the we have a reference.
-		 */
-		RWLOCK_EXIT(&softc->ipf_state);
-
-		obj->ipfo_ptr = dst;
-		/*
-		 * Copy out data and clean up references and tokens.
-		 */
-		error = ipf_outobjk(softc, obj, next);
-		if (error != 0) {
-			softc->ipf_interror = 100030;
-		}
-		if (token->ipt_data != NULL) {
-			if (is != NULL)
-				ipf_state_deref(softc, &is);
-			if (next->is_next == NULL)
-				ipf_token_mark_complete(token);
-		}
-
-		if ((count == 1) || (error != 0))
-			break;
-
-		READ_ENTER(&softc->ipf_state);
-		dst += sizeof(*next);
-		is = next;
-		next = is->is_next;
+	/*
+	 * If we find a state entry to use, bump its reference count so that
+	 * it can be used for is_next when we come back.
+	 */
+	if (next != NULL) {
+		MUTEX_ENTER(&next->is_lock);
+		next->is_ref++;
+		MUTEX_EXIT(&next->is_lock);
+		token->ipt_data = next;
+	} else {
+		bzero(&zero, sizeof(zero));
+		next = &zero;
+		token->ipt_data = NULL;
 	}
+	if (next->is_next == NULL)
+		ipf_token_mark_complete(token);
+
+	RWLOCK_EXIT(&softc->ipf_state);
+
+	obj->ipfo_ptr = itp->igi_data;
+	error = ipf_outobjk(softc, obj, next);
+	if ((is != NULL) && (next == &zero))
+		ipf_state_deref(softc, &is);
+
+	READ_ENTER(&softc->ipf_state);
 
 	return error;
 }

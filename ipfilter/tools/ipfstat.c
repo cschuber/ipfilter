@@ -2,8 +2,6 @@
  * Copyright (C) 2002-2007 by Darren Reed.
  *
  * See the IPFILTER.LICENCE file for details on licencing.
- *
- * Copyright 2008 Sun Microsystems.
  */
 #ifdef __FreeBSD__
 # ifndef __FreeBSD_cc_version
@@ -803,6 +801,8 @@ static void printlivelist(fiop, out, set, fp, group, comment)
 		rule.iri_rule = fp;
 		if (ioctl(ipf_fd, SIOCIPFITER, &obj) == -1) {
 			ipferror(ipf_fd, "ioctl(SIOCIPFITER)");
+			n = IPFGENITER_IPF;
+			(void) ioctl(ipf_fd,SIOCIPFDELTOK, &n);
 			return;
 		}
 		if (bcmp(fp, &zero, sizeof(zero)) == 0)
@@ -875,6 +875,9 @@ static void printlivelist(fiop, out, set, fp, group, comment)
 				      "# callfunc: ");
 		}
 	} while (fp->fr_next != NULL);
+
+	n = IPFGENITER_IPF;
+	(void) ioctl(ipf_fd,SIOCIPFDELTOK, &n);
 
 	if (group == NULL) {
 		while ((g = grtop) != NULL) {
@@ -2093,6 +2096,10 @@ ipstate_t *fetchstate(src, dst)
 
 		if (ioctl(state_fd, SIOCGENITER, &obj) != 0)
 			return NULL;
+		if (dst->is_next == NULL) {
+			int n = IPFGENITER_STATE;
+			(void) ioctl(ipf_fd,SIOCIPFDELTOK, &n);
+		}
 	} else {
 		if (kmemcpy((char *)dst, (u_long)src, sizeof(*dst)))
 			return NULL;

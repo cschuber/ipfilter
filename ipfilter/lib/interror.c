@@ -17,7 +17,7 @@ typedef	struct	{
 
 static ipf_error_entry_t *find_error __P((int));
 
-#define	IPF_NUM_ERRORS	450
+#define	IPF_NUM_ERRORS	452
 
 /*
  * NO REUSE OF NUMBERS!
@@ -170,6 +170,7 @@ static ipf_error_entry_t ipf_errors[IPF_NUM_ERRORS] = {
 	{	142,	"could not initialise call now function" },
 	{	143,	"could not initialise call function" },
 	{	144,	"could not find destination list" },
+	{	145,	"auth rules cannot have dup/to/fastroute" },
 /* -------------------------------------------------------------------------- */
 	{	10001,	"could not find token for auth iterator" },
 	{	10002,	"write permissions require to add/remove auth rule" },
@@ -343,7 +344,8 @@ log" },
 	{	60071,	"new destination lookup type is not dstlist" },
 	{	60072,	"function not found for lookup (ipv6)" },
 	{	60073,	"unknown lookup group for next address (ipv6)" },
-	{	60074,	"unknwon next address type (ipv6)" },
+	{	60074,	"unknown next address type (ipv6)" },
+	{	60075,	"one object at a time must be copied" },
 /* -------------------------------------------------------------------------- */
 	{	70001,	"incorrect object size to get pool stats" },
 	{	70002,	"could not malloc memory for new pool node" },

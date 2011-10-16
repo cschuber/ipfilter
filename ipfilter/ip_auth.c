@@ -2,8 +2,6 @@
  * Copyright (C) 1998-2003 by Darren Reed & Guido van Rooij.
  *
  * See the IPFILTER.LICENCE file for details on licencing.
- *
- * Copyright 2008 Sun Microsystems.
  */
 #if defined(KERNEL) || defined(_KERNEL)
 # undef KERNEL
@@ -158,6 +156,7 @@ typedef	struct ipf_auth_softc_s {
 
 
 static void ipf_auth_deref __P((frauthent_t **));
+static void ipf_auth_deref_unlocked __P((ipf_auth_softc_t *, frauthent_t **));
 static int ipf_auth_geniter __P((ipf_main_softc_t *, ipftoken_t *,
 				 ipfgeniter_t *, ipfobj_t *));
 static int ipf_auth_reply __P((ipf_main_softc_t *, ipf_auth_softc_t *, char *));
@@ -950,9 +949,6 @@ ipf_auth_geniter(softc, token, itp, objp)
 
 	READ_ENTER(&softa->ipf_authlk);
 
-	/*
-	 * Retrieve "previous" entry from token and find the next entry.
-	 */
 	fae = token->ipt_data;
 	if (fae == NULL) {
 		next = softa->ipf_auth_entries;
@@ -961,8 +957,8 @@ ipf_auth_geniter(softc, token, itp, objp)
 	}
 
 	/*
-	 * If we found an entry, add reference to it and update token.
-	 * Otherwise, zero out data to be returned and NULL out token.
+	 * If we found an auth entry to use, bump its reference count
+	 * so that it can be used for is_next when we come back.
 	 */
 	if (next != NULL) {
 		ATOMIC_INC(next->fae_ref);
@@ -973,29 +969,34 @@ ipf_auth_geniter(softc, token, itp, objp)
 		token->ipt_data = NULL;
 	}
 
-	/*
-	 * Safe to release the lock now that we have a reference.
-	 */
 	RWLOCK_EXIT(&softa->ipf_authlk);
 
-	/*
-	 * Copy out the data and clean up references and token as needed.
-	 */
 	error = ipf_outobjk(softc, objp, next);
+	if ((fae != NULL) && (next == &zero))
+		ipf_auth_deref_unlocked(softa, &fae);
 
-	/*
-	 * Clean up reference and token.
-	 */
-	if (token->ipt_data != NULL) {
-		if (fae != NULL) {
-			WRITE_ENTER(&softa->ipf_authlk);
-			ipf_auth_deref(&fae);
-			RWLOCK_EXIT(&softa->ipf_authlk);
-		}
-		if (next->fae_next == NULL)
-			ipf_token_mark_complete(token);
-	}
+	if (next->fae_next == NULL)
+		ipf_token_mark_complete(token);
 	return error;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_auth_deref_unlocked                                     */
+/* Returns:     None                                                        */
+/* Parameters:  faep(IO) - pointer to caller's frauthent_t pointer          */
+/*                                                                          */
+/* Wrapper for ipf_auth_deref for when a write lock on ipf_authlk is not    */
+/* held.                                                                    */
+/* ------------------------------------------------------------------------ */
+static void
+ipf_auth_deref_unlocked(softa, faep)
+	ipf_auth_softc_t *softa;
+	frauthent_t **faep;
+{
+	WRITE_ENTER(&softa->ipf_authlk);
+	ipf_auth_deref(faep);
+	RWLOCK_EXIT(&softa->ipf_authlk);
 }
 
 
