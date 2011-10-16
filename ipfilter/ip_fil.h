@@ -1572,7 +1572,6 @@ typedef struct ipf_main_softc_s {
 	int		ipf_minttl;
 	int		ipf_icmpminfragmtu;
 	int		ipf_interror;
-	int		ipf_specfuncref[3][2];
         u_int		ipf_tcpidletimeout;
         u_int		ipf_tcpclosewait;
         u_int		ipf_tcplastack;
