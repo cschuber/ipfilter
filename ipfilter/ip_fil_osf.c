@@ -1101,10 +1101,10 @@ INLINE void
 ipf_checkv6sum(fin)
 	fr_info_t *fin;
 {
-#ifdef IPFILTER_CKSUM
+# ifdef IPFILTER_CKSUM
 	if (ipf_checkl4sum(fin) == -1)
 		fin->fin_flx |= FI_BAD;
-#endif
+# endif
 }
 #endif /* USE_INET6 */
 
