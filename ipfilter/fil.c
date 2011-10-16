@@ -3,8 +3,6 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2008 Sun Microsystems.
- *
  * $Id$
  *
  */
@@ -7798,7 +7796,7 @@ void
 ipf_token_mark_complete(token)
 	ipftoken_t *token;
 {
-	token->ipt_complete |= 1;
+	token->ipt_complete = 1;
 }
 
 
@@ -7826,8 +7824,6 @@ ipf_token_find(softc, type, uid, ptr)
 
 	WRITE_ENTER(&softc->ipf_tokens);
 	for (it = softc->ipf_token_head; it != NULL; it = it->ipt_next) {
-		if (it->ipt_complete == 1)
-			continue;
 		if (ptr == it->ipt_ctx && type == it->ipt_type &&
 		    uid == it->ipt_uid)
 			break;
@@ -7836,8 +7832,10 @@ ipf_token_find(softc, type, uid, ptr)
 	if (it == NULL) {
 		it = new;
 		new = NULL;
-		if (it == NULL)
+		if (it == NULL) {
+			RWLOCK_EXIT(&softc->ipf_tokens);
 			return NULL;
+		}
 		it->ipt_data = NULL;
 		it->ipt_ctx = ptr;
 		it->ipt_uid = uid;
@@ -7854,12 +7852,17 @@ ipf_token_find(softc, type, uid, ptr)
 		ipf_token_unlink(softc, it);
 		it->ipt_ref++;
 	}
-	it->ipt_pnext = softc->ipf_token_tail;
-	*softc->ipf_token_tail = it;
-	softc->ipf_token_tail = &it->ipt_next;
-	it->ipt_next = NULL;
 
-	it->ipt_die = softc->ipf_ticks + 2;
+	if (it->ipt_complete == 0) {
+		it->ipt_pnext = softc->ipf_token_tail;
+		*softc->ipf_token_tail = it;
+		softc->ipf_token_tail = &it->ipt_next;
+		it->ipt_next = NULL;
+
+		it->ipt_die = softc->ipf_ticks + 20;
+	} else {
+		it = NULL;
+	}
 
 	RWLOCK_EXIT(&softc->ipf_tokens);
 
@@ -7996,8 +7999,8 @@ ipf_getnextrule(softc, t, ptr)
 	void *ptr;
 {
 	frentry_t *fr, *next, zero;
-	int error, count, out;
 	ipfruleiter_t it;
+	int error, out;
 	frgroup_t *fg;
 	ipfobj_t obj;
 	char *dst;
@@ -8029,13 +8032,10 @@ ipf_getnextrule(softc, t, ptr)
 	}
 
 	fg = NULL;
+	fr = t->ipt_data;
 	out = it.iri_inout & F_OUT;
 
 	READ_ENTER(&softc->ipf_mutex);
-	/*
-	 * Retrieve "previous" entry from token and find the next entry.
-	 */
-	fr = t->ipt_data;
 	if (fr == NULL) {
 		if (*it.iri_group == '\0') {
 			if ((it.iri_inout & F_ACIN) != 0)
@@ -8055,68 +8055,39 @@ ipf_getnextrule(softc, t, ptr)
 	}
 
 	obj.ipfo_type = IPFOBJ_FRENTRY;
-	obj.ipfo_size = 0;
+	obj.ipfo_size = sizeof(frentry_t);
 	dst = (char *)it.iri_rule;
-	/*
-	 * The ipfruleiter may ask for more than 1 rule at a time to be
-	 * copied out, so long as that many exist in the list to start with!
-	 */
-	for (count = it.iri_nrules; count > 0; count--) {
-		/*
-		 * If we found an entry, add reference to it and update token.
-		 * Otherwise, zero out data to be returned and NULL out token.
-		 */
-		if (next != NULL) {
-			MUTEX_ENTER(&next->fr_lock);
-			next->fr_ref++;
-			MUTEX_EXIT(&next->fr_lock);
-			t->ipt_data = next;
-		} else {
-			bzero(&zero, sizeof(zero));
-			next = &zero;
-			t->ipt_data = NULL;
-		}
 
-		/*
-		 * Now that we have ref, it's save to give up lock.
-		 */
-		RWLOCK_EXIT(&softc->ipf_mutex);
-
-		/*
-		 * Copy out data and clean up references and token as needed.
-		 */
-		obj.ipfo_size = sizeof(frentry_t);
-		obj.ipfo_ptr = dst;
-		error = ipf_outobjk(softc, &obj, next);
-		if (error != 0)
-			return error;
-		if (t->ipt_data == NULL) {
-			break;
-		} else {
-			if (fr != NULL)
-				(void) ipf_derefrule(softc, &fr);
-			dst += obj.ipfo_size;
-			if (next->fr_data != NULL) {
-				error = COPYOUT(next->fr_data, dst,
-						next->fr_dsize);
-				if (error != 0) {
-					softc->ipf_interror = 90;
-					error = EFAULT;
-				} else {
-					dst += next->fr_dsize;
-				}
-			}
-			if (next->fr_next == NULL)
-				ipf_token_mark_complete(t);
-		}
-
-		if ((count == 1) || (error != 0))
-			break;
-
-		READ_ENTER(&softc->ipf_mutex);
-		fr = next;
-		next = next->fr_next;
+	if (next != NULL) {
+		MUTEX_ENTER(&next->fr_lock);
+		next->fr_ref++;
+		MUTEX_EXIT(&next->fr_lock);
+		t->ipt_data = next;
+	} else {
+		bzero(&zero, sizeof(zero));
+		next = &zero;
+		t->ipt_data = NULL;
 	}
+	if (next->fr_next == NULL)
+		ipf_token_mark_complete(t);
+
+	RWLOCK_EXIT(&softc->ipf_mutex);
+
+	obj.ipfo_ptr = dst;
+	error = ipf_outobjk(softc, &obj, next);
+	if (error == 0 && t->ipt_data != NULL) {
+		dst += obj.ipfo_size;
+		if (next->fr_data != NULL) {
+			error = COPYOUT(next->fr_data, dst, next->fr_dsize);
+			if (error != 0)
+				softc->ipf_interror = 90;
+		}
+	}
+
+	if ((fr != NULL) && (next == &zero))
+		(void) ipf_derefrule(softc, &fr);
+
+	READ_ENTER(&softc->ipf_mutex);
 	return error;
 }
 
@@ -8152,7 +8123,7 @@ ipf_frruleiter(softc, data, uid, ctx)
 		RWLOCK_EXIT(&softc->ipf_tokens);
 	} else {
 		softc->ipf_interror = 91;
-		error = EFAULT;
+		error = 0;
 	}
 
 	return error;
@@ -8215,15 +8186,15 @@ ipf_genericiter(softc, data, uid, ctx)
 	if (token != NULL) {
 		token->ipt_subtype = iter.igi_type;
 		error = ipf_geniter(softc, token, &iter);
-	} else {
 		WRITE_ENTER(&softc->ipf_tokens);
 		if (token->ipt_data == NULL)
 			ipf_token_free(softc, token);
 		else
 			ipf_token_deref(softc, token);
 		RWLOCK_EXIT(&softc->ipf_tokens);
+	} else {
 		softc->ipf_interror = 93;
-		error = EFAULT;
+		error = 0;
 	}
 
 	return error;

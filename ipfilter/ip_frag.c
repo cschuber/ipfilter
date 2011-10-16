@@ -2,8 +2,6 @@
  * Copyright (C) 1993-2003 by Darren Reed.
  *
  * See the IPFILTER.LICENCE file for details on licencing.
- *
- * Copyright 2008 Sun Microsystems.
  */
 #if defined(KERNEL) || defined(_KERNEL)
 # undef KERNEL
@@ -1210,20 +1208,15 @@ ipf_frag_next(softc, token, itp, top
 		return EFAULT;
 	}
 
+	frag = token->ipt_data;
+
 	READ_ENTER(lock);
 
-	/*
-	 * Retrieve "previous" entry from token and find the next entry.
-	 */
-	frag = token->ipt_data;
 	if (frag == NULL)
 		next = *top;
 	else
 		next = frag->ipfr_next;
-	/*
-	 * If we found an entry, add reference to it and update token.
-	 * Otherwise, zero out data to be returned and NULL out token.
-	 */
+
 	if (next != NULL) {
 		ATOMIC_INC(next->ipfr_ref);
 		token->ipt_data = next;
@@ -1232,28 +1225,21 @@ ipf_frag_next(softc, token, itp, top
 		next = &zero;
 		token->ipt_data = NULL;
 	}
+	if (next->ipfr_next == NULL)
+		ipf_token_mark_complete(token);
 
-	/*
-	 * Now that we have ref, it's safe to give up lock.
-	 */
 	RWLOCK_EXIT(lock);
 
-	/*
-	 * Copy out data and clean up references and token as needed.
-	 */
 	error = COPYOUT(next, itp->igi_data, sizeof(*next));
-	if (error != 0) {
+	if (error != 0)
 		softc->ipf_interror = 20002;
-	}
-        if (token->ipt_data != NULL) {
-                if (frag != NULL)
+
+        if ((frag != NULL) && (next != &zero)) {
 #ifdef USE_MUTEXES
-                        ipf_frag_deref(softc, &frag, lock);
+		ipf_frag_deref(softc, &frag, lock);
 #else
-                        ipf_frag_deref(softc, &frag);
+		ipf_frag_deref(softc, &frag);
 #endif
-                if (next->ipfr_next == NULL)
-                        ipf_token_mark_complete(token);
         }
         return error;
 }

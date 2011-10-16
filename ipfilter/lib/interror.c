@@ -17,7 +17,7 @@ typedef	struct	{
 
 static ipf_error_entry_t *find_error(int);
 
-#define	IPF_NUM_ERRORS	450
+#define	IPF_NUM_ERRORS	451
 
 /*
  * NO REUSE OF NUMBERS!
@@ -343,7 +343,8 @@ log" },
 	{	60071,	"new destination lookup type is not dstlist" },
 	{	60072,	"function not found for lookup (ipv6)" },
 	{	60073,	"unknown lookup group for next address (ipv6)" },
-	{	60074,	"unknwon next address type (ipv6)" },
+	{	60074,	"unknown next address type (ipv6)" },
+	{	60075,	"one object at a time must be copied" },
 /* -------------------------------------------------------------------------- */
 	{	70001,	"incorrect object size to get pool stats" },
 	{	70002,	"could not malloc memory for new pool node" },

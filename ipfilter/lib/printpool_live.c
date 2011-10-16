@@ -2,8 +2,6 @@
  * Copyright (C) 2006-2008 by Darren Reed.
  *
  * See the IPFILTER.LICENCE file for details on licencing.
- *
- * Copyright 2008 Sun Microsystems.
  */
 
 #include <sys/ioctl.h>
@@ -79,6 +77,8 @@ printpool_live(pool, fd, name, opts, fields)
 
 	if ((opts & OPT_DEBUG) == 0)
 		PRINTF(" };\n");
+
+	(void) ioctl(fd,SIOCIPFDELTOK, &iter.ili_key);
 
 	return pool->ipo_next;
 }
