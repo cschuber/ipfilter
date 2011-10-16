@@ -3037,7 +3037,7 @@ ipf_check(ctx, ip, hlen, ifp, out
 
 	READ_ENTER(&softc->ipf_mutex);
 
-	if (!out && (softc->ipf_specfuncref[1][softc->ipf_active] == 0)) {
+	if (!out) {
 		switch (fin->fin_v)
 		{
 		case 4 :
@@ -3076,8 +3076,7 @@ ipf_check(ctx, ip, hlen, ifp, out
 		if ((fin->fin_flx & FI_FRAG) != 0)
 			fr = ipf_frag_known(fin, &pass);
 
-		if ((fr == NULL) && (softc->ipf_specfuncref[0]
-					    [softc->ipf_active] == 0))
+		if (fr == NULL)
 			fr = ipf_state_check(fin, &pass);
 	}
 
@@ -3119,8 +3118,7 @@ ipf_check(ctx, ip, hlen, ifp, out
 		switch (fin->fin_v)
 		{
 		case 4 :
-			if (!softc->ipf_specfuncref[2][softc->ipf_active] &&
-			    (ipf_nat_checkout(fin, &pass) == -1)) {
+			if (ipf_nat_checkout(fin, &pass) == -1) {
 				;
 			} else if ((softc->ipf_update_ipid != 0) && (v == 4)) {
 				if (ipf_updateipid(fin) == -1) {
@@ -3135,8 +3133,7 @@ ipf_check(ctx, ip, hlen, ifp, out
 			break;
 #ifdef USE_INET6
 		case 6 :
-			if (softc->ipf_specfuncref[2][softc->ipf_active] == 0)
-				(void) ipf_nat6_checkout(fin, &pass);
+			(void) ipf_nat6_checkout(fin, &pass);
 			break;
 #endif
 		default :
