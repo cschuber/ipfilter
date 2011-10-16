@@ -1230,6 +1230,10 @@ poollist:
 
 port:	IPFY_PORT			{ yyexpectaddr = 0;
 					  yycont = NULL;
+					  if (frc->fr_proto != 0 &&
+					      frc->fr_proto != IPPROTO_UDP &&
+					      frc->fr_proto != IPPROTO_TCP)
+						yyerror("port use incorrect");
 					}
 	;
 
