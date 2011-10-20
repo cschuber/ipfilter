@@ -92,7 +92,6 @@ struct file;
 #if defined(_KERNEL)
 # include "netinet/ip_irc_pxy.c"
 # include "netinet/ip_raudio_pxy.c"
-# include "netinet/ip_h323_pxy.c"
 # include "netinet/ip_netbios_pxy.c"
 #endif
 #include "netinet/ip_ipsec_pxy.c"
@@ -211,21 +210,6 @@ static	aproxy_t	ips_proxies[] = {
 	  NULL, NULL,
 	  ipf_p_pptp_new, ipf_p_pptp_del,
 	  ipf_p_pptp_inout, ipf_p_pptp_inout, NULL,
-	  NULL, NULL, NULL, NULL },
-#endif
-#ifdef  IPF_H323_PROXY
-	{ NULL, NULL, "h323", (char)IPPROTO_TCP, 0, 0, 0,
-	  ipf_p_h323_main_load, ipf_p_h323_main_unload,
-	  NULL, NULL,
-	  NULL, NULL,
-	  ipf_p_h323_new, ipf_p_h323_del,
-	  ipf_p_h323_in, NULL, NULL,
-	  NULL, NULL, NULL, NULL },
-	{ NULL, NULL, "h245", (char)IPPROTO_TCP, 0, 0, 0, NULL, NULL,
-	  NULL, NULL,
-	  NULL, NULL,
-	  ipf_p_h245_new, NULL,
-	  NULL, ipf_p_h245_out, NULL,
 	  NULL, NULL, NULL, NULL },
 #endif
 #ifdef	IPF_RPCB_PROXY
