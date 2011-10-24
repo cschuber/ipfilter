@@ -268,5 +268,6 @@ static	int	pcap_readip(mb, ifn, dir)
 	/* } while (ty[0] != 0x8 && ty[1] != 0); */
 	n = MIN(i, cnt);
 	bcopy(s, buf, n);
+	mb->mb_len = n;
 	return n;
 }

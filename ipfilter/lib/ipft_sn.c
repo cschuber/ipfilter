@@ -196,6 +196,7 @@ static	int	snoop_readip(mb, ifn, dir)
 	s += l->lc_tl;
 	n = MIN(i, cnt);
 	bcopy(s, buf, n);
+	mb->mb_len = n;
 
 	return n;
 }
