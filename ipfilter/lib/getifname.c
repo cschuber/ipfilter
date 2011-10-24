@@ -48,7 +48,7 @@ struct ifnet *ptr;
     defined(__OpenBSD__) || \
     (defined(__FreeBSD__) && (__FreeBSD_version >= 501113))
 #else
-	char buf[32];
+	char buf[LIFNAMSIZ];
 	int len;
 # endif
 	struct ifnet netif;
