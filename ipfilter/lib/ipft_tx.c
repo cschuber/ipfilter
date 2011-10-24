@@ -148,13 +148,17 @@ static	int	text_readip(mb, ifn, dir)
 		*dir = 0;
 		if (!parseline(line, (ip_t *)buf, ifn, dir)) {
 			ip = (ip_t *)buf;
-#ifdef USE_INET6
 			if (IP_V(ip) == 6) {
-				return ntohs(((ip6_t *)ip)->ip6_plen) +
+#ifdef USE_INET6
+				mb->mb_len = ntohs(((ip6_t *)ip)->ip6_plen) +
 				       sizeof(ip6_t);
-			}
+#else
+				mb->mb_len = 0;
 #endif
-			return ntohs(ip->ip_len);
+			} else {
+				mb->mb_len = ntohs(ip->ip_len);
+			}
+			return mb->mb_len;
 		}
 	}
 	if (feof(tfp))

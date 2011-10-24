@@ -177,5 +177,6 @@ static	int	tcpd_readip(mb, ifn, dir)
 	}
 
 	slen = IP_HL(ip) + extra + ip->ip_len;
+	mb->mb_len = slen;
 	return slen;
 }

@@ -78,8 +78,10 @@ static	int	hex_readip(mb, ifn, dir)
  	ip = (ip_t *)buf;
 	while (fgets(line, sizeof(line)-1, tfp)) {
 		if ((s = strchr(line, '\n'))) {
-			if (s == line)
-				return (char *)ip - buf;
+			if (s == line) {
+				mb->mb_len = (char *)ip - buf;
+				return mb->mb_len;
+			}
 			*s = '\0';
 		}
 		if ((s = strchr(line, '#')))

@@ -134,5 +134,6 @@ static	int	etherf_readip(mb, ifn, dir)
 	slen = IP_HL(ip) + extra;
 	i = MIN(cnt, slen);
 	bcopy((char *)&pkt, buf, i);
+	mb->mb_len = i;
 	return i;
 }
