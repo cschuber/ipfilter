@@ -414,18 +414,13 @@ ipf_p_ftp_port(softf, fin, ip, nat, ftp, dlen)
 	bcopy(newbuf, MTOD(m, char *) + off, nlen);
 	m->mb_len += inc;
 #else
-# if defined(MENTAT)
-	if (inc < 0)
-		(void)adjmsg(m, inc);
-# else /* defined(MENTAT) */
 	/*
 	 * m_adj takes care of pkthdr.len, if required and treats inc<0 to
 	 * mean remove -len bytes from the end of the packet.
 	 * The mbuf chain will be extended if necessary by m_copyback().
 	 */
 	if (inc < 0)
-		m_adj(m, inc);
-# endif /* defined(MENTAT) */
+		M_ADJ(m, inc);
 #endif /* !defined(_KERNEL) */
 	COPYBACK(m, off, nlen, newbuf);
 
@@ -835,18 +830,13 @@ ipf_p_ftp_pasvreply(softf, fin, ip, nat, ftp, port, newmsg, s, data_ip)
 #if !defined(_KERNEL)
 	bcopy(newmsg, MTOD(m, char *) + off, nlen);
 #else
-# if defined(MENTAT)
-	if (inc < 0)
-		(void)adjmsg(m, inc);
-# else /* defined(MENTAT) */
 	/*
 	 * m_adj takes care of pkthdr.len, if required and treats inc<0 to
 	 * mean remove -len bytes from the end of the packet.
 	 * The mbuf chain will be extended if necessary by m_copyback().
 	 */
 	if (inc < 0)
-		m_adj(m, inc);
-# endif /* defined(MENTAT) */
+		M_ADJ(m, inc);
 #endif /* !defined(_KERNEL) */
 	COPYBACK(m, off, nlen, newmsg);
 
@@ -1783,17 +1773,8 @@ ipf_p_ftp_eprt4(softf, fin, ip, nat, ftp, dlen)
 #if !defined(_KERNEL)
 	bcopy(newbuf, MTOD(m, char *) + off, nlen);
 #else
-# if defined(MENTAT)
 	if (inc < 0)
-		(void)adjmsg(m, inc);
-# else
-	if (inc < 0)
-		m_adj(m, inc);
-#  ifdef	M_PKTHDR
-	if (!(m->m_flags & M_PKTHDR))
-		m->m_pkthdr.len += inc;
-#  endif
-# endif
+		M_ADJ(m, inc);
 #endif
 	/* the mbuf chain will be extended if necessary by m_copyback() */
 	COPYBACK(m, off, nlen, newbuf);

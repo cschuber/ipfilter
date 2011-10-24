@@ -345,6 +345,7 @@ typedef struct qifpkt {
 #  define	GETKTIME(x)	uniqtime((struct timeval *)x)
 #  define	MSGDSIZE(x)	msgdsize(x)
 #  define	M_LEN(x)	((x)->b_wptr - (x)->b_rptr)
+#  define	M_ADJ(m,x)	adjmsg(m, x)
 #  define	M_COPY(x)	dupmsg((x))
 #  define	MTOD(m,t)	((t)((m)->b_rptr))
 #  define	MTYPE(m)	((m)->b_datap->db_type)
@@ -524,6 +525,7 @@ extern	void	*get_unit(char *, int);
 #  define	KFREE(x)	kmem_free((char *)(x), sizeof(*(x)))
 #  define	KFREES(x,s)	kmem_free((char *)(x), (s))
 #  define	MSGDSIZE(x)	msgdsize(x)
+#  define	M_ADJ(m,x)	adjmsg(m, x)
 #  define	M_LEN(x)	((x)->b_wptr - (x)->b_rptr)
 #  define	M_COPY(x)	dupmsg((x))
 #  define	M_DUP(m)	copymsg(m)
@@ -671,6 +673,7 @@ typedef struct {
 extern	void	m_copydata(struct mbuf *, int, int, caddr_t);
 extern	void	m_copyback(struct mbuf *, int, int, caddr_t);
 #  define	MSGDSIZE(x)	mbufchainlen(x)
+#  define	M_ADJ(m,x)	m_adj(m, x)
 #  define	M_LEN(x)	(x)->m_len
 #  define	M_COPY(x)	m_copy((x), 0, M_COPYALL)
 #  define	GETKTIME(x)	microtime((struct timeval *)x)
@@ -746,6 +749,7 @@ typedef struct mbuf mb_t;
 #  define	KFREES(x,s)	FREE((x), M_PFILT)
 #  define	MSGDSIZE(x)	mbufchainlen(x)
 #  define	M_LEN(x)	(x)->m_len
+#  define	M_ADJ(m,x)	m_adj(m, x)
 #  define	M_COPY(x)	m_copy((x), 0, M_COPYALL)
 #  define	M_DUP(x)	m_dup((x), M_COPYALL)
 #  define	GETKTIME(x)	microtime((struct timeval *)x)
@@ -867,6 +871,7 @@ typedef	char *	caddr_t;
 #  endif
 #  define	MSGDSIZE(x)	mbufchainlen(x)
 #  define	M_LEN(x)	(x)->m_len
+#  define	M_ADJ(m,x)	m_adj(m, x)
 #  define	M_COPY(x)	m_copy((x), 0, M_COPYALL)
 #  define	GETKTIME(x)	microtime((struct timeval *)x)
 #  define	IPF_PANIC(x,y)	if (x) { printf y; panic("ipf_panic"); }
@@ -1071,6 +1076,7 @@ extern	int	in_cksum(struct mbuf *, int);
 #  endif
 #  define	MSGDSIZE(x)	mbufchainlen(x)
 #  define	M_LEN(x)	(x)->m_len
+#  define	M_ADJ(m,x)	m_adj(m, x)
 #  define	M_COPY(x)	m_copy((x), 0, M_COPYALL)
 #  define	M_DUP(m)	m_dup(m, M_NOWAIT)
 #  define	IPF_PANIC(x,y)	if (x) { printf y; panic("ipf_panic"); }
@@ -1128,6 +1134,7 @@ typedef	u_int32_t	u_32_t;
 #  define	GETKTIME(x)	microtime((struct timeval *)x)
 #  define	MSGDSIZE(x)	mbufchainlen(x)
 #  define	M_LEN(x)	(x)->m_len
+#  define	M_ADJ(m,x)	m_adj(m, x)
 #  define	M_COPY(x)	m_copy((x), 0, M_COPYALL)
 #  define	IPF_PANIC(x,y)	if (x) { printf y; panic("ipf_panic"); }
 typedef struct mbuf mb_t;
@@ -1163,6 +1170,7 @@ typedef	u_int32_t	u_32_t;
 #  define	GETKTIME(x)	microtime((struct timeval *)x)
 #  define	MSGDSIZE(x)	mbufchainlen(x)
 #  define	M_LEN(x)	(x)->m_len
+#  define	M_ADJ(m,x)	m_adj(m, x)
 #  define	M_COPY(x)	m_copy((x), 0, M_COPYALL)
 #  define	IFNAME(x)	((struct ifnet *)x)->if_name
 typedef struct mbuf mb_t;
@@ -1188,6 +1196,7 @@ typedef	u_int32_t	u_32_t;
 #  define	GETKTIME(x)	uniqtime((struct timeval *)x)
 #  define	MSGDSIZE(x)	mbufchainlen(x)
 #  define	M_LEN(x)	(x)->m_len
+#  define	M_ADJ(m,x)	m_adj(m, x)
 #  define	M_COPY(x)	m_copy((x), 0, M_COPYALL)
 #  define	IFNAME(x)	((struct ifnet *)x)->if_name
 #  define	GETIFP(n, v)	ifunit(n, IFNAMSIZ)
@@ -1310,6 +1319,7 @@ extern	mb_t	*m_pullup(mb_t *, int);
 								GFP_KERNEL)
 #  define	MSGDSIZE(m)	(m)->len
 #  define	M_LEN(m)	(m)->len
+#  define	M_ADJ(m,x)	m_adj(m, x)
 #  define	M_DUP(m)	skb_copy((m), in_interrupt() ? GFP_ATOMIC : \
 								GFP_KERNEL)
 #  define	PREP_MB_T(f, m)	do { \
@@ -1490,6 +1500,7 @@ extern void* getifp(char *, int);
 #  define	KFREES(x,s)	FREE((x), M_TEMP)
 #  define	MSGDSIZE(x)	mbufchainlen(x)
 #  define	M_LEN(x)	(x)->m_len
+#  define	M_ADJ(m,x)	m_adj(m, x)
 #  define	M_COPY(x)	m_copy((x), 0, M_COPYALL)
 #  define	GETKTIME(x)
 #  define	IPF_PANIC(x,y)
@@ -1650,6 +1661,7 @@ typedef	struct	mb_s	{
 # define	M_MBCAST	0x04
 # define	MSGDSIZE(x)	msgdsize(x)
 # define	M_LEN(x)	(x)->mb_len
+# define	M_ADJ(m,x)	(x)->mb_len += x
 # define	M_COPY(x)	dupmbt(x)
 # define	M_DUP(x)	dupmbt(x)
 # define	GETKTIME(x)	gettimeofday((struct timeval *)(x), NULL)
