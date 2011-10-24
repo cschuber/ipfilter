@@ -39,7 +39,7 @@ printaps(aps, opts)
 #else
 	PRINTF("%lu pkts %lu", ap.aps_bytes, ap.aps_pkts);
 #endif
-	PRINTF(" data %s size %d\n", ap.aps_data ? "YES" : "NO", ap.aps_psiz);
+	PRINTF(" data %s\n", ap.aps_data ? "YES" : "NO");
 	if ((ap.aps_p == IPPROTO_TCP) && (opts & OPT_VERBOSE)) {
 		PRINTF("\t\tstate[%u,%u], sel[%d,%d]\n",
 			ap.aps_state[0], ap.aps_state[1],

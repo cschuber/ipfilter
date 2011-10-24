@@ -47,7 +47,7 @@ List of active sessions:
 MAP 192.168.113.4   1023  <- -> 10.1.1.4        1023  [192.168.113.3 1008]
 RDR 192.168.113.4   514   <- -> 10.1.1.4        514   [192.168.113.3 1009]
 	proxy rcmd/6 use 1 flags 0
-		proto 6 flags 0 bytes 697 pkts 15 data YES size 500
+		proto 6 flags 0 bytes 697 pkts 15 data YES
 
 Hostmap table:
 192.168.113.4,192.168.113.3 -> 10.1.1.4,0.0.0.0 (use = 1)
