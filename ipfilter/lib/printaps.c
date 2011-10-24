@@ -38,7 +38,7 @@ int opts;
 #else
 	printf("%lu pkts %lu", ap.aps_bytes, ap.aps_pkts);
 #endif
-	printf(" data %s size %d\n", ap.aps_data ? "YES" : "NO", ap.aps_psiz);
+	printf(" data %s\n", ap.aps_data ? "YES" : "NO");
 	if ((ap.aps_p == IPPROTO_TCP) && (opts & OPT_VERBOSE)) {
 		printf("\t\tstate[%u,%u], sel[%d,%d]\n",
 			ap.aps_state[0], ap.aps_state[1],
