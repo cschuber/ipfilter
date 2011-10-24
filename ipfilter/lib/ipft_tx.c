@@ -172,6 +172,7 @@ int	*out;
 	bzero(ipopts, sizeof(ipopts));
 	IP_HL_A(ip, sizeof(*ip) >> 2);
 	IP_V_A(ip, IPVERSION);
+	ip->ip_ttl = 63;
 	for (i = 0, cps[0] = strtok(line, " \b\t\r\n"); cps[i] && i < 19; )
 		cps[++i] = strtok(NULL, " \b\t\r\n");
 
