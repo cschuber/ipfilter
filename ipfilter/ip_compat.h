@@ -500,6 +500,7 @@ extern	void	*get_unit __P((char *, int));
 #  define	KFREE(x)	kmem_free((char *)(x), sizeof(*(x)))
 #  define	KFREES(x,s)	kmem_free((char *)(x), (s))
 #  define	MSGDSIZE(x)	msgdsize(x)
+#  define	M_ADJ(m,x)	adjmsg(m, x)
 #  define	M_LEN(x)	((x)->b_wptr - (x)->b_rptr)
 #  define	M_DUPLICATE(x)	dupmsg((x))
 #  define	MTOD(m,t)	((t)((m)->b_rptr))
@@ -649,6 +650,7 @@ typedef struct {
 extern	void	m_copydata __P((struct mbuf *, int, int, caddr_t));
 extern	void	m_copyback __P((struct mbuf *, int, int, caddr_t));
 #  define	MSGDSIZE(x)	mbufchainlen(x)
+#  define	M_ADJ(m,x)	m_adj(m, x)
 #  define	M_LEN(x)	(x)->m_len
 #  define	M_DUPLICATE(x)	m_copy((x), 0, M_COPYALL)
 #  define	GETKTIME(x)	microtime((struct timeval *)x)

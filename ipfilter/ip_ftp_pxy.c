@@ -288,18 +288,13 @@ int dlen;
 #if !defined(_KERNEL)
 	bcopy(newbuf, MTOD(m, char *) + off, nlen);
 #else
-# if defined(MENTAT)
-	if (inc < 0)
-		(void)adjmsg(m, inc);
-# else /* defined(MENTAT) */
 	/*
 	 * m_adj takes care of pkthdr.len, if required and treats inc<0 to
 	 * mean remove -len bytes from the end of the packet.
 	 * The mbuf chain will be extended if necessary by m_copyback().
 	 */
 	if (inc < 0)
-		m_adj(m, inc);
-# endif /* defined(MENTAT) */
+		M_ADJ(m, inc);
 #endif /* !defined(_KERNEL) */
 	COPYBACK(m, off, nlen, newbuf);
 
@@ -634,18 +629,13 @@ u_int data_ip;
 #if !defined(_KERNEL)
 	bcopy(newmsg, MTOD(m, char *) + off, nlen);
 #else
-# if defined(MENTAT)
-	if (inc < 0)
-		(void)adjmsg(m, inc);
-# else /* defined(MENTAT) */
 	/*
 	 * m_adj takes care of pkthdr.len, if required and treats inc<0 to
 	 * mean remove -len bytes from the end of the packet.
 	 * The mbuf chain will be extended if necessary by m_copyback().
 	 */
 	if (inc < 0)
-		m_adj(m, inc);
-# endif /* defined(MENTAT) */
+		M_ADJ(m, inc);
 #endif /* !defined(_KERNEL) */
 	COPYBACK(m, off, nlen, newmsg);
 
