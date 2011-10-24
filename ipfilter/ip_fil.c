@@ -435,9 +435,15 @@ int v;
     (defined(__FreeBSD__) && (__FreeBSD_version >= 501113))
 	(void) strncpy(ifp->if_xname, name, sizeof(ifp->if_xname));
 #else
-	for (s = name; *s && !ISDIGIT(*s); s++)
-		;
-	if (*s && ISDIGIT(*s)) {
+	s = name + strlen(name) - 1;
+	for (; s > name; s--) {
+		if (!ISDIGIT(*s)) {
+			s++;
+			break;
+		}
+	}
+		
+	if ((s > name) && (*s != 0) && ISDIGIT(*s)) {
 		ifp->if_unit = atoi(s);
 		ifp->if_name = (char *)malloc(s - name + 1);
 		(void) strncpy(ifp->if_name, name, s - name);
@@ -466,7 +472,10 @@ struct ifnet *ifp;
     (defined(__FreeBSD__) && (__FreeBSD_version >= 501113))
 	sprintf(ifname, "%s", ifp->if_xname);
 #else
-	sprintf(ifname, "%s%d", ifp->if_name, ifp->if_unit);
+	if (ifp->if_unit != -1)
+		sprintf(ifname, "%s%d", ifp->if_name, ifp->if_unit);
+	else
+		strcpy(ifname, ifp->if_name);
 #endif
 	return ifname;
 }

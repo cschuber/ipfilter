@@ -1802,7 +1802,7 @@ MALLOC_DECLARE(M_IPFILTER);
 #endif /* _KERNEL */
 
 #if !defined(IFNAME) && !defined(_KERNEL)
-# define	IFNAME(x)	((struct ifnet *)x)->if_name
+# define	IFNAME(x)	get_ifname((struct ifnet *)x)
 #endif
 #ifndef	COPYIFNAME
 # define	NEED_FRGETIFNAME
