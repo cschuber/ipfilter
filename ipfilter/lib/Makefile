@@ -50,11 +50,8 @@ LIBOBJS=$(DEST)/addicmp.o \
      $(DEST)/ipoptsec.o \
      $(DEST)/ipf_dotuning.o \
      $(DEST)/ipf_perror.o \
-     $(DEST)/ipft_ef.o \
      $(DEST)/ipft_hx.o \
      $(DEST)/ipft_pc.o \
-     $(DEST)/ipft_sn.o \
-     $(DEST)/ipft_td.o \
      $(DEST)/ipft_tx.o \
      $(DEST)/kmem.o \
      $(DEST)/kmemcpywrap.o \
@@ -240,16 +237,10 @@ $(DEST)/ipf_dotuning.o: $(LIBSRC)/ipf_dotuning.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/ipf_dotuning.c -o $@
 $(DEST)/ipf_perror.o: $(LIBSRC)/ipf_perror.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/ipf_perror.c -o $@
-$(DEST)/ipft_ef.o: $(LIBSRC)/ipft_ef.c $(INCDEP)
-	$(CC) $(CCARGS) -c $(LIBSRC)/ipft_ef.c -o $@
 $(DEST)/ipft_hx.o: $(LIBSRC)/ipft_hx.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/ipft_hx.c -o $@
 $(DEST)/ipft_pc.o: $(LIBSRC)/ipft_pc.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/ipft_pc.c -o $@
-$(DEST)/ipft_sn.o: $(LIBSRC)/ipft_sn.c $(TOP)/snoop.h
-	$(CC) $(CCARGS) -c $(LIBSRC)/ipft_sn.c -o $@
-$(DEST)/ipft_td.o: $(LIBSRC)/ipft_td.c $(INCDEP)
-	$(CC) $(CCARGS) -c $(LIBSRC)/ipft_td.c -o $@
 $(DEST)/ipft_tx.o: $(LIBSRC)/ipft_tx.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/ipft_tx.c -o $@
 $(DEST)/kmem.o: $(LIBSRC)/kmem.c $(INCDEP)
