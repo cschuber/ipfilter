@@ -15,7 +15,7 @@ static const char rcsid[] = "@(#)$Id$";
 
 extern	char	*optarg;
 extern	struct frentry	*ipfilter[2][2];
-extern	struct ipread	snoop, etherf, tcpd, pcap, iptext, iphex;
+extern	struct ipread	pcap, iptext, iphex;
 extern	struct ifnet	*get_unit __P((char *, int));
 extern	void	init_ifp __P((void));
 extern	ipnat_t	*natparse __P((char *, int));
@@ -135,12 +135,6 @@ char *argv[];
 		case 'F' :
 			if (strcasecmp(optarg, "pcap") == 0)
 				r = &pcap;
-			else if (strcasecmp(optarg, "etherfind") == 0)
-				r = &etherf;
-			else if (strcasecmp(optarg, "snoop") == 0)
-				r = &snoop;
-			else if (strcasecmp(optarg, "tcpdump") == 0)
-				r = &tcpd;
 			else if (strcasecmp(optarg, "hex") == 0)
 				r = &iphex;
 			else if (strcasecmp(optarg, "text") == 0)
