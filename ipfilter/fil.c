@@ -3007,15 +3007,8 @@ void *l4hdr;
 
 #ifdef	_KERNEL
 # ifdef MENTAT
-	{
-	void *rp = m->b_rptr;
-
-	if ((unsigned char *)ip > m->b_rptr && (unsigned char *)ip < m->b_wptr)
-		m->b_rptr = (u_char *)ip;
-	sum2 = ip_cksum(m, hlen, sum);	/* hlen == offset */
-	m->b_rptr = rp;
+	sum2 = ip_cksum(m, ((qpktinfo_t m*)fin->fin_qif)->qpi_off + hlen, sum);
 	sum2 = (u_short)(~sum2 & 0xffff);
-	}
 # else /* MENTAT */
 #  if defined(BSD) || defined(sun)
 #   if defined(BSD) && (BSD >= 199103)
