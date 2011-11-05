@@ -5091,8 +5091,6 @@ ipf_state_iter(softc, token, itp, obj)
 	if ((is != NULL) && (next == &zero))
 		ipf_state_deref(softc, &is);
 
-	READ_ENTER(&softc->ipf_state);
-
 	return error;
 }
 /* ------------------------------------------------------------------------ */

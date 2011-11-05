@@ -6932,7 +6932,6 @@ ipf_nat_getnext(softc, t, itp, objp)
 	if (nnext == NULL)
 		ipf_token_mark_complete(t);
 
-	READ_ENTER(&softc->ipf_nat);
 	return error;
 }
 
