@@ -1261,6 +1261,16 @@ ipf_sync_flush_table(softs, tabsize, table)
 
 	for (i = 0; i < tabsize; i++) {
 		while ((sl = table[i]) != NULL) {
+			switch (sl->sl_table) {
+			case SMC_STATE :
+				if (sl->sl_ips != NULL)
+					sl->sl_ips->is_sync = NULL;
+				break;
+			case SMC_NAT :
+				if (sl->sl_ipn != NULL)
+					sl->sl_ipn->ipn_sync = NULL;
+				break;
+			}
 			if (sl->sl_next != NULL)
 				sl->sl_next->sl_pnext = sl->sl_pnext;
 			table[i] = sl->sl_next;
