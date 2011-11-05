@@ -1268,7 +1268,7 @@ ipf_sync_flush_table(softs, tabsize, table)
 				break;
 			case SMC_NAT :
 				if (sl->sl_ipn != NULL)
-					sl->sl_ipn->ipn_sync = NULL;
+					sl->sl_ipn->nat_sync = NULL;
 				break;
 			}
 			if (sl->sl_next != NULL)
