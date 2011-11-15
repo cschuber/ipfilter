@@ -4105,7 +4105,12 @@ ipf_synclist(softc, fr, ifp)
 	error = 0;
 
 	for (; fr; fr = fr->fr_next) {
-		v = fr->fr_family;
+		if (fr->fr_family == AF_INET)
+			v = 4;
+		else if (fr->fr_family == AF_INET6)
+			v = 6;
+		else
+			v = 0;
 
 		/*
 		 * Lookup all the interface names that are part of the rule.
