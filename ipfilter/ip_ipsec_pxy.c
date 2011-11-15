@@ -161,9 +161,8 @@ ipf_p_ipsec_new(arg, fin, aps, nat)
 		return -1;
 
 	np = nat->nat_ptr;
-	aps->aps_psiz = sizeof(*ipsec);
-	KMALLOCS(aps->aps_data, ipsec_pxy_t *,
-		 sizeof(*ipsec) + np->in_namelen);
+	aps->aps_psiz = sizeof(*ipsec) + np->in_namelen;
+	KMALLOCS(aps->aps_data, ipsec_pxy_t *, aps->aps_psiz);
 	if (aps->aps_data == NULL)
 		return -1;
 

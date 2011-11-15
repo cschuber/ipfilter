@@ -103,8 +103,8 @@ ipf_p_pptp_new(arg, fin, aps, nat)
 	}
 	np = nat->nat_ptr;
 
-	aps->aps_psiz = sizeof(*pptp);
-	KMALLOCS(aps->aps_data, pptp_pxy_t *, sizeof(*pptp) + np->in_namelen);
+	aps->aps_psiz = sizeof(*pptp) + np->in_namelen;
+	KMALLOCS(aps->aps_data, pptp_pxy_t *, aps->aps_psiz);
 	if (aps->aps_data == NULL) {
 		if (ipf_p_pptp_debug > 0)
 			printf("ipf_p_pptp_new: malloc for aps_data failed\n");
