@@ -201,13 +201,14 @@ if [ x$solrev = x ] ; then
 fi
 for b in $ISABITS
 do
-    echo build $b bit binaries.
-    for v in OBJ ARCHINC XARCH
-    do
-	eval $v=\"\$$v$b\"
-    done
-    if [ -n "$BPFILTER" ] ; then
-	BPF="BPFILTER=$OBJ/$BPFILTER"
-    fi
-    $MAKE $MAKEFLAGS ${1+"$@"} sunos$rev SOLARIS2="-DSOLARIS2=$solrev" CPU= CPUDIR=${cpudir} CC="$CC $XARCH" XARCH="$XARCH" ARCHINC="$ARCHINC" BITS=$b OBJ=$OBJ $BPF || exit $?
+	echo build $b bit binaries.
+	for v in OBJ ARCHINC XARCH
+	do
+		eval $v=\"\$$v$b\"
+	done
+	eval B=\"\$OBJ${b}_`uname -p`\"
+	if [ -n "$BPFILTER" ] ; then
+		BPF="BPFILTER=$OBJ/$BPFILTER"
+	fi
+	$MAKE $MAKEFLAGS ${1+"$@"} sunos$rev SOLARIS2="-DSOLARIS2=$solrev" CPU= CPUDIR=${cpudir} CC="$CC $XARCH" XARCH="$XARCH" INSTANCE="$INST" ARCHINC="$ARCHINC" BITS=$b OBJ=$B $BPF || exit $?
 done
