@@ -102,34 +102,6 @@ static const char sccsid[] = "@(#)ip_state.c	1.8 6/5/96 (C) 1993-2000 Darren Ree
 static const char rcsid[] = "@(#)$Id$";
 #endif
 
-typedef struct ipf_state_softc_s {
-	ipfmutex_t	ipf_stinsert;
-	int		ipf_state_logging;
-	int		ipf_state_lock;
-	int		ipf_state_doflush;
-	u_int		ipf_state_inited;
-	u_int		ipf_state_max;
-	u_int		ipf_state_maxbucket;
-	u_int		ipf_state_size;
-	u_int		ipf_state_wm_freq;
-	u_int		ipf_state_wm_high;
-	u_int		ipf_state_wm_low;
-	u_int		ipf_state_wm_last;
-	u_long		*ipf_state_seed;
-	ipstate_t	*ipf_state_list;
-	ipstate_t	**ipf_state_table;
-	ipftuneable_t	*ipf_state_tune;
-	ipftq_t		*ipf_state_usertq;
-	ipftq_t		ipf_state_pending;
-	ipftq_t		ipf_state_deletetq;
-	ipftq_t		ipf_state_udptq;
-	ipftq_t		ipf_state_udpacktq;
-	ipftq_t		ipf_state_iptq;
-	ipftq_t		ipf_state_icmptq;
-	ipftq_t		ipf_state_icmpacktq;
-	ipftq_t		ipf_state_tcptq[IPF_TCP_NSTATES];
-	ips_stat_t	ipf_state_stats;
-} ipf_state_softc_t;
 
 static ipftuneable_t ipf_state_tuneables[] = {
 	{ { (void *)offsetof(ipf_state_softc_t, ipf_state_max) },
