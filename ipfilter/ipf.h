@@ -305,7 +305,7 @@ extern char *portname __P((int, int));
 extern int pri_findname __P((char *));
 extern char *pri_toname __P((int));
 extern void print_toif __P((char *, char *, struct frdest *));
-extern void printaps __P((ap_session_t *, int));
+extern void printaps __P((ap_session_t *, int, int));
 extern void printaddr __P((int, int, char *, int, u_32_t *, u_32_t *));
 extern void printbuf __P((char *, int, int));
 extern void printfieldhdr __P((wordtab_t *, wordtab_t *));

@@ -796,7 +796,6 @@ ipf_proxy_new(fin, nat)
 	}
 
 	bzero((char *)aps, sizeof(*aps));
-	aps->aps_p = fin->fin_p;
 	aps->aps_data = NULL;
 	aps->aps_apr = apr;
 	aps->aps_psiz = 0;
@@ -873,7 +872,7 @@ ipf_proxy_check(fin, nat)
 #endif
 
 	aps = nat->nat_aps;
-	if ((aps != NULL) && (aps->aps_p == fin->fin_p)) {
+	if (aps != NULL) {
 		/*
 		 * If there is data in this packet to be proxied then try and
 		 * get it all into the one buffer, else drop it.
