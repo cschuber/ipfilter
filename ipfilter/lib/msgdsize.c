@@ -11,10 +11,10 @@
 size_t msgdsize(orig)
 	mb_t *orig;
 {
-	size_t sz;
+	size_t sz = 0;
 	mb_t *m;
 
-	for (sz = 0, m = orig; m != NULL; sz += m->mb_len, m = m->mb_next)
-		;
+	for (m = orig; m != NULL; m = m->mb_next)
+		sz += m->mb_len;
 	return sz;
 }
