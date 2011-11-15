@@ -291,6 +291,7 @@ extern int load_pool __P((struct ip_pool_s *list, ioctlfunc_t));
 extern int load_poolnode __P((int, char *, ip_pool_node_t *, int, ioctlfunc_t));
 extern alist_t *load_url __P((char *));
 extern alist_t *make_range __P((int, struct in_addr, struct in_addr));
+extern void mb_hexdump __P((mb_t *, FILE *));
 extern ipfunc_t nametokva __P((char *, ioctlfunc_t));
 extern void nat_setgroupmap __P((struct ipnat *));
 extern int ntomask __P((int, int, u_32_t *));
