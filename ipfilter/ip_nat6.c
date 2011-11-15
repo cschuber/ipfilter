@@ -135,6 +135,16 @@ static int ipf_nat6_insert __P((ipf_main_softc_t *, ipf_nat_softc_t *,
 
 #define	NINCLSIDE6(y,x)	ATOMIC_INCL(softn->ipf_nat_stats.ns_side6[y].x)
 #define	NBUMPSIDE6(y,x)	softn->ipf_nat_stats.ns_side6[y].x++
+#define	NBUMPSIDE6D(y,x) \
+			do { \
+				softn->ipf_nat_stats.ns_side6[y].x++; \
+				DT(x); \
+			} while (0)
+#define	NBUMPSIDE6DX(y,x,z) \
+			do { \
+				softn->ipf_nat_stats.ns_side6[y].x++; \
+				DT(z); \
+			} while (0)
 
 
 /* ------------------------------------------------------------------------ */
@@ -509,7 +519,7 @@ ipf_nat6_newmap(fin, nat, ni)
 
 		if (IP6_ISONES(&np->in_nsrcmsk6) && (np->in_spnext == 0)) {
 			if (l > 0) {
-				NINCLSIDE6(1, ns_exhausted);
+				NBUMPSIDE6DX(1, ns_exhausted, ns_exhausted_1);
 				return -1;
 			}
 		}
@@ -535,7 +545,7 @@ ipf_nat6_newmap(fin, nat, ni)
 		} else if (np->in_redir & NAT_MAPBLK) {
 			if ((l >= np->in_ppip) || ((l > 0) &&
 			     !(flags & IPN_TCPUDP))) {
-				NINCLSIDE6(1, ns_exhausted);
+				NBUMPSIDE6DX(1, ns_exhausted, ns_exhausted_2);
 				return -1;
 			}
 			/*
@@ -569,7 +579,8 @@ ipf_nat6_newmap(fin, nat, ni)
 			if ((l > 0) ||
 			    ipf_ifpaddr(softc, 6, FRI_NORMAL, fin->fin_ifp,
 				       &in, NULL) == -1) {
-				NINCLSIDE6(1, ns_new_ifpaddr);
+				NBUMPSIDE6DX(1, ns_new_ifpaddr,
+					     ns_new_ifpaddr_1);
 				return -1;
 			}
 
@@ -579,7 +590,7 @@ ipf_nat6_newmap(fin, nat, ni)
 			 * 0/0 - use the original source address/port.
 			 */
 			if (l > 0) {
-				NINCLSIDE6(1, ns_exhausted);
+				NBUMPSIDE6DX(1, ns_exhausted, ns_exhausted_3);
 				return -1;
 			}
 			in = fin->fin_src6;
@@ -678,7 +689,7 @@ ipf_nat6_newmap(fin, nat, ni)
 		    (np->in_spnext != 0) && (st_port == np->in_spnext) &&
 		    (!IP6_ISZERO(&np->in_snip6) &&
 		     IP6_EQ(&st_ip, &np->in_snip6))) {
-			NINCLSIDE6(1, ns_wrap);
+			NBUMPSIDE6D(1, ns_wrap);
 			return -1;
 		}
 		l++;
@@ -812,7 +823,7 @@ ipf_nat6_newrdr(fin, nat, ni)
 		 */
 		if (ipf_ifpaddr(softc, 6, FRI_NORMAL, fin->fin_ifp,
 			       &in, NULL) == -1) {
-			NINCLSIDE6(0, ns_new_ifpaddr);
+			NBUMPSIDE6DX(0, ns_new_ifpaddr, ns_new_ifpaddr_2);
 			return -1;
 		}
 
@@ -865,7 +876,7 @@ ipf_nat6_newrdr(fin, nat, ni)
 	 */
 	if (IP6_ISZERO(&in)) {
 		if (nport == dport) {
-			NINCLSIDE6(0, ns_xlate_null);
+			NBUMPSIDE6D(0, ns_xlate_null);
 			return -1;
 		}
 		in = fin->fin_dst6;
@@ -886,7 +897,7 @@ ipf_nat6_newrdr(fin, nat, ni)
 	fin->fin_data[0] = sp;
 	fin->fin_data[1] = dp;
 	if (natl != NULL) {
-		NINCLSIDE6(0, ns_xlate_exists);
+		NBUMPSIDE6D(0, ns_xlate_exists);
 		return -1;
 	}
 
@@ -1197,7 +1208,7 @@ ipf_nat6_finalise(fin, nat)
 		return 0;
 	}
 
-	NINCLSIDE6(fin->fin_out, ns_unfinalised);
+	NBUMPSIDE6D(fin->fin_out, ns_unfinalised);
 	/*
 	 * nat6_insert failed, so cleanup time...
 	 */
@@ -1262,13 +1273,13 @@ ipf_nat6_insert(softc, softn, nat)
 
 	if (softn->ipf_nat_stats.ns_side[0].ns_bucketlen[hv1] >=
 	    softn->ipf_nat_maxbucket) {
-		NINCLSIDE6(0, ns_bucket_max);
+		NBUMPSIDE6D(0, ns_bucket_max);
 		return -1;
 	}
 
 	if (softn->ipf_nat_stats.ns_side[1].ns_bucketlen[hv2] >=
 	    softn->ipf_nat_maxbucket) {
-		NINCLSIDE6(1, ns_bucket_max);
+		NBUMPSIDE6D(1, ns_bucket_max);
 		return -1;
 	}
 	if (nat->nat_dir == NAT_INBOUND || nat->nat_dir == NAT_ENCAPIN ||
@@ -1578,7 +1589,7 @@ ipf_nat6_icmperror(fin, nflags, dir)
 	void *dp;
 
 	if ((fin->fin_flx & (FI_SHORT|FI_FRAGBODY))) {
-		NINCLSIDE6(fin->fin_out, ns_icmp_short);
+		NBUMPSIDE6D(fin->fin_out, ns_icmp_short);
 		return NULL;
 	}
 
@@ -1586,7 +1597,7 @@ ipf_nat6_icmperror(fin, nflags, dir)
 	 * ipf_nat6_icmperrorlookup() will return NULL for `defective' packets.
 	 */
 	if ((fin->fin_v != 6) || !(nat = ipf_nat6_icmperrorlookup(fin, dir))) {
-		NINCLSIDE6(fin->fin_out, ns_icmp_notfound);
+		NBUMPSIDE6D(fin->fin_out, ns_icmp_notfound);
 		return NULL;
 	}
 
@@ -1598,7 +1609,7 @@ ipf_nat6_icmperror(fin, nflags, dir)
 		 */
 		if (ipf_nat6_rebuildencapicmp(fin, nat) == 0)
 			return nat;
-		NINCLSIDE6(fin->fin_out, ns_icmp_rebuild);
+		NBUMPSIDE6D(fin->fin_out, ns_icmp_rebuild);
 		return NULL;
 	}
 
@@ -2016,11 +2027,11 @@ ipf_nat6_inlookup(fin, flags, p, src, mapdst)
 	 */
 find_in_wild_ports:
 	if (!(flags & NAT_TCPUDP) || !(flags & NAT_SEARCH)) {
-		NINCLSIDE6(0, ns_lookup_miss);
+		NBUMPSIDE6DX(0, ns_lookup_miss, ns_lookup_miss_1);
 		return NULL;
 	}
 	if (softn->ipf_nat_stats.ns_wilds == 0) {
-		NINCLSIDE6(0, ns_lookup_nowild);
+		NBUMPSIDE6D(0, ns_lookup_nowild);
 		return NULL;
 	}
 
@@ -2109,7 +2120,7 @@ find_in_wild_ports:
 	MUTEX_DOWNGRADE(&softc->ipf_nat);
 
 	if (nat == NULL) {
-		NINCLSIDE6(0, ns_lookup_miss);
+		NBUMPSIDE6DX(0, ns_lookup_miss, ns_lookup_miss_2);
 	}
 	return nat;
 }
@@ -2334,11 +2345,11 @@ ipf_nat6_outlookup(fin, flags, p, src, dst)
 	 */
 find_out_wild_ports:
 	if (!(flags & NAT_TCPUDP) || !(flags & NAT_SEARCH)) {
-		NINCLSIDE6(1, ns_lookup_miss);
+		NBUMPSIDE6DX(1, ns_lookup_miss, ns_lookup_miss_3);
 		return NULL;
 	}
 	if (softn->ipf_nat_stats.ns_wilds == 0) {
-		NINCLSIDE6(1, ns_lookup_nowild);
+		NBUMPSIDE6D(1, ns_lookup_nowild);
 		return NULL;
 	}
 
@@ -2426,7 +2437,7 @@ find_out_wild_ports:
 	MUTEX_DOWNGRADE(&softc->ipf_nat);
 
 	if (nat == NULL) {
-		NINCLSIDE6(1, ns_lookup_miss);
+		NBUMPSIDE6DX(1, ns_lookup_miss, ns_lookup_miss_4);
 	}
 	return nat;
 }
@@ -2826,18 +2837,18 @@ outmatchfail:
 	{
 	case -1 :
 		if (passp != NULL) {
-			NINCLSIDE6(1, ns_drop);
+			NBUMPSIDE6D(1, ns_drop);
 			*passp = FR_BLOCK;
 			fin->fin_reason = FRB_NATV6OUT;
 		}
 		fin->fin_flx |= FI_BADNAT;
-		NINCLSIDE6(1, ns_badnat);
+		NBUMPSIDE6D(1, ns_badnat);
 		break;
 	case 0 :
-		NINCLSIDE6(1, ns_ignored);
+		NBUMPSIDE6D(1, ns_ignored);
 		break;
 	case 1 :
-		NINCLSIDE6(1, ns_translated);
+		NBUMPSIDE6D(1, ns_translated);
 		break;
 	}
 	fin->fin_ifp = sifp;
@@ -2909,7 +2920,7 @@ ipf_nat6_out(fin, nat, natadd, nflags)
 
 		skip = ipf_nat6_decap(fin, nat);
 		if (skip <= 0) {
-			NINCLSIDE6(1, ns_decap_fail);
+			NBUMPSIDE6D(1, ns_decap_fail);
 			return -1;
 		}
 
@@ -2947,7 +2958,7 @@ ipf_nat6_out(fin, nat, natadd, nflags)
 
 		m = M_DUP(np->in_divmp);
 		if (m == NULL) {
-			NINCLSIDE6(1, ns_encap_dup);
+			NBUMPSIDE6D(1, ns_encap_dup);
 			return -1;
 		}
 
@@ -2976,7 +2987,7 @@ ipf_nat6_out(fin, nat, natadd, nflags)
 
 		m = M_DUP(np->in_divmp);
 		if (m == NULL) {
-			NINCLSIDE6(1, ns_divert_dup);
+			NBUMPSIDE6D(1, ns_divert_dup);
 			return -1;
 		}
 
@@ -3058,7 +3069,7 @@ ipf_nat6_out(fin, nat, natadd, nflags)
 		if (i == 0)
 			i = 1;
 		else if (i == -1) {
-			NINCLSIDE6(1, ns_appr_fail);
+			NBUMPSIDE6D(1, ns_appr_fail);
 		}
 #else
 		i = 1;
@@ -3313,18 +3324,18 @@ inmatchfail:
 	{
 	case -1 :
 		if (passp != NULL) {
-			NINCLSIDE6(0, ns_drop);
+			NBUMPSIDE6D(0, ns_drop);
 			*passp = FR_BLOCK;
 			fin->fin_reason = FRB_NATV6IN;
 		}
 		fin->fin_flx |= FI_BADNAT;
-		NINCLSIDE6(0, ns_badnat);
+		NBUMPSIDE6D(0, ns_badnat);
 		break;
 	case 0 :
-		NINCLSIDE6(0, ns_ignored);
+		NBUMPSIDE6D(0, ns_ignored);
 		break;
 	case 1 :
-		NINCLSIDE6(0, ns_translated);
+		NBUMPSIDE6D(0, ns_translated);
 		break;
 	}
 	return rval;
@@ -3381,7 +3392,7 @@ ipf_nat6_in(fin, nat, natadd, nflags)
 #ifdef IPF_V6_PROXIES
 			i = appr_check(fin, nat);
 			if (i == -1) {
-				NINCLSIDE6(0, ns_appr_fail);
+				NBUMPSIDE6D(0, ns_appr_fail);
 				return -1;
 			}
 #endif
@@ -3440,7 +3451,7 @@ ipf_nat6_in(fin, nat, natadd, nflags)
 
 		m = M_DUP(np->in_divmp);
 		if (m == NULL) {
-			NINCLSIDE6(0, ns_encap_dup);
+			NBUMPSIDE6D(0, ns_encap_dup);
 			return -1;
 		}
 
@@ -3467,7 +3478,7 @@ ipf_nat6_in(fin, nat, natadd, nflags)
 
 		m = M_DUP(np->in_divmp);
 		if (m == NULL) {
-			NINCLSIDE6(0, ns_divert_dup);
+			NBUMPSIDE6D(0, ns_divert_dup);
 			return -1;
 		}
 
@@ -3496,7 +3507,7 @@ ipf_nat6_in(fin, nat, natadd, nflags)
 
 		skip = ipf_nat6_decap(fin, nat);
 		if (skip <= 0) {
-			NINCLSIDE6(0, ns_decap_fail);
+			NBUMPSIDE6D(0, ns_decap_fail);
 			return -1;
 		}
 
@@ -3859,7 +3870,7 @@ ipf_nat6_newdivert(fin, nat, nai)
 	}
 
 	if (natl != NULL) {
-		NINCLSIDE6(fin->fin_out, ns_divert_exist);
+		NBUMPSIDE6D(fin->fin_out, ns_divert_exist);
 		return -1;
 	}
 
@@ -4013,7 +4024,7 @@ ipf_nat6_decap(fin, nat)
 	fin->fin_ip6 = (ip6_t *)(hdr + skip);
 
 	if (ipf_pr_pullup(fin, skip + sizeof(ip6_t)) == -1) {
-		NINCLSIDE6(fin->fin_out, ns_decap_pullup);
+		NBUMPSIDE6D(fin->fin_out, ns_decap_pullup);
 		return -1;
 	}
 
@@ -4023,7 +4034,7 @@ ipf_nat6_decap(fin, nat)
 	fin->fin_ipoff += skip;
 
 	if (ipf_makefrip(sizeof(ip6_t), (ip_t *)hdr, fin) == -1) {
-		NINCLSIDE6(fin->fin_out, ns_decap_bad);
+		NBUMPSIDE6D(fin->fin_out, ns_decap_bad);
 		return -1;
 	}
 
@@ -4082,7 +4093,7 @@ ipf_nat6_matchencap(fin, np)
 	skip = fin->fin_hlen;
 	if (M_LEN(m) < skip + sizeof(ip6_t)) {
 		if (ipf_pr_pullup(fin, sizeof(ip6_t)) == -1) {
-			NINCLSIDE6(fin->fin_out, ns_encap_pullup);
+			NBUMPSIDE6D(fin->fin_out, ns_encap_pullup);
 			return -1;
 		}
 	}
