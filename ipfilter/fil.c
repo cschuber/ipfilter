@@ -1988,7 +1988,7 @@ ipf_checkcipso(fin, s, ol)
 
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_makefrip                                                */
-/* Returns:     void                                                        */
+/* Returns:     int     - 0 == packet ok, -1 == packet freed                */
 /* Parameters:  hlen(I) - length of IP packet header                        */
 /*              ip(I)   - pointer to the IP header                          */
 /*              fin(IO) - pointer to packet information                     */
@@ -7321,7 +7321,8 @@ ipf_resolvedest(softc, base, fdp, v)
 /* Function:    ipf_resolvenic                                              */
 /* Returns:     void* - NULL = wildcard name, -1 = failed to find NIC, else */
 /*                      pointer to interface structure for NIC              */
-/* Parameters:  name(I) - complete interface name                           */
+/* Parameters:  softc(I)- pointer to soft context main structure            */
+/*              name(I) - complete interface name                           */
 /*              v(I)    - IP protocol version                               */
 /*                                                                          */
 /* Look for a network interface structure that firstly has a matching name  */
@@ -7354,7 +7355,7 @@ ipf_resolvenic(softc, name, v)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_token_expire                                            */
 /* Returns:     None.                                                       */
-/* Parameters:  None.                                                       */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
 /*                                                                          */
 /* This function is run every ipf tick to see if there are any tokens that  */
 /* have been held for too long and need to be freed up.                     */
@@ -7379,7 +7380,8 @@ ipf_token_expire(softc)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_token_del                                                */
 /* Returns:     int     - 0 = success, else error                           */
-/* Parameters:  type(I) - the token type to match                           */
+/* Parameters:  softc(I)- pointer to soft context main structure           */
+/*              type(I) - the token type to match                           */
 /*              uid(I)  - uid owning the token                              */
 /*              ptr(I)  - context pointer for the token                     */
 /*                                                                          */
@@ -7432,7 +7434,8 @@ ipf_token_mark_complete(token)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_token_find                                               */
 /* Returns:     ipftoken_t * - NULL if no memory, else pointer to token     */
-/* Parameters:  type(I) - the token type to match                           */
+/* Parameters:  softc(I)- pointer to soft context main structure            */
+/*              type(I) - the token type to match                           */
 /*              uid(I)  - uid owning the token                              */
 /*              ptr(I)  - context pointer for the token                     */
 /*                                                                          */
@@ -7500,9 +7503,10 @@ ipf_token_find(softc, type, uid, ptr)
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    ipf_token_unlink                                             */
+/* Function:    ipf_token_unlink                                            */
 /* Returns:     None.                                                       */
-/* Parameters:  token(I) - pointer to token structure                       */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              token(I) - pointer to token structure                       */
 /* Write Locks: ipf_tokens                                                  */
 /*                                                                          */
 /* This function unlinks a token structure from the linked list of tokens   */
@@ -7527,7 +7531,8 @@ ipf_token_unlink(softc, token)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_token_deref                                             */
 /* Returns:     None.                                                       */
-/* Parameters:  token(I) - pointer to token structure                       */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              token(I) - pointer to token structure                       */
 /* Write Locks: ipf_tokens                                                  */
 /*                                                                          */
 /* Drop the reference count on the token structure and if it drops to zero, */
@@ -7589,7 +7594,8 @@ ipf_token_deref(softc, token)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_token_free                                              */
 /* Returns:     None.                                                       */
-/* Parameters:  token(I) - pointer to token structure                       */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              token(I) - pointer to token structure                       */
 /* Write Locks: ipf_tokens                                                  */
 /*                                                                          */
 /* This function unlinks a token from the linked list and does a dereference*/
@@ -7610,7 +7616,8 @@ ipf_token_free(softc, token)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_getnextrule                                             */
 /* Returns:     int - 0 = success, else error                               */
-/* Parameters:  t(I)   - pointer to destination information to resolve      */
+/* Parameters:  softc(I)- pointer to soft context main structure            */
+/*              t(I)   - pointer to destination information to resolve      */
 /*              ptr(I) - pointer to ipfobj_t to copyin from user space      */
 /*                                                                          */
 /* This function's first job is to bring in the ipfruleiter_t structure via */
@@ -7724,7 +7731,8 @@ ipf_getnextrule(softc, t, ptr)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_frruleiter                                              */
 /* Returns:     int - 0 = success, else error                               */
-/* Parameters:  data(I) - the token type to match                           */
+/* Parameters:  softc(I)- pointer to soft context main structure            */
+/*              data(I) - the token type to match                           */
 /*              uid(I)  - uid owning the token                              */
 /*              ptr(I)  - context pointer for the token                     */
 /*                                                                          */
@@ -7762,9 +7770,12 @@ ipf_frruleiter(softc, data, uid, ctx)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_geniter                                                 */
 /* Returns:     int - 0 = success, else error                               */
-/* Parameters:  token(I) - pointer to ipftoken_t structure                  */
-/*              itp(I)   -                                                  */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              token(I) - pointer to ipftoken_t structure                  */
+/*              itp(I)   - pointer to iterator data                         */
 /*                                                                          */
+/* Decide which iterator function to call using information passed through  */
+/* the ipfgeniter_t structure at itp.                                       */
 /* ------------------------------------------------------------------------ */
 static int
 ipf_geniter(softc, token, itp)
@@ -7792,10 +7803,12 @@ ipf_geniter(softc, token, itp)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_genericiter                                             */
 /* Returns:     int - 0 = success, else error                               */
-/* Parameters:  data(I) - the token type to match                           */
+/* Parameters:  softc(I)- pointer to soft context main structure            */
+/*              data(I) - the token type to match                           */
 /*              uid(I)  - uid owning the token                              */
 /*              ptr(I)  - context pointer for the token                     */
 /*                                                                          */
+/* Handle the SIOCGENITER ioctl for the ipfilter device. The primary role   */
 /* ------------------------------------------------------------------------ */
 int
 ipf_genericiter(softc, data, uid, ctx)
@@ -7833,7 +7846,8 @@ ipf_genericiter(softc, data, uid, ctx)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_ipf_ioctl                                               */
 /* Returns:     int - 0 = success, else error                               */
-/* Parameters:  data(I) - the token type to match                           */
+/* Parameters:  softc(I)- pointer to soft context main structure           */
+/*              data(I) - the token type to match                           */
 /*              cmd(I)  - the ioctl command number                          */
 /*              mode(I) - mode flags for the ioctl                          */
 /*              uid(I)  - uid owning the token                              */
@@ -8320,7 +8334,8 @@ cantdecaps:
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_matcharray_load                                         */
 /* Returns:     int         - 0 = success, else error                       */
-/* Parameters:  data(I)     - pointer to ioctl data                         */
+/* Parameters:  softc(I)    - pointer to soft context main structure        */
+/*              data(I)     - pointer to ioctl data                         */
 /*              objp(I)     - ipfobj_t structure to load data into          */
 /*              arrayptr(I) - pointer to location to store array pointer    */
 /*                                                                          */
@@ -8588,7 +8603,8 @@ ipf_fr_matcharray(fin, array)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_queueflush                                              */
 /* Returns:     int - number of entries flushed (0 = none)                  */
-/* Parameters:  deletefn(I) - function to call to delete entry              */
+/* Parameters:  softc(I)    - pointer to soft context main structure        */
+/*              deletefn(I) - function to call to delete entry              */
 /*              ipfqs(I)    - top of the list of ipf internal queues        */
 /*              userqs(I)   - top of the list of user defined timeouts      */
 /*                                                                          */
@@ -8742,7 +8758,8 @@ ipf_queueflush(softc, deletefn, ipfqs, userqs, activep, size, low)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_deliverlocal                                            */
 /* Returns:     int - 1 = local address, 0 = non-local address              */
-/* Parameters:  ipversion(I) - IP protocol version (4 or 6)                 */
+/* Parameters:  softc(I)     - pointer to soft context main structure       */
+/*              ipversion(I) - IP protocol version (4 or 6)                 */
 /*              ifp(I)       - network interface pointer                    */
 /*              ipaddr(I)    - IPv4/6 destination address                   */
 /*                                                                          */
@@ -8781,8 +8798,9 @@ ipf_deliverlocal(softc, ipversion, ifp, ipaddr)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_settimeout                                              */
 /* Returns:     int - 0 = success, -1 = failure                             */
-/* Parameters:  t(I) - pointer to tuneable array entry                      */
-/*              p(I) - pointer to values passed in to apply                 */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              t(I)     - pointer to tuneable array entry                  */
+/*              p(I)     - pointer to values passed in to apply             */
 /*                                                                          */
 /* This function is called to set the timeout values for each distinct      */
 /* queue timeout that is available.  When called, it calls into both the    */
