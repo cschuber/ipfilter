@@ -781,8 +781,8 @@ ipf_hk_v4_in(tok, data, arg)
 	qpktinfo_t qpi;
 	int rval;
 
-	qpi.qpi_real = (void *)hpe->hpe_ofp;
-	qpi.qpi_ill = qpi.qpi_real;
+	qpi.qpi_real = (void *)hpe->hpe_ifp;
+	qpi.qpi_ill = (void *)hpe->hpe_ifp;
 	qpi.qpi_q = NULL;
 	qpi.qpi_m = hpe->hpe_mb;
 	qpi.qpi_data = hpe->hpe_hdr;
@@ -814,7 +814,7 @@ ipf_hk_v4_out(tok, data, arg)
 	int rval;
 
 	qpi.qpi_real = (void *)hpe->hpe_ofp;
-	qpi.qpi_ill = qpi.qpi_real;
+	qpi.qpi_ill = (void *)hpe->hpe_ofp;
 	qpi.qpi_q = NULL;
 	qpi.qpi_m = hpe->hpe_mb;
 	qpi.qpi_data = hpe->hpe_hdr;
@@ -879,8 +879,8 @@ ipf_hk_v6_in(tok, data, arg)
 	qpktinfo_t qpi;
 	int rval;
 
-	qpi.qpi_real = (void *)hpe->hpe_ofp;
-	qpi.qpi_ill = qpi.qpi_real;
+	qpi.qpi_real = (void *)hpe->hpe_ifp;
+	qpi.qpi_ill = (void *)hpe->hpe_ifp;
 	qpi.qpi_q = NULL;
 	qpi.qpi_m = hpe->hpe_mb;
 	qpi.qpi_data = hpe->hpe_hdr;
@@ -911,7 +911,7 @@ ipf_hk_v6_out(tok, data, arg)
 	int rval;
 
 	qpi.qpi_real = (void *)hpe->hpe_ofp;
-	qpi.qpi_ill = qpi.qpi_real;
+	qpi.qpi_ill = (void *)hpe->hpe_ofp;
 	qpi.qpi_q = NULL;
 	qpi.qpi_m = hpe->hpe_mb;
 	qpi.qpi_data = hpe->hpe_hdr;
