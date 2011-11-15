@@ -382,7 +382,7 @@ void dostats_dead(nsp, opts, filter)
 			}
 			printf("\n");
 		} else {
-			printactivenat(&nat, opts, 0, nsp->ns_ticks);
+			printactivenat(&nat, opts, nsp->ns_ticks);
 			if (nat.nat_aps)
 				printaps(nat.nat_aps, opts);
 		}
@@ -568,7 +568,7 @@ void dostats_live(fd, nsp, opts, filter)
 			}
 			printf("\n");
 		} else {
-			printactivenat(&nat, opts, 1, nsp->ns_ticks);
+			printactivenat(&nat, opts, nsp->ns_ticks);
 			if (nat.nat_aps)
 				printaps(nat.nat_aps, opts);
 		}
