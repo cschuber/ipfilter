@@ -116,12 +116,19 @@ static const char rcsid[] = "@(#)$Id$";
 
 #define	NATFSUM(n,v,f)	((v) == 4 ? (n)->f.in4.s_addr : (n)->f.i6[0] + \
 			 (n)->f.i6[1] + (n)->f.i6[2] + (n)->f.i6[3])
-#define	NINCL(x)	ATOMIC_INCL(softn->x)
 #define	NBUMP(x)	softn->(x)++
-#define	NINCLSIDE(y,x)	ATOMIC_INCL(softn->ipf_nat_stats.ns_side[y].x)
+#define	NBUMPD(x, y)	do { \
+				softn->x.y++; \
+				DT(y); \
+			} while (0)
 #define	NBUMPSIDE(y,x)	softn->ipf_nat_stats.ns_side[y].x++
 #define	NBUMPSIDED(y,x)	do { softn->ipf_nat_stats.ns_side[y].x++; \
 			     DT(x); } while (0)
+#define	NBUMPSIDEX(y,x,z) \
+			do { softn->ipf_nat_stats.ns_side[y].x++; \
+			     DT(z); } while (0)
+#define	NBUMPSIDEDF(y,x)do { softn->ipf_nat_stats.ns_side[y].x++; \
+			     DT1(x, fr_info_t *, fin); } while (0)
 
 frentry_t	ipfnatblock;
 
@@ -2738,8 +2745,7 @@ ipf_nat_newmap(fin, nat, ni)
 
 		if ((np->in_nsrcmsk == 0xffffffff) && (np->in_spnext == 0)) {
 			if (l > 0) {
-				DT(ns_exhausted_1);
-				NBUMPSIDE(1, ns_exhausted);
+				NBUMPSIDEX(1, ns_exhausted, ns_exhausted_1);
 				return -1;
 			}
 		}
@@ -2756,8 +2762,7 @@ ipf_nat_newmap(fin, nat, ni)
 		} else if (np->in_redir & NAT_MAPBLK) {
 			if ((l >= np->in_ppip) || ((l > 0) &&
 			     !(flags & IPN_TCPUDP))) {
-				DT(ns_exhausted_2);
-				NBUMPSIDE(1, ns_exhausted);
+				NBUMPSIDEX(1, ns_exhausted, ns_exhausted_2);
 				return -1;
 			}
 			/*
@@ -2792,8 +2797,7 @@ ipf_nat_newmap(fin, nat, ni)
 			if ((l > 0) ||
 			    ipf_ifpaddr(softc, 4, FRI_NORMAL, fin->fin_ifp,
 				       &in6, NULL) == -1) {
-				DT(ns_new_ifpaddr_1);
-				NBUMPSIDE(1, ns_new_ifpaddr);
+				NBUMPSIDEX(1, ns_new_ifpaddr, ns_new_ifpaddr_1);
 				return -1;
 			}
 			in.s_addr = ntohl(in6.in4.s_addr);
@@ -2803,8 +2807,7 @@ ipf_nat_newmap(fin, nat, ni)
 			 * 0/0 - use the original source address/port.
 			 */
 			if (l > 0) {
-				DT(ns_exhausted_3);
-				NBUMPSIDE(1, ns_exhausted);
+				NBUMPSIDEX(1, ns_exhausted, ns_exhausted_3);
 				return -1;
 			}
 			in.s_addr = ntohl(fin->fin_saddr);
@@ -2845,8 +2848,11 @@ ipf_nat_newmap(fin, nat, ni)
 			if (np->in_flags & IPN_SEQUENTIAL) {
 				port = np->in_spnext;
 			} else {
-				port = ipf_random() %
-				       (np->in_spmax - np->in_spmin + 1);
+				if (np->in_spmax > np->in_spmin)
+					port = ipf_random() % (np->in_spmax -
+							       np->in_spmin);
+				else
+					port = 0;
 				port += np->in_spmin;
 			}
 			port = htons(port);
@@ -3030,8 +3036,7 @@ ipf_nat_newrdr(fin, nat, ni)
 		 */
 		if (ipf_ifpaddr(softc, 4, FRI_NORMAL, fin->fin_ifp,
 			       &in6, NULL) == -1) {
-			DT(ns_new_ifpaddr_2);
-			NBUMPSIDE(0, ns_new_ifpaddr);
+			NBUMPSIDEX(0, ns_new_ifpaddr, ns_new_ifpaddr_2);
 			return -1;
 		}
 		in.s_addr = ntohl(in6.in4.s_addr);
@@ -3176,7 +3181,7 @@ ipf_nat_add(fin, np, natsave, flags, direction)
 	}
 
 	if (nsp->ns_active >= softn->ipf_nat_table_max) {
-		NINCLSIDE(fin->fin_out, ns_table_max);
+		NBUMPSIDED(fin->fin_out, ns_table_max);
 		return NULL;
 	}
 
@@ -3191,7 +3196,7 @@ ipf_nat_add(fin, np, natsave, flags, direction)
 	/* Give me a new nat */
 	KMALLOC(nat, nat_t *);
 	if (nat == NULL) {
-		NINCLSIDE(fin->fin_out, ns_memfail);
+		NBUMPSIDED(fin->fin_out, ns_memfail);
 		/*
 		 * Try to automatically tune the max # of entries in the
 		 * table allowed to be less than what will cause kmem_alloc()
@@ -3799,7 +3804,7 @@ ipf_nat_icmperror(fin, nflags, dir)
 	void *dp;
 
 	if ((fin->fin_flx & (FI_SHORT|FI_FRAGBODY))) {
-		NINCLSIDE(fin->fin_out, ns_icmp_short);
+		NBUMPSIDED(fin->fin_out, ns_icmp_short);
 		return NULL;
 	}
 
@@ -3807,7 +3812,7 @@ ipf_nat_icmperror(fin, nflags, dir)
 	 * ipf_nat_icmperrorlookup() will return NULL for `defective' packets.
 	 */
 	if ((fin->fin_v != 4) || !(nat = ipf_nat_icmperrorlookup(fin, dir))) {
-		NINCLSIDE(fin->fin_out, ns_icmp_notfound);
+		NBUMPSIDED(fin->fin_out, ns_icmp_notfound);
 		return NULL;
 	}
 
@@ -3819,7 +3824,7 @@ ipf_nat_icmperror(fin, nflags, dir)
 		 */
 		if (ipf_nat_rebuildencapicmp(fin, nat) == 0)
 			return nat;
-		NINCLSIDE(fin->fin_out, ns_icmp_rebuild);
+		NBUMPSIDED(fin->fin_out, ns_icmp_rebuild);
 		return NULL;
 	}
 
@@ -4245,13 +4250,11 @@ ipf_nat_inlookup(fin, flags, p, src, mapdst)
 	 */
 find_in_wild_ports:
 	if (!(flags & NAT_TCPUDP) || !(flags & NAT_SEARCH)) {
-		DT(ns_lookup_miss_0);
-		NBUMPSIDE(0, ns_lookup_miss);
+		NBUMPSIDEX(0, ns_lookup_miss, ns_lookup_miss_0);
 		return NULL;
 	}
 	if (softn->ipf_nat_stats.ns_wilds == 0) {
-		DT(ns_lookup_nowild_0);
-		NBUMPSIDE(0, ns_lookup_nowild);
+		NBUMPSIDEX(0, ns_lookup_nowild, ns_lookup_nowild_0);
 		return NULL;
 	}
 
@@ -4574,13 +4577,11 @@ ipf_nat_outlookup(fin, flags, p, src, dst)
 	 */
 find_out_wild_ports:
 	if (!(flags & NAT_TCPUDP) || !(flags & NAT_SEARCH)) {
-		DT(ns_lookup_miss_1);
-		NBUMPSIDE(1, ns_lookup_miss);
+		NBUMPSIDEX(1, ns_lookup_miss, ns_lookup_miss_1);
 		return NULL;
 	}
 	if (softn->ipf_nat_stats.ns_wilds == 0) {
-		DT(ns_lookup_nowild_1);
-		NBUMPSIDE(1, ns_lookup_nowild);
+		NBUMPSIDEX(1, ns_lookup_nowild, ns_lookup_nowild_1);
 		return NULL;
 	}
 
@@ -5143,12 +5144,13 @@ outmatchfail:
 	{
 	case -1 :
 		if (passp != NULL) {
-			NBUMPSIDE(1, ns_drop);
+			DT1(frb_natv4out, fr_info_t *, fin);
+			NBUMPSIDED(1, ns_drop);
 			*passp = FR_BLOCK;
 			fin->fin_reason = FRB_NATV4OUT;
 		}
 		fin->fin_flx |= FI_BADNAT;
-		NBUMPSIDE(1, ns_badnat);
+		NBUMPSIDED(1, ns_badnat);
 		break;
 	case 0 :
 		NBUMPSIDE(1, ns_ignored);
@@ -5282,7 +5284,7 @@ ipf_nat_out(fin, nat, natadd, nflags)
 
 		skip = ipf_nat_decap(fin, nat);
 		if (skip <= 0) {
-			NINCLSIDE(1, ns_decap_fail);
+			NBUMPSIDED(1, ns_decap_fail);
 			return -1;
 		}
 
@@ -5321,7 +5323,7 @@ ipf_nat_out(fin, nat, natadd, nflags)
 
 		m = M_DUP(np->in_divmp);
 		if (m == NULL) {
-			NINCLSIDE(1, ns_encap_dup);
+			NBUMPSIDED(1, ns_encap_dup);
 			return -1;
 		}
 
@@ -5367,7 +5369,7 @@ ipf_nat_out(fin, nat, natadd, nflags)
 
 		m = M_DUP(np->in_divmp);
 		if (m == NULL) {
-			NINCLSIDE(1, ns_divert_dup);
+			NBUMPSIDED(1, ns_divert_dup);
 			return -1;
 		}
 
@@ -5466,7 +5468,7 @@ ipf_nat_out(fin, nat, natadd, nflags)
 		if (i == 0)
 			i = 1;
 		else if (i == -1) {
-			NINCLSIDE(1, ns_ipf_proxy_fail);
+			NBUMPSIDED(1, ns_ipf_proxy_fail);
 		}
 	} else {
 		i = 1;
@@ -5735,12 +5737,13 @@ inmatchfail:
 	{
 	case -1 :
 		if (passp != NULL) {
-			NBUMPSIDE(0, ns_drop);
+			DT1(frb_natv4in, fr_info_t *, fin);
+			NBUMPSIDED(0, ns_drop);
 			*passp = FR_BLOCK;
 			fin->fin_reason = FRB_NATV4IN;
 		}
 		fin->fin_flx |= FI_BADNAT;
-		NBUMPSIDE(0, ns_badnat);
+		NBUMPSIDED(0, ns_badnat);
 		break;
 	case 0 :
 		NBUMPSIDE(0, ns_ignored);
@@ -5802,7 +5805,7 @@ ipf_nat_in(fin, nat, natadd, nflags)
 		if (np->in_apr != NULL) {
 			i = ipf_proxy_check(fin, nat);
 			if (i == -1) {
-				NINCLSIDE(0, ns_ipf_proxy_fail);
+				NBUMPSIDED(0, ns_ipf_proxy_fail);
 				return -1;
 			}
 		}
@@ -5879,7 +5882,7 @@ ipf_nat_in(fin, nat, natadd, nflags)
 
 		m = M_DUP(np->in_divmp);
 		if (m == NULL) {
-			NINCLSIDE(0, ns_encap_dup);
+			NBUMPSIDED(0, ns_encap_dup);
 			return -1;
 		}
 
@@ -5915,7 +5918,7 @@ ipf_nat_in(fin, nat, natadd, nflags)
 
 		m = M_DUP(np->in_divmp);
 		if (m == NULL) {
-			NINCLSIDE(0, ns_divert_dup);
+			NBUMPSIDED(0, ns_divert_dup);
 			return -1;
 		}
 
@@ -5957,7 +5960,7 @@ ipf_nat_in(fin, nat, natadd, nflags)
 
 		skip = ipf_nat_decap(fin, nat);
 		if (skip <= 0) {
-			NINCLSIDE(0, ns_decap_fail);
+			NBUMPSIDED(0, ns_decap_fail);
 			return -1;
 		}
 
@@ -6549,7 +6552,7 @@ ipf_nat_clone(fin, nat)
 
 	KMALLOC(clone, nat_t *);
 	if (clone == NULL) {
-		NINCLSIDE(fin->fin_out, ns_clone_nomem);
+		NBUMPSIDED(fin->fin_out, ns_clone_nomem);
 		return NULL;
 	}
 	bcopy((char *)nat, (char *)clone, sizeof(*clone));
@@ -6574,7 +6577,7 @@ ipf_nat_clone(fin, nat)
 
 	if (ipf_nat_insert(softc, softn, clone) == -1) {
 		KFREE(clone);
-		NINCLSIDE(fin->fin_out, ns_insert_fail);
+		NBUMPSIDED(fin->fin_out, ns_insert_fail);
 		return NULL;
 	}
 
@@ -6875,6 +6878,7 @@ ipf_nat_getnext(softc, t, itp, objp)
 			MUTEX_ENTER(&nextnat->nat_lock);
 			nextnat->nat_ref++;
 			MUTEX_EXIT(&nextnat->nat_lock);
+			t->ipt_data = nextnat;
 		} else {
 			bzero(&zeronat, sizeof(zeronat));
 			nextnat = &zeronat;
@@ -7144,8 +7148,6 @@ ipf_nat_iterator(softc, token, itp, obj)
 		softc->ipf_interror = 60052;
 		return EFAULT;
 	}
-
-	token->ipt_subtype = itp->igi_type;
 
 	switch (itp->igi_type)
 	{
@@ -7486,7 +7488,7 @@ ipf_nat_newdivert(fin, nat, nai)
 	}
 
 	if (natl != NULL) {
-		NINCLSIDE(fin->fin_out, ns_divert_exist);
+		NBUMPSIDED(fin->fin_out, ns_divert_exist);
 		return -1;
 	}
 
@@ -7542,7 +7544,7 @@ ipf_nat_builddivertmp(softn, np)
 
 	ALLOC_MB_T(np->in_divmp, len);
 	if (np->in_divmp == NULL) {
-		NINCL(ipf_nat_stats.ns_divert_build);
+		NBUMPD(ipf_nat_stats, ns_divert_build);
 		return -1;
 	}
 
@@ -7627,7 +7629,7 @@ ipf_nat_decap(fin, nat)
 			fin->fin_ip->ip_dst = nat->nat_osrcip;
 			fin->fin_daddr = nat->nat_osrcaddr;
 #if !defined(_KERNEL) || defined(MENTAT) || defined(__sgi) || \
-defined(__osf__) || defined(linux)
+     defined(__osf__) || defined(linux)
 			ipf_fix_outcksum(fin, &fin->fin_ip->ip_sum, sumd);
 #endif
 		}
@@ -7671,7 +7673,7 @@ defined(__osf__) || defined(linux)
 	hlen = IP_HL(fin->fin_ip) << 2;
 
 	if (ipf_pr_pullup(fin, skip + hlen) == -1) {
-		NINCLSIDE(fin->fin_out, ns_decap_pullup);
+		NBUMPSIDED(fin->fin_out, ns_decap_pullup);
 		return -1;
 	}
 
@@ -7681,7 +7683,7 @@ defined(__osf__) || defined(linux)
 	fin->fin_ipoff += skip;
 
 	if (ipf_makefrip(hlen, (ip_t *)hdr, fin) == -1) {
-		NINCLSIDE(fin->fin_out, ns_decap_bad);
+		NBUMPSIDED(fin->fin_out, ns_decap_bad);
 		return -1;
 	}
 
@@ -7739,7 +7741,7 @@ ipf_nat_matchencap(softn, fin, np)
 	skip = fin->fin_hlen;
 	if (M_LEN(m) < skip + sizeof(ip_t)) {
 		if (ipf_pr_pullup(fin, sizeof(ip_t)) == -1) {
-			NINCLSIDE(fin->fin_out, ns_encap_pullup);
+			NBUMPSIDED(fin->fin_out, ns_encap_pullup);
 			return -1;
 		}
 	}
@@ -7749,7 +7751,7 @@ ipf_nat_matchencap(softn, fin, np)
 	hlen = IP_HL(ip) << 2;
 
 	if (ipf_pr_pullup(fin, hlen) == -1) {
-		NINCLSIDE(fin->fin_out, ns_encap_pullup);
+		NBUMPSIDED(fin->fin_out, ns_encap_pullup);
 		return -1;
 	}
 
@@ -7800,7 +7802,7 @@ ipf_nat_matchencap(softn, fin, np)
 		 * Only need to fetch port numbers for NAT
 		 */
 		if (ipf_pr_pullup(fin, hlen + 4) == -1) {
-			NINCLSIDE(fin->fin_out, ns_encap_pullup);
+			NBUMPSIDED(fin->fin_out, ns_encap_pullup);
 			return -1;
 		}
 
@@ -7908,7 +7910,7 @@ ipf_nat_nextaddr(fin, na, old, dst)
 			   na->na_addr[1].in4.s_addr == 0xffffffff) {
 			if (ipf_ifpaddr(softc, 4, na->na_atype,
 					fin->fin_ifp, &newip, NULL) == -1) {
-				NINCLSIDE(fin->fin_out, ns_ifpaddrfail);
+				NBUMPSIDED(fin->fin_out, ns_ifpaddrfail);
 				return -1;
 			}
 			new = newip.in4.s_addr;
