@@ -1798,7 +1798,7 @@ ipf_nat_free_rule(softc, softn, n)
 
 	MUTEX_DESTROY(&n->in_lock);
 
-	KFREE(n);
+	KFREES(n, n->in_size);
 
 #if SOLARIS && !defined(INSTANCES)
 	if (softn->ipf_nat_stats.ns_rules == 0)
@@ -2379,7 +2379,7 @@ junkput:
 		if (in != NULL) {
 			if (in->in_apr)
 				ipf_proxy_free(in->in_apr);
-			KFREE(in);
+			KFREES(in, in->in_size);
 		}
 		KFREE(nat);
 	}
