@@ -782,14 +782,18 @@ ipf_nextipid(fin)
 }
 
 
-INLINE void
+INLINE int
 ipf_checkv4sum(fin)
 	fr_info_t *fin;
 {
-#ifdef IPFILTER_CKSUM
-	if (ipf_checkl4sum(fin) == -1)
+	if ((fin->fin_flx & FI_SHORT) != 0)
+		return 1;
+
+	if (ipf_checkl4sum(fin) == -1) {
 		fin->fin_flx |= FI_BAD;
-#endif
+		return -1;
+	}
+	return 0;
 }
 
 
@@ -929,4 +933,26 @@ ipf_random()
 	last += (int)&range * ipf_ticks;
 	number = last + tv.tv_sec;
 	return number;
+}
+
+
+u_short
+ipf_pcksum(fin, hlen, sum)
+{
+	u_short sum2;
+
+	slen = fin->fin_plen - hlen;
+	m->m_off += hlen;
+	m->m_len -= hlen;
+	sum2 = in_cksum(fin->fin_m, slen);
+	m->m_len += hlen;
+	m->m_off -= hlen;
+	/*
+	 * Both sum and sum2 are partial sums, so combine them together.
+	 */
+	sum += ~sum2 & 0xffff;
+	while (sum > 0xffff)
+		sum = (sum & 0xffff) + (sum >> 16);
+	sum2 = ~sum & 0xffff;
+	return sum2;
 }

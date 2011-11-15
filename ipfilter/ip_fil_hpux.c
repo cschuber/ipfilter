@@ -608,26 +608,34 @@ ipf_nextipid(fin)
 }
 
 
-INLINE void
+INLINE int
 ipf_checkv4sum(fin)
 	fr_info_t *fin;
 {
-#ifdef IPFILTER_CKSUM
-	if (ipf_checkl4sum(fin) == -1)
+	if ((fin->fin_flx & FI_SHORT) != 0)
+		return 1;
+
+	if (ipf_checkl4sum(fin) == -1) {
 		fin->fin_flx |= FI_BAD;
-#endif
+		return -1;
+	}
+	return 0;
 }
 
 
 #ifdef USE_INET6
-INLINE void
+INLINE int
 ipf_checkv6sum(fin)
 	fr_info_t *fin;
 {
-# ifdef IPFILTER_CKSUM
-	if (ipf_checkl4sum(fin) == -1)
+	if ((fin->fin_flx & FI_SHORT) != 0)
+		return 1;
+
+	if (ipf_checkl4sum(fin) == -1) {
 		fin->fin_flx |= FI_BAD;
-# endif
+		return -1;
+	}
+	return 0;
 }
 #endif /* USE_INET6 */
 

@@ -955,6 +955,7 @@ typedef	struct	ipf_statistics {
 	u_long	fr_v4_icmp_pullup;
 	u_long	fr_v4_badttl;	/* TTL in packet doesn't reach minimum */
 	u_long	fr_v4_badsrc;	/* source received doesn't match route */
+	u_long	fr_l4_badcksum;	/* layer 4 header checksum failure */
 	u_long	fr_badcoalesces;
 	u_long	fr_pass;	/* packets allowed */
 	u_long	fr_block;	/* packets denied */
@@ -1810,14 +1811,14 @@ extern	int	ipf_queueflush __P((ipf_main_softc_t *, ipftq_delete_fn_t,
 extern	void	ipf_queuefront __P((ipftqent_t *));
 extern	int	ipf_settimeout_tcp __P((ipftuneable_t *, ipftuneval_t *,
 					ipftq_t *));
-extern	void	ipf_checkv4sum __P((fr_info_t *));
+extern	int	ipf_checkv4sum __P((fr_info_t *));
 extern	int	ipf_checkl4sum __P((fr_info_t *));
 extern	int	ipf_ifpfillv4addr __P((int, struct sockaddr_in *,
 				      struct sockaddr_in *, struct in_addr *,
 				      struct in_addr *));
 extern	int	ipf_coalesce __P((fr_info_t *));
 #ifdef	USE_INET6
-extern	void	ipf_checkv6sum __P((fr_info_t *));
+extern	int	ipf_checkv6sum __P((fr_info_t *));
 extern	int	ipf_ifpfillv6addr __P((int, struct sockaddr_in6 *,
 				      struct sockaddr_in6 *, i6addr_t *,
 				      i6addr_t *));
@@ -1857,7 +1858,7 @@ extern	int 	ipf_log_pkt __P((fr_info_t *, u_int));
 extern	int 	ipf_log_pkt __P((fr_info_t *, u_int));
 
 extern	frentry_t	*ipf_acctpkt __P((fr_info_t *, u_32_t *));
-extern	u_short		fr_cksum __P((mb_t *, ip_t *, int, void *, int));
+extern	u_short		fr_cksum __P((mb_t *, ip_t *, int, void *));
 extern	void		ipf_deinitialise __P((ipf_main_softc_t *));
 extern	int		ipf_deliverlocal __P((ipf_main_softc_t *, int, void *,
 					      i6addr_t *));
@@ -1876,6 +1877,7 @@ extern	int		ipf_matchicmpqueryreply __P((int, icmpinfo_t *,
 						     struct icmp *, int));
 extern	u_32_t		ipf_newisn __P((fr_info_t *));
 extern	u_short		ipf_nextipid __P((fr_info_t *));
+extern	u_int		ipf_pcksum __P((fr_info_t *, int, u_int));
 extern	void		ipf_rule_expire __P((ipf_main_softc_t *));
 extern	int		ipf_scanlist __P((fr_info_t *, u_32_t));
 extern	frentry_t 	*ipf_srcgrpmap __P((fr_info_t *, u_32_t *));

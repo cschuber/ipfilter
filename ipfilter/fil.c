@@ -3339,11 +3339,10 @@ ipf_cksum(addr, len)
 /* ------------------------------------------------------------------------ */
 /* Function:    fr_cksum                                                    */
 /* Returns:     u_short - layer 4 checksum                                  */
-/* Parameters:  m(I  )     - pointer to buffer holding packet               */
+/* Parameters:  fin(I)     - pointer to packet information                  */
 /*              ip(I)      - pointer to IP header                           */
 /*              l4proto(I) - protocol to caclulate checksum for             */
 /*              l4hdr(I)   - pointer to layer 4 header                      */
-/*              l3len(I)   - length of layer 4 data plus layer 3 header     */
 /*                                                                          */
 /* Calculates the TCP checksum for the packet held in "m", using the data   */
 /* in the IP header "ip" to seed it.                                        */
@@ -3352,27 +3351,25 @@ ipf_cksum(addr, len)
 /* and the TCP header.  We also assume that data blocks aren't allocated in */
 /* odd sizes.                                                               */
 /*                                                                          */
-/* For IPv6, l3len excludes extension header size.                          */
-/*                                                                          */
 /* Expects ip_len and ip_off to be in network byte order when called.       */
 /* ------------------------------------------------------------------------ */
 u_short
-fr_cksum(m, ip, l4proto, l4hdr, l3len)
-	mb_t *m;
+fr_cksum(fin, ip, l4proto, l4hdr)
+	fr_info_t *fin;
 	ip_t *ip;
-	int l4proto, l3len;
+	int l4proto;
 	void *l4hdr;
 {
-	u_short *sp, slen, sumsave, l4hlen, *csump;
+	u_short *sp, slen, sumsave, *csump;
 	u_int sum, sum2;
 	int hlen;
+	int off;
 #ifdef	USE_INET6
 	ip6_t *ip6;
 #endif
 
 	csump = NULL;
 	sumsave = 0;
-	l4hlen = 0;
 	sp = NULL;
 	slen = 0;
 	hlen = 0;
@@ -3386,8 +3383,7 @@ fr_cksum(m, ip, l4proto, l4hdr, l3len)
 	if (IP_V(ip) == 4) {
 #endif
 		hlen = IP_HL(ip) << 2;
-		slen = l3len - hlen;
-		sum += htons(slen);
+		off = hlen;
 		sp = (u_short *)&ip->ip_src;
 		sum += *sp++;	/* ip_src */
 		sum += *sp++;
@@ -3397,8 +3393,7 @@ fr_cksum(m, ip, l4proto, l4hdr, l3len)
 	} else if (IP_V(ip) == 6) {
 		ip6 = (ip6_t *)ip;
 		hlen = sizeof(*ip6);
-		slen = l3len - hlen;
-		sum += htons(slen);
+		off = ((char *)fin->fin_dp - (char *)fin->fin_ip);
 		sp = (u_short *)&ip6->ip6_src;
 		sum += *sp++;	/* ip6_src */
 		sum += *sp++;
@@ -3416,24 +3411,25 @@ fr_cksum(m, ip, l4proto, l4hdr, l3len)
 		sum += *sp++;
 		sum += *sp++;
 		sum += *sp++;
+	} else {
+		return 0xffff;
 	}
 #endif
+	slen = fin->fin_plen - off;
+	sum += htons(slen);
 
 	switch (l4proto)
 	{
 	case IPPROTO_UDP :
 		csump = &((udphdr_t *)l4hdr)->uh_sum;
-		l4hlen = sizeof(udphdr_t);
 		break;
 
 	case IPPROTO_TCP :
 		csump = &((tcphdr_t *)l4hdr)->th_sum;
-		l4hlen = sizeof(tcphdr_t);
 		break;
 	case IPPROTO_ICMP :
 		csump = &((icmphdr_t *)l4hdr)->icmp_cksum;
-		l4hlen = 4;
-		sum = 0;
+		sum = 0;	/* Pseudo-checksum is not included */
 		break;
 	default :
 		break;
@@ -3444,153 +3440,7 @@ fr_cksum(m, ip, l4proto, l4hdr, l3len)
 		*csump = 0;
 	}
 
-	l4hlen = l4hlen;	/* LINT */
-
-#ifdef	_KERNEL
-# ifdef MENTAT
-	sum2 = ip_cksum(m, ((qpktinfo_t m*)fin->fin_qif)->qpi_off + hlen, sum);
-	sum2 = (u_short)(~sum2 & 0xffff);
-# else /* MENTAT */
-#  if defined(BSD) || defined(sun)
-#   if BSD_GE_YEAR(199103)
-	m->m_data += hlen;
-#   else
-	m->m_off += hlen;
-#   endif
-	m->m_len -= hlen;
-	sum2 = in_cksum(m, slen);
-	m->m_len += hlen;
-#   if BSD >= 199103
-	m->m_data -= hlen;
-#   else
-	m->m_off -= hlen;
-#   endif
-	/*
-	 * Both sum and sum2 are partial sums, so combine them together.
-	 */
-	sum += ~sum2 & 0xffff;
-	while (sum > 0xffff)
-		sum = (sum & 0xffff) + (sum >> 16);
-	sum2 = ~sum & 0xffff;
-#  else /* defined(BSD) || defined(sun) */
-{
-	union {
-		u_char	c[2];
-		u_short	s;
-	} bytes;
-	u_short len = ntohs(ip->ip_len);
-#   if defined(__sgi)
-	int add;
-#   endif
-
-	/*
-	 * Add up IP Header portion
-	 */
-	if (sp != (u_short *)l4hdr)
-		sp = (u_short *)l4hdr;
-
-	switch (l4proto)
-	{
-	case IPPROTO_UDP :
-		sum += *sp++;	/* sport */
-		sum += *sp++;	/* dport */
-		sum += *sp++;	/* udp length */
-		sum += *sp++;	/* checksum */
-		break;
-
-	case IPPROTO_TCP :
-		sum += *sp++;	/* sport */
-		sum += *sp++;	/* dport */
-		sum += *sp++;	/* seq */
-		sum += *sp++;
-		sum += *sp++;	/* ack */
-		sum += *sp++;
-		sum += *sp++;	/* off */
-		sum += *sp++;	/* win */
-		sum += *sp++;	/* checksum */
-		sum += *sp++;	/* urp */
-		break;
-	case IPPROTO_ICMP :
-		sum = *sp++;	/* type/code */
-		sum += *sp++;	/* checksum */
-		break;
-	}
-
-#   ifdef	__sgi
-	/*
-	 * In case we had to copy the IP & TCP header out of mbufs,
-	 * skip over the mbuf bits which are the header
-	 */
-	if ((char *)ip != mtod(m, char *)) {
-		hlen = (char *)sp - (char *)ip;
-		while (hlen) {
-			add = MIN(hlen, m->m_len);
-			sp = (u_short *)(mtod(m, char *) + add);
-			hlen -= add;
-			if (add == m->m_len) {
-				m = m->m_next;
-				if (!hlen) {
-					if (!m)
-						break;
-					sp = mtod(m, u_short *);
-				}
-				PANIC((!m),("fr_cksum(1): not enough data"));
-			}
-		}
-	}
-#   endif
-
-	len -= (l4hlen + hlen);
-	if (len <= 0)
-		goto nodata;
-
-	while (len > 1) {
-		if (((char *)sp - mtod(m, char *)) >= m->m_len) {
-			m = m->m_next;
-			PANIC((!m),("fr_cksum(2): not enough data"));
-			sp = mtod(m, u_short *);
-		}
-		if (((char *)(sp + 1) - mtod(m, char *)) > m->m_len) {
-			bytes.c[0] = *(u_char *)sp;
-			m = m->m_next;
-			PANIC((!m),("fr_cksum(3): not enough data"));
-			sp = mtod(m, u_short *);
-			bytes.c[1] = *(u_char *)sp;
-			sum += bytes.s;
-			sp = (u_short *)((u_char *)sp + 1);
-		}
-		if ((u_long)sp & 1) {
-			bcopy((char *)sp++, (char *)&bytes.s, sizeof(bytes.s));
-			sum += bytes.s;
-		} else
-			sum += *sp++;
-		len -= 2;
-	}
-
-	if (len != 0)
-		sum += ntohs(*(u_char *)sp << 8);
-nodata:
-	while (sum > 0xffff)
-		sum = (sum & 0xffff) + (sum >> 16);
-	sum2 = (u_short)(~sum & 0xffff);
-}
-#  endif /*  defined(BSD) || defined(sun) */
-# endif /* MENTAT */
-#else /* _KERNEL */
-	/*
-	 * Add up IP Header portion
-	 */
-	if (sp != (u_short *)l4hdr)
-		sp = (u_short *)l4hdr;
-
-	for (; slen > 1; slen -= 2)
-	        sum += *sp++;
-	if (slen)
-		sum += ntohs(*(u_char *)sp << 8);
-	while (sum > 0xffff)
-		sum = (sum & 0xffff) + (sum >> 16);
-	sum2 = (u_short)(~sum & 0xffff);
-#endif /* _KERNEL */
+	sum2 = ipf_pcksum(fin, off, sum);
 	if (csump != NULL)
 		*csump = sumsave;
 	return sum2;
@@ -6667,9 +6517,8 @@ ipf_checkl4sum(fin)
 			hdrsum = *csump;
 
 		if (dosum) {
-			sum = fr_cksum(fin->fin_m, fin->fin_ip,
-				       fin->fin_p, fin->fin_dp,
-				       fin->fin_dlen + fin->fin_hlen);
+			sum = fr_cksum(fin, fin->fin_ip,
+				       fin->fin_p, fin->fin_dp);
 		}
 #if SOLARIS && defined(_KERNEL) && (SOLARIS2 >= 6) && defined(ICK_VALID)
 	}

@@ -807,30 +807,34 @@ ipf_nextipid(fr_info_t *fin)
 }
 
 
-#ifndef IPFILTER_CKSUM
-/* ARGSUSED */
-#endif
-INLINE void
+INLINE int
 ipf_checkv4sum(fr_info_t *fin)
 {
-#ifdef IPFILTER_CKSUM
-	if (ipf_checkl4sum(fin) == -1)
+	if ((fin->fin_flx & FI_SHORT) != 0)
+		return 1;
+
+	if (ipf_checkl4sum(fin) == -1) {
+		DT1(bad_l4_sum, fr_info_t *, fin);
 		fin->fin_flx |= FI_BAD;
-#endif
+		return -1;
+	}
+	return 0;
 }
 
 
 #ifdef USE_INET6
-# ifndef IPFILTER_CKSUM
-/* ARGSUSED */
-# endif
-INLINE void
+INLINE int
 ipf_checkv6sum(fr_info_t *fin)
 {
-# ifdef IPFILTER_CKSUM
-	if (ipf_checkl4sum(fin) == -1)
+	if ((fin->fin_flx & FI_SHORT) != 0)
+		return 1;
+
+	if (ipf_checkl4sum(fin) == -1) {
+		DT1(bad_l4_sum, fr_info_t *, fin);
 		fin->fin_flx |= FI_BAD;
-# endif
+		return -1;
+	}
+	return 0;
 }
 #endif /* USE_INET6 */
 
@@ -1307,8 +1311,7 @@ ipf_fixl4sum(fr_info_t *fin)
 
 	if (csump != NULL) {
 		*csump = 0;
-		*csump = fr_cksum(fin->fin_m, fin->fin_ip, fin->fin_p,
-				  fin->fin_dp, fin->fin_plen);
+		*csump = fr_cksum(fin, fin->fin_ip, fin->fin_p, fin->fin_dp);
 	}
 }
 
@@ -1417,4 +1420,19 @@ ipf_routeto(fin, v, dstip)
 #else
 	return qif_illrouteto(v, dstip);
 #endif
+}
+
+
+u_int
+ipf_pcksum(fin, hlen, sum)
+	fr_info_t *fin;
+	int hlen;
+	u_int sum;
+{
+	u_int sum2;
+
+        sum2 = ip_cksum(fin->fin_qfm,
+			((qpktinfo_t *)fin->fin_qpi)->qpi_off + hlen, sum);
+	sum2 = (~sum2 & 0xffff);
+	return sum2;
 }

@@ -1127,26 +1127,34 @@ ipf_nextipid(fin)
 }
 
 
-void
+int
 ipf_checkv4sum(fin)
 	fr_info_t *fin;
 {
-#ifdef IPFILTER_CKSUM
-	if (ipf_checkl4sum(fin) == -1)
+	if ((fin->fin_flx & FI_SHORT) != 0)
+		return 1;
+
+	if (ipf_checkl4sum(fin) == -1) {
 		fin->fin_flx |= FI_BAD;
-#endif
+		return -1;
+	}
+	return 0;
 }
 
 
 #ifdef USE_INET6
-INLINE void
+INLINE int
 ipf_checkv6sum(fin)
 	fr_info_t *fin;
 {
-#ifdef IPFILTER_CKSUM
-	if (ipf_checkl4sum(fin) == -1)
+	if ((fin->fin_flx & FI_SHORT) != 0)
+		return 1;
+
+	if (ipf_checkl4sum(fin) == -1) {
 		fin->fin_flx |= FI_BAD;
-#endif
+		return -1;
+	}
+	return 0;
 }
 #endif /* USE_INET6 */
 
@@ -1266,4 +1274,75 @@ ipf_random()
 	last += (int)&range * ipf_ticks;
 	number = last + tv.tv_sec;
 	return number;
+}
+
+u_int
+ipf_pcksum(fin, hlen, sum)
+	fr_info_t *fin;
+	int hlen;
+	u_int sum;
+{
+        union {
+                u_char  c[2];
+                u_short s;
+        } bytes;
+        int add;
+
+        /*
+         * In case we had to copy the IP & TCP header out of mbufs,
+         * skip over the mbuf bits which are the header
+         */
+        if ((char *)ip != mtod(m, char *)) {
+                hlen = (char *)sp - (char *)ip;
+                while (hlen) {
+                        add = MIN(hlen, m->m_len);
+                        sp = (u_short *)(mtod(m, char *) + add);
+                        hlen -= add;
+                        if (add == m->m_len) {
+                                m = m->m_next;
+                                if (!hlen) {
+                                        if (!m)
+                                                break;
+                                        sp = mtod(m, u_short *);
+                                }
+                                PANIC((!m),("fr_cksum(1): not enough data"));
+                        }
+                }
+        }
+
+	l4hlen =;
+	len -= (l4hlen + hlen);
+	if (len <= 0)
+		goto nodata;
+
+	while (len > 1) {
+		if (((char *)sp - mtod(m, char *)) >= m->m_len) {
+			m = m->m_next;
+			PANIC((!m),("fr_cksum(2): not enough data"));
+			sp = mtod(m, u_short *);
+		}
+		if (((char *)(sp + 1) - mtod(m, char *)) > m->m_len) {
+			bytes.c[0] = *(u_char *)sp;
+			m = m->m_next;
+			PANIC((!m),("fr_cksum(3): not enough data"));
+			sp = mtod(m, u_short *);
+			bytes.c[1] = *(u_char *)sp;
+			sum += bytes.s;
+			sp = (u_short *)((u_char *)sp + 1);
+		}
+		if ((u_long)sp & 1) {
+			bcopy((char *)sp++, (char *)&bytes.s, sizeof(bytes.s));
+			sum += bytes.s;
+		} else
+			sum += *sp++;
+		len -= 2;
+	}
+
+	if (len != 0)
+		sum += ntohs(*(u_char *)sp << 8);
+	nodata:
+	while (sum > 0xffff)
+		sum = (sum & 0xffff) + (sum >> 16);
+	sum2 = (u_short)(~sum & 0xffff);
+	return sum2;
 }

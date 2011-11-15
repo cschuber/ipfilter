@@ -260,8 +260,7 @@ ipf_send_reset(fr_info_t *fin)
 		ip->ip_dst.s_addr = fin->fin_saddr;
 		ip->ip_p = IPPROTO_TCP;
 		ip->ip_len = htons(sizeof(*ip) + sizeof(*tcp));
-		tcp2->th_sum = fr_cksum(m, ip, IPPROTO_TCP, tcp2,
-					 ntohs(ip->ip_len));
+		tcp2->th_sum = fr_cksum(fin, ip, IPPROTO_TCP, tcp2);
 	}
 	return ipf_send_ip(fin, m, &m);
 }
@@ -486,19 +485,23 @@ ipf_verifysrc(fr_info_t *fin)
 }
 
 
-void
+int
 ipf_checkv4sum(fr_info_t *fin)
 {
+	if ((fin->fin_flx & FI_SHORT) != 0)
+		return 1;
+
 	/*
 	 * Linux 2.4.20-8smp (RedHat 9)
 	 * Because ip_input() on linux clears the checksum flag in the sk_buff
 	 * before calling the netfilter hook, it is not possible to take
 	 * advantage of the work already done by the hardware.
 	 */
-#ifdef IPFILTER_CKSUM
-	if (ipf_checkl4sum(fin) == -1)
+	if (ipf_checkl4sum(fin) == -1) {
 		fin->fin_flx |= FI_BAD;
-#endif
+		return -1;
+	}
+	return 0;
 }
 
 
