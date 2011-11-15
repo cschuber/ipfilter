@@ -1389,7 +1389,7 @@ ipf_nextipid(fin)
 }
 
 
-INLINE void
+INLINE int
 ipf_checkv4sum(fin)
 	fr_info_t *fin;
 {
@@ -1398,10 +1398,13 @@ ipf_checkv4sum(fin)
 	mb_t *m;
 
 	if ((fin->fin_flx & FI_NOCKSUM) != 0)
-		return;
+		return 0;
+
+	if ((fin->fin_flx & FI_SHORT) != 0)
+		return 1;
 
 	if (fin->fin_cksum != 0)
-		return;
+		return (fin->fin_cksum == 1) ? 0 : -1;
 
 	manual = 0;
 	m = fin->fin_m;
@@ -1446,24 +1449,24 @@ ipf_checkv4sum(fin)
 		}
 	}
 skipauto:
-# ifdef IPFILTER_CKSUM
-	if (manual != 0)
-		if (ipf_checkl4sum(fin) == -1)
+	if (manual != 0) {
+		if (ipf_checkl4sum(fin) == -1) {
 			fin->fin_flx |= FI_BAD;
-# else
-	;
-# endif
+			return -1;
+		}
+	}
 #else
-# ifdef IPFILTER_CKSUM
-	if (ipf_checkl4sum(fin) == -1)
+	if (ipf_checkl4sum(fin) == -1) {
 		fin->fin_flx |= FI_BAD;
-# endif
+		return -1;
+	}
 #endif
+	return 0;
 }
 
 
 #ifdef USE_INET6
-INLINE void
+INLINE int
 ipf_checkv6sum(fin)
 	fr_info_t *fin;
 {
@@ -1472,7 +1475,7 @@ ipf_checkv6sum(fin)
 	mb_t *m;
 
 	if ((fin->fin_flx & FI_NOCKSUM) != 0)
-		return;
+		return 0;
 
 	manual = 0;
 	m = fin->fin_m;
@@ -1512,17 +1515,18 @@ ipf_checkv6sum(fin)
 			manual = 1;
 		}
 	}
-#  ifdef IPFILTER_CKSUM
 	if (manual != 0)
-		if (ipf_checkl4sum(fin) == -1)
+		if (ipf_checkl4sum(fin) == -1) {
 			fin->fin_flx |= FI_BAD;
-#  endif
+			return -1;
+		}
 # else
-#  ifdef IPFILTER_CKSUM
-	if (ipf_checkl4sum(fin) == -1)
+	if (ipf_checkl4sum(fin) == -1) {
 		fin->fin_flx |= FI_BAD;
-#  endif
+		return -1;
+	}
 # endif
+	return 0;
 }
 #endif /* USE_INET6 */
 

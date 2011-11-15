@@ -1613,7 +1613,7 @@ ipf_nextipid(fin)
 }
 
 
-INLINE void
+INLINE int
 ipf_checkv4sum(fin)
 	fr_info_t *fin;
 {
@@ -1622,10 +1622,13 @@ ipf_checkv4sum(fin)
 	mb_t *m;
 
 	if ((fin->fin_flx & FI_NOCKSUM) != 0)
-		return;
+		return 0;
+
+	if ((fin->fin_flx & FI_SHORT) != 0)
+		return 1;
 
 	if (fin->fin_cksum != 0)
-		return;
+		return (fin->fin_cksum == 1) ? 0 : -1;
 
 	manual = 0;
 	m = fin->fin_m;
@@ -1670,24 +1673,24 @@ ipf_checkv4sum(fin)
 		}
 	}
 skipauto:
-# ifdef IPFILTER_CKSUM
-	if (manual != 0)
-		if (ipf_checkl4sum(fin) == -1)
+	if (manual != 0) {
+		if (ipf_checkl4sum(fin) == -1) {
 			fin->fin_flx |= FI_BAD;
-# else
-	;
-# endif
+			return -1;
+		}
+	}
 #else
-# ifdef IPFILTER_CKSUM
-	if (ipf_checkl4sum(fin) == -1)
+	if (ipf_checkl4sum(fin) == -1) {
 		fin->fin_flx |= FI_BAD;
-# endif
+		return -1;
+	}
 #endif
+	return 0;
 }
 
 
 #ifdef USE_INET6
-INLINE void
+INLINE int
 ipf_checkv6sum(fin)
 	fr_info_t *fin;
 {
@@ -1696,7 +1699,10 @@ ipf_checkv6sum(fin)
 	mb_t *m;
 
 	if ((fin->fin_flx & FI_NOCKSUM) != 0)
-		return;
+		return 0;
+
+	if ((fin->fin_flx & FI_SHORT) != 0)
+		return 1;
 
 	manual = 0;
 	m = fin->fin_m;
@@ -1731,17 +1737,19 @@ ipf_checkv6sum(fin)
 			manual = 1;
 		}
 	}
-#  ifdef IPFILTER_CKSUM
-	if (manual != 0)
-		if (ipf_checkl4sum(fin) == -1)
+	if (manual != 0) {
+		if (ipf_checkl4sum(fin) == -1) {
 			fin->fin_flx |= FI_BAD;
-#  endif
+			return -1;
+		}
+	}
 # else
-#  ifdef IPFILTER_CKSUM
-	if (ipf_checkl4sum(fin) == -1)
+	if (ipf_checkl4sum(fin) == -1) {
 		fin->fin_flx |= FI_BAD;
-#  endif
+		return -1;
+	}
 # endif
+	return 0;
 }
 #endif /* USE_INET6 */
 
@@ -2077,4 +2085,28 @@ static int ipfpoll(dev, events, p)
 	if ((revents == 0) && (((events & (POLLIN|POLLRDNORM)) != 0)))
 		selrecord(p, &ipfmain.ipf_selwait[unit]);
 	return revents;
+}
+
+u_int
+ipf_pcksum(fin, hlen, sum)
+	fr_info_t *fin;
+	int hlen;
+	u_int sum;
+{
+	u_int sum2;
+
+	m->m_data += hlen;
+	m->m_len -= hlen;
+	sum = in_cksum(fin->fin_m, slen);
+	m->m_len += hlen;
+	m->m_data -= hlen;
+
+	/*
+	 * Both sum and sum2 are partial sums, so combine them together.
+	 */
+	sum += ~sum2 & 0xffff;
+	while (sum > 0xffff)
+		sum = (sum & 0xffff) + (sum >> 16);
+	sum2 = ~sum & 0xffff;
+	return sum2;
 }

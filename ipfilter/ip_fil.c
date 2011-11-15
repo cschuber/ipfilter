@@ -610,29 +610,49 @@ ipf_nextipid(fin)
 	u_short id;
 
 	MUTEX_ENTER(&softc->ipf_rw);
-	id = ipid++;
+	if (fin->fin_pktnum != 0) {
+		/*
+		 * The -1 is for aligned test results.
+		 */
+		id = (fin->fin_pktnum - 1) & 0xffff;
+	} else {
+	}
+		id = ipid++;
 	MUTEX_EXIT(&softc->ipf_rw);
 
 	return id;
 }
 
 
-INLINE void
+INLINE int
 ipf_checkv4sum(fin)
 	fr_info_t *fin;
 {
-	if (ipf_checkl4sum(fin) == -1)
+
+	if (fin->fin_flx & FI_SHORT)
+		return 1;
+
+	if (ipf_checkl4sum(fin) == -1) {
 		fin->fin_flx |= FI_BAD;
+		return -1;
+	}
+	return 0;
 }
 
 
 #ifdef	USE_INET6
-INLINE void
+INLINE int
 ipf_checkv6sum(fin)
 	fr_info_t *fin;
 {
-	if (ipf_checkl4sum(fin) == -1)
+	if (fin->fin_flx & FI_SHORT)
+		return 1;
+
+	if (ipf_checkl4sum(fin) == -1) {
 		fin->fin_flx |= FI_BAD;
+		return -1;
+	}
+	return 0;
 }
 #endif
 
@@ -794,4 +814,49 @@ ipf_inject(fin, m)
 	FREE_MB_T(m);
 
 	return 0;
+}
+
+
+u_int
+ipf_pcksum(fin, hlen, sum)
+	fr_info_t *fin;
+	int hlen;
+	u_int sum;
+{
+	u_short *sp;
+	u_int sum2;
+	int slen;
+
+	slen = fin->fin_plen - hlen;
+	sp = (u_short *)((u_char *)fin->fin_ip + hlen);
+
+	for (; slen > 1; slen -= 2)
+		sum += *sp++;
+	if (slen)
+		sum += ntohs(*(u_char *)sp << 8);
+	while (sum > 0xffff)
+		sum = (sum & 0xffff) + (sum >> 16);
+	sum2 = (u_short)(~sum & 0xffff);
+
+	return sum2;
+}
+
+
+void *
+ipf_pullup(m, fin, plen)
+	mb_t *m;
+	fr_info_t *fin;
+	int plen;
+{
+	if (M_LEN(m) >= plen)
+		return fin->fin_ip;
+
+	/*
+	 * Fake ipf_pullup failing
+	 */
+	fin->fin_reason = FRB_PULLUP;
+	*fin->fin_mp = NULL;
+	fin->fin_m = NULL;
+	fin->fin_ip = NULL;
+	return NULL;
 }
