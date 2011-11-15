@@ -297,6 +297,12 @@ get_unit(soft, name, family)
 	ipf_main_softc_t *softc = soft;
 	net_handle_t proto;
 
+	if (family == 0) {
+		ifp = (void *)net_phylookup(softc->ipf_nd_v4, name);
+		if (ifp == NULL)
+			ifp = (void *)net_phylookup(softc->ipf_nd_v6, name);
+		return ifp;
+	}
 	if (family == 4)
 		proto = softc->ipf_nd_v4;
 	else if (family == 6)
