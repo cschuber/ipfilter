@@ -50,14 +50,11 @@ typedef	struct ap_session {
 		struct	ap_tcp	apu_tcp;
 		struct	ap_udp	apu_udp;
 	} aps_un;
-	u_int	aps_flags;
 	U_QUAD_T aps_bytes;	/* bytes sent */
 	U_QUAD_T aps_pkts;	/* packets sent */
 	void	*aps_nat;	/* pointer back to nat struct */
 	void	*aps_data;	/* private data */
-	int	aps_p;		/* protocol */
 	int	aps_psiz;	/* size of private data */
-	struct	ap_session	*aps_hnext;
 	struct	ap_session	*aps_next;
 } ap_session_t;
 

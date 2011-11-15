@@ -16,9 +16,9 @@ static const char rcsid[] = "@(#)$Id$";
 
 
 void
-printaps(aps, opts)
+printaps(aps, opts, proto)
 	ap_session_t *aps;
-	int opts;
+	int opts, proto;
 {
 	ipsec_pxy_t ipsec;
 	ap_session_t ap;
@@ -32,7 +32,6 @@ printaps(aps, opts)
 		return;
 	PRINTF("\tproxy %s/%d use %d flags %x\n", apr.apr_label,
 		apr.apr_p, apr.apr_ref, apr.apr_flags);
-	PRINTF("\t\tproto %d flags %#x bytes ", ap.aps_p, ap.aps_flags);
 #ifdef	USE_QUAD_T
 	PRINTF("%qu pkts %qu", (unsigned long long)ap.aps_bytes,
 		(unsigned long long)ap.aps_pkts);
@@ -40,7 +39,7 @@ printaps(aps, opts)
 	PRINTF("%lu pkts %lu", ap.aps_bytes, ap.aps_pkts);
 #endif
 	PRINTF(" data %s\n", ap.aps_data ? "YES" : "NO");
-	if ((ap.aps_p == IPPROTO_TCP) && (opts & OPT_VERBOSE)) {
+	if ((proto == IPPROTO_TCP) && (opts & OPT_VERBOSE)) {
 		PRINTF("\t\tstate[%u,%u], sel[%d,%d]\n",
 			ap.aps_state[0], ap.aps_state[1],
 			ap.aps_sel[0], ap.aps_sel[1]);
