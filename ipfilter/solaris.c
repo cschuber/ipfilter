@@ -764,7 +764,6 @@ ipf_stack_init()
 static void
 ipf_stack_fini()
 {
-	ipf_fini_all(&ipfmain);
 	ipf_destroy_all(&ipfmain);
 }
 #else
@@ -999,8 +998,6 @@ static void
 ipf_instance_destroy(netid_t id, void *arg)
 {
 	ipf_main_softc_t *softc = arg;
-
-	ipf_fini_all(softc);
 
 	ipf_destroy_all(softc);
 }
