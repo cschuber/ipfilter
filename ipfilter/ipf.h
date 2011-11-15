@@ -251,7 +251,7 @@ extern int geticmptype __P((int, char *));
 extern int getport __P((struct frentry *, char *, u_short *, char *));
 extern int getportproto __P((char *, int));
 extern int getproto __P((char *));
-extern char *getnattype __P((struct nat *, int));
+extern char *getnattype __P((struct nat *));
 extern char *getsumd __P((u_32_t));
 extern u_32_t getoptbyname __P((char *));
 extern u_32_t getoptbyvalue __P((int));
