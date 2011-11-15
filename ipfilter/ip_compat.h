@@ -350,7 +350,7 @@ typedef struct qifpkt {
 #  define	MTOD(m,t)	((t)((m)->b_rptr))
 #  define	MTYPE(m)	((m)->b_datap->db_type)
 #  define	FREE_MB_T(m)	freemsg(m)
-#  define	ALLOC_MB_T(m,l)	(m) = ipf_allocmbt(l)
+#  define	ALLOC_MB_T(m,l)	(m) = allocmbt(l)
 #  define	PREP_MB_T(f,m)	ipf_prependmbt(f, m)
 #  define	M_DUP(m)	copymsg(m)
 #  define	m_next		b_cont
@@ -1700,7 +1700,6 @@ typedef	struct	mb_s	{
 extern	void	m_copydata(mb_t *, int, int, caddr_t);
 extern	int	ipfuiomove(caddr_t, int, int, struct uio *);
 extern	int	bcopywrap(void *, void *, size_t);
-extern	mb_t	*allocmbt(size_t);
 extern	mb_t	*dupmbt(mb_t *);
 extern	void	freembt(mb_t *);
 
@@ -1739,6 +1738,8 @@ extern void eMrwlock_write_enter(eMrwlock_t *, char *, int);
 extern void eMrwlock_downgrade(eMrwlock_t *, char *, int);
 
 #endif
+
+extern	mb_t	*allocmbt(size_t);
 
 #define	MAX_IPV4HDR	((0xf << 2) + sizeof(struct icmp) + sizeof(ip_t) + 8)
 
