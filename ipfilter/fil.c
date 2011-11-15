@@ -7874,15 +7874,16 @@ ipf_getnextrule(softc, t, ptr)
 	}
 
 	obj.ipfo_type = IPFOBJ_FRENTRY;
-	obj.ipfo_size = sizeof(frentry_t);
 	dst = (char *)it.iri_rule;
 
 	if (next != NULL) {
+		obj.ipfo_size = next->fr_size;
 		MUTEX_ENTER(&next->fr_lock);
 		next->fr_ref++;
 		MUTEX_EXIT(&next->fr_lock);
 		t->ipt_data = next;
 	} else {
+		obj.ipfo_size = sizeof(frentry_t);
 		bzero(&zero, sizeof(zero));
 		next = &zero;
 		t->ipt_data = NULL;
@@ -7906,7 +7907,6 @@ ipf_getnextrule(softc, t, ptr)
 	if ((fr != NULL) && (next == &zero))
 		(void) ipf_derefrule(softc, &fr);
 
-	READ_ENTER(&softc->ipf_mutex);
 	return error;
 }
 
