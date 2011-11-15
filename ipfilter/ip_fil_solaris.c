@@ -1314,7 +1314,7 @@ ipf_fixl4sum(fr_info_t *fin)
 
 
 mblk_t *
-ipf_allocmbt(size_t len)
+allocmbt(size_t len)
 {
 	mblk_t *m;
 
@@ -1324,11 +1324,10 @@ ipf_allocmbt(size_t len)
 	 * front of the existing IP packet to this one.
 	 */
 	m = allocb(len + 128, BPRI_HI);
-	if (m == NULL)
-		return NULL;
-
-	m->b_rptr += 128;
-	m->b_wptr += 128 + len;
+	if (m != NULL) {
+		m->b_rptr += 128;
+		m->b_wptr = m->b_rptr + len;
+	}
 	return m;
 }
 
