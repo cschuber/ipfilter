@@ -69,9 +69,8 @@ ipf_p_rcmd_new(arg, fin, aps, nat)
 	fin = fin;	/* LINT */
 	nat = nat;	/* LINT */
 
-	aps->aps_psiz = sizeof(rcmdinfo_t);
-	KMALLOCS(rc, rcmdinfo_t *,
-		 sizeof(rcmdinfo_t) + nat->nat_ptr->in_namelen + 1);
+	aps->aps_psiz = sizeof(rcmdinfo_t) + nat->nat_ptr->in_namelen + 1;
+	KMALLOCS(rc, rcmdinfo_t *, aps->aps_psiz);
 	if (rc == NULL) {
 #ifdef IP_RCMD_PROXY_DEBUG
 		printf("ipf_p_rcmd_new:KMALLOCS(%d) failed\n", sizeof(*rc));
