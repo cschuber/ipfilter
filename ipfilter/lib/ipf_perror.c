@@ -8,5 +8,5 @@ ipf_perror(err, string)
 	if (err == 0)
 		fprintf(stderr, "%s\n", string);
 	else
-		fprintf(stderr, "%s\n", ipf_strerror(err));
+		fprintf(stderr, "%s %s\n", string, ipf_strerror(err));
 }
