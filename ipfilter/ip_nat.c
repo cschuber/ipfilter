@@ -6909,7 +6909,7 @@ ipf_nat_getnext(softc, t, itp, objp)
 		break;
 
 	case IPFGENITER_IPNAT :
-		objp->ipfo_size = sizeof(ipnat_t);
+		objp->ipfo_size = nextipnat->in_size;
 		objp->ipfo_type = IPFOBJ_IPNAT;
 		error = ipf_outobjk(softc, objp, nextipnat);
 		if ((ipn != NULL) && (nextipnat != &zeroipn)) {
@@ -6920,7 +6920,7 @@ ipf_nat_getnext(softc, t, itp, objp)
 		break;
 
 	case IPFGENITER_NAT :
-		objp->ipfo_size = sizeof(ipnat_t);
+		objp->ipfo_size = sizeof(nat_t);
 		objp->ipfo_type = IPFOBJ_NAT;
 		error = ipf_outobjk(softc, objp, nextnat);
 		if ((nat != NULL) && (nextnat != &zeronat))
