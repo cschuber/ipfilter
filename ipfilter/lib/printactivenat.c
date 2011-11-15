@@ -15,13 +15,13 @@ static const char rcsid[] = "@(#)$Id$";
 
 
 void
-printactivenat(nat, opts, alive, now)
+printactivenat(nat, opts, ticks)
 	nat_t *nat;
-	int opts, alive;
-	u_long now;
+	int opts;
+	u_long ticks;
 {
 
-	PRINTF("%s", getnattype(nat, alive));
+	PRINTF("%s", getnattype(nat));
 
 	if (nat->nat_flags & SI_CLONE)
 		PRINTF(" CLONE");

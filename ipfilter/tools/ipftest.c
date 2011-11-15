@@ -671,7 +671,7 @@ void dumpnat(arg)
 	for (nat = softn->ipf_nat_instances; nat; nat = nat->nat_next) {
 		printactivenat(nat, opts, 0, 0);
 		if (nat->nat_aps)
-			printaps(nat->nat_aps, opts);
+			printf("\tproxy active\n");
 	}
 
 	printf("\nHostmap table:\n");
