@@ -1224,13 +1224,13 @@ ipf_checkv4sum(fin)
 	mb_t *m;
 
 	if ((fin->fin_flx & FI_NOCKSUM) != 0)
-		return;
+		return 0;
 
 	if ((fin->fin_flx & FI_SHORT) != 0)
 		return 1;
 
 	if (fin->fin_cksum != 0)
-		return;
+		return (fin->fin_cksum == 1) ? 0 : -1;
 
 	m = fin->fin_m;
 	if (m == NULL) {
@@ -1277,8 +1277,15 @@ INLINE int
 ipf_checkv6sum(fin)
 	fr_info_t *fin;
 {
+	if ((fin->fin_flx & FI_NOCKSUM) != 0)
+		return 0;
+
 	if ((fin->fin_flx & FI_SHORT) != 0)
 		return 1;
+
+	if (fin->fin_cksum != 0)
+		return (fin->fin_cksum == 1) ? 0 : -1;
+
 
 	if (ipf_checkl4sum(fin) == -1) {
 		fin->fin_flx |= FI_BAD;

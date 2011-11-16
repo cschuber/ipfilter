@@ -488,8 +488,14 @@ ipf_verifysrc(fr_info_t *fin)
 int
 ipf_checkv4sum(fr_info_t *fin)
 {
+	if ((fin->fin_flx & FI_NOCKSUM) != 0)
+		return 0;
+
 	if ((fin->fin_flx & FI_SHORT) != 0)
 		return 1;
+
+	if (fin->fin_cksum != 0)
+		return (fin->fin_cksum == 1) ? 0 : -1;
 
 	/*
 	 * Linux 2.4.20-8smp (RedHat 9)
