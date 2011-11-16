@@ -2504,6 +2504,7 @@ ipf_scanlist(fin, pass)
 		if ((passt & FR_LOGMASK) == FR_LOG) {
 			if (ipf_log_pkt(fin, passt) == -1) {
 				if (passt & FR_LOGORBLOCK) {
+					DT(frb_logfail);
 					passt &= ~FR_CMDMASK;
 					passt |= FR_BLOCK|FR_QUICK;
 					fin->fin_reason = FRB_LOGFAIL;
@@ -2678,6 +2679,7 @@ ipf_firewall(fin, passp)
 	 */
 	if ((fr != NULL) && (fr->fr_pps != 0) &&
 	    !ppsratecheck(&fr->fr_lastpkt, &fr->fr_curpps, fr->fr_pps)) {
+		DT2(frb_ppsrate, fr_info_t *, fin, frentry_t *, fr);
 		pass &= ~(FR_CMDMASK|FR_RETICMP|FR_RETRST);
 		pass |= FR_BLOCK;
 		LBUMPD(ipf_stats[out], fr_ppshit);
@@ -2691,6 +2693,7 @@ ipf_firewall(fin, passp)
 	 */
 	if (FR_ISAUTH(pass)) {
 		if (ipf_auth_new(fin->fin_m, fin) != 0) {
+			DT1(frb_authnew, fr_info_t *, fin);
 			fin->fin_m = *fin->fin_mp = NULL;
 			fin->fin_reason = FRB_AUTHNEW;
 			fin->fin_error = 0;
@@ -2900,6 +2903,7 @@ ipf_check(ctx, ip, hlen, ifp, out
 		 * them.
 		 */
 		if (((ip6_t *)ip)->ip6_plen == 0) {
+			DT1(frb_jumbo, ip6_t *, (ip6_t *)ip);
 			pass = FR_BLOCK|FR_NOMATCH;
 			fin->fin_reason = FRB_JUMBO;
 			goto finished;
@@ -2912,6 +2916,7 @@ ipf_check(ctx, ip, hlen, ifp, out
 	}
 
 	if (ipf_makefrip(hlen, ip, fin) == -1) {
+		DT1(frb_makefrip, fr_info_t *, fin);
 		pass = FR_BLOCK|FR_NOMATCH;
 		fin->fin_reason = FRB_MAKEFRIP;
 		goto finished;
@@ -3009,6 +3014,7 @@ ipf_check(ctx, ip, hlen, ifp, out
 		} else {
 			LBUMP(ipf_stats[out].fr_bads);
 			if (FR_ISPASS(pass)) {
+				DT(frb_stateadd);
 				pass &= ~FR_CMDMASK;
 				pass |= FR_BLOCK;
 				fin->fin_reason = FRB_STATEADD;
@@ -3036,6 +3042,7 @@ ipf_check(ctx, ip, hlen, ifp, out
 				;
 			} else if ((softc->ipf_update_ipid != 0) && (v == 4)) {
 				if (ipf_updateipid(fin) == -1) {
+					DT(frb_updateipid);
 					LBUMP(ipf_stats[1].fr_ipud);
 					pass &= ~FR_CMDMASK;
 					pass |= FR_BLOCK;
@@ -3120,6 +3127,7 @@ filterdone:
 			 * takes over disposing of this packet.
 			 */
 			if (FR_ISAUTH(pass) && (fin->fin_m != NULL)) {
+				DT1(frb_authcapture, fr_info_t *, fin);
 				fin->fin_m = *fin->fin_mp = NULL;
 				fin->fin_reason = FRB_AUTHCAPTURE;
 				m = NULL;
@@ -3288,8 +3296,8 @@ logit:
 			 * If the "or-block" option has been used then
 			 * block the packet if we failed to log it.
 			 */
-			if ((pass & FR_LOGORBLOCK) &&
-			    FR_ISPASS(pass)) {
+			if ((pass & FR_LOGORBLOCK) && FR_ISPASS(pass)) {
+				DT1(frb_logfail2, u_int, pass);
 				pass &= ~FR_CMDMASK;
 				pass |= FR_BLOCK;
 				fin->fin_reason = FRB_LOGFAIL2;
@@ -6697,7 +6705,8 @@ ipf_coalesce(fin)
 	if (ipf_pullup(fin->fin_m, fin, fin->fin_plen) == NULL) {
 		ipf_main_softc_t *softc = fin->fin_main_soft;
 
-		LBUMPD(ipf_stats[fin->fin_out], fr_badcoalesces);
+		DT1(frb_coalesce, fr_info_t *, fin);
+		LBUMP(ipf_stats[fin->fin_out], fr_badcoalesces);
 # ifdef MENTAT
 		FREE_MB_T(*fin->fin_mp);
 # endif
@@ -8295,6 +8304,7 @@ ipf_decaps(fin, pass, l5proto)
 
 	if (ipf_makefrip(hlen, ip, fin) == -1) {
 cantdecaps:
+		DT1(frb_decapfrip, fr_info_t *, fin);
 		pass &= ~FR_CMDMASK;
 		pass |= FR_BLOCK|FR_QUICK;
 		fin->fin_reason = FRB_DECAPFRIP;
