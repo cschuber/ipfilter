@@ -29,8 +29,10 @@ extern int sysctl_ip_default_ttl;
 
 extern	ipf_main_softc_t	ipfmain;
 
+static	u_short	ipid = 0;
+
 static void	ipf_timer_func(unsigned long);
-static	int	ipf_send_ip __P((fr_info_t *, struct sk_buff *, struct sk_buff **));
+static	int	ipf_send_ip __P((fr_info_t *, struct sk_buff *));
 
 ipfmutex_t	ipl_mutex, ipf_auth_mx, ipf_rw, ipf_stinsert;
 ipfmutex_t	ipf_nat_new, ipf_natio, ipf_timeoutlock;
@@ -262,7 +264,7 @@ ipf_send_reset(fr_info_t *fin)
 		ip->ip_len = htons(sizeof(*ip) + sizeof(*tcp));
 		tcp2->th_sum = fr_cksum(fin, ip, IPPROTO_TCP, tcp2);
 	}
-	return ipf_send_ip(fin, m, &m);
+	return ipf_send_ip(fin, m);
 }
 
 
@@ -270,7 +272,7 @@ ipf_send_reset(fr_info_t *fin)
  * On input, ip_len is in network byte order
  */
 static int
-ipf_send_ip(fr_info_t *fin, struct sk_buff *sk, struct sk_buff **skp)
+ipf_send_ip(fr_info_t *fin, struct sk_buff *sk)
 {
 	fr_info_t fnew;
 	ip_t *ip, *oip;
@@ -278,12 +280,15 @@ ipf_send_ip(fr_info_t *fin, struct sk_buff *sk, struct sk_buff **skp)
 
 	ip = MTOD(sk, ip_t *);
 	bzero((char *)&fnew, sizeof(fnew));
+	fnew.fin_main_soft = fin->fin_main_soft;
 	oip = fin->fin_ip;
 
 	switch (fin->fin_v)
 	{
 	case 4 :
 		fnew.fin_v = 4;
+		fnew.fin_p = ip->ip_p;
+		fnew.fin_plen = ntohs(ip->ip_len);
 		ip->ip_hl = sizeof(*oip) >> 2;
 		ip->ip_tos = oip->ip_tos;
 		ip->ip_id = 0;
@@ -304,12 +309,12 @@ ipf_send_ip(fr_info_t *fin, struct sk_buff *sk, struct sk_buff **skp)
 	fnew.fin_flx = FI_NOCKSUM;
 	fnew.fin_m = sk;
 	fnew.fin_ip = ip;
-	fnew.fin_mp = skp;
+	fnew.fin_mp = &sk;
 	fnew.fin_hlen = hlen;
 	fnew.fin_dp = (char *)ip + hlen;
 	(void) ipf_makefrip(hlen, ip, &fnew);
 
-	return ipf_fastroute(sk, skp, &fnew, NULL);
+	return ipf_fastroute(sk, &sk, &fnew, NULL);
 }
 
 
@@ -474,7 +479,7 @@ ipf_send_icmp_err(int type, fr_info_t *fin, int isdst)
 	 * Need to exit out of these so we don't recursively call rw_enter
 	 * from fr_qout.
 	 */
-	return ipf_send_ip(fin, m, &m);
+	return ipf_send_ip(fin, m);
 }
 
 
@@ -515,8 +520,6 @@ u_short
 ipf_nextipid(fr_info_t *fin)
 {
 #if 1
-	static u_short ipid = 0;
-
 	return ipid++;
 #else
 	ip_t ip;
@@ -751,6 +754,8 @@ int ipfattach(ipf_main_softc_t *softc)
 	if (ipf_control_forwarding & 1)
 		ipv4_devconf.forwarding = 1;
 #endif
+
+	ipid = 0;
 
 	SPL_X(s);
 

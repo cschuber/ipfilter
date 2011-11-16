@@ -66,6 +66,7 @@ int		*ip_ttl_ptr;
 int		*ip_mtudisc;
 int		*ip_forwarding;
 
+static	u_short	ipid = 0;
 
 int
 ipfdetach()
@@ -133,6 +134,9 @@ ipfattach __P((void))
 #endif
 	if (ipf_control_forwarding & 1)
 		*ip_forwarding = 1;
+
+	ipid = 0;
+
 	return 0;
 }
 
@@ -597,7 +601,6 @@ INLINE u_short
 ipf_nextipid(fin)
 	fr_info_t *fin;
 {
-	static u_short ipid = 0;
 	u_short id;
 
 	MUTEX_ENTER(&ipf_rw);

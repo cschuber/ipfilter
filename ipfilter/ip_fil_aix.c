@@ -78,8 +78,9 @@ outbound_fw
 */
 
 
+static	u_short	ipid = 0;
 static	int	(*fr_savep) __P((ip_t *, int, void *, int, struct mbuf **));
-static	int	fr_send_ip __P((fr_info_t *, mb_t *, mb_t **));
+static	int	fr_send_ip __P((fr_info_t *, mb_t *));
 #ifdef KMUTEX_T
 extern  ipfmutex_t	ipf_rw;
 extern	ipfrwlock_t	ipf_mutex;
@@ -185,6 +186,8 @@ ipfattach(softc)
 
 	if (fr_control_forwarding & 1)
 		ipforwarding = 1;
+
+	ipid = 0;
 
 	ipf_init_all(softc);
 
@@ -606,7 +609,7 @@ ipf_send_reset(fin)
 		ip6->ip6_dst = fin->fin_src6;
 		tcp2->th_sum = in6_cksum(m, IPPROTO_TCP,
 					 sizeof(*ip6), sizeof(*tcp2));
-		return ipf_send_ip(fin, m, &m);
+		return ipf_send_ip(fin, m);
 	}
 #endif
 #ifdef INET
@@ -616,7 +619,7 @@ ipf_send_reset(fin)
 	ip->ip_dst.s_addr = fin->fin_saddr;
 	tcp2->th_sum = in_cksum(m, hlen + sizeof(*tcp2));
 	ip->ip_len = hlen + sizeof(*tcp2);
-	return ipf_send_ip(fin, m, &m);
+	return ipf_send_ip(fin, m);
 #else
 	return 0;
 #endif
@@ -624,9 +627,9 @@ ipf_send_reset(fin)
 
 
 static int
-ipf_send_ip(fin, m, mpp)
+ipf_send_ip(fin, m)
 	fr_info_t *fin;
-	mb_t *m, **mpp;
+	mb_t *m;
 {
 	fr_info_t fnew;
 #ifdef INET
@@ -637,21 +640,24 @@ ipf_send_ip(fin, m, mpp)
 
 	ip = mtod(m, ip_t *);
 	bzero((char *)&fnew, sizeof(fnew));
+	fnew.fin_main_soft = fin->fin_main_soft;
 
 	IP_V_A(ip, fin->fin_v);
 	switch (fin->fin_v)
 	{
 #ifdef INET
 	case 4 :
-		fnew.fin_v = 4;
 		oip = fin->fin_ip;
+		hlen = sizeof(*oip);
+		fnew.fin_v = 4;
+		fnew.fin_p = ip->ip_p;
+		fnew.fin_plen = ntohs(ip->ip_len);
 		IP_HL_A(ip, sizeof(*oip) >> 2);
 		ip->ip_tos = oip->ip_tos;
 		ip->ip_id = ipf_nextipid(fin);
 		ip->ip_off = 0;
 		ip->ip_ttl = IPDEFTTL;
 		ip->ip_sum = 0;
-		hlen = sizeof(*oip);
 		break;
 #endif
 #ifdef USE_INET6
@@ -662,8 +668,10 @@ ipf_send_ip(fin, m, mpp)
 		ip6->ip6_vfc = 0x60;
 		ip6->ip6_hlim = IPDEFTTL;
 
-		fnew.fin_v = 6;
 		hlen = sizeof(*ip6);
+		fnew.fin_p = ip6->ip6_nxt;
+		fnew.fin_v = 6;
+		fnew.fin_plen = ntohs(ip6->ip6_plen) + hlen;
 		break;
 	}
 #endif
@@ -678,12 +686,12 @@ ipf_send_ip(fin, m, mpp)
 	fnew.fin_flx = FI_NOCKSUM;
 	fnew.fin_m = m;
 	fnew.fin_ip = ip;
-	fnew.fin_mp = mpp;
+	fnew.fin_mp = &m;
 	fnew.fin_hlen = hlen;
 	fnew.fin_dp = (char *)ip + hlen;
 	(void) ipf_makefrip(hlen, ip, &fnew);
 
-	return ipf_fastroute(m, mpp, &fnew, NULL);
+	return ipf_fastroute(m, &m, &fnew, NULL);
 }
 
 
@@ -869,7 +877,7 @@ ipf_send_icmp_err(type, fin, dst)
 		ip->ip_len = iclen;
 		ip->ip_p = IPPROTO_ICMP;
 	}
-	err = ipf_send_ip(fin, m, &m);
+	err = ipf_send_ip(fin, m);
 	return err;
 }
 
@@ -1370,7 +1378,6 @@ u_short
 ipf_nextipid(fin)
 	fr_info_t *fin;
 {
-	static u_short ipid = 0;
 	u_short id;
 
 	MUTEX_ENTER(&ipf_rw);

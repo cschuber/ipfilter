@@ -60,7 +60,8 @@ static const char rcsid[] = "@(#)$Id$";
 # include "md5.h"
 #endif
 
-static	int	ipf_send_ip __P((fr_info_t *fin, mblk_t *m, mblk_t **mp));
+static	u_short	ipid = 0;
+static	int	ipf_send_ip __P((fr_info_t *fin, mblk_t *m));
 static	void	ipf_fixl4sum __P((fr_info_t *));
 static	void	*ipf_routeto __P((fr_info_t *, int, void *));
 static	int	ipf_sendpkt __P((ipf_main_softc_t *, int, void *, mblk_t *,
@@ -72,6 +73,7 @@ static	void	ipf_timer_func __P((void));
 static	void	ipf_timer_func __P((void *));
 #endif
 
+static	u_short	ipid = 0;
 #if !defined(FW_HOOKS)
 # if SOLARIS2 >= 7
 u_int		*ip_ttl_ptr = NULL;
@@ -210,6 +212,7 @@ ipfattach(softc)
 #else
 	ipf_attach_hooks(softc);
 #endif
+	ipid = 0;
 
 	return 0;
 }
@@ -278,8 +281,8 @@ get_unit(soft, name, family)
 	char *name;
 	int family;
 {
-#if !defined(FW_HOOKS)
 	void *ifp;
+#if !defined(FW_HOOKS)
 	qif_t *qf;
 	int sap;
 
@@ -385,16 +388,14 @@ ipf_send_reset(fr_info_t *fin)
 		ip->ip_p = IPPROTO_TCP;
 		ip->ip_len = htons(sizeof(*ip) + sizeof(*tcp));
 		ip->ip_tos = fin->fin_ip->ip_tos;
-		tcp2->th_sum = fr_cksum(m, ip, IPPROTO_TCP, tcp2,
-					ntohs(ip->ip_len));
 	}
-	return ipf_send_ip(fin, m, &m);
+	return ipf_send_ip(fin, m);
 }
 
 
 /*ARGSUSED*/
 static int
-ipf_send_ip(fr_info_t *fin, mblk_t *m, mb_t **mpp)
+ipf_send_ip(fr_info_t *fin, mblk_t *m)
 {
 #if !defined(FW_HOOKS)
 	qif_t *qif;
@@ -406,6 +407,7 @@ ipf_send_ip(fr_info_t *fin, mblk_t *m, mb_t **mpp)
 
 	ip = (ip_t *)m->b_rptr;
 	bzero((char *)&fnew, sizeof(fnew));
+	fnew.fin_main_soft = fin->fin_main_soft;
 
 #ifdef	USE_INET6
 	if (fin->fin_v == 6) {
@@ -414,8 +416,10 @@ ipf_send_ip(fr_info_t *fin, mblk_t *m, mb_t **mpp)
 		ip6 = (ip6_t *)ip;
 		ip6->ip6_vfc = 0x60;
 		ip6->ip6_hlim = 127;
+		fnew.fin_p = ip6->ip6_nxt;
 		fnew.fin_v = 6;
 		hlen = sizeof(*ip6);
+		fnew.fin_plen = ntohs(ip6->ip6_plen) + hlen;
 	} else
 #endif
 	{
@@ -432,6 +436,8 @@ ipf_send_ip(fr_info_t *fin, mblk_t *m, mb_t **mpp)
 		else
 #endif
 			ip->ip_off = htons(IP_DF);
+		fnew.fin_p = ip->ip_p;
+		fnew.fin_plen = ntohs(ip->ip_len);
 		ip->ip_sum = ipf_cksum((u_short *)ip, sizeof(*ip));
 		hlen = sizeof(*ip);
 	}
@@ -454,13 +460,27 @@ ipf_send_ip(fr_info_t *fin, mblk_t *m, mb_t **mpp)
 	fnew.fin_ifp = fin->fin_ifp;
 	fnew.fin_flx = FI_NOCKSUM;
 	fnew.fin_m = m;
+	fnew.fin_qfm = m;
 	fnew.fin_ip = ip;
-	fnew.fin_mp = mpp;
+	fnew.fin_mp = &m;
 	fnew.fin_hlen = hlen;
 	fnew.fin_dp = (char *)ip + hlen;
-	(void) ipf_makefrip(hlen, ip, &fnew);
+	if (fnew.fin_p == IPPROTO_TCP) {
+		tcphdr_t *tcp2 = fnew.fin_dp;
+		tcp2->th_sum = fr_cksum(&fnew, ip, IPPROTO_TCP, tcp2);
+	}
+	if (ipf_makefrip(hlen, ip, &fnew) == -1)
+		return -1;
 
-	i = ipf_fastroute(m, mpp, &fnew, NULL);
+	if (fin->fin_fr != NULL && fin->fin_fr->fr_type == FR_T_IPF) {
+		frdest_t *fdp = &fin->fin_fr->fr_rif;
+
+		if ((fdp->fd_ptr != NULL) &&
+		    (fdp->fd_ptr != (struct ifnet *)-1))
+			return ipf_fastroute(m, &m, &fnew, fdp);
+	}
+
+	i = ipf_fastroute(m, &m, &fnew, NULL);
 	return i;
 }
 
@@ -468,11 +488,7 @@ ipf_send_ip(fr_info_t *fin, mblk_t *m, mb_t **mpp)
 int
 ipf_send_icmp_err(int type, fr_info_t *fin, int dst)
 {
-# ifdef FW_HOOKS
 	ipf_main_softc_t *softc = fin->fin_main_soft;
-# else
-	ipf_main_softc_t *softc = &ipfmain;
-# endif
 	struct in_addr dst4;
 	struct icmp *icmp;
 	qpktinfo_t *qpi;
@@ -613,7 +629,7 @@ ipf_send_icmp_err(int type, fr_info_t *fin, int dst)
 	 * Need to exit out of these so we don't recursively call rw_enter
 	 * from fr_qout.
 	 */
-	return ipf_send_ip(fin, m, &m);
+	return ipf_send_ip(fin, m);
 }
 
 
@@ -795,7 +811,6 @@ ipf_newisn(fr_info_t *fin)
 u_short
 ipf_nextipid(fr_info_t *fin)
 {
-	static u_short ipid = 0;
 	ipf_main_softc_t *softc = fin->fin_main_soft;
 	ipstate_t *is;
 	nat_t *nat;
@@ -803,7 +818,11 @@ ipf_nextipid(fr_info_t *fin)
 
 	MUTEX_ENTER(&softc->ipf_rw);
 	if (fin->fin_pktnum != 0) {
-		id = fin->fin_pktnum & 0xffff;
+		/*
+		 * The -1 is for aligned test results.
+		 */
+		id = (fin->fin_pktnum - 1) & 0xffff;
+		id = ipid++;
 	} else {
 		id = ipid++;
 	}
