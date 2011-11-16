@@ -6008,7 +6008,7 @@ ipf_getifname(ifp, buffer)
 		;
 	unit = ifp->if_unit;
 	space = LIFNAMSIZ - (s - buffer);
-	if (space > 0) {
+	if ((space > 0) && (unit >= 0)) {
 #  if defined(SNPRINTF) && defined(_KERNEL)
 		SNPRINTF(temp, sizeof(temp), "%d", unit);
 #  else
