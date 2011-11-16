@@ -73,7 +73,9 @@ extern	ipf_main_softc_t	ipfmain;
 
 /* #undef	IPFDEBUG	*/
 
-static	int	ipf_send_ip(fr_info_t *, mb_t *, mb_t **);
+static	int	ipf_send_ip(fr_info_t *, mb_t *);
+
+static	u_short	ipid = 0;
 
 ipfmutex_t	ipf_rw, ipl_mutex, ipf_auth_mx, ipf_timeoutlock;
 ipfmutex_t	ipf_nat_new, ipf_natio, ipf_stinsert;
@@ -117,6 +119,8 @@ ipfattach(softc)
 
 	if (softc->ipf_control_forwarding & 1)
 		ipforwarding = 1;
+
+	ipid = 0;
 
 	SPL_X(s);
 
@@ -291,7 +295,7 @@ ipf_send_reset(fin)
 		tcp2->th_sum = in6_cksum(m, IPPROTO_TCP,
 					 sizeof(*ip6), sizeof(*tcp2));
 */
-		return ipf_send_ip(fin, m, &m);
+		return ipf_send_ip(fin, m);
 	}
 #endif
 	ip->ip_p = IPPROTO_TCP;
@@ -300,14 +304,14 @@ ipf_send_reset(fin)
 	ip->ip_dst.s_addr = fin->fin_saddr;
 	tcp2->th_sum = in_cksum(m, hlen + sizeof(*tcp2));
 	ip->ip_len = hlen + sizeof(*tcp2);
-	return ipf_send_ip(fin, m, &m);
+	return ipf_send_ip(fin, m);
 }
 
 
 static int
-ipf_send_ip(fin, m, mpp)
+ipf_send_ip(fin, m)
 	fr_info_t *fin;
-	mb_t *m, **mpp;
+	mb_t *m;
 {
 	fr_info_t fnew;
 	ip_t *ip, *oip;
@@ -315,6 +319,7 @@ ipf_send_ip(fin, m, mpp)
 
 	ip = mtod(m, ip_t *);
 	bzero((char *)&fnew, sizeof(fnew));
+	fnew.fin_main_soft = fin->fin_main_soft;
 
 	switch (fin->fin_p)
 	{
@@ -334,8 +339,11 @@ ipf_send_ip(fin, m, mpp)
 	switch (fin->fin_v)
 	{
 	case 4 :
-		fnew.fin_v = 4;
 		oip = fin->fin_ip;
+		hlen = sizeof(*oip);
+		fnew.fin_v = 4;
+		fnew.fin_p = ip->ip_p;
+		fnew.fin_plen = ip->ip_len + hlen;
 		IP_HL_A(ip, sizeof(*oip) >> 2);
 		ip->ip_tos = oip->ip_tos;
 		ip->ip_id = fin->fin_ip->ip_id;
@@ -343,7 +351,6 @@ ipf_send_ip(fin, m, mpp)
 		ip->ip_off = 0;
 		ip->ip_ttl = ttl;
 		ip->ip_sum = 0;
-		hlen = sizeof(*oip);
 		break;
 #ifdef	USE_INET6
 	case 6 :
@@ -357,8 +364,10 @@ ipf_send_ip(fin, m, mpp)
 # endif
 		ip6->ip6_hlim = ttl;
 
-		fnew.fin_v = 6;
 		hlen = sizeof(*ip6);
+		fnew.fin_p = ip6->ip6_nxt;
+		fnew.fin_v = 6;
+		fnew.fin_plen = ntohs(ip6->ip6_plen) + hlen;
 	}
 #endif
 	default :
@@ -385,7 +394,7 @@ ipf_send_ip(fin, m, mpp)
 			return ipf_fastroute(m, mpp, &fnew, fdp);
 	}
 
-	return ipf_fastroute(m, mpp, &fnew, NULL);
+	return ipf_fastroute(m, &m, &fnew, NULL);
 }
 
 
@@ -561,7 +570,7 @@ ipf_send_icmp_err(type, fin, dst)
 		ip->ip_len = iclen;
 		ip->ip_p = IPPROTO_ICMP;
 	}
-	err = ipf_send_ip(fin, m, &m);
+	err = ipf_send_ip(fin, m);
 	return err;
 }
 
@@ -1040,7 +1049,6 @@ INLINE u_short
 ipf_nextipid(fin)
 	fr_info_t *fin;
 {
-	static u_short ipid = 0;
 	u_short id;
 
 	MUTEX_ENTER(&ipf_rw);

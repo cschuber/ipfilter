@@ -121,8 +121,9 @@ const struct cdevsw ipl_cdevsw = {
 
 ipf_main_softc_t ipfmain;
 
+static	u_short	ipid = 0;
 static	int	(*ipf_savep)(void *, ip_t *, int, void *, int, struct mbuf **);
-static	int	ipf_send_ip(fr_info_t *, mb_t *, mb_t **);
+static	int	ipf_send_ip(fr_info_t *, mb_t *);
 #ifdef USE_INET6
 static int ipf_fastroute6(struct mbuf *, struct mbuf **,
 			  fr_info_t *, frdest_t *);
@@ -399,6 +400,8 @@ ipfattach(softc)
 	if (softc->ipf_control_forwarding & 1)
 		ipforwarding = 1;
 #endif
+
+	ipid = 0;
 
 	SPL_X(s);
 
@@ -720,7 +723,7 @@ ipf_send_reset(fin)
 		ip6->ip6_dst = fin->fin_src6.in6;
 		tcp2->th_sum = in6_cksum(m, IPPROTO_TCP,
 					 sizeof(*ip6), sizeof(*tcp2));
-		return ipf_send_ip(fin, m, &m);
+		return ipf_send_ip(fin, m);
 	}
 #endif
 #ifdef INET
@@ -730,7 +733,7 @@ ipf_send_reset(fin)
 	ip->ip_dst.s_addr = fin->fin_saddr;
 	tcp2->th_sum = in_cksum(m, hlen + sizeof(*tcp2));
 	ip->ip_len = hlen + sizeof(*tcp2);
-	return ipf_send_ip(fin, m, &m);
+	return ipf_send_ip(fin, m);
 #else
 	return 0;
 #endif
@@ -741,9 +744,9 @@ ipf_send_reset(fin)
  * Expects ip_len to be in host byte order when called.
  */
 static int
-ipf_send_ip(fin, m, mpp)
+ipf_send_ip(fin, m)
 	fr_info_t *fin;
-	mb_t *m, **mpp;
+	mb_t *m;
 {
 	fr_info_t fnew;
 #ifdef INET
@@ -754,22 +757,25 @@ ipf_send_ip(fin, m, mpp)
 
 	ip = mtod(m, ip_t *);
 	bzero((char *)&fnew, sizeof(fnew));
+	fnew.fin_main_soft = fin->fin_main_soft;
 
 	IP_V_A(ip, fin->fin_v);
 	switch (fin->fin_v)
 	{
 #ifdef INET
 	case 4 :
-		fnew.fin_v = 4;
 		oip = fin->fin_ip;
+		hlen = sizeof(*oip);
+		fnew.fin_v = 4;
+		fnew.fin_p = ip->ip_p;
+		fnew.fin_plen = ntohs(ip->ip_len);
+		HTONS(ip->ip_len);
 		IP_HL_A(ip, sizeof(*oip) >> 2);
 		ip->ip_tos = oip->ip_tos;
-		HTONS(ip->ip_len);
 		ip->ip_id = ipf_nextipid(fin);
 		ip->ip_off = htons(ip_mtudisc ? IP_DF : 0);
 		ip->ip_ttl = ip_defttl;
 		ip->ip_sum = 0;
-		hlen = sizeof(*oip);
 		break;
 #endif
 #ifdef USE_INET6
@@ -780,8 +786,10 @@ ipf_send_ip(fin, m, mpp)
 		ip6->ip6_vfc = 0x60;
 		ip6->ip6_hlim = IPDEFTTL;
 
-		fnew.fin_v = 6;
 		hlen = sizeof(*ip6);
+		fnew.fin_p = ip6->ip6_nxt;
+		fnew.fin_v = 6;
+		fnew.fin_plen = ntohs(ip6->ip6_plen) + hlen;
 		break;
 	}
 #endif
@@ -796,7 +804,7 @@ ipf_send_ip(fin, m, mpp)
 	fnew.fin_flx = FI_NOCKSUM;
 	fnew.fin_m = m;
 	fnew.fin_ip = ip;
-	fnew.fin_mp = mpp;
+	fnew.fin_mp = &m;
 	fnew.fin_hlen = hlen;
 	fnew.fin_dp = (char *)ip + hlen;
 	(void) ipf_makefrip(hlen, ip, &fnew);
@@ -809,7 +817,7 @@ ipf_send_ip(fin, m, mpp)
 			return ipf_fastroute(m, mpp, &fnew, fdp);
 	}
 
-	return ipf_fastroute(m, mpp, &fnew, NULL);
+	return ipf_fastroute(m, &m, &fnew, NULL);
 }
 
 
@@ -995,7 +1003,7 @@ ipf_send_icmp_err(type, fin, dst)
 		ip->ip_len = iclen;
 		ip->ip_p = IPPROTO_ICMP;
 	}
-	err = ipf_send_ip(fin, m, &m);
+	err = ipf_send_ip(fin, m);
 	return err;
 }
 
@@ -1602,7 +1610,6 @@ ipf_nextipid(fin)
 #ifdef USE_MUTEXES
 	ipf_main_softc_t *softc = fin->fin_main_soft;
 #endif
-	static u_short ipid = 0;
 	u_short id;
 
 	MUTEX_ENTER(&softc->ipf_rw);
