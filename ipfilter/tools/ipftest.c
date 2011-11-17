@@ -669,7 +669,7 @@ void dumpnat(arg)
 		printnat(ipn, opts & (OPT_DEBUG|OPT_VERBOSE));
 	printf("\nList of active sessions:\n");
 	for (nat = softn->ipf_nat_instances; nat; nat = nat->nat_next) {
-		printactivenat(nat, opts, 0, 0);
+		printactivenat(nat, opts, 0);
 		if (nat->nat_aps)
 			printf("\tproxy active\n");
 	}
@@ -786,26 +786,32 @@ void fixv4sums(m, ip)
 	ip_t *ip;
 {
 	u_char *csump, *hdr, p;
+	fr_info_t tmp;
 	int len;
 
 	p = 0;
 	len = 0;
+	bzero((char *)&tmp, sizeof(tmp));
+
 	csump = (u_char *)ip;
 	if (IP_V(ip) == 4) {
 		ip->ip_sum = 0;
 		ip->ip_sum = ipf_cksum((u_short *)ip, IP_HL(ip) << 2);
+		tmp.fin_hlen = IP_HL(ip) << 2;
 		csump += IP_HL(ip) << 2;
 		p = ip->ip_p;
 		len = ntohs(ip->ip_len);
 #ifdef USE_INET6
 	} else if (IP_V(ip) == 6) {
+		tmp.fin_hlen = sizeof(ip6_t);
 		csump += sizeof(ip6_t);
 		p = ((ip6_t *)ip)->ip6_nxt;
 		len = ntohs(((ip6_t *)ip)->ip6_plen);
 		len += sizeof(ip6_t);
 #endif
 	}
-
+	tmp.fin_plen = len;
+	tmp.fin_dlen = len - tmp.fin_hlen;
 
 	switch (p)
 	{
@@ -827,7 +833,12 @@ void fixv4sums(m, ip)
 		break;
 	}
 	if (hdr != NULL) {
+		tmp.fin_m = m;
+		tmp.fin_mp = &m;
+		tmp.fin_dp = hdr;
+		tmp.fin_ip = ip;
+		tmp.fin_plen = len;
 		*csump = 0;
-		*(u_short *)csump = fr_cksum(m, ip, p, hdr, len);
+		*(u_short *)csump = fr_cksum(&tmp, ip, p, hdr);
 	}
 }
