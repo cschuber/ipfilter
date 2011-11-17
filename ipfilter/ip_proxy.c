@@ -964,25 +964,15 @@ ipf_proxy_check(fin, nat)
 			err = ipf_proxy_fixseqack(fin, ip, aps, APR_INC(err));
 #if SOLARIS && defined(_KERNEL) && (SOLARIS2 >= 6)
 			if (dosum)
-				tcp->th_sum = fr_cksum(fin->fin_qfm, ip,
-						       IPPROTO_TCP, tcp,
-						       fin->fin_plen);
-#else
-			tcp->th_sum = fr_cksum(fin->fin_m, ip,
-					       IPPROTO_TCP, tcp,
-					       fin->fin_plen);
 #endif
+				tcp->th_sum = fr_cksum(fin, ip,
+						       IPPROTO_TCP, tcp);
 		} else if ((udp != NULL) && (udp->uh_sum != 0)) {
 #if SOLARIS && defined(_KERNEL) && (SOLARIS2 >= 6)
 			if (dosum)
-				udp->uh_sum = fr_cksum(fin->fin_qfm, ip,
-						       IPPROTO_UDP, udp,
-						       fin->fin_plen);
-#else
-			udp->uh_sum = fr_cksum(fin->fin_m, ip,
-					       IPPROTO_UDP, udp,
-					       fin->fin_plen);
 #endif
+				udp->uh_sum = fr_cksum(fin, ip,
+						       IPPROTO_UDP, udp);
 		}
 		aps->aps_bytes += fin->fin_plen;
 		aps->aps_pkts++;
