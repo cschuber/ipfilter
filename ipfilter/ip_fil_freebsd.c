@@ -176,6 +176,11 @@ ipf_check_wrapper(void *arg, struct mbuf **mp, struct ifnet *ifp, int dir)
 	ip->ip_off = htons(ip->ip_off);
 	rv = ipf_check(&ipfmain, ip, ip->ip_hl << 2, ifp, (dir == PFIL_OUT),
 		       mp);
+	if (FR_ISPASS(rv)) {
+		rv = 0;
+	} else {
+		rv = ENETUNREACH;
+	}
 	if ((rv == 0) && (*mp != NULL)) {
 		ip = mtod(*mp, struct ip *);
 		ip->ip_len = ntohs(ip->ip_len);

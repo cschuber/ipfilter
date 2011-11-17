@@ -1,0 +1,3 @@
+block out all
+block in all
+pass in on NIC0,NIC1 out-via NIC3,NIC2 to NIC3:3.3.3.254 proto udp all keep state

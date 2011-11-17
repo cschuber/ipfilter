@@ -1,0 +1,290 @@
+pass
+nomatch
+nomatch
+pass
+pass
+nomatch
+pass
+nomatch
+pass
+nomatch
+nomatch
+nomatch
+nomatch
+nomatch
+nomatch
+List of active MAP/Redirect filters:
+
+List of active sessions:
+
+Hostmap table:
+List of active state sessions:
+4:6 src:1.1.1.1,1 dst:2.1.2.2,23 state:6/4
+	3:66 4096<<0:4096<<0
+	FWD: IN pkts 3 bytes 120 OUT pkts 0 bytes 0
+	REV: IN pkts 2 bytes 80 OUT pkts 0 bytes 0
+	tag 0 pass 0x2008402 = pass in keep state
+	interfaces: in X[NIC0],X[NIC1] out X[],X[]
+	Sync status: not synchronized
+List of configured pools
+List of configured hash tables
+List of groups configured (set 0)
+List of groups configured (set 1)
+Rules configured (set 0, in)
+1 pass in proto tcp from any to any port = 23 flags S/SA keep state
+Rules configured (set 0, out)
+Rules configured (set 1, in)
+Rules configured (set 1, out)
+Accounting rules configured (set 0, in)
+Accounting rules configured (set 0, out)
+Accounting rules configured (set 1, in)
+Accounting rules configured (set 1, out)
+--------
+block
+nomatch
+nomatch
+block
+block
+nomatch
+block
+nomatch
+block
+nomatch
+nomatch
+nomatch
+nomatch
+nomatch
+nomatch
+List of active MAP/Redirect filters:
+
+List of active sessions:
+
+Hostmap table:
+List of active state sessions:
+4:6 src:1.1.1.1,1 dst:2.1.2.2,23 state:6/4
+	3:66 4096<<0:4096<<0
+	FWD: IN pkts 3 bytes 120 OUT pkts 0 bytes 0
+	REV: IN pkts 2 bytes 80 OUT pkts 0 bytes 0
+	tag 0 pass 0x2008401 = block in keep state
+	interfaces: in X[NIC0],X[NIC1] out X[],X[]
+	Sync status: not synchronized
+List of configured pools
+List of configured hash tables
+List of groups configured (set 0)
+List of groups configured (set 1)
+Rules configured (set 0, in)
+1 block in proto tcp from any to any port = 23 flags S/SA keep state
+Rules configured (set 0, out)
+Rules configured (set 1, in)
+Rules configured (set 1, out)
+Accounting rules configured (set 0, in)
+Accounting rules configured (set 0, out)
+Accounting rules configured (set 1, in)
+Accounting rules configured (set 1, out)
+--------
+nomatch
+nomatch
+nomatch
+nomatch
+nomatch
+nomatch
+nomatch
+nomatch
+nomatch
+nomatch
+pass
+pass
+nomatch
+nomatch
+nomatch
+List of active MAP/Redirect filters:
+
+List of active sessions:
+
+Hostmap table:
+List of active state sessions:
+List of configured pools
+List of configured hash tables
+List of groups configured (set 0)
+List of groups configured (set 1)
+Rules configured (set 0, in)
+2 pass in proto udp from any to any port = 53 keep frags
+Rules configured (set 0, out)
+Rules configured (set 1, in)
+Rules configured (set 1, out)
+Accounting rules configured (set 0, in)
+Accounting rules configured (set 0, out)
+Accounting rules configured (set 1, in)
+Accounting rules configured (set 1, out)
+--------
+nomatch
+nomatch
+nomatch
+nomatch
+nomatch
+nomatch
+nomatch
+nomatch
+nomatch
+nomatch
+block
+block
+nomatch
+nomatch
+nomatch
+List of active MAP/Redirect filters:
+
+List of active sessions:
+
+Hostmap table:
+List of active state sessions:
+List of configured pools
+List of configured hash tables
+List of groups configured (set 0)
+List of groups configured (set 1)
+Rules configured (set 0, in)
+2 block in proto udp from any to any port = 53 keep frags
+Rules configured (set 0, out)
+Rules configured (set 1, in)
+Rules configured (set 1, out)
+Accounting rules configured (set 0, in)
+Accounting rules configured (set 0, out)
+Accounting rules configured (set 1, in)
+Accounting rules configured (set 1, out)
+--------
+nomatch
+nomatch
+nomatch
+nomatch
+nomatch
+nomatch
+nomatch
+nomatch
+nomatch
+nomatch
+pass
+pass
+pass
+nomatch
+nomatch
+List of active MAP/Redirect filters:
+
+List of active sessions:
+
+Hostmap table:
+List of active state sessions:
+4:17 src:2.2.2.2,2 dst:4.4.4.4,53
+	FWD: IN pkts 1 bytes 28 OUT pkts 0 bytes 0
+	REV: IN pkts 0 bytes 0 OUT pkts 0 bytes 0
+	tag 0 pass 0x2008402 = pass in keep state
+	interfaces: in X[NIC1],X[] out X[],X[]
+	Sync status: not synchronized
+4:17 src:1.1.1.1,1 dst:4.4.4.4,53
+	FWD: IN pkts 1 bytes 28 OUT pkts 0 bytes 0
+	REV: IN pkts 1 bytes 28 OUT pkts 0 bytes 0
+	tag 0 pass 0x2008402 = pass in keep state
+	interfaces: in X[NIC1],X[NIC0] out X[],X[]
+	Sync status: not synchronized
+List of configured pools
+List of configured hash tables
+List of groups configured (set 0)
+List of groups configured (set 1)
+Rules configured (set 0, in)
+2 pass in proto udp from any to any port = 53 keep state
+Rules configured (set 0, out)
+Rules configured (set 1, in)
+Rules configured (set 1, out)
+Accounting rules configured (set 0, in)
+Accounting rules configured (set 0, out)
+Accounting rules configured (set 1, in)
+Accounting rules configured (set 1, out)
+--------
+nomatch
+nomatch
+nomatch
+nomatch
+nomatch
+nomatch
+nomatch
+nomatch
+nomatch
+nomatch
+block
+block
+block
+nomatch
+nomatch
+List of active MAP/Redirect filters:
+
+List of active sessions:
+
+Hostmap table:
+List of active state sessions:
+4:17 src:2.2.2.2,2 dst:4.4.4.4,53
+	FWD: IN pkts 1 bytes 28 OUT pkts 0 bytes 0
+	REV: IN pkts 0 bytes 0 OUT pkts 0 bytes 0
+	tag 0 pass 0x2008401 = block in keep state
+	interfaces: in X[NIC1],X[] out X[],X[]
+	Sync status: not synchronized
+4:17 src:1.1.1.1,1 dst:4.4.4.4,53
+	FWD: IN pkts 1 bytes 28 OUT pkts 0 bytes 0
+	REV: IN pkts 1 bytes 28 OUT pkts 0 bytes 0
+	tag 0 pass 0x2008401 = block in keep state
+	interfaces: in X[NIC1],X[NIC0] out X[],X[]
+	Sync status: not synchronized
+List of configured pools
+List of configured hash tables
+List of groups configured (set 0)
+List of groups configured (set 1)
+Rules configured (set 0, in)
+2 block in proto udp from any to any port = 53 keep state
+Rules configured (set 0, out)
+Rules configured (set 1, in)
+Rules configured (set 1, out)
+Accounting rules configured (set 0, in)
+Accounting rules configured (set 0, out)
+Accounting rules configured (set 1, in)
+Accounting rules configured (set 1, out)
+--------
+nomatch
+nomatch
+nomatch
+nomatch
+nomatch
+pass
+nomatch
+pass
+nomatch
+nomatch
+nomatch
+nomatch
+nomatch
+nomatch
+nomatch
+List of active MAP/Redirect filters:
+
+List of active sessions:
+
+Hostmap table:
+List of active state sessions:
+4:6 src:1.1.1.1,1 dst:2.1.2.2,25 state:3/4
+	2:66 4096<<0:16384<<0
+	FWD: IN pkts 1 bytes 40 OUT pkts 0 bytes 0
+	REV: IN pkts 1 bytes 40 OUT pkts 0 bytes 0
+	tag 0 pass 0x2008402 = pass in keep state
+	interfaces: in X[NIC0],X[NIC1] out X[],X[]
+	Sync status: not synchronized
+List of configured pools
+List of configured hash tables
+List of groups configured (set 0)
+List of groups configured (set 1)
+Rules configured (set 0, in)
+1 pass in on NIC0 proto tcp from any to any port = 25 keep state
+Rules configured (set 0, out)
+Rules configured (set 1, in)
+Rules configured (set 1, out)
+Accounting rules configured (set 0, in)
+Accounting rules configured (set 0, out)
+Accounting rules configured (set 1, in)
+Accounting rules configured (set 1, out)
+--------

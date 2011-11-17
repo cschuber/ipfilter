@@ -859,8 +859,8 @@ ipf_proxy_check(fin, nat)
 		return -1;
 	}
 
-#ifndef IPFILTER_CKSUM
-	if ((fin->fin_out == 0) && (ipf_checkl4sum(fin) == -1)) {
+	if (softc->ipf_valid_cksum == 0 &&
+	    (fin->fin_out == 0) && (ipf_checkl4sum(fin) == -1)) {
 		if (softp->ips_proxy_debug > 0)
 			printf("ipf_proxy_check: l4 checksum failure %d\n",
 				fin->fin_p);
@@ -868,7 +868,6 @@ ipf_proxy_check(fin, nat)
 			softc->ipf_stats[fin->fin_out].fr_tcpbad++;
 		return -1;
 	}
-#endif
 
 	aps = nat->nat_aps;
 	if (aps != NULL) {

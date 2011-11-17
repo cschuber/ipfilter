@@ -65,6 +65,11 @@ static	int	hex_readip(mb, ifn, dir)
 	char	*buf;
 	int	cnt;
 
+	if (mb->mb_data != (char *)mb->mb_buf) {
+		fprintf(stderr, "mb_data(%p) != mb_buf(%p)\n",
+			mb->mb_data, mb->mb_buf);
+		abort();
+	}
 	buf = (char *)mb->mb_buf;
 	cnt = sizeof(mb->mb_buf);
 	/*
@@ -112,15 +117,15 @@ static	int	hex_readip(mb, ifn, dir)
 
 			while (*s++ == '+') {
 				if (!strncasecmp(s, "mcast", 5)) {
-					mb->mb_flags |= M_MCAST;
+					mb->mb_flags |= QF_MULTICAST;
 					s += 5;
 				}
 				if (!strncasecmp(s, "bcast", 5)) {
-					mb->mb_flags |= M_BCAST;
+					mb->mb_flags |= QF_BROADCAST;
 					s += 5;
 				}
 				if (!strncasecmp(s, "mbcast", 6)) {
-					mb->mb_flags |= M_MBCAST;
+					mb->mb_flags |= QF_MBCAST;
 					s += 6;
 				}
 			}

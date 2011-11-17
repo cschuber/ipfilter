@@ -1,0 +1,45 @@
+#!/bin/sh
+testitem=$1
+TESTMODE=$2
+todo=`expr ${testitem} : '.*\/\(.*\)$'`
+resdir=`expr ${testitem} : '\(.*\)\/.*$'`
+args=`awk "/^${todo} / { print; } " test.format`
+set $args
+
+if [ ${TESTMODE} != user ] ; then
+	exit 0
+fi
+. ./setup_test.sh
+
+/bin/rm -f $1
+echo "${todo}...";
+/bin/cp /dev/null ${results}
+if [ ${TESTMODE} = kern ] ; then
+	../ipf -D
+	../ipf -E
+fi
+if [ -f regress/${todo}.pool -a -f "${regress_ipf}" ] ; then
+	../ipftest -RD -b -P regress/${todo}.pool -r ${regress_ipf} \
+		   -i ${input} >> ${results}
+	status=$?
+elif [ -f regress/${todo}.pool -a -f "${regress_nat}" ] ; then
+	../ipftest -RD -b -P regress/${todo}.pool -N ${regress_nat} \
+		   -i ${input} >> ${results}
+	status=$?
+else
+	../ipftest -RD -b -r ${regress_ipf} -i ${input} >> ${results}
+	status=$?
+fi
+if [ ${TESTMODE} = kern ] ; then
+	../ipf -D
+fi
+if [ $status -ne 0 ] ; then
+	exit 1;
+fi
+echo "-------------------------------" >> ${results}
+cmp ${expected} ${results}
+status=$?
+if [ $status = 0 ] ; then
+	$TOUCH ${resdir}/${todo}
+fi
+exit $status

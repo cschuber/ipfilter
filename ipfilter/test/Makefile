@@ -9,504 +9,675 @@ POOLDEP=../ip_lookup.c ../ip_lookup.h ../ip_pool.c ../ip_pool.h \
 BINDEST=/usr/local/bin
 SBINDEST=/sbin
 MANDIR=/usr/share/man
-all: expected.d results tests
+RESDIR=user
+TESTMODE=user
+all: usersetup.d results
+	make tests RESDIR=user TESTMODE=user NIC0=nic0 NIC1=nic1 NIC2=nic2 NIC3=nic3 NIC0ADDR="192.168.1.188__" NIC0HEXADDR="c0a8 01bc" NIC0ADDR6="c0a8:100::bc" NIC0HEXADDR6="c0a8 0100 0000 0000 0000 0000 0000 00bc"
 
-expected.d:
-	(cd expected; make)
+usersetup.d:
+	make setup.d RESDIR=user
+
+setup.d:
+	mkdir -p $(RESDIR) expected/$(RESDIR) input/$(RESDIR) regress/$(RESDIR)
+
+#	for i in `egrep '^[a-z]' test.format | cut -f1 -d' '`; do \
+#		perl ./build_test.pl all $${i}; \
+#	done
 
 results:
 	mkdir -p results
 
 tests: ipf nat logtests ipv6 pools
 
-ipf: ptests ftests
+ipf: p_tests ftests
 
-nat: intests ntests nitests
+nat: in_tests ntests nitests
 
 first:
 	-mkdir -p results
 
-# Filtering tests
-ftests: f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22 f24 f25 f26 f27 f28 f29 f30
+kerntests:
+	make setup.d
+	make ftests RESDIR=kern TESTMODE=kern
+	make ntests RESDIR=kern TESTMODE=kern
+	make nitests RESDIR=kern TESTMODE=kern
+	make ipv6 RESDIR=kern TESTMODE=kern
+
+kernsetup.d:
+	make RESDIR=kern NIC0=$(NIC0) NIC1=$(NIC1) NIC2=$(NIC2) NIC3=$(NIC3) setup.d
+
+#
+# IPv4 filtering tests
+#
+ftests: \
+	$(RESDIR)/f1 \
+	$(RESDIR)/f2 \
+	$(RESDIR)/f3 \
+	$(RESDIR)/f4 \
+	$(RESDIR)/f5 \
+	$(RESDIR)/f6 \
+	$(RESDIR)/f7 \
+	$(RESDIR)/f8 \
+	$(RESDIR)/f9 \
+	$(RESDIR)/f10 \
+	$(RESDIR)/f11 \
+	$(RESDIR)/f12 \
+	$(RESDIR)/f13 \
+	$(RESDIR)/f14 \
+	$(RESDIR)/f15 \
+	$(RESDIR)/f17 \
+	$(RESDIR)/f18 \
+	$(RESDIR)/f19 \
+	$(RESDIR)/f21 \
+	$(RESDIR)/f22 \
+	$(RESDIR)/f24 \
+	$(RESDIR)/f25 \
+	$(RESDIR)/f26 \
+	$(RESDIR)/f27 \
+	$(RESDIR)/f28 \
+	$(RESDIR)/f29 \
+	$(RESDIR)/f30
+
+#
+# ipf rule parsing tests
+#
+p_tests: \
+	$(RESDIR)/i1 \
+	$(RESDIR)/i2 \
+	$(RESDIR)/i3 \
+	$(RESDIR)/i4 \
+	$(RESDIR)/i5 \
+	$(RESDIR)/i6 \
+	$(RESDIR)/i7 \
+	$(RESDIR)/i8 \
+	$(RESDIR)/i9 \
+	$(RESDIR)/i10 \
+	$(RESDIR)/i11 \
+	$(RESDIR)/i12 \
+	$(RESDIR)/i13 \
+	$(RESDIR)/i14 \
+	$(RESDIR)/i15 \
+	$(RESDIR)/i16 \
+	$(RESDIR)/i17 \
+	$(RESDIR)/i18 \
+	$(RESDIR)/i19 \
+	$(RESDIR)/i20 \
+	$(RESDIR)/i21 \
+	$(RESDIR)/i22 \
+	$(RESDIR)/i23
+
+#
+# Basic testing of NAT
+#
+ntests: \
+	$(RESDIR)/n1 \
+	$(RESDIR)/n2 \
+	$(RESDIR)/n3 \
+	$(RESDIR)/n4 \
+	$(RESDIR)/n5 \
+	$(RESDIR)/n6 \
+	$(RESDIR)/n7 \
+	$(RESDIR)/n8 \
+	$(RESDIR)/n9 \
+	$(RESDIR)/n10 \
+	$(RESDIR)/n11 \
+	$(RESDIR)/n12 \
+	$(RESDIR)/n13 \
+	$(RESDIR)/n14 \
+	$(RESDIR)/n15 \
+	$(RESDIR)/n16 \
+	$(RESDIR)/n17 \
+	$(RESDIR)/n18 \
+	$(RESDIR)/n100 \
+	$(RESDIR)/n101 \
+	$(RESDIR)/n102 \
+	$(RESDIR)/n103 \
+	$(RESDIR)/n104 \
+	$(RESDIR)/n105 \
+	$(RESDIR)/n106 \
+	$(RESDIR)/n200 \
+	$(RESDIR)/n201
+
+#
+# Basic IPv6 NAT tests
+#
+ntests6: \
+	$(RESDIR)/n1_6 \
+	$(RESDIR)/n2_6 \
+	$(RESDIR)/n4_6 \
+	$(RESDIR)/n5_6 \
+	$(RESDIR)/n6_6 \
+	$(RESDIR)/n7_6 \
+	$(RESDIR)/n8_6 \
+	$(RESDIR)/n9_6 \
+	$(RESDIR)/n11_6 \
+	$(RESDIR)/n12_6 \
+	$(RESDIR)/n15_6
+
+#
+# Tests combining ipf rules with NAT
+#
+nitests: \
+	$(RESDIR)/ni1 \
+	$(RESDIR)/ni2 \
+	$(RESDIR)/ni3 \
+	$(RESDIR)/ni4 \
+	$(RESDIR)/ni5 \
+	$(RESDIR)/ni6 \
+	$(RESDIR)/ni7 \
+	$(RESDIR)/ni8 \
+	$(RESDIR)/ni9 \
+	$(RESDIR)/ni10 \
+	$(RESDIR)/ni11 \
+	$(RESDIR)/ni12 \
+	$(RESDIR)/ni13 \
+	$(RESDIR)/ni14 \
+	$(RESDIR)/ni15 \
+	$(RESDIR)/ni16 \
+	$(RESDIR)/ni17 \
+	$(RESDIR)/ni18 \
+	$(RESDIR)/ni19 \
+	$(RESDIR)/ni20 \
+	$(RESDIR)/ni21 \
+	$(RESDIR)/ni23
+
+#
+# NAT parser testing
+#
+in_tests: \
+	$(RESDIR)/in1 \
+	$(RESDIR)/in2 \
+	$(RESDIR)/in3 \
+	$(RESDIR)/in4 \
+	$(RESDIR)/in5 \
+	$(RESDIR)/in6 \
+	$(RESDIR)/in7 \
+	$(RESDIR)/in100 \
+	$(RESDIR)/in101 \
+	$(RESDIR)/in102
+
+logtests: \
+	$(RESDIR)/l1
+
+pools: \
+	$(RESDIR)/p1 \
+	$(RESDIR)/p2 \
+	$(RESDIR)/p3 \
+	$(RESDIR)/p4 \
+	$(RESDIR)/p5 \
+	$(RESDIR)/p6 \
+	$(RESDIR)/p7 \
+	$(RESDIR)/p9 \
+	$(RESDIR)/p10 \
+	$(RESDIR)/p11 \
+	$(RESDIR)/p12 \
+	$(RESDIR)/p13 \
+	$(RESDIR)/ip1 \
+	$(RESDIR)/ip2 \
+	$(RESDIR)/ip3
+
+ipv6: \
+	$(RESDIR)/ipv6_1 \
+	$(RESDIR)/ipv6_2 \
+	$(RESDIR)/ipv6_3 \
+	$(RESDIR)/ipv6_4 \
+	$(RESDIR)/ipv6_5 \
+	$(RESDIR)/ipv6_6 \
+	ntests6
+
+bpf: \
+	$(RESDIR)/bpf1 \
+	$(RESDIR)/bpf-f1
+
+$(RESDIR)/f1: expected/f1 input/f1 regress/f1
+	@/bin/sh ./f_test $@ $(TESTMODE)
+
+$(RESDIR)/f2: expected/f2 input/f2 regress/f2
+	@/bin/sh ./f_test $@ $(TESTMODE)
+
+$(RESDIR)/f3: expected/f3 input/f3 regress/f3
+	@/bin/sh ./f_test $@ $(TESTMODE)
+
+$(RESDIR)/f4: expected/f4 input/f4 regress/f4
+	@/bin/sh ./f_test $@ $(TESTMODE)
+
+$(RESDIR)/f5: expected/f5 input/f5 regress/f5
+	@/bin/sh ./f_test $@ $(TESTMODE)
+
+$(RESDIR)/f6: expected/f6 input/f6 regress/f6
+	@/bin/sh ./f_test $@ $(TESTMODE)
+
+$(RESDIR)/f7: expected/f7 input/f7 regress/f7
+	@/bin/sh ./f_test $@ $(TESTMODE)
+
+$(RESDIR)/f8: expected/f8 input/f8 regress/f8
+	@/bin/sh ./f_test $@ $(TESTMODE)
+
+$(RESDIR)/f9: expected/f9 input/f9 regress/f9
+	@/bin/sh ./f_test $@ $(TESTMODE)
+
+$(RESDIR)/f10: expected/f10 input/f10 regress/f10
+	@/bin/sh ./f_test $@ $(TESTMODE)
+
+$(RESDIR)/f11: expected/$(RESDIR)/f11 input/$(RESDIR)/f11 regress/$(RESDIR)/f11
+	@/bin/sh ./f_test $@ $(TESTMODE)
+
+$(RESDIR)/f12: expected/f12 input/f12 regress/f12
+	@/bin/sh ./f_test $@ $(TESTMODE)
+
+$(RESDIR)/f13: expected/f13 input/f13 regress/f13
+	@/bin/sh ./f_test $@ $(TESTMODE)
+
+$(RESDIR)/f14: expected/f14 input/f14 regress/f14
+	@/bin/sh ./f_test $@ $(TESTMODE)
+
+$(RESDIR)/f15: expected/f15 input/$(RESDIR)/f15 regress/$(RESDIR)/f15
+	@/bin/sh ./f_m_test $@ $(TESTMODE)
+
+$(RESDIR)/f17: expected/f17 input/$(RESDIR)/f17 regress/$(RESDIR)/f17
+	@/bin/sh ./f_m_test $@ $(TESTMODE)
+
+$(RESDIR)/f18: expected/f18 input/$(RESDIR)/f18 regress/f18
+	@/bin/sh ./f_m_test $@ $(TESTMODE)
+
+$(RESDIR)/f19: expected/f19 input/f19 regress/f19
+	@/bin/sh ./f_test $@ $(TESTMODE)
+
+$(RESDIR)/f21: expected/f21 input/$(RESDIR)/f21 regress/f21
+	@/bin/sh ./f_m_test $@ $(TESTMODE)
+
+$(RESDIR)/f22: expected/f22 input/f22 regress/f22
+	@/bin/sh ./f_m_test $@ $(TESTMODE)
+
+$(RESDIR)/f24: expected/f24 input/$(RESDIR)/f24 regress/f24
+	@/bin/sh ./f_m_test $@ $(TESTMODE)
+
+$(RESDIR)/f25: expected/$(RESDIR)/f25 input/$(RESDIR)/f25 regress/$(RESDIR)/f25
+	@/bin/sh ./f_m_test $@ $(TESTMODE)
+
+$(RESDIR)/f26: expected/f26 input/f26 regress/f26
+	@/bin/sh ./f_test $@ $(TESTMODE)
+
+$(RESDIR)/f27: expected/f27 input/$(RESDIR)/f27 regress/f27
+	@/bin/sh ./f_test $@ $(TESTMODE)
+
+$(RESDIR)/f28: expected/$(RESDIR)/f28 input/$(RESDIR)/f28 regress/$(RESDIR)/f28.ipf regress/f28.pool \
+	    $(POOLDEP)
+	@/bin/sh ./p_test $@ $(TESTMODE)
+
+$(RESDIR)/f29: expected/$(RESDIR)/f29 input/$(RESDIR)/f29 regress/$(RESDIR)/f29.ipf regress/f29.pool \
+	    $(POOLDEP)
+	@/bin/sh ./p_test $@ $(TESTMODE)
+
+$(RESDIR)/f30: expected/f30 input/$(RESDIR)/f30 regress/$(RESDIR)/f30
+	@/bin/sh ./f_test $@ $(TESTMODE)
+
+$(RESDIR)/i1: expected/i1 regress/i1
+	@/bin/sh ./i_test $@ $(TESTMODE)
+
+$(RESDIR)/i2: expected/i2 regress/i2
+	@/bin/sh ./i_test $@ $(TESTMODE)
+
+$(RESDIR)/i3: expected/i3 regress/i3
+	@/bin/sh ./i_test $@ $(TESTMODE)
 
-# Rule parsing tests
-ptests: i1 i2 i3 i4 i5 i6 i7 i8 i9 i10 i11 i12 i13 i14 i15 i16 i17 i18 i19 \
-	i20 i21 i22 i23
+$(RESDIR)/i4: expected/i4 regress/i4
+	@/bin/sh ./i_test $@ $(TESTMODE)
 
-ntests: n1 n2 n3 n4 n5 n6 n7 n8 n9 n10 n11 n12 n13 n14 n15 n16 n17 n18 n100 n101 n102 n103 n104 n105 n106 n200 n201
+$(RESDIR)/i5: expected/i5 regress/i5
+	@/bin/sh ./i_test $@ $(TESTMODE)
 
-ntests6: n1_6 n2_6 n4_6 n5_6 n6_6 n7_6 n8_6 n9_6 n11_6 n12_6 n15_6
+$(RESDIR)/i6: expected/i6 regress/i6
+	@/bin/sh ./i_test $@ $(TESTMODE)
 
-nitests: ni1 ni2 ni3 ni4 ni5 ni6 ni7 ni8 ni9 ni10 ni11 ni12 ni13 ni14 ni15 \
-	 ni16 ni17 ni18 ni19 ni20 ni21 ni23
+$(RESDIR)/i7: expected/i7 regress/i7
+	@/bin/sh ./i_test $@ $(TESTMODE)
 
-intests: in1 in2 in3 in4 in5 in6 in7 in100 in101 in102
+$(RESDIR)/i8: expected/i8 regress/i8
+	@/bin/sh ./i_test $@ $(TESTMODE)
 
-logtests: l1
+$(RESDIR)/i9: expected/i9 regress/i9
+	@/bin/sh ./i_test $@ $(TESTMODE)
 
-pools: p1 p2 p3 p4 p5 p6 p7 p9 p10 p11 p12 p13 ip1 ip2 ip3
+$(RESDIR)/i10: expected/i10 regress/i10
+	@/bin/sh ./i_test $@ $(TESTMODE)
 
-ipv6: ipv6.1 ipv6.2 ipv6.3 ipv6.4 ipv6.5 ipv6.6 ntests6
+$(RESDIR)/i11: expected/i11 regress/i11
+	@/bin/sh ./i_test $@ $(TESTMODE)
 
-bpf: bpf1 bpf-f1
+$(RESDIR)/i12: expected/i12 regress/i12
+	@/bin/sh ./i_test $@ $(TESTMODE)
 
-f1: expected/f1 input/f1 regress/f1
-	@/bin/sh ./dotest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/i13: expected/i13 regress/i13
+	@/bin/sh ./i_test $@ $(TESTMODE)
 
-f2: expected/f2 input/f2 regress/f2
-	@/bin/sh ./dotest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/i14: expected/i14 regress/i14
+	@/bin/sh ./i_test $@ $(TESTMODE)
 
-f3: expected/f3 input/f3 regress/f3
-	@/bin/sh ./dotest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/i15: expected/i15 regress/i15
+	@/bin/sh ./i_test $@ $(TESTMODE)
 
-f4: expected/f4 input/f4 regress/f4
-	@/bin/sh ./dotest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/i16: expected/i16 regress/i16
+	@/bin/sh ./i_test $@ $(TESTMODE)
 
-f5: expected/f5 input/f5 regress/f5
-	@/bin/sh ./dotest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/i17: expected/i17 regress/i17
+	@/bin/sh ./i_test $@ $(TESTMODE)
 
-f6: expected/f6 input/f6 regress/f6
-	@/bin/sh ./dotest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/i18: expected/i18 regress/i18
+	@/bin/sh ./i_test $@ $(TESTMODE)
 
-f7: expected/f7 input/f7 regress/f7
-	@/bin/sh ./dotest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/i19: expected/i19 regress/i19
+	@/bin/sh ./i_test $@ $(TESTMODE)
 
-f8: expected/f8 input/f8 regress/f8
-	@/bin/sh ./dotest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/i20: expected/i20 regress/i20
+	@/bin/sh ./i_test $@ $(TESTMODE)
 
-f9: expected/f9 input/f9 regress/f9
-	@/bin/sh ./dotest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/i21: expected/i21 regress/i21
+	@/bin/sh ./i_test $@ $(TESTMODE)
 
-f10: expected/f10 input/f10 regress/f10
-	@/bin/sh ./dotest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/i22: expected/i22 regress/i22
+	@/bin/sh ./i_test $@ $(TESTMODE)
 
-f11: expected/f11 input/f11 regress/f11
-	@/bin/sh ./dotest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/i23: expected/i23 regress/i23
+	@/bin/sh ./i_test $@ $(TESTMODE)
 
-f12: expected/f12 input/f12 regress/f12
-	@/bin/sh ./dotest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/bpf1: expected/bpf1 regress/bpf1
+	@/bin/sh ./bpf_test $@ $(TESTMODE)
 
-f13: expected/f13 input/f13 regress/f13
-	@/bin/sh ./dotest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/n1: expected/$(RESDIR)/n1 regress/$(RESDIR)/n1 input/$(RESDIR)/n1
+	@/bin/sh ./n_test $@ $(TESTMODE)
 
-f14: expected/f14 input/f14 regress/f14
-	@/bin/sh ./dotest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/n2: expected/$(RESDIR)/n2 regress/$(RESDIR)/n2 input/$(RESDIR)/n2
+	@/bin/sh ./n_test $@ $(TESTMODE)
 
-f19: expected/f15 input/f15 regress/f15
-	@/bin/sh ./dotest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/n3: expected/$(RESDIR)/n3 regress/$(RESDIR)/n3 input/$(RESDIR)/n3
+	@/bin/sh ./n_test $@ $(TESTMODE)
 
-f15: expected/f15 input/f15 regress/f15
-	@/bin/sh ./mtest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/n4: expected/$(RESDIR)/n4 regress/$(RESDIR)/n4 input/$(RESDIR)/n4
+	@/bin/sh ./n_test $@ $(TESTMODE)
 
-f16: expected/f16 input/f16 regress/f16
-	@/bin/sh ./mtest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/n5: expected/$(RESDIR)/n5 regress/$(RESDIR)/n5 input/$(RESDIR)/n5
+	@/bin/sh ./n_test $@ $(TESTMODE)
 
-f17: expected/f17 input/f17 regress/f17
-	@/bin/sh ./mtest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/n6: expected/$(RESDIR)/n6 regress/$(RESDIR)/n6 input/$(RESDIR)/n6
+	@/bin/sh ./n_test $@ $(TESTMODE)
 
-f18: expected/f18 input/f18 regress/f18
-	@/bin/sh ./mtest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/n7: expected/$(RESDIR)/n7 regress/$(RESDIR)/n7 input/$(RESDIR)/n7
+	@/bin/sh ./n_test $@ $(TESTMODE)
 
-f20: expected/f20 input/f20 regress/f20
-	@/bin/sh ./mtest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/n8: expected/$(RESDIR)/n8 regress/$(RESDIR)/n8 input/$(RESDIR)/n8
+	@/bin/sh ./n_test $@ $(TESTMODE)
 
-f21: expected/f21 input/f21 regress/f21
-	@/bin/sh ./mtest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/n9: expected/$(RESDIR)/n9 regress/$(RESDIR)/n9 input/$(RESDIR)/n9
+	@/bin/sh ./n_test $@ $(TESTMODE)
 
-f22: expected/f22 input/f22 regress/f22
-	@/bin/sh ./mtest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/n10: expected/$(RESDIR)/n10 regress/$(RESDIR)/n10 input/$(RESDIR)/n10
+	@/bin/sh ./n_test $@ $(TESTMODE)
 
-f24: expected/f24 input/f24 regress/f24
-	@/bin/sh ./mtest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/n11: expected/$(RESDIR)/n11 regress/$(RESDIR)/n11 input/$(RESDIR)/n11
+	@/bin/sh ./n_test $@ $(TESTMODE)
 
-f25: expected/f25 input/f25 regress/f25
-	@/bin/sh ./mtest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/n12: expected/$(RESDIR)/n12 regress/$(RESDIR)/n12 input/$(RESDIR)/n12
+	@/bin/sh ./n_test $@ $(TESTMODE)
 
-f26: expected/f26 input/f26 regress/f26
-	@/bin/sh ./dotest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/n13: expected/$(RESDIR)/n13 regress/$(RESDIR)/n13 input/$(RESDIR)/n13
+	@/bin/sh ./n_test $@ $(TESTMODE)
 
-f27: expected/f27 input/f27 regress/f27
-	@/bin/sh ./dotest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/n14: expected/$(RESDIR)/n14 regress/$(RESDIR)/n14 input/$(RESDIR)/n14
+	@/bin/sh ./n_test $@ $(TESTMODE)
 
-f28: expected/f28 input/f28 regress/f28.ipf regress/f28.pool $(POOLDEP)
-	@/bin/sh ./ptest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/n15: expected/$(RESDIR)/n15 regress/$(RESDIR)/n15 input/$(RESDIR)/n15
+	@/bin/sh ./n_test $@ $(TESTMODE)
 
-f29: expected/f29 input/f29 regress/f29.ipf regress/f29.pool $(POOLDEP)
-	@/bin/sh ./ptest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/n16: expected/$(RESDIR)/n16 regress/$(RESDIR)/n16 input/$(RESDIR)/n16
+	@/bin/sh ./n_test $@ $(TESTMODE)
 
-f30: expected/f30 input/f30 regress/f30
-	@/bin/sh ./dotest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/n17: expected/$(RESDIR)/n17 regress/$(RESDIR)/n17 input/$(RESDIR)/n17
+	@/bin/sh ./n_test $@ $(TESTMODE)
 
-i1: expected/i1 regress/i1
-	@/bin/sh ./itest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/n18: expected/$(RESDIR)/n18 regress/$(RESDIR)/n18 input/$(RESDIR)/n18
+	@/bin/sh ./n_test $@ $(TESTMODE)
 
-i2: expected/i2 regress/i2
-	@/bin/sh ./itest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/n100: expected/$(RESDIR)/n100 regress/$(RESDIR)/n100 input/$(RESDIR)/n100
+	@/bin/sh ./n_test $@ $(TESTMODE)
 
-i3: expected/i3 regress/i3
-	@/bin/sh ./itest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/n101: expected/$(RESDIR)/n101 regress/$(RESDIR)/n101 input/$(RESDIR)/n101
+	@/bin/sh ./n_test $@ $(TESTMODE)
 
-i4: expected/i4 regress/i4
-	@/bin/sh ./itest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/n102: expected/$(RESDIR)/n102 regress/$(RESDIR)/n102 input/$(RESDIR)/n102
+	@/bin/sh ./n_test $@ $(TESTMODE)
 
-i5: expected/i5 regress/i5
-	@/bin/sh ./itest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/n103: expected/$(RESDIR)/n103 regress/$(RESDIR)/n103 input/$(RESDIR)/n103
+	@/bin/sh ./n_test $@ $(TESTMODE)
 
-i6: expected/i6 regress/i6
-	@/bin/sh ./itest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/n104: expected/$(RESDIR)/n104 regress/$(RESDIR)/n104 input/$(RESDIR)/n104
+	@/bin/sh ./n_test $@ $(TESTMODE)
 
-i7: expected/i7 regress/i7
-	@/bin/sh ./itest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/n105: expected/$(RESDIR)/n105 regress/$(RESDIR)/n105 input/$(RESDIR)/n105
+	@/bin/sh ./n_test $@ $(TESTMODE)
 
-i8: expected/i8 regress/i8
-	@/bin/sh ./itest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/n106: expected/$(RESDIR)/n106 regress/$(RESDIR)/n106 input/$(RESDIR)/n106
+	@/bin/sh ./n_test $@ $(TESTMODE)
 
-i9: expected/i9 regress/i9
-	@/bin/sh ./itest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/n200: expected/$(RESDIR)/n200 regress/$(RESDIR)/n200 input/$(RESDIR)/n200
+	@/bin/sh ./n_test $@ $(TESTMODE)
 
-i10: expected/i10 regress/i10
-	@/bin/sh ./itest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/n201: expected/$(RESDIR)/n201 regress/$(RESDIR)/n201 input/$(RESDIR)/n201
+	@/bin/sh ./n_test $@ $(TESTMODE)
 
-i11: expected/i11 regress/i11
-	@/bin/sh ./itest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/n202: expected/n202 regress/n202 input/n202
+	@/bin/sh ./n_test $@ $(TESTMODE)
 
-i12: expected/i12 regress/i12
-	@/bin/sh ./itest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/n1_6: expected/$(RESDIR)/n1_6 regress/$(RESDIR)/n1_6 input/$(RESDIR)/n1_6
+	@/bin/sh ./n_test $@ $(TESTMODE)
 
-i13: expected/i13 regress/i13
-	@/bin/sh ./itest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/n2_6: expected/$(RESDIR)/n2_6 regress/$(RESDIR)/n2_6 input/$(RESDIR)/n2_6
+	@/bin/sh ./n_test $@ $(TESTMODE)
 
-i14: expected/i14 regress/i14
-	@/bin/sh ./itest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/n4_6: expected/$(RESDIR)/n4_6 regress/$(RESDIR)/n4_6 input/$(RESDIR)/n4_6
+	@/bin/sh ./n_test $@ $(TESTMODE)
 
-i15: expected/i15 regress/i15
-	@/bin/sh ./itest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/n5_6: expected/$(RESDIR)/n5_6 regress/$(RESDIR)/n5_6 input/$(RESDIR)/n5_6
+	@/bin/sh ./n_test $@ $(TESTMODE)
 
-i16: expected/i16 regress/i16
-	@/bin/sh ./itest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/n6_6: expected/$(RESDIR)/n6_6 regress/$(RESDIR)/n6_6 input/$(RESDIR)/n6_6
+	@/bin/sh ./n_test $@ $(TESTMODE)
 
-i17: expected/i17 regress/i17
-	@/bin/sh ./itest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/n7_6: expected/$(RESDIR)/n7_6 regress/$(RESDIR)/n7_6 input/$(RESDIR)/n7_6
+	@/bin/sh ./n_test $@ $(TESTMODE)
 
-i18: expected/i18 regress/i18
-	@/bin/sh ./itest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/n8_6: expected/$(RESDIR)/n8_6 regress/$(RESDIR)/n8_6 input/$(RESDIR)/n8_6
+	@/bin/sh ./n_test $@ $(TESTMODE)
 
-i19: expected/i19 regress/i19
-	@/bin/sh ./itest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/n9_6: expected/$(RESDIR)/n9_6 regress/$(RESDIR)/n9_6 input/$(RESDIR)/n9_6
+	@/bin/sh ./n_test $@ $(TESTMODE)
 
-i20: expected/i20 regress/i20
-	@/bin/sh ./itest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/n11_6: expected/$(RESDIR)/n11_6 regress/$(RESDIR)/n11_6 input/$(RESDIR)/n11_6
+	@/bin/sh ./n_test $@ $(TESTMODE)
 
-i21: expected/i21 regress/i21
-	@/bin/sh ./itest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/n12_6: expected/$(RESDIR)/n12_6 regress/$(RESDIR)/n12_6 input/$(RESDIR)/n12_6
+	@/bin/sh ./n_test $@ $(TESTMODE)
 
-i22: expected/i22 regress/i22
-	@/bin/sh ./itest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/n15_6: expected/$(RESDIR)/n15_6 regress/$(RESDIR)/n15_6 input/$(RESDIR)/n15_6
+	@/bin/sh ./n_test $@ $(TESTMODE)
 
-i23: expected/i23 regress/i23
-	@/bin/sh ./itest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/ni1: expected/ni1 input/$(RESDIR)/ni1 regress/$(RESDIR)/ni1.nat regress/ni1.ipf
+	@/bin/sh ./ni_test $@ $(TESTMODE) multi
 
-bpf1: expected/bpf1 regress/bpf1
-	@/bin/sh ./itest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/ni2: expected/ni2 input/$(RESDIR)/ni2 regress/$(RESDIR)/ni2.nat regress/ni2.ipf
+	@/bin/sh ./ni_test $@ $(TESTMODE) single
 
-n1: expected/n1 regress/n1 input/n1
-	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/ni3: expected/ni3 input/$(RESDIR)/ni3 regress/$(RESDIR)/ni3.nat regress/ni3.ipf
+	@/bin/sh ./ni_test $@ $(TESTMODE) single
 
-n2: expected/n2 regress/n2 input/n2
-	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/ni4: expected/ni4 input/$(RESDIR)/ni4 regress/$(RESDIR)/ni4.nat regress/ni4.ipf
+	@/bin/sh ./ni_test $@ $(TESTMODE) single
 
-n3: expected/n3 regress/n3 input/n3
-	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/ni5: expected/ni5 input/$(RESDIR)/ni5 regress/$(RESDIR)/ni5.nat regress/$(RESDIR)/ni5.ipf
+	@/bin/sh ./ni_test $@ $(TESTMODE) single
 
-n4: expected/n4 regress/n4 input/n4
-	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/ni6: expected/$(RESDIR)/ni6 input/$(RESDIR)/ni6 regress/$(RESDIR)/ni6.nat regress/$(RESDIR)/ni6.ipf
+	@/bin/sh ./ni_test $@ $(TESTMODE) multi
 
-n5: expected/n5 regress/n5 input/n5
-	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/ni7: expected/ni7 input/$(RESDIR)/ni7 regress/$(RESDIR)/ni7.nat regress/ni7.ipf
+	@/bin/sh ./ni_test $@ $(TESTMODE) single
 
-n6: expected/n6 regress/n6 input/n6
-	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/ni8: expected/ni8 input/$(RESDIR)/ni8 regress/$(RESDIR)/ni8.nat regress/ni8.ipf
+	@/bin/sh ./ni_test $@ $(TESTMODE) single
 
-n7: expected/n7 regress/n7 input/n7
-	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/ni9: expected/ni9 input/$(RESDIR)/ni9 regress/$(RESDIR)/ni9.nat regress/ni9.ipf
+	@/bin/sh ./ni_test $@ $(TESTMODE) single
 
-n8: expected/n8 regress/n8 input/n8
-	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/ni10: expected/ni10 input/$(RESDIR)/ni10 regress/$(RESDIR)/ni10.nat regress/ni10.ipf
+	@/bin/sh ./ni_test $@ $(TESTMODE) single
 
-n9: expected/n9 regress/n9 input/n9
-	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/ni11: expected/ni11 input/$(RESDIR)/ni11 regress/$(RESDIR)/ni11.nat regress/ni11.ipf
+	@/bin/sh ./ni_test $@ $(TESTMODE) single
 
-n10: expected/n10 regress/n10 input/n10
-	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/ni12: expected/ni12 input/$(RESDIR)/ni12 regress/$(RESDIR)/ni12.nat regress/ni12.ipf
+	@/bin/sh ./ni_test $@ $(TESTMODE) single
 
-n11: expected/n11 regress/n11 input/n11
-	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/ni13: expected/$(RESDIR)/ni13 input/$(RESDIR)/ni13 regress/$(RESDIR)/ni13.nat regress/$(RESDIR)/ni13.ipf
+	@/bin/sh ./ni_test $@ $(TESTMODE) single
 
-n12: expected/n12 regress/n12 input/n12
-	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/ni14: expected/ni14 input/$(RESDIR)/ni14 regress/$(RESDIR)/ni14.nat regress/$(RESDIR)/ni14.ipf
+	@/bin/sh ./ni_test $@ $(TESTMODE) single
 
-n13: expected/n13 regress/n13 input/n13
-	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/ni15: expected/ni15 input/$(RESDIR)/ni15 regress/$(RESDIR)/ni15.nat regress/$(RESDIR)/ni15.ipf
+	@/bin/sh ./ni_test $@ $(TESTMODE) single
 
-n14: expected/n14 regress/n14 input/n14
-	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/ni16: expected/$(RESDIR)/ni16 input/$(RESDIR)/ni16 regress/$(RESDIR)/ni16.nat regress/$(RESDIR)/ni16.ipf
+	@/bin/sh ./ni_test $@ $(TESTMODE) single
 
-n15: expected/n15 regress/n15 input/n15
-	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/ni17: expected/$(RESDIR)/ni17 input/$(RESDIR)/ni17 regress/$(RESDIR)/ni17.nat regress/ni17.ipf
+	@/bin/sh ./ni_test $@ $(TESTMODE) multi
 
-n16: expected/n16 regress/n16 input/n16
-	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/ni18: expected/$(RESDIR)/ni18 input/$(RESDIR)/ni18 regress/$(RESDIR)/ni18.nat regress/ni18.ipf
+	@/bin/sh ./ni_test $@ $(TESTMODE) multi
 
-n17: expected/n17 regress/n17 input/n17
-	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/ni19: expected/ni19 input/$(RESDIR)/ni19 regress/$(RESDIR)/ni19.nat regress/$(RESDIR)/ni19.ipf
+	@/bin/sh ./ni_test $@ $(TESTMODE) single
 
-n18: expected/n18 regress/n18 input/n18
-	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/ni20: expected/$(RESDIR)/ni20 input/$(RESDIR)/ni20 regress/$(RESDIR)/ni20.nat regress/$(RESDIR)/ni20.ipf
+	@/bin/sh ./ni_test $@ $(TESTMODE) single
 
-n100: expected/n100 regress/n100 input/n100
-	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/ni21: expected/$(RESDIR)/ni21 input/$(RESDIR)/ni21 regress/$(RESDIR)/ni21.nat regress/$(RESDIR)/ni21.ipf
+	@/bin/sh ./ni_test $@ $(TESTMODE) multi
 
-n101: expected/n101 regress/n101 input/n101
-	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/ni23: expected/$(RESDIR)/ni23 input/$(RESDIR)/ni23 regress/$(RESDIR)/ni23.nat regress/$(RESDIR)/ni23.ipf
+	@/bin/sh ./ni_test $@ $(TESTMODE) multi
 
-n102: expected/n102 regress/n102 input/n102
-	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/in1: expected/in1 regress/in1
+	@/bin/sh ./in_test $@ $(TESTMODE)
 
-n103: expected/n103 regress/n103 input/n103
-	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/in2: expected/in2 regress/in2
+	@/bin/sh ./in_test $@ $(TESTMODE)
 
-n104: expected/n104 regress/n104 input/n104
-	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/in3: expected/in3 regress/in3
+	@/bin/sh ./in_test $@ $(TESTMODE)
 
-n105: expected/n105 regress/n105 input/n105
-	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/in4: expected/in4 regress/in4
+	@/bin/sh ./in_test $@ $(TESTMODE)
 
-n106: expected/n106 regress/n106 input/n106
-	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/in5: expected/in5 regress/in5
+	@/bin/sh ./in_test $@ $(TESTMODE)
 
-n200: expected/n200 regress/n200 input/n200
-	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/in6: expected/in6 regress/in6
+	@/bin/sh ./in_test $@ $(TESTMODE)
 
-n201: expected/n201 regress/n201 input/n201
-	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/in7: expected/in7 regress/in7
+	@/bin/sh ./in_test $@ $(TESTMODE)
 
-n202: expected/n202 regress/n202 input/n202
-	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/in100: expected/in100 regress/in100
+	@/bin/sh ./in_test $@ $(TESTMODE)
 
-n1_6: expected/n1_6 regress/n1_6 input/n1_6
-	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/in101: expected/in101 regress/in101
+	@/bin/sh ./in_test $@ $(TESTMODE)
 
-n2_6: expected/n2_6 regress/n2_6 input/n2_6
-	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/in102: expected/in102 regress/in102
+	@/bin/sh ./in_test $@ $(TESTMODE)
 
-n4_6: expected/n4_6 regress/n4_6 input/n4_6
-	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/l1:
+	@/bin/sh ./logtest $@ $(TESTMODE)
 
-n5_6: expected/n5_6 regress/n5_6 input/n5_6
-	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/ipv6_1: expected/ipv6_1 input/$(RESDIR)/ipv6_1 regress/$(RESDIR)/ipv6_1
+	@/bin/sh ./ipv6_test $@ $(TESTMODE)
 
-n6_6: expected/n6_6 regress/n6_6 input/n6_6
-	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/ipv6_2: expected/ipv6_2 input/$(RESDIR)/ipv6_2 regress/ipv6_2
+	@/bin/sh ./ipv6_test $@ $(TESTMODE)
 
-n7_6: expected/n7_6 regress/n7_6 input/n7_6
-	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/ipv6_3: expected/ipv6_3 input/$(RESDIR)/ipv6_3 regress/$(RESDIR)/ipv6_3
+	@/bin/sh ./ipv6_test $@ $(TESTMODE)
 
-n8_6: expected/n8_6 regress/n8_6 input/n8_6
-	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/ipv6_4: expected/ipv6_4 input/$(RESDIR)/ipv6_4 regress/ipv6_4
+	@/bin/sh ./ipv6_test $@ $(TESTMODE)
 
-n9_6: expected/n9_6 regress/n9_6 input/n9_6
-	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/ipv6_5: expected/ipv6_5 input/$(RESDIR)/ipv6_5 regress/ipv6_5
+	@/bin/sh ./ipv6_test $@ $(TESTMODE)
 
-n11_6: expected/n11_6 regress/n11_6 input/n11_6
-	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/ipv6_6: expected/ipv6_6 input/$(RESDIR)/ipv6_6 regress/$(RESDIR)/ipv6_6
+	@/bin/sh ./ipv6_test $@ $(TESTMODE)
 
-n12_6: expected/n12_6 regress/n12_6 input/n12_6
-	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/p1: expected/p1 input/p1 regress/p1.ipf regress/p1.pool $(POOLDEP)
+	@/bin/sh ./p_test $@ $(TESTMODE)
 
-n15_6: expected/n15_6 regress/n15_6 input/n15_6
-	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/p2: expected/p2 input/p2 regress/p2.ipf $(POOLDEP)
+	@/bin/sh ./p_test $@ $(TESTMODE)
 
-ni2: expected/ni2 input/ni2 regress/ni2.nat regress/ni2.ipf
-	@/bin/sh ./natipftest single `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/p3: expected/p3 input/p3 regress/p3.ipf regress/p3.pool $(POOLDEP)
+	@/bin/sh ./p_test $@ $(TESTMODE)
 
-ni3: expected/ni3 input/ni3 regress/ni3.nat regress/ni3.ipf
-	@/bin/sh ./natipftest single `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/p4: expected/p4 input/p4 regress/p4.nat regress/p4.pool $(POOLDEP)
+	@/bin/sh ./p_test $@ $(TESTMODE)
 
-ni4: expected/ni4 input/ni4 regress/ni4.nat regress/ni4.ipf
-	@/bin/sh ./natipftest single `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/p5: expected/p5 input/p5 regress/p5.ipf regress/p5.pool $(POOLDEP)
+	@/bin/sh ./p_test $@ $(TESTMODE)
 
-ni5: expected/ni5 input/ni5 regress/ni5.nat regress/ni5.ipf
-	@/bin/sh ./natipftest single `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/p6: expected/p6 input/p6 regress/p6.ipf regress/p6.pool $(POOLDEP)
+	@/bin/sh ./p_test $@ $(TESTMODE)
 
-ni7: expected/ni7 input/ni7 regress/ni7.nat regress/ni7.ipf
-	@/bin/sh ./natipftest single `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/p7: expected/$(RESDIR)/p7 input/$(RESDIR)/p7 regress/$(RESDIR)/p7.nat regress/p7.pool $(POOLDEP)
+	@/bin/sh ./p_test $@ $(TESTMODE)
 
-ni8: expected/ni8 input/ni8 regress/ni8.nat regress/ni8.ipf
-	@/bin/sh ./natipftest single `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/p9: expected/$(RESDIR)/p9 input/$(RESDIR)/p9 regress/$(RESDIR)/p9.nat regress/p9.pool $(POOLDEP)
+	@/bin/sh ./p_test $@ $(TESTMODE)
 
-ni9: expected/ni9 input/ni9 regress/ni9.nat regress/ni9.ipf
-	@/bin/sh ./natipftest single `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/p10: expected/$(RESDIR)/p10 input/$(RESDIR)/p10 regress/$(RESDIR)/p10.nat regress/p10.pool \
+	    $(POOLDEP)
+	@/bin/sh ./p_test $@ $(TESTMODE)
 
-ni10: expected/ni10 input/ni10 regress/ni10.nat regress/ni10.ipf
-	@/bin/sh ./natipftest single `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/p11: expected/$(RESDIR)/p11 input/$(RESDIR)/p11 regress/$(RESDIR)/p11.nat regress/p11.pool \
+	    $(POOLDEP)
+	@/bin/sh ./p_test $@ $(TESTMODE)
 
-ni11: expected/ni11 input/ni11 regress/ni11.nat regress/ni11.ipf
-	@/bin/sh ./natipftest single `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/p12: expected/$(RESDIR)/p12 input/$(RESDIR)/p12 regress/$(RESDIR)/p12.nat regress/p12.pool \
+	    $(POOLDEP)
+	@/bin/sh ./p_test $@ $(TESTMODE)
 
-ni12: expected/ni12 input/ni12 regress/ni12.nat regress/ni12.ipf
-	@/bin/sh ./natipftest single `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/p13: expected/p13 input/p13 regress/p13.ipf regress/p13.pool \
+	    $(POOLDEP)
+	@/bin/sh ./p_test $@ $(TESTMODE)
 
-ni13: expected/ni13 input/ni13 regress/ni13.nat regress/ni13.ipf
-	@/bin/sh ./natipftest single `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/ip1: expected/ip1 regress/ip1 $(POOLDEP)
+	@/bin/sh ./ip_test $@ $(TESTMODE)
 
-ni14: expected/ni14 input/ni14 regress/ni14.nat regress/ni14.ipf
-	@/bin/sh ./natipftest single `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/ip2: expected/ip2 input/ip2.data regress/ip2 $(POOLDEP)
+	@/bin/sh ./ip_test $@ $(TESTMODE)
 
-ni15: expected/ni15 input/ni15 regress/ni15.nat regress/ni15.ipf
-	@/bin/sh ./natipftest single `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/ip3: expected/ip3 regress/ip3 $(POOLDEP)
+	@/bin/sh ./ip_test $@ $(TESTMODE)
 
-ni16: expected/ni16 input/ni16 regress/ni16.nat regress/ni16.ipf
-	@/bin/sh ./natipftest single `awk "/^$@ / { print; } " test.format`
-
-ni19: expected/ni19 input/ni19 regress/ni19.nat regress/ni19.ipf
-	@/bin/sh ./natipftest single `awk "/^$@ / { print; } " test.format`
-
-ni20: expected/ni20 input/ni20 regress/ni20.nat regress/ni20.ipf
-	@/bin/sh ./natipftest single `awk "/^$@ / { print; } " test.format`
-
-ni1: expected/ni1 input/ni1 regress/ni1.nat regress/ni1.ipf
-	@/bin/sh ./natipftest multi `awk "/^$@ / { print; } " test.format`
-
-ni6: expected/ni6 input/ni6 regress/ni6.nat regress/ni6.ipf
-	@/bin/sh ./natipftest multi `awk "/^$@ / { print; } " test.format`
-
-ni17: expected/ni17 input/ni17 regress/ni17.nat regress/ni17.ipf
-	@/bin/sh ./natipftest multi `awk "/^$@ / { print; } " test.format`
-
-ni18: expected/ni18 input/ni18 regress/ni18.nat regress/ni18.ipf
-	@/bin/sh ./natipftest multi `awk "/^$@ / { print; } " test.format`
-
-ni21: expected/ni21 input/ni21 regress/ni21.nat regress/ni21.ipf
-	@/bin/sh ./natipftest multi `awk "/^$@ / { print; } " test.format`
-
-ni23: expected/ni23 input/ni23 regress/ni23.nat regress/ni23.ipf
-	@/bin/sh ./natipftest multi `awk "/^$@ / { print; } " test.format`
-
-in1: expected/in1 regress/in1
-	@/bin/sh ./intest `awk "/^$@ / { print; } " test.format`
-
-in2: expected/in2 regress/in2
-	@/bin/sh ./intest `awk "/^$@ / { print; } " test.format`
-
-in3: expected/in3 regress/in3
-	@/bin/sh ./intest `awk "/^$@ / { print; } " test.format`
-
-in4: expected/in4 regress/in4
-	@/bin/sh ./intest `awk "/^$@ / { print; } " test.format`
-
-in5: expected/in5 regress/in5
-	@/bin/sh ./intest `awk "/^$@ / { print; } " test.format`
-
-in6: expected/in6 regress/in6
-	@/bin/sh ./intest `awk "/^$@ / { print; } " test.format`
-
-in7: expected/in7 regress/in7
-	@/bin/sh ./intest `awk "/^$@ / { print; } " test.format`
-
-in100: expected/in100 regress/in100
-	@/bin/sh ./intest `awk "/^$@ / { print; } " test.format`
-
-in101: expected/in101 regress/in101
-	@/bin/sh ./intest `awk "/^$@ / { print; } " test.format`
-
-in102: expected/in102 regress/in102
-	@/bin/sh ./intest `awk "/^$@ / { print; } " test.format`
-
-l1:
-	@/bin/sh ./logtest `awk "/^$@ / { print; } " test.format`
-
-ipv6.1: expected/ipv6.1 input/ipv6.1 regress/ipv6.1
-	@/bin/sh ./dotest6 `awk "/^$@ / { print; } " test.format`
-
-ipv6.2: expected/ipv6.2 input/ipv6.2 regress/ipv6.2
-	@/bin/sh ./dotest6 `awk "/^$@ / { print; } " test.format`
-
-ipv6.3: expected/ipv6.3 input/ipv6.3 regress/ipv6.3
-	@/bin/sh ./dotest6 `awk "/^$@ / { print; } " test.format`
-
-ipv6.4: expected/ipv6.4 input/ipv6.4 regress/ipv6.4
-	@/bin/sh ./dotest6 `awk "/^$@ / { print; } " test.format`
-
-ipv6.5: expected/ipv6.5 input/ipv6.5 regress/ipv6.5
-	@/bin/sh ./dotest6 `awk "/^$@ / { print; } " test.format`
-
-ipv6.6: expected/ipv6.6 input/ipv6.6 regress/ipv6.6
-	@/bin/sh ./dotest6 `awk "/^$@ / { print; } " test.format`
-
-p1: expected/p1 input/p1 regress/p1.ipf regress/p1.pool $(POOLDEP)
-	@/bin/sh ./ptest `awk "/^$@ / { print; } " test.format`
-
-p2: expected/p2 input/p2 regress/p2.ipf $(POOLDEP)
-	@/bin/sh ./ptest `awk "/^$@ / { print; } " test.format`
-
-p3: expected/p3 input/p3 regress/p3.ipf regress/p3.pool $(POOLDEP)
-	@/bin/sh ./ptest `awk "/^$@ / { print; } " test.format`
-
-p4: expected/p4 input/p4 regress/p4.nat regress/p4.pool $(POOLDEP)
-	@/bin/sh ./ptest `awk "/^$@ / { print; } " test.format`
-
-p5: expected/p5 input/p5 regress/p5.ipf regress/p5.pool $(POOLDEP)
-	@/bin/sh ./ptest `awk "/^$@ / { print; } " test.format`
-
-p6: expected/p6 input/p6 regress/p6.ipf regress/p6.pool $(POOLDEP)
-	@/bin/sh ./ptest `awk "/^$@ / { print; } " test.format`
-
-p7: expected/p7 input/p7 regress/p7.nat regress/p7.pool $(POOLDEP)
-	@/bin/sh ./ptest `awk "/^$@ / { print; } " test.format`
-
-p9: expected/p9 input/p9 regress/p9.nat regress/p9.pool $(POOLDEP)
-	@/bin/sh ./ptest `awk "/^$@ / { print; } " test.format`
-
-p10: expected/p10 input/p10 regress/p10.nat regress/p10.pool $(POOLDEP)
-	@/bin/sh ./ptest `awk "/^$@ / { print; } " test.format`
-
-p11: expected/p11 input/p11 regress/p11.nat regress/p11.pool $(POOLDEP)
-	@/bin/sh ./ptest `awk "/^$@ / { print; } " test.format`
-
-p12: expected/p12 input/p12 regress/p12.nat regress/p12.pool $(POOLDEP)
-	@/bin/sh ./ptest `awk "/^$@ / { print; } " test.format`
-
-p13: expected/p13 input/p13 regress/p13.ipf regress/p13.pool $(POOLDEP)
-	@/bin/sh ./ptest `awk "/^$@ / { print; } " test.format`
-
-ip1: expected/ip1 regress/ip1 $(POOLDEP)
-	@/bin/sh ./iptest `awk "/^$@ / { print; } " test.format`
-
-ip2: expected/ip2 input/ip2.data regress/ip2 $(POOLDEP)
-	@/bin/sh ./iptest `awk "/^$@ / { print; } " test.format`
-
-ip3: expected/ip3 regress/ip3 $(POOLDEP)
-	@/bin/sh ./iptest `awk "/^$@ / { print; } " test.format`
-
-bpf-f1: expected/bpf-f1 regress/bpf-f1
-	/bin/sh ./bpftest `awk "/^$@ / { print; } " test.format`
+$(RESDIR)/bpf-f1: expected/bpf-f1 regress/bpf-f1
+	/bin/sh ./bpf_test $@ $(TESTMODE)
 
 clean:
-	/bin/rm -f f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17
-	/bin/rm -f f18 f19 f20 f21 f22 f24 f25 f26 f27 f28 f29
-	/bin/rm -f i1 i2 i3 i4 i5 i6 i7 i8 i9 i10 i11 i12 i13 i14 i15 i16 i17
-	/bin/rm -f i18 i19 i20 i21 i22 i23
-	/bin/rm -f n1 n2 n3 n4 n5 n6 n7 n8 n9 n10 n11 n12 n13 n14 n15 n16 n17 n18 n100 n101 n102 n103 n104 n105 n106 n200 n201 n202
-	/bin/rm -f n1_6 n2_6 n4_6 n5_6 n6_6 n7_6 n8_6 n9_6 n11_6 n12_6 n15_6
-	/bin/rm -f ni1 ni2 ni3 ni4 ni5 ni6 ni7 ni8 ni9
-	/bin/rm -f ni10 ni11 ni12 ni13 ni14 ni15 ni16 ni17 ni18 ni19 ni20 ni21 ni23
-	/bin/rm -f in1 in2 in3 in4 in5 in6 in7 in100 in101 in102
-	/bin/rm -f p1 p2 p3 p4 p5 p6 p7 p9 p10 p11 p12 p13 ip1 ip2 ip3
-	/bin/rm -f l1
-	/bin/rm -f ipv6.1 ipv6.2 ipv6.3 ipv6.4 ipv6.5 ipv6.6
-	/bin/rm -f bpf1 bpf-f1
+	/bin/rm -rf $(RESDIR)/*
 	/bin/rm -f results/* logout
 	(cd expected; make clean)
+	(cd input; make clean)
+	(cd regress; make clean)
+	sed -ne '1,/^# APPEND/p' Makefile > Makefile.new
+	mv Makefile.new Makefile
 
 diffs:
 	-cd expected; for i in *; do if [ -f $$i -a ! -f ../$$i -a -f ../results/$$i ] ; then  diff -c $$i ../results/$$i >> ../diff.out; fi done
@@ -521,3 +692,10 @@ n6s:
 		sh e4to6 < regress/n$${i} > regress/n$${i}_6; \
 		perl h4to6 < input/n$${i} > input/n$${i}_6; \
 	done
+
+appendixes:
+	sed -ne '1,/^# APPEND/p' Makefile > Makefile.new
+	find . -name \*.dist | sed -e 's/^\.\///p' -e 's@/@/\$$(RESDIR)/@' -e 's/.dist//' | perl -e 'while(<>){chop;@F=split(/[\/\.]/); $$d=$$_;$$_=<>;chop;print "$$_: $$d\n";print "\tperl ./build_test.pl $$F[0] $$F[1]\n";print "\n";}' >> Makefile.new
+	mv Makefile.new Makefile
+#
+# APPENDIXES

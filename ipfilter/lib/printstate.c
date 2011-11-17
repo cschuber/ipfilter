@@ -48,7 +48,9 @@ printstate(sp, opts, now)
 		PRINTF(" state:%d/%d", sp->is_state[0], sp->is_state[1]);
 	}
 
-	PRINTF(" %lu", sp->is_die - now);
+	if ((opts & OPT_VERBOSE) != 0)
+		PRINTF(" %lu", sp->is_die - now);
+
 	if (sp->is_phnext == NULL)
 		PRINTF(" ORPHAN");
 	if (sp->is_flags & IS_CLONE)
@@ -88,7 +90,7 @@ printstate(sp, opts, now)
 			sp->is_icmp.ici_seq, sp->is_icmp.ici_type);
 
 #ifdef        USE_QUAD_T
-	PRINTF("\tFWD: IN pkts %qu bytes %qu OUT pkts %qu bytes %qu\n\tREV: IN pkts %qu bytes %qu OUT pkts %qu bytes %qu\n",
+	PRINTF("\tFWD: IN pkts %"PRIu64" bytes %"PRIu64" OUT pkts %"PRIu64" bytes %"PRIu64"\n\tREV: IN pkts %"PRIu64" bytes %"PRIu64" OUT pkts %"PRIu64" bytes %"PRIu64"\n",
 		sp->is_pkts[0], sp->is_bytes[0],
 		sp->is_pkts[1], sp->is_bytes[1],
 		sp->is_pkts[2], sp->is_bytes[2],

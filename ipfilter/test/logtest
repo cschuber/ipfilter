@@ -1,4 +1,11 @@
 #!/bin/sh
+testitem=$1
+todo=`expr ${testitem} : '.*\/\(.*\)$'`
+resdir=`expr ${testitem} : '\(.*\)\/.*$'`
+args=`awk "/^${todo} / { print; } " test.format`
+set $args
+results=${resdir}/results/${todo}
+
 format=$2
 mkdir -p results
 if [ -f /usr/ucb/touch ] ; then
@@ -23,37 +30,37 @@ OSF1)
 	;;
 esac
 
-/bin/cp /dev/null results/$1
-/bin/cp /dev/null results/$1.b
+/bin/cp /dev/null ${results}
+/bin/cp /dev/null ${results}.b
 
 ( while read rule; do
-	echo $rule >> results/$1
+	echo $rule >> ${results}
 	echo $rule | ../ipftest -br - -F $format -i input/$1 -l logout > /dev/null
 	if [ $? -ne 0 ] ; then
 		/bin/rm -f logout
 		exit 1
 	fi
-	TZ=$GMT ../ipmon -P /dev/null -f logout >> results/$1
-        echo "--------" >> results/$1
-	TZ=$GMT ../ipmon -P /dev/null -bf logout >> results/$1.b
-        echo "--------" >> results/$1.b
-done ) < regress/$1
-../ipftest -br regress/$1 -F $format -i input/$1 -l logout > /dev/null
-TZ=$GMT ../ipmon -P /dev/null -f logout >> results/$1
-echo "--------" >> results/$1
-TZ=$GMT ../ipmon -P /dev/null -bf logout >> results/$1.b
-echo "--------" >> results/$1.b
+	TZ=$GMT ../ipmon -P /dev/null -f logout >> ${results}
+        echo "--------" >> ${results}
+	TZ=$GMT ../ipmon -P /dev/null -bf logout >> ${results}.b
+        echo "--------" >> ${results}.b
+done ) < regress/${todo}
+../ipftest -br regress/${todo} -F $format -i input/${todo} -l logout > /dev/null
+TZ=$GMT ../ipmon -P /dev/null -f logout >> ${results}
+echo "--------" >> ${results}
+TZ=$GMT ../ipmon -P /dev/null -bf logout >> ${results}.b
+echo "--------" >> ${results}.b
 
-cmp expected/$1 results/$1
+cmp expected/${todo} ${results}
 status=$?
 if [ $status -ne 0 ] ; then
 	exit $status
 fi
-cmp expected/$1.b results/$1.b
+cmp expected/${todo}.b ${results}.b
 status=$?
 if [ $status -ne 0 ] ; then
 	exit $status
 fi
 /bin/rm -f logout
-$TOUCH $1
+$TOUCH ${resdir}/${todo}
 exit 0

@@ -1,0 +1,4 @@
+nic NIC0 NIC1
+out on NIC0 2.2.2.2 3.3.3.3
+in on NIC0 3.3.3.3 4.4.4.4
+out on NIC0 2.2.2.2 3.3.3.3

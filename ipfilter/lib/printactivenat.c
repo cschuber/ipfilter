@@ -111,7 +111,7 @@ printactivenat(nat, opts, ticks)
 		PRINTF("\tifp %s", getifname(nat->nat_ifps[0]));
 		PRINTF(",%s ", getifname(nat->nat_ifps[1]));
 #ifdef	USE_QUAD_T
-		PRINTF("bytes %qu/%qu pkts %qu/%qu",
+		PRINTF("bytes %"PRIu64"/%"PRIu64" pkts %"PRIu64"/%"PRIu64"",
 			(unsigned long long)nat->nat_bytes[0],
 			(unsigned long long)nat->nat_bytes[1],
 			(unsigned long long)nat->nat_pkts[0],

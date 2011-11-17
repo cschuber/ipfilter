@@ -23,12 +23,30 @@ printfr(fp, iocfunc)
 	int pr, af;
 	char *s;
 	int hash;
+	static int n = 0;
 
-	pr = -2;
-	type = fp->fr_type & ~FR_T_BUILTIN;
+	n++;
 
 	if ((fp->fr_type & FR_T_BUILTIN) != 0)
 		PRINTF("# Builtin: ");
+
+	if (opts & OPT_HITS)
+#ifdef  USE_QUAD_T
+		PRINTF("%"PRIu64" ", (unsigned long long) fp->fr_hits);
+#else
+		PRINTF("%lu ", fp->fr_hits);
+#endif
+	if (opts & OPT_ACCNT)
+#ifdef  USE_QUAD_T
+		PRINTF("%"PRIu64" ", (unsigned long long) fp->fr_bytes);
+#else
+		PRINTF("%lu ", fp->fr_bytes);
+#endif
+	if (opts & OPT_SHOWLINENO)
+		PRINTF("@%d ", n);
+
+	pr = -2;
+	type = fp->fr_type & ~FR_T_BUILTIN;
 
 	if (fp->fr_collect != 0)
 		PRINTF("%u ", fp->fr_collect);
@@ -451,10 +469,15 @@ printfr(fp, iocfunc)
 		PRINTF(" # rule-ttl %u", fp->fr_die);
 		hash = 1;
 	}
-	if (opts & OPT_VERBOSE) {
+	if (opts & OPT_DEBUG) {
 		if (hash == 0)
 			putchar('#');
 		PRINTF(" ref %d", fp->fr_ref);
 	}
 	(void)putchar('\n');
+	if (opts & OPT_DEBUG) {
+		binprint(fp, fp->fr_size);
+		if (fp->fr_data != NULL && fp->fr_dsize > 0)
+			binprint(fp->fr_data, fp->fr_dsize);
+	}
 }

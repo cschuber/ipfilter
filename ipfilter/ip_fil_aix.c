@@ -234,6 +234,7 @@ ipf_check_inbound(ifp, m, args)
 	inbound_fw_args_t *args;
 {
 	ip_t *ip;
+	int rv;
 
 	if (ipf_check_mbuf(&m) == -1) {
 		if (m != NULL) {
@@ -244,16 +245,13 @@ ipf_check_inbound(ifp, m, args)
 
 	ip = mtod(m, ip_t *);
 
-	switch (ipf_check(ip, ip->ip_hl << 2, ifp, 0, &m))
-	{
-	case 0 :
+	rv =  ipf_check(ip, ip->ip_hl << 2, ifp, 0, &m);
+	if (FR_ISPASS(rv)) {
 		ipintr_noqueue_post_fw(ifp, m, args);
-		break;
-	default :
+	} else {
 		if (m != NULL) {
 			FREE_MB_T(m);
 		}
-		break;
 	}
 
 	return;
@@ -270,6 +268,7 @@ ipf_check_outbound(ifp, m, args)
 	outbound_fw_args_t *args;
 {
 	ip_t *ip;
+	int rv;
 
 	if (ipf_check_mbuf(&m) == -1) {
 		if (m != NULL) {
@@ -280,13 +279,11 @@ ipf_check_outbound(ifp, m, args)
 
 	ip = mtod(m, ip_t *);
 
-	switch (ipf_check(ip, ip->ip_hl << 2, ifp, 1, &m))
-	{
-	case 0 :
+	rv = ipf_check(ip, ip->ip_hl << 2, ifp, 1, &m);
+
+	if (FR_ISPASS(rv)) {
 		ip_output_post_fw(ifp, m, args);
 		return 0;	/* FIREWALL_OK */
-	default :
-		break;
 	}
 
 	if (m != NULL) {

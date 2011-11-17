@@ -1,0 +1,86 @@
+#!/bin/sh
+testitem=$1
+TESTMODE=$2
+mode=$3
+todo=`expr ${testitem} : '.*\/\(.*\)$'`
+resdir=`expr ${testitem} : '\(.*\)\/.*$'`
+args=`awk "/^${todo} / { print; } " test.format`
+if [ -z $todo -o -z $resdir ] ; then
+	echo "arg1 wrong - '$1'"
+	exit 1
+fi
+set $args
+name=$1
+inputformat=$2
+output=$3
+shift
+if [ $output = hex ] ; then
+	format="-xF $inputformat"
+else
+	format="-F $inputformat"
+fi
+shift
+shift
+while [ $# -ge 1 ] ; do
+	l=`echo $1 | cut -c1`
+	if [ "$l" = "-" ] ; then
+		format="$format $1"
+	else
+		format="-T $1 $format"
+	fi
+	shift
+done
+. ./setup_test.sh
+
+case $mode in
+single)
+	echo "${todo}...";
+	/bin/cp /dev/null ${results}
+	( while read rule; do
+		if [ ${TESTMODE} = kern ] ; then
+			../ipf -D
+			../ipf -E
+		fi
+		echo "$rule" | ../ipftest -M ${TESTMODE} -R $format -b \
+					  -r ${regress_ipf} -N - \
+					  -i ${input} >> ${results}
+		status=$?
+		if [ ${TESTMODE} = kern ] ; then
+			../ipf -D
+		fi
+		if [ $status -ne 0 ] ; then
+			exit 1;
+		fi
+		echo "-------------------------------" >> ${results}
+	done ) < ${regress_nat}
+	cmp ${expected} ${results}
+	status=$?
+	if [ $status = 0 ] ; then
+		$TOUCH ${resdir}/${todo}
+	fi
+	;;
+multi)
+	echo "${todo}...";
+	/bin/cp /dev/null ${results}
+	if [ ${TESTMODE} = kern ] ; then
+		../ipf -D
+		../ipf -E
+	fi
+	../ipftest -M ${TESTMODE} -R $format -b -r ${regress_ipf} \
+		-N ${regress_nat} -i ${input} >> ${results}
+	status=$?
+	if [ ${TESTMODE} = kern ] ; then
+		../ipf -D
+	fi
+	if [ $status -ne 0 ] ; then
+		exit 2;
+	fi
+	echo "-------------------------------" >> ${results}
+	cmp ${expected} ${results}
+	status=$?
+	if [ $status = 0 ] ; then
+		$TOUCH ${resdir}/${todo}
+	fi
+	;;
+esac
+exit $status

@@ -131,6 +131,7 @@ static	int	text_readip(mb, ifn, dir)
 
 	buf = (char *)mb->mb_buf;
 	cnt = sizeof(mb->mb_buf);
+	bzero(buf, sizeof(mb->mb_buf));
 
 	*ifn = NULL;
 	while (fgets(line, sizeof(line)-1, tfp)) {
@@ -179,7 +180,6 @@ static	int	parseline(line, ip, ifn, out)
 
 	if (*ifn)
 		free(*ifn);
-	bzero((char *)ip, MAX(sizeof(*tcp), sizeof(*ic)) + sizeof(*ip));
 	bzero((char *)tcp, sizeof(*tcp));
 	bzero((char *)ic, sizeof(*ic));
 	bzero(ipopts, sizeof(ipopts));
@@ -192,6 +192,13 @@ static	int	parseline(line, ip, ifn, out)
 	cpp = cps;
 	if (!*cpp)
 		return 1;
+
+	if (!strcmp(*cpp, "nic")) {
+		cpp++;
+		while (*cpp)
+			(void) get_unit(*cpp++, 0);
+		return 1;
+	}
 
 	c = **cpp;
 	if (!ISALPHA(c) || (TOLOWER(c) != 'o' && TOLOWER(c) != 'i')) {
@@ -357,7 +364,6 @@ int parseipv6(cpp, ip6, ifn, out)
 	tcphdr_t th, *tcp = &th;
 	struct icmp6_hdr icmp, *ic6 = &icmp;
 
-	bzero((char *)ip6, MAX(sizeof(*tcp), sizeof(*ic6)) + sizeof(*ip6));
 	bzero((char *)tcp, sizeof(*tcp));
 	bzero((char *)ic6, sizeof(*ic6));
 	ip6->ip6_vfc = 0x60;

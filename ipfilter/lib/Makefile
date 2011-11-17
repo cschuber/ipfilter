@@ -65,6 +65,7 @@ LIBOBJS=$(DEST)/addicmp.o \
      $(DEST)/load_pool.o \
      $(DEST)/load_poolnode.o \
      $(DEST)/load_url.o \
+     $(DEST)/mb_hexdump.o \
      $(DEST)/msgdsize.o \
      $(DEST)/mutex_emul.o \
      $(DEST)/nametokva.o \
@@ -144,7 +145,13 @@ LIBOBJS=$(DEST)/addicmp.o \
      $(DEST)/verbose.o \
      $(DEST)/vtof.o \
      $(DEST)/v6ionames.o \
-     $(DEST)/v6optvalue.o
+     $(DEST)/v6optvalue.o \
+     $(DEST)/walk_live_fr_rules.o \
+     $(DEST)/walk_live_groups.o \
+     $(DEST)/walk_live_hostmap.o \
+     $(DEST)/walk_live_ipnat.o \
+     $(DEST)/walk_live_nat.o \
+     $(DEST)/walk_live_states.o
 
 $(DEST)/libipf.a: $(LIBOBJS)
 	/bin/rm -f $@
@@ -268,6 +275,8 @@ $(DEST)/load_poolnode.o: $(LIBSRC)/load_poolnode.c $(INCDEP) $(TOP)/ip_pool.h
 	$(CC) $(CCARGS) -c $(LIBSRC)/load_poolnode.c -o $@
 $(DEST)/load_url.o: $(LIBSRC)/load_url.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/load_url.c -o $@
+$(DEST)/mb_hexdump.o: $(LIBSRC)/mb_hexdump.c $(INCDEP)
+	$(CC) $(CCARGS) -c $(LIBSRC)/mb_hexdump.c -o $@
 $(DEST)/msgdsize.o: $(LIBSRC)/msgdsize.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/msgdsize.c -o $@
 $(DEST)/mutex_emul.o: $(LIBSRC)/mutex_emul.c $(INCDEP)
@@ -445,6 +454,18 @@ $(DEST)/v6ionames.o: $(LIBSRC)/v6ionames.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/v6ionames.c -o $@
 $(DEST)/v6optvalue.o: $(LIBSRC)/v6optvalue.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/v6optvalue.c -o $@
+$(DEST)/walk_live_fr_rules.o: $(LIBSRC)/walk_live_fr_rules.c $(INCDEP)
+	$(CC) $(CCARGS) -c $(LIBSRC)/walk_live_fr_rules.c -o $@
+$(DEST)/walk_live_groups.o: $(LIBSRC)/walk_live_groups.c $(INCDEP)
+	$(CC) $(CCARGS) -c $(LIBSRC)/walk_live_groups.c -o $@
+$(DEST)/walk_live_hostmap.o: $(LIBSRC)/walk_live_hostmap.c $(INCDEP)
+	$(CC) $(CCARGS) -c $(LIBSRC)/walk_live_hostmap.c -o $@
+$(DEST)/walk_live_ipnat.o: $(LIBSRC)/walk_live_ipnat.c $(INCDEP)
+	$(CC) $(CCARGS) -c $(LIBSRC)/walk_live_ipnat.c -o $@
+$(DEST)/walk_live_nat.o: $(LIBSRC)/walk_live_nat.c $(INCDEP)
+	$(CC) $(CCARGS) -c $(LIBSRC)/walk_live_nat.c -o $@
+$(DEST)/walk_live_states.o: $(LIBSRC)/walk_live_states.c $(INCDEP)
+	$(CC) $(CCARGS) -c $(LIBSRC)/walk_live_states.c -o $@
 
 clean-lib:
 	/bin/rm -f ${LIBOBJS} ${LIB}

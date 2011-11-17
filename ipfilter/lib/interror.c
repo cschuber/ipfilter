@@ -17,7 +17,7 @@ typedef	struct	{
 
 static ipf_error_entry_t *find_error(int);
 
-#define	IPF_NUM_ERRORS	451
+#define	IPF_NUM_ERRORS	462
 
 /*
  * NO REUSE OF NUMBERS!
@@ -170,6 +170,17 @@ static ipf_error_entry_t ipf_errors[IPF_NUM_ERRORS] = {
 	{	142,	"could not initialise call now function" },
 	{	143,	"could not initialise call function" },
 	{	144,	"could not find destination list" },
+	{	145,	"auth rules cannot have dup/to/fastroute" },
+	{	146,	"generic iterator pointer for group is NULL" },
+	{	147,	"generic iterator item count is not 1" },
+	{	148,	"error copying in group iterator structure" },
+	{	149,	"invalid unit in group iterator" },
+	{	150,	"rule set is neither 0 nor 1 in group iterator" },
+	{	151,	"error copying group iterator out to user space" },
+	{	152,	"could not allocate test packet structure" },
+	{	153,	"error copying test packet structure to kernel" },
+	{	154,	"unrecognised packet family in test packet structure" },
+	{	155,	"could not allocate packet buffer for test packet" },
 /* -------------------------------------------------------------------------- */
 	{	10001,	"could not find token for auth iterator" },
 	{	10002,	"write permissions require to add/remove auth rule" },

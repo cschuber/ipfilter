@@ -82,16 +82,17 @@ AROPTS=crs
 #
 DFLAGS=$(IPFLKM) $(DEF) $(SOLARIS2) $(IPFLOG) $(LOOKUP) $(SYNC) $(XID)
 #-DIPFDEBUG
-MODOBJS=$(OBJ)/ip_fil.o $(OBJ)/fil.o $(OBJ)/solaris.o $(OBJ)/ip_state.o \
+MODOBJS=$(OBJ)/ip_fil.o $(OBJ)/solaris.o $(OBJ)/ip_state.o \
     $(OBJ)/ip_frag.o $(OBJ)/ip_nat.o $(OBJ)/ip_proxy.o $(OBJ)/ip_auth.o \
     $(OBJ)/ip_pool.o $(OBJ)/ip_htable.o $(OBJ)/ip_lookup.o $(OBJ)/ip_log.o \
     $(OBJ)/ip_scan.o $(OBJ)/ip_sync.o $(OBJ)/radix.o $(OBJ)/md5.o \
     $(OBJ)/ip_nat6.o $(OBJ)/ip_dstlist.o $(OBJ)/arc4random.o \
-    $(OBJ)/mblk_misc.o $(BPFILTER)
+    $(OBJ)/fil.o $(OBJ)/mblk_misc.o $(BPFILTER)
 #	$(OBJ)/ip_trafcon.o
 IPF=$(OBJ)/ipf.o $(OBJ)/ipfcomp.o $(OBJ)/ipf_y.o $(OBJ)/ipf_l.o
 IPT=$(OBJ)/ipftest.o $(OBJ)/ip_fil_u.o $(OBJ)/ip_state_u.o \
-    $(OBJ)/ip_frag_u.o $(OBJ)/ip_nat_u.o $(OBJ)/fil_u.o $(OBJ)/ip_dstlist_u.o \
+    $(OBJ)/ip_frag_u.o $(OBJ)/ip_nat_u.o \
+    $(OBJ)/fil_u.o \
     $(OBJ)/ip_scan_u.o $(OBJ)/ip_sync_u.o $(OBJ)/ip_pool_u.o \
     $(OBJ)/ip_htable_u.o $(OBJ)/ip_lookup_u.o $(OBJ)/ip_proxy_u.o \
     $(OBJ)/ip_auth_u.o $(OBJ)/ip_log_u.o $(OBJ)/ip_rules_u.o\
@@ -123,7 +124,7 @@ sunos5 solaris2 build: $(OBJ) $(OBJ)/libipf.a $(OBJ)/ipf.exe $(OBJ)/ipfstat \
 		cp /usr/lib/isaexec $(TOP)/ipf; \
 	fi
 	ln -s `pwd`/$(OBJ)/ipf.exe $(TOP)/$(OBJ)/ipf
-	-(for i in ipftest ipmon ippool ipnat ipscan ipsyncm ipsyncs; do \
+	-(for i in ipftest ipmon ippool ipnat ipscan ipsyncm ipsyncs ipfstat; do \
 		/bin/rm -f $(TOP)/$$i $(TOP)/$(OBJ)/$$i; \
 		if [ -f /usr/lib/isaexec -a "$(OBJ)" != "." ] ; then \
 			ln $(TOP)/ipf $(TOP)/$$i; \
@@ -367,10 +368,6 @@ $(OBJ)/ip_lookup_u.o: $(TOP)/ip_lookup.c $(TOP)/ip_lookup.h $(TOP)/ip_compat.h \
 	$(TOP)/ip_fil.h $(TOP)/ip_lookup.h
 	$(CC) $(CCARGS) $(EXTRA) -c $(TOP)/ip_lookup.c -o $@
 
-$(OBJ)/ip_dstlist_u.o: $(TOP)/ip_dstlist.c $(TOP)/ip_dstlist.h \
-	$(TOP)/ip_compat.h $(TOP)/ip_fil.h
-	$(CC) $(CCARGS) $(EXTRA) -c $(TOP)/ip_dstlist.c -o $@
-
 $(OBJ)/ip_trafcon_u.o: $(TOP)/ip_trafcon.c $(TOP)/ip_compat.h $(TOP)/ip_fil.h \
 	$(TOP)/ip_trafcon.h
 	$(CC) $(CCARGS) -c $(TOP)/ip_trafcon.c -o $@
@@ -579,8 +576,6 @@ ipf.pkg.bin:
 	mkdir -p $(PKGBIN) $(ROOT)/$(SBINDEST) $(ROOT)/usr/kernel/drv/$(OBJ)
 	-$(INSTALL) -c -s $(OBJDIR)/ipftest $(PKGBIN)/ipftest
 	-$(INSTALL) -c -s $(OBJDIR)/ipmon $(PKGBIN)/ipmon
-	-$(INSTALL) -c -s $(OBJDIR)/ipsend $(PKGBIN)/ipsend
-	-$(INSTALL) -c -s $(OBJDIR)/ipresend $(PKGBIN)/ipresend
 	-$(INSTALL) -c $(TOP)/mkfilters $(PKGBIN)/mkfilters
 	-$(INSTALL) -c $(OBJDIR)/ipf $(ROOT)/usr/kernel/drv/$(OBJ)/ipf
 	-$(INSTALL) -c -s $(OBJDIR)/ipnat $(ROOT)/$(SBINDEST)/ipnat

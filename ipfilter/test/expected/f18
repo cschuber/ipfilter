@@ -21,7 +21,7 @@ Rules configured (set 1, out)
 Accounting rules configured (set 0, in)
 1 count in inet from 1.1.1.1/32 to 3.3.3.3/32
 Accounting rules configured (set 0, out)
-Accounting rules configured (set 1, in)
 1 count out inet from 2.2.2.2/32 to 4.4.4.4/32
+Accounting rules configured (set 1, in)
 Accounting rules configured (set 1, out)
 --------

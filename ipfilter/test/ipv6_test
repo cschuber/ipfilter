@@ -1,0 +1,40 @@
+#!/bin/sh
+testitem=$1
+TESTMODE=$2
+todo=`expr ${testitem} : '.*\/\(.*\)$'`
+resdir=`expr ${testitem} : '\(.*\)\/.*$'`
+args=`awk "/^${todo} / { print; } " test.format`
+set $args
+
+format=$2
+. ./setup_test.sh
+echo "${todo}...";
+/bin/cp /dev/null ${results}
+../ipftest -6 -r /dev/null -i /dev/null >/dev/null 2>&1
+if [ $? -ne 0 ] ; then
+	echo "skipping IPv6 tests"
+	$TOUCH $1
+	exit 0
+fi
+( while read rule; do
+	if [ ${TESTMODE} = kern ] ; then
+		../ipf -D
+		../ipf -E
+	fi
+	echo "$rule" | ../ipftest -M ${TESTMODE} -F ${format} -6br - \
+				  -i ${input} >> ${results}
+	status=$?
+	if [ ${TESTMODE} = kern ] ; then
+		../ipf -D
+	fi
+	if [ $status -ne 0 ] ; then
+		exit 1;
+	fi
+	echo "--------" >> ${results}
+done ) < ${regress}
+cmp ${expected} ${results}
+status=$?
+if [ $status = 0 ] ; then
+	$TOUCH ${resdir}/${todo}
+fi
+exit $status

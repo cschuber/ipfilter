@@ -348,76 +348,91 @@ sub icmpcheck {
 	}
 }
 
-while ($#ARGV >= 0) {
-	open(I, "$ARGV[0]") || die $!;
-	print "--- $ARGV[0] ---\n";
-	$multi = 0;
-	while (<I>) {
-		chop;
-		s/#.*//g;
+sub readinput {
+	chop;
+	s/#.*//g;
 
-		#
-		# If the first non-comment, non-empty line of input starts
-		# with a '[', then allow the input to be a multi-line hex
-		# string, otherwise it has to be all on one line.
-		#
-		if (/^\[/) {
-			$multi=1;
-			s/^\[[^]]*\]//g;
+	#
+	# If the first non-comment, non-empty line of input starts
+	# with a '[', then allow the input to be a multi-line hex
+	# string, otherwise it has to be all on one line.
+	#
+	if (/^\[/) {
+		$multi=1;
+		s/^\[[^]]*\]//g;
 
-		}
-		s/^ *//g;
-		if (length == 0) {
-			next if ($cnt == 0);
-			&ipv4check(0);
-			$cnt = 0;
-			$multi = 0;
-			next;
-		}
-
-		#
-		# look for 16 bits, represented with leading 0's as required,
-		# in hex.
-		#
-		s/\t/ /g;
-		while (/^[0-9a-fA-F][0-9a-fA-F] [0-9a-fA-F][0-9a-fA-F] .*/) {
-			s/^([0-9a-fA-F][0-9a-fA-F]) ([0-9a-fA-F][0-9a-fA-F]) (.*)/$1$2 $3/;
-		}
-		while (/.* [0-9a-fA-F][0-9a-fA-F] [0-9a-fA-F][0-9a-fA-F] .*/) {
-$b=$_;
-			s/(.*?) ([0-9a-fA-F][0-9a-fA-F]) ([0-9a-fA-F][0-9a-fA-F]) (.*)/$1 $2$3 $4/g;
-		}
-		if (/.* [0-9a-fA-F][0-9a-fA-F] [0-9a-fA-F][0-9a-fA-F]/) {
-$b=$_;
-			s/(.*?) ([0-9a-fA-F][0-9a-fA-F]) ([0-9a-fA-F][0-9a-fA-F])/$1 $2$3/g;
-		}
-		while (/^[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F].*/) {
-			$x = $_;
-			$x =~ s/([0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]).*/$1/;
-			$x =~ s/ *//g;
-			$y = hex $x;
-			s/[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F] *(.*)/$1/;
-			$bytes[$cnt] = $y;
-#print "bytes[$cnt] = $x\n";
-			$cnt++;
-		}
-
-		#
-		# Pick up stragler bytes.
-		#
-		if (/^[0-9a-fA-F][0-9a-fA-F]/) {
-			$y = hex $_;
-			$bytes[$cnt++] = $y * 256;
-		}
-		if ($multi == 0 && $cnt > 0) {
-			&ipv4check(0);
-			$cnt = 0;
-		}
 	}
-
-	if ($cnt > 0) {
+	s/^ *//g;
+	if (length == 0) {
+		next if ($cnt == 0);
 		&ipv4check(0);
+		$cnt = 0;
+		$multi = 0;
+		next;
 	}
-	close(I);
-	shift(@ARGV);
+
+	#
+	# look for 16 bits, represented with leading 0's as required,
+	# in hex.
+	#
+	s/NIC.HEXADDR/0000 0000/g;
+	s/TCPCKSUM/0000/g;
+	s/UDPCKSUM/0000/g;
+	s/IPCKSUM/0000/g;
+	s/\t/ /g;
+	while (/^[0-9a-fA-F][0-9a-fA-F] [0-9a-fA-F][0-9a-fA-F] .*/) {
+		s/^([0-9a-fA-F][0-9a-fA-F]) ([0-9a-fA-F][0-9a-fA-F]) (.*)/$1$2 $3/;
+	}
+	while (/.* [0-9a-fA-F][0-9a-fA-F] [0-9a-fA-F][0-9a-fA-F] .*/) {
+$b=$_;
+		s/(.*?) ([0-9a-fA-F][0-9a-fA-F]) ([0-9a-fA-F][0-9a-fA-F]) (.*)/$1 $2$3 $4/g;
+	}
+	if (/.* [0-9a-fA-F][0-9a-fA-F] [0-9a-fA-F][0-9a-fA-F]/) {
+$b=$_;
+		s/(.*?) ([0-9a-fA-F][0-9a-fA-F]) ([0-9a-fA-F][0-9a-fA-F])/$1 $2$3/g;
+	}
+	while (/^[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F].*/) {
+		$x = $_;
+		$x =~ s/([0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]).*/$1/;
+		$x =~ s/ *//g;
+		$y = hex $x;
+		s/[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F] *(.*)/$1/;
+		$bytes[$cnt] = $y;
+#print "bytes[$cnt] = $x\n";
+		$cnt++;
+	}
+
+	#
+	# Pick up stragler bytes.
+	#
+	if (/^[0-9a-fA-F][0-9a-fA-F]/) {
+		$y = hex $_;
+		$bytes[$cnt++] = $y * 256;
+	}
+	if ($multi == 0 && $cnt > 0) {
+		&ipv4check(0);
+		$cnt = 0;
+	}
+}
+
+if ($#ARGV >= 0) {
+	while ($#ARGV >= 0) {
+		print "--- $ARGV[0] ---\n";
+		$multi = 0;
+
+		open(I, "$ARGV[0]") || die $!;
+		while (<I>) {
+			&readinput;
+		}
+		close(I);
+
+		if ($cnt > 0) {
+			&ipv4check(0);
+		}
+		shift(@ARGV);
+	}
+} else {
+	while (<>) {
+		&readinput;
+	}
 }

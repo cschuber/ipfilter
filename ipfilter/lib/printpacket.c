@@ -34,24 +34,13 @@ printpacket(dir, m)
 	} else {
 		len = ntohs(ip->ip_len);
 	}
-	ASSERT(len == msgdsize(m));
+	if (len != MSGDSIZE(m)) {
+		printf("len %d != MSGDSIZE(m) %d\n", len, MSGDSIZE(m));
+		abort();
+	}
 
 	if ((opts & OPT_HEX) == OPT_HEX) {
-		u_char *s;
-		int i;
-
-		for (; m != NULL; m = m->mb_next) {
-			len = m->mb_len;
-			for (s = (u_char *)m->mb_data, i = 0; i < len; i++) {
-				PRINTF("%02x", *s++ & 0xff);
-				if (len - i > 1) {
-					i++;
-					PRINTF("%02x", *s++ & 0xff);
-				}
-				putchar(' ');
-			}
-		}
-		putchar('\n');
+		mb_hexdump(m, stdout);
 		putchar('\n');
 		return;
 	}

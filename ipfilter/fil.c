@@ -168,6 +168,8 @@ static	int		ipf_geniter(ipf_main_softc_t *, ipftoken_t *,
 				    ipfgeniter_t *);
 static	void		ipf_getstat(ipf_main_softc_t *, struct friostat *, int);
 static	int		ipf_grpmapinit(struct ipf_main_softc_s *, frentry_t *);
+static	int		ipf_group_iter(ipf_main_softc_t *, ipftoken_t *,
+				       ipfgeniter_t *);
 static	int		ipf_portcheck(frpcmp_t *, u_32_t);
 static	INLINE int	ipf_pr_ah(fr_info_t *);
 static	INLINE void	ipf_pr_esp(fr_info_t *);
@@ -1125,24 +1127,12 @@ ipf_pr_pullup(fin, plen)
 				((char *)fin->fin_ip + fin->fin_hlen);
 		plen += fin->fin_hlen;
 		if (M_LEN(fin->fin_m) < plen) {
-#if defined(_KERNEL)
 			if (ipf_pullup(fin->fin_m, fin, plen) == NULL) {
 				DT(ipf_pullup_fail);
 				LBUMP(ipf_stats[fin->fin_out].fr_pull[1]);
 				return -1;
 			}
 			LBUMP(ipf_stats[fin->fin_out].fr_pull[0]);
-#else
-			LBUMP(ipf_stats[fin->fin_out].fr_pull[1]);
-			/*
-			 * Fake ipf_pullup failing
-			 */
-			fin->fin_reason = FRB_PULLUP;
-			*fin->fin_mp = NULL;
-			fin->fin_m = NULL;
-			fin->fin_ip = NULL;
-			return -1;
-#endif
 		}
 	}
 	return 0;
@@ -1168,9 +1158,12 @@ ipf_pr_short(fin, xmin)
 {
 
 	if (fin->fin_off == 0) {
-		if (fin->fin_dlen < xmin)
+		if (fin->fin_dlen < xmin) {
+			DT1(pr_short_1, fr_info_t *, fin);
 			fin->fin_flx |= FI_SHORT;
+		}
 	} else if (fin->fin_off < xmin) {
+		DT1(pr_short_2, fr_info_t *, fin);
 		fin->fin_flx |= FI_SHORT;
 	}
 }
@@ -1372,7 +1365,7 @@ ipf_pr_tcpcommon(fin)
 		return 0;
 	}
 
-	if (ipf_pr_pullup(fin, sizeof(*tcp)) == -1) {
+	if (ipf_pr_pullup(fin, MIN(sizeof(*tcp), fin->fin_dlen)) == -1) {
 		LBUMPD(ipf_stats[fin->fin_out], fr_tcp_pullup);
 		return -1;
 	}
@@ -2850,7 +2843,7 @@ ipf_firewall(fin, passp)
 /* ------------------------------------------------------------------------ */
 int
 ipf_check(ctx, ip, hlen, ifp, out
-#if defined(_KERNEL) && defined(MENTAT)
+#if !defined(_KERNEL) || defined(MENTAT)
 	, qif, mp)
 	void *qif;
 #else
@@ -2900,8 +2893,10 @@ ipf_check(ctx, ip, hlen, ifp, out
 	bzero((char *)fin, sizeof(*fin));
 
 # ifdef MENTAT
-	if (qpi->qpi_flags & QF_GROUP)
-		fin->fin_flx |= FI_MBCAST;
+	if (qpi->qpi_flags & QF_BROADCAST)
+		fin->fin_flx |= FI_MBCAST|FI_BROADCAST;
+	if (qpi->qpi_flags & QF_MULTICAST)
+		fin->fin_flx |= FI_MBCAST|FI_MULTICAST;
 	m = qpi->qpi_m;
 	fin->fin_qfm = m;
 	fin->fin_qpi = qpi;
@@ -2941,20 +2936,16 @@ ipf_check(ctx, ip, hlen, ifp, out
 #  endif /* CSUM_DELAY_DATA */
 # endif /* MENTAT */
 #else
+	qpktinfo_t *qpi = qif;
+
 	bzero((char *)fin, sizeof(*fin));
-	m = *mp;
-# if defined(M_MCAST)
-	if ((m->m_flags & M_MCAST) != 0)
-		fin->fin_flx |= FI_MBCAST|FI_MULTICAST;
-# endif
-# if defined(M_MLOOP)
-	if ((m->m_flags & M_MLOOP) != 0)
-		fin->fin_flx |= FI_MBCAST|FI_MULTICAST;
-# endif
-# if defined(M_BCAST)
-	if ((m->m_flags & M_BCAST) != 0)
+	fin->fin_qpi = qpi;
+	fin->fin_pktnum = qpi->qpi_id;
+	if (qpi->qpi_flags & QF_BROADCAST)
 		fin->fin_flx |= FI_MBCAST|FI_BROADCAST;
-# endif
+	if (qpi->qpi_flags & QF_MULTICAST)
+		fin->fin_flx |= FI_MBCAST|FI_MULTICAST;
+	m = *mp;
 #endif /* _KERNEL */
 
 	fin->fin_v = v;
@@ -3088,9 +3079,9 @@ ipf_check(ctx, ip, hlen, ifp, out
 	if ((pass & FR_KEEPSTATE) && (fin->fin_m != NULL) &&
 	    !(fin->fin_flx & FI_STATE)) {
 		if (ipf_state_add(softc, fin, NULL, 0) == 0) {
-			LBUMP(ipf_stats[out].fr_ads);
+			LBUMPD(ipf_stats[out], fr_ads);
 		} else {
-			LBUMP(ipf_stats[out].fr_bads);
+			LBUMPD(ipf_stats[out], fr_bads);
 			if (FR_ISPASS(pass)) {
 				DT(frb_stateadd);
 				pass &= ~FR_CMDMASK;
@@ -3285,46 +3276,16 @@ finished:
 		}
 #endif
 	}
+#if defined(_KERNEL) && defined(MENTAT)
+	((qpktinfo_t *)qif)->qpi_reason = fin->fin_reason;
+#endif
+#if !defined(_KERNEL)
+	blockreason = fin->fin_reason;
+#endif
 
 	SPL_X(s);
 
-#ifdef _KERNEL
-	return (FR_ISPASS(pass)) ? 0 : fin->fin_error;
-#else /* _KERNEL */
-	if (*mp != NULL)
-		(*mp)->mb_ifp = fin->fin_ifp;
-	blockreason = fin->fin_reason;
-	FR_VERBOSE(("fin_flx %#x pass %#x ", fin->fin_flx, pass));
-	/*if ((pass & FR_CMDMASK) == (softc->ipf_pass & FR_CMDMASK))*/
-		if ((pass & FR_NOMATCH) != 0)
-			return 1;
-
-	if ((pass & FR_RETMASK) != 0)
-		switch (pass & FR_RETMASK)
-		{
-		case FR_RETRST :
-			return 3;
-		case FR_RETICMP :
-			return 4;
-		case FR_FAKEICMP :
-			return 5;
-		}
-
-	switch (pass & FR_CMDMASK)
-	{
-	case FR_PASS :
-		return 0;
-	case FR_BLOCK :
-		return -1;
-	case FR_AUTH :
-		return -2;
-	case FR_ACCOUNT :
-		return -3;
-	case FR_PREAUTH :
-		return -4;
-	}
-	return 2;
-#endif /* _KERNEL */
+	return (pass);
 }
 
 
@@ -7821,6 +7782,93 @@ ipf_frruleiter(softc, data, uid, ctx)
 
 
 /* ------------------------------------------------------------------------ */
+/* Function:    ipf_group_iter                                              */
+/* Returns:     int - 0 = success, else error                               */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              token(I) - pointer to ipftoken_t structure                  */
+/*              itp(I)   - pointer to structure describing group iterator   */
+/*                                                                          */
+/* This function is used to walk through a given set of groups that hold    */
+/* filter rules. The unit and set members of the frgroupiter_t structure    */
+/* are only used the first time this function is called. Changing them in   */
+/* the midst of walking a particular combination will have no impact on the */
+/* next returned element.                                                   */
+/* ------------------------------------------------------------------------ */
+static int
+ipf_group_iter(softc, token, itp)
+	ipf_main_softc_t *softc;
+	ipftoken_t *token;
+	ipfgeniter_t *itp;
+{
+	frgroup_t *grp, *next, zero;
+	int error = 0;
+	frgroupiter_t info;
+
+	if (itp->igi_data == NULL) {
+		softc->ipf_interror = 146;
+		return EFAULT;
+	}
+
+	if (itp->igi_nitems != 1) {
+		softc->ipf_interror = 147;
+		return EFAULT;
+	}
+
+	error = COPYIN(itp->igi_data, &info, sizeof(info));
+	if (error != 0) {
+		softc->ipf_interror = 148;
+		return EFAULT;
+	}
+
+	if (info.gi_unit < 0 || info.gi_unit > IPL_LOGMAX) {
+		softc->ipf_interror = 149;
+		return EINVAL;
+	}
+
+	if (info.gi_set < 0 || info.gi_set > 1) {
+		softc->ipf_interror = 150;
+		return EINVAL;
+	}
+
+	grp = token->ipt_data;
+
+	READ_ENTER(&softc->ipf_mutex);
+
+	if (grp == NULL)
+		next = softc->ipf_groups[info.gi_unit][info.gi_set];
+	else
+		next = grp->fg_next;
+
+	if (next != NULL) {
+		ATOMIC_INC(next->fg_ref);
+		token->ipt_data = next;
+	} else {
+		bzero(&zero, sizeof(zero));
+		next = &zero;
+		token->ipt_data = NULL;
+	}
+	if (next->fg_next == NULL)
+		ipf_token_mark_complete(token);
+
+	RWLOCK_EXIT(&softc->ipf_mutex);
+
+	info.gi_flags = next->fg_flags;
+	bcopy(next->fg_name, info.gi_name, FR_GROUPLEN);
+
+	error = COPYOUT(&info, itp->igi_data, sizeof(info));
+	if (error != 0)
+		softc->ipf_interror = 151;
+
+	if ((grp != NULL) && (next != &zero)) {
+		WRITE_ENTER(&softc->ipf_mutex);
+		ipf_group_del(softc, grp->fg_name, info.gi_unit, info.gi_set);
+		RWLOCK_EXIT(&softc->ipf_mutex);
+	}
+	return error;
+}
+
+
+/* ------------------------------------------------------------------------ */
 /* Function:    ipf_geniter                                                 */
 /* Returns:     int - 0 = success, else error                               */
 /* Parameters:  softc(I) - pointer to soft context main structure           */
@@ -7842,6 +7890,9 @@ ipf_geniter(softc, token, itp)
 	{
 	case IPFGENITER_FRAG :
 		error = ipf_frag_pkt_next(softc, token, itp);
+		break;
+	case IPFGENITER_GROUP :
+		error = ipf_group_iter(softc, token, itp);
 		break;
 	default :
 		softc->ipf_interror = 92;
@@ -7879,7 +7930,6 @@ ipf_genericiter(softc, data, uid, ctx)
 
 	token = ipf_token_find(softc, iter.igi_type, uid, ctx);
 	if (token != NULL) {
-		token->ipt_subtype = iter.igi_type;
 		error = ipf_geniter(softc, token, &iter);
 		WRITE_ENTER(&softc->ipf_tokens);
 		if (token->ipt_data == NULL)
@@ -7889,7 +7939,7 @@ ipf_genericiter(softc, data, uid, ctx)
 		RWLOCK_EXIT(&softc->ipf_tokens);
 	} else {
 		softc->ipf_interror = 93;
-		error = 0;
+		error = ENOMEM;
 	}
 
 	return error;
@@ -8179,6 +8229,10 @@ ipf_ipf_ioctl(softc, data, cmd, mode, uid, ctx)
 			error = ipf_token_del(softc, tmp, uid, ctx);
 			SPL_X(s);
 		}
+		break;
+
+        case SIOCIPFTSTPKT :
+		error = ipf_test_pkt(softc, data);
 		break;
 
 	default :
@@ -9808,4 +9862,139 @@ ipf_slowtimer(softc)
 #   if defined(__OpenBSD__)
 	timeout_add(&ipf_slowtimer_ch, hz/2);
 #   endif
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_test_pkt                                                */
+/* Returns:     int - 0 = success, else failure                             */
+/* Parameters:  softc(I)  - pointer to soft context main structure          */
+/*              data(IO)  - pointer to ioctl data                           */
+/*                                                                          */
+/* This function serves the SIOCIPFTSTPKT ioctl. Its purpose is to allocate */
+/* a packet from network buffers, copy data in from the buffer at 'data' to */
+/* the mblk/mbuf and then call ipf_check() as if the packet was being sent  */
+/* in/out of the system. When ipf_check returns, if the packet has not been */
+/* free'd by ipfilter then the data from the mblk/mbuf is copied back out   */
+/* to user space. The network interface and ancillary data (such as in/out  */
+/* and broadcast flags) for the packet are all passed in along with the     */
+/* packet itself in the ipf_test_pkt_t structure. The filtering result is   */
+/* also put into this structure and the return value of this function       */
+/* reflects whether the ioctl was successful, not the filtering of the      */
+/* actual packet.                                                           */
+/* ------------------------------------------------------------------------ */
+int
+ipf_test_pkt(softc, data)
+	ipf_main_softc_t *softc;
+	void *data;
+{
+	int error, v, hlen, plen;
+	ipf_test_pkt_t *p;
+	void *ifp;
+	mb_t *m;
+#if !defined(_KERNEL) || defined(MENTAT)
+	qpktinfo_t qpi;
+#endif
+
+	KMALLOC(p, ipf_test_pkt_t *);
+	if (p == NULL) {
+		softc->ipf_interror = 152;
+		return ENOMEM;
+	}
+
+	error = COPYIN(data, p, sizeof(*p));
+	if (error != 0) {
+		softc->ipf_interror = 153;
+		KFREE(p);
+		return EFAULT;
+	}
+
+	switch (p->pkt_family)
+	{
+	case AF_INET :
+	    {
+		ip_t *ip;
+
+		ip = (ip_t *)p->pkt_buf;
+		hlen = IP_HL(ip) << 2;
+		v = 4;
+		break;
+	    }
+#ifdef USE_INET6
+	case AF_INET6 :
+	    {
+		ip6_t *ip6;
+
+		ip6 = (ip6_t *)p->pkt_buf;
+		hlen = sizeof(ip6_t);
+		v = 6;
+		break;
+	    }
+#endif
+	default :
+		softc->ipf_interror = 154;
+		KFREE(p);
+		return EINVAL;
+	}
+
+	plen = p->pkt_length;
+	ALLOC_MB_T(m, plen);
+	if (m == NULL) {
+		softc->ipf_interror = 155;
+		KFREE(p);
+		return ENOBUFS;
+	}
+	bcopy(p->pkt_buf, MTOD(m, char *), plen);
+
+	ifp = GETIFP(p->pkt_ifname, v);
+
+#if !defined(_KERNEL) || defined(MENTAT)
+	qpi.qpi_q = NULL;
+	qpi.qpi_off = 0;
+	qpi.qpi_flags = p->pkt_flags;
+	qpi.qpi_m = m;
+	qpi.qpi_real = (void *)ifp;
+	qpi.qpi_data = NULL;
+	qpi.qpi_ill = qpi.qpi_real;
+	qpi.qpi_id = p->pkt_id;
+	p->pkt_result = ipf_check(softc, MTOD(m, ip_t *), hlen, ifp,
+				  p->pkt_direction, &qpi, &m);
+	p->pkt_reason = qpi.qpi_reason;
+#else
+	M_LEN(m) = plen;
+	p->pkt_result = ipf_check(softc, MTOD(m, ip_t *), hlen, ifp,
+				  p->pkt_direction, &m);
+#endif
+	if (m != NULL) {
+		int tocopy = MSGDSIZE(m);
+		int todo;
+		char *dst;
+		mb_t *m2;
+
+		if (tocopy > p->pkt_length) {
+			if (tocopy > sizeof(p->pkt_buf))
+				tocopy = sizeof(p->pkt_buf);
+		}
+		todo = tocopy;
+		p->pkt_length = tocopy;
+		dst = p->pkt_buf;
+
+		for (m2 = m; (m2 != NULL) && (todo > 0); m2 = m2->m_next) {
+			tocopy = M_LEN(m2);
+			if (tocopy > todo)
+				tocopy = todo;
+			bcopy(MTOD(m2, char *), dst, tocopy);
+			dst += tocopy;
+			todo -= tocopy;
+		}
+		FREE_MB_T(m);
+		p->pkt_freed = 0;
+	} else {
+		p->pkt_freed = 1;
+	}
+
+	error = BCOPYOUT(p, data, sizeof(*p));
+	KFREE(p);
+
+	return error;
 }

@@ -47,9 +47,7 @@ __EOF__
 		mkdir -p SunOS5/${cpudir}
 	fi
 	/bin/rm -f SunOS5/${cpudir}/Makefile
-	/bin/rm -f SunOS5/${cpudir}/Makefile.ipsend
 	ln -s `pwd`/SunOS5/Makefile SunOS5/${cpudir}/Makefile
-	ln -s `pwd`/SunOS5/Makefile.ipsend SunOS5/${cpudir}/Makefile.ipsend
 
 	#
 	# Default C compiler is "cc", override on make commandline

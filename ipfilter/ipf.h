@@ -383,6 +383,19 @@ extern void verbose(int, char *, ...);
 extern void ipfkdebug(char *, ...);
 extern void ipfkverbose(char *, ...);
 
+typedef	void	(* ipf_fr_walk_func_t)(frentry_t *);
+extern void walk_live_fr_rules(u_long, int, int, char *, ipf_fr_walk_func_t);
+typedef	void	(* ipf_group_walk_func_t)(frgroupiter_t *);
+extern void walk_live_groups(int, int, ipf_group_walk_func_t);
+typedef	void	(* ipf_state_walk_func_t)(u_long, int *, ipstate_t *);
+extern void walk_live_states(u_long, int *, ipf_state_walk_func_t);
+typedef	void	(* ipf_nat_t_walk_func_t)(u_long, int *, nat_t *);
+extern void walk_live_nat(u_long, int *, ipf_nat_t_walk_func_t);
+typedef	void	(* ipf_ipnat_t_walk_func_t)(ipnat_t *);
+extern void walk_live_ipnat(ipf_ipnat_t_walk_func_t);
+typedef	void	(* ipf_hostmap_t_walk_func_t)(hostmap_t *);
+extern void walk_live_hostmap(ipf_hostmap_t_walk_func_t);
+
 #if SOLARIS
 extern int gethostname(char *, int );
 extern void sync(void);

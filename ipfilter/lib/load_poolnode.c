@@ -43,6 +43,8 @@ load_poolnode(role, name, node, ttl, iocfunc)
 	pn.ipn_info = node->ipn_info;
 	pn.ipn_die = ttl;
 	strncpy(pn.ipn_name, node->ipn_name, sizeof(pn.ipn_name));
+fprintf(stderr, "[%s/", inet_ntoa(pn.ipn_addr.adf_addr.in4));
+fprintf(stderr, "%s]\n", inet_ntoa(pn.ipn_mask.adf_addr.in4));
 
 	if ((opts & OPT_REMOVE) == 0)
 		err = pool_ioctl(iocfunc, SIOCLOOKUPADDNODE, &op);

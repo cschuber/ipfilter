@@ -436,6 +436,7 @@ void ipfilter_ip_input(m)
 	struct mbuf *m0;
 	struct ip *ip;
 	int hlen, len;
+	int rv;
 
 #ifdef	IPFDEBUG
 	printf("ipfilter_ip_input(%x)\n", m);
@@ -509,7 +510,9 @@ void ipfilter_ip_input(m)
 			m_adj(m, len - m->m_pkthdr.len);
 	}
 
-	if (ipf_check(&ipfmain, ip, hlen, m->m_pkthdr.rcvif, 0, &m) == 0) {
+	rv = ipf_check(&ipfmain, ip, hlen, m->m_pkthdr.rcvif, 0, &m);
+	rv = FR_ISPASS(rv) ? 0 : ENETUNREACH;
+	if (rv == 0) {
 		if (m != NULL) {
 			m->m_flags &= ~M_PROTOCOL_SUM|M_NOCHECKSUM|M_CHECKSUM;
 
@@ -547,6 +550,7 @@ int ipfilter_ip_output(ifp, m, in_ro, flags, imo)
 {
 	struct ip *ip;
 	int hlen;
+	int rv;
 
 #ifdef	IPFDEBUG
 	printf("ipfilter_ip_output(%x,%x,%x,%x,%x)\n",
@@ -564,7 +568,8 @@ int ipfilter_ip_output(ifp, m, in_ro, flags, imo)
 	hlen = IP_HL(ip);
 	hlen <<= 2;
 
-	if (ipf_check(&ipfmain, ip, hlen, ifp, 1, &m) == 0) {
+	rv = ipf_check(&ipfmain, ip, hlen, ifp, 1, &m);
+	if (FR_ISPASS(rv)) {
 		if (m != NULL) {
 			m->m_flags |= M_OUTPUT_PROCESSING_DONE;
 			RWLOCK_EXIT(&ipf_tru64);
@@ -572,6 +577,8 @@ int ipfilter_ip_output(ifp, m, in_ro, flags, imo)
 		}
 	}
 	RWLOCK_EXIT(&ipf_tru64);
+	if (m != NULL)
+		m_freem(m);
 	return 0;
 }
 

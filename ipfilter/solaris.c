@@ -57,6 +57,7 @@
 # include <sys/hook_event.h>
 #endif
 
+extern	void	ipf_rand_push(void *, int);
 
 static	int	ipf_getinfo(dev_info_t *, ddi_info_cmd_t, void *, void **);
 #if SOLARIS2 < 10
@@ -197,6 +198,7 @@ net_instance_t		*ipf_inst = NULL;
 ipf_main_softc_t	ipfmain;
 ipf_main_softc_t	*ipf_instances = &ipfmain;
 #endif
+static	int		ipf_pkts = 0;
 
 
 int
@@ -287,6 +289,8 @@ ipf_attach(dip, cmd)
 
 	cmn_err(CE_NOTE, "IP Filter: ipf_attach(%x,%x)", dip, cmd);
 #endif
+
+	ipf_rand_push(dip, sizeof(*dip));
 
 #if !defined(INSTANCES)
 	if ((pfilinterface != PFIL_INTERFACE) || (PFIL_INTERFACE < 2000000)) {
@@ -718,14 +722,41 @@ ipfwrite(dev, uio, cp)
 }
 
 #if !defined(INSTANCES)
+
+static int
+ipf_bounce(ctx, ip, hlen, ifp, out, qif, mp)
+        void *qif;
+        mb_t **mp;
+        ip_t *ip;
+        int hlen;
+        void *ifp;
+        int out;
+        void *ctx;
+{
+	int rval;
+
+	if ((++ipf_pkts & 0xffff) == 0)
+		ipf_rand_push(*mp, M_LEN(*mp));
+
+	rval = ipf_check(ctx, ip, hlen, ifp, out, qif, mp);
+	if (FR_ISPASS(rval)) {
+		rval = 0;
+		if (*hpe->hpe_mp == NULL)
+			rval = ENETUNREACH;
+	} else {
+		rval = ENETUNREACH;
+	}
+	return (rval);
+}
+
 void
 ipf_pfil_hooks_add()
 {
-	if (pfil_add_hook(ipf_check, PFIL_IN|PFIL_OUT, &pfh_inet4))
+	if (pfil_add_hook(ipf_bounce, PFIL_IN|PFIL_OUT, &pfh_inet4))
 		cmn_err(CE_WARN, "IP Filter: %s(pfh_inet4) failed",
 			"pfil_add_hook");
 # ifdef USE_INET6
-	if (pfil_add_hook(ipf_check, PFIL_IN|PFIL_OUT, &pfh_inet6))
+	if (pfil_add_hook(ipf_bounce, PFIL_IN|PFIL_OUT, &pfh_inet6))
 		cmn_err(CE_WARN, "IP Filter: %s(pfh_inet6) failed",
 			"pfil_add_hook");
 # endif
@@ -737,11 +768,11 @@ ipf_pfil_hooks_add()
 void
 ipf_pfil_hooks_remove()
 {
-	if (pfil_remove_hook(ipf_check, PFIL_IN|PFIL_OUT, &pfh_inet4))
+	if (pfil_remove_hook(ipf_bounce, PFIL_IN|PFIL_OUT, &pfh_inet4))
 		cmn_err(CE_WARN, "IP Filter: %s(pfh_inet4) failed",
 			"pfil_remove_hook");
 # ifdef USE_INET6
-	if (pfil_remove_hook(ipf_check, PFIL_IN|PFIL_OUT, &pfh_inet6))
+	if (pfil_remove_hook(ipf_bounce, PFIL_IN|PFIL_OUT, &pfh_inet6))
 		cmn_err(CE_WARN, "IP Filter: %s(pfh_inet6) failed",
 			"pfil_add_hook");
 # endif
@@ -787,11 +818,18 @@ ipf_hk_v4_in(tok, data, arg)
 	qpi.qpi_data = hpe->hpe_hdr;
 	qpi.qpi_off = 0;
 	qpi.qpi_flags = 0;
+	if ((++ipf_pkts & 0xffff) == 0)
+		ipf_rand_push(qpi.qpi_m, M_LEN(qpi.qpi_m));
 
 	rval = ipf_check(softc, hpe->hpe_hdr, ip->ip_hl << 2,
 			 (void *)hpe->hpe_ifp, 0, &qpi, hpe->hpe_mp);
-	if (rval == 0 && *hpe->hpe_mp == NULL)
-		rval = 1;
+	if (FR_ISPASS(rval)) {
+		rval = 0;
+		if (*hpe->hpe_mp == NULL)
+			rval = ENETUNREACH;
+	} else {
+		rval = ENETUNREACH;
+	}
 
 	hpe->hpe_hdr = qpi.qpi_data;
 	hpe->hpe_mb = qpi.qpi_m;
@@ -819,11 +857,18 @@ ipf_hk_v4_out(tok, data, arg)
 	qpi.qpi_data = hpe->hpe_hdr;
 	qpi.qpi_off = 0;
 	qpi.qpi_flags = 0;
+	if ((++ipf_pkts & 0xffff) == 0)
+		ipf_rand_push(qpi.qpi_m, M_LEN(qpi.qpi_m));
 
 	rval = ipf_check(softc, hpe->hpe_hdr, ip->ip_hl << 2,
 			 (void *)hpe->hpe_ofp, 1, &qpi, hpe->hpe_mp);
-	if (rval == 0 && *hpe->hpe_mp == NULL)
-		rval = 1;
+	if (FR_ISPASS(rval)) {
+		rval = 0;
+		if (*hpe->hpe_mp == NULL)
+			rval = ENETUNREACH;
+	} else {
+		rval = ENETUNREACH;
+	}
 
 	hpe->hpe_hdr = qpi.qpi_data;
 	hpe->hpe_mb = qpi.qpi_m;
@@ -885,11 +930,18 @@ ipf_hk_v6_in(tok, data, arg)
 	qpi.qpi_data = hpe->hpe_hdr;
 	qpi.qpi_off = 0;
 	qpi.qpi_flags = 0;
+	if ((++ipf_pkts & 0xffff) == 0)
+		ipf_rand_push(qpi.qpi_m, M_LEN(qpi.qpi_m));
 
 	rval = ipf_check(softc, hpe->hpe_hdr, sizeof(ip6_t),
 			 (void *)hpe->hpe_ifp, 0, &qpi, hpe->hpe_mp);
-	if (rval == 0 && *hpe->hpe_mp == NULL)
-		rval = 1;
+	if (FR_ISPASS(rval)) {
+		rval = 0;
+		if (*hpe->hpe_mp == NULL)
+			rval = ENETUNREACH;
+	} else {
+		rval = ENETUNREACH;
+	}
 
 	hpe->hpe_hdr = qpi.qpi_data;
 	hpe->hpe_mb = qpi.qpi_m;
@@ -916,11 +968,18 @@ ipf_hk_v6_out(tok, data, arg)
 	qpi.qpi_data = hpe->hpe_hdr;
 	qpi.qpi_off = 0;
 	qpi.qpi_flags = 0;
+	if ((++ipf_pkts & 0xffff) == 0)
+		ipf_rand_push(qpi.qpi_m, M_LEN(qpi.qpi_m));
 
 	rval = ipf_check(softc, hpe->hpe_hdr, sizeof(ip6_t),
 			 (void *)hpe->hpe_ofp, 1, &qpi, hpe->hpe_mp);
-	if (rval == 0 && *hpe->hpe_mp == NULL)
-		rval = 1;
+	if (FR_ISPASS(rval)) {
+		rval = 0;
+		if (*hpe->hpe_mp == NULL)
+			rval = ENETUNREACH;
+	} else {
+		rval = ENETUNREACH;
+	}
 
 	hpe->hpe_hdr = qpi.qpi_data;
 	hpe->hpe_mb = qpi.qpi_m;
@@ -1160,6 +1219,8 @@ ipf_attach_loopback(softc)
 	if (net_hook_register(softc->ipf_nd_v6, NH_LOOPBACK_OUT,
 			      softc->ipf_hk_loop_v6_out))
 		cmn_err(CE_WARN, "register-hook(v6-loop_out) failed");
+
+	ipf_rand_push(softc, sizeof(*softc));
 }
 
 

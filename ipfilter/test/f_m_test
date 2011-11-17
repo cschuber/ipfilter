@@ -1,0 +1,35 @@
+#!/bin/sh
+testitem=$1
+TESTMODE=$2
+todo=`expr ${testitem} : '.*\/\(.*\)$'`
+resdir=`expr ${testitem} : '\(.*\)\/.*$'`
+args=`awk "/^${todo} / { print; } " test.format`
+set $args
+
+format=$2
+# multiple rules at the same time
+
+. ./setup_test.sh
+echo "${todo}...";
+
+if [ ${TESTMODE} = kern ] ; then
+	../ipf -D
+	../ipf -E
+fi
+../ipftest -M ${TESTMODE} -F $format $4 -Rbr ${regress} -i ${input} > ${results}
+status=$?
+if [ ${TESTMODE} = kern ] ; then
+	../ipf -D
+fi
+if [ $status -ne 0 ] ; then
+	exit 1
+fi
+echo "--------" >> ${results}
+
+cmp ${expected} ${results}
+status=$?
+if [ $status -ne 0 ] ; then
+	exit $status
+fi
+$TOUCH ${resdir}/${todo}
+exit 0

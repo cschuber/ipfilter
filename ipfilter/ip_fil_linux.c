@@ -849,7 +849,13 @@ ipf_linux_inout(hooknum, skbp, inifp, outifp, okfn)
 #endif
 	} else
 		return NF_DROP;
-	result = ipf_check(&ipfmain, ip, hlen, (struct net_device *)ifp, dir, &sk);
+	result = ipf_check(&ipfmain, ip, hlen, (struct net_device *)ifp,
+			   dir, &sk);
+	if (FR_ISPASS(result)) {
+		result = 0;
+	} else {
+		result = ENETUNREACH;
+	}
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,23)
 	*skbp = sk;
 #endif

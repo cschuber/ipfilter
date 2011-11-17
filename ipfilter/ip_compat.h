@@ -227,6 +227,7 @@ typedef unsigned int	u_32_t;
 # endif
 # define	U_32_T	1
 # if SOLARIS2 >= 7
+#  define	USE_QUAD_T
 #  define	U_QUAD_T	uint64_t
 #  define	QUAD_T		int64_t
 # endif
@@ -297,17 +298,6 @@ extern	void	*get_unit(void *, char *, int);
 #  if defined(INSTANCES)
 #   include	<sys/hook.h>
 #   include	<sys/neti.h>
-typedef struct	qpktinfo	{
-	void		*qpi_real;	/* the real one on the STREAM */
-	void		*qpi_ill;	/* COPIED */
-	mblk_t		*qpi_m;
-	queue_t		*qpi_q;
-	void		*qpi_data;	/* where layer 3 header starts */
-	size_t		qpi_off;
-	int		qpi_flags;	/* COPIED */
-} qpktinfo_t;
-
-#define	QF_GROUP	0x0001
 
 typedef struct qifpkt {
 	struct qifpkt	*qp_next;
@@ -1653,12 +1643,6 @@ typedef	struct	mb_s	{
 # define	m_flags		mb_flags
 # undef		m_data
 # define	m_data		mb_data
-# undef		M_MCAST
-# define	M_MCAST		0x01
-# undef		M_BCAST
-# define	M_BCAST		0x02
-# undef		M_MBCAST
-# define	M_MBCAST	0x04
 # define	MSGDSIZE(x)	msgdsize(x)
 # define	M_LEN(x)	(x)->mb_len
 # define	M_ADJ(m,x)	(x)->mb_len += x

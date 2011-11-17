@@ -115,6 +115,8 @@ void eMmutex_destroy(mtx, file, line)
 
 void ipf_mutex_clean()
 {
-	if (initcount != 0)
+	if (initcount != 0) {
+		fprintf(stderr, "initcount non-zero %d\n", initcount);
 		abort();
+	}
 }

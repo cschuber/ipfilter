@@ -1,0 +1,48 @@
+#!/bin/sh
+testitem=$1
+TESTMODE=$2
+todo=`expr ${testitem} : '.*\/\(.*\)$'`
+resdir=`expr ${testitem} : '\(.*\)\/.*$'`
+args=`awk "/^${todo} / { print; } " test.format`
+set $args
+
+if [ $3 = hex ] ; then
+	format="-xF $2"
+else
+	format="-F $2"
+fi
+if [ "$4" != "" ] ; then
+	case $4 in
+	-*)
+		format="$4 $format"
+		;;
+	*)
+		format="-T $4 $format"
+		;;
+	esac
+fi
+echo "${todo}...";
+. ./setup_test.sh
+/bin/cp /dev/null ${results}
+( while read rule; do
+	if [ ${TESTMODE} = kern ] ; then
+		../ipf -D
+		../ipf -E
+	fi
+	echo "$rule" | ../ipftest $format -M ${TESTMODE} -DRbN - \
+				  -i ${input} >> ${results}
+	status=$?
+	if [ ${TESTMODE} = kern ] ; then
+		../ipf -D
+	fi
+	if [ $status -ne 0 ] ; then
+		exit 1;
+	fi
+	echo "-------------------------------" >> ${results}
+done ) < ${regress}
+cmp ${expected} ${results}
+status=$?
+if [ $status = 0 ] ; then
+	$TOUCH ${resdir}/${todo}
+fi
+exit $status

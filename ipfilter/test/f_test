@@ -1,0 +1,54 @@
+#!/bin/sh
+testitem=$1
+TESTMODE=$2
+todo=`expr ${testitem} : '.*\/\(.*\)$'`
+resdir=`expr ${testitem} : '\(.*\)\/.*$'`
+args=`awk "/^${todo} / { print; } " test.format`
+set $args
+
+thistest=$1
+format=$2
+output=$3
+. ./setup_test.sh
+args=""
+while [ "$4" != "" ] ; do
+	case $4 in
+	-*)
+		args="$args $4"
+		;;
+	*)
+		args="$args -T $4"
+		;;
+	esac
+	shift
+done
+if [ ${TESTMODE} = kern ] ; then
+	args="-M kern $args"
+else
+	args="$args"
+
+fi
+echo "${todo}...";
+/bin/cp /dev/null ${results}
+( while read rule; do
+	if [ ${TESTMODE} = kern ] ; then
+		../ipf -D
+		../ipf -E
+	fi
+	echo "$rule" | ../ipftest ${args} -F $format -Rbr - \
+				  -i ${input} ${tuning} >> ${results}
+	status=$?
+	if [ ${TESTMODE} = kern ] ; then
+		../ipf -D
+	fi
+	if [ $status -ne 0 ] ; then
+		exit 1;
+	fi
+	echo "--------" >> ${results}
+done ) < ${regress}
+cmp ${expected} ${results}
+status=$?
+if [ $status = 0 ] ; then
+	$TOUCH ${resdir}/${todo}
+fi
+exit $status

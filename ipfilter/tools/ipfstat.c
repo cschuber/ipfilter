@@ -95,8 +95,12 @@ int	state_fd = -1;
 int	ipf_fd = -1;
 int	auth_fd = -1;
 int	nat_fd = -1;
+int	ipstate_fd = -1;
 frgroup_t *grtop = NULL;
 frgroup_t *grtail = NULL;
+
+static char *gnames[3] = { "Filter", "Accounting", "Authentication" };
+static int gnums[3] = { IPL_LOGIPF, IPL_LOGCOUNT, IPL_LOGAUTH };
 
 #ifdef STATETOP
 #define	STSTRSIZE 	80
@@ -139,13 +143,12 @@ static	void	showstatestats(ips_stat_t *);
 static	void	showipstates(ips_stat_t *, int *);
 static	void	showauthstates(ipf_authstat_t *);
 static	void	showtqtable_live(int);
-static	void	showgroups(friostat_t *);
+static	void	showgroups_dead(friostat_t *);
+static	void	showgroups_live(friostat_t *);
 static	void	usage(char *);
 static	int	state_matcharray(ipstate_t *, int *);
-static	void	printlivelist(friostat_t *, int, int, frentry_t *,
-			      char *, char *);
-static	void	printdeadlist(friostat_t *, int, int, frentry_t *,
-			      char *, char *);
+static	void	printlivelist(u_long, int, int, char *);
+static	void	printdeadlist(u_long, int, int, frentry_t *, char *);
 static	void	printside(char *, ipf_statistics_t *);
 static	void	parse_ipportstr(const char *, i6addr_t *, int *);
 static	void	ipfstate_live(char *, friostat_t **, ips_stat_t **,
@@ -268,6 +271,11 @@ int main(argc,argv)
 		}
 		if ((ipf_fd = open(IPL_NAME, O_RDONLY)) == -1) {
 			fprintf(stderr, "open(%s)", IPL_NAME);
+			perror("");
+			exit(-1);
+		}
+		if ((ipstate_fd = open(IPSTATE_NAME, O_RDONLY)) == -1) {
+			fprintf(stderr, "open(%s)", IPSTATE_NAME);
 			perror("");
 			exit(-1);
 		}
@@ -417,19 +425,23 @@ int main(argc,argv)
 			opts &= ~OPT_OUTQUE;
 			showlist(fiop);
 		}
-	} else if (opts & OPT_FRSTATES)
+	} else if (opts & OPT_FRSTATES) {
 		showfrstates(ifrstp, fiop->f_ticks);
 #ifdef STATETOP
-	else if (opts & OPT_STATETOP)
+	} else if (opts & OPT_STATETOP) {
 		topipstates(saddr, daddr, sport, dport, protocol,
 			    use_inet6 ? 6 : 4, refreshtime, topclosed, filter);
 #endif
-	else if (opts & OPT_AUTHSTATS)
+	} else if (opts & OPT_AUTHSTATS) {
 		showauthstates(frauthstp);
-	else if (opts & OPT_GROUPS)
-		showgroups(fiop);
-	else
+	} else if (opts & OPT_GROUPS) {
+		if (live_kernel == 1)
+			showgroups_live(fiop);
+		else
+			showgroups_dead(fiop);
+	} else {
 		showstats(fiop, frf);
+	}
 
 	return 0;
 }
@@ -758,132 +770,58 @@ static	void	showstats(fp, frf)
 }
 
 
-/*
- * Print out a list of rules from the kernel, starting at the one passed.
- */
-static void printlivelist(fiop, out, set, fp, group, comment)
-	struct friostat *fiop;
-	int out, set;
+void
+ipf_walker(fp)
 	frentry_t *fp;
-	char *group, *comment;
 {
-	struct	frentry	fb;
-	ipfruleiter_t rule;
-	frentry_t zero;
 	frgroup_t *g;
-	ipfobj_t obj;
-	int n;
 
-	n = 0;
+	printfr(fp, ioctl);
 
-	rule.iri_inout = out;
-	rule.iri_active = set;
-	rule.iri_rule = &fb;
-	rule.iri_nrules = 1;
-	if (group != NULL)
-		strncpy(rule.iri_group, group, FR_GROUPLEN);
-	else
-		rule.iri_group[0] = '\0';
-
-	bzero((char *)&zero, sizeof(zero));
-
-	bzero((char *)&obj, sizeof(obj));
-	obj.ipfo_rev = IPFILTER_VERSION;
-	obj.ipfo_type = IPFOBJ_IPFITER;
-	obj.ipfo_size = sizeof(rule);
-	obj.ipfo_ptr = &rule;
-
-	do {
-		u_long array[1000];
-
-		memset(array, 0xff, sizeof(array));
-		fp = (frentry_t *)array;
-		rule.iri_rule = fp;
-		if (ioctl(ipf_fd, SIOCIPFITER, &obj) == -1) {
-			ipferror(ipf_fd, "ioctl(SIOCIPFITER)");
-			n = IPFGENITER_IPF;
-			(void) ioctl(ipf_fd,SIOCIPFDELTOK, &n);
-			return;
+	if (fp->fr_grhead != -1) {
+		for (g = grtop; g != NULL; g = g->fg_next) {
+			if (!strncmp(fp->fr_names + fp->fr_grhead,
+				     g->fg_name,
+				     FR_GROUPLEN))
+				break;
 		}
-		if (bcmp(fp, &zero, sizeof(zero)) == 0)
-			break;
-#ifdef USE_INET6
-		if (use_inet6 != 0) {
-			if (fp->fr_family != 0 && fp->fr_family != AF_INET6)
-				continue;
-		} else
-#endif
-		{
-			if (fp->fr_family != 0 && fp->fr_family != AF_INET)
-				continue;
-		}
-		if (fp->fr_data != NULL)
-			fp->fr_data = (char *)fp + fp->fr_size;
+		if (g == NULL) {
+			g = calloc(1, sizeof(*g));
 
-		n++;
-
-		if (opts & (OPT_HITS|OPT_VERBOSE))
-#ifdef	USE_QUAD_T
-			PRINTF("%qu ", (unsigned long long) fp->fr_hits);
-#else
-			PRINTF("%lu ", fp->fr_hits);
-#endif
-		if (opts & (OPT_ACCNT|OPT_VERBOSE))
-#ifdef	USE_QUAD_T
-			PRINTF("%qu ", (unsigned long long) fp->fr_bytes);
-#else
-			PRINTF("%lu ", fp->fr_bytes);
-#endif
-		if (opts & OPT_SHOWLINENO)
-			PRINTF("@%d ", n);
-
-		if (fp->fr_die != 0)
-			fp->fr_die -= fiop->f_ticks;
-
-		printfr(fp, ioctl);
-		if (opts & OPT_VERBOSE) {
-			binprint(fp, fp->fr_size);
-			if (fp->fr_data != NULL && fp->fr_dsize > 0)
-				binprint(fp->fr_data, fp->fr_dsize);
-		}
-		if (fp->fr_grhead != -1) {
-			for (g = grtop; g != NULL; g = g->fg_next) {
-				if (!strncmp(fp->fr_names + fp->fr_grhead,
-					     g->fg_name,
-					     FR_GROUPLEN))
-					break;
-			}
-			if (g == NULL) {
-				g = calloc(1, sizeof(*g));
-
-				if (g != NULL) {
-					strncpy(g->fg_name,
-						fp->fr_names + fp->fr_grhead,
-						FR_GROUPLEN);
-					if (grtop == NULL) {
-						grtop = g;
-						grtail = g;
-					} else {
-						grtail->fg_next = g;
-						grtail = g;
-					}
+			if (g != NULL) {
+				strncpy(g->fg_name,
+					fp->fr_names + fp->fr_grhead,
+					FR_GROUPLEN);
+				if (grtop == NULL) {
+					grtop = g;
+					grtail = g;
+				} else {
+					grtail->fg_next = g;
+					grtail = g;
 				}
 			}
 		}
-		if (fp->fr_type == FR_T_CALLFUNC) {
-			printlivelist(fiop, out, set, fp->fr_data, group,
-				      "# callfunc: ");
-		}
-	} while (fp->fr_next != NULL);
+	}
+}
 
-	n = IPFGENITER_IPF;
-	(void) ioctl(ipf_fd,SIOCIPFDELTOK, &n);
+
+/*
+ * Print out a list of rules from the kernel, starting at the one passed.
+ */
+static void
+printlivelist(ticks, out, set, group)
+	u_long ticks;
+	int out, set;
+	char *group;
+{
+	frgroup_t *g;
+
+	walk_live_fr_rules(ticks, out, set, group, ipf_walker);
 
 	if (group == NULL) {
 		while ((g = grtop) != NULL) {
 			printf("# Group %s\n", g->fg_name);
-			printlivelist(fiop, out, set, NULL, g->fg_name,
-				      comment);
+			printlivelist(ticks, out, set, g->fg_name);
 			grtop = g->fg_next;
 			free(g);
 		}
@@ -891,13 +829,14 @@ static void printlivelist(fiop, out, set, fp, group, comment)
 }
 
 
-static void printdeadlist(fiop, out, set, fp, group, comment)
-	friostat_t *fiop;
+static void
+printdeadlist(ticks, out, set, fp, group)
+	u_long ticks;
 	int out, set;
 	frentry_t *fp;
-	char *group, *comment;
+	char *group;
 {
-	frgroup_t *grtop, *grtail, *g;
+	frgroup_t *g;
 	struct	frentry	fb;
 	char	*data;
 	u_32_t	type;
@@ -938,52 +877,17 @@ static void printdeadlist(fiop, out, set, fp, group, comment)
 			}
 		}
 
-		if (opts & (OPT_HITS|OPT_VERBOSE))
-#ifdef	USE_QUAD_T
-			PRINTF("%qu ", (unsigned long long) fb.fr_hits);
-#else
-			PRINTF("%lu ", fb.fr_hits);
-#endif
-		if (opts & (OPT_ACCNT|OPT_VERBOSE))
-#ifdef	USE_QUAD_T
-			PRINTF("%qu ", (unsigned long long) fb.fr_bytes);
-#else
-			PRINTF("%lu ", fb.fr_bytes);
-#endif
-		if (opts & OPT_SHOWLINENO)
-			PRINTF("@%d ", n);
+		ipf_walker(&fb);
 
-		printfr(fp, ioctl);
-		if (opts & OPT_DEBUG) {
-			binprint(fp, fp->fr_size);
-			if (fb.fr_data != NULL && fb.fr_dsize > 0)
-				binprint(fb.fr_data, fb.fr_dsize);
-		}
+		if (type == FR_T_CALLFUNC)
+			printdeadlist(ticks, out, set, fb.fr_data, group);
+
 		if (data != NULL)
 			free(data);
-		if (fb.fr_grhead != -1) {
-			g = calloc(1, sizeof(*g));
-
-			if (g != NULL) {
-				strncpy(g->fg_name, fb.fr_names + fb.fr_grhead,
-					FR_GROUPLEN);
-				if (grtop == NULL) {
-					grtop = g;
-					grtail = g;
-				} else {
-					grtail->fg_next = g;
-					grtail = g;
-				}
-			}
-		}
-		if (type == FR_T_CALLFUNC) {
-			printdeadlist(fiop, out, set, fb.fr_data, group,
-				      "# callfunc: ");
-		}
 	}
 
 	while ((g = grtop) != NULL) {
-		printdeadlist(fiop, out, set, NULL, g->fg_name, comment);
+		printdeadlist(ticks, out, set, NULL, g->fg_name);
 		grtop = g->fg_next;
 		free(g);
 	}
@@ -1034,9 +938,33 @@ static	void	showlist(fiop)
 		return;
 	}
 	if (live_kernel == 1)
-		printlivelist(fiop, i, set, fp, NULL, NULL);
+		printlivelist(fiop->f_ticks, i, set, NULL);
 	else
-		printdeadlist(fiop, i, set, fp, NULL, NULL);
+		printdeadlist(fiop->f_ticks, i, set, fp, NULL);
+}
+
+
+void
+state_walker(ticks, filter, is)
+	u_long ticks;
+	int *filter;
+	ipstate_t *is;
+{
+	int i;
+
+	if ((filter != NULL) && (state_matcharray(is, filter) == 0))
+		return;
+
+	if (state_fields != NULL) {
+		for (i = 0; state_fields[i].w_value != 0; i++) {
+			printstatefield(is, state_fields[i].w_value);
+			if (state_fields[i + 1].w_value != 0)
+				printf("\t");
+		}
+		printf("\n");
+	} else {
+		printstate(is, opts, ticks);
+	}
 }
 
 
@@ -1047,7 +975,7 @@ static void showipstates(ipsp, filter)
 	ips_stat_t *ipsp;
 	int *filter;
 {
-	ipstate_t *is;
+	ipstate_t *is, ips;
 	int i;
 
 	/*
@@ -1070,28 +998,15 @@ static void showipstates(ipsp, filter)
 	/*
 	 * Print out all the state information currently held in the kernel.
 	 */
-	for (is = ipsp->iss_list; is != NULL; ) {
-		ipstate_t ips;
-
-		is = fetchstate(is, &ips);
-
-		if (is == NULL)
-			break;
-
-		is = ips.is_next;
-		if ((filter != NULL) &&
-		    (state_matcharray(&ips, filter) == 0)) {
-			continue;
-		}
-		if (state_fields != NULL) {
-			for (i = 0; state_fields[i].w_value != 0; i++) {
-				printstatefield(&ips, state_fields[i].w_value);
-				if (state_fields[i + 1].w_value != 0)
-					printf("\t");
-			}
-			printf("\n");
-		} else {
-			printstate(&ips, opts, ipsp->iss_ticks);
+	if (live_kernel == 1) {
+		walk_live_states(ipsp->iss_ticks, filter, state_walker);
+	} else {
+		for (is = ipsp->iss_list; is != NULL; ) {
+			is = fetchstate(is, &ips);
+			if (is == NULL)
+				break;
+			state_walker(ipsp->iss_ticks, filter, is);
+			is = ips.is_next;
 		}
 	}
 }
@@ -1590,7 +1505,7 @@ static void topipstates(saddr, daddr, sport, dport, protocol, ver,
 
 			/* print #pkt/#bytes */
 #ifdef	USE_QUAD_T
-			printw(" %7qu %9qu", (unsigned long long) tp->st_pkts,
+			printw(" %7"PRIu64" %9"PRIu64"", (unsigned long long) tp->st_pkts,
 				(unsigned long long) tp->st_bytes);
 #else
 			printw(" %7lu %9lu", tp->st_pkts, tp->st_bytes);
@@ -1763,7 +1678,7 @@ static void showauthstates(asp)
 	auth.igi_data = &fra;
 
 #ifdef	USE_QUAD_T
-	printf("Authorisation hits: %qu\tmisses %qu\n",
+	printf("Authorisation hits: %"PRIu64"\tmisses %"PRIu64"\n",
 		(unsigned long long) asp->fas_hits,
 		(unsigned long long) asp->fas_miss);
 #else
@@ -1797,33 +1712,60 @@ static void showauthstates(asp)
  * Display groups used for each of filter rules, accounting rules and
  * authentication, separately.
  */
-static void showgroups(fiop)
+static void
+showgroups_dead(fiop)
 	struct friostat	*fiop;
 {
-	static char *gnames[3] = { "Filter", "Accounting", "Authentication" };
-	static int gnums[3] = { IPL_LOGIPF, IPL_LOGCOUNT, IPL_LOGAUTH };
 	frgroup_t *fp, grp;
-	int on, off, i;
-
-	on = fiop->f_active;
-	off = 1 - on;
+	int i;
 
 	for (i = 0; i < 3; i++) {
-		printf("%s groups (active):\n", gnames[i]);
-		for (fp = fiop->f_groups[gnums[i]][on]; fp != NULL;
-		     fp = grp.fg_next)
+		printf("%s groups (set 0):\n", gnames[i]);
+		for (fp = fiop->f_groups[gnums[i]][0]; fp != NULL;
+		     fp = grp.fg_next) {
 			if (kmemcpy((char *)&grp, (u_long)fp, sizeof(grp)))
 				break;
-			else
-				printf("%s\n", grp.fg_name);
-		printf("%s groups (inactive):\n", gnames[i]);
-		for (fp = fiop->f_groups[gnums[i]][off]; fp != NULL;
-		     fp = grp.fg_next)
+			printf("%s\n", grp.fg_name);
+		}
+		printf("%s groups (set 1):\n", gnames[i]);
+		for (fp = fiop->f_groups[gnums[i]][1]; fp != NULL;
+		     fp = grp.fg_next) {
 			if (kmemcpy((char *)&grp, (u_long)fp, sizeof(grp)))
 				break;
-			else
-				printf("%s\n", grp.fg_name);
+			printf("%s\n", grp.fg_name);
+		}
 	}
+}
+
+
+static void
+group_walker(info)
+	frgroupiter_t *info;
+{
+	static int visited[2][IPL_LOGMAX] = { { 0, 0, 0, 0, 0, 0, 0 },
+					      { 0, 0, 0, 0, 0, 0, 0 }
+					    };
+	int set = info->gi_set;
+	int unit = info->gi_unit;
+
+	if (visited[set][unit] == 0) {
+		printf("%s groups (set %d):\n", gnames[unit], set);
+		visited[info->gi_set][info->gi_unit] = 1;
+	}
+	if (info->gi_name[0] != '\0')
+		PRINTF("%s\n", info->gi_name);
+}
+
+static void
+showgroups_live(fiop)
+	struct friostat	*fiop;
+{
+	int on, i;
+
+	on = fiop->f_active;
+
+	for (i = 0; i < 3; i++)
+		walk_live_groups(gnums[i], on, group_walker);
 }
 
 

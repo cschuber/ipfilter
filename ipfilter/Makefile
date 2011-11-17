@@ -368,7 +368,6 @@ sunos4 solaris1:
 
 sunos5 solaris2: null
 	(cd SunOS5/$(CPUDIR); $(MAKE) build TOP=../.. "CC=$(CC)" $(DEST) $(MFLAGS) "SOLARIS2=$(SOLARIS2)" INSTANCE=$(INSTANCE); cd ..)
-	(cd SunOS5/$(CPUDIR); $(MAKE) -f Makefile.ipsend build TOP=../.. "CC=$(CC)" $(DEST) $(MFLAGS); cd ..)
 
 linux: include
 	(cd Linux; make build LINUX=$(LINUX) TOP=.. "DEBUG=-g" "CC=$(CC)" $(MFLAGS) OBJ=$(CPUDIR) LINUXKERNEL=$(LINUXKERNEL); cd ..)

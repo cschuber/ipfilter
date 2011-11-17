@@ -71,6 +71,7 @@
 # define	SIOCGTQTAB	_IOWR('r', 96, struct ipfobj)
 # define	SIOCMATCHFLUSH	_IOWR('r', 97, struct ipfobj)
 # define	SIOCIPFINTERROR	_IOR('r', 98, int)
+# define	SIOCIPFTSTPKT	_IOWR('r', 99, struct ipf_test_pkt)
 #else
 # define	SIOCADAFR	_IOW(r, 60, struct ipfobj)
 # define	SIOCRMAFR	_IOW(r, 61, struct ipfobj)
@@ -111,6 +112,7 @@
 # define	SIOCGTQTAB	_IOWR(r, 96, struct ipfobj)
 # define	SIOCMATCHFLUSH	_IOWR(r, 97, struct ipfobj)
 # define	SIOCIPFINTERROR	_IOR(r, 98, int)
+# define	SIOCIPFTSTPKT	_IOWR(r, 99, struct ipf_test_pkt)
 #endif
 #define	SIOCADDFR	SIOCADAFR
 #define	SIOCDELFR	SIOCRMAFR
@@ -434,9 +436,9 @@ typedef	struct	fr_info	{
 	} fin_ipu;
 	mb_t	**fin_mp;		/* pointer to pointer to mbuf */
 	mb_t	*fin_m;			/* pointer to mbuf */
+	void	*fin_qpi;
 #ifdef	MENTAT
 	mb_t	*fin_qfm;		/* pointer to mblk where pkt starts */
-	void	*fin_qpi;
 	char	fin_ifname[LIFNAMSIZ];
 #endif
 #ifdef	__sgi
@@ -1149,6 +1151,13 @@ typedef	struct frgroup {
 
 #define	FG_NAME(g)	(*(g)->fg_name == '\0' ? "" : (g)->fg_name)
 
+typedef struct frgroupiter {
+	int	gi_unit;
+	int	gi_set;
+	u_32_t	gi_flags;
+	char	gi_name[FR_GROUPLEN];
+} frgroupiter_t;
+
 
 /*
  * Used by state and NAT tables
@@ -1494,6 +1503,7 @@ typedef	struct	ipfgeniter {
 #define	IPFGENITER_NATFRAG	6
 #define	IPFGENITER_HOSTMAP	7
 #define	IPFGENITER_LOOKUP	8
+#define	IPFGENITER_GROUP	9
 
 typedef	struct	ipftable {
 	int	ita_type;
@@ -1521,6 +1531,27 @@ typedef struct ipftoken {
 	int		ipt_complete;
 } ipftoken_t;
 
+
+/*
+ * For Solaris and the SIOCIPFTSTPKT ioctl, extra data is required to ipfilter
+ * that is not present in the network buffers, such as boradcast flag. This
+ * structure provides the means to pass in associated data such as that.
+ */
+typedef struct	qpktinfo	{
+	void		*qpi_real;
+	void		*qpi_ill;
+	mb_t		*qpi_m;
+	queue_t		*qpi_q;
+	void		*qpi_data;	/* where layer 3 header starts */
+	size_t		qpi_off;
+	int		qpi_flags;
+	int		qpi_reason;
+	int		qpi_id;
+} qpktinfo_t;
+
+#define	QF_BROADCAST	0x0001
+#define	QF_MULTICAST	0x0002
+#define	QF_MBCAST	0x0004
 
 /*
  *
@@ -1561,6 +1592,23 @@ typedef struct ipfexp {
 #define	ONE_DAY			IPF_TTLVAL(1 * 86400)   /* 1 day */
 #define	FIVE_DAYS		(5 * ONE_DAY)
 
+/*
+ * This structure is used by ipftest to pass packet data into the kernel
+ * for sending through ipfilter's main filtering loop.
+ */
+typedef	struct ipf_test_pkt {
+	int		pkt_family;		/* AF_INET, etc */
+	int		pkt_direction;		/* 0 = in, 1 = out */
+	int		pkt_result;		/* fr_flags */
+	int		pkt_freed;		/* on return 1 = free'd */
+	int		pkt_id;
+	int		pkt_reason;		/* on return, FRB_* */
+	int		pkt_length;		/* # of bytes in pkt_buf */
+	int		pkt_flags;		/* QF_* */
+	char		pkt_ifname[LIFNAMSIZ];	/* bge0, lo0, etc */
+	u_char		pkt_buf[1536];
+} ipf_test_pkt_t;
+
 typedef struct ipf_main_softc_s {
 	struct ipf_main_softc_s *ipf_next;
 	ipfmutex_t	ipf_rw;
@@ -1581,6 +1629,7 @@ typedef struct ipf_main_softc_s {
 	int		ipf_control_forwarding;
 	int		ipf_update_ipid;
 	int		ipf_chksrc;	/* causes a system crash if enabled */
+	int		ipf_valid_cksum;
 	int		ipf_pass;
 	int		ipf_minttl;
 	int		ipf_icmpminfragmtu;
@@ -1677,7 +1726,8 @@ typedef struct ipf_main_softc_s {
 
 
 #ifndef	_KERNEL
-extern	int	ipf_check(void *, struct ip *, int, void *, int, mb_t **);
+extern	int	ipf_check(void *, struct ip *, int, void *, int,
+			  void *, mb_t **);
 extern	int	(*ipf_checkp)(ip_t *, int, void *, int, mb_t **);
 extern	struct	ifnet *get_unit(char *, int);
 extern	char	*get_ifname(struct ifnet *);
@@ -1905,6 +1955,7 @@ extern	int		ipf_genericiter(ipf_main_softc_t *, void *,
 extern	void		*ipf_resolvelookup(int, u_int, u_int, lookupfunc_t *);
 #endif
 extern	u_32_t		ipf_random(void);
+extern	int		ipf_test_pkt(ipf_main_softc_t *, void *);
 
 extern	int		ipf_main_load(void);
 extern	void		*ipf_main_soft_create(void *);

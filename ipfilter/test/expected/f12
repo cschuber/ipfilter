@@ -1,7 +1,7 @@
 pass
 pass
 pass
-bad-packet
+nomatch
 nomatch
 nomatch
 bad-packet
@@ -11,7 +11,7 @@ nomatch
 pass
 pass
 pass
-bad-packet
+pass
 nomatch
 nomatch
 bad-packet
@@ -21,7 +21,7 @@ nomatch
 nomatch
 nomatch
 nomatch
-bad-packet
+block
 block
 nomatch
 bad-packet
@@ -31,7 +31,7 @@ nomatch
 nomatch
 nomatch
 block
-bad-packet
+block
 block
 nomatch
 bad-packet
@@ -41,7 +41,7 @@ nomatch
 nomatch
 nomatch
 nomatch
-bad-packet
+nomatch
 nomatch
 nomatch
 bad-packet
@@ -51,7 +51,7 @@ pass
 nomatch
 nomatch
 nomatch
-bad-packet
+nomatch
 nomatch
 nomatch
 bad-packet

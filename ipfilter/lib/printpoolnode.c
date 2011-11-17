@@ -48,7 +48,7 @@ printpoolnode(np, opts, fields)
 		printmask(np->ipn_addr.adf_family,
 			  (u_32_t *)&np->ipn_mask.adf_addr);
 #ifdef USE_QUAD_T
-		PRINTF("\n\t\tHits %qu\tBytes %qu\tName %s\tRef %d\n",
+		PRINTF("\n\t\tHits %"PRIu64"\tBytes %"PRIu64"\tName %s\tRef %d\n",
 			np->ipn_hits, np->ipn_bytes,
 			np->ipn_name, np->ipn_ref);
 #else

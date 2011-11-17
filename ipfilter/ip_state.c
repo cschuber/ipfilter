@@ -4880,12 +4880,6 @@ ipf_state_deref(softc, isp)
 	if (is->is_ref > 1) {
 		is->is_ref--;
 		MUTEX_EXIT(&is->is_lock);
-#ifndef	_KERNEL
-		if ((is->is_sti.tqe_state[0] > IPF_TCPS_ESTABLISHED) ||
-		    (is->is_sti.tqe_state[1] > IPF_TCPS_ESTABLISHED)) {
-			ipf_state_del(softc, is, ISL_EXPIRE);
-		}
-#endif
 		return;
 	}
 	MUTEX_EXIT(&is->is_lock);
@@ -5479,23 +5473,3 @@ ipf_state_add_tq(softc, ttl)
 
         return ipf_addtimeoutqueue(softc, &softs->ipf_state_usertq, ttl);
 }
-
-
-#ifndef _KERNEL
-/*
- * Display the built up state table rules and mapping entries.
- */
-void
-ipf_state_dump(softc, arg)
-	ipf_main_softc_t *softc;
-	void *arg;
-{
-	ipf_state_softc_t *softs = arg;
-	ipstate_t *ips;
-
-	printf("List of active state sessions:\n");
-	for (ips = softs->ipf_state_list; ips != NULL; )
-		ips = printstate(ips, opts & (OPT_DEBUG|OPT_VERBOSE),
-				 softc->ipf_ticks);
-}
-#endif

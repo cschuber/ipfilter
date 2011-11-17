@@ -122,7 +122,7 @@ printstatefield(sp, fieldnum)
 
 	case 9:
 #ifdef USE_QUAD_T
-		PRINTF("%qu", sp->is_pkts[0]);
+		PRINTF("%"PRIu64"", sp->is_pkts[0]);
 #else
 		PRINTF("%lu", sp->is_pkts[0]);
 #endif
@@ -130,7 +130,7 @@ printstatefield(sp, fieldnum)
 
 	case 10:
 #ifdef USE_QUAD_T
-		PRINTF("%qu", sp->is_pkts[1]);
+		PRINTF("%"PRIu64"", sp->is_pkts[1]);
 #else
 		PRINTF("%lu", sp->is_pkts[1]);
 #endif
@@ -138,7 +138,7 @@ printstatefield(sp, fieldnum)
 
 	case 11:
 #ifdef USE_QUAD_T
-		PRINTF("%qu", sp->is_pkts[2]);
+		PRINTF("%"PRIu64"", sp->is_pkts[2]);
 #else
 		PRINTF("%lu", sp->is_pkts[2]);
 #endif
@@ -146,7 +146,7 @@ printstatefield(sp, fieldnum)
 
 	case 12:
 #ifdef USE_QUAD_T
-		PRINTF("%qu", sp->is_pkts[3]);
+		PRINTF("%"PRIu64"", sp->is_pkts[3]);
 #else
 		PRINTF("%lu", sp->is_pkts[3]);
 #endif
@@ -154,7 +154,7 @@ printstatefield(sp, fieldnum)
 
 	case 13:
 #ifdef USE_QUAD_T
-		PRINTF("%qu", sp->is_bytes[0]);
+		PRINTF("%"PRIu64"", sp->is_bytes[0]);
 #else
 		PRINTF("%lu", sp->is_bytes[0]);
 #endif
@@ -162,7 +162,7 @@ printstatefield(sp, fieldnum)
 
 	case 14:
 #ifdef USE_QUAD_T
-		PRINTF("%qu", sp->is_bytes[1]);
+		PRINTF("%"PRIu64"", sp->is_bytes[1]);
 #else
 		PRINTF("%lu", sp->is_bytes[1]);
 #endif
@@ -170,7 +170,7 @@ printstatefield(sp, fieldnum)
 
 	case 15:
 #ifdef USE_QUAD_T
-		PRINTF("%qu", sp->is_bytes[2]);
+		PRINTF("%"PRIu64"", sp->is_bytes[2]);
 #else
 		PRINTF("%lu", sp->is_bytes[2]);
 #endif
@@ -178,7 +178,7 @@ printstatefield(sp, fieldnum)
 
 	case 16:
 #ifdef USE_QUAD_T
-		PRINTF("%qu", sp->is_bytes[3]);
+		PRINTF("%"PRIu64"", sp->is_bytes[3]);
 #else
 		PRINTF("%lu", sp->is_bytes[3]);
 #endif
@@ -322,7 +322,7 @@ printstatefield(sp, fieldnum)
 
 	case 52:
 #ifdef USE_QUAD_T
-		PRINTF("%qu", sp->is_icmppkts[0]);
+		PRINTF("%"PRIu64"", sp->is_icmppkts[0]);
 #else
 		PRINTF("%lu", sp->is_icmppkts[0]);
 #endif
@@ -330,7 +330,7 @@ printstatefield(sp, fieldnum)
 
 	case 53:
 #ifdef USE_QUAD_T
-		PRINTF("%qu", sp->is_icmppkts[1]);
+		PRINTF("%"PRIu64"", sp->is_icmppkts[1]);
 #else
 		PRINTF("%lu", sp->is_icmppkts[1]);
 #endif
@@ -338,7 +338,7 @@ printstatefield(sp, fieldnum)
 
 	case 54:
 #ifdef USE_QUAD_T
-		PRINTF("%qu", sp->is_icmppkts[2]);
+		PRINTF("%"PRIu64"", sp->is_icmppkts[2]);
 #else
 		PRINTF("%lu", sp->is_icmppkts[2]);
 #endif
@@ -346,7 +346,7 @@ printstatefield(sp, fieldnum)
 
 	case 55:
 #ifdef USE_QUAD_T
-		PRINTF("%qu", sp->is_icmppkts[3]);
+		PRINTF("%"PRIu64"", sp->is_icmppkts[3]);
 #else
 		PRINTF("%lu", sp->is_icmppkts[3]);
 #endif

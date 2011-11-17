@@ -1,0 +1,3 @@
+map NIC0 0/0 -> 1.1.1.1/32 portmap tcp/udp 1:4
+map NIC0 0/0 -> 1.1.1.1/32 portmap tcp/udp 1000:5000
+map NIC0 0/0 -> 1.1.1.1/32 portmap tcp/udp 1000:50000

@@ -1,0 +1,74 @@
+Test Description
+================
+
+i1 - i23	Each one of these files verifies parsing of different features
+		in the ipf.conf file. Each file contains a cluster of rules
+		that verify parsing of similarly related features.
+
+f1 - f30	Firewall tests. These tests verify that filtering works.
+
+f1		Simple rules that match all packets
+f2		Verify that filtering by protocol works
+f3		Verify that specifying a from address works
+f4		Verify that specifying a to address works
+f5		Verify that filtering on the source port works.
+		Each of the operations that allows a port number
+		to be compared must be tested here.
+f6		Verify that filtering on the source port works.
+		Each of the operations that allows a port number
+		to be compared must be tested here.
+f7		Verify that filtering on the icmp type works
+f8		Verify that filtering on TCP flags works
+f9		Verify that positive filtering on IP options works
+f10		Verify that negative filtering on IP options works
+f12		Verify firewall behaviour with "short fragment" packets
+f13		Verify the behaviour of "keep frags" and "keep state"
+f14		Verify filtering with negative IP address matching
+f16		Skip rules. To be removed.
+f18		Verify using accounting rules with firewall rules
+f19		Verify stateful filtering behaviour with a limit
+f21		Verify filtering on ICMP types allowed with stateful filtering
+		for state built with outbound packets
+f22		Verify filtering on ICMP types allowed with stateful filtering
+		for state built with inbound packets
+f24		Verify stateful filtering for UDP with fragments
+f26		Verify stateful filtering behaviour when specifying a limit
+		on the number of sources and source netmask (text input)
+f27		Verify stateful filtering behaviour when specifying a limit
+		on the number of sources and source netmask (hex input)
+f30		Verify stateful filtering when packets have IP options
+--------------------------------
+
+n1 - n18	These tests verify that the various aspects of NAT
+		functionality work.
+
+n1		Verify simple address translation for outbound packets
+n2		Verify outbound address translation with port translation too
+n3		Verify outbound address translation using automatic port range
+		assignment for network to network translation
+n4		Verify inbound address translation, including changing the
+		destination port number
+n5		Verify that the presence of "from-to" works in map rules
+n6		Verify that the presence of "from-to" works in rdr rules
+n7		Verify that specifying a range of matching destination ports
+		works for inbound translation. Also test splitting packets
+		across two destination address for inbound.
+n8		Verify that mapping network A to network B for outbound
+		packets works
+n9		Verify that redirection network A to network B for inbound
+		packets works
+n10		Verify that mssclamp works with outbound translation
+n11		Verify that bimap works between networks and hosts
+n12		Verify that using 0/32 syntax works when used  with port
+		translation
+n13		Verify that setting a range of destination addresses in a
+		map rule works
+n14		Verify that when redirecting inbound packets to a pair of
+		addresses that the "sticky" behaviour works
+n15		Verify that redirecting one destination port to multiple ports
+		works
+n16		Verify that redirecting a specific address/port pair to another
+		address/port pair works
+n17		Verify bimap???
+n18		Verify port mapping
+--------------------------------

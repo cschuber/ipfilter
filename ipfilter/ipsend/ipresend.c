@@ -30,7 +30,7 @@ static const char rcsid[] = "@(#)$Id$";
 extern	char	*optarg;
 extern	int	optind;
 #ifndef	NO_IPF
-extern	struct	ipread	snoop, pcap, etherf, iphex, tcpd, iptext;
+extern	struct	ipread	pcap, iphex, iptext;
 #endif
 
 int	opts = 0;
@@ -113,20 +113,11 @@ int main(argc, argv)
 			opts |= OPT_RAW;
 			break;
 #ifndef	NO_IPF
-		case 'E' :
-			ipr = &etherf;
-			break;
 		case 'H' :
 			ipr = &iphex;
 			break;
 		case 'P' :
 			ipr = &pcap;
-			break;
-		case 'S' :
-			ipr = &snoop;
-			break;
-		case 'T' :
-			ipr = &tcpd;
 			break;
 		case 'X' :
 			ipr = &iptext;

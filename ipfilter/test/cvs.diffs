@@ -1,0 +1,3429 @@
+? Description.txt
+? bpf_test
+? build_test.pl
+? build_test.sh
+? cvs.diffs
+? f_m_test
+? f_test
+? fillcksum.pl
+? i_test
+? in_test
+? ip_test
+? ipv6_test
+? kerntest.sh
+? n_test
+? ni_test
+? p_test
+? setup_test.sh
+? expected/f11.dist
+? expected/f25.dist
+? expected/f28.dist
+? expected/f29.dist
+? expected/ipv6_1
+? expected/ipv6_2
+? expected/ipv6_3
+? expected/ipv6_4
+? expected/ipv6_5
+? expected/ipv6_6
+? expected/kern
+? expected/n1.dist
+? expected/n10.dist
+? expected/n100.dist
+? expected/n101.dist
+? expected/n102.dist
+? expected/n103.dist
+? expected/n104.dist
+? expected/n105.dist
+? expected/n106.dist
+? expected/n11.dist
+? expected/n11_6.dist
+? expected/n12.dist
+? expected/n12_6.dist
+? expected/n13.dist
+? expected/n13_6.dist
+? expected/n14.dist
+? expected/n14_6.dist
+? expected/n15.dist
+? expected/n15_6.dist
+? expected/n16.dist
+? expected/n17.dist
+? expected/n18.dist
+? expected/n1_6.dist
+? expected/n2.dist
+? expected/n200.dist
+? expected/n201.dist
+? expected/n202.dist
+? expected/n2_6.dist
+? expected/n3.dist
+? expected/n4.dist
+? expected/n4_6.dist
+? expected/n5.dist
+? expected/n5_6.dist
+? expected/n6.dist
+? expected/n6_6.dist
+? expected/n7.dist
+? expected/n7_6.dist
+? expected/n8.dist
+? expected/n8_6.dist
+? expected/n9.dist
+? expected/n9_6.dist
+? expected/ni13.dist
+? expected/ni16.dist
+? expected/ni17.dist
+? expected/ni18.dist
+? expected/ni20.dist
+? expected/ni21.dist
+? expected/ni23.dist
+? expected/ni6.dist
+? expected/p10.dist
+? expected/p11.dist
+? expected/p12.dist
+? expected/p7.dist
+? expected/p9.dist
+? expected/user
+? input/Makefile
+? input/f11.dist
+? input/f15.dist
+? input/f17.dist
+? input/f18.dist
+? input/f20.dist
+? input/f21.dist
+? input/f24.dist
+? input/f25.dist
+? input/f27.dist
+? input/f28.dist
+? input/f29.dist
+? input/f30.dist
+? input/ipv6_1.dist
+? input/ipv6_2.dist
+? input/ipv6_3.dist
+? input/ipv6_4.dist
+? input/ipv6_5.dist
+? input/ipv6_6.dist
+? input/kern
+? input/n1.dist
+? input/n10.dist
+? input/n100.dist
+? input/n101.dist
+? input/n102.dist
+? input/n103.dist
+? input/n104.dist
+? input/n105.dist
+? input/n106.dist
+? input/n10_6.dist
+? input/n11.dist
+? input/n11_6.dist
+? input/n12.dist
+? input/n12_6.dist
+? input/n13.dist
+? input/n13_6.dist
+? input/n14.dist
+? input/n14_6.dist
+? input/n15.dist
+? input/n15_6.dist
+? input/n16.dist
+? input/n17.dist
+? input/n17_6.dist
+? input/n18.dist
+? input/n1_6.dist
+? input/n2.dist
+? input/n200.dist
+? input/n201.dist
+? input/n202.dist
+? input/n2_6.dist
+? input/n3.dist
+? input/n4.dist
+? input/n4_6.dist
+? input/n5.dist
+? input/n5_6.dist
+? input/n6.dist
+? input/n6_6.dist
+? input/n7.dist
+? input/n7_6.dist
+? input/n8.dist
+? input/n8_6.dist
+? input/n9.dist
+? input/n9_6.dist
+? input/ni1.dist
+? input/ni10.dist
+? input/ni11.dist
+? input/ni12.dist
+? input/ni13.dist
+? input/ni14.dist
+? input/ni15.dist
+? input/ni16.dist
+? input/ni17.dist
+? input/ni18.dist
+? input/ni19.dist
+? input/ni2.dist
+? input/ni20.dist
+? input/ni21.dist
+? input/ni23.dist
+? input/ni3.dist
+? input/ni4.dist
+? input/ni5.dist
+? input/ni6.dist
+? input/ni7.dist
+? input/ni8.dist
+? input/ni9.dist
+? input/p10.dist
+? input/p11.dist
+? input/p12.dist
+? input/p7.dist
+? input/p9.dist
+? input/user
+? regress/Makefile
+? regress/f11.dist
+? regress/f15.dist
+? regress/f17.dist
+? regress/f20.dist
+? regress/f25.dist
+? regress/f28.ipf.dist
+? regress/f29.ipf.dist
+? regress/f30.dist
+? regress/ipv6_1.dist
+? regress/ipv6_2
+? regress/ipv6_3.dist
+? regress/ipv6_4
+? regress/ipv6_5
+? regress/ipv6_6.dist
+? regress/kern
+? regress/n1.dist
+? regress/n10.dist
+? regress/n100.dist
+? regress/n101.dist
+? regress/n102.dist
+? regress/n103.dist
+? regress/n104.dist
+? regress/n105.dist
+? regress/n106.dist
+? regress/n10_6.dist
+? regress/n11.dist
+? regress/n11_6.dist
+? regress/n12.dist
+? regress/n12_6.dist
+? regress/n13.dist
+? regress/n13_6.dist
+? regress/n14.dist
+? regress/n14_6.dist
+? regress/n15.dist
+? regress/n15_6.dist
+? regress/n16.dist
+? regress/n16_6.dist
+? regress/n17.dist
+? regress/n17_6.dist
+? regress/n18.dist
+? regress/n1_6.dist
+? regress/n2.dist
+? regress/n200.dist
+? regress/n201.dist
+? regress/n202.dist
+? regress/n2_6.dist
+? regress/n3.dist
+? regress/n4.dist
+? regress/n4_6.dist
+? regress/n5.dist
+? regress/n5_6.dist
+? regress/n6.dist
+? regress/n6_6.dist
+? regress/n7.dist
+? regress/n7_6.dist
+? regress/n8.dist
+? regress/n8_6.dist
+? regress/n9.dist
+? regress/n9_6.dist
+? regress/ni1.nat.dist
+? regress/ni10.nat.dist
+? regress/ni11.nat.dist
+? regress/ni12.nat.dist
+? regress/ni13.ipf.dist
+? regress/ni13.nat.dist
+? regress/ni14.ipf.dist
+? regress/ni14.nat.dist
+? regress/ni15.ipf.dist
+? regress/ni15.nat.dist
+? regress/ni16.ipf.dist
+? regress/ni16.nat.dist
+? regress/ni17.nat.dist
+? regress/ni18.nat.dist
+? regress/ni19.ipf.dist
+? regress/ni19.nat.dist
+? regress/ni2.nat.dist
+? regress/ni20.ipf.dist
+? regress/ni20.nat.dist
+? regress/ni21.ipf.dist
+? regress/ni21.nat.dist
+? regress/ni23.ipf.dist
+? regress/ni23.nat.dist
+? regress/ni3.nat.dist
+? regress/ni4.nat.dist
+? regress/ni5.ipf.dist
+? regress/ni5.nat.dist
+? regress/ni6.ipf.dist
+? regress/ni6.nat.dist
+? regress/ni7.nat.dist
+? regress/ni8.nat.dist
+? regress/ni9.nat.dist
+? regress/p10.nat.dist
+? regress/p11.nat.dist
+? regress/p12.nat.dist
+? regress/p7.nat.dist
+? regress/p9.nat.dist
+? regress/user
+Index: .cvsignore
+===================================================================
+RCS file: /devel/CVS/IP-Filter/test/.cvsignore,v
+retrieving revision 2.47
+diff -c -r2.47 .cvsignore
+*** .cvsignore	8 Feb 2010 19:48:15 -0000	2.47
+--- .cvsignore	17 Nov 2011 19:57:52 -0000
+***************
+*** 155,157 ****
+--- 155,160 ----
+  p13
+  f28
+  f29
++ user
++ kern
++ .nicstate
+Index: Makefile
+===================================================================
+RCS file: /devel/CVS/IP-Filter/test/Makefile,v
+retrieving revision 2.83
+diff -c -r2.83 Makefile
+*** Makefile	7 Aug 2011 10:07:07 -0000	2.83
+--- Makefile	17 Nov 2011 19:57:52 -0000
+***************
+*** 9,523 ****
+  BINDEST=/usr/local/bin
+  SBINDEST=/sbin
+  MANDIR=/usr/share/man
+! all: expected.d results tests
+! 
+! expected.d:
+! 	(cd expected; make)
+  
+  results:
+  	mkdir -p results
+  
+  tests: ipf nat logtests ipv6 pools
+  
+! ipf: ptests ftests
+  
+! nat: intests ntests nitests
+  
+  first:
+  	-mkdir -p results
+  
+! # Filtering tests
+! ftests: f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17 f18 f19 f20 f21 f22 f24 f25 f26 f27 f28 f29 f30
+  
+! # Rule parsing tests
+! ptests: i1 i2 i3 i4 i5 i6 i7 i8 i9 i10 i11 i12 i13 i14 i15 i16 i17 i18 i19 \
+! 	i20 i21 i22 i23
+  
+! ntests: n1 n2 n3 n4 n5 n6 n7 n8 n9 n10 n11 n12 n13 n14 n15 n16 n17 n18 n100 n101 n102 n103 n104 n105 n106 n200 n201
+  
+! ntests6: n1_6 n2_6 n4_6 n5_6 n6_6 n7_6 n8_6 n9_6 n11_6 n12_6 n15_6
+  
+! nitests: ni1 ni2 ni3 ni4 ni5 ni6 ni7 ni8 ni9 ni10 ni11 ni12 ni13 ni14 ni15 \
+! 	 ni16 ni17 ni18 ni19 ni20 ni21 ni23
+  
+! intests: in1 in2 in3 in4 in5 in6 in7 in100 in101 in102
+  
+! logtests: l1
+  
+! pools: p1 p2 p3 p4 p5 p6 p7 p9 p10 p11 p12 p13 ip1 ip2 ip3
+  
+! ipv6: ipv6.1 ipv6.2 ipv6.3 ipv6.4 ipv6.5 ipv6.6 ntests6
+  
+! bpf: bpf1 bpf-f1
+  
+! f1: expected/f1 input/f1 regress/f1
+! 	@/bin/sh ./dotest `awk "/^$@ / { print; } " test.format`
+  
+! f2: expected/f2 input/f2 regress/f2
+! 	@/bin/sh ./dotest `awk "/^$@ / { print; } " test.format`
+  
+! f3: expected/f3 input/f3 regress/f3
+! 	@/bin/sh ./dotest `awk "/^$@ / { print; } " test.format`
+  
+! f4: expected/f4 input/f4 regress/f4
+! 	@/bin/sh ./dotest `awk "/^$@ / { print; } " test.format`
+  
+! f5: expected/f5 input/f5 regress/f5
+! 	@/bin/sh ./dotest `awk "/^$@ / { print; } " test.format`
+  
+! f6: expected/f6 input/f6 regress/f6
+! 	@/bin/sh ./dotest `awk "/^$@ / { print; } " test.format`
+  
+! f7: expected/f7 input/f7 regress/f7
+! 	@/bin/sh ./dotest `awk "/^$@ / { print; } " test.format`
+  
+! f8: expected/f8 input/f8 regress/f8
+! 	@/bin/sh ./dotest `awk "/^$@ / { print; } " test.format`
+  
+! f9: expected/f9 input/f9 regress/f9
+! 	@/bin/sh ./dotest `awk "/^$@ / { print; } " test.format`
+  
+! f10: expected/f10 input/f10 regress/f10
+! 	@/bin/sh ./dotest `awk "/^$@ / { print; } " test.format`
+  
+! f11: expected/f11 input/f11 regress/f11
+! 	@/bin/sh ./dotest `awk "/^$@ / { print; } " test.format`
+  
+! f12: expected/f12 input/f12 regress/f12
+! 	@/bin/sh ./dotest `awk "/^$@ / { print; } " test.format`
+  
+! f13: expected/f13 input/f13 regress/f13
+! 	@/bin/sh ./dotest `awk "/^$@ / { print; } " test.format`
+  
+! f14: expected/f14 input/f14 regress/f14
+! 	@/bin/sh ./dotest `awk "/^$@ / { print; } " test.format`
+  
+! f19: expected/f15 input/f15 regress/f15
+! 	@/bin/sh ./dotest `awk "/^$@ / { print; } " test.format`
+  
+! f15: expected/f15 input/f15 regress/f15
+! 	@/bin/sh ./mtest `awk "/^$@ / { print; } " test.format`
+  
+! f16: expected/f16 input/f16 regress/f16
+! 	@/bin/sh ./mtest `awk "/^$@ / { print; } " test.format`
+  
+! f17: expected/f17 input/f17 regress/f17
+! 	@/bin/sh ./mtest `awk "/^$@ / { print; } " test.format`
+  
+! f18: expected/f18 input/f18 regress/f18
+! 	@/bin/sh ./mtest `awk "/^$@ / { print; } " test.format`
+  
+! f20: expected/f20 input/f20 regress/f20
+! 	@/bin/sh ./mtest `awk "/^$@ / { print; } " test.format`
+  
+! f21: expected/f21 input/f21 regress/f21
+! 	@/bin/sh ./mtest `awk "/^$@ / { print; } " test.format`
+  
+! f22: expected/f22 input/f22 regress/f22
+! 	@/bin/sh ./mtest `awk "/^$@ / { print; } " test.format`
+  
+! f24: expected/f24 input/f24 regress/f24
+! 	@/bin/sh ./mtest `awk "/^$@ / { print; } " test.format`
+  
+! f25: expected/f25 input/f25 regress/f25
+! 	@/bin/sh ./mtest `awk "/^$@ / { print; } " test.format`
+  
+! f26: expected/f26 input/f26 regress/f26
+! 	@/bin/sh ./dotest `awk "/^$@ / { print; } " test.format`
+  
+! f27: expected/f27 input/f27 regress/f27
+! 	@/bin/sh ./dotest `awk "/^$@ / { print; } " test.format`
+  
+! f28: expected/f28 input/f28 regress/f28.ipf regress/f28.pool $(POOLDEP)
+! 	@/bin/sh ./ptest `awk "/^$@ / { print; } " test.format`
+  
+! f29: expected/f29 input/f29 regress/f29.ipf regress/f29.pool $(POOLDEP)
+! 	@/bin/sh ./ptest `awk "/^$@ / { print; } " test.format`
+  
+! f30: expected/f30 input/f30 regress/f30
+! 	@/bin/sh ./dotest `awk "/^$@ / { print; } " test.format`
+  
+! i1: expected/i1 regress/i1
+! 	@/bin/sh ./itest `awk "/^$@ / { print; } " test.format`
+  
+! i2: expected/i2 regress/i2
+! 	@/bin/sh ./itest `awk "/^$@ / { print; } " test.format`
+  
+! i3: expected/i3 regress/i3
+! 	@/bin/sh ./itest `awk "/^$@ / { print; } " test.format`
+  
+! i4: expected/i4 regress/i4
+! 	@/bin/sh ./itest `awk "/^$@ / { print; } " test.format`
+  
+! i5: expected/i5 regress/i5
+! 	@/bin/sh ./itest `awk "/^$@ / { print; } " test.format`
+  
+! i6: expected/i6 regress/i6
+! 	@/bin/sh ./itest `awk "/^$@ / { print; } " test.format`
+  
+! i7: expected/i7 regress/i7
+! 	@/bin/sh ./itest `awk "/^$@ / { print; } " test.format`
+  
+! i8: expected/i8 regress/i8
+! 	@/bin/sh ./itest `awk "/^$@ / { print; } " test.format`
+  
+! i9: expected/i9 regress/i9
+! 	@/bin/sh ./itest `awk "/^$@ / { print; } " test.format`
+  
+! i10: expected/i10 regress/i10
+! 	@/bin/sh ./itest `awk "/^$@ / { print; } " test.format`
+  
+! i11: expected/i11 regress/i11
+! 	@/bin/sh ./itest `awk "/^$@ / { print; } " test.format`
+  
+! i12: expected/i12 regress/i12
+! 	@/bin/sh ./itest `awk "/^$@ / { print; } " test.format`
+  
+! i13: expected/i13 regress/i13
+! 	@/bin/sh ./itest `awk "/^$@ / { print; } " test.format`
+  
+! i14: expected/i14 regress/i14
+! 	@/bin/sh ./itest `awk "/^$@ / { print; } " test.format`
+  
+! i15: expected/i15 regress/i15
+! 	@/bin/sh ./itest `awk "/^$@ / { print; } " test.format`
+  
+! i16: expected/i16 regress/i16
+! 	@/bin/sh ./itest `awk "/^$@ / { print; } " test.format`
+  
+! i17: expected/i17 regress/i17
+! 	@/bin/sh ./itest `awk "/^$@ / { print; } " test.format`
+  
+! i18: expected/i18 regress/i18
+! 	@/bin/sh ./itest `awk "/^$@ / { print; } " test.format`
+  
+! i19: expected/i19 regress/i19
+! 	@/bin/sh ./itest `awk "/^$@ / { print; } " test.format`
+  
+! i20: expected/i20 regress/i20
+! 	@/bin/sh ./itest `awk "/^$@ / { print; } " test.format`
+  
+! i21: expected/i21 regress/i21
+! 	@/bin/sh ./itest `awk "/^$@ / { print; } " test.format`
+  
+! i22: expected/i22 regress/i22
+! 	@/bin/sh ./itest `awk "/^$@ / { print; } " test.format`
+  
+! i23: expected/i23 regress/i23
+! 	@/bin/sh ./itest `awk "/^$@ / { print; } " test.format`
+  
+! bpf1: expected/bpf1 regress/bpf1
+! 	@/bin/sh ./itest `awk "/^$@ / { print; } " test.format`
+  
+! n1: expected/n1 regress/n1 input/n1
+! 	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+  
+! n2: expected/n2 regress/n2 input/n2
+! 	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+  
+! n3: expected/n3 regress/n3 input/n3
+! 	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+  
+! n4: expected/n4 regress/n4 input/n4
+! 	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+  
+! n5: expected/n5 regress/n5 input/n5
+! 	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+  
+! n6: expected/n6 regress/n6 input/n6
+! 	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+  
+! n7: expected/n7 regress/n7 input/n7
+! 	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+  
+! n8: expected/n8 regress/n8 input/n8
+! 	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+  
+! n9: expected/n9 regress/n9 input/n9
+! 	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+  
+! n10: expected/n10 regress/n10 input/n10
+! 	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+  
+! n11: expected/n11 regress/n11 input/n11
+! 	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+  
+! n12: expected/n12 regress/n12 input/n12
+! 	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+  
+! n13: expected/n13 regress/n13 input/n13
+! 	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+  
+! n14: expected/n14 regress/n14 input/n14
+! 	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+  
+! n15: expected/n15 regress/n15 input/n15
+! 	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+  
+! n16: expected/n16 regress/n16 input/n16
+! 	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+  
+! n17: expected/n17 regress/n17 input/n17
+! 	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+  
+! n18: expected/n18 regress/n18 input/n18
+! 	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+  
+! n100: expected/n100 regress/n100 input/n100
+! 	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+  
+! n101: expected/n101 regress/n101 input/n101
+! 	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+  
+! n102: expected/n102 regress/n102 input/n102
+! 	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+  
+! n103: expected/n103 regress/n103 input/n103
+! 	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+  
+! n104: expected/n104 regress/n104 input/n104
+! 	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+  
+! n105: expected/n105 regress/n105 input/n105
+! 	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+  
+! n106: expected/n106 regress/n106 input/n106
+! 	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+  
+! n200: expected/n200 regress/n200 input/n200
+! 	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+  
+! n201: expected/n201 regress/n201 input/n201
+! 	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+  
+! n202: expected/n202 regress/n202 input/n202
+! 	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+  
+! n1_6: expected/n1_6 regress/n1_6 input/n1_6
+! 	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+  
+! n2_6: expected/n2_6 regress/n2_6 input/n2_6
+! 	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+  
+! n4_6: expected/n4_6 regress/n4_6 input/n4_6
+! 	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+  
+! n5_6: expected/n5_6 regress/n5_6 input/n5_6
+! 	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+  
+! n6_6: expected/n6_6 regress/n6_6 input/n6_6
+! 	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+  
+! n7_6: expected/n7_6 regress/n7_6 input/n7_6
+! 	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+  
+! n8_6: expected/n8_6 regress/n8_6 input/n8_6
+! 	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+  
+! n9_6: expected/n9_6 regress/n9_6 input/n9_6
+! 	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+  
+! n11_6: expected/n11_6 regress/n11_6 input/n11_6
+! 	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+  
+! n12_6: expected/n12_6 regress/n12_6 input/n12_6
+! 	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+  
+! n15_6: expected/n15_6 regress/n15_6 input/n15_6
+! 	@/bin/sh ./nattest `awk "/^$@ / { print; } " test.format`
+  
+! ni2: expected/ni2 input/ni2 regress/ni2.nat regress/ni2.ipf
+! 	@/bin/sh ./natipftest single `awk "/^$@ / { print; } " test.format`
+  
+! ni3: expected/ni3 input/ni3 regress/ni3.nat regress/ni3.ipf
+! 	@/bin/sh ./natipftest single `awk "/^$@ / { print; } " test.format`
+  
+! ni4: expected/ni4 input/ni4 regress/ni4.nat regress/ni4.ipf
+! 	@/bin/sh ./natipftest single `awk "/^$@ / { print; } " test.format`
+  
+! ni5: expected/ni5 input/ni5 regress/ni5.nat regress/ni5.ipf
+! 	@/bin/sh ./natipftest single `awk "/^$@ / { print; } " test.format`
+  
+! ni7: expected/ni7 input/ni7 regress/ni7.nat regress/ni7.ipf
+! 	@/bin/sh ./natipftest single `awk "/^$@ / { print; } " test.format`
+  
+! ni8: expected/ni8 input/ni8 regress/ni8.nat regress/ni8.ipf
+! 	@/bin/sh ./natipftest single `awk "/^$@ / { print; } " test.format`
+  
+! ni9: expected/ni9 input/ni9 regress/ni9.nat regress/ni9.ipf
+! 	@/bin/sh ./natipftest single `awk "/^$@ / { print; } " test.format`
+  
+! ni10: expected/ni10 input/ni10 regress/ni10.nat regress/ni10.ipf
+! 	@/bin/sh ./natipftest single `awk "/^$@ / { print; } " test.format`
+  
+! ni11: expected/ni11 input/ni11 regress/ni11.nat regress/ni11.ipf
+! 	@/bin/sh ./natipftest single `awk "/^$@ / { print; } " test.format`
+  
+! ni12: expected/ni12 input/ni12 regress/ni12.nat regress/ni12.ipf
+! 	@/bin/sh ./natipftest single `awk "/^$@ / { print; } " test.format`
+  
+! ni13: expected/ni13 input/ni13 regress/ni13.nat regress/ni13.ipf
+! 	@/bin/sh ./natipftest single `awk "/^$@ / { print; } " test.format`
+  
+! ni14: expected/ni14 input/ni14 regress/ni14.nat regress/ni14.ipf
+! 	@/bin/sh ./natipftest single `awk "/^$@ / { print; } " test.format`
+  
+! ni15: expected/ni15 input/ni15 regress/ni15.nat regress/ni15.ipf
+! 	@/bin/sh ./natipftest single `awk "/^$@ / { print; } " test.format`
+  
+! ni16: expected/ni16 input/ni16 regress/ni16.nat regress/ni16.ipf
+! 	@/bin/sh ./natipftest single `awk "/^$@ / { print; } " test.format`
+  
+! ni19: expected/ni19 input/ni19 regress/ni19.nat regress/ni19.ipf
+! 	@/bin/sh ./natipftest single `awk "/^$@ / { print; } " test.format`
+  
+! ni20: expected/ni20 input/ni20 regress/ni20.nat regress/ni20.ipf
+! 	@/bin/sh ./natipftest single `awk "/^$@ / { print; } " test.format`
+  
+! ni1: expected/ni1 input/ni1 regress/ni1.nat regress/ni1.ipf
+! 	@/bin/sh ./natipftest multi `awk "/^$@ / { print; } " test.format`
+  
+! ni6: expected/ni6 input/ni6 regress/ni6.nat regress/ni6.ipf
+! 	@/bin/sh ./natipftest multi `awk "/^$@ / { print; } " test.format`
+  
+! ni17: expected/ni17 input/ni17 regress/ni17.nat regress/ni17.ipf
+! 	@/bin/sh ./natipftest multi `awk "/^$@ / { print; } " test.format`
+  
+! ni18: expected/ni18 input/ni18 regress/ni18.nat regress/ni18.ipf
+! 	@/bin/sh ./natipftest multi `awk "/^$@ / { print; } " test.format`
+  
+! ni21: expected/ni21 input/ni21 regress/ni21.nat regress/ni21.ipf
+! 	@/bin/sh ./natipftest multi `awk "/^$@ / { print; } " test.format`
+  
+! ni23: expected/ni23 input/ni23 regress/ni23.nat regress/ni23.ipf
+! 	@/bin/sh ./natipftest multi `awk "/^$@ / { print; } " test.format`
+  
+! in1: expected/in1 regress/in1
+! 	@/bin/sh ./intest `awk "/^$@ / { print; } " test.format`
+  
+! in2: expected/in2 regress/in2
+! 	@/bin/sh ./intest `awk "/^$@ / { print; } " test.format`
+  
+! in3: expected/in3 regress/in3
+! 	@/bin/sh ./intest `awk "/^$@ / { print; } " test.format`
+  
+! in4: expected/in4 regress/in4
+! 	@/bin/sh ./intest `awk "/^$@ / { print; } " test.format`
+  
+! in5: expected/in5 regress/in5
+! 	@/bin/sh ./intest `awk "/^$@ / { print; } " test.format`
+  
+! in6: expected/in6 regress/in6
+! 	@/bin/sh ./intest `awk "/^$@ / { print; } " test.format`
+  
+! in7: expected/in7 regress/in7
+! 	@/bin/sh ./intest `awk "/^$@ / { print; } " test.format`
+  
+! in100: expected/in100 regress/in100
+! 	@/bin/sh ./intest `awk "/^$@ / { print; } " test.format`
+  
+! in101: expected/in101 regress/in101
+! 	@/bin/sh ./intest `awk "/^$@ / { print; } " test.format`
+  
+! in102: expected/in102 regress/in102
+! 	@/bin/sh ./intest `awk "/^$@ / { print; } " test.format`
+  
+! l1:
+! 	@/bin/sh ./logtest `awk "/^$@ / { print; } " test.format`
+  
+! ipv6.1: expected/ipv6.1 input/ipv6.1 regress/ipv6.1
+! 	@/bin/sh ./dotest6 `awk "/^$@ / { print; } " test.format`
+  
+! ipv6.2: expected/ipv6.2 input/ipv6.2 regress/ipv6.2
+! 	@/bin/sh ./dotest6 `awk "/^$@ / { print; } " test.format`
+  
+! ipv6.3: expected/ipv6.3 input/ipv6.3 regress/ipv6.3
+! 	@/bin/sh ./dotest6 `awk "/^$@ / { print; } " test.format`
+  
+! ipv6.4: expected/ipv6.4 input/ipv6.4 regress/ipv6.4
+! 	@/bin/sh ./dotest6 `awk "/^$@ / { print; } " test.format`
+  
+! ipv6.5: expected/ipv6.5 input/ipv6.5 regress/ipv6.5
+! 	@/bin/sh ./dotest6 `awk "/^$@ / { print; } " test.format`
+  
+! ipv6.6: expected/ipv6.6 input/ipv6.6 regress/ipv6.6
+! 	@/bin/sh ./dotest6 `awk "/^$@ / { print; } " test.format`
+  
+! p1: expected/p1 input/p1 regress/p1.ipf regress/p1.pool $(POOLDEP)
+! 	@/bin/sh ./ptest `awk "/^$@ / { print; } " test.format`
+  
+! p2: expected/p2 input/p2 regress/p2.ipf $(POOLDEP)
+! 	@/bin/sh ./ptest `awk "/^$@ / { print; } " test.format`
+  
+! p3: expected/p3 input/p3 regress/p3.ipf regress/p3.pool $(POOLDEP)
+! 	@/bin/sh ./ptest `awk "/^$@ / { print; } " test.format`
+  
+! p4: expected/p4 input/p4 regress/p4.nat regress/p4.pool $(POOLDEP)
+! 	@/bin/sh ./ptest `awk "/^$@ / { print; } " test.format`
+  
+! p5: expected/p5 input/p5 regress/p5.ipf regress/p5.pool $(POOLDEP)
+! 	@/bin/sh ./ptest `awk "/^$@ / { print; } " test.format`
+  
+! p6: expected/p6 input/p6 regress/p6.ipf regress/p6.pool $(POOLDEP)
+! 	@/bin/sh ./ptest `awk "/^$@ / { print; } " test.format`
+  
+! p7: expected/p7 input/p7 regress/p7.nat regress/p7.pool $(POOLDEP)
+! 	@/bin/sh ./ptest `awk "/^$@ / { print; } " test.format`
+  
+! p9: expected/p9 input/p9 regress/p9.nat regress/p9.pool $(POOLDEP)
+! 	@/bin/sh ./ptest `awk "/^$@ / { print; } " test.format`
+  
+! p10: expected/p10 input/p10 regress/p10.nat regress/p10.pool $(POOLDEP)
+! 	@/bin/sh ./ptest `awk "/^$@ / { print; } " test.format`
+  
+! p11: expected/p11 input/p11 regress/p11.nat regress/p11.pool $(POOLDEP)
+! 	@/bin/sh ./ptest `awk "/^$@ / { print; } " test.format`
+  
+! p12: expected/p12 input/p12 regress/p12.nat regress/p12.pool $(POOLDEP)
+! 	@/bin/sh ./ptest `awk "/^$@ / { print; } " test.format`
+  
+! p13: expected/p13 input/p13 regress/p13.ipf regress/p13.pool $(POOLDEP)
+! 	@/bin/sh ./ptest `awk "/^$@ / { print; } " test.format`
+  
+! ip1: expected/ip1 regress/ip1 $(POOLDEP)
+! 	@/bin/sh ./iptest `awk "/^$@ / { print; } " test.format`
+  
+! ip2: expected/ip2 input/ip2.data regress/ip2 $(POOLDEP)
+! 	@/bin/sh ./iptest `awk "/^$@ / { print; } " test.format`
+  
+! ip3: expected/ip3 regress/ip3 $(POOLDEP)
+! 	@/bin/sh ./iptest `awk "/^$@ / { print; } " test.format`
+  
+! bpf-f1: expected/bpf-f1 regress/bpf-f1
+! 	/bin/sh ./bpftest `awk "/^$@ / { print; } " test.format`
+  
+! clean:
+! 	/bin/rm -f f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 f16 f17
+! 	/bin/rm -f f18 f19 f20 f21 f22 f24 f25 f26 f27 f28 f29
+! 	/bin/rm -f i1 i2 i3 i4 i5 i6 i7 i8 i9 i10 i11 i12 i13 i14 i15 i16 i17
+! 	/bin/rm -f i18 i19 i20 i21 i22 i23
+! 	/bin/rm -f n1 n2 n3 n4 n5 n6 n7 n8 n9 n10 n11 n12 n13 n14 n15 n16 n17 n18 n100 n101 n102 n103 n104 n105 n106 n200 n201 n202
+! 	/bin/rm -f n1_6 n2_6 n4_6 n5_6 n6_6 n7_6 n8_6 n9_6 n11_6 n12_6 n15_6
+! 	/bin/rm -f ni1 ni2 ni3 ni4 ni5 ni6 ni7 ni8 ni9
+! 	/bin/rm -f ni10 ni11 ni12 ni13 ni14 ni15 ni16 ni17 ni18 ni19 ni20 ni21 ni23
+! 	/bin/rm -f in1 in2 in3 in4 in5 in6 in7 in100 in101 in102
+! 	/bin/rm -f p1 p2 p3 p4 p5 p6 p7 p9 p10 p11 p12 p13 ip1 ip2 ip3
+! 	/bin/rm -f l1
+! 	/bin/rm -f ipv6.1 ipv6.2 ipv6.3 ipv6.4 ipv6.5 ipv6.6
+! 	/bin/rm -f bpf1 bpf-f1
+! 	/bin/rm -f results/* logout
+! 	(cd expected; make clean)
+  
+! diffs:
+! 	-cd expected; for i in *; do if [ -f $$i -a ! -f ../$$i -a -f ../results/$$i ] ; then  diff -c $$i ../results/$$i >> ../diff.out; fi done
+  
+- n6s:
+- 	for i in 1 2 4 5 6 7 11 13 14 15; do \
+- 		sh i4to6 < input/n$${i} > input/n$${i}_6; \
+- 		sh e4to6 < regress/n$${i} > regress/n$${i}_6; \
+- 		sh e4to6 < expected/n$${i} > expected/n$${i}_6; \
+- 	done
+- 	for i in 8 9 10 12 17; do \
+- 		sh e4to6 < regress/n$${i} > regress/n$${i}_6; \
+- 		perl h4to6 < input/n$${i} > input/n$${i}_6; \
+- 	done
+--- 9,1418 ----
+  BINDEST=/usr/local/bin
+  SBINDEST=/sbin
+  MANDIR=/usr/share/man
+! RESDIR=user
+! TESTMODE=user
+! all: usersetup.d results
+! 	make tests RESDIR=user TESTMODE=user NIC0=nic0 NIC1=nic1 NIC2=nic2 NIC3=nic3 NIC0ADDR="192.168.1.188__" NIC0HEXADDR="c0a8 01bc" NIC0ADDR6="c0a8:100::bc" NIC0HEXADDR6="c0a8 0100 0000 0000 0000 0000 0000 00bc"
+! 
+! usersetup.d:
+! 	make setup.d RESDIR=user
+! 
+! setup.d:
+! 	mkdir -p $(RESDIR) expected/$(RESDIR) input/$(RESDIR) regress/$(RESDIR)
+! 
+! #	for i in `egrep '^[a-z]' test.format | cut -f1 -d' '`; do \
+! #		perl ./build_test.pl all $${i}; \
+! #	done
+  
+  results:
+  	mkdir -p results
+  
+  tests: ipf nat logtests ipv6 pools
+  
+! ipf: p_tests ftests
+  
+! nat: in_tests ntests nitests
+  
+  first:
+  	-mkdir -p results
+  
+! kerntests:
+! 	make setup.d
+! 	make ftests RESDIR=kern TESTMODE=kern
+! 	make ntests RESDIR=kern TESTMODE=kern
+! 	make nitests RESDIR=kern TESTMODE=kern
+! 	make ipv6 RESDIR=kern TESTMODE=kern
+! 
+! kernsetup.d:
+! 	make RESDIR=kern NIC0=$(NIC0) NIC1=$(NIC1) NIC2=$(NIC2) NIC3=$(NIC3) setup.d
+! 
+! #
+! # IPv4 filtering tests
+! #
+! ftests: \
+! 	$(RESDIR)/f1 \
+! 	$(RESDIR)/f2 \
+! 	$(RESDIR)/f3 \
+! 	$(RESDIR)/f4 \
+! 	$(RESDIR)/f5 \
+! 	$(RESDIR)/f6 \
+! 	$(RESDIR)/f7 \
+! 	$(RESDIR)/f8 \
+! 	$(RESDIR)/f9 \
+! 	$(RESDIR)/f10 \
+! 	$(RESDIR)/f11 \
+! 	$(RESDIR)/f12 \
+! 	$(RESDIR)/f13 \
+! 	$(RESDIR)/f14 \
+! 	$(RESDIR)/f15 \
+! 	$(RESDIR)/f17 \
+! 	$(RESDIR)/f18 \
+! 	$(RESDIR)/f19 \
+! 	$(RESDIR)/f21 \
+! 	$(RESDIR)/f22 \
+! 	$(RESDIR)/f24 \
+! 	$(RESDIR)/f25 \
+! 	$(RESDIR)/f26 \
+! 	$(RESDIR)/f27 \
+! 	$(RESDIR)/f28 \
+! 	$(RESDIR)/f29 \
+! 	$(RESDIR)/f30
+! 
+! #
+! # ipf rule parsing tests
+! #
+! p_tests: \
+! 	$(RESDIR)/i1 \
+! 	$(RESDIR)/i2 \
+! 	$(RESDIR)/i3 \
+! 	$(RESDIR)/i4 \
+! 	$(RESDIR)/i5 \
+! 	$(RESDIR)/i6 \
+! 	$(RESDIR)/i7 \
+! 	$(RESDIR)/i8 \
+! 	$(RESDIR)/i9 \
+! 	$(RESDIR)/i10 \
+! 	$(RESDIR)/i11 \
+! 	$(RESDIR)/i12 \
+! 	$(RESDIR)/i13 \
+! 	$(RESDIR)/i14 \
+! 	$(RESDIR)/i15 \
+! 	$(RESDIR)/i16 \
+! 	$(RESDIR)/i17 \
+! 	$(RESDIR)/i18 \
+! 	$(RESDIR)/i19 \
+! 	$(RESDIR)/i20 \
+! 	$(RESDIR)/i21 \
+! 	$(RESDIR)/i22 \
+! 	$(RESDIR)/i23
+! 
+! #
+! # Basic testing of NAT
+! #
+! ntests: \
+! 	$(RESDIR)/n1 \
+! 	$(RESDIR)/n2 \
+! 	$(RESDIR)/n3 \
+! 	$(RESDIR)/n4 \
+! 	$(RESDIR)/n5 \
+! 	$(RESDIR)/n6 \
+! 	$(RESDIR)/n7 \
+! 	$(RESDIR)/n8 \
+! 	$(RESDIR)/n9 \
+! 	$(RESDIR)/n10 \
+! 	$(RESDIR)/n11 \
+! 	$(RESDIR)/n12 \
+! 	$(RESDIR)/n13 \
+! 	$(RESDIR)/n14 \
+! 	$(RESDIR)/n15 \
+! 	$(RESDIR)/n16 \
+! 	$(RESDIR)/n17 \
+! 	$(RESDIR)/n18 \
+! 	$(RESDIR)/n100 \
+! 	$(RESDIR)/n101 \
+! 	$(RESDIR)/n102 \
+! 	$(RESDIR)/n103 \
+! 	$(RESDIR)/n104 \
+! 	$(RESDIR)/n105 \
+! 	$(RESDIR)/n106 \
+! 	$(RESDIR)/n200 \
+! 	$(RESDIR)/n201
+! 
+! #
+! # Basic IPv6 NAT tests
+! #
+! ntests6: \
+! 	$(RESDIR)/n1_6 \
+! 	$(RESDIR)/n2_6 \
+! 	$(RESDIR)/n4_6 \
+! 	$(RESDIR)/n5_6 \
+! 	$(RESDIR)/n6_6 \
+! 	$(RESDIR)/n7_6 \
+! 	$(RESDIR)/n8_6 \
+! 	$(RESDIR)/n9_6 \
+! 	$(RESDIR)/n11_6 \
+! 	$(RESDIR)/n12_6 \
+! 	$(RESDIR)/n15_6
+! 
+! #
+! # Tests combining ipf rules with NAT
+! #
+! nitests: \
+! 	$(RESDIR)/ni1 \
+! 	$(RESDIR)/ni2 \
+! 	$(RESDIR)/ni3 \
+! 	$(RESDIR)/ni4 \
+! 	$(RESDIR)/ni5 \
+! 	$(RESDIR)/ni6 \
+! 	$(RESDIR)/ni7 \
+! 	$(RESDIR)/ni8 \
+! 	$(RESDIR)/ni9 \
+! 	$(RESDIR)/ni10 \
+! 	$(RESDIR)/ni11 \
+! 	$(RESDIR)/ni12 \
+! 	$(RESDIR)/ni13 \
+! 	$(RESDIR)/ni14 \
+! 	$(RESDIR)/ni15 \
+! 	$(RESDIR)/ni16 \
+! 	$(RESDIR)/ni17 \
+! 	$(RESDIR)/ni18 \
+! 	$(RESDIR)/ni19 \
+! 	$(RESDIR)/ni20 \
+! 	$(RESDIR)/ni21 \
+! 	$(RESDIR)/ni23
+! 
+! #
+! # NAT parser testing
+! #
+! in_tests: \
+! 	$(RESDIR)/in1 \
+! 	$(RESDIR)/in2 \
+! 	$(RESDIR)/in3 \
+! 	$(RESDIR)/in4 \
+! 	$(RESDIR)/in5 \
+! 	$(RESDIR)/in6 \
+! 	$(RESDIR)/in7 \
+! 	$(RESDIR)/in100 \
+! 	$(RESDIR)/in101 \
+! 	$(RESDIR)/in102
+! 
+! logtests: \
+! 	$(RESDIR)/l1
+! 
+! pools: \
+! 	$(RESDIR)/p1 \
+! 	$(RESDIR)/p2 \
+! 	$(RESDIR)/p3 \
+! 	$(RESDIR)/p4 \
+! 	$(RESDIR)/p5 \
+! 	$(RESDIR)/p6 \
+! 	$(RESDIR)/p7 \
+! 	$(RESDIR)/p9 \
+! 	$(RESDIR)/p10 \
+! 	$(RESDIR)/p11 \
+! 	$(RESDIR)/p12 \
+! 	$(RESDIR)/p13 \
+! 	$(RESDIR)/ip1 \
+! 	$(RESDIR)/ip2 \
+! 	$(RESDIR)/ip3
+! 
+! ipv6: \
+! 	$(RESDIR)/ipv6_1 \
+! 	$(RESDIR)/ipv6_2 \
+! 	$(RESDIR)/ipv6_3 \
+! 	$(RESDIR)/ipv6_4 \
+! 	$(RESDIR)/ipv6_5 \
+! 	$(RESDIR)/ipv6_6 \
+! 	ntests6
+! 
+! bpf: \
+! 	$(RESDIR)/bpf1 \
+! 	$(RESDIR)/bpf-f1
+! 
+! $(RESDIR)/f1: expected/f1 input/f1 regress/f1
+! 	@/bin/sh ./f_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/f2: expected/f2 input/f2 regress/f2
+! 	@/bin/sh ./f_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/f3: expected/f3 input/f3 regress/f3
+! 	@/bin/sh ./f_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/f4: expected/f4 input/f4 regress/f4
+! 	@/bin/sh ./f_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/f5: expected/f5 input/f5 regress/f5
+! 	@/bin/sh ./f_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/f6: expected/f6 input/f6 regress/f6
+! 	@/bin/sh ./f_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/f7: expected/f7 input/f7 regress/f7
+! 	@/bin/sh ./f_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/f8: expected/f8 input/f8 regress/f8
+! 	@/bin/sh ./f_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/f9: expected/f9 input/f9 regress/f9
+! 	@/bin/sh ./f_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/f10: expected/f10 input/f10 regress/f10
+! 	@/bin/sh ./f_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/f11: expected/$(RESDIR)/f11 input/$(RESDIR)/f11 regress/$(RESDIR)/f11
+! 	@/bin/sh ./f_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/f12: expected/f12 input/f12 regress/f12
+! 	@/bin/sh ./f_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/f13: expected/f13 input/f13 regress/f13
+! 	@/bin/sh ./f_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/f14: expected/f14 input/f14 regress/f14
+! 	@/bin/sh ./f_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/f15: expected/f15 input/$(RESDIR)/f15 regress/$(RESDIR)/f15
+! 	@/bin/sh ./f_m_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/f17: expected/f17 input/$(RESDIR)/f17 regress/$(RESDIR)/f17
+! 	@/bin/sh ./f_m_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/f18: expected/f18 input/$(RESDIR)/f18 regress/f18
+! 	@/bin/sh ./f_m_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/f19: expected/f19 input/f19 regress/f19
+! 	@/bin/sh ./f_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/f21: expected/f21 input/$(RESDIR)/f21 regress/f21
+! 	@/bin/sh ./f_m_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/f22: expected/f22 input/f22 regress/f22
+! 	@/bin/sh ./f_m_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/f24: expected/f24 input/$(RESDIR)/f24 regress/f24
+! 	@/bin/sh ./f_m_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/f25: expected/$(RESDIR)/f25 input/$(RESDIR)/f25 regress/$(RESDIR)/f25
+! 	@/bin/sh ./f_m_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/f26: expected/f26 input/f26 regress/f26
+! 	@/bin/sh ./f_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/f27: expected/f27 input/$(RESDIR)/f27 regress/f27
+! 	@/bin/sh ./f_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/f28: expected/$(RESDIR)/f28 input/$(RESDIR)/f28 regress/$(RESDIR)/f28.ipf regress/f28.pool \
+! 	    $(POOLDEP)
+! 	@/bin/sh ./p_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/f29: expected/$(RESDIR)/f29 input/$(RESDIR)/f29 regress/$(RESDIR)/f29.ipf regress/f29.pool \
+! 	    $(POOLDEP)
+! 	@/bin/sh ./p_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/f30: expected/f30 input/$(RESDIR)/f30 regress/$(RESDIR)/f30
+! 	@/bin/sh ./f_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/i1: expected/i1 regress/i1
+! 	@/bin/sh ./i_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/i2: expected/i2 regress/i2
+! 	@/bin/sh ./i_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/i3: expected/i3 regress/i3
+! 	@/bin/sh ./i_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/i4: expected/i4 regress/i4
+! 	@/bin/sh ./i_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/i5: expected/i5 regress/i5
+! 	@/bin/sh ./i_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/i6: expected/i6 regress/i6
+! 	@/bin/sh ./i_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/i7: expected/i7 regress/i7
+! 	@/bin/sh ./i_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/i8: expected/i8 regress/i8
+! 	@/bin/sh ./i_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/i9: expected/i9 regress/i9
+! 	@/bin/sh ./i_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/i10: expected/i10 regress/i10
+! 	@/bin/sh ./i_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/i11: expected/i11 regress/i11
+! 	@/bin/sh ./i_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/i12: expected/i12 regress/i12
+! 	@/bin/sh ./i_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/i13: expected/i13 regress/i13
+! 	@/bin/sh ./i_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/i14: expected/i14 regress/i14
+! 	@/bin/sh ./i_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/i15: expected/i15 regress/i15
+! 	@/bin/sh ./i_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/i16: expected/i16 regress/i16
+! 	@/bin/sh ./i_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/i17: expected/i17 regress/i17
+! 	@/bin/sh ./i_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/i18: expected/i18 regress/i18
+! 	@/bin/sh ./i_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/i19: expected/i19 regress/i19
+! 	@/bin/sh ./i_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/i20: expected/i20 regress/i20
+! 	@/bin/sh ./i_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/i21: expected/i21 regress/i21
+! 	@/bin/sh ./i_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/i22: expected/i22 regress/i22
+! 	@/bin/sh ./i_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/i23: expected/i23 regress/i23
+! 	@/bin/sh ./i_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/bpf1: expected/bpf1 regress/bpf1
+! 	@/bin/sh ./bpf_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/n1: expected/$(RESDIR)/n1 regress/$(RESDIR)/n1 input/$(RESDIR)/n1
+! 	@/bin/sh ./n_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/n2: expected/$(RESDIR)/n2 regress/$(RESDIR)/n2 input/$(RESDIR)/n2
+! 	@/bin/sh ./n_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/n3: expected/$(RESDIR)/n3 regress/$(RESDIR)/n3 input/$(RESDIR)/n3
+! 	@/bin/sh ./n_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/n4: expected/$(RESDIR)/n4 regress/$(RESDIR)/n4 input/$(RESDIR)/n4
+! 	@/bin/sh ./n_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/n5: expected/$(RESDIR)/n5 regress/$(RESDIR)/n5 input/$(RESDIR)/n5
+! 	@/bin/sh ./n_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/n6: expected/$(RESDIR)/n6 regress/$(RESDIR)/n6 input/$(RESDIR)/n6
+! 	@/bin/sh ./n_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/n7: expected/$(RESDIR)/n7 regress/$(RESDIR)/n7 input/$(RESDIR)/n7
+! 	@/bin/sh ./n_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/n8: expected/$(RESDIR)/n8 regress/$(RESDIR)/n8 input/$(RESDIR)/n8
+! 	@/bin/sh ./n_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/n9: expected/$(RESDIR)/n9 regress/$(RESDIR)/n9 input/$(RESDIR)/n9
+! 	@/bin/sh ./n_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/n10: expected/$(RESDIR)/n10 regress/$(RESDIR)/n10 input/$(RESDIR)/n10
+! 	@/bin/sh ./n_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/n11: expected/$(RESDIR)/n11 regress/$(RESDIR)/n11 input/$(RESDIR)/n11
+! 	@/bin/sh ./n_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/n12: expected/$(RESDIR)/n12 regress/$(RESDIR)/n12 input/$(RESDIR)/n12
+! 	@/bin/sh ./n_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/n13: expected/$(RESDIR)/n13 regress/$(RESDIR)/n13 input/$(RESDIR)/n13
+! 	@/bin/sh ./n_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/n14: expected/$(RESDIR)/n14 regress/$(RESDIR)/n14 input/$(RESDIR)/n14
+! 	@/bin/sh ./n_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/n15: expected/$(RESDIR)/n15 regress/$(RESDIR)/n15 input/$(RESDIR)/n15
+! 	@/bin/sh ./n_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/n16: expected/$(RESDIR)/n16 regress/$(RESDIR)/n16 input/$(RESDIR)/n16
+! 	@/bin/sh ./n_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/n17: expected/$(RESDIR)/n17 regress/$(RESDIR)/n17 input/$(RESDIR)/n17
+! 	@/bin/sh ./n_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/n18: expected/$(RESDIR)/n18 regress/$(RESDIR)/n18 input/$(RESDIR)/n18
+! 	@/bin/sh ./n_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/n100: expected/$(RESDIR)/n100 regress/$(RESDIR)/n100 input/$(RESDIR)/n100
+! 	@/bin/sh ./n_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/n101: expected/$(RESDIR)/n101 regress/$(RESDIR)/n101 input/$(RESDIR)/n101
+! 	@/bin/sh ./n_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/n102: expected/$(RESDIR)/n102 regress/$(RESDIR)/n102 input/$(RESDIR)/n102
+! 	@/bin/sh ./n_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/n103: expected/$(RESDIR)/n103 regress/$(RESDIR)/n103 input/$(RESDIR)/n103
+! 	@/bin/sh ./n_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/n104: expected/$(RESDIR)/n104 regress/$(RESDIR)/n104 input/$(RESDIR)/n104
+! 	@/bin/sh ./n_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/n105: expected/$(RESDIR)/n105 regress/$(RESDIR)/n105 input/$(RESDIR)/n105
+! 	@/bin/sh ./n_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/n106: expected/$(RESDIR)/n106 regress/$(RESDIR)/n106 input/$(RESDIR)/n106
+! 	@/bin/sh ./n_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/n200: expected/$(RESDIR)/n200 regress/$(RESDIR)/n200 input/$(RESDIR)/n200
+! 	@/bin/sh ./n_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/n201: expected/$(RESDIR)/n201 regress/$(RESDIR)/n201 input/$(RESDIR)/n201
+! 	@/bin/sh ./n_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/n202: expected/n202 regress/n202 input/n202
+! 	@/bin/sh ./n_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/n1_6: expected/$(RESDIR)/n1_6 regress/$(RESDIR)/n1_6 input/$(RESDIR)/n1_6
+! 	@/bin/sh ./n_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/n2_6: expected/$(RESDIR)/n2_6 regress/$(RESDIR)/n2_6 input/$(RESDIR)/n2_6
+! 	@/bin/sh ./n_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/n4_6: expected/$(RESDIR)/n4_6 regress/$(RESDIR)/n4_6 input/$(RESDIR)/n4_6
+! 	@/bin/sh ./n_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/n5_6: expected/$(RESDIR)/n5_6 regress/$(RESDIR)/n5_6 input/$(RESDIR)/n5_6
+! 	@/bin/sh ./n_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/n6_6: expected/$(RESDIR)/n6_6 regress/$(RESDIR)/n6_6 input/$(RESDIR)/n6_6
+! 	@/bin/sh ./n_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/n7_6: expected/$(RESDIR)/n7_6 regress/$(RESDIR)/n7_6 input/$(RESDIR)/n7_6
+! 	@/bin/sh ./n_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/n8_6: expected/$(RESDIR)/n8_6 regress/$(RESDIR)/n8_6 input/$(RESDIR)/n8_6
+! 	@/bin/sh ./n_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/n9_6: expected/$(RESDIR)/n9_6 regress/$(RESDIR)/n9_6 input/$(RESDIR)/n9_6
+! 	@/bin/sh ./n_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/n11_6: expected/$(RESDIR)/n11_6 regress/$(RESDIR)/n11_6 input/$(RESDIR)/n11_6
+! 	@/bin/sh ./n_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/n12_6: expected/$(RESDIR)/n12_6 regress/$(RESDIR)/n12_6 input/$(RESDIR)/n12_6
+! 	@/bin/sh ./n_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/n15_6: expected/$(RESDIR)/n15_6 regress/$(RESDIR)/n15_6 input/$(RESDIR)/n15_6
+! 	@/bin/sh ./n_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/ni1: expected/ni1 input/$(RESDIR)/ni1 regress/$(RESDIR)/ni1.nat regress/ni1.ipf
+! 	@/bin/sh ./ni_test $@ $(TESTMODE) multi
+! 
+! $(RESDIR)/ni2: expected/ni2 input/$(RESDIR)/ni2 regress/$(RESDIR)/ni2.nat regress/ni2.ipf
+! 	@/bin/sh ./ni_test $@ $(TESTMODE) single
+! 
+! $(RESDIR)/ni3: expected/ni3 input/$(RESDIR)/ni3 regress/$(RESDIR)/ni3.nat regress/ni3.ipf
+! 	@/bin/sh ./ni_test $@ $(TESTMODE) single
+! 
+! $(RESDIR)/ni4: expected/ni4 input/$(RESDIR)/ni4 regress/$(RESDIR)/ni4.nat regress/ni4.ipf
+! 	@/bin/sh ./ni_test $@ $(TESTMODE) single
+! 
+! $(RESDIR)/ni5: expected/ni5 input/$(RESDIR)/ni5 regress/$(RESDIR)/ni5.nat regress/$(RESDIR)/ni5.ipf
+! 	@/bin/sh ./ni_test $@ $(TESTMODE) single
+! 
+! $(RESDIR)/ni6: expected/$(RESDIR)/ni6 input/$(RESDIR)/ni6 regress/$(RESDIR)/ni6.nat regress/$(RESDIR)/ni6.ipf
+! 	@/bin/sh ./ni_test $@ $(TESTMODE) multi
+! 
+! $(RESDIR)/ni7: expected/ni7 input/$(RESDIR)/ni7 regress/$(RESDIR)/ni7.nat regress/ni7.ipf
+! 	@/bin/sh ./ni_test $@ $(TESTMODE) single
+! 
+! $(RESDIR)/ni8: expected/ni8 input/$(RESDIR)/ni8 regress/$(RESDIR)/ni8.nat regress/ni8.ipf
+! 	@/bin/sh ./ni_test $@ $(TESTMODE) single
+! 
+! $(RESDIR)/ni9: expected/ni9 input/$(RESDIR)/ni9 regress/$(RESDIR)/ni9.nat regress/ni9.ipf
+! 	@/bin/sh ./ni_test $@ $(TESTMODE) single
+! 
+! $(RESDIR)/ni10: expected/ni10 input/$(RESDIR)/ni10 regress/$(RESDIR)/ni10.nat regress/ni10.ipf
+! 	@/bin/sh ./ni_test $@ $(TESTMODE) single
+! 
+! $(RESDIR)/ni11: expected/ni11 input/$(RESDIR)/ni11 regress/$(RESDIR)/ni11.nat regress/ni11.ipf
+! 	@/bin/sh ./ni_test $@ $(TESTMODE) single
+! 
+! $(RESDIR)/ni12: expected/ni12 input/$(RESDIR)/ni12 regress/$(RESDIR)/ni12.nat regress/ni12.ipf
+! 	@/bin/sh ./ni_test $@ $(TESTMODE) single
+! 
+! $(RESDIR)/ni13: expected/$(RESDIR)/ni13 input/$(RESDIR)/ni13 regress/$(RESDIR)/ni13.nat regress/$(RESDIR)/ni13.ipf
+! 	@/bin/sh ./ni_test $@ $(TESTMODE) single
+! 
+! $(RESDIR)/ni14: expected/ni14 input/$(RESDIR)/ni14 regress/$(RESDIR)/ni14.nat regress/$(RESDIR)/ni14.ipf
+! 	@/bin/sh ./ni_test $@ $(TESTMODE) single
+! 
+! $(RESDIR)/ni15: expected/ni15 input/$(RESDIR)/ni15 regress/$(RESDIR)/ni15.nat regress/$(RESDIR)/ni15.ipf
+! 	@/bin/sh ./ni_test $@ $(TESTMODE) single
+! 
+! $(RESDIR)/ni16: expected/$(RESDIR)/ni16 input/$(RESDIR)/ni16 regress/$(RESDIR)/ni16.nat regress/$(RESDIR)/ni16.ipf
+! 	@/bin/sh ./ni_test $@ $(TESTMODE) single
+! 
+! $(RESDIR)/ni17: expected/$(RESDIR)/ni17 input/$(RESDIR)/ni17 regress/$(RESDIR)/ni17.nat regress/ni17.ipf
+! 	@/bin/sh ./ni_test $@ $(TESTMODE) multi
+! 
+! $(RESDIR)/ni18: expected/$(RESDIR)/ni18 input/$(RESDIR)/ni18 regress/$(RESDIR)/ni18.nat regress/ni18.ipf
+! 	@/bin/sh ./ni_test $@ $(TESTMODE) multi
+! 
+! $(RESDIR)/ni19: expected/ni19 input/$(RESDIR)/ni19 regress/$(RESDIR)/ni19.nat regress/$(RESDIR)/ni19.ipf
+! 	@/bin/sh ./ni_test $@ $(TESTMODE) single
+! 
+! $(RESDIR)/ni20: expected/$(RESDIR)/ni20 input/$(RESDIR)/ni20 regress/$(RESDIR)/ni20.nat regress/$(RESDIR)/ni20.ipf
+! 	@/bin/sh ./ni_test $@ $(TESTMODE) single
+! 
+! $(RESDIR)/ni21: expected/$(RESDIR)/ni21 input/$(RESDIR)/ni21 regress/$(RESDIR)/ni21.nat regress/$(RESDIR)/ni21.ipf
+! 	@/bin/sh ./ni_test $@ $(TESTMODE) multi
+! 
+! $(RESDIR)/ni23: expected/$(RESDIR)/ni23 input/$(RESDIR)/ni23 regress/$(RESDIR)/ni23.nat regress/$(RESDIR)/ni23.ipf
+! 	@/bin/sh ./ni_test $@ $(TESTMODE) multi
+! 
+! $(RESDIR)/in1: expected/in1 regress/in1
+! 	@/bin/sh ./in_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/in2: expected/in2 regress/in2
+! 	@/bin/sh ./in_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/in3: expected/in3 regress/in3
+! 	@/bin/sh ./in_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/in4: expected/in4 regress/in4
+! 	@/bin/sh ./in_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/in5: expected/in5 regress/in5
+! 	@/bin/sh ./in_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/in6: expected/in6 regress/in6
+! 	@/bin/sh ./in_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/in7: expected/in7 regress/in7
+! 	@/bin/sh ./in_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/in100: expected/in100 regress/in100
+! 	@/bin/sh ./in_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/in101: expected/in101 regress/in101
+! 	@/bin/sh ./in_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/in102: expected/in102 regress/in102
+! 	@/bin/sh ./in_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/l1:
+! 	@/bin/sh ./logtest $@ $(TESTMODE)
+! 
+! $(RESDIR)/ipv6_1: expected/ipv6_1 input/$(RESDIR)/ipv6_1 regress/$(RESDIR)/ipv6_1
+! 	@/bin/sh ./ipv6_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/ipv6_2: expected/ipv6_2 input/$(RESDIR)/ipv6_2 regress/ipv6_2
+! 	@/bin/sh ./ipv6_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/ipv6_3: expected/ipv6_3 input/$(RESDIR)/ipv6_3 regress/$(RESDIR)/ipv6_3
+! 	@/bin/sh ./ipv6_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/ipv6_4: expected/ipv6_4 input/$(RESDIR)/ipv6_4 regress/ipv6_4
+! 	@/bin/sh ./ipv6_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/ipv6_5: expected/ipv6_5 input/$(RESDIR)/ipv6_5 regress/ipv6_5
+! 	@/bin/sh ./ipv6_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/ipv6_6: expected/ipv6_6 input/$(RESDIR)/ipv6_6 regress/$(RESDIR)/ipv6_6
+! 	@/bin/sh ./ipv6_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/p1: expected/p1 input/p1 regress/p1.ipf regress/p1.pool $(POOLDEP)
+! 	@/bin/sh ./p_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/p2: expected/p2 input/p2 regress/p2.ipf $(POOLDEP)
+! 	@/bin/sh ./p_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/p3: expected/p3 input/p3 regress/p3.ipf regress/p3.pool $(POOLDEP)
+! 	@/bin/sh ./p_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/p4: expected/p4 input/p4 regress/p4.nat regress/p4.pool $(POOLDEP)
+! 	@/bin/sh ./p_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/p5: expected/p5 input/p5 regress/p5.ipf regress/p5.pool $(POOLDEP)
+! 	@/bin/sh ./p_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/p6: expected/p6 input/p6 regress/p6.ipf regress/p6.pool $(POOLDEP)
+! 	@/bin/sh ./p_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/p7: expected/$(RESDIR)/p7 input/$(RESDIR)/p7 regress/$(RESDIR)/p7.nat regress/p7.pool $(POOLDEP)
+! 	@/bin/sh ./p_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/p9: expected/$(RESDIR)/p9 input/$(RESDIR)/p9 regress/$(RESDIR)/p9.nat regress/p9.pool $(POOLDEP)
+! 	@/bin/sh ./p_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/p10: expected/$(RESDIR)/p10 input/$(RESDIR)/p10 regress/$(RESDIR)/p10.nat regress/p10.pool \
+! 	    $(POOLDEP)
+! 	@/bin/sh ./p_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/p11: expected/$(RESDIR)/p11 input/$(RESDIR)/p11 regress/$(RESDIR)/p11.nat regress/p11.pool \
+! 	    $(POOLDEP)
+! 	@/bin/sh ./p_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/p12: expected/$(RESDIR)/p12 input/$(RESDIR)/p12 regress/$(RESDIR)/p12.nat regress/p12.pool \
+! 	    $(POOLDEP)
+! 	@/bin/sh ./p_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/p13: expected/p13 input/p13 regress/p13.ipf regress/p13.pool \
+! 	    $(POOLDEP)
+! 	@/bin/sh ./p_test $@ $(TESTMODE)
+! 
+! $(RESDIR)/ip1: expected/ip1 regress/ip1 $(POOLDEP)
+! 	@/bin/sh ./ip_test $@ $(TESTMODE)
+  
+! $(RESDIR)/ip2: expected/ip2 input/ip2.data regress/ip2 $(POOLDEP)
+! 	@/bin/sh ./ip_test $@ $(TESTMODE)
+  
+! $(RESDIR)/ip3: expected/ip3 regress/ip3 $(POOLDEP)
+! 	@/bin/sh ./ip_test $@ $(TESTMODE)
+  
+! $(RESDIR)/bpf-f1: expected/bpf-f1 regress/bpf-f1
+! 	/bin/sh ./bpf_test $@ $(TESTMODE)
+  
+! clean:
+! 	/bin/rm -rf $(RESDIR)/*
+! 	/bin/rm -f results/* logout
+! 	(cd expected; make clean)
+! 	(cd input; make clean)
+! 	(cd regress; make clean)
+! 	sed -ne '1,/^# APPEND/p' Makefile > Makefile.new
+! 	mv Makefile.new Makefile
+  
+! diffs:
+! 	-cd expected; for i in *; do if [ -f $$i -a ! -f ../$$i -a -f ../results/$$i ] ; then  diff -c $$i ../results/$$i >> ../diff.out; fi done
+  
+! n6s:
+! 	for i in 1 2 4 5 6 7 11 13 14 15; do \
+! 		sh i4to6 < input/n$${i} > input/n$${i}_6; \
+! 		sh e4to6 < regress/n$${i} > regress/n$${i}_6; \
+! 		sh e4to6 < expected/n$${i} > expected/n$${i}_6; \
+! 	done
+! 	for i in 8 9 10 12 17; do \
+! 		sh e4to6 < regress/n$${i} > regress/n$${i}_6; \
+! 		perl h4to6 < input/n$${i} > input/n$${i}_6; \
+! 	done
+  
+! appendixes:
+! 	sed -ne '1,/^# APPEND/p' Makefile > Makefile.new
+! 	find . -name \*.dist | sed -e 's/^\.\///p' -e 's@/@/\$$(RESDIR)/@' -e 's/.dist//' | perl -e 'while(<>){chop;@F=split(/[\/\.]/); $$d=$$_;$$_=<>;chop;print "$$_: $$d\n";print "\tperl ./build_test.pl $$F[0] $$F[1]\n";print "\n";}' >> Makefile.new
+! 	mv Makefile.new Makefile
+! #
+! # APPENDIXES
+! expected/$(RESDIR)/n100: expected/n100.dist
+! 	perl ./build_test.pl expected n100
+  
+! expected/$(RESDIR)/i19: expected/i19.dist
+! 	perl ./build_test.pl expected i19
+  
+! expected/$(RESDIR)/n11: expected/n11.dist
+! 	perl ./build_test.pl expected n11
+  
+! expected/$(RESDIR)/n101: expected/n101.dist
+! 	perl ./build_test.pl expected n101
+  
+! expected/$(RESDIR)/n103: expected/n103.dist
+! 	perl ./build_test.pl expected n103
+  
+! expected/$(RESDIR)/n104: expected/n104.dist
+! 	perl ./build_test.pl expected n104
+  
+! expected/$(RESDIR)/n105: expected/n105.dist
+! 	perl ./build_test.pl expected n105
+  
+! expected/$(RESDIR)/n106: expected/n106.dist
+! 	perl ./build_test.pl expected n106
+  
+! expected/$(RESDIR)/n200: expected/n200.dist
+! 	perl ./build_test.pl expected n200
+  
+! expected/$(RESDIR)/n12_6: expected/n12_6.dist
+! 	perl ./build_test.pl expected n12_6
+  
+! expected/$(RESDIR)/n13_6: expected/n13_6.dist
+! 	perl ./build_test.pl expected n13_6
+  
+! expected/$(RESDIR)/n14_6: expected/n14_6.dist
+! 	perl ./build_test.pl expected n14_6
+  
+! expected/$(RESDIR)/n15_6: expected/n15_6.dist
+! 	perl ./build_test.pl expected n15_6
+  
+! expected/$(RESDIR)/ni13: expected/ni13.dist
+! 	perl ./build_test.pl expected ni13
+  
+! expected/$(RESDIR)/n18: expected/n18.dist
+! 	perl ./build_test.pl expected n18
+  
+! expected/$(RESDIR)/n4_6: expected/n4_6.dist
+! 	perl ./build_test.pl expected n4_6
+  
+! expected/$(RESDIR)/n201: expected/n201.dist
+! 	perl ./build_test.pl expected n201
+  
+! expected/$(RESDIR)/n202: expected/n202.dist
+! 	perl ./build_test.pl expected n202
+  
+! expected/$(RESDIR)/n2_6: expected/n2_6.dist
+! 	perl ./build_test.pl expected n2_6
+  
+! expected/$(RESDIR)/p7: expected/p7.dist
+! 	perl ./build_test.pl expected p7
+  
+! expected/$(RESDIR)/n5: expected/n5.dist
+! 	perl ./build_test.pl expected n5
+  
+! expected/$(RESDIR)/n5_6: expected/n5_6.dist
+! 	perl ./build_test.pl expected n5_6
+  
+! expected/$(RESDIR)/n7: expected/n7.dist
+! 	perl ./build_test.pl expected n7
+  
+! expected/$(RESDIR)/n6_6: expected/n6_6.dist
+! 	perl ./build_test.pl expected n6_6
+  
+! expected/$(RESDIR)/p9: expected/p9.dist
+! 	perl ./build_test.pl expected p9
+  
+! expected/$(RESDIR)/n8_6: expected/n8_6.dist
+! 	perl ./build_test.pl expected n8_6
+  
+! expected/$(RESDIR)/n9_6: expected/n9_6.dist
+! 	perl ./build_test.pl expected n9_6
+  
+! expected/$(RESDIR)/p10: expected/p10.dist
+! 	perl ./build_test.pl expected p10
+  
+! expected/$(RESDIR)/p11: expected/p11.dist
+! 	perl ./build_test.pl expected p11
+  
+! expected/$(RESDIR)/ni20: expected/ni20.dist
+! 	perl ./build_test.pl expected ni20
+  
+! expected/$(RESDIR)/ni23: expected/ni23.dist
+! 	perl ./build_test.pl expected ni23
+  
+! expected/$(RESDIR)/f25: expected/f25.dist
+! 	perl ./build_test.pl expected f25
+  
+! expected/$(RESDIR)/p12: expected/p12.dist
+! 	perl ./build_test.pl expected p12
+  
+! expected/$(RESDIR)/n11_6: expected/n11_6.dist
+! 	perl ./build_test.pl expected n11_6
+  
+! expected/$(RESDIR)/ni16: expected/ni16.dist
+! 	perl ./build_test.pl expected ni16
+  
+! expected/$(RESDIR)/n1: expected/n1.dist
+! 	perl ./build_test.pl expected n1
+  
+! expected/$(RESDIR)/n2: expected/n2.dist
+! 	perl ./build_test.pl expected n2
+  
+! expected/$(RESDIR)/n3: expected/n3.dist
+! 	perl ./build_test.pl expected n3
+  
+! expected/$(RESDIR)/f11: expected/f11.dist
+! 	perl ./build_test.pl expected f11
+  
+! expected/$(RESDIR)/n4: expected/n4.dist
+! 	perl ./build_test.pl expected n4
+  
+! expected/$(RESDIR)/n6: expected/n6.dist
+! 	perl ./build_test.pl expected n6
+  
+! expected/$(RESDIR)/n8: expected/n8.dist
+! 	perl ./build_test.pl expected n8
+  
+! expected/$(RESDIR)/n9: expected/n9.dist
+! 	perl ./build_test.pl expected n9
+  
+! expected/$(RESDIR)/n10: expected/n10.dist
+! 	perl ./build_test.pl expected n10
+  
+! expected/$(RESDIR)/n12: expected/n12.dist
+! 	perl ./build_test.pl expected n12
+  
+! expected/$(RESDIR)/n13: expected/n13.dist
+! 	perl ./build_test.pl expected n13
+  
+! expected/$(RESDIR)/n14: expected/n14.dist
+! 	perl ./build_test.pl expected n14
+  
+! expected/$(RESDIR)/n15: expected/n15.dist
+! 	perl ./build_test.pl expected n15
+  
+! expected/$(RESDIR)/n16: expected/n16.dist
+! 	perl ./build_test.pl expected n16
+  
+! expected/$(RESDIR)/n17: expected/n17.dist
+! 	perl ./build_test.pl expected n17
+  
+! expected/$(RESDIR)/ni6: expected/ni6.dist
+! 	perl ./build_test.pl expected ni6
+  
+! expected/$(RESDIR)/ni17: expected/ni17.dist
+! 	perl ./build_test.pl expected ni17
+  
+! expected/$(RESDIR)/ni18: expected/ni18.dist
+! 	perl ./build_test.pl expected ni18
+  
+! expected/$(RESDIR)/ni21: expected/ni21.dist
+! 	perl ./build_test.pl expected ni21
+  
+! expected/$(RESDIR)/f28: expected/f28.dist
+! 	perl ./build_test.pl expected f28
+  
+! expected/$(RESDIR)/f29: expected/f29.dist
+! 	perl ./build_test.pl expected f29
+  
+! expected/$(RESDIR)/n102: expected/n102.dist
+! 	perl ./build_test.pl expected n102
+  
+! expected/$(RESDIR)/n1_6: expected/n1_6.dist
+! 	perl ./build_test.pl expected n1_6
+  
+! expected/$(RESDIR)/n7_6: expected/n7_6.dist
+! 	perl ./build_test.pl expected n7_6
+  
+! input/$(RESDIR)/n8: input/n8.dist
+! 	perl ./build_test.pl input n8
+  
+! input/$(RESDIR)/f18: input/f18.dist
+! 	perl ./build_test.pl input f18
+  
+! input/$(RESDIR)/f21: input/f21.dist
+! 	perl ./build_test.pl input f21
+  
+! input/$(RESDIR)/f27: input/f27.dist
+! 	perl ./build_test.pl input f27
+  
+! input/$(RESDIR)/ipv6_4: input/ipv6_4.dist
+! 	perl ./build_test.pl input ipv6_4
+  
+! input/$(RESDIR)/ipv6_5: input/ipv6_5.dist
+! 	perl ./build_test.pl input ipv6_5
+  
+! input/$(RESDIR)/ipv6_6: input/ipv6_6.dist
+! 	perl ./build_test.pl input ipv6_6
+  
+! input/$(RESDIR)/n12: input/n12.dist
+! 	perl ./build_test.pl input n12
+  
+! input/$(RESDIR)/n102: input/n102.dist
+! 	perl ./build_test.pl input n102
+  
+! input/$(RESDIR)/n103: input/n103.dist
+! 	perl ./build_test.pl input n103
+  
+! input/$(RESDIR)/n104: input/n104.dist
+! 	perl ./build_test.pl input n104
+  
+! input/$(RESDIR)/n105: input/n105.dist
+! 	perl ./build_test.pl input n105
+  
+! input/$(RESDIR)/n11: input/n11.dist
+! 	perl ./build_test.pl input n11
+  
+! input/$(RESDIR)/n12_6: input/n12_6.dist
+! 	perl ./build_test.pl input n12_6
+  
+! input/$(RESDIR)/n13_6: input/n13_6.dist
+! 	perl ./build_test.pl input n13_6
+  
+! input/$(RESDIR)/n16: input/n16.dist
+! 	perl ./build_test.pl input n16
+  
+! input/$(RESDIR)/n14_6: input/n14_6.dist
+! 	perl ./build_test.pl input n14_6
+  
+! input/$(RESDIR)/n15_6: input/n15_6.dist
+! 	perl ./build_test.pl input n15_6
+  
+! input/$(RESDIR)/p7: input/p7.dist
+! 	perl ./build_test.pl input p7
+  
+! input/$(RESDIR)/p9: input/p9.dist
+! 	perl ./build_test.pl input p9
+  
+! input/$(RESDIR)/n17: input/n17.dist
+! 	perl ./build_test.pl input n17
+  
+! input/$(RESDIR)/n8_6: input/n8_6.dist
+! 	perl ./build_test.pl input n8_6
+  
+! input/$(RESDIR)/n2_6: input/n2_6.dist
+! 	perl ./build_test.pl input n2_6
+  
+! input/$(RESDIR)/n4_6: input/n4_6.dist
+! 	perl ./build_test.pl input n4_6
+  
+! input/$(RESDIR)/n202: input/n202.dist
+! 	perl ./build_test.pl input n202
+  
+! input/$(RESDIR)/ni1: input/ni1.dist
+! 	perl ./build_test.pl input ni1
+  
+! input/$(RESDIR)/ni2: input/ni2.dist
+! 	perl ./build_test.pl input ni2
+  
+! input/$(RESDIR)/n5: input/n5.dist
+! 	perl ./build_test.pl input n5
+  
+! input/$(RESDIR)/n5_6: input/n5_6.dist
+! 	perl ./build_test.pl input n5_6
+  
+! input/$(RESDIR)/n6_6: input/n6_6.dist
+! 	perl ./build_test.pl input n6_6
+  
+! input/$(RESDIR)/n7_6: input/n7_6.dist
+! 	perl ./build_test.pl input n7_6
+  
+! input/$(RESDIR)/n11_6: input/n11_6.dist
+! 	perl ./build_test.pl input n11_6
+  
+! input/$(RESDIR)/p10: input/p10.dist
+! 	perl ./build_test.pl input p10
+  
+! input/$(RESDIR)/n9: input/n9.dist
+! 	perl ./build_test.pl input n9
+  
+! input/$(RESDIR)/n9_6: input/n9_6.dist
+! 	perl ./build_test.pl input n9_6
+  
+! input/$(RESDIR)/ni3: input/ni3.dist
+! 	perl ./build_test.pl input ni3
+  
+! input/$(RESDIR)/ni4: input/ni4.dist
+! 	perl ./build_test.pl input ni4
+  
+! input/$(RESDIR)/ni12: input/ni12.dist
+! 	perl ./build_test.pl input ni12
+  
+! input/$(RESDIR)/ni13: input/ni13.dist
+! 	perl ./build_test.pl input ni13
+  
+! input/$(RESDIR)/ni14: input/ni14.dist
+! 	perl ./build_test.pl input ni14
+  
+! input/$(RESDIR)/ni15: input/ni15.dist
+! 	perl ./build_test.pl input ni15
+  
+! input/$(RESDIR)/ni18: input/ni18.dist
+! 	perl ./build_test.pl input ni18
+  
+! input/$(RESDIR)/ni19: input/ni19.dist
+! 	perl ./build_test.pl input ni19
+  
+! input/$(RESDIR)/ni20: input/ni20.dist
+! 	perl ./build_test.pl input ni20
+  
+! input/$(RESDIR)/ni21: input/ni21.dist
+! 	perl ./build_test.pl input ni21
+  
+! input/$(RESDIR)/ni23: input/ni23.dist
+! 	perl ./build_test.pl input ni23
+  
+! input/$(RESDIR)/f30: input/f30.dist
+! 	perl ./build_test.pl input f30
+  
+! input/$(RESDIR)/ipv6_1: input/ipv6_1.dist
+! 	perl ./build_test.pl input ipv6_1
+  
+! input/$(RESDIR)/ni7: input/ni7.dist
+! 	perl ./build_test.pl input ni7
+  
+! input/$(RESDIR)/ni9: input/ni9.dist
+! 	perl ./build_test.pl input ni9
+  
+! input/$(RESDIR)/ni10: input/ni10.dist
+! 	perl ./build_test.pl input ni10
+  
+! input/$(RESDIR)/p12: input/p12.dist
+! 	perl ./build_test.pl input p12
+  
+! input/$(RESDIR)/p11: input/p11.dist
+! 	perl ./build_test.pl input p11
+  
+! input/$(RESDIR)/ni5: input/ni5.dist
+! 	perl ./build_test.pl input ni5
+  
+! input/$(RESDIR)/ni6: input/ni6.dist
+! 	perl ./build_test.pl input ni6
+  
+! input/$(RESDIR)/ni8: input/ni8.dist
+! 	perl ./build_test.pl input ni8
+  
+! input/$(RESDIR)/ni11: input/ni11.dist
+! 	perl ./build_test.pl input ni11
+  
+! input/$(RESDIR)/ni16: input/ni16.dist
+! 	perl ./build_test.pl input ni16
+  
+! input/$(RESDIR)/ni17: input/ni17.dist
+! 	perl ./build_test.pl input ni17
+  
+! input/$(RESDIR)/f29: input/f29.dist
+! 	perl ./build_test.pl input f29
+  
+! input/$(RESDIR)/f28: input/f28.dist
+! 	perl ./build_test.pl input f28
+  
+! input/$(RESDIR)/f25: input/f25.dist
+! 	perl ./build_test.pl input f25
+  
+! input/$(RESDIR)/f24: input/f24.dist
+! 	perl ./build_test.pl input f24
+  
+! input/$(RESDIR)/f20: input/f20.dist
+! 	perl ./build_test.pl input f20
+  
+! input/$(RESDIR)/f15: input/f15.dist
+! 	perl ./build_test.pl input f15
+  
+! input/$(RESDIR)/f11: input/f11.dist
+! 	perl ./build_test.pl input f11
+  
+! input/$(RESDIR)/n1: input/n1.dist
+! 	perl ./build_test.pl input n1
+  
+! input/$(RESDIR)/n100: input/n100.dist
+! 	perl ./build_test.pl input n100
+  
+! input/$(RESDIR)/n101: input/n101.dist
+! 	perl ./build_test.pl input n101
+  
+! input/$(RESDIR)/n106: input/n106.dist
+! 	perl ./build_test.pl input n106
+  
+! input/$(RESDIR)/n13: input/n13.dist
+! 	perl ./build_test.pl input n13
+  
+! input/$(RESDIR)/n14: input/n14.dist
+! 	perl ./build_test.pl input n14
+  
+! input/$(RESDIR)/n15: input/n15.dist
+! 	perl ./build_test.pl input n15
+  
+! input/$(RESDIR)/n18: input/n18.dist
+! 	perl ./build_test.pl input n18
+  
+! input/$(RESDIR)/n2: input/n2.dist
+! 	perl ./build_test.pl input n2
+  
+! input/$(RESDIR)/n3: input/n3.dist
+! 	perl ./build_test.pl input n3
+  
+! input/$(RESDIR)/n4: input/n4.dist
+! 	perl ./build_test.pl input n4
+  
+! input/$(RESDIR)/n6: input/n6.dist
+! 	perl ./build_test.pl input n6
+  
+! input/$(RESDIR)/n7: input/n7.dist
+! 	perl ./build_test.pl input n7
+  
+! input/$(RESDIR)/n1_6: input/n1_6.dist
+! 	perl ./build_test.pl input n1_6
+  
+! input/$(RESDIR)/f17: input/f17.dist
+! 	perl ./build_test.pl input f17
+  
+! input/$(RESDIR)/n10: input/n10.dist
+! 	perl ./build_test.pl input n10
+  
+! input/$(RESDIR)/n200: input/n200.dist
+! 	perl ./build_test.pl input n200
+  
+! input/$(RESDIR)/n201: input/n201.dist
+! 	perl ./build_test.pl input n201
+  
+! input/$(RESDIR)/ipv6_2: input/ipv6_2.dist
+! 	perl ./build_test.pl input ipv6_2
+  
+! input/$(RESDIR)/ipv6_3: input/ipv6_3.dist
+! 	perl ./build_test.pl input ipv6_3
+  
+! input/$(RESDIR)/n10_6: input/n10_6.dist
+! 	perl ./build_test.pl input n10_6
+  
+! input/$(RESDIR)/n17_6: input/n17_6.dist
+! 	perl ./build_test.pl input n17_6
+  
+! regress/$(RESDIR)/n2: regress/n2.dist
+! 	perl ./build_test.pl regress n2
+  
+! regress/$(RESDIR)/n1: regress/n1.dist
+! 	perl ./build_test.pl regress n1
+  
+! regress/$(RESDIR)/n3: regress/n3.dist
+! 	perl ./build_test.pl regress n3
+  
+! regress/$(RESDIR)/n4: regress/n4.dist
+! 	perl ./build_test.pl regress n4
+  
+! regress/$(RESDIR)/n5: regress/n5.dist
+! 	perl ./build_test.pl regress n5
+! 
+! regress/$(RESDIR)/n6: regress/n6.dist
+! 	perl ./build_test.pl regress n6
+! 
+! regress/$(RESDIR)/n102: regress/n102.dist
+! 	perl ./build_test.pl regress n102
+! 
+! regress/$(RESDIR)/n103: regress/n103.dist
+! 	perl ./build_test.pl regress n103
+! 
+! regress/$(RESDIR)/n104: regress/n104.dist
+! 	perl ./build_test.pl regress n104
+! 
+! regress/$(RESDIR)/n105: regress/n105.dist
+! 	perl ./build_test.pl regress n105
+! 
+! regress/$(RESDIR)/n200: regress/n200.dist
+! 	perl ./build_test.pl regress n200
+! 
+! regress/$(RESDIR)/n11_6: regress/n11_6.dist
+! 	perl ./build_test.pl regress n11_6
+! 
+! regress/$(RESDIR)/n12_6: regress/n12_6.dist
+! 	perl ./build_test.pl regress n12_6
+! 
+! regress/$(RESDIR)/n13_6: regress/n13_6.dist
+! 	perl ./build_test.pl regress n13_6
+! 
+! regress/$(RESDIR)/n14_6: regress/n14_6.dist
+! 	perl ./build_test.pl regress n14_6
+! 
+! regress/$(RESDIR)/n15_6: regress/n15_6.dist
+! 	perl ./build_test.pl regress n15_6
+! 
+! regress/$(RESDIR)/n16_6: regress/n16_6.dist
+! 	perl ./build_test.pl regress n16_6
+! 
+! regress/$(RESDIR)/n17_6: regress/n17_6.dist
+! 	perl ./build_test.pl regress n17_6
+! 
+! regress/$(RESDIR)/n1_6: regress/n1_6.dist
+! 	perl ./build_test.pl regress n1_6
+! 
+! regress/$(RESDIR)/n7: regress/n7.dist
+! 	perl ./build_test.pl regress n7
+! 
+! regress/$(RESDIR)/n8: regress/n8.dist
+! 	perl ./build_test.pl regress n8
+! 
+! regress/$(RESDIR)/n9: regress/n9.dist
+! 	perl ./build_test.pl regress n9
+! 
+! regress/$(RESDIR)/n2_6: regress/n2_6.dist
+! 	perl ./build_test.pl regress n2_6
+! 
+! regress/$(RESDIR)/n4_6: regress/n4_6.dist
+! 	perl ./build_test.pl regress n4_6
+! 
+! regress/$(RESDIR)/n202: regress/n202.dist
+! 	perl ./build_test.pl regress n202
+! 
+! regress/$(RESDIR)/ni13.ipf: regress/ni13.ipf.dist
+! 	perl ./build_test.pl regress ni13
+! 
+! regress/$(RESDIR)/n5_6: regress/n5_6.dist
+! 	perl ./build_test.pl regress n5_6
+! 
+! regress/$(RESDIR)/n6_6: regress/n6_6.dist
+! 	perl ./build_test.pl regress n6_6
+! 
+! regress/$(RESDIR)/n7_6: regress/n7_6.dist
+! 	perl ./build_test.pl regress n7_6
+! 
+! regress/$(RESDIR)/n8_6: regress/n8_6.dist
+! 	perl ./build_test.pl regress n8_6
+! 
+! regress/$(RESDIR)/n9_6: regress/n9_6.dist
+! 	perl ./build_test.pl regress n9_6
+! 
+! regress/$(RESDIR)/ni1.nat: regress/ni1.nat.dist
+! 	perl ./build_test.pl regress ni1
+! 
+! regress/$(RESDIR)/ni20.nat: regress/ni20.nat.dist
+! 	perl ./build_test.pl regress ni20
+! 
+! regress/$(RESDIR)/ni2.nat: regress/ni2.nat.dist
+! 	perl ./build_test.pl regress ni2
+! 
+! regress/$(RESDIR)/ipv6_1: regress/ipv6_1.dist
+! 	perl ./build_test.pl regress ipv6_1
+! 
+! regress/$(RESDIR)/ipv6_3: regress/ipv6_3.dist
+! 	perl ./build_test.pl regress ipv6_3
+! 
+! regress/$(RESDIR)/ipv6_6: regress/ipv6_6.dist
+! 	perl ./build_test.pl regress ipv6_6
+! 
+! regress/$(RESDIR)/p7.nat: regress/p7.nat.dist
+! 	perl ./build_test.pl regress p7
+! 
+! regress/$(RESDIR)/p9.nat: regress/p9.nat.dist
+! 	perl ./build_test.pl regress p9
+! 
+! regress/$(RESDIR)/n10: regress/n10.dist
+! 	perl ./build_test.pl regress n10
+! 
+! regress/$(RESDIR)/n11: regress/n11.dist
+! 	perl ./build_test.pl regress n11
+! 
+! regress/$(RESDIR)/n12: regress/n12.dist
+! 	perl ./build_test.pl regress n12
+! 
+! regress/$(RESDIR)/n13: regress/n13.dist
+! 	perl ./build_test.pl regress n13
+! 
+! regress/$(RESDIR)/n14: regress/n14.dist
+! 	perl ./build_test.pl regress n14
+! 
+! regress/$(RESDIR)/n15: regress/n15.dist
+! 	perl ./build_test.pl regress n15
+! 
+! regress/$(RESDIR)/ni5.nat: regress/ni5.nat.dist
+! 	perl ./build_test.pl regress ni5
+! 
+! regress/$(RESDIR)/ni6.nat: regress/ni6.nat.dist
+! 	perl ./build_test.pl regress ni6
+! 
+! regress/$(RESDIR)/ni7.nat: regress/ni7.nat.dist
+! 	perl ./build_test.pl regress ni7
+! 
+! regress/$(RESDIR)/f11: regress/f11.dist
+! 	perl ./build_test.pl regress f11
+! 
+! regress/$(RESDIR)/f15: regress/f15.dist
+! 	perl ./build_test.pl regress f15
+! 
+! regress/$(RESDIR)/f17: regress/f17.dist
+! 	perl ./build_test.pl regress f17
+! 
+! regress/$(RESDIR)/f20: regress/f20.dist
+! 	perl ./build_test.pl regress f20
+! 
+! regress/$(RESDIR)/f25: regress/f25.dist
+! 	perl ./build_test.pl regress f25
+! 
+! regress/$(RESDIR)/f28.ipf: regress/f28.ipf.dist
+! 	perl ./build_test.pl regress f28
+! 
+! regress/$(RESDIR)/f29.ipf: regress/f29.ipf.dist
+! 	perl ./build_test.pl regress f29
+! 
+! regress/$(RESDIR)/f30: regress/f30.dist
+! 	perl ./build_test.pl regress f30
+! 
+! regress/$(RESDIR)/n100: regress/n100.dist
+! 	perl ./build_test.pl regress n100
+! 
+! regress/$(RESDIR)/n101: regress/n101.dist
+! 	perl ./build_test.pl regress n101
+! 
+! regress/$(RESDIR)/n106: regress/n106.dist
+! 	perl ./build_test.pl regress n106
+! 
+! regress/$(RESDIR)/n201: regress/n201.dist
+! 	perl ./build_test.pl regress n201
+! 
+! regress/$(RESDIR)/ni14.ipf: regress/ni14.ipf.dist
+! 	perl ./build_test.pl regress ni14
+! 
+! regress/$(RESDIR)/ni15.ipf: regress/ni15.ipf.dist
+! 	perl ./build_test.pl regress ni15
+! 
+! regress/$(RESDIR)/ni16.ipf: regress/ni16.ipf.dist
+! 	perl ./build_test.pl regress ni16
+! 
+! regress/$(RESDIR)/ni19.ipf: regress/ni19.ipf.dist
+! 	perl ./build_test.pl regress ni19
+! 
+! regress/$(RESDIR)/ni20.ipf: regress/ni20.ipf.dist
+! 	perl ./build_test.pl regress ni20
+! 
+! regress/$(RESDIR)/ni21.ipf: regress/ni21.ipf.dist
+! 	perl ./build_test.pl regress ni21
+! 
+! regress/$(RESDIR)/ni23.ipf: regress/ni23.ipf.dist
+! 	perl ./build_test.pl regress ni23
+! 
+! regress/$(RESDIR)/ni5.ipf: regress/ni5.ipf.dist
+! 	perl ./build_test.pl regress ni5
+! 
+! regress/$(RESDIR)/ni6.ipf: regress/ni6.ipf.dist
+! 	perl ./build_test.pl regress ni6
+! 
+! regress/$(RESDIR)/p10.nat: regress/p10.nat.dist
+! 	perl ./build_test.pl regress p10
+! 
+! regress/$(RESDIR)/p11.nat: regress/p11.nat.dist
+! 	perl ./build_test.pl regress p11
+! 
+! regress/$(RESDIR)/p12.nat: regress/p12.nat.dist
+! 	perl ./build_test.pl regress p12
+! 
+! regress/$(RESDIR)/n16: regress/n16.dist
+! 	perl ./build_test.pl regress n16
+! 
+! regress/$(RESDIR)/n17: regress/n17.dist
+! 	perl ./build_test.pl regress n17
+! 
+! regress/$(RESDIR)/n18: regress/n18.dist
+! 	perl ./build_test.pl regress n18
+! 
+! regress/$(RESDIR)/n10_6: regress/n10_6.dist
+! 	perl ./build_test.pl regress n10_6
+! 
+! regress/$(RESDIR)/ni3.nat: regress/ni3.nat.dist
+! 	perl ./build_test.pl regress ni3
+! 
+! regress/$(RESDIR)/ni4.nat: regress/ni4.nat.dist
+! 	perl ./build_test.pl regress ni4
+! 
+! regress/$(RESDIR)/ni8.nat: regress/ni8.nat.dist
+! 	perl ./build_test.pl regress ni8
+! 
+! regress/$(RESDIR)/ni9.nat: regress/ni9.nat.dist
+! 	perl ./build_test.pl regress ni9
+! 
+! regress/$(RESDIR)/ni10.nat: regress/ni10.nat.dist
+! 	perl ./build_test.pl regress ni10
+! 
+! regress/$(RESDIR)/ni11.nat: regress/ni11.nat.dist
+! 	perl ./build_test.pl regress ni11
+! 
+! regress/$(RESDIR)/ni12.nat: regress/ni12.nat.dist
+! 	perl ./build_test.pl regress ni12
+! 
+! regress/$(RESDIR)/ni13.nat: regress/ni13.nat.dist
+! 	perl ./build_test.pl regress ni13
+! 
+! regress/$(RESDIR)/ni14.nat: regress/ni14.nat.dist
+! 	perl ./build_test.pl regress ni14
+! 
+! regress/$(RESDIR)/ni15.nat: regress/ni15.nat.dist
+! 	perl ./build_test.pl regress ni15
+! 
+! regress/$(RESDIR)/ni16.nat: regress/ni16.nat.dist
+! 	perl ./build_test.pl regress ni16
+! 
+! regress/$(RESDIR)/ni17.nat: regress/ni17.nat.dist
+! 	perl ./build_test.pl regress ni17
+! 
+! regress/$(RESDIR)/ni18.nat: regress/ni18.nat.dist
+! 	perl ./build_test.pl regress ni18
+! 
+! regress/$(RESDIR)/ni19.nat: regress/ni19.nat.dist
+! 	perl ./build_test.pl regress ni19
+! 
+! regress/$(RESDIR)/ni21.nat: regress/ni21.nat.dist
+! 	perl ./build_test.pl regress ni21
+! 
+! regress/$(RESDIR)/ni23.nat: regress/ni23.nat.dist
+! 	perl ./build_test.pl regress ni23
+  
+Index: logtest
+===================================================================
+RCS file: /devel/CVS/IP-Filter/test/logtest,v
+retrieving revision 2.7
+diff -c -r2.7 logtest
+*** logtest	25 Oct 2007 17:03:31 -0000	2.7
+--- logtest	17 Nov 2011 19:57:52 -0000
+***************
+*** 1,4 ****
+--- 1,11 ----
+  #!/bin/sh
++ testitem=$1
++ todo=`expr ${testitem} : '.*\/\(.*\)$'`
++ resdir=`expr ${testitem} : '\(.*\)\/.*$'`
++ args=`awk "/^${todo} / { print; } " test.format`
++ set $args
++ results=${resdir}/results/${todo}
++ 
+  format=$2
+  mkdir -p results
+  if [ -f /usr/ucb/touch ] ; then
+***************
+*** 23,59 ****
+  	;;
+  esac
+  
+! /bin/cp /dev/null results/$1
+! /bin/cp /dev/null results/$1.b
+  
+  ( while read rule; do
+! 	echo $rule >> results/$1
+  	echo $rule | ../ipftest -br - -F $format -i input/$1 -l logout > /dev/null
+  	if [ $? -ne 0 ] ; then
+  		/bin/rm -f logout
+  		exit 1
+  	fi
+! 	TZ=$GMT ../ipmon -P /dev/null -f logout >> results/$1
+!         echo "--------" >> results/$1
+! 	TZ=$GMT ../ipmon -P /dev/null -bf logout >> results/$1.b
+!         echo "--------" >> results/$1.b
+! done ) < regress/$1
+! ../ipftest -br regress/$1 -F $format -i input/$1 -l logout > /dev/null
+! TZ=$GMT ../ipmon -P /dev/null -f logout >> results/$1
+! echo "--------" >> results/$1
+! TZ=$GMT ../ipmon -P /dev/null -bf logout >> results/$1.b
+! echo "--------" >> results/$1.b
+  
+! cmp expected/$1 results/$1
+  status=$?
+  if [ $status -ne 0 ] ; then
+  	exit $status
+  fi
+! cmp expected/$1.b results/$1.b
+  status=$?
+  if [ $status -ne 0 ] ; then
+  	exit $status
+  fi
+  /bin/rm -f logout
+! $TOUCH $1
+  exit 0
+--- 30,66 ----
+  	;;
+  esac
+  
+! /bin/cp /dev/null ${results}
+! /bin/cp /dev/null ${results}.b
+  
+  ( while read rule; do
+! 	echo $rule >> ${results}
+  	echo $rule | ../ipftest -br - -F $format -i input/$1 -l logout > /dev/null
+  	if [ $? -ne 0 ] ; then
+  		/bin/rm -f logout
+  		exit 1
+  	fi
+! 	TZ=$GMT ../ipmon -P /dev/null -f logout >> ${results}
+!         echo "--------" >> ${results}
+! 	TZ=$GMT ../ipmon -P /dev/null -bf logout >> ${results}.b
+!         echo "--------" >> ${results}.b
+! done ) < regress/${todo}
+! ../ipftest -br regress/${todo} -F $format -i input/${todo} -l logout > /dev/null
+! TZ=$GMT ../ipmon -P /dev/null -f logout >> ${results}
+! echo "--------" >> ${results}
+! TZ=$GMT ../ipmon -P /dev/null -bf logout >> ${results}.b
+! echo "--------" >> ${results}.b
+  
+! cmp expected/${todo} ${results}
+  status=$?
+  if [ $status -ne 0 ] ; then
+  	exit $status
+  fi
+! cmp expected/${todo}.b ${results}.b
+  status=$?
+  if [ $status -ne 0 ] ; then
+  	exit $status
+  fi
+  /bin/rm -f logout
+! $TOUCH ${resdir}/${todo}
+  exit 0
+Index: test.format
+===================================================================
+RCS file: /devel/CVS/IP-Filter/test/test.format,v
+retrieving revision 2.51
+diff -c -r2.51 test.format
+*** test.format	7 Aug 2011 10:07:07 -0000	2.51
+--- test.format	17 Nov 2011 19:57:52 -0000
+***************
+*** 59,69 ****
+  ip1 text text
+  ip2 text text
+  ip3 text text
+! ipv6.1 hex hex
+! ipv6.2 hex hex
+! ipv6.3 hex hex
+! ipv6.4 hex hex
+! ipv6.5 hex hex
+  l1 hex hex
+  n1 text text
+  n2 text text
+--- 59,69 ----
+  ip1 text text
+  ip2 text text
+  ip3 text text
+! ipv6_1 hex hex
+! ipv6_2 hex hex
+! ipv6_3 hex hex
+! ipv6_4 hex hex
+! ipv6_5 hex hex
+  l1 hex hex
+  n1 text text
+  n2 text text
+***************
+*** 126,134 ****
+  n16 hex hex -D
+  n17 hex hex -D
+  f24 hex text
+! ipv6.6 hex text
+  f25 hex text -D
+! f26 text text
+  f27 hex text
+  n1_6 text text -6
+  n2_6 text text -6
+--- 126,134 ----
+  n16 hex hex -D
+  n17 hex hex -D
+  f24 hex text
+! ipv6_6 hex text
+  f25 hex text -D
+! f26 text text state_max=99
+  f27 hex text
+  n1_6 text text -6
+  n2_6 text text -6
+Index: vfycksum.pl
+===================================================================
+RCS file: /devel/CVS/IP-Filter/test/vfycksum.pl,v
+retrieving revision 2.10
+diff -c -r2.10 vfycksum.pl
+*** vfycksum.pl	18 Jul 2008 08:12:51 -0000	2.10
+--- vfycksum.pl	17 Nov 2011 19:57:52 -0000
+***************
+*** 348,423 ****
+  	}
+  }
+  
+! while ($#ARGV >= 0) {
+! 	open(I, "$ARGV[0]") || die $!;
+! 	print "--- $ARGV[0] ---\n";
+! 	$multi = 0;
+! 	while (<I>) {
+! 		chop;
+! 		s/#.*//g;
+! 
+! 		#
+! 		# If the first non-comment, non-empty line of input starts
+! 		# with a '[', then allow the input to be a multi-line hex
+! 		# string, otherwise it has to be all on one line.
+! 		#
+! 		if (/^\[/) {
+! 			$multi=1;
+! 			s/^\[[^]]*\]//g;
+  
+! 		}
+! 		s/^ *//g;
+! 		if (length == 0) {
+! 			next if ($cnt == 0);
+! 			&ipv4check(0);
+! 			$cnt = 0;
+! 			$multi = 0;
+! 			next;
+! 		}
+  
+! 		#
+! 		# look for 16 bits, represented with leading 0's as required,
+! 		# in hex.
+! 		#
+! 		s/\t/ /g;
+! 		while (/^[0-9a-fA-F][0-9a-fA-F] [0-9a-fA-F][0-9a-fA-F] .*/) {
+! 			s/^([0-9a-fA-F][0-9a-fA-F]) ([0-9a-fA-F][0-9a-fA-F]) (.*)/$1$2 $3/;
+! 		}
+! 		while (/.* [0-9a-fA-F][0-9a-fA-F] [0-9a-fA-F][0-9a-fA-F] .*/) {
+  $b=$_;
+! 			s/(.*?) ([0-9a-fA-F][0-9a-fA-F]) ([0-9a-fA-F][0-9a-fA-F]) (.*)/$1 $2$3 $4/g;
+! 		}
+! 		if (/.* [0-9a-fA-F][0-9a-fA-F] [0-9a-fA-F][0-9a-fA-F]/) {
+  $b=$_;
+! 			s/(.*?) ([0-9a-fA-F][0-9a-fA-F]) ([0-9a-fA-F][0-9a-fA-F])/$1 $2$3/g;
+! 		}
+! 		while (/^[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F].*/) {
+! 			$x = $_;
+! 			$x =~ s/([0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]).*/$1/;
+! 			$x =~ s/ *//g;
+! 			$y = hex $x;
+! 			s/[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F] *(.*)/$1/;
+! 			$bytes[$cnt] = $y;
+  #print "bytes[$cnt] = $x\n";
+! 			$cnt++;
+! 		}
+  
+! 		#
+! 		# Pick up stragler bytes.
+! 		#
+! 		if (/^[0-9a-fA-F][0-9a-fA-F]/) {
+! 			$y = hex $_;
+! 			$bytes[$cnt++] = $y * 256;
+  		}
+! 		if ($multi == 0 && $cnt > 0) {
+  			&ipv4check(0);
+- 			$cnt = 0;
+  		}
+  	}
+! 
+! 	if ($cnt > 0) {
+! 		&ipv4check(0);
+  	}
+- 	close(I);
+- 	shift(@ARGV);
+  }
+--- 348,438 ----
+  	}
+  }
+  
+! sub readinput {
+! 	chop;
+! 	s/#.*//g;
+  
+! 	#
+! 	# If the first non-comment, non-empty line of input starts
+! 	# with a '[', then allow the input to be a multi-line hex
+! 	# string, otherwise it has to be all on one line.
+! 	#
+! 	if (/^\[/) {
+! 		$multi=1;
+! 		s/^\[[^]]*\]//g;
+  
+! 	}
+! 	s/^ *//g;
+! 	if (length == 0) {
+! 		next if ($cnt == 0);
+! 		&ipv4check(0);
+! 		$cnt = 0;
+! 		$multi = 0;
+! 		next;
+! 	}
+! 
+! 	#
+! 	# look for 16 bits, represented with leading 0's as required,
+! 	# in hex.
+! 	#
+! 	s/NIC.HEXADDR/0000 0000/g;
+! 	s/TCPCKSUM/0000/g;
+! 	s/UDPCKSUM/0000/g;
+! 	s/IPCKSUM/0000/g;
+! 	s/\t/ /g;
+! 	while (/^[0-9a-fA-F][0-9a-fA-F] [0-9a-fA-F][0-9a-fA-F] .*/) {
+! 		s/^([0-9a-fA-F][0-9a-fA-F]) ([0-9a-fA-F][0-9a-fA-F]) (.*)/$1$2 $3/;
+! 	}
+! 	while (/.* [0-9a-fA-F][0-9a-fA-F] [0-9a-fA-F][0-9a-fA-F] .*/) {
+  $b=$_;
+! 		s/(.*?) ([0-9a-fA-F][0-9a-fA-F]) ([0-9a-fA-F][0-9a-fA-F]) (.*)/$1 $2$3 $4/g;
+! 	}
+! 	if (/.* [0-9a-fA-F][0-9a-fA-F] [0-9a-fA-F][0-9a-fA-F]/) {
+  $b=$_;
+! 		s/(.*?) ([0-9a-fA-F][0-9a-fA-F]) ([0-9a-fA-F][0-9a-fA-F])/$1 $2$3/g;
+! 	}
+! 	while (/^[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F].*/) {
+! 		$x = $_;
+! 		$x =~ s/([0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]).*/$1/;
+! 		$x =~ s/ *//g;
+! 		$y = hex $x;
+! 		s/[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F] *(.*)/$1/;
+! 		$bytes[$cnt] = $y;
+  #print "bytes[$cnt] = $x\n";
+! 		$cnt++;
+! 	}
+! 
+! 	#
+! 	# Pick up stragler bytes.
+! 	#
+! 	if (/^[0-9a-fA-F][0-9a-fA-F]/) {
+! 		$y = hex $_;
+! 		$bytes[$cnt++] = $y * 256;
+! 	}
+! 	if ($multi == 0 && $cnt > 0) {
+! 		&ipv4check(0);
+! 		$cnt = 0;
+! 	}
+! }
+! 
+! if ($#ARGV >= 0) {
+! 	while ($#ARGV >= 0) {
+! 		print "--- $ARGV[0] ---\n";
+! 		$multi = 0;
+  
+! 		open(I, "$ARGV[0]") || die $!;
+! 		while (<I>) {
+! 			&readinput;
+  		}
+! 		close(I);
+! 
+! 		if ($cnt > 0) {
+  			&ipv4check(0);
+  		}
++ 		shift(@ARGV);
+  	}
+! } else {
+! 	while (<>) {
+! 		&readinput;
+  	}
+  }
+Index: expected/Makefile
+===================================================================
+RCS file: /devel/CVS/IP-Filter/test/expected/Makefile,v
+retrieving revision 2.4
+diff -c -r2.4 Makefile
+*** expected/Makefile	18 Aug 2008 13:27:44 -0000	2.4
+--- expected/Makefile	17 Nov 2011 19:57:52 -0000
+***************
+*** 6,35 ****
+  all: i19
+  
+  i19: i19.dist Makefile
+! 	-if [ "`grep '13<<3' /usr/include/sys/syslog.h 2>&1`" = "" ] ; then \
+! 		sed -e 's/security/!!!/g' i19.dist > i19.p1; \
+  	else \
+! 		x=`sed -ne '/13<<3/s/.*LOG_\([A-Z_]*\).*/\1/p' /usr/include/sys/syslog.h | tr '[A-Z]' '[a-z]'`; \
+! 		sed -e "s/security/$$x/g" i19.dist > i19.p1; \
+  	fi
+  	-if [ "`grep LOG_AUTHPRIV /usr/include/sys/syslog.h 2>&1`" = "" ] ; then \
+  		sed -e 's/authpriv/!!!/g' i19.p1 > i19.p2; \
+  	else \
+  		/bin/cp i19.p1 i19.p2; \
+  	fi
+! 	/bin/rm i19.p1
+! 	-if [ "`grep LOG_FTP /usr/include/sys/syslog.h 2>&1`" = "" ] ; then \
+! 		sed -e 's/ftp/!!!/g' i19.p2 > i19.p1; \
+  	else \
+  		/bin/cp i19.p2 i19.p1; \
+  	fi
+! 	/bin/mv -f i19.p1 i19.p2
+! 	-if [ "`grep LOG_LOGALERT /usr/include/sys/syslog.h 2>&1`" = "" ] ; then \
+! 		sed -e 's/logalert/!!!/g' i19.p2 > i19; \
+  	else \
+  		/bin/cp i19.p2 i19; \
+  	fi
+! 	/bin/rm i19.p2
+  
+  clean:
+  	/bin/rm -f i19
+--- 6,70 ----
+  all: i19
+  
+  i19: i19.dist Makefile
+! 	-if [ "`grep LOG_SECURITY /usr/include/sys/syslog.h 2>&1`" = "" ] ; then \
+! 		if [ "`grep LOG_AUDIT /usr/include/sys/syslog.h 2>&1`" = "" ] ; then \
+! 				sed -e 's/security/!!!/g' i19.dist > i19.p1; \
+! 		else \
+! 				sed -e 's/security/audit/g' i19.dist > i19.p1; \
+! 		fi \
+  	else \
+! 		/bin/cp i19.dist i19.p1; \
+  	fi
+  	-if [ "`grep LOG_AUTHPRIV /usr/include/sys/syslog.h 2>&1`" = "" ] ; then \
+  		sed -e 's/authpriv/!!!/g' i19.p1 > i19.p2; \
+  	else \
+  		/bin/cp i19.p1 i19.p2; \
+  	fi
+! 	-if [ "`grep LOG_LOGALERT /usr/include/sys/syslog.h 2>&1`" = "" ] ; then \
+! 		sed -e 's/logalert/!!!/g' i19.p2 > i19.p1; \
+  	else \
+  		/bin/cp i19.p2 i19.p1; \
+  	fi
+! 	-if [ "`grep LOG_FTP /usr/include/sys/syslog.h 2>&1`" = "" ] ; then \
+! 		sed -e 's/ftp/!!!/g' i19.p1 > i19.p2; \
+! 	else \
+! 		/bin/cp i19.p1 i19.p2; \
+! 	fi
+! 	-if [ "`egrep 'LOG_CRON.*15' /usr/include/sys/syslog.h 2>&1`" != "" ] ; then \
+! 		sed -e 's/cron/cron2/g' i19.p2 > i19; \
+  	else \
+  		/bin/cp i19.p2 i19; \
+  	fi
+! 	/bin/rm i19.p?
+! 
+! $(RESDIR)/done:
+! 	mkdir -p $(RESDIR)
+! 	for i in *.dist; do \
+! 		target=`expr $$i : '\(.*\).dist'`; \
+! 		sed \
+! 		    -e "s/NIC0HEXADDR/${NIC0HEXADDR}/g" \
+! 		    -e "s/NIC1HEXADDR/${NIC1HEXADDR}/g" \
+! 		    -e "s/NIC0ADDR/${NIC0ADDR}/g" \
+! 		    -e "s/NIC1ADDR/${NIC1ADDR}/g" \
+! 		    -e "s/NIC0/$(NIC0)/g" -e "s/NIC1/$(NIC1)/g" \
+! 		    -e "s/NIC2/$(NIC2)/g" -e "s/NIC3/$(NIC3)/g" \
+! 		    -e 's/_/ /g' \
+! 		    $$i > $(RESDIR)/$${target}; \
+! 		cc=`egrep CKSUM $(RESDIR)/$${target} | wc -l`; \
+! 		if [ $${cc} -ne 0 ] ; then \
+! 			mv $(RESDIR)/$${target} $(RESDIR)/$${target}.tmp; \
+! 			perl ../fillcksum.pl $(RESDIR)/$${target}.tmp > \
+! 			     $(RESDIR)/$${target}; \
+! 		fi \
+! 	done
+! 	touch $(RESDIR)/done
+  
+  clean:
+  	/bin/rm -f i19
++ 	for i in */done; do \
++ 		d=`dirname $$i`; \
++ 		if [ -d "$$d" ] ; then \
++ 			echo $$d; \
++ 			/bin/rm -rf $$d; \
++ 		fi \
++ 	done
+Index: expected/f12
+===================================================================
+RCS file: /devel/CVS/IP-Filter/test/expected/f12,v
+retrieving revision 2.2
+diff -c -r2.2 f12
+*** expected/f12	15 May 2006 08:39:40 -0000	2.2
+--- expected/f12	17 Nov 2011 19:57:52 -0000
+***************
+*** 1,7 ****
+  pass
+  pass
+  pass
+! bad-packet
+  nomatch
+  nomatch
+  bad-packet
+--- 1,7 ----
+  pass
+  pass
+  pass
+! nomatch
+  nomatch
+  nomatch
+  bad-packet
+***************
+*** 11,17 ****
+  pass
+  pass
+  pass
+! bad-packet
+  nomatch
+  nomatch
+  bad-packet
+--- 11,17 ----
+  pass
+  pass
+  pass
+! pass
+  nomatch
+  nomatch
+  bad-packet
+***************
+*** 21,27 ****
+  nomatch
+  nomatch
+  nomatch
+! bad-packet
+  block
+  nomatch
+  bad-packet
+--- 21,27 ----
+  nomatch
+  nomatch
+  nomatch
+! block
+  block
+  nomatch
+  bad-packet
+***************
+*** 31,37 ****
+  nomatch
+  nomatch
+  block
+! bad-packet
+  block
+  nomatch
+  bad-packet
+--- 31,37 ----
+  nomatch
+  nomatch
+  block
+! block
+  block
+  nomatch
+  bad-packet
+***************
+*** 41,47 ****
+  nomatch
+  nomatch
+  nomatch
+! bad-packet
+  nomatch
+  nomatch
+  bad-packet
+--- 41,47 ----
+  nomatch
+  nomatch
+  nomatch
+! nomatch
+  nomatch
+  nomatch
+  bad-packet
+***************
+*** 51,57 ****
+  nomatch
+  nomatch
+  nomatch
+! bad-packet
+  nomatch
+  nomatch
+  bad-packet
+--- 51,57 ----
+  nomatch
+  nomatch
+  nomatch
+! nomatch
+  nomatch
+  nomatch
+  bad-packet
+Index: expected/f13
+===================================================================
+RCS file: /devel/CVS/IP-Filter/test/expected/f13,v
+retrieving revision 2.8
+diff -c -r2.8 f13
+*** expected/f13	27 Dec 2009 12:40:35 -0000	2.8
+--- expected/f13	17 Nov 2011 19:57:52 -0000
+***************
+*** 1,8 ****
+  pass
+! bad-packet
+  nomatch
+  pass
+! bad-packet
+  nomatch
+  nomatch
+  bad-packet
+--- 1,8 ----
+  pass
+! nomatch
+  nomatch
+  pass
+! nomatch
+  nomatch
+  nomatch
+  bad-packet
+***************
+*** 19,28 ****
+  nomatch
+  --------
+  block
+! bad-packet
+  nomatch
+  block
+! bad-packet
+  nomatch
+  nomatch
+  bad-packet
+--- 19,28 ----
+  nomatch
+  --------
+  block
+! nomatch
+  nomatch
+  block
+! nomatch
+  nomatch
+  nomatch
+  bad-packet
+***************
+*** 39,48 ****
+  nomatch
+  --------
+  nomatch
+- bad-packet
+  nomatch
+  nomatch
+! bad-packet
+  nomatch
+  nomatch
+  bad-packet
+--- 39,48 ----
+  nomatch
+  --------
+  nomatch
+  nomatch
+  nomatch
+! nomatch
+! nomatch
+  nomatch
+  nomatch
+  bad-packet
+***************
+*** 59,68 ****
+  nomatch
+  --------
+  nomatch
+- bad-packet
+  nomatch
+  nomatch
+! bad-packet
+  nomatch
+  nomatch
+  bad-packet
+--- 59,68 ----
+  nomatch
+  --------
+  nomatch
+  nomatch
+  nomatch
+! nomatch
+! nomatch
+  nomatch
+  nomatch
+  bad-packet
+***************
+*** 79,88 ****
+  nomatch
+  --------
+  block
+! bad-packet
+  nomatch
+  pass
+! bad-packet
+  nomatch
+  nomatch
+  bad-packet
+--- 79,88 ----
+  nomatch
+  --------
+  block
+! nomatch
+  nomatch
+  pass
+! nomatch
+  nomatch
+  nomatch
+  bad-packet
+***************
+*** 99,108 ****
+  pass
+  --------
+  block
+! bad-packet
+  nomatch
+  block
+! bad-packet
+  nomatch
+  nomatch
+  bad-packet
+--- 99,108 ----
+  pass
+  --------
+  block
+! nomatch
+  nomatch
+  block
+! nomatch
+  nomatch
+  nomatch
+  bad-packet
+***************
+*** 119,128 ****
+  block
+  --------
+  nomatch
+- bad-packet
+  nomatch
+  nomatch
+! bad-packet
+  nomatch
+  nomatch
+  bad-packet
+--- 119,128 ----
+  block
+  --------
+  nomatch
+  nomatch
+  nomatch
+! nomatch
+! nomatch
+  nomatch
+  nomatch
+  bad-packet
+***************
+*** 139,148 ****
+  nomatch
+  --------
+  block
+! bad-packet
+  nomatch
+  pass
+! bad-packet
+  nomatch
+  nomatch
+  bad-packet
+--- 139,148 ----
+  nomatch
+  --------
+  block
+! block
+  nomatch
+  pass
+! block
+  nomatch
+  nomatch
+  bad-packet
+***************
+*** 159,168 ****
+  pass
+  --------
+  block
+! bad-packet
+  nomatch
+  pass
+! bad-packet
+  nomatch
+  nomatch
+  bad-packet
+--- 159,168 ----
+  pass
+  --------
+  block
+! block
+  nomatch
+  pass
+! block
+  nomatch
+  nomatch
+  bad-packet
+Index: expected/f18
+===================================================================
+RCS file: /devel/CVS/IP-Filter/test/expected/f18,v
+retrieving revision 2.3
+diff -c -r2.3 f18
+*** expected/f18	27 Dec 2005 09:35:02 -0000	2.3
+--- expected/f18	17 Nov 2011 19:57:52 -0000
+***************
+*** 21,27 ****
+  Accounting rules configured (set 0, in)
+  1 count in inet from 1.1.1.1/32 to 3.3.3.3/32
+  Accounting rules configured (set 0, out)
+- Accounting rules configured (set 1, in)
+  1 count out inet from 2.2.2.2/32 to 4.4.4.4/32
+  Accounting rules configured (set 1, out)
+  --------
+--- 21,27 ----
+  Accounting rules configured (set 0, in)
+  1 count in inet from 1.1.1.1/32 to 3.3.3.3/32
+  Accounting rules configured (set 0, out)
+  1 count out inet from 2.2.2.2/32 to 4.4.4.4/32
++ Accounting rules configured (set 1, in)
+  Accounting rules configured (set 1, out)
+  --------
+Index: expected/i5
+===================================================================
+RCS file: /devel/CVS/IP-Filter/test/expected/i5,v
+retrieving revision 2.4
+diff -c -r2.4 i5
+*** expected/i5	27 Dec 2005 09:35:04 -0000	2.4
+--- expected/i5	17 Nov 2011 19:57:52 -0000
+***************
+*** 3,9 ****
+  pass in on ed0(!) inet tos 0x40 from 127.0.0.1/32 to 127.0.0.1/32
+  block in log on lo0(!) ttl 0 from any to any
+  pass in quick ttl 1 from any to any
+- skip 3 out inet from 127.0.0.1/32 to any
+  auth out on foo0(!) proto tcp from any to any port = 80
+  preauth out on foo0(!) proto tcp from any to any port = 22
+  nomatch out on foo0(!) proto tcp from any port < 1024 to any
+--- 3,8 ----
+Index: expected/l1
+===================================================================
+RCS file: /devel/CVS/IP-Filter/test/expected/l1,v
+retrieving revision 2.4
+diff -c -r2.4 l1
+*** expected/l1	1 Mar 2009 12:46:49 -0000	2.4
+--- expected/l1	17 Nov 2011 19:57:52 -0000
+***************
+*** 30,35 ****
+--- 30,36 ----
+  01/01/1970 00:00:00.000000 anon0 @0:1 p 2.2.2.2,25 -> 1.1.1.1,1025 PR tcp len 20 40 -AS K-S IN
+  01/01/1970 00:00:00.000000 e1 @0:1 p 2.2.2.2,25 -> 1.1.1.1,1025 PR tcp len 20 40 -A K-S OUT
+  01/01/1970 00:00:00.000000 anon0 @0:1 p 1.1.1.1,1025 -> 2.2.2.2,25 PR tcp len 20 40 -AF K-S IN
++ 01/01/1970 00:00:00.000000 2x anon0 @0:1 p 1.1.1.1,1025 -> 2.2.2.2,25 PR tcp len 20 40 -A K-S IN
+  --------
+  pass in log first quick proto tcp from 1.1.1.1 to any flags S keep state
+  missed 1 ipf log entries: 0 1
+***************
+*** 42,48 ****
+  01/01/1970 00:00:00.000000 anon0 @0:4 p 2.2.2.2,25 -> 1.1.1.1,1025 PR tcp len 20 40 -AS K-S IN
+  01/01/1970 00:00:00.000000 e1 @0:4 p 2.2.2.2,25 -> 1.1.1.1,1025 PR tcp len 20 40 -A K-S OUT
+  01/01/1970 00:00:00.000000 anon0 @0:4 p 1.1.1.1,1025 -> 2.2.2.2,25 PR tcp len 20 40 -AF K-S IN
+! 01/01/1970 00:00:00.000000 2x anon0 @-1:-1 L 1.1.1.1,1025 -> 2.2.2.2,25 PR tcp len 20 40 -A IN
+  01/01/1970 00:00:00.000000 anon0 @-1:-1 L 1.1.1.1,1 -> 4.4.4.4,53 PR udp len 20 40 IN
+  01/01/1970 00:00:00.000000 anon0 @-1:-1 L 2.2.2.2,1 -> 4.4.4.4,53 PR udp len 20 40 IN
+  01/01/1970 00:00:00.000000 anon0 @0:3 p 2.2.2.2,1 -> 4.4.4.4,53 PR udp len 20 40 IN
+--- 43,49 ----
+  01/01/1970 00:00:00.000000 anon0 @0:4 p 2.2.2.2,25 -> 1.1.1.1,1025 PR tcp len 20 40 -AS K-S IN
+  01/01/1970 00:00:00.000000 e1 @0:4 p 2.2.2.2,25 -> 1.1.1.1,1025 PR tcp len 20 40 -A K-S OUT
+  01/01/1970 00:00:00.000000 anon0 @0:4 p 1.1.1.1,1025 -> 2.2.2.2,25 PR tcp len 20 40 -AF K-S IN
+! 01/01/1970 00:00:00.000000 2x anon0 @0:4 p 1.1.1.1,1025 -> 2.2.2.2,25 PR tcp len 20 40 -A K-S IN
+  01/01/1970 00:00:00.000000 anon0 @-1:-1 L 1.1.1.1,1 -> 4.4.4.4,53 PR udp len 20 40 IN
+  01/01/1970 00:00:00.000000 anon0 @-1:-1 L 2.2.2.2,1 -> 4.4.4.4,53 PR udp len 20 40 IN
+  01/01/1970 00:00:00.000000 anon0 @0:3 p 2.2.2.2,1 -> 4.4.4.4,53 PR udp len 20 40 IN
+Index: expected/l1.b
+===================================================================
+RCS file: /devel/CVS/IP-Filter/test/expected/l1.b,v
+retrieving revision 2.3
+diff -c -r2.3 l1.b
+*** expected/l1.b	1 Mar 2009 12:46:49 -0000	2.3
+--- expected/l1.b	17 Nov 2011 19:57:52 -0000
+***************
+*** 28,33 ****
+--- 28,34 ----
+  01/01/1970 00:00:00.000000 anon0 @0:1 p 2.2.2.2,25 -> 1.1.1.1,1025 PR tcp len 20 40 -AS K-S IN
+  01/01/1970 00:00:00.000000 e1 @0:1 p 2.2.2.2,25 -> 1.1.1.1,1025 PR tcp len 20 40 -A K-S OUT
+  01/01/1970 00:00:00.000000 anon0 @0:1 p 1.1.1.1,1025 -> 2.2.2.2,25 PR tcp len 20 40 -AF K-S IN
++ 01/01/1970 00:00:00.000000 2x anon0 @0:1 p 1.1.1.1,1025 -> 2.2.2.2,25 PR tcp len 20 40 -A K-S IN
+  --------
+  missed 1 ipf log entries: 0 1
+  01/01/1970 00:00:00.000000 anon0 @0:1 p 1.1.1.1,1025 -> 2.2.2.2,25 PR tcp len 20 40 -S K-S IN
+***************
+*** 39,45 ****
+  01/01/1970 00:00:00.000000 anon0 @0:4 p 2.2.2.2,25 -> 1.1.1.1,1025 PR tcp len 20 40 -AS K-S IN
+  01/01/1970 00:00:00.000000 e1 @0:4 p 2.2.2.2,25 -> 1.1.1.1,1025 PR tcp len 20 40 -A K-S OUT
+  01/01/1970 00:00:00.000000 anon0 @0:4 p 1.1.1.1,1025 -> 2.2.2.2,25 PR tcp len 20 40 -AF K-S IN
+! 01/01/1970 00:00:00.000000 2x anon0 @-1:-1 L 1.1.1.1,1025 -> 2.2.2.2,25 PR tcp len 20 40 -A IN
+  01/01/1970 00:00:00.000000 anon0 @-1:-1 L 1.1.1.1,1 -> 4.4.4.4,53 PR udp len 20 40 IN
+  01/01/1970 00:00:00.000000 anon0 @-1:-1 L 2.2.2.2,1 -> 4.4.4.4,53 PR udp len 20 40 IN
+  01/01/1970 00:00:00.000000 anon0 @0:3 p 2.2.2.2,1 -> 4.4.4.4,53 PR udp len 20 40 IN
+--- 40,46 ----
+  01/01/1970 00:00:00.000000 anon0 @0:4 p 2.2.2.2,25 -> 1.1.1.1,1025 PR tcp len 20 40 -AS K-S IN
+  01/01/1970 00:00:00.000000 e1 @0:4 p 2.2.2.2,25 -> 1.1.1.1,1025 PR tcp len 20 40 -A K-S OUT
+  01/01/1970 00:00:00.000000 anon0 @0:4 p 1.1.1.1,1025 -> 2.2.2.2,25 PR tcp len 20 40 -AF K-S IN
+! 01/01/1970 00:00:00.000000 2x anon0 @0:4 p 1.1.1.1,1025 -> 2.2.2.2,25 PR tcp len 20 40 -A K-S IN
+  01/01/1970 00:00:00.000000 anon0 @-1:-1 L 1.1.1.1,1 -> 4.4.4.4,53 PR udp len 20 40 IN
+  01/01/1970 00:00:00.000000 anon0 @-1:-1 L 2.2.2.2,1 -> 4.4.4.4,53 PR udp len 20 40 IN
+  01/01/1970 00:00:00.000000 anon0 @0:3 p 2.2.2.2,1 -> 4.4.4.4,53 PR udp len 20 40 IN
+Index: expected/ni19
+===================================================================
+RCS file: /devel/CVS/IP-Filter/test/expected/ni19,v
+retrieving revision 2.3
+diff -c -r2.3 ni19
+*** expected/ni19	31 Jan 2010 11:49:59 -0000	2.3
+--- expected/ni19	17 Nov 2011 19:57:52 -0000
+***************
+*** 34,43 ****
+  
+  4500 0034 118c 4000 4006 ec87 0a01 0104 c0a8 7103 03ff 03f0 91d4 c8a7 66e5 b811 8011 05b4 d54e 0000 0101 080a 0039 dd6d 0000 0000 
+  
+! 0
+! 0
+! 0
+! 0
+! 0
+! 0
+  -------------------------------
+--- 34,49 ----
+  
+  4500 0034 118c 4000 4006 ec87 0a01 0104 c0a8 7103 03ff 03f0 91d4 c8a7 66e5 b811 8011 05b4 d54e 0000 0101 080a 0039 dd6d 0000 0000 
+  
+! 4500 0028 e404 4000 4006 40c5 0a01 0101 0a01 0104 03f1 0202 6523 90eb 915a a5cb 5010 8328 e37d 0000 
+! 
+! 4500 0034 e405 4000 4006 40b8 0a01 0101 0a01 0104 03f0 03ff 66e5 b811 91d4 c8a8 8010 8328 7e81 0000 0101 080a 0000 0004 0039 dd6c 
+! 
+! 4500 0028 e40a 4000 4006 40bf 0a01 0101 0a01 0104 03f1 0202 6523 90eb 915a a5cb 5011 832c e378 0000 
+! 
+! 4500 0034 e40b 4000 4006 40b2 0a01 0101 0a01 0104 03f0 03ff 66e5 b811 91d4 c8a8 8011 832c 7e7c 0000 0101 080a 0000 0004 0039 dd6c 
+! 
+! 4500 0028 0004 4000 4006 fe1b 0a01 0104 c0a8 7103 0202 03f1 915a a5cb 6523 90ec 5010 05b4 3a47 0000 
+! 
+! 4500 0034 118e 4000 4006 ec85 0a01 0104 c0a8 7103 03ff 03f0 91d4 c8a8 66e5 b812 8010 05b4 d548 0000 0101 080a 0039 dd6e 0000 0004 
+! 
+  -------------------------------
+Index: expected/ni5
+===================================================================
+RCS file: /devel/CVS/IP-Filter/test/expected/ni5,v
+retrieving revision 2.13
+diff -c -r2.13 ni5
+*** expected/ni5	31 Jan 2010 11:49:59 -0000	2.13
+--- expected/ni5	17 Nov 2011 19:57:52 -0000
+***************
+*** 72,94 ****
+  
+  4500 0028 ffec 4000 ef06 5369 96cb e002 c0a8 0103 0014 8034 d9f8 11d4 0000 0000 5010 2238 e90d 0000 
+  
+! 0
+! 0
+! 0
+! 0
+! 0
+! 0
+  4500 0040 fff0 4000 ef06 534d 96cb e002 c0a8 0103 0015 8032 3786 7903 bd6b ca3f 5018 269c 7c80 0000 3232 3620 4c69 7374 696e 6720 636f 6d70 6c65 7465 642e 0d0a 
+  
+! 4500 0028 0014 4000 ff06 02ec 0101 0101 96cb e002 8032 0015 bd6b ca2f 3786 791b 5010 269c 57e4 0000 
+  
+! 4500 002e 0015 4000 ff06 02e5 0101 0101 96cb e002 8032 0015 bd6b ca2f 3786 791b 5018 269c b022 0000 5155 4954 0d0a 
+  
+  4500 0036 fff2 4000 ef06 5355 96cb e002 c0a8 0103 0015 8032 3786 791b bd6b ca45 5018 269c a936 0000 3232 3120 476f 6f64 6279 652e 0d0a 
+  
+! 4500 0028 0016 4000 ff06 02ea 0101 0101 96cb e002 8032 0015 bd6b ca35 3786 7929 5011 269c 57cf 0000 
+  
+- 0
+- 0
+- 0
+  -------------------------------
+--- 72,103 ----
+  
+  4500 0028 ffec 4000 ef06 5369 96cb e002 c0a8 0103 0014 8034 d9f8 11d4 0000 0000 5010 2238 e90d 0000 
+  
+! 4500 0063 ffed 4000 ef06 532d 96cb e002 c0a8 0103 0014 8033 d9f8 11d5 bd78 5c13 5018 269c a315 0000 636f 6f6d 6273 7061 7065 7273 0d0a 6465 7074 730d 0a66 6f75 6e64 2d66 696c 6573 0d0a 696e 636f 6d69 6e67 0d0a 6e6c 632d 7465 7374 0d0a 7075 620d 0a 
+! 
+! 4500 0028 0014 4000 ff06 02ec 0101 0101 96cb e002 8033 0014 bd78 5c13 d9f8 1210 5010 6348 4de0 0000 
+! 
+! 4500 0028 ffee 4000 ef06 5367 96cb e002 c0a8 0103 0014 8033 d9f8 1210 bd78 5c13 5011 269c cae1 0000 
+! 
+! 4500 0028 0015 4000 ff06 02eb 0101 0101 96cb e002 8033 0014 bd78 5c13 d9f8 1211 5010 6348 4ddf 0000 
+! 
+! 4500 0028 0016 4000 ff06 02ea 0101 0101 96cb e002 8033 0014 bd78 5c13 d9f8 1211 5011 6348 4dde 0000 
+! 
+! 4500 0028 ffef 4000 ef06 5366 96cb e002 c0a8 0103 0014 8033 d9f8 1211 bd78 5c14 5010 269c cae0 0000 
+! 
+  4500 0040 fff0 4000 ef06 534d 96cb e002 c0a8 0103 0015 8032 3786 7903 bd6b ca3f 5018 269c 7c80 0000 3232 3620 4c69 7374 696e 6720 636f 6d70 6c65 7465 642e 0d0a 
+  
+! 4500 0028 0017 4000 ff06 02e9 0101 0101 96cb e002 8032 0015 bd6b ca2f 3786 791b 5010 269c 57e4 0000 
+  
+! 4500 002e 0018 4000 ff06 02e2 0101 0101 96cb e002 8032 0015 bd6b ca2f 3786 791b 5018 269c b022 0000 5155 4954 0d0a 
+  
+  4500 0036 fff2 4000 ef06 5355 96cb e002 c0a8 0103 0015 8032 3786 791b bd6b ca45 5018 269c a936 0000 3232 3120 476f 6f64 6279 652e 0d0a 
+  
+! 4500 0028 0019 4000 ff06 02e7 0101 0101 96cb e002 8032 0015 bd6b ca35 3786 7929 5011 269c 57cf 0000 
+! 
+! 4500 0028 fff3 4000 ef06 5362 96cb e002 c0a8 0103 0015 8032 3786 7929 bd6b ca45 5011 269c 9815 0000 
+! 
+! 4500 0028 001a 4000 ff06 02e6 0101 0101 96cb e002 8032 0015 bd6b ca35 3786 792a 5010 269c 57cf 0000 
+! 
+! 4500 0028 fff4 4000 ef06 5361 96cb e002 c0a8 0103 0015 8032 3786 792a bd6b ca46 5010 269c 9814 0000 
+  
+  -------------------------------
+Index: input/f12
+===================================================================
+RCS file: /devel/CVS/IP-Filter/test/input/f12,v
+retrieving revision 2.2
+diff -c -r2.2 f12
+*** input/f12	17 May 2004 15:46:04 -0000	2.2
+--- input/f12	17 Nov 2011 19:57:52 -0000
+***************
+*** 13,19 ****
+  4500 0028 0000 6000 3f06 16cd 0101 0101 0201 0101
+  0401 0019 0000 0000 0000 0000 5010 2000 86b7 0000
+  
+! # 1.1.1.1,1025 -> 2.1.1.1,25 TTL=63 TCP DF FO=0
+  []
+  4500 001c 0000 6000 3f06 16d9 0101 0101 0201 0101
+  0401 0019 0000 0000
+--- 13,19 ----
+  4500 0028 0000 6000 3f06 16cd 0101 0101 0201 0101
+  0401 0019 0000 0000 0000 0000 5010 2000 86b7 0000
+  
+! # 1.1.1.1,1025 -> 2.1.1.1,25 TTL=63 TCP DF MF FO=0
+  []
+  4500 001c 0000 6000 3f06 16d9 0101 0101 0201 0101
+  0401 0019 0000 0000
+Index: input/f13
+===================================================================
+RCS file: /devel/CVS/IP-Filter/test/input/f13,v
+retrieving revision 2.9
+diff -c -r2.9 f13
+*** input/f13	27 Dec 2009 12:40:35 -0000	2.9
+--- input/f13	17 Nov 2011 19:57:52 -0000
+***************
+*** 1,62 ****
+  # This checksum is deliberately incorrect.
+! # 1.1.1.1,1025 -> 2.1.1.1,25 TTL=63 TCP DF,FO=0  SYN
+  [in]
+  4500 0028 0001 4000 3f06 36cc 0101 0101 0201 0101
+  0401 0019 0000 0000 0000 0000 50 02 2000 86bb 0000
+  
+! # 1.1.1.1,1025 -> 2.1.1.1,25 TTL=63 TCP MF  ACK
+  [in]
+  4500 0024 0002 2000 3f06 56cf 0101 0101 0201 0101
+  0401 0019 0000 0000 0000 0000 5010 2000
+  
+! # 1.1.1.1,1025 -> 2.1.1.1,25 TTL=63 TCP FO=2  ACK
+  [in]
+  4500 002c 0002 0002 3f06 76c5 0101 0101 0201 0101
+  0000 0000 0001 0203 0405 0607 0809 0a0b 0c0d 0e0f 1011 1213
+  
+! # 1.1.1.1,1024 -> 2.1.1.1,25 TTL=63 TCP DF MF FO=0 SYN
+  [in]
+  4500 0028 0003 6000 3f06 16ca 0101 0101 0201 0101
+  0400 0019 7000 0000 0000 0000 5002 2000 16c6 0000
+  
+! # 1.1.1.1,1025 -> 2.1.1.1,25 TTL=63 TCP DF FO=0
+  [in]
+  4500 001c 0004 6000 3f06 16d5 0101 0101 0201 0101
+  0401 0019 0000 0000
+  
+! # 1.1.1.1 -> 2.1.1.1 TTL=63 TCP DF FO=1 SYN
+  [in]
+  4500 001c 0005 6001 3f06 16d3 0101 0101 0201 0101
+  0000 0000 5010 2000
+  
+! # 1.1.1.1 -> 2.1.1.1 TTL=63 UDP DF MF FO=0
+  [in]
+  4500 0014 0006 6000 3f11 16d0 0101 0101 0201 0101
+  
+! # 1.1.1.1,53 -> 2.1.1.1,53 TTL=63 UDP MF FO=0
+  [in]
+  4500 0018 0007 2000 3f11 56cb 0101 0101 0201 0101
+  0035 0035
+  
+! # 1.1.1.1,53 -> 2.1.1.1,53 TTL=63 UDP MF FO=0
+  [in]
+  4500 001c 0008 2000 3f11 56c6 0101 0101 0201 0101
+  0035 0035 0004 0000
+  
+! # 1.1.1.1,53 -> 2.1.1.1,54 TTL=63 UDP MF FO=0 (short)
+  [in]
+  4500 0018 0008 2000 3f11 56ca 0101 0101 0201 0101
+  0035 0036
+  
+! # 1.1.1.1,21 -> 2.1.1.1,54 TTL=63 UDP MF FO=0
+  [in]
+  4500 001c 0008 2000 3f11 56c6 0101 0101 0201 0101
+  0015 0036 0004 0000
+  
+! # 1.1.1.1,21 -> 2.1.1.1,54 TTL=63 TCP MF FO=0
+  [in]
+  4500 001c 0008 2000 3f06 56d1 0101 0101 0201 0101
+! 0015 0036 0000 0000 0000 0000 50 02 2000 0000 0000
+  
+  # 1.1.1.1 -> 2.1.1.1 TTL=63 UDP FO=3
+  [in]
+--- 1,62 ----
+  # This checksum is deliberately incorrect.
+! # 1.1.1.1,1025 -> 2.1.1.1,25 TTL=63 TCP DF,FO=0  SYN #1
+  [in]
+  4500 0028 0001 4000 3f06 36cc 0101 0101 0201 0101
+  0401 0019 0000 0000 0000 0000 50 02 2000 86bb 0000
+  
+! # 1.1.1.1,1025 -> 2.1.1.1,25 TTL=63 TCP MF  ACK #2
+  [in]
+  4500 0024 0002 2000 3f06 56cf 0101 0101 0201 0101
+  0401 0019 0000 0000 0000 0000 5010 2000
+  
+! # 1.1.1.1,1025 -> 2.1.1.1,25 TTL=63 TCP FO=2  ACK #3
+  [in]
+  4500 002c 0002 0002 3f06 76c5 0101 0101 0201 0101
+  0000 0000 0001 0203 0405 0607 0809 0a0b 0c0d 0e0f 1011 1213
+  
+! # 1.1.1.1,1024 -> 2.1.1.1,25 TTL=63 TCP DF MF FO=0 SYN #4
+  [in]
+  4500 0028 0003 6000 3f06 16ca 0101 0101 0201 0101
+  0400 0019 7000 0000 0000 0000 5002 2000 16c6 0000
+  
+! # 1.1.1.1,1025 -> 2.1.1.1,25 TTL=63 TCP DF FO=0 #5
+  [in]
+  4500 001c 0004 6000 3f06 16d5 0101 0101 0201 0101
+  0401 0019 0000 0000
+  
+! # 1.1.1.1 -> 2.1.1.1 TTL=63 TCP DF FO=1 SYN #6
+  [in]
+  4500 001c 0005 6001 3f06 16d3 0101 0101 0201 0101
+  0000 0000 5010 2000
+  
+! # 1.1.1.1 -> 2.1.1.1 TTL=63 UDP DF MF FO=0 #7
+  [in]
+  4500 0014 0006 6000 3f11 16d0 0101 0101 0201 0101
+  
+! # 1.1.1.1,53 -> 2.1.1.1,53 TTL=63 UDP MF FO=0 #8
+  [in]
+  4500 0018 0007 2000 3f11 56cb 0101 0101 0201 0101
+  0035 0035
+  
+! # 1.1.1.1,53 -> 2.1.1.1,53 TTL=63 UDP MF FO=0 #9
+  [in]
+  4500 001c 0008 2000 3f11 56c6 0101 0101 0201 0101
+  0035 0035 0004 0000
+  
+! # 1.1.1.1,53 -> 2.1.1.1,54 TTL=63 UDP MF FO=0 (short) #10
+  [in]
+  4500 0018 0008 2000 3f11 56ca 0101 0101 0201 0101
+  0035 0036
+  
+! # 1.1.1.1,21 -> 2.1.1.1,54 TTL=63 UDP MF FO=0 #11
+  [in]
+  4500 001c 0008 2000 3f11 56c6 0101 0101 0201 0101
+  0015 0036 0004 0000
+  
+! # 1.1.1.1,21 -> 2.1.1.1,54 TTL=63 TCP MF FO=0 #12
+  [in]
+  4500 001c 0008 2000 3f06 56d1 0101 0101 0201 0101
+! 0015 0036 0000 0000
+  
+  # 1.1.1.1 -> 2.1.1.1 TTL=63 UDP FO=3
+  [in]
+Index: input/f22
+===================================================================
+RCS file: /devel/CVS/IP-Filter/test/input/f22,v
+retrieving revision 2.1
+diff -c -r2.1 f22
+*** input/f22	2 Jan 2007 07:53:40 -0000	2.1
+--- input/f22	17 Nov 2011 19:57:52 -0000
+***************
+*** 1,14 ****
+  # ICMP dest unreachable with 64 bits in payload (in reply to a TCP packet
+  # going out)
+  # IP 4.4.4.4 2.2.2.2 TCP(20480,80)
+! [in,df0]
+  4500 003c 4706 4000 ff06 28aa 0404 0404
+  0202 0202 5000 0050 0000 0001 0000 0000
+  a002 16d0 d8e2 0000 0204 05b4 0402 080a
+  0047 fbb0 0000 0000 0103 0300 
+  
+  # IP 3.3.3.3 -> 4.4.4.4 ICMP (IP(4.4.4.4,6.6.6.6) TCP(20480,80)) UNREACH
+! [out,df0]
+  4500 0038 809a 0000 ff01 2d1d 0303 0303
+  0404 0404 0303 acab 0000 0000 4500 003c
+  4706 4000 ff06 28aa 0404 0404 0202 0202
+--- 1,14 ----
+  # ICMP dest unreachable with 64 bits in payload (in reply to a TCP packet
+  # going out)
+  # IP 4.4.4.4 2.2.2.2 TCP(20480,80)
+! [in,NIC0]
+  4500 003c 4706 4000 ff06 28aa 0404 0404
+  0202 0202 5000 0050 0000 0001 0000 0000
+  a002 16d0 d8e2 0000 0204 05b4 0402 080a
+  0047 fbb0 0000 0000 0103 0300 
+  
+  # IP 3.3.3.3 -> 4.4.4.4 ICMP (IP(4.4.4.4,6.6.6.6) TCP(20480,80)) UNREACH
+! [out,NIC0]
+  4500 0038 809a 0000 ff01 2d1d 0303 0303
+  0404 0404 0303 acab 0000 0000 4500 003c
+  4706 4000 ff06 28aa 0404 0404 0202 0202
+***************
+*** 16,29 ****
+  
+  # IP 3.3.3.3 -> 4.4.4.4 ICMP (IP(4.4.4.4,6.6.6.6) TCP(20480,80)) REDIRECT
+  # ICMP dest unreachable with whole packet in payload (40 bytes = 320 bits)
+! [out,df0]
+  4500 0038 809a 0000 ff01 2d1d 0303 0303
+  0404 0404 0501 9a9d 0808 0808 4500 003c
+  4706 4000 ff06 28aa 0404 0404 0202 0202
+  5000 0050 0000 0001
+  
+  # IP 3.3.3.3 -> 5.5.5.5 ICMP (IP(4.4.4.4,6.6.6.6) TCP(20480,80)) UNREACH
+! [out,df0]
+  4500 0038 809a 0000 ff01 2b1b 0303 0303
+  0505 0505 0303 acab 0000 0000 4500 003c
+  4706 4000 ff06 28aa 0404 0404 0202 0202
+--- 16,29 ----
+  
+  # IP 3.3.3.3 -> 4.4.4.4 ICMP (IP(4.4.4.4,6.6.6.6) TCP(20480,80)) REDIRECT
+  # ICMP dest unreachable with whole packet in payload (40 bytes = 320 bits)
+! [out,NIC0]
+  4500 0038 809a 0000 ff01 2d1d 0303 0303
+  0404 0404 0501 9a9d 0808 0808 4500 003c
+  4706 4000 ff06 28aa 0404 0404 0202 0202
+  5000 0050 0000 0001
+  
+  # IP 3.3.3.3 -> 5.5.5.5 ICMP (IP(4.4.4.4,6.6.6.6) TCP(20480,80)) UNREACH
+! [out,NIC0]
+  4500 0038 809a 0000 ff01 2b1b 0303 0303
+  0505 0505 0303 acab 0000 0000 4500 003c
+  4706 4000 ff06 28aa 0404 0404 0202 0202
+Index: regress/i5
+===================================================================
+RCS file: /devel/CVS/IP-Filter/test/regress/i5,v
+retrieving revision 2.1
+diff -c -r2.1 i5
+*** regress/i5	18 Dec 2005 14:41:05 -0000	2.1
+--- regress/i5	17 Nov 2011 19:57:52 -0000
+***************
+*** 3,9 ****
+  pass in on ed0 tos 64 from localhost to localhost
+  block in log on lo0 ttl 0 from any to any
+  pass in quick ttl 1 from any to any
+- skip 3 out from 127.0.0.1 to any
+  auth out on foo0 proto tcp from any to any port = 80
+  preauth out on foo0 proto tcp from any to any port = 22
+  nomatch out on foo0 proto tcp from any port < 1024 to any
+--- 3,8 ----

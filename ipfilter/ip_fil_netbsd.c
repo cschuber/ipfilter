@@ -191,7 +191,11 @@ ipf_check_wrapper(arg, mp, ifp, dir)
 	 * it has already been verified.
 	 */
 	rv = ipf_check(&ipfmain, ip, hlen, ifp, (dir == PFIL_OUT), mp);
-
+	if (FR_ISPASS(rv)) {
+		rv = 0;
+	} else {
+		rv = ENETUNREACH;
+	}
 	return (rv);
 }
 
