@@ -6750,7 +6750,7 @@ ipf_coalesce(fin)
 		ipf_main_softc_t *softc = fin->fin_main_soft;
 
 		DT1(frb_coalesce, fr_info_t *, fin);
-		LBUMP(ipf_stats[fin->fin_out], fr_badcoalesces);
+		LBUMP(ipf_stats[fin->fin_out].fr_badcoalesces);
 # ifdef MENTAT
 		FREE_MB_T(*fin->fin_mp);
 # endif
@@ -8331,10 +8331,10 @@ ipf_decaps(fin, pass, l5proto)
 		hlen = sizeof(ip6_t);
 #endif
 	else
-		goto cantdecaps;
+		goto cantdecaps2;
 
 	if (fin->fin_plen < hlen)
-		goto cantdecaps;
+		goto cantdecaps2;
 
 	fin->fin_dp = (char *)ip + hlen;
 
@@ -8343,10 +8343,19 @@ ipf_decaps(fin, pass, l5proto)
 		 * Perform IPv4 header checksum validation.
 		 */
 		if (ipf_cksum((u_short *)ip, hlen))
-			goto cantdecaps;
+			goto cantdecaps2;
 	}
 
 	if (ipf_makefrip(hlen, ip, fin) == -1) {
+cantdecaps2:
+		if (m != NULL) {
+#if defined(MENTAT) && defined(_KERNEL)
+			m->b_rptr -= elen;
+#else
+			m->m_data -= elen;
+			m->m_len += elen;
+#endif
+		}
 cantdecaps:
 		DT1(frb_decapfrip, fr_info_t *, fin);
 		pass &= ~FR_CMDMASK;
