@@ -576,8 +576,15 @@ void dostats_live(fd, nsp, opts, filter)
 			printf("\n");
 		} else {
 			printactivenat(&nat, opts, nsp->ns_ticks);
-			if (nat.nat_aps)
-				printaps(nat.nat_aps, opts);
+			if (nat.nat_aps) {
+				int proto;
+
+				if (nat.nat_dir & NAT_OUTBOUND)
+					proto = nat.nat_pr[1];
+				else
+					proto = nat.nat_pr[0];
+				printaps(nat.nat_aps, opts, proto);
+			}
 		}
 		nsp->ns_instances = nat.nat_next;
 	}
