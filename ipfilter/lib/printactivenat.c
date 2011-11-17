@@ -102,7 +102,7 @@ printactivenat(nat, opts, ticks)
 
 	if (opts & OPT_VERBOSE) {
 		PRINTF("\n\tttl %lu use %hu sumd %s/",
-			nat->nat_age - now, nat->nat_use,
+			nat->nat_age - ticks, nat->nat_use,
 			getsumd(nat->nat_sumd[0]));
 		PRINTF("%s pr %u/%u hash %u/%u flags %x\n",
 			getsumd(nat->nat_sumd[1]),
