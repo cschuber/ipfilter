@@ -319,7 +319,7 @@ ipf_send_ip(fr_info_t *fin, struct sk_buff *sk)
 
 		if ((fdp->fd_ptr != NULL) &&
 		    (fdp->fd_ptr != (struct ifnet *)-1))
-			return ipf_fastroute(m, mpp, &fnew, fdp);
+			return ipf_fastroute(sk, &sk, &fnew, fdp);
 	}
 
 	return ipf_fastroute(sk, &sk, &fnew, NULL);

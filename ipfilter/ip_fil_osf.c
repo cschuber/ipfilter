@@ -381,7 +381,7 @@ ipf_send_ip(fin, m)
 	fnew.fin_flx = FI_NOCKSUM;
 	fnew.fin_m = m;
 	fnew.fin_ip = ip;
-	fnew.fin_mp = mpp;
+	fnew.fin_mp = &m;
 	fnew.fin_hlen = hlen;
 	fnew.fin_dp = (char *)ip + hlen;
 	(void) ipf_makefrip(hlen, ip, &fnew);
@@ -391,7 +391,7 @@ ipf_send_ip(fin, m)
 
 		if ((fdp->fd_ptr != NULL) &&
 		    (fdp->fd_ptr != (struct ifnet *)-1))
-			return ipf_fastroute(m, mpp, &fnew, fdp);
+			return ipf_fastroute(m, &m, &fnew, fdp);
 	}
 
 	return ipf_fastroute(m, &m, &fnew, NULL);
