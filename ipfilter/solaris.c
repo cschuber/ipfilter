@@ -57,6 +57,7 @@
 # include <sys/hook_event.h>
 #endif
 
+extern	void	ipf_rand_push(void *, int);
 
 static	int	ipf_getinfo __P((dev_info_t *, ddi_info_cmd_t,
 				 void *, void **));
@@ -129,6 +130,7 @@ extern struct mod_ops mod_driverops;
 static struct modldrv iplmod = {
 	&mod_driverops, IPL_VERSION, &ipf_ops };
 static struct modlinkage modlink1 = { MODREV_1, &iplmod, NULL };
+static int ipf_pkts = 0;
 
 #if SOLARIS2 >= 6
 static	size_t	hdrsizes[57][2] = {
@@ -288,6 +290,8 @@ ipf_attach(dip, cmd)
 
 	cmn_err(CE_NOTE, "IP Filter: ipf_attach(%x,%x)", dip, cmd);
 #endif
+
+	ipf_rand_push(dip, sizeof(*dip));
 
 #if !defined(INSTANCES)
 	if ((pfilinterface != PFIL_INTERFACE) || (PFIL_INTERFACE < 2000000)) {
@@ -719,6 +723,23 @@ ipfwrite(dev, uio, cp)
 }
 
 #if !defined(INSTANCES)
+
+static int
+ipf_bounce(ctx, ip, hlen, ifp, out, qif, mp)
+	void *ctx;
+	ip_t *ip;
+	int hlen;
+	void *ifp;
+	int out;
+	void *qif;
+	mb_t **mp;
+{
+	if (++ipf_pkts & 0xffff) == 0)
+		ipf_rand_push(*mp, M_LEN(*mp));
+
+	return ipf_check(ctx, ip, hlen, ifp, out, qif, mp);
+}
+
 void
 ipf_pfil_hooks_add()
 {
@@ -788,6 +809,8 @@ ipf_hk_v4_in(tok, data, arg)
 	qpi.qpi_data = hpe->hpe_hdr;
 	qpi.qpi_off = 0;
 	qpi.qpi_flags = 0;
+	if (++ipf_pkts & 0xffff) == 0)
+		ipf_rand_push(qpi.qpi_m, M_LEN(qpi.qpi_m));
 
 	rval = ipf_check(softc, hpe->hpe_hdr, ip->ip_hl << 2,
 			 (void *)hpe->hpe_ifp, 0, &qpi, hpe->hpe_mp);
@@ -820,6 +843,8 @@ ipf_hk_v4_out(tok, data, arg)
 	qpi.qpi_data = hpe->hpe_hdr;
 	qpi.qpi_off = 0;
 	qpi.qpi_flags = 0;
+	if (++ipf_pkts & 0xffff) == 0)
+		ipf_rand_push(qpi.qpi_m, M_LEN(qpi.qpi_m));
 
 	rval = ipf_check(softc, hpe->hpe_hdr, ip->ip_hl << 2,
 			 (void *)hpe->hpe_ofp, 1, &qpi, hpe->hpe_mp);
@@ -886,6 +911,8 @@ ipf_hk_v6_in(tok, data, arg)
 	qpi.qpi_data = hpe->hpe_hdr;
 	qpi.qpi_off = 0;
 	qpi.qpi_flags = 0;
+	if (++ipf_pkts & 0xffff) == 0)
+		ipf_rand_push(qpi.qpi_m, M_LEN(qpi.qpi_m));
 
 	rval = ipf_check(softc, hpe->hpe_hdr, sizeof(ip6_t),
 			 (void *)hpe->hpe_ifp, 0, &qpi, hpe->hpe_mp);
@@ -917,6 +944,8 @@ ipf_hk_v6_out(tok, data, arg)
 	qpi.qpi_data = hpe->hpe_hdr;
 	qpi.qpi_off = 0;
 	qpi.qpi_flags = 0;
+	if (++ipf_pkts & 0xffff) == 0)
+		ipf_rand_push(qpi.qpi_m, M_LEN(qpi.qpi_m));
 
 	rval = ipf_check(softc, hpe->hpe_hdr, sizeof(ip6_t),
 			 (void *)hpe->hpe_ofp, 1, &qpi, hpe->hpe_mp);
