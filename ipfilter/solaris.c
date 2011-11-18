@@ -60,7 +60,8 @@ extern	int	fr_running;
 extern	int	fr_flags;
 extern	int	iplwrite __P((dev_t, struct uio *, cred_t *));
 
-extern ipnat_t *nat_list;
+extern	ipnat_t	*nat_list;
+extern	void	ipf_rand_push __P((void *, int));
 
 static	int	ipf_getinfo __P((dev_info_t *, ddi_info_cmd_t,
 				 void *, void **));
@@ -128,6 +129,7 @@ extern struct mod_ops mod_driverops;
 static struct modldrv iplmod = {
 	&mod_driverops, IPL_VERSION, &ipf_ops };
 static struct modlinkage modlink1 = { MODREV_1, &iplmod, NULL };
+static int ipf_pkts = 0;
 
 #if SOLARIS2 >= 6
 static	size_t	hdrsizes[57][2] = {
@@ -260,6 +262,8 @@ ddi_attach_cmd_t cmd;
 
 	cmn_err(CE_NOTE, "IP Filter: ipf_attach(%x,%x)", dip, cmd);
 #endif
+
+	ipf_rand_push(dip, sizeof(*dip));
 
 #if !defined(_INET_IP_STACK_H)
 	if ((pfilinterface != PFIL_INTERFACE) || (PFIL_INTERFACE < 2000000)) {
@@ -667,6 +671,8 @@ ipf_hook(hook_event_token_t event, hook_data_t data, void *stp)
 	qpi.qpi_flags = 0;
 	qpi.qpi_num = hpe->hpe_ifp;
 	qpi.qpi_off = 0;
+	if ((++ipf_pkts & 0xffff) == 0)
+		ipf_rand_push(qpi.qpi_m, M_LEN(qpi.qpi_m));
 
 	ip = hpe->hpe_hdr;
 	if (ip->ip_v == 4) {
