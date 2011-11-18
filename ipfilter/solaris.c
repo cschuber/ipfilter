@@ -734,7 +734,7 @@ ipf_bounce(ctx, ip, hlen, ifp, out, qif, mp)
 	void *qif;
 	mb_t **mp;
 {
-	if (++ipf_pkts & 0xffff) == 0)
+	if ((++ipf_pkts & 0xffff) == 0)
 		ipf_rand_push(*mp, M_LEN(*mp));
 
 	return ipf_check(ctx, ip, hlen, ifp, out, qif, mp);
@@ -809,7 +809,7 @@ ipf_hk_v4_in(tok, data, arg)
 	qpi.qpi_data = hpe->hpe_hdr;
 	qpi.qpi_off = 0;
 	qpi.qpi_flags = 0;
-	if (++ipf_pkts & 0xffff) == 0)
+	if ((++ipf_pkts & 0xffff) == 0)
 		ipf_rand_push(qpi.qpi_m, M_LEN(qpi.qpi_m));
 
 	rval = ipf_check(softc, hpe->hpe_hdr, ip->ip_hl << 2,
@@ -843,7 +843,7 @@ ipf_hk_v4_out(tok, data, arg)
 	qpi.qpi_data = hpe->hpe_hdr;
 	qpi.qpi_off = 0;
 	qpi.qpi_flags = 0;
-	if (++ipf_pkts & 0xffff) == 0)
+	if ((++ipf_pkts & 0xffff) == 0)
 		ipf_rand_push(qpi.qpi_m, M_LEN(qpi.qpi_m));
 
 	rval = ipf_check(softc, hpe->hpe_hdr, ip->ip_hl << 2,
@@ -911,7 +911,7 @@ ipf_hk_v6_in(tok, data, arg)
 	qpi.qpi_data = hpe->hpe_hdr;
 	qpi.qpi_off = 0;
 	qpi.qpi_flags = 0;
-	if (++ipf_pkts & 0xffff) == 0)
+	if ((++ipf_pkts & 0xffff) == 0)
 		ipf_rand_push(qpi.qpi_m, M_LEN(qpi.qpi_m));
 
 	rval = ipf_check(softc, hpe->hpe_hdr, sizeof(ip6_t),
@@ -944,7 +944,7 @@ ipf_hk_v6_out(tok, data, arg)
 	qpi.qpi_data = hpe->hpe_hdr;
 	qpi.qpi_off = 0;
 	qpi.qpi_flags = 0;
-	if (++ipf_pkts & 0xffff) == 0)
+	if ((++ipf_pkts & 0xffff) == 0)
 		ipf_rand_push(qpi.qpi_m, M_LEN(qpi.qpi_m));
 
 	rval = ipf_check(softc, hpe->hpe_hdr, sizeof(ip6_t),
