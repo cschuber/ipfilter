@@ -171,11 +171,6 @@ struct file;
 # ifdef i386
 #  define _SYS_PROMIF_H
 # endif
-# ifndef _KERNEL
-#  include "radix_ipf.h"
-# else
-#  include "radix_ipf_local.h"
-# endif
 # include <inet/mib2.h>
 # include <inet/ip.h>
 # undef COPYOUT

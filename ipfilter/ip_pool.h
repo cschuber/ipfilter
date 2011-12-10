@@ -9,35 +9,20 @@
 #ifndef	__IP_POOL_H__
 #define	__IP_POOL_H__
 
-#if defined(_KERNEL) && !defined(__osf__) && !defined(__hpux) && \
-    !defined(linux) && !defined(sun) && !defined(AIX)
-# include <net/radix.h>
-extern void rn_freehead __P((struct radix_node_head *));
-# define FreeS(p, z)		KFREES(p, z)
-extern int max_keylen;
-#else
-# if defined(__osf__) || defined(__hpux) || defined(sun)
-#  include "radix_ipf_local.h"
-#  define radix_mask ipf_radix_mask
-#  define radix_node ipf_radix_node
-#  define radix_node_head ipf_radix_node_head
-# else
-#  include "radix_ipf.h"
-# endif
-#endif
 #include "netinet/ip_lookup.h"
+#include "radix_ipf.h"
 
 #define	IP_POOL_NOMATCH		0
 #define	IP_POOL_POSITIVE	1
 
 typedef	struct ip_pool_node {
-	struct	radix_node	ipn_nodes[2];
+	ipf_rdx_node_t		ipn_nodes[2];
 	addrfamily_t		ipn_addr;
 	addrfamily_t		ipn_mask;
 	int			ipn_info;
 	int			ipn_ref;
-char			ipn_name[FR_GROUPLEN];
-u_long			ipn_hits;
+	char			ipn_name[FR_GROUPLEN];
+	u_long			ipn_hits;
 	struct ip_pool_node	*ipn_next, **ipn_pnext;
 } ip_pool_node_t;
 
@@ -45,7 +30,7 @@ u_long			ipn_hits;
 typedef	struct ip_pool_s {
 	struct ip_pool_s	*ipo_next;
 	struct ip_pool_s	**ipo_pnext;
-	struct radix_node_head	*ipo_head;
+	ipf_rdx_head_t	*ipo_head;
 	ip_pool_node_t	*ipo_list;
 	u_long		ipo_hits;
 	int		ipo_unit;

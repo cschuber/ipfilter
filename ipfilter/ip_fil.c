@@ -79,9 +79,6 @@ struct file;
 #include <sys/hashing.h>
 # endif
 #endif
-#if defined(__FreeBSD__) || defined(SOLARIS2)
-# include "radix_ipf.h"
-#endif
 #ifndef __osf__
 # include <net/route.h>
 #endif
@@ -98,10 +95,6 @@ struct file;
 #include <netinet/tcp.h>
 #if defined(__osf__)
 # include <netinet/tcp_timer.h>
-#endif
-#if defined(__osf__) || defined(__hpux) || defined(__sgi)
-# include "radix_ipf_local.h"
-# define _RADIX_H_
 #endif
 #include <netinet/udp.h>
 #include <netinet/tcpip.h>

@@ -52,7 +52,7 @@ IPT=ipftest.o fil_u.o ip_frag_u.o ip_state_u.o ip_nat_u.o \
     ip_proxy_u.o ip_auth_u.o ip_htable_u.o ip_lookup_u.o ip_pool_u.o \
     ip_scan_u.o ip_sync_u.o ip_rules_u.o ip_fil_u.o ip_log_u.o \
     ippool_y.o ippool_l.o ipf_y.o ipf_l.o ipnat_y.o ipnat_l.o \
-    md5_u.o radix_u.o bpf_filter_u.o
+    md5_u.o radix_ipf_u.o bpf_filter_u.o
 #   ip_syn_u.o
 #ip_trafcon_u.o
 TOOL=$(TOP)/tools
@@ -241,8 +241,8 @@ ip_log_u.o: $(TOP)/ip_log.c $(TOP)/ip_fil.h $(TOP)/ip_compat.h
 md5_u.o: $(TOP)/md5.c $(TOP)/md5.h
 	$(CC) $(CCARGS) $(EXTRA) -c $(TOP)/md5.c -o $@
 
-radix_u.o: $(TOP)/md5.c $(TOP)/radix_ipf.h
-	$(CC) $(CCARGS) $(EXTRA) -c $(TOP)/radix.c -o $@
+radix_ipf_u.o: $(TOP)/md5.c $(TOP)/radix_ipf.h
+	$(CC) $(CCARGS) $(EXTRA) -c $(TOP)/radix_ipf.c -o $@
 
 bpf_filter_u.o: $(TOP)/bpf_filter.c $(TOP)/pcap-ipf.h
 	$(CC) $(CCARGS) $(EXTRA) -c $(TOP)/bpf_filter.c -o $@

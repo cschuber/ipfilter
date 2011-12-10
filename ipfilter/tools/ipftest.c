@@ -817,6 +817,6 @@ ip_t *ip;
 	}
 	if (hdr != NULL) {
 		*csump = 0;
-		*(u_short *)csump = fr_cksum(m, ip, ip->ip_p, hdr, ip->ip_len);
+		*(u_short *)csump = fr_cksum(NULL, m, ip, ip->ip_p, hdr, ip->ip_len);
 	}
 }

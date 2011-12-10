@@ -1080,6 +1080,8 @@ typedef	int	(*ipftq_delete_fn_t)(void *);
  */
 typedef	struct	{
 	u_char		adf_len;
+	u_char		adf_family;
+	u_char		adf_xxx[6];	/* Force adf_addr to be 64bit aligned */
 	i6addr_t	adf_addr;
 } addrfamily_t;
 
@@ -1497,7 +1499,7 @@ extern	void	fr_logunload __P((void));
 
 extern	frentry_t	*fr_acctpkt __P((fr_info_t *, u_32_t *));
 extern	int		fr_copytolog __P((int, char *, int));
-extern	u_short		fr_cksum __P((mb_t *, ip_t *, int, void *, int));
+extern	u_short		fr_cksum __P((fr_info_t *, mb_t *, ip_t *, int, void *, int));
 extern	void		fr_deinitialise __P((void));
 extern	frentry_t 	*fr_dolog __P((fr_info_t *, u_32_t *));
 extern	frentry_t 	*fr_dstgrpmap __P((fr_info_t *, u_32_t *));

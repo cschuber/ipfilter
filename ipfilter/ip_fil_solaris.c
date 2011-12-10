@@ -473,7 +473,7 @@ fr_info_t *fin;
 		ip->ip_p = IPPROTO_TCP;
 		ip->ip_len = sizeof(*ip) + sizeof(*tcp);
 		ip->ip_tos = fin->fin_ip->ip_tos;
-		tcp2->th_sum = fr_cksum(m, ip, IPPROTO_TCP, tcp2, ip->ip_len);
+		tcp2->th_sum = fr_cksum(fin, m, ip, IPPROTO_TCP, tcp2, ip->ip_len);
 	}
 	return fr_send_ip(fin, m, &m);
 }
@@ -1330,7 +1330,7 @@ fr_info_t *fin;
 
 	if (csump != NULL) {
 		*csump = 0;
-		*csump = fr_cksum(fin->fin_m, fin->fin_ip, fin->fin_p,
+		*csump = fr_cksum(fin, fin->fin_m, fin->fin_ip, fin->fin_p,
 				  fin->fin_dp, fin->fin_plen);
 	}
 }

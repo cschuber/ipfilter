@@ -1484,17 +1484,17 @@ u_int flags;
 	 * this may change.
 	 */
 	is->is_v = fin->fin_v;
+	is->is_me = stsave;
+	is->is_sec = fin->fin_secmsk;
+	is->is_secmsk = 0xffff;
+	is->is_auth = fin->fin_auth;
+	is->is_authmsk = 0xffff;
 	is->is_opt[0] = fin->fin_optmsk;
 	is->is_optmsk[0] = 0xffffffff;
 	if (is->is_v == 6) {
 		is->is_opt[0] &= ~0x8;
 		is->is_optmsk[0] &= ~0x8;
 	}
-	is->is_me = stsave;
-	is->is_sec = fin->fin_secmsk;
-	is->is_secmsk = 0xffff;
-	is->is_auth = fin->fin_auth;
-	is->is_authmsk = 0xffff;
 	if (flags & (SI_WILDP|SI_WILDA)) {
 		ATOMIC_INCL(ips_stats.iss_wild);
 	}
@@ -2268,9 +2268,11 @@ u_32_t cmask;
 		is->is_flx[out][rev] = flx;
 		if (rev == 1 && is->is_optmsk[1] == 0) {
 			is->is_opt[1] = fin->fin_optmsk;
-			is->is_optmsk[1] = is->is_optmsk[0];
-			if (is->is_v == 6)
+			is->is_optmsk[1] = 0xffffffff;
+			if (is->is_v == 6) {
 				is->is_opt[1] &= ~0x8;
+				is->is_optmsk[1] &= ~0x8;
+			}
 		}
 	}
 

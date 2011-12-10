@@ -42,7 +42,7 @@ INSTALL=install
 MODOBJS=ip_fil.o fil.o mls_ipl.o ip_nat.o ip_state.o ip_frag.o ip_proxy.o \
 	ip_auth.o ip_log.o ip_pool.o ip_htable.o ip_lookup.o ip_scan.o \
 	ip_sync.o ip_rules.o \
-	radix.o md5.o
+	radix_ipf.o md5.o
 #	ip_trafcon.o
 DFLAGS=$(IPFLKM) $(IPFLOG) $(DEF) $(LOOKUP) $(SYNC)
 IPF=ipf.o ipfcomp.o ipf_y.o ipf_l.o
@@ -50,7 +50,7 @@ IPFTEST=ipftest.o fil_u.o ip_nat_u.o ip_frag_u.o ip_state_u.o ip_fil_u.o \
 	ip_proxy_u.o ip_auth_u.o ip_pool_u.o ip_htable_u.o ip_lookup_u.o \
 	ip_scan_u.o ip_sync_u.o ip_rules_u.o ip_log_u.o \
 	ippool_y.o ippool_l.o ipf_y.o ipf_l.o ipnat_y.o ipnat_l.o \
-	bpf_filter_u.o md5_u.o radix_u.o
+	bpf_filter_u.o md5_u.o radix_ipf_u.o
 #	ip_trafcon_u.o
 IPNAT=ipnat.o ipnat_y.o ipnat_l.o
 IPMON=ipmon.o ipmon_y.o ipmon_l.o
@@ -121,8 +121,8 @@ ipf.o: $(TOOL)/ipf.c $(TOP)/ip_fil.h $(TOP)/ipf.h
 md5.o: $(TOP)/md5.c $(TOP)/md5.h
 	$(CC) $(CCARGS) $(DFLAGS) -c $(TOP)/md5.c -o $@
 
-radix.o: $(TOP)/radix.c $(TOP)/radix_ipf.h
-	$(CC) $(CCARGS) $(DFLAGS) -c $(TOP)/radix.c -o $@
+radix_ipf.o: $(TOP)/radix_ipf.c $(TOP)/radix_ipf.h
+	$(CC) $(CCARGS) $(DFLAGS) -c $(TOP)/radix_ipf.c -o $@
 
 bpf_filter_u.o: $(TOP)/bpf_filter.c
 	$(CC) $(CCARGS) -c $(TOP)/bpf_filter.c -o $@
@@ -130,8 +130,8 @@ bpf_filter_u.o: $(TOP)/bpf_filter.c
 md5_u.o: $(TOP)/md5.c $(TOP)/md5.h
 	$(CC) $(CCARGS) -c $(TOP)/md5.c -o $@
 
-radix_u.o: $(TOP)/radix.c $(TOP)/radix_ipf.h
-	$(CC) $(CCARGS) -c $(TOP)/radix.c -o $@
+radix_ipf_u.o: $(TOP)/radix_ipf.c $(TOP)/radix_ipf.h
+	$(CC) $(CCARGS) -c $(TOP)/radix_ipf.c -o $@
 
 ipfcomp.o: $(TOOL)/ipfcomp.c $(TOP)/ip_fil.h $(TOP)/ipf.h
 	$(CC) $(CCARGS) -c $(TOOL)/ipfcomp.c -o $@

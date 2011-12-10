@@ -288,8 +288,6 @@ caddr_t data;
 {
 	ip_pool_node_t node, *m;
 	iplookupop_t op;
-	iphtable_t *iph;
-	iphtent_t hte;
 	ip_pool_t *p;
 	int err;
 
@@ -323,17 +321,10 @@ caddr_t data;
 		break;
 
 	case IPLT_HASH :
-		if (op.iplo_size != sizeof(hte))
-			return EINVAL;
-
-		err = COPYIN(op.iplo_struct, &hte, sizeof(hte));
-		if (err != 0)
-			return EFAULT;
-
-		iph = fr_findhtable(op.iplo_unit, op.iplo_name);
-		if (iph == NULL)
-			return ESRCH;
-		err = fr_delhtent(iph, &hte);
+		/*
+		 * This cannot be done with the current APIs available here.
+		 */
+		err = EINVAL;
 		break;
 
 	default :

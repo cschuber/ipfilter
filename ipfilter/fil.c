@@ -2,8 +2,6 @@
  * Copyright (C) 1993-2010 by Darren Reed.
  *
  * See the IPFILTER.LICENCE file for details on licencing.
- *
- * Copyright 2008 Sun Microsystems, Inc.
  */
 #if defined(KERNEL) || defined(_KERNEL)
 # undef KERNEL
@@ -81,17 +79,6 @@ struct file;
 #include <net/if.h>
 #ifdef sun
 # include <net/af.h>
-#endif
-#if !defined(_KERNEL) && (defined(__FreeBSD__) || defined(SOLARIS2))
-# if (__FreeBSD_version >= 504000)
-#  undef _RADIX_H_
-# endif
-# include "radix_ipf.h"
-#endif
-#ifdef __osf__
-# include "radix_ipf.h"
-#else
-# include <net/route.h>
 #endif
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
@@ -393,7 +380,9 @@ int xmin;
 /* Copy values from the IPv6 header into the fr_info_t struct and call the  */
 /* per-protocol analyzer if it exists.  In validating the packet, a protocol*/
 /* analyzer may pullup or free the packet itself so we need to be vigiliant */
-/* of that possibility arising.                                             */
+/* of that possibility arising. When this function returns, fin_dp points   */
+/* to the first byte past the last extension header parsed without error.   */
+/* This will usually be a transport protocol such a TCP, UDP, etc.          */
 /* ------------------------------------------------------------------------ */
 static INLINE void frpr_ipv6hdr(fin)
 fr_info_t *fin;
@@ -1591,7 +1580,11 @@ fr_info_t *fin;
 /* Compact the IP header into a structure which contains just the info.     */
 /* which is useful for comparing IP headers with and store this information */
 /* in the fr_info_t structure pointer to by fin.  At present, it is assumed */
-/* this function will be called with either an IPv4 or IPv6 packet.         */
+/* this function will be called with either an IPv4 or IPv6 packet. When it */
+/* returns, fin_dp will point to a transport protocol header if present. If */
+/* no transport header is present, then it points to the first byte of data */
+/* past the IPv4 header or after the last IPv6 extension header verified    */
+/* without error.                                                           */
 /* ------------------------------------------------------------------------ */
 int	fr_makefrip(hlen, ip, fin)
 int hlen;
@@ -2915,7 +2908,8 @@ int len;
 /*                                                                          */
 /* Expects ip_len to be in host byte order when called.                     */
 /* ------------------------------------------------------------------------ */
-u_short fr_cksum(m, ip, l4proto, l4hdr, l3len)
+u_short fr_cksum(fin, m, ip, l4proto, l4hdr, l3len)
+fr_info_t *fin;
 mb_t *m;
 ip_t *ip;
 int l4proto, l3len;
@@ -3007,7 +3001,7 @@ void *l4hdr;
 
 #ifdef	_KERNEL
 # ifdef MENTAT
-	sum2 = ip_cksum(m, ((qpktinfo_t m*)fin->fin_qif)->qpi_off + hlen, sum);
+	sum2 = ip_cksum(m, ((qpktinfo_t *)fin->fin_qpi)->qpi_off + hlen, sum);
 	sum2 = (u_short)(~sum2 & 0xffff);
 # else /* MENTAT */
 #  if defined(BSD) || defined(sun)
@@ -5217,7 +5211,7 @@ char *buffer;
 		;
 	unit = ifp->if_unit;
 	space = LIFNAMSIZ - (s - buffer);
-	if (space > 0) {
+	if ((space > 0) && !ISDIGIT(*(s-1))) {
 #  if defined(SNPRINTF) && defined(_KERNEL)
 		SNPRINTF(temp, sizeof(temp), "%d", unit);
 #  else
@@ -5677,7 +5671,7 @@ fr_info_t *fin;
 			hdrsum = *csump;
 
 		if (dosum) {
-			sum = fr_cksum(fin->fin_m, fin->fin_ip,
+			sum = fr_cksum(fin, fin->fin_m, fin->fin_ip,
 				       fin->fin_p, fin->fin_dp,
 				       fin->fin_dlen + fin->fin_hlen);
 		}

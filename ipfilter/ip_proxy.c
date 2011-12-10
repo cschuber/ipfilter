@@ -577,22 +577,22 @@ nat_t *nat;
 			err = appr_fixseqack(fin, ip, aps, APR_INC(err));
 #if SOLARIS && defined(_KERNEL) && (SOLARIS2 >= 6)
 			if (dosum)
-				tcp->th_sum = fr_cksum(fin->fin_qfm, ip,
+				tcp->th_sum = fr_cksum(fin, fin->fin_qfm, ip,
 						       IPPROTO_TCP, tcp,
 						       fin->fin_plen);
 #else
-			tcp->th_sum = fr_cksum(fin->fin_m, ip,
+			tcp->th_sum = fr_cksum(fin, fin->fin_m, ip,
 					       IPPROTO_TCP, tcp,
 					       fin->fin_plen);
 #endif
 		} else if ((udp != NULL) && (udp->uh_sum != 0)) {
 #if SOLARIS && defined(_KERNEL) && (SOLARIS2 >= 6)
 			if (dosum)
-				udp->uh_sum = fr_cksum(fin->fin_qfm, ip,
+				udp->uh_sum = fr_cksum(fin, fin->fin_qfm, ip,
 						       IPPROTO_UDP, udp,
 						       fin->fin_plen);
 #else
-			udp->uh_sum = fr_cksum(fin->fin_m, ip,
+			udp->uh_sum = fr_cksum(fin, fin->fin_m, ip,
 					       IPPROTO_UDP, udp,
 					       fin->fin_plen);
 #endif
