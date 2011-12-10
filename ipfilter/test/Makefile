@@ -670,6 +670,9 @@ $(RESDIR)/ip3: expected/ip3 regress/ip3 $(POOLDEP)
 $(RESDIR)/bpf-f1: expected/bpf-f1 regress/bpf-f1
 	/bin/sh ./bpf_test $@ $(TESTMODE)
 
+expected/i19:
+	(cd expected; make i19)
+
 clean:
 	/bin/rm -rf $(RESDIR)/*
 	/bin/rm -f results/* logout

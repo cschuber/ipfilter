@@ -61,7 +61,7 @@ DFLAGS=$(IPFLKM) $(IPFLOG) $(DEF) $(IPFBPF) $(LOOKUP) $(XID)
 MODOBJS=ip_fil.o fil.o ip_state.o ip_frag.o \
 	ip_nat.o ip_proxy.o ip_auth.o ip_log.o \
 	ip_pool.o ip_htable.o ip_lookup.o \
-	ip_sync.o ip_scan.o ip_rules.o hpux.o $(BPFILTER) md5.o radix.o
+	ip_sync.o ip_scan.o ip_rules.o hpux.o $(BPFILTER) md5.o radix_ipf.o
 #	ip_trafcon.o
 IPF=ipf.o ipfcomp.o ipf_y.o ipf_l.o
 IPT=ipftest.o fil_u.o ip_state_u.o ip_frag_u.o \
@@ -69,7 +69,7 @@ IPT=ipftest.o fil_u.o ip_state_u.o ip_frag_u.o \
 	ip_auth_u.o ip_pool_u.o ip_rules_u.o ip_log_u.o \
 	ip_htable_u.o ip_lookup_u.o \
 	ipf_y.o ipf_l.o ipnat_y.o ipnat_l.o ippool_y.o ippool_l.o \
-	bpf_filter_u.o md5_u.o radix_u.o
+	bpf_filter_u.o md5_u.o radix_ipf_u.o
 #	ip_trafcon_u.o
 IPMON=ipmon.o ipmon_y.o ipmon_l.o
 IPPOOL=ippool_y.o ippool_l.o ippool.o
@@ -81,18 +81,12 @@ RANLIB=ranlib
 AROPTS=cq
 CCARGS=$(DEBUG) $(CFLAGS) -I$(TOP)/../pfil/HP-UX
 EXTRA=$(ALLOPTS)
-#FIXRADIX=-Dradix_node=ipf_radix_node -Dradix_node_head=ipf_radix_node_head
 #
 include $(TOP)/lib/Makefile
 
-build: radix_ipf_local.h $(DEST)/libipf.a ipf ipfstat ipftest ipmon ipnat ippool \
+build: $(DEST)/libipf.a ipf ipfstat ipftest ipmon ipnat ippool \
 	ipfs ipscan ipsyncm ipsyncs mod.o
 	-sh -c 'for i in ipf ipftest ipmon ippool ipnat ipscan ipsyncm ipsyncs; do /bin/rm -f $(TOP)/$$i; ln -s `pwd`/$$i $(TOP); done'
-
-radix_ipf_local.h: $(TOP)/radix_ipf.h Makefile
-	sed -e 's/radix_node/ipf_radix_node/g' \
-	    -e 's/radix_mask/ipf_radix_mask/g' \
-	    $(TOP)/radix_ipf.h > $@
 
 .y.c:
 
@@ -256,10 +250,11 @@ ip_sync.o: $(TOP)/ip_sync.c $(TOP)/ip_sync.h $(TOP)/ip_compat.h
 ip_trafcon.o: $(TOP)/ip_trafcon.c $(TOP)/ip_trafcon.h $(TOP)/ip_compat.h
 	$(CC) -I$(TOP) $(DFLAGS) $(HFLAGS) -c $(TOP)/ip_trafcon.c -o $@
 
-radix.o: $(TOP)/radix.c $(TOP)/radix_ipf.h
-	$(CC) -I$(TOP) $(DFLAGS) $(HFLAGS) $(O2) -c $(TOP)/radix.c -o $@
+radix_ipf.o: $(TOP)/radix_ipf.c $(TOP)/radix_ipf.h
+	$(CC) -I$(TOP) $(DFLAGS) $(HFLAGS) $(O2) -c $(TOP)/radix_ipf.c -o $@
 
-ip_pool.o: $(TOP)/ip_pool.c $(TOP)/ip_pool.h $(TOP)/ip_compat.h radix_ipf_local.h
+ip_pool.o: $(TOP)/ip_pool.c $(TOP)/ip_pool.h $(TOP)/ip_compat.h \
+	   $(TOP)/radix_ipf.h
 	$(CC) -I$(TOP) $(DFLAGS) $(HFLAGS) $(FIXRADIX) $(O2) \
 		-c $(TOP)/ip_pool.c -o $@
 
@@ -340,8 +335,8 @@ md5_u.o: $(TOP)/md5.c $(TOP)/md5.h
 md5.o: $(TOP)/md5.c $(TOP)/md5.h
 	$(CC) -I$(TOP) $(DFLAGS) $(HFLAGS) $(O3) $(SPU) -c $(TOP)/md5.c -o $@
 
-radix_u.o: $(TOP)/radix.c $(TOP)/radix_ipf.h
-	$(CC) $(CCARGS) $(EXTRA) -c $(TOP)/radix.c -o $@
+radix_ipf_u.o: $(TOP)/radix_ipf.c $(TOP)/radix_ipf.h
+	$(CC) $(CCARGS) $(EXTRA) -c $(TOP)/radix_ipf.c -o $@
 
 ipmon: $(IPMON) $(DEST)/libipf.a
 	$(CC) $(CCARGS) $(LOGFAC) $(IPMON) -o $@ $(LIBS) $(LLIB)
@@ -398,7 +393,7 @@ clean:
 	${RM} -f ../ipscan ../ipsyncm ../ipsyncs
 	${RM} -f core *.o *.a ipt ipfstat ipf ipfstat ipftest ipmon
 	${RM} -f if_ipl ipnat $(LKM) libmilli.a ipf.psf
-	${RM} -f ip_fil.c ipf_l.c ipf_y.c ipf_y.h ipf_l.h radix_ipf_local.h
+	${RM} -f ip_fil.c ipf_l.c ipf_y.c ipf_y.h ipf_l.h
 	${RM} -f ipscan ipscan_y.c ipscan_y.h ipscan_l.c ipscan_l.h
 	${RM} -f ippool ippool_y.c ippool_y.h ippool_l.c ippool_l.h
 	${RM} -f ipnat_y.c ipnat_y.h ipnat_l.c ipnat_l.h

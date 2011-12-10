@@ -35,8 +35,6 @@ MFLAGS="BINDEST=$(BINDEST)" "SBINDEST=$(SBINDEST)" "MANDIR=$(MANDIR)" \
 LIBS=-L. -lipf
 CCARGS=$(DEBUG) $(CFLAGS) -I. -DTRU64=$(TRU64)
 EXTRA=$(ALLOPTS)
-#FIXRADIX=-Dradix_node=ipf_radix_node -Dradix_node_head=ipf_radix_node_head \
-# -Drn_inithead=ipf_rn_inithead -Drn_walktree=ipf_rn_walktree
 #
 ########## ########## ########## ########## ########## ########## ##########
 #
@@ -45,7 +43,7 @@ RM=/bin/rm
 CHMOD=/bin/chmod
 INSTALL=$(TOP)/bsdinstall
 #
-MODOBJS=md5.o arc4random.o tru64.o radix.o \
+MODOBJS=md5.o arc4random.o tru64.o radix_ipf.o \
 	ip_fil.o fil.o ip_nat.o ip_frag.o ip_state.o ip_nat6.o \
 	ip_proxy.o ip_auth.o ip_log.o ip_pool.o ip_htable.o ip_lookup.o \
 	ip_dstlist.o ip_sync.o ip_scan.o ip_rules.o
@@ -56,7 +54,7 @@ IPT=ipftest.o fil_u.o ip_frag_u.o ip_state_u.o ip_nat_u.o ip_nat6_u.o \
 	ip_proxy_u.o ip_auth_u.o ip_fil_u.o ip_sync_u.o ip_scan_u.o \
 	ip_log_u.o ip_pool_u.o ip_htable_u.o ip_lookup_u.o ip_rules_u.o \
 	ipf_y.o ipf_l.o ipnat_y.o ipnat_l.o ippool_y.o ippool_l.o \
-	bpf_filter_u.o md5_u.o radix_u.o ip_dstlist_u.o
+	bpf_filter_u.o md5_u.o radix_ipf_u.o ip_dstlist_u.o
 IPNAT=ipnat.o ipnat_y.o ipnat_l.o
 IPMON=ipmon.o ipmon_y.o ipmon_l.o
 IPPOOL=ippool_y.o ippool_l.o kmem.o ippool.o
@@ -68,7 +66,7 @@ TOOL=$(TOP)/tools
 
 include $(TOP)/lib/Makefile
 
-build all: radix_ipf_local.h ./libipf.a ipf ipfs ipfstat ipftest ipmon ipnat \
+build all: ./libipf.a ipf ipfs ipfstat ipftest ipmon ipnat \
 	ippool ipscan ipsyncm ipsyncs $(LKM)
 	-sh -c 'for i in ipf ipftest ipmon ippool ipnat ipscan ipsyncm ipsyncs; do /bin/rm -f $(TOP)/$$i; ln -s `pwd`/$$i $(TOP); done'
 
@@ -226,8 +224,8 @@ bpf_filter_u.o: $(TOP)/bpf_filter.c $(TOP)/pcap-ipf.h $(TOP)/bpf-ipf.h
 md5_u.o: $(TOP)/md5.c $(TOP)/md5.h
 	$(CC) $(CCARGS) -c $(TOP)/md5.c -o $@
 
-radix_u.o: $(TOP)/radix.c $(TOP)/radix_ipf.h
-	$(CC) $(CCARGS) -c $(TOP)/radix.c -o $@
+radix_ipf_u.o: $(TOP)/radix_ipf.c $(TOP)/radix_ipf.h
+	$(CC) $(CCARGS) -c $(TOP)/radix_ipf.c -o $@
 
 if_ipl.o: $(MODOBJS)
 	ld -r -dc $(MODOBJS) -o $(LKM)
@@ -271,11 +269,11 @@ ip_scan.o: $(TOP)/ip_scan.c $(TOP)/ip_compat.h $(TOP)/ip_fil.h $(TOP)/ip_scan.h
 ip_sync.o: $(TOP)/ip_sync.c $(TOP)/ip_compat.h $(TOP)/ip_fil.h $(TOP)/ip_sync.h
 	$(CC) $(DFLAGS) -c $(TOP)/ip_sync.c -o $@
 
-radix.o: $(TOP)/radix.c radix_ipf_local.h
-	$(CC) $(DFLAGS) -c $(TOP)/radix.c -o $@
+radix_ipf.o: $(TOP)/radix_ipf.c $(TOP)/radix_ipf.h
+	$(CC) $(DFLAGS) -c $(TOP)/radix_ipf.c -o $@
 
 ip_pool.o: $(TOP)/ip_pool.c $(TOP)/ip_compat.h $(TOP)/ip_fil.h \
-	$(TOP)/ip_pool.h radix_ipf_local.h
+	$(TOP)/ip_pool.h $(TOP)/radix_ipf.h
 	$(CC) $(DFLAGS) $(FIXRADIX) -c $(TOP)/ip_pool.c -o $@
 
 ip_htable.o: $(TOP)/ip_htable.c $(TOP)/ip_compat.h $(TOP)/ip_fil.h \
@@ -356,11 +354,6 @@ ippool_y.h ippool_y.c: $(TOOL)/ippool_y.y $(TOP)/ip_pool.h
 ippool_l.c ippool_l.h: $(TOOL)/lexer.c $(TOP)/ip_pool.h
 	(cd $(TOOL); make "DEST=../$(HERE)" ../$(HERE)/$@)
 
-radix_ipf_local.h: $(TOP)/radix_ipf.h Makefile
-	sed -e 's/^\([^#].*\)\([ 	]\)radix_node/\1\2ipf_radix_node/g' \
-	    -e 's/^\([^#].*\)\([ 	]\)radix_mask/\1\2ipf_radix_mask/g' \
-	    $(TOP)/radix_ipf.h > $@
-
 .y.c:
 
 .l.c:
@@ -368,7 +361,7 @@ radix_ipf_local.h: $(TOP)/radix_ipf.h Makefile
 clean:
 	${RM} -f ../ipf ../ipnat ../ipmon ../ippool ../ipftest
 	${RM} -f ../ipscan ../ipsyncm ../ipsyncs
-	${RM} -f *.core *.o *.a *.o.d radix_ipf_local.h
+	${RM} -f *.core *.o *.a *.o.d
 	${RM} -f fils ipf ipfstat ipftest ipmon if_ipl ipnat
 	${RM} -f $(LKM) ioconf.h *.ko setdef1.c setdef0.c setdefs.h
 	${RM} -f ip_fil.c ipf_l.c ipf_y.c ipf_y.h ipf_l.h

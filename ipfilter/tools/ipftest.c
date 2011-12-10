@@ -829,12 +829,12 @@ test_usermode(r)
 
 	pcount = 0;
 	m = &mb;
-	ip = MTOD(m, ip_t *);
 	m->m_data = (char *)m->mb_buf;
 	while ((i = (*r->r_readip)(m, &iface, &dir)) > 0) {
 
 		if ((iface == NULL) || (*iface == '\0'))
 			iface = ifname;
+		ip = MTOD(m, ip_t *);
 		m->mb_ifp = get_unit(iface, IP_V(ip));
 		m->mb_len = i;
 		pkt.pkt_length = i;

@@ -63,7 +63,7 @@ MODOBJS=$(OBJ)/linux.o $(OBJ)/ip_fil.o $(OBJ)/fil.o $(OBJ)/ip_nat.o \
 	$(OBJ)/ip_frag.o $(OBJ)/ip_scan.o $(OBJ)/ip_sync.o $(OBJ)/ip_nat6.o \
 	$(OBJ)/ip_state.o $(OBJ)/ip_proxy.o $(OBJ)/ip_auth.o \
 	$(OBJ)/ip_lookup.o $(OBJ)/ip_pool.o $(OBJ)/ip_htable.o \
-	$(OBJ)/ip_dstlist.o $(OBJ)/ip_log.o $(OBJ)/radix.o $(OBJ)/md5.o
+	$(OBJ)/ip_dstlist.o $(OBJ)/ip_log.o $(OBJ)/radix_ipf.o $(OBJ)/md5.o
 KCCARGS=$(KCFLAGS) -D_BSD_SOURCE=1 $(IPFLKM) $(DEF) $(DLKM) -march=$(ARCH) \
 	$(INC) -iwithprefix include -I. $(LOOKUP) $(XID) $(IPFLOG)
 IPF=$(OBJ)/ipf.o $(OBJ)/ipfcomp.o $(OBJ)/ipf_y.o $(OBJ)/ipf_l.o
@@ -72,7 +72,7 @@ IPT=$(OBJ)/ipftest.o $(OBJ)/ip_fil_u.o $(OBJ)/ip_state_u.o \
     $(OBJ)/ip_pool_u.o $(OBJ)/ip_htable_u.o $(OBJ)/ip_lookup_u.o \
     $(OBJ)/ip_proxy_u.o $(OBJ)/ip_auth_u.o $(OBJ)/ip_log_u.o \
     $(OBJ)/ippool_y.o $(OBJ)/ippool_l.o $(OBJ)/ipnat_y.o $(OBJ)/ipnat_l.o \
-    $(OBJ)/ipf_y.o $(OBJ)/ipf_l.o $(OBJ)/radix_u.o $(OBJ)/md5_u.o \
+    $(OBJ)/ipf_y.o $(OBJ)/ipf_l.o $(OBJ)/radix_ipf_u.o $(OBJ)/md5_u.o \
     $(OBJ)/ip_dstlist_u.o $(OBJ)/ip_scan_u.o $(OBJ)/ip_sync_u.o
 #	$(OBJ)/ip_trafcon_u.o
 IPNAT=$(OBJ)/ipnat.o $(OBJ)/ipnat_y.o $(OBJ)/ipnat_l.o
@@ -243,8 +243,8 @@ $(OBJ)/ipnat.o: $(TOOL)/ipnat.c $(TOP)/ip_fil.h $(TOP)/ipf.h $(TOP)/ip_nat.h
 $(OBJ)/md5_u.o: $(TOP)/md5.c $(TOP)/md5.h
 	$(CC) $(CCARGS) $(EXTRA) -c $(TOP)/md5.c -o $@
 
-$(OBJ)/radix_u.o: $(TOP)/radix.c $(TOP)/radix_ipf.h
-	$(CC) $(CCARGS) $(EXTRA) -c $(TOP)/radix.c -o $@
+$(OBJ)/radix_ipf_u.o: $(TOP)/radix_ipf.c $(TOP)/radix_ipf.h
+	$(CC) $(CCARGS) $(EXTRA) -c $(TOP)/radix_ipf.c -o $@
 
 $(OBJ)/ip_nat_u.o: $(TOP)/ip_nat.c $(TOP)/ip_nat.h $(TOP)/ip_compat.h \
 	    $(TOP)/ip_fil.h
@@ -415,13 +415,13 @@ ip_log.c: $(TOP)/ip_log.c Makefile
 	echo '#include "ipf-linux.h"' >> $@
 	sed -ne '/END OF INCLUDES/,$$p' $< >> $@
 
-$(OBJ)/radix.o: radix.c $(TOP)/radix_ipf.h ipf-linux.h
-	$(CC) $(KCCARGS) -c radix.c -o $@
+$(OBJ)/radix_ipf.o: radix_ipf.c $(TOP)/radix_ipf.h ipf-linux.h
+	$(CC) $(KCCARGS) -c radix_ipf.c -o $@
 
 $(OBJ)/md5.o: $(TOP)/md5.c $(TOP)/md5.h
 	$(CC) $(KCCARGS) -c $(TOP)/md5.c -o $@
 
-radix.c: $(TOP)/radix.c Makefile
+radix_ipf.c: $(TOP)/radix_ipf.c Makefile
 	sed -e '/^#/,$$d' $< > $@
 	echo '#include "ipf-linux.h"' >> $@
 	sed -ne '/END OF INCLUDES/,$$p' $< >> $@
@@ -477,7 +477,7 @@ clean:
 		ipfilter.o
 	${RM} -f fil.c ip_auth.c ip_frag.c ip_htable.c ip_lookup.c ip_log.c
 	${RM} -f ip_lookup.c ip_nat.c ip_pool.c ip_proxy.c ip_scan.c
-	${RM} -f ip_state.c ip_sync.c radix.c ip_rules.c ip_rules.h
+	${RM} -f ip_state.c ip_sync.c radix_ipf.c ip_rules.c ip_rules.h
 	${MAKE} -f Makefile.ipsend ${MFLAGS} clean
 	-(for i in Linux*; do \
 		if [ -d $${i} ] ; then \
