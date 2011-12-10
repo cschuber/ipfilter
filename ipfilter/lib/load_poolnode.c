@@ -51,7 +51,11 @@ load_poolnode(role, name, node, ttl, iocfunc)
 
 	if (err != 0) {
 		if ((opts & OPT_DONOTHING) == 0) {
-			perror("load_poolnode:SIOCLOOKUP*NODE");
+			fprintf(stderr, "load_loopnode(%s/",
+				inet_ntoa(pn.ipn_addr.adf_addr.in4));
+			fprintf(stderr, "%s",
+				inet_ntoa(pn.ipn_mask.adf_addr.in4));
+			perror(":SIOCLOOKUP*NODE");
 			return -1;
 		}
 	}

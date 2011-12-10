@@ -160,10 +160,6 @@ include:
 		touch netinet/done; \
 	fi
 	-(cd netinet; ln -s ../ip_rules.h ip_rules.h)
-	if [ ! -f net/done ] ; then \
-		(cd net; ln -s ../radix_ipf.h .; ); \
-		touch net/done; \
-	fi
 
 sunos solaris: include
 	MAKE="$(MAKE)" MAKEFLAGS="$(MAKEFLAGS)" BPFILTER=$(BPFILTER) \

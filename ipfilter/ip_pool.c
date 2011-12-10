@@ -48,12 +48,6 @@ struct file;
 # include <sys/malloc.h>
 #endif
 
-#ifdef BSD
-# include <net/radix.h>
-#endif
-#undef _NET_RADIX_H_
-#include "net/radix_ipf.h"
-#define _NET_RADIX_H_	1
 #include <sys/socket.h>
 #include <net/if.h>
 #include <netinet/in.h>
@@ -64,6 +58,7 @@ struct file;
 #include "netinet/ip_compat.h"
 #include "netinet/ip_fil.h"
 #include "netinet/ip_pool.h"
+#include "radix_ipf.h"
 
 /* END OF INCLUDES */
 
@@ -278,7 +273,7 @@ ipf_pool_soft_create(softc)
 
 	bzero((char *)softp, sizeof(*softp));
 
-	softp->ipf_radix = ipf_rn_create();
+	softp->ipf_radix = ipf_rx_create();
 	if (softp->ipf_radix == NULL) {
 		KFREE(softp);
 		return NULL;
@@ -303,7 +298,7 @@ ipf_pool_soft_init(softc, arg)
 {
 	ipf_pool_softc_t *softp = arg;
 
-	ipf_rn_init(softp->ipf_radix);
+	ipf_rx_init(softp->ipf_radix);
 
 	return 0;
 }
@@ -357,7 +352,7 @@ ipf_pool_soft_destroy(softc, arg)
 {
 	ipf_pool_softc_t *softp = arg;
 
-	ipf_rn_destroy(softp->ipf_radix);
+	ipf_rx_destroy(softp->ipf_radix);
 
 	KFREE(softp);
 }
@@ -685,10 +680,9 @@ ipf_pool_findeq(softp, ipo, addr, mask)
 	ip_pool_t *ipo;
 	addrfamily_t *addr, *mask;
 {
-	struct ipf_radix_node *n;
+	ipf_rdx_node_t *n;
 
-	n = ipo->ipo_head->rnh_lookup(softp->ipf_radix, addr, mask,
-				      ipo->ipo_head);
+	n = ipo->ipo_head->lookup(ipo->ipo_head, addr, mask);
 	return (ip_pool_node_t *)n;
 }
 
@@ -712,7 +706,7 @@ ipf_pool_search(softc, tptr, ipversion, dptr, bytes)
 	void *dptr;
 	u_int bytes;
 {
-	struct ipf_radix_node *rn;
+	ipf_rdx_node_t *rn;
 	ip_pool_node_t *m;
 	i6addr_t *addr;
 	addrfamily_t v;
@@ -744,9 +738,9 @@ ipf_pool_search(softc, tptr, ipversion, dptr, bytes)
 
 	READ_ENTER(&softc->ipf_poolrw);
 
-	rn = ipo->ipo_head->rnh_matchaddr(ipo->ipo_radix, &v, ipo->ipo_head);
+	rn = ipo->ipo_head->matchaddr(ipo->ipo_head, &v);
 
-	if ((rn != NULL) && ((rn->rn_flags & RNF_ROOT) == 0)) {
+	if ((rn != NULL) && (rn->root == 0)) {
 		m = (ip_pool_node_t *)rn;
 		ipo->ipo_hits++;
 		m->ipn_bytes += bytes;
@@ -777,7 +771,7 @@ ipf_pool_insert_node(softc, softp, ipo, node)
 	ip_pool_t *ipo;
 	struct ip_pool_node *node;
 {
-	struct ipf_radix_node *rn;
+	ipf_rdx_node_t *rn;
 	ip_pool_node_t *x;
 
 	if ((node->ipn_addr.adf_len > sizeof(*rn)) ||
@@ -844,9 +838,8 @@ ipf_pool_insert_node(softc, softp, ipo, node)
 		}
 	}
 
-	rn = ipo->ipo_head->rnh_addaddr(softp->ipf_radix,
-					&x->ipn_addr, &x->ipn_mask,
-					ipo->ipo_head, x->ipn_nodes);
+	rn = ipo->ipo_head->addaddr(ipo->ipo_head, &x->ipn_addr, &x->ipn_mask,
+				    x->ipn_nodes);
 #ifdef	DEBUG_POOL
 	printf("Added %p at %p\n", x, rn);
 #endif
@@ -919,8 +912,8 @@ ipf_pool_create(softc, softp, op)
 	}
 	bzero(h, sizeof(*h));
 
-	if (ipf_rn_inithead(softp->ipf_radix, (void **)&h->ipo_head,
-			    offsetof(addrfamily_t, adf_addr) << 3) == 0) {
+	if (ipf_rx_inithead(softp->ipf_radix, (void **)&h->ipo_head,
+			    offsetof(addrfamily_t, adf_addr) << 3) != 0) {
 		KFREE(h);
 		softc->ipf_interror = 70008;
 		return ENOMEM;
@@ -1001,8 +994,7 @@ ipf_pool_remove_node(softp, ipo, ipe)
 	if (ipe->ipn_dnext != NULL)
 		ipe->ipn_dnext->ipn_pdnext = ipe->ipn_pdnext;
 
-	ipo->ipo_head->rnh_deladdr(softp->ipf_radix, &ipe->ipn_addr,
-				   &ipe->ipn_mask, ipo->ipo_head);
+	ipo->ipo_head->deladdr(ipo->ipo_head, &ipe->ipn_addr, &ipe->ipn_mask);
 
 	ipf_pool_node_deref(softp, ipe);
 
@@ -1119,7 +1111,7 @@ ipf_pool_free(softp, ipo)
 	if (ipo->ipo_next != NULL)
 		ipo->ipo_next->ipo_pnext = ipo->ipo_pnext;
 	*ipo->ipo_pnext = ipo->ipo_next;
-	ipf_rn_freehead(softp->ipf_radix, ipo->ipo_head);
+	ipf_rx_freehead(ipo->ipo_head);
 	KFREE(ipo);
 
 	softp->ipf_pool_stats.ipls_pools--;
@@ -1143,8 +1135,8 @@ ipf_pool_clearnodes(softp, ipo)
 	ip_pool_node_t *n, **next;
 
 	for (next = &ipo->ipo_list; (n = *next) != NULL; ) {
-		ipo->ipo_head->rnh_deladdr(softp->ipf_radix, &n->ipn_addr,
-					   &n->ipn_mask, ipo->ipo_head);
+		ipo->ipo_head->deladdr(ipo->ipo_head, &n->ipn_addr,
+				       &n->ipn_mask);
 
 		*n->ipn_pnext = n->ipn_next;
 		if (n->ipn_next)

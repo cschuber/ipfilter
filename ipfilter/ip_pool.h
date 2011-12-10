@@ -9,14 +9,14 @@
 #ifndef	__IP_POOL_H__
 #define	__IP_POOL_H__
 
-#include "net/radix_ipf.h"
 #include "netinet/ip_lookup.h"
+#include "radix_ipf.h"
 
 #define	IP_POOL_NOMATCH		0
 #define	IP_POOL_POSITIVE	1
 
 typedef	struct ip_pool_node {
-	struct	ipf_radix_node	ipn_nodes[2];
+	ipf_rdx_node_t		ipn_nodes[2];
 	addrfamily_t		ipn_addr;
 	addrfamily_t		ipn_mask;
 	int			ipn_uid;
@@ -35,7 +35,7 @@ typedef	struct ip_pool_node {
 typedef	struct ip_pool_s {
 	struct ip_pool_s	*ipo_next;
 	struct ip_pool_s	**ipo_pnext;
-	struct ipf_radix_node_head	*ipo_head;
+	ipf_rdx_head_t		*ipo_head;
 	ip_pool_node_t		*ipo_list;
 	ip_pool_node_t		*ipo_nextaddr;
 	void			*ipo_radix;

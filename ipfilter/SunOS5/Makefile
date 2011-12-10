@@ -85,7 +85,7 @@ DFLAGS=$(IPFLKM) $(DEF) $(SOLARIS2) $(IPFLOG) $(LOOKUP) $(SYNC) $(XID)
 MODOBJS=$(OBJ)/ip_fil.o $(OBJ)/fil.o $(OBJ)/solaris.o $(OBJ)/ip_state.o \
     $(OBJ)/ip_frag.o $(OBJ)/ip_nat.o $(OBJ)/ip_proxy.o $(OBJ)/ip_auth.o \
     $(OBJ)/ip_pool.o $(OBJ)/ip_htable.o $(OBJ)/ip_lookup.o $(OBJ)/ip_log.o \
-    $(OBJ)/ip_scan.o $(OBJ)/ip_sync.o $(OBJ)/radix.o $(OBJ)/md5.o \
+    $(OBJ)/ip_scan.o $(OBJ)/ip_sync.o $(OBJ)/radix_ipf.o $(OBJ)/md5.o \
     $(OBJ)/ip_nat6.o $(OBJ)/ip_dstlist.o $(OBJ)/arc4random.o \
     $(OBJ)/mblk_misc.o $(BPFILTER)
 #	$(OBJ)/ip_trafcon.o
@@ -96,7 +96,7 @@ IPT=$(OBJ)/ipftest.o $(OBJ)/ip_fil_u.o $(OBJ)/ip_state_u.o \
     $(OBJ)/ip_htable_u.o $(OBJ)/ip_lookup_u.o $(OBJ)/ip_proxy_u.o \
     $(OBJ)/ip_auth_u.o $(OBJ)/ip_log_u.o $(OBJ)/ip_rules_u.o\
     $(OBJ)/ippool_y.o $(OBJ)/ippool_l.o $(OBJ)/ipnat_y.o $(OBJ)/ipnat_l.o \
-    $(OBJ)/ipf_y.o $(OBJ)/ipf_l.o $(OBJ)/radix_u.o $(OBJ)/md5_u.o \
+    $(OBJ)/ipf_y.o $(OBJ)/ipf_l.o $(OBJ)/radix_ipf_u.o $(OBJ)/md5_u.o \
     $(OBJ)/ip_nat6_u.o $(OBJ)/ip_dstlist_u.o $(OBJ)/bpf_filter_u.o
 #	$(OBJ)/ip_trafcon_u.o
 IPNAT=$(OBJ)/ipnat.o $(OBJ)/ipnat_y.o $(OBJ)/ipnat_l.o
@@ -248,8 +248,8 @@ $(OBJ)/md5.o: $(TOP)/md5.c $(TOP)/md5.h
 	$(CC) -I$(TOP) $(DFLAGS) -c $(TOP)/md5.c -o $@
 	$(CTFCONVERT) $@
 
-$(OBJ)/radix.o: $(TOP)/md5.c $(TOP)/radix_ipf.h
-	$(CC) -I$(TOP) $(DFLAGS) -c $(TOP)/radix.c -o $@
+$(OBJ)/radix_ipf.o: $(TOP)/md5.c $(TOP)/radix_ipf.h
+	$(CC) -I$(TOP) $(DFLAGS) -c $(TOP)/radix_ipf.c -o $@
 	$(CTFCONVERT) $@
 
 $(OBJ)/ip_nat.o: $(TOP)/ip_nat.c $(TOP)/ip_nat.h $(TOP)/ip_compat.h
@@ -330,8 +330,8 @@ $(OBJ)/bpf_filter_u.o: $(TOP)/bpf_filter.c
 $(OBJ)/md5_u.o: $(TOP)/md5.c $(TOP)/md5.h
 	$(CC) $(CCARGS) $(EXTRA) -c $(TOP)/md5.c -o $@
 
-$(OBJ)/radix_u.o: $(TOP)/radix.c $(TOP)/radix_ipf.h
-	$(CC) $(CCARGS) $(EXTRA) -c $(TOP)/radix.c -o $@
+$(OBJ)/radix_ipf_u.o: $(TOP)/radix_ipf.c $(TOP)/radix_ipf.h
+	$(CC) $(CCARGS) $(EXTRA) -c $(TOP)/radix_ipf.c -o $@
 
 $(OBJ)/ip_nat_u.o: $(TOP)/ip_nat.c $(TOP)/ip_nat.h $(TOP)/ip_compat.h
 	$(CC) $(CCARGS) $(EXTRA) -c $(TOP)/ip_nat.c -o $@

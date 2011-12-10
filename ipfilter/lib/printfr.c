@@ -451,7 +451,7 @@ printfr(fp, iocfunc)
 		PRINTF(" # rule-ttl %u", fp->fr_die);
 		hash = 1;
 	}
-	if (opts & OPT_VERBOSE) {
+	if (opts & OPT_DEBUG) {
 		if (hash == 0)
 			putchar('#');
 		PRINTF(" ref %d", fp->fr_ref);

@@ -375,7 +375,7 @@ extern struct ipstate *printstate __P((struct ipstate *, int, u_long));
 extern void printsbuf __P((char *));
 extern void printnat __P((struct ipnat *, int));
 extern void printactiveaddress __P((int, char *, i6addr_t *, char *));
-extern void printactivenat __P((struct nat *, int, int, u_long));
+extern void printactivenat __P((struct nat *, int, u_long));
 extern void printhostmap __P((struct hostmap *, u_int));
 extern void printtcpflags __P((u_32_t, u_32_t));
 extern void printipfexpr __P((int *));

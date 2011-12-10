@@ -60,7 +60,6 @@ static const char rcsid[] = "@(#)$Id$";
 # include "md5.h"
 #endif
 
-static	u_short	ipid = 0;
 static	int	ipf_send_ip __P((fr_info_t *fin, mblk_t *m));
 static	void	ipf_fixl4sum __P((fr_info_t *));
 static	void	*ipf_routeto __P((fr_info_t *, int, void *));

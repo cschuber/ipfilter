@@ -1858,7 +1858,7 @@ extern	int 	ipf_log_pkt __P((fr_info_t *, u_int));
 extern	int 	ipf_log_pkt __P((fr_info_t *, u_int));
 
 extern	frentry_t	*ipf_acctpkt __P((fr_info_t *, u_32_t *));
-extern	u_short		fr_cksum __P((mb_t *, ip_t *, int, void *));
+extern	u_short		fr_cksum __P((fr_info_t *, ip_t *, int, void *));
 extern	void		ipf_deinitialise __P((ipf_main_softc_t *));
 extern	int		ipf_deliverlocal __P((ipf_main_softc_t *, int, void *,
 					      i6addr_t *));
