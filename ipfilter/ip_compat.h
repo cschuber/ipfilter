@@ -830,6 +830,7 @@ typedef	char *	caddr_t;
 #  endif
 #  define	MSGDSIZE(x)	mbufchainlen(x)
 #  define	M_LEN(x)	(x)->m_len
+#  define	M_ADJ(m,x)	m_adj(m, x)
 #  define	M_DUPLICATE(x)	m_copy((x), 0, M_COPYALL)
 #  define	GETKTIME(x)	microtime((struct timeval *)x)
 #  define	IPF_PANIC(x,y)	if (x) { printf y; panic("ipf_panic"); }
@@ -1030,6 +1031,7 @@ extern	int	in_cksum __P((struct mbuf *, int));
 #  endif
 #  define	MSGDSIZE(x)	mbufchainlen(x)
 #  define	M_LEN(x)	(x)->m_len
+#  define	M_ADJ(m,x)	m_adj(m, x)
 #  define	M_DUPLICATE(x)	m_copy((x), 0, M_COPYALL)
 #  define	IPF_PANIC(x,y)	if (x) { printf y; panic("ipf_panic"); }
 typedef struct mbuf mb_t;
@@ -1086,6 +1088,7 @@ typedef	u_int32_t	u_32_t;
 #  define	GETKTIME(x)	microtime((struct timeval *)x)
 #  define	MSGDSIZE(x)	mbufchainlen(x)
 #  define	M_LEN(x)	(x)->m_len
+#  define	M_ADJ(m,x)	m_adj(m, x)
 #  define	M_DUPLICATE(x)	m_copy((x), 0, M_COPYALL)
 #  define	IPF_PANIC(x,y)	if (x) { printf y; panic("ipf_panic"); }
 typedef struct mbuf mb_t;
