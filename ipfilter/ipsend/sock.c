@@ -1,5 +1,5 @@
 /*
- * sock.c (C) 1995-1998 Darren Reed
+ * sock.c (C) 1995-2011 Darren Reed
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *

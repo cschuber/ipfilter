@@ -1,5 +1,5 @@
 /*
- * (C)opyright 1992-1998 Darren Reed. (from tcplog)
+ * (C)opyright 1992-2011 Darren Reed. (from tcplog)
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *

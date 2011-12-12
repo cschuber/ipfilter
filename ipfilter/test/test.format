@@ -101,3 +101,4 @@ n17 hex hex -D
 f24 hex text
 ipv6.6 hex text
 n18 text text -D
+f30 text text

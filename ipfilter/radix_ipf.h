@@ -1,4 +1,8 @@
-
+/*
+ * Copyright (C) 2011 by Darren Reed.
+ *
+ * See the IPFILTER.LICENCE file for details on licencing.
+ */
 #ifndef __RADIX_IPF_H__
 #define	__RADIX_IPF_H__
 
