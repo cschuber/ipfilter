@@ -70,7 +70,7 @@ typedef struct radix_softc {
 #undef	RADIX_NODE_HEAD_UNLOCK
 #ifdef	_KERNEL
 # define	RADIX_NODE_HEAD_LOCK(x)		MUTEX_ENTER(&(x)->lock)
-# define	RADIX_NODE_HEAD_UNLOCK(x)	MUTEX_UNLOCK(&(x)->lock)
+# define	RADIX_NODE_HEAD_UNLOCK(x)	MUTEX_EXIT(&(x)->lock)
 #else
 # define	RADIX_NODE_HEAD_LOCK(x)
 # define	RADIX_NODE_HEAD_UNLOCK(x)
@@ -78,5 +78,13 @@ typedef struct radix_softc {
 
 extern	void	*ipf_rx_create __P((void));
 extern	int	ipf_rx_init __P((void *));
+extern	int	ipf_rx_inithead __P((ipf_rdx_head_t **));
+extern	void	ipf_rx_freehead __P((ipf_rdx_head_t *));
+extern	ipf_rdx_node_t *ipf_rx_addroute __P((ipf_rdx_head_t *, addrfamily_t *,
+					     addrfamily_t *, ipf_rdx_node_t *));
+extern	ipf_rdx_node_t *ipf_rx_delete __P((ipf_rdx_head_t *, addrfamily_t *,
+					   addrfamily_t *));
+extern	void	ipf_rx_walktree __P((ipf_rdx_head_t *, radix_walk_func_t, void *));
+extern	void	ipf_rx_destroy __P((void *));  
 
 #endif /* __RADIX_IPF_H__ */

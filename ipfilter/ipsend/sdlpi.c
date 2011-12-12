@@ -25,7 +25,6 @@
 #endif
 #ifdef __osf__
 # include <sys/dlpihdr.h>
-# include "radix_ipf_local.h"
 #else
 # include <sys/dlpi.h>
 #endif

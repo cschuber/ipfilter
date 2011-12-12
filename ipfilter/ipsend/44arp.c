@@ -11,9 +11,6 @@
 #endif
 #include <net/if_dl.h>
 #include <net/if_types.h>
-#if defined(__FreeBSD__)
-# include "radix_ipf.h"
-#endif
 #ifndef __osf__
 # include <net/route.h>
 #endif

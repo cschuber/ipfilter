@@ -57,7 +57,6 @@ struct file;
 #include "netinet/ip_compat.h"
 #include "netinet/ip_fil.h"
 #include "netinet/ip_pool.h"
-#include "radix_ipf.h"
 
 /* END OF INCLUDES */
 
@@ -501,8 +500,7 @@ iplookupop_t *op;
 		return ENOMEM;
 	bzero(h, sizeof(*h));
 
-	if (ipf_rx_inithead(&h->ipo_head,
-			    offsetof(addrfamily_t, adf_addr) << 3) != 0) {
+	if (ipf_rx_inithead(&h->ipo_head) != 0) {
 		KFREE(h);
 		return ENOMEM;
 	}

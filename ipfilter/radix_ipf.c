@@ -3,21 +3,40 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  */
+#include <sys/types.h>
+#include <sys/time.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <net/if.h>
+#if !defined(_KERNEL)
+# include <stddef.h>
+# include <stdlib.h>
+# include <strings.h>
+# include <string.h>
+#endif
 #include "ip_compat.h"
 #include "ip_fil.h"
 #ifdef RDX_DEBUG
 # include <arpa/inet.h>
-# include <stddef.h>
 # include <stdlib.h>
 # include <stdio.h>
-# include <strings.h>
 #endif
 #include "radix_ipf.h"
 
 #define	ADF_OFF	offsetof(addrfamily_t, adf_addr)
 static int adf_off = ADF_OFF << 3;
-static int nodecount = 0;
 static radix_softc_t *softr = NULL;
+
+static ipf_rdx_node_t *ipf_rx_insert __P((ipf_rdx_head_t *,
+					  ipf_rdx_node_t nodes[2], int *));
+static void ipf_rx_attach_mask __P((ipf_rdx_node_t *, ipf_rdx_mask_t *));
+static int count_mask_bits __P((addrfamily_t *, u_32_t **));
+static void buildnodes __P((addrfamily_t *, addrfamily_t *,
+			    ipf_rdx_node_t n[2]));
+static ipf_rdx_node_t *ipf_rx_find_addr __P((ipf_rdx_node_t *, u_32_t *));
+static ipf_rdx_node_t *ipf_rx_lookup __P((ipf_rdx_head_t *, addrfamily_t *,
+					  addrfamily_t *));
+static ipf_rdx_node_t *ipf_rx_match __P((ipf_rdx_head_t *, addrfamily_t *));
 
 static int
 count_mask_bits(mask, lastp)
@@ -119,7 +138,7 @@ ipf_rx_match(head, addr)
 
 	len = addr->adf_len;
 	end = (u_32_t *)((u_char *)addr + len);
-	node = ipf_rx_find_addr(head->root, addr);
+	node = ipf_rx_find_addr(head->root, (u_32_t *)addr);
 
 	/*
 	 * Search the dupkey list for a potential match.
@@ -169,7 +188,7 @@ ipf_rx_lookup(head, addr, mask)
 	u_32_t *akey;
 	int count;
 
-	found = ipf_rx_find_addr(head->root, addr);
+	found = ipf_rx_find_addr(head->root, (u_32_t *)addr);
 	if (found->root == 1)
 		return NULL;
 	count = count_mask_bits(mask, NULL);
@@ -429,7 +448,7 @@ ipf_rx_delete(head, addr, mask)
 	ipf_rdx_mask_t *m;
 	int count;
 
-	found = ipf_rx_find_addr(head->root, addr);
+	found = ipf_rx_find_addr(head->root, (u_32_t *)addr);
 	if (found->root == 1)
 		return NULL;
 	count = count_mask_bits(mask, NULL);
@@ -740,6 +759,7 @@ typedef struct myst {
 	int		printed;
 } myst_t;
 
+static int nodecount = 0;
 myst_t *myst_top = NULL;
 
 void add_addr(ipf_rdx_head_t *, int , int);
