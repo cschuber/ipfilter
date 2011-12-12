@@ -69,7 +69,7 @@ IPT=ipftest.o fil_u.o ip_state_u.o ip_frag_u.o \
 	ip_auth_u.o ip_pool_u.o ip_rules_u.o ip_log_u.o \
 	ip_htable_u.o ip_lookup_u.o \
 	ipf_y.o ipf_l.o ipnat_y.o ipnat_l.o ippool_y.o ippool_l.o \
-	bpf_filter_u.o md5_u.o radix_ipf_u.o
+	md5_u.o radix_ipf_u.o
 #	ip_trafcon_u.o
 IPMON=ipmon.o ipmon_y.o ipmon_l.o
 IPPOOL=ippool_y.o ippool_l.o ippool.o
