@@ -146,7 +146,6 @@ static const char rcsid[] = "@(#)$Id$";
 #ifndef	_KERNEL
 # include "ipf.h"
 # include "ipt.h"
-# include "bpf-ipf.h"
 extern	int	opts;
 #endif /* _KERNEL */
 
