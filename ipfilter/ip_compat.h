@@ -1541,6 +1541,7 @@ typedef union {
 		const char	*ipf_lname;
 	} ipf_lkun_s;
 #endif
+	char		_padding[24];
 	eMmutex_t	ipf_emu;
 } ipfmutex_t;
 
