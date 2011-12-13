@@ -135,7 +135,7 @@ List of active state sessions:
 	pass in keep state	IPv4
 	pkt_flags & 0(0) = 0,		pkt_options & ffffffff = 0, 0 = 0 
 	pkt_security & ffff = 0, pkt_auth & ffff = 0
-	is_flx 0x8001 0 0 0
+	is_flx 0x1 0 0 0
 	interfaces: in X[e1],X[] out X[],X[]
 	Sync status: not synchronized
 1.1.1.1 -> 4.4.4.4 pass 0x40008402 pr 17 state 0/0
@@ -145,7 +145,7 @@ List of active state sessions:
 	pass in keep state	IPv4
 	pkt_flags & 0(0) = 0,		pkt_options & ffffffff = 0, ffffffff = 0 
 	pkt_security & ffff = 0, pkt_auth & ffff = 0
-	is_flx 0x8001 0x8001 0 0
+	is_flx 0x1 0x1 0 0
 	interfaces: in X[e1],X[e0] out X[],X[]
 	Sync status: not synchronized
 List of configured pools
@@ -182,7 +182,7 @@ List of active state sessions:
 	block in keep state	IPv4
 	pkt_flags & 0(0) = 0,		pkt_options & ffffffff = 0, 0 = 0 
 	pkt_security & ffff = 0, pkt_auth & ffff = 0
-	is_flx 0x8001 0 0 0
+	is_flx 0x1 0 0 0
 	interfaces: in X[e1],X[] out X[],X[]
 	Sync status: not synchronized
 1.1.1.1 -> 4.4.4.4 pass 0x40008401 pr 17 state 0/0
@@ -192,7 +192,7 @@ List of active state sessions:
 	block in keep state	IPv4
 	pkt_flags & 0(0) = 0,		pkt_options & ffffffff = 0, ffffffff = 0 
 	pkt_security & ffff = 0, pkt_auth & ffff = 0
-	is_flx 0x8001 0x8001 0 0
+	is_flx 0x1 0x1 0 0
 	interfaces: in X[e1],X[e0] out X[],X[]
 	Sync status: not synchronized
 List of configured pools
@@ -233,7 +233,7 @@ List of active state sessions:
 	pass in keep state	IPv4
 	pkt_flags & 0(0) = 0,		pkt_options & ffffffff = 0, ffffffff = 0 
 	pkt_security & ffff = 0, pkt_auth & ffff = 0
-	is_flx 0x8001 0x8001 0 0
+	is_flx 0x1 0x1 0 0
 	interfaces: in X[e0],X[e1] out X[],X[]
 	Sync status: not synchronized
 List of configured pools
