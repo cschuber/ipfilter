@@ -206,6 +206,146 @@ ipf_nat6_ruleaddrinit(softc, softn, n)
 
 
 /* ------------------------------------------------------------------------ */
+/* Function:    ipf_nat6_add_active                                         */
+/* Returns:     Nil                                                         */
+/* Parameters:  mask(I)   - mask to add to the active array                 */
+/*              active(O) - pointer to array of active masks                */
+/*                                                                          */
+/* Insert the bitmask at "mask" into the array pointed to by "active".      */
+/* The array is kept sorted in order from most specific mask at [0] to      */
+/* the least specific mask. When full, [0] will have a mask with all 128    */
+/* bits set and [128] will have a mask with all 0s.                         */
+/* ------------------------------------------------------------------------ */
+static void
+ipf_nat6_add_active(mask, active)
+	i6addr_t *mask, *active;
+{
+	int i;
+
+	for (i = 0; i < 33; i++) {
+		if (IP6_LT(&active[i], mask)) {
+			int j;
+
+			for (j = i + 1; j < 33; j++)
+				active[j] = active[j - 1];
+			active[i] = *mask;
+			break;
+		}
+	}
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_nat6_del_active                                         */
+/* Returns:     Nil                                                         */
+/* Parameters:  mask(I)   - mask to remove from the active array            */
+/*              active(O) - pointer to array of active masks                */
+/*                                                                          */
+/* Remove the bitmask at "mask" from the array pointed to by "active".      */
+/* This should be called as part of th cleanup of the last rule that is     */
+/* using the mask at "mask" for its matching.                               */
+/* ------------------------------------------------------------------------ */
+static void
+ipf_nat6_del_active(mask, active)
+	i6addr_t *mask, *active;
+{
+	int i;
+
+	for (i = 0; i < 33; i++) {
+		if (IP6_EQ(&active[i], mask)) {
+			int j;
+
+			for (j = i + 1; j < 33; j++)
+				active[j - 1] = active[j];
+			break;
+		}
+	}
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_nat6_add_map_mask                                       */
+/* Returns:     Nil                                                         */
+/* Parameters:  softn(I) - pointer to nat context information               */
+/*              mask(I)  - pointer to mask to add                           */
+/*                                                                          */
+/* Add the mask pointed to by "mask" to the active set of masks used for    */
+/* map rules and update the number of active masks to reflect the new mask  */
+/* being present.                                                           */
+/* ------------------------------------------------------------------------ */
+static void
+ipf_nat6_add_map_mask(softn, mask)
+	ipf_nat_softc_t *softn;
+	i6addr_t *mask;
+{
+	ipf_nat6_add_active(mask, softn->ipf_nat6_map_active_masks);
+	softn->ipf_nat6_map_max++;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_nat6_add_rdr_mask                                       */
+/* Returns:     Nil                                                         */
+/* Parameters:  softn(I)    - pointer to nat context information            */
+/*              mask(I)   - mask to add to the active array                 */
+/*                                                                          */
+/* Add the mask pointed to by "mask" to the active set of masks used for    */
+/* rdr rules and update the number of active masks to reflect the new mask  */
+/* being present.                                                           */
+/* ------------------------------------------------------------------------ */
+static void
+ipf_nat6_add_rdr_mask(softn, mask)
+	ipf_nat_softc_t *softn;
+	i6addr_t *mask;
+{
+	ipf_nat6_add_active(mask, softn->ipf_nat6_rdr_active_masks);
+	softn->ipf_nat6_rdr_max++;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_nat6_del_map_mask                                       */
+/* Returns:     Nil                                                         */
+/* Parameters:  softn(I) - pointer to nat context information               */
+/*              mask(I)  - mask to add to the active array                  */
+/*                                                                          */
+/* Remove the mask at "mask" from the list of active masks in use with map  */
+/* rules and reduce the number of active masks accordingly. There should be */
+/* no more map rules present using the mask matching "mask" after the       */
+/* current rule is deleted.                                                 */
+/* ------------------------------------------------------------------------ */
+static void
+ipf_nat6_del_map_mask(softn, mask)
+	ipf_nat_softc_t *softn;
+	i6addr_t *mask;
+{
+	ipf_nat6_del_active(mask, softn->ipf_nat6_map_active_masks);
+	softn->ipf_nat6_map_max--;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_nat6_del_rdr_mask                                       */
+/* Returns:     Nil                                                         */
+/* Parameters:  softn(I) - pointer to nat context information               */
+/*              mask(I)  - mask to add to the active array                  */
+/*                                                                          */
+/* Remove the mask at "mask" from the list of active masks in use with rdr  */
+/* rules and reduce the number of active masks accordingly. There should be */
+/* no more rdr rules present using the mask matching "mask" after the       */
+/* current rule is deleted.                                                 */
+/* ------------------------------------------------------------------------ */
+static void
+ipf_nat6_del_rdr_mask(softn, mask)
+	ipf_nat_softc_t *softn;
+	i6addr_t *mask;
+{
+	ipf_nat6_del_active(mask, softn->ipf_nat6_rdr_active_masks);
+	softn->ipf_nat6_rdr_max--;
+}
+
+
+/* ------------------------------------------------------------------------ */
 /* Function:    ipf_nat6_addrdr                                             */
 /* Returns:     Nil                                                         */
 /* Parameters:  n(I) - pointer to NAT rule to add                           */
@@ -226,21 +366,25 @@ ipf_nat6_addrdr(softn, n)
 
 	 if ((n->in_redir & NAT_BIMAP) == NAT_BIMAP) {
 		k = count6bits(n->in_nsrcmsk6.i6);
-		if ((k >= 0) && (k != 128))
-			softn->ipf_nat6_rdr_masks[k >> 5] |= 1 << (k & 31);
+		softn->ipf_nat6_rdr_masks[k]++;
+		if (softn->ipf_nat6_rdr_masks[k] == 1)
+			ipf_nat6_add_rdr_mask(softn, n->in_nsrcmsk6.i6);
 
 		IP6_AND(&n->in_odstip6, &n->in_odstmsk6, &j);
 		hv = NAT_HASH_FN6(&j, 0, softn->ipf_nat_rdrrules_sz);
 
 	} else if (n->in_odstatype == FRI_NORMAL) {
 		k = count6bits(n->in_odstmsk6.i6);
-		if ((k >= 0) && (k != 128))
-			softn->ipf_nat6_rdr_masks[k >> 5] |= 1 << (k & 31);
+		softn->ipf_nat6_rdr_masks[k]++;
+		if (softn->ipf_nat6_rdr_masks[k] == 1)
+			ipf_nat6_add_rdr_mask(softn, n->in_odstmsk6.i6);
 
 		IP6_AND(&n->in_odstip6, &n->in_odstmsk6, &j);
 		hv = NAT_HASH_FN6(&j, 0, softn->ipf_nat_rdrrules_sz);
 	} else {
-		softn->ipf_nat6_rdr_masks[3] |= 1;
+		softn->ipf_nat6_rdr_masks[0]++;
+		if (softn->ipf_nat6_rdr_masks[0] == 1)
+			ipf_nat6_add_rdr_mask(softn, n->in_odstmsk6.i6);
 		hv = 0;
 	}
 	np = softn->ipf_nat_rdr_rules + hv;
@@ -274,12 +418,15 @@ ipf_nat6_addmap(softn, n)
 
 	if (n->in_osrcatype == FRI_NORMAL) {
 		k = count6bits(n->in_osrcmsk6.i6);
-		if ((k >= 0) && (k != 128))
-			softn->ipf_nat6_map_masks[k >> 5] |= 1 << (k & 31);
+		softn->ipf_nat6_map_masks[k]++;
+		if (softn->ipf_nat6_map_masks[k] == 1)
+			ipf_nat6_add_map_mask(softn, n->in_osrcmsk6.i6);
 		IP6_AND(&n->in_osrcip6, &n->in_osrcmsk6, &j);
 		hv = NAT_HASH_FN6(&j, 0, softn->ipf_nat_maprules_sz);
 	} else {
-		softn->ipf_nat6_map_masks[3] |= 1;
+		softn->ipf_nat6_map_masks[0]++;
+		if (softn->ipf_nat6_map_masks[0] == 1)
+			ipf_nat6_add_map_mask(softn, n->in_osrcmsk6.i6);
 		hv = 0;
 	}
 	np = softn->ipf_nat_map_rules + hv;
@@ -324,6 +471,7 @@ ipf_nat6_addencap(softn, n)
 		IP6_AND(&n->in_nsrcip6, &n->in_nsrcip6, &j);
 		hv = NAT_HASH_FN6(&j, 0, softn->ipf_nat_maprules_sz);
 	} else {
+		k = 0;
 		j = 0;
 		hv = 0;
 	}
@@ -333,10 +481,10 @@ ipf_nat6_addencap(softn, n)
 	 * we use the rdr-links and for rdr, we use the map-links/
 	 */
 	if (n->in_redir & NAT_MAP) {
-		if ((k >= 0) && (k != 128))
-			softn->ipf_nat6_rdr_masks[k >> 5] |= 1 << (k & 0x1f);
-		else
-			softn->ipf_nat6_rdr_masks[3] |= 1;
+		softn->ipf_nat6_rdr_masks[k]++;
+		if (softn->ipf_nat6_rdr_masks[k] == 1)
+			ipf_nat6_add_rdr_mask(softn, n->in_nsrcip6.i6);
+
 		np = softn->ipf_nat_rdr_rules + hv;
 		while (*np != NULL)
 			np = &(*np)->in_rnext;
@@ -345,10 +493,9 @@ ipf_nat6_addencap(softn, n)
 		n->in_hv[0] = hv;
 		*np = n;
 	} else if (n->in_redir & NAT_REDIRECT) {
-		if ((k >= 0) && (k != 128))
-			softn->ipf_nat6_map_masks[k >> 5] |= 1 << (k & 0x1f);
-		else
-			softn->ipf_nat6_map_masks[3] |= 1;
+		softn->ipf_nat6_map_masks[k]++;
+		if (softn->ipf_nat6_map_masks[k] == 1)
+			ipf_nat6_add_map_mask(softn, n->in_nsrcip6.i6);
 		np = softn->ipf_nat_map_rules + hv;
 		while (*np != NULL)
 			np = &(*np)->in_mnext;
@@ -635,11 +782,8 @@ ipf_nat6_newmap(fin, nat, ni)
                         if (np->in_flags & IPN_SEQUENTIAL) {
                                 port = np->in_spnext;
                         } else {
-                                if (np->in_spmax > np->in_spmin)
-                                        port = ipf_random() % (np->in_spmax -
-                                                               np->in_spmin);
-                                else
-                                        port = 0;
+				port = ipf_random() % (np->in_spmax -
+						       np->in_spmin + 1);
                                 port += np->in_spmin;
                         }
                         port = htons(port);
@@ -1116,10 +1260,10 @@ ipf_nat6_add(fin, np, natsave, flags, direction)
 
 	if ((move == 1) && (np->in_flags & IPN_ROUNDR)) {
 		if ((np->in_redir & (NAT_REDIRECT|NAT_MAP)) == NAT_REDIRECT) {
-			ipf_nat_delrdr(np);
+			ipf_nat_delrdr(softn, np);
 			ipf_nat6_addrdr(softn, np);
 		} else if ((np->in_redir & (NAT_REDIRECT|NAT_MAP)) == NAT_MAP) {
-			ipf_nat_delmap(np);
+			ipf_nat_delmap(softn, np);
 			ipf_nat6_addmap(softn, np);
 		}
 	}
@@ -2739,22 +2883,17 @@ ipf_nat6_checkout(fin, passp)
 					   &fin->fin_dst6.in6))) {
 		nflags = nat->nat_flags;
 	} else if (fin->fin_off == 0) {
-		u_32_t hv, nmsk;
-		i6addr_t msk;
+		u_32_t hv, nmsk = 0;
+		i6addr_t *msk;
 		int i;
 
 		/*
 		 * If there is no current entry in the nat table for this IP#,
 		 * create one for it (if there is a matching rule).
 		 */
-		i = 3;
-		msk.i6[0] = 0xffffffff;
-		msk.i6[1] = 0xffffffff;
-		msk.i6[2] = 0xffffffff;
-		msk.i6[3] = 0xffffffff;
-		nmsk = softn->ipf_nat6_map_masks[3];
 maskloop:
-		IP6_AND(&ipa, &msk, &iph);
+		msk = &softn->ipf_nat6_map_active_masks[nmsk];
+		IP6_AND(&ipa, msk, &iph);
 		hv = NAT_HASH_FN6(&iph, 0, softn->ipf_nat_maprules_sz);
 		for (np = softn->ipf_nat_map_rules[hv]; np; np = np->in_mnext) {
 			if ((np->in_ifps[1] && (np->in_ifps[1] != ifp)))
@@ -2810,23 +2949,9 @@ maskloop:
 			}
 			natfailed = -1;
 		}
-		if ((np == NULL) && (i >= 0)) {
-			while (i >= 0) {
-				while (nmsk) {
-					msk.i6[i] = htonl(ntohl(msk.i6[i])<<1);
-					if ((nmsk & 0x80000000) != 0) {
-						nmsk <<= 1;
-						goto maskloop;
-					}
-					nmsk <<= 1;
-				}
-				msk.i6[i--] = 0;
-				if  (i >= 0) {
-					nmsk = softn->ipf_nat6_map_masks[i];
-					if (nmsk != 0)
-						goto maskloop;
-				}
-			}
+		if ((np == NULL) && (nmsk < softn->ipf_nat6_map_max)) {
+			nmsk++;
+			goto maskloop;
 		}
 	}
 
@@ -3226,22 +3351,17 @@ ipf_nat6_checkin(fin, passp)
 					  &fin->fin_src6.in6, &ipa.in6))) {
 		nflags = nat->nat_flags;
 	} else if (fin->fin_off == 0) {
-		u_32_t hv, rmsk;
-		i6addr_t msk;
+		u_32_t hv, rmsk = 0;
+		i6addr_t *msk;
 		int i;
 
 		/*
 		 * If there is no current entry in the nat table for this IP#,
 		 * create one for it (if there is a matching rule).
 		 */
-		i = 3;
-		msk.i6[0] = 0xffffffff;
-		msk.i6[1] = 0xffffffff;
-		msk.i6[2] = 0xffffffff;
-		msk.i6[3] = 0xffffffff;
-		rmsk = softn->ipf_nat6_rdr_masks[3];
 maskloop:
-		IP6_AND(&ipa, &msk, &iph);
+		msk = &softn->ipf_nat6_rdr_active_masks[rmsk];
+		IP6_AND(&ipa, msk, &iph);
 		hv = NAT_HASH_FN6(&iph, 0, softn->ipf_nat_rdrrules_sz);
 		for (np = softn->ipf_nat_rdr_rules[hv]; np; np = np->in_rnext) {
 			if (np->in_ifps[0] && (np->in_ifps[0] != ifp))
@@ -3298,23 +3418,9 @@ maskloop:
 			natfailed = -1;
 		}
 
-		if ((np == NULL) && (i >= 0)) {
-			while (i >= 0) {
-				while (rmsk) {
-					msk.i6[i] = htonl(ntohl(msk.i6[i])<<1);
-					if ((rmsk & 0x80000000) != 0) {
-						rmsk <<= 1;
-						goto maskloop;
-					}
-					rmsk <<= 1;
-				}
-				msk.i6[i--] = 0;
-				if  (i >= 0) {
-					rmsk = softn->ipf_nat6_rdr_masks[i];
-					if (rmsk != 0)
-						goto maskloop;
-				}
-			}
+		if ((np == NULL) && (rmsk < softn->ipf_nat6_rdr_max)) {
+			rmsk++;
+			goto maskloop;
 		}
 	}
 	if (nat != NULL) {

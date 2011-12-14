@@ -631,10 +631,18 @@ typedef struct ipf_nat_softc_s {
 	u_int		ipf_nat_defage;
 	u_int		ipf_nat_defipage;
 	u_int		ipf_nat_deficmpage;
-	u_32_t		ipf_nat_map_masks;
-	u_32_t		ipf_nat_rdr_masks;
-	u_32_t		ipf_nat6_map_masks[4];
-	u_32_t		ipf_nat6_rdr_masks[4];
+	int		ipf_nat_map_max;
+	int		ipf_nat_map_masks[33];
+	u_32_t		ipf_nat_map_active_masks[33];
+	int		ipf_nat6_map_max;
+	int		ipf_nat6_map_masks[129];
+	i6addr_t	ipf_nat6_map_active_masks[129];
+	int		ipf_nat_rdr_max;
+	int		ipf_nat_rdr_masks[33];
+	u_32_t		ipf_nat_rdr_active_masks[33];
+	int		ipf_nat6_rdr_max;
+	int		ipf_nat6_rdr_masks[129];
+	i6addr_t	ipf_nat6_rdr_active_masks[129];
 	nat_t		**ipf_nat_table[2];
 	nat_t		*ipf_nat_instances;
 	ipnat_t		*ipf_nat_list;
@@ -713,8 +721,8 @@ extern	int	ipf_nat_settimeout __P((struct ipf_main_softc_s *,
 extern	void	ipf_nat_sync __P((ipf_main_softc_t *, void *));
 
 extern	nat_t	*ipf_nat_clone __P((fr_info_t *, nat_t *));
-extern	void	ipf_nat_delmap __P((ipnat_t *));
-extern	void	ipf_nat_delrdr __P((ipnat_t *));
+extern	void	ipf_nat_delmap __P((ipf_nat_softc_t *, ipnat_t *));
+extern	void	ipf_nat_delrdr __P((ipf_nat_softc_t *, ipnat_t *));
 extern	void	ipf_nat_delrule __P((ipf_main_softc_t *, ipf_nat_softc_t *,
 				     ipnat_t *));
 extern	int	ipf_nat_wildok __P((nat_t *, int, int, int, int));
