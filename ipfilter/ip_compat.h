@@ -898,6 +898,7 @@ typedef	u_int32_t	u_32_t;
 # if  (__FreeBSD_version < 400000)
 #  define	NEED_LOCAL_RAND	1
 # endif
+# include <inttypes.h>
 # if defined(_KERNEL)
 #  if (__FreeBSD_version >= 500000)
 #   include "opt_bpf.h"
@@ -911,6 +912,7 @@ typedef	u_int32_t	u_32_t;
 # endif
 
 # if defined(_KERNEL)
+#  include <netinet/in.h>
 #  include <netinet/ip_var.h>
 #  if (__FreeBSD_version >= 500024)
 #   if (__FreeBSD_version >= 500043)
@@ -940,6 +942,10 @@ typedef	u_int32_t	u_32_t;
 #  if (__FreeBSD_version >= 500043)
 #   define NETBSD_PF
 #  endif
+# else
+#  include <strings.h>
+#  include <string.h>
+#  include <stdlib.h>
 # endif /* _KERNEL */
 
 # if (__FreeBSD_version >= 700000)
@@ -1005,6 +1011,8 @@ typedef	u_int32_t	u_32_t;
 #  define	KMUTEX_T		struct mtx
 # endif
 
+# include <sys/socket.h>
+# include <net/if.h>
 # if (__FreeBSD_version >= 501113)
 #  include <net/if_var.h>
 #  define	IFNAME(x)	((struct ifnet *)x)->if_xname
@@ -1751,6 +1759,7 @@ extern	mb_t	*allocmbt(size_t);
 #ifdef	USE_INET6
 # if defined(__NetBSD__) || defined(__OpenBSD__) || defined(__FreeBSD__) || \
      defined(__osf__) || defined(linux)
+#  include <netinet/in.h>
 #  include <netinet/ip6.h>
 #  include <netinet/icmp6.h>
 #  if !defined(linux)
