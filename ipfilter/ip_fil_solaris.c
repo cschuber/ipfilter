@@ -444,7 +444,6 @@ ipf_send_ip(fr_info_t *fin, mblk_t *m)
 	}
 
 	qpip = fin->fin_qpi;
-	qpi.qpi_q = qpip->qpi_q;
 	qpi.qpi_off = 0;
 #if defined(FW_HOOKS)
 	qpi.qpi_real = qpip->qpi_real;

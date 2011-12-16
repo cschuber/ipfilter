@@ -813,7 +813,6 @@ ipf_hk_v4_in(tok, data, arg)
 
 	qpi.qpi_real = (void *)hpe->hpe_ifp;
 	qpi.qpi_ill = (void *)hpe->hpe_ifp;
-	qpi.qpi_q = NULL;
 	qpi.qpi_m = hpe->hpe_mb;
 	qpi.qpi_data = hpe->hpe_hdr;
 	qpi.qpi_off = 0;
@@ -852,7 +851,6 @@ ipf_hk_v4_out(tok, data, arg)
 
 	qpi.qpi_real = (void *)hpe->hpe_ofp;
 	qpi.qpi_ill = (void *)hpe->hpe_ofp;
-	qpi.qpi_q = NULL;
 	qpi.qpi_m = hpe->hpe_mb;
 	qpi.qpi_data = hpe->hpe_hdr;
 	qpi.qpi_off = 0;
@@ -925,7 +923,6 @@ ipf_hk_v6_in(tok, data, arg)
 
 	qpi.qpi_real = (void *)hpe->hpe_ifp;
 	qpi.qpi_ill = (void *)hpe->hpe_ifp;
-	qpi.qpi_q = NULL;
 	qpi.qpi_m = hpe->hpe_mb;
 	qpi.qpi_data = hpe->hpe_hdr;
 	qpi.qpi_off = 0;
@@ -963,7 +960,6 @@ ipf_hk_v6_out(tok, data, arg)
 
 	qpi.qpi_real = (void *)hpe->hpe_ofp;
 	qpi.qpi_ill = (void *)hpe->hpe_ofp;
-	qpi.qpi_q = NULL;
 	qpi.qpi_m = hpe->hpe_mb;
 	qpi.qpi_data = hpe->hpe_hdr;
 	qpi.qpi_off = 0;
