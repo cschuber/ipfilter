@@ -11,6 +11,7 @@
 #define	__IP_FIL_H__
 
 #include "netinet/ip_compat.h"
+#include "netinet/ipf_rb.h"
 #if NETBSD_GE_REV(104040000)
 # include <sys/callout.h>
 #endif
@@ -25,7 +26,6 @@
 #if !defined(linux) || !defined(_KERNEL)
 # include <netinet/in.h>
 #endif
-#include "sys/tree.h"
 
 #ifndef	SOLARIS
 # define SOLARIS (defined(sun) && (defined(__svr4__) || defined(__SVR4)))
@@ -523,14 +523,15 @@ typedef	struct	{
 	i6addr_t	adf_addr;
 } addrfamily_t;
 
+RBI_LINK(ipf_rb, host_node_s);
+
 typedef	struct	host_node_s {
-	RB_ENTRY(host_node_s)	hn_entry;
-	i6addr_t		hn_addr;
-	int			hn_family;
+	RBI_FIELD(ipf_rb)	hn_entry;
+	addrfamily_t		hn_addr;
 	int			hn_active;
 } host_node_t;
 
-typedef RB_HEAD(ipf_rb, host_node_s) ipf_rb_head_t;
+typedef RBI_HEAD(ipf_rb, host_node_s) ipf_rb_head_t;
 
 typedef	struct	host_track_s {
 	ipf_rb_head_t	ht_root;
@@ -1936,8 +1937,11 @@ extern	int	ipf_out_compat __P((ipf_main_softc_t *, ipfobj_t *, void *));
 #endif
 extern	int	icmpreplytype4[ICMP_MAXTYPE + 1];
 
-extern	void	ipf_rb_ht_init __P((host_track_t *));
-extern	int	ipf_ht_node_add __P((ipf_main_softc_t *, host_track_t *, int, i6addr_t *));
+extern	int	ipf_ht_node_add __P((ipf_main_softc_t *, host_track_t *,
+				     int, i6addr_t *));
 extern	int	ipf_ht_node_del __P((host_track_t *, int, i6addr_t *));
+extern	void	ipf_rb_ht_flush __P((host_track_t *));
+extern	void	ipf_rb_ht_freenode __P((host_node_t *, void *));
+extern	void	ipf_rb_ht_init __P((host_track_t *));
 
 #endif	/* __IP_FIL_H__ */
