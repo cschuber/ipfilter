@@ -131,6 +131,14 @@ static int ipf_nat6_nextaddrinit __P((ipf_main_softc_t *, char *,
 				      nat_addr_t *, int, void *));
 static int ipf_nat6_insert __P((ipf_main_softc_t *, ipf_nat_softc_t *,
 				nat_t *));
+static void ipf_nat6_add_active __P((i6addr_t *, i6addr_t *));
+static void ipf_nat6_add_map_mask __P((ipf_nat_softc_t *, i6addr_t *));
+static void ipf_nat6_add_rdr_mask __P((ipf_nat_softc_t *, i6addr_t *));
+static void ipf_nat6_delmap __P((ipf_nat_softc_t *, ipnat_t *));
+static void ipf_nat6_delrdr __P((ipf_nat_softc_t *, ipnat_t *));
+static void ipf_nat6_del_active __P((i6addr_t *, i6addr_t *));
+static void ipf_nat6_del_map_mask __P((ipf_nat_softc_t *, i6addr_t *));
+static void ipf_nat6_del_rdr_mask __P((ipf_nat_softc_t *, i6addr_t *));
 
 
 #define	NINCLSIDE6(y,x)	ATOMIC_INCL(softn->ipf_nat_stats.ns_side6[y].x)
@@ -368,7 +376,7 @@ ipf_nat6_addrdr(softn, n)
 		k = count6bits(n->in_nsrcmsk6.i6);
 		softn->ipf_nat6_rdr_masks[k]++;
 		if (softn->ipf_nat6_rdr_masks[k] == 1)
-			ipf_nat6_add_rdr_mask(softn, n->in_nsrcmsk6.i6);
+			ipf_nat6_add_rdr_mask(softn, &n->in_nsrcmsk6);
 
 		IP6_AND(&n->in_odstip6, &n->in_odstmsk6, &j);
 		hv = NAT_HASH_FN6(&j, 0, softn->ipf_nat_rdrrules_sz);
@@ -377,14 +385,14 @@ ipf_nat6_addrdr(softn, n)
 		k = count6bits(n->in_odstmsk6.i6);
 		softn->ipf_nat6_rdr_masks[k]++;
 		if (softn->ipf_nat6_rdr_masks[k] == 1)
-			ipf_nat6_add_rdr_mask(softn, n->in_odstmsk6.i6);
+			ipf_nat6_add_rdr_mask(softn, &n->in_odstmsk6);
 
 		IP6_AND(&n->in_odstip6, &n->in_odstmsk6, &j);
 		hv = NAT_HASH_FN6(&j, 0, softn->ipf_nat_rdrrules_sz);
 	} else {
 		softn->ipf_nat6_rdr_masks[0]++;
 		if (softn->ipf_nat6_rdr_masks[0] == 1)
-			ipf_nat6_add_rdr_mask(softn, n->in_odstmsk6.i6);
+			ipf_nat6_add_rdr_mask(softn, &n->in_odstmsk6);
 		hv = 0;
 	}
 	np = softn->ipf_nat_rdr_rules + hv;
@@ -420,13 +428,13 @@ ipf_nat6_addmap(softn, n)
 		k = count6bits(n->in_osrcmsk6.i6);
 		softn->ipf_nat6_map_masks[k]++;
 		if (softn->ipf_nat6_map_masks[k] == 1)
-			ipf_nat6_add_map_mask(softn, n->in_osrcmsk6.i6);
+			ipf_nat6_add_map_mask(softn, &n->in_osrcmsk6);
 		IP6_AND(&n->in_osrcip6, &n->in_osrcmsk6, &j);
 		hv = NAT_HASH_FN6(&j, 0, softn->ipf_nat_maprules_sz);
 	} else {
 		softn->ipf_nat6_map_masks[0]++;
 		if (softn->ipf_nat6_map_masks[0] == 1)
-			ipf_nat6_add_map_mask(softn, n->in_osrcmsk6.i6);
+			ipf_nat6_add_map_mask(softn, &n->in_osrcmsk6);
 		hv = 0;
 	}
 	np = softn->ipf_nat_map_rules + hv;
@@ -436,6 +444,64 @@ ipf_nat6_addmap(softn, n)
 	n->in_pmnext = np;
 	n->in_hv[1] = hv;
 	*np = n;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_nat6_del_rdr                                             */
+/* Returns:     Nil                                                         */
+/* Parameters:  n(I) - pointer to NAT rule to delete                        */
+/*                                                                          */
+/* Removes a NAT rdr rule from the hash table of NAT rdr rules.             */
+/* ------------------------------------------------------------------------ */
+static void
+ipf_nat6_delrdr(softn, n)
+	ipf_nat_softc_t *softn;
+	ipnat_t *n;
+{
+	int k;
+
+	if (n->in_osrcatype == FRI_NORMAL) {
+		k = count6bits(n->in_osrcmsk6.i6);
+	} else {
+		k = 0;
+	}
+	softn->ipf_nat6_rdr_masks[k]--;
+	if (softn->ipf_nat6_rdr_masks[k] == 0)
+		ipf_nat6_del_rdr_mask(softn, &n->in_osrcmsk6);
+
+	if (n->in_mnext != NULL)
+		n->in_mnext->in_pmnext = n->in_pmnext;
+	*n->in_pmnext = n->in_mnext;
+}
+                                        
+                       
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_nat6_delmap                                             */
+/* Returns:     Nil                                                         */
+/* Parameters:  n(I) - pointer to NAT rule to delete                        */
+/*                                                                          */
+/* Removes a NAT map rule from the hash table of NAT map rules.             */
+/* ------------------------------------------------------------------------ */
+static void
+ipf_nat6_delmap(softn, n)
+	ipf_nat_softc_t *softn;
+	ipnat_t *n;
+{
+	int k;
+
+	if (n->in_osrcatype == FRI_NORMAL) {
+		k = count6bits(n->in_odstmsk6.i6);
+	} else {
+		k = 0;
+	}
+	softn->ipf_nat6_map_masks[k]--;
+	if (softn->ipf_nat6_map_masks[k] == 0)
+		ipf_nat6_del_map_mask(softn, &n->in_odstmsk6);
+
+	if (n->in_mnext != NULL)
+		n->in_mnext->in_pmnext = n->in_pmnext;
+	*n->in_pmnext = n->in_mnext;
 }
 
 
@@ -483,7 +549,7 @@ ipf_nat6_addencap(softn, n)
 	if (n->in_redir & NAT_MAP) {
 		softn->ipf_nat6_rdr_masks[k]++;
 		if (softn->ipf_nat6_rdr_masks[k] == 1)
-			ipf_nat6_add_rdr_mask(softn, n->in_nsrcip6.i6);
+			ipf_nat6_add_rdr_mask(softn, &n->in_nsrcip6);
 
 		np = softn->ipf_nat_rdr_rules + hv;
 		while (*np != NULL)
@@ -495,7 +561,7 @@ ipf_nat6_addencap(softn, n)
 	} else if (n->in_redir & NAT_REDIRECT) {
 		softn->ipf_nat6_map_masks[k]++;
 		if (softn->ipf_nat6_map_masks[k] == 1)
-			ipf_nat6_add_map_mask(softn, n->in_nsrcip6.i6);
+			ipf_nat6_add_map_mask(softn, &n->in_nsrcip6);
 		np = softn->ipf_nat_map_rules + hv;
 		while (*np != NULL)
 			np = &(*np)->in_mnext;
@@ -1260,10 +1326,10 @@ ipf_nat6_add(fin, np, natsave, flags, direction)
 
 	if ((move == 1) && (np->in_flags & IPN_ROUNDR)) {
 		if ((np->in_redir & (NAT_REDIRECT|NAT_MAP)) == NAT_REDIRECT) {
-			ipf_nat_delrdr(softn, np);
+			ipf_nat6_delrdr(softn, np);
 			ipf_nat6_addrdr(softn, np);
 		} else if ((np->in_redir & (NAT_REDIRECT|NAT_MAP)) == NAT_MAP) {
-			ipf_nat_delmap(softn, np);
+			ipf_nat6_delmap(softn, np);
 			ipf_nat6_addmap(softn, np);
 		}
 	}
@@ -2885,7 +2951,6 @@ ipf_nat6_checkout(fin, passp)
 	} else if (fin->fin_off == 0) {
 		u_32_t hv, nmsk = 0;
 		i6addr_t *msk;
-		int i;
 
 		/*
 		 * If there is no current entry in the nat table for this IP#,
@@ -3353,7 +3418,6 @@ ipf_nat6_checkin(fin, passp)
 	} else if (fin->fin_off == 0) {
 		u_32_t hv, rmsk = 0;
 		i6addr_t *msk;
-		int i;
 
 		/*
 		 * If there is no current entry in the nat table for this IP#,

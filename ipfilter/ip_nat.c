@@ -214,12 +214,18 @@ static	int	ipf_nat_flush_entry __P((ipf_main_softc_t *, void *));
 static	int	ipf_nat_getent __P((ipf_main_softc_t *, caddr_t, int));
 static	int	ipf_nat_getsz __P((ipf_main_softc_t *, caddr_t, int));
 static	int	ipf_nat_putent __P((ipf_main_softc_t *, caddr_t, int));
+static	void	ipf_nat_add_active __P((int, u_32_t *));
+static	void	ipf_nat_add_map_mask __P((ipf_nat_softc_t *, int));
+static	void	ipf_nat_add_rdr_mask __P((ipf_nat_softc_t *, int));
 static	void	ipf_nat_addencap __P((ipf_nat_softc_t *, ipnat_t *));
 static	void	ipf_nat_addmap __P((ipf_nat_softc_t *, ipnat_t *));
 static	void	ipf_nat_addrdr __P((ipf_nat_softc_t *, ipnat_t *));
 static	int	ipf_nat_builddivertmp __P((ipf_nat_softc_t *, ipnat_t *));
 static	int	ipf_nat_clearlist __P((ipf_main_softc_t *, ipf_nat_softc_t *));
 static	int	ipf_nat_decap __P((fr_info_t *, nat_t *));
+static	void	ipf_nat_del_active __P((int, u_32_t *));
+static	void	ipf_nat_del_map_mask __P((ipf_nat_softc_t *, int));
+static	void	ipf_nat_del_rdr_mask __P((ipf_nat_softc_t *, int));
 static	int	ipf_nat_encapok __P((fr_info_t *, nat_t *));
 static	int	ipf_nat_extraflush __P((ipf_main_softc_t *, ipf_nat_softc_t *, int));
 static	int	ipf_nat_finalise __P((fr_info_t *, nat_t *));
@@ -260,7 +266,6 @@ static	int	ipf_nat_siocaddnat __P((ipf_main_softc_t *, ipf_nat_softc_t *,
 static	void	ipf_nat_siocdelnat __P((ipf_main_softc_t *, ipf_nat_softc_t *,
 					ipnat_t *, ipnat_t **, int));
 static	void	ipf_nat_tabmove __P((ipf_nat_softc_t *, nat_t *));
-
 
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_nat_main_load                                           */
@@ -639,7 +644,8 @@ ipf_nat_setlock(arg, tmp)
 /* ------------------------------------------------------------------------ */
 static void
 ipf_nat_add_active(bitcount, active)
-	int bitcount, *active;
+	int bitcount;
+	u_32_t *active;
 {
 	u_32_t mask = 0xffffffff << (32 - bitcount);
 	int i;
@@ -668,7 +674,8 @@ ipf_nat_add_active(bitcount, active)
 /* ------------------------------------------------------------------------ */
 static void
 ipf_nat_del_active(bitcount, active)
-	int bitcount, *active;
+	int bitcount;
+	u_32_t *active;
 {
 	u_32_t mask = htonl(0xffffffff << (32 - bitcount));
 	int i;
@@ -3005,7 +3012,7 @@ ipf_nat_newmap(fin, nat, ni)
 				port = np->in_spnext;
 			} else {
 				port = ipf_random() % (np->in_spmax -
-						       np->in_spmin +1 );
+						       np->in_spmin + 1);
 				port += np->in_spmin;
 			}
 			port = htons(port);
