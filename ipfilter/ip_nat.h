@@ -719,8 +719,8 @@ extern	int	ipf_nat_settimeout(struct ipf_main_softc_s *,
 extern	void	ipf_nat_sync(ipf_main_softc_t *, void *);
 
 extern	nat_t	*ipf_nat_clone(fr_info_t *, nat_t *);
-extern	void	ipf_nat_delmap(ipnat_t *);
-extern	void	ipf_nat_delrdr(ipnat_t *);
+extern	void	ipf_nat_delmap(ipf_nat_softc_t *, ipnat_t *);
+extern	void	ipf_nat_delrdr(ipf_nat_softc_t *, ipnat_t *);
 extern	void	ipf_nat_delrule(ipf_main_softc_t *, ipf_nat_softc_t *,
 				ipnat_t *);
 extern	int	ipf_nat_wildok(nat_t *, int, int, int, int);

@@ -1,6 +1,8 @@
 #include "ipf.h"
 #include "ipl.h"
 
+#include <sys/ioctl.h>
+
 extern int ipnat_fd;
 
 void

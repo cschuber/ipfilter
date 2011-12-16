@@ -1,6 +1,8 @@
 #include "ipf.h"
 #include "ipl.h"
 
+#include <sys/ioctl.h>
+
 extern int ipf_fd;
 
 void
@@ -14,7 +16,6 @@ walk_live_fr_rules(ticks, out, set, group, walker)
 	ipfruleiter_t rule;
 	frentry_t zero;
 	frentry_t *fp;
-	frgroup_t *g;
 	ipfobj_t obj;
 	int n;
 

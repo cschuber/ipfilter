@@ -82,5 +82,14 @@ typedef struct radix_softc {
 
 extern	void	*ipf_rx_create(void);
 extern	int	ipf_rx_init(void *);
+extern	void	ipf_rx_destroy(void *);
+extern	int	ipf_rx_inithead(radix_softc_t *, ipf_rdx_head_t **);
+extern	void	ipf_rx_freehead(ipf_rdx_head_t *);
+extern	ipf_rdx_node_t *ipf_rx_addroute(ipf_rdx_head_t *, addrfamily_t *,
+					addrfamily_t *, ipf_rdx_node_t *);
+extern	ipf_rdx_node_t *ipf_rx_delete(ipf_rdx_head_t *, addrfamily_t *,
+				      addrfamily_t *);
+extern	ipf_rdx_node_t *ipf_rx_lookup(ipf_rdx_head_t *, addrfamily_t *,
+				      addrfamily_t *);
+extern	void	ipf_rx_walktree(ipf_rdx_head_t *, radix_walk_func_t, void *);
 
-#endif /* __RADIX_IPF_H__ */

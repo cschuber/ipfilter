@@ -89,6 +89,9 @@ void	showhostmap_dead(natstat_t *);
 void	showhostmap_live(int, natstat_t *);
 void	dostats_dead(natstat_t *, int, int *);
 int	nat_matcharray(nat_t *, int *);
+void	nat_walker(u_long, int *, nat_t *);
+void	ipnat_walker(ipnat_t *);
+void	hostmap_walk(hostmap_t *);
 
 int		opts;
 int		ipnat_fd = -1;

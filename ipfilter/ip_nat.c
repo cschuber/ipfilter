@@ -256,6 +256,12 @@ static	int	ipf_nat_siocaddnat(ipf_main_softc_t *, ipf_nat_softc_t *,
 static	void	ipf_nat_siocdelnat(ipf_main_softc_t *, ipf_nat_softc_t *,
 				   ipnat_t *, ipnat_t **, int);
 static	void	ipf_nat_tabmove(ipf_nat_softc_t *, nat_t *);
+static	void	ipf_nat_add_active(int, u_32_t *);
+static	void	ipf_nat_del_active(int, u_32_t *);
+static	void	ipf_nat_add_map_mask(ipf_nat_softc_t *, int);
+static	void	ipf_nat_add_rdr_mask(ipf_nat_softc_t *, int);
+static	void	ipf_nat_del_map_mask(ipf_nat_softc_t *, int);
+static	void	ipf_nat_del_rdr_mask(ipf_nat_softc_t *, int);
 
 
 /* ------------------------------------------------------------------------ */
@@ -635,7 +641,8 @@ ipf_nat_setlock(arg, tmp)
 /* ------------------------------------------------------------------------ */
 static void
 ipf_nat_add_active(bitcount, active)
-	int bitcount, *active;
+	int bitcount;
+	u_32_t *active;
 {
 	u_32_t mask = 0xffffffff << (32 - bitcount);
 	int i;
@@ -664,7 +671,8 @@ ipf_nat_add_active(bitcount, active)
 /* ------------------------------------------------------------------------ */
 static void
 ipf_nat_del_active(bitcount, active)
-	int bitcount, *active;
+	int bitcount;
+	u_32_t *active;
 {
 	u_32_t mask = htonl(0xffffffff << (32 - bitcount));
 	int i;
@@ -3001,7 +3009,7 @@ ipf_nat_newmap(fin, nat, ni)
 				port = np->in_spnext;
 			} else {
 				port = ipf_random() % (np->in_spmax -
-						       np->in_spmin +1 );
+						       np->in_spmin + 1);
 				port += np->in_spmin;
 			}
 			port = htons(port);

@@ -1,6 +1,8 @@
 #include "ipf.h"
 #include "ipl.h"
 
+#include <sys/ioctl.h>
+
 extern int ipf_fd;
 
 void
@@ -11,7 +13,6 @@ walk_live_groups(unit, set, walker)
 {
 	frgroupiter_t info;
 	ipfgeniter_t iter;
-	frgroup_t *fg;
 	ipfobj_t obj;
 	int i;
 

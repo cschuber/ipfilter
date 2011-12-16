@@ -1,6 +1,8 @@
 #include "ipf.h"
 #include "ipl.h"
 
+#include <sys/ioctl.h>
+
 extern int ipstate_fd;
 
 void

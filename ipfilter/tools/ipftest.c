@@ -39,24 +39,29 @@ int	loadrules(char *, int);
 int	kmemcpy(char *, long, int);
 int     kstrncpy(char *, long, int n);
 int	ipf_check_result(u_32_t);
-	int pass;
+int	pass;
 int	blockreason;
 int	testmode = 0;
 void	dumpnat(void *);
 void	dumpstate(ipf_main_softc_t *, void *);
 void	dumpgroups_test(ipf_main_softc_t *);
 void	dumprules_test(frentry_t *);
-void	dumpnat_live();
-void	dumpstate_live();
-void	dumplookup_live();
-void	dumpgroups_live();
+void	dumpnat_live(void);
+void	dumpstate_live(void);
+void	dumplookup_live(void);
+void	dumpgroups_live(void);
 void	drain_log(char *);
 void	fixv4sums(mb_t *, ip_t *);
-void	test_usermode();
-void	test_kernmode();
+void	test_usermode(struct ipread *);
+void	test_kernmode(struct ipread *);
 void	print_result(int, int, mb_t *, mb_t *);
 void	user_init(ioctlcmd_t);
+void	ipf_group_walker(frgroupiter_t *);
 void	ipf_walker(frentry_t *);
+void	state_walker(u_long, int *, ipstate_t *);
+void	hostmap_walker(hostmap_t *);
+void	nat_walker(u_long, int *, nat_t *);
+void	ipnat_walker(ipnat_t *);
 
 #if defined(__NetBSD__) || defined(__OpenBSD__) || SOLARIS || \
 	(_BSDI_VERSION >= 199701) || (__FreeBSD_version >= 300000) || \
@@ -1148,9 +1153,7 @@ ipf_check_result(pass)
 
 
 void
-ipf_group_walker(unit, set, info)
-	int unit;
-	int set;
+ipf_group_walker(info)
 	frgroupiter_t *info;
 {
 	static int done[2][IPL_LOGSIZE] = {
@@ -1158,10 +1161,10 @@ ipf_group_walker(unit, set, info)
 					   { 0, 0, 0, 0, 0, 0, 0, 0}
 					  };
 
-	if (done[set][unit] == 0) {
+	if (done[info->gi_set][info->gi_unit] == 0) {
 		printf("Dev.%d. Group %s Flags %#x\n",
-			unit, info->gi_name, info->gi_flags);
-		done[set][unit] = 1;
+			info->gi_unit, info->gi_name, info->gi_flags);
+		done[info->gi_set][info->gi_unit] = 1;
 	}
 
 	if (info->gi_name[0] != '\0')

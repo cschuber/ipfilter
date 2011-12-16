@@ -156,6 +156,9 @@ static	void	ipfstate_live(char *, friostat_t **, ips_stat_t **,
 static	void	ipfstate_dead(char *, friostat_t **, ips_stat_t **,
 			      ipfrstat_t **, ipf_authstat_t **, u_32_t *);
 static	ipstate_t *fetchstate(ipstate_t *, ipstate_t *);
+static	void	group_walker(frgroupiter_t *);
+static	void	ipf_walker(frentry_t *);
+static	void	state_walker(u_long, int *, ipstate_t *);
 #ifdef STATETOP
 static	void	topipstates(i6addr_t, i6addr_t, int, int, int,
 			    int, int, int, int *);
@@ -770,7 +773,7 @@ static	void	showstats(fp, frf)
 }
 
 
-void
+static void
 ipf_walker(fp)
 	frentry_t *fp;
 {
@@ -944,7 +947,7 @@ static	void	showlist(fiop)
 }
 
 
-void
+static void
 state_walker(ticks, filter, is)
 	u_long ticks;
 	int *filter;
