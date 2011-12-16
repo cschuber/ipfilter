@@ -3726,7 +3726,7 @@ ipf_flushlist(softc, set, unit, nfreedp, listp)
 		}
 
 		if (fp->fr_srctrack.ht_max_nodes)
-			ipf_rb_ht_init(&fp->fr_srctrack);
+			ipf_rb_ht_flush(&fp->fr_srctrack);
 
 		fp->fr_next = NULL;
 
@@ -4812,6 +4812,8 @@ frrequest(softc, unit, req, data, set, makecopy)
 	if (error != 0)
 		goto donenolock;
 	fp->fr_statecnt = 0;
+	if (fp->fr_srctrack.ht_max_nodes != 0)
+		ipf_rb_ht_init(&fp->fr_srctrack);
 
 	/*
 	 * Look for an existing matching filter rule, but don't include the
@@ -9590,20 +9592,12 @@ ipf_rule_expire(softc)
 }
 
 
-/*
- * NOTE:
- *
- * As there is currently only 1 use of a red-black tree in IPFilter, I'm
- * happy to use the widespread BSD interfaces in <sys/tree.h>. Was there
- * more than one use, I'd be using a .c file implementation fof a red-
- * -black tree.
- */
 static int ipf_ht_node_cmp(struct host_node_s *, struct host_node_s *);
 static void ipf_ht_node_make_key(host_track_t *, host_node_t *, int,
 				 i6addr_t *);
 
-RB_PROTOTYPE(ipf_rb, host_node_s, hn_entry, ipf_ht_node_cmp);
-RB_GENERATE(ipf_rb, host_node_s, hn_entry, ipf_ht_node_cmp);
+host_node_t RBI_ZERO(ipf_rb);
+RBI_CODE(ipf_rb, host_node_t, hn_entry, ipf_ht_node_cmp);
 
 
 /* ------------------------------------------------------------------------ */
@@ -9630,23 +9624,24 @@ ipf_ht_node_cmp(k1, k2)
 {
 	int i;
 
-	i = (k2->hn_family - k1->hn_family);
+	i = (k2->hn_addr.adf_family - k1->hn_addr.adf_family);
 	if (i != 0)
 		return i;
 
-	if (k1->hn_family == AF_INET)
-		return (k2->hn_addr.in4.s_addr - k1->hn_addr.in4.s_addr);
+	if (k1->hn_addr.adf_family == AF_INET)
+		return (k2->hn_addr.adf_addr.in4.s_addr -
+			k1->hn_addr.adf_addr.in4.s_addr);
 
-	i = k2->hn_addr.i6[3] - k1->hn_addr.i6[3];
+	i = k2->hn_addr.adf_addr.i6[3] - k1->hn_addr.adf_addr.i6[3];
 	if (i != 0)
 		return i;
-	i = k2->hn_addr.i6[2] - k1->hn_addr.i6[2];
+	i = k2->hn_addr.adf_addr.i6[2] - k1->hn_addr.adf_addr.i6[2];
 	if (i != 0)
 		return i;
-	i = k2->hn_addr.i6[1] - k1->hn_addr.i6[1];
+	i = k2->hn_addr.adf_addr.i6[1] - k1->hn_addr.adf_addr.i6[1];
 	if (i != 0)
 		return i;
-	i = k2->hn_addr.i6[0] - k1->hn_addr.i6[0];
+	i = k2->hn_addr.adf_addr.i6[0] - k1->hn_addr.adf_addr.i6[0];
 	return i;
 }
 
@@ -9674,44 +9669,46 @@ ipf_ht_node_make_key(htp, key, family, addr)
 	int family;
 	i6addr_t *addr;
 {
-	key->hn_family = family;
+	key->hn_addr.adf_family = family;
 	if (family == AF_INET) {
 		u_32_t mask;
 		int bits;
 
+		key->hn_addr.adf_len = sizeof(key->hn_addr.adf_addr.in4);
 		bits = htp->ht_netmask;
 		if (bits >= 32) {
 			mask = 0xffffffff;
 		} else {
 			mask = htonl(0xffffffff << (32 - bits));
 		}
-		key->hn_addr.in4.s_addr = addr->in4.s_addr & mask;
+		key->hn_addr.adf_addr.in4.s_addr = addr->in4.s_addr & mask;
 	} else {
 		int bits = htp->ht_netmask;
 
+		key->hn_addr.adf_len = sizeof(key->hn_addr.adf_addr.in6);
 		if (bits > 96) {
-			key->hn_addr.i6[3] = addr->i6[3] &
+			key->hn_addr.adf_addr.i6[3] = addr->i6[3] &
 					     htonl(0xffffffff << (128 - bits));
-			key->hn_addr.i6[2] = addr->i6[2];
-			key->hn_addr.i6[1] = addr->i6[2];
-			key->hn_addr.i6[0] = addr->i6[2];
+			key->hn_addr.adf_addr.i6[2] = addr->i6[2];
+			key->hn_addr.adf_addr.i6[1] = addr->i6[2];
+			key->hn_addr.adf_addr.i6[0] = addr->i6[2];
 		} else if (bits > 64) {
-			key->hn_addr.i6[3] = 0;
-			key->hn_addr.i6[2] = addr->i6[2] &
+			key->hn_addr.adf_addr.i6[3] = 0;
+			key->hn_addr.adf_addr.i6[2] = addr->i6[2] &
 					     htonl(0xffffffff << (96 - bits));
-			key->hn_addr.i6[1] = addr->i6[1];
-			key->hn_addr.i6[0] = addr->i6[0];
+			key->hn_addr.adf_addr.i6[1] = addr->i6[1];
+			key->hn_addr.adf_addr.i6[0] = addr->i6[0];
 		} else if (bits > 32) {
-			key->hn_addr.i6[3] = 0;
-			key->hn_addr.i6[2] = 0;
-			key->hn_addr.i6[1] = addr->i6[1] &
+			key->hn_addr.adf_addr.i6[3] = 0;
+			key->hn_addr.adf_addr.i6[2] = 0;
+			key->hn_addr.adf_addr.i6[1] = addr->i6[1] &
 					     htonl(0xffffffff << (64 - bits));
-			key->hn_addr.i6[0] = addr->i6[0];
+			key->hn_addr.adf_addr.i6[0] = addr->i6[0];
 		} else {
-			key->hn_addr.i6[3] = 0;
-			key->hn_addr.i6[2] = 0;
-			key->hn_addr.i6[1] = 0;
-			key->hn_addr.i6[0] = addr->i6[0] &
+			key->hn_addr.adf_addr.i6[3] = 0;
+			key->hn_addr.adf_addr.i6[2] = 0;
+			key->hn_addr.adf_addr.i6[1] = 0;
+			key->hn_addr.adf_addr.i6[0] = addr->i6[0] &
 					     htonl(0xffffffff << (32 - bits));
 		}
 	}
@@ -9746,7 +9743,7 @@ ipf_ht_node_add(softc, htp, family, addr)
 
 	ipf_ht_node_make_key(htp, &k, family, addr);
 
-	h = RB_FIND(ipf_rb, &htp->ht_root, &k);
+	h = RBI_SEARCH(ipf_rb, &htp->ht_root, &k);
 	if (h == NULL) {
 		if (htp->ht_cur_nodes >= htp->ht_max_nodes)
 			return -1;
@@ -9763,8 +9760,8 @@ ipf_ht_node_add(softc, htp, family, addr)
 		 */
 		bzero((char *)h, sizeof(*h));
 		h->hn_addr = k.hn_addr;
-		h->hn_family = k.hn_family;
-		RB_INSERT(ipf_rb, &htp->ht_root, h);
+		h->hn_addr.adf_family = k.hn_addr.adf_family;
+		RBI_INSERT(ipf_rb, &htp->ht_root, h);
 		htp->ht_cur_nodes++;
 	} else {
 		if ((htp->ht_max_per_node != 0) &&
@@ -9806,13 +9803,13 @@ ipf_ht_node_del(htp, family, addr)
 
 	ipf_ht_node_make_key(htp, &k, family, addr);
 
-	h = RB_FIND(ipf_rb, &htp->ht_root, &k);
+	h = RBI_SEARCH(ipf_rb, &htp->ht_root, &k);
 	if (h == NULL) {
 		return -1;
 	} else {
 		h->hn_active--;
 		if (h->hn_active == 0) {
-			RB_REMOVE(ipf_rb, &htp->ht_root, h);
+			(void) RBI_DELETE(ipf_rb, &htp->ht_root, h);
 			htp->ht_cur_nodes--;
 			KFREE(h);
 		}
@@ -9833,7 +9830,40 @@ void
 ipf_rb_ht_init(head)
 	host_track_t *head;
 {
-	RB_INIT(&head->ht_root);
+	RBI_INIT(ipf_rb, &head->ht_root);
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_rb_ht_freenode                                          */
+/* Returns:     Nil                                                         */
+/* Parameters:  head(I) - pointer to host tracking structure                */
+/*              arg(I)  - additional argument from walk caller              */
+/*                                                                          */
+/* Free an actual host_node_t structure.                                    */
+/* ------------------------------------------------------------------------ */
+void
+ipf_rb_ht_freenode(node, arg)
+	host_node_t *node;
+	void *arg;
+{
+	KFREE(node);
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_rb_ht_flush                                             */
+/* Returns:     Nil                                                         */
+/* Parameters:  head(I) - pointer to host tracking structure                */
+/*                                                                          */
+/* Remove all of the nodes in the tree tracking hosts by calling a walker   */
+/* and free'ing each one.                                                   */
+/* ------------------------------------------------------------------------ */
+void
+ipf_rb_ht_flush(head)
+	host_track_t *head;
+{
+	RBI_WALK(ipf_rb, &head->ht_root, ipf_rb_ht_freenode, NULL);
 }
 
 
@@ -9949,7 +9979,6 @@ ipf_test_pkt(softc, data)
 	ifp = GETIFP(p->pkt_ifname, v);
 
 #if !defined(_KERNEL) || defined(MENTAT)
-	qpi.qpi_q = NULL;
 	qpi.qpi_off = 0;
 	qpi.qpi_flags = p->pkt_flags;
 	qpi.qpi_m = m;
@@ -9977,7 +10006,7 @@ ipf_test_pkt(softc, data)
 		}
 		todo = tocopy;
 		p->pkt_length = tocopy;
-		dst = p->pkt_buf;
+		dst = (char *)p->pkt_buf;
 
 		for (m2 = m; (m2 != NULL) && (todo > 0); m2 = m2->m_next) {
 			tocopy = M_LEN(m2);
