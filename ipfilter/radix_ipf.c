@@ -3,6 +3,8 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  */
+#include <sys/types.h>
+
 #include "ip_compat.h"
 #include "ip_fil.h"
 #ifdef RDX_DEBUG
@@ -16,7 +18,14 @@
 
 #define	ADF_OFF	offsetof(addrfamily_t, adf_addr)
 static int adf_off = ADF_OFF << 3;
-static int nodecount = 0;
+
+static void buildnodes(addrfamily_t *, addrfamily_t *, ipf_rdx_node_t n[2]);
+static int count_mask_bits(addrfamily_t *, u_32_t **);
+static ipf_rdx_node_t *ipf_rx_find_addr(ipf_rdx_node_t *, u_32_t *);
+static ipf_rdx_node_t *ipf_rx_insert(ipf_rdx_head_t *, ipf_rdx_node_t n[2],
+				     int *);
+static ipf_rdx_node_t *ipf_rx_match(ipf_rdx_head_t *, addrfamily_t *);
+static void ipf_rx_attach_mask(ipf_rdx_node_t *, ipf_rdx_mask_t *);
 
 static int
 count_mask_bits(mask, lastp)
@@ -118,7 +127,7 @@ ipf_rx_match(head, addr)
 
 	len = addr->adf_len;
 	end = (u_32_t *)((u_char *)addr + len);
-	node = ipf_rx_find_addr(head->root, addr);
+	node = ipf_rx_find_addr(head->root, (u_32_t *)addr);
 
 	/*
 	 * Search the dupkey list for a potential match.
@@ -168,7 +177,7 @@ ipf_rx_lookup(head, addr, mask)
 	u_32_t *akey;
 	int count;
 
-	found = ipf_rx_find_addr(head->root, addr);
+	found = ipf_rx_find_addr(head->root, (u_32_t *)addr);
 	if (found->root == 1)
 		return NULL;
 	count = count_mask_bits(mask, NULL);
@@ -296,7 +305,11 @@ ipf_rx_insert(head, nodes, dup)
 		prev = cur;
 	}
 
-	mask = calloc(1, sizeof(*mask));
+	KMALLOC(mask, ipf_rdx_mask_t *);
+	if (mask == NULL) {
+		return NULL;
+	}
+	mask->next = NULL;
 	mask->node = &nodes[0];
 	mask->maskbitcount = nodebits;
 	mask->mask = nodes[0].maskkey;
@@ -424,7 +437,7 @@ ipf_rx_delete(head, addr, mask)
 	ipf_rdx_mask_t *m;
 	int count;
 
-	found = ipf_rx_find_addr(head->root, addr);
+	found = ipf_rx_find_addr(head->root, (u_32_t *)addr);
 	if (found->root == 1)
 		return NULL;
 	count = count_mask_bits(mask, NULL);
@@ -625,11 +638,10 @@ ipf_rx_inithead(softr, headp)
 	ipf_rdx_head_t *ptr;
 	ipf_rdx_node_t *node;
 
-	ptr = calloc(1, sizeof(*ptr));
+	KMALLOC(ptr, ipf_rdx_head_t *);
 	*headp = ptr;
-	if (ptr == NULL) {
+	if (ptr == NULL)
 		return -1;
-	}
 	node = ptr->nodes;
 	ptr->root = node + 1;
 	node[0].index = -1 - adf_off;
@@ -660,13 +672,14 @@ ipf_rx_inithead(softr, headp)
 	ptr->lookup = ipf_rx_lookup;
 	ptr->matchaddr = ipf_rx_match;
 	ptr->walktree = ipf_rx_walktree;
-
 	return 0;
 }
 
 void
-ipf_rx_freehead()
+ipf_rx_freehead(head)
+	ipf_rdx_head_t *head;
 {
+	KFREE(head);
 }
 
 void *
@@ -674,10 +687,9 @@ ipf_rx_create()
 {
 	radix_softc_t *softr;
 
-	softr = calloc(1, sizeof(*softr));
+	KMALLOC(softr, radix_softc_t *);
 	if (softr == NULL)
 		return NULL;
-
 	bzero((char *)softr, sizeof(*softr));
 
 	return softr;
@@ -727,14 +739,6 @@ ipf_rx_freenode(node, arg)
 	}
 }
 
-void
-ipf_rx_freehead(ctx, head)
-	void *ctx;
-	ipf_rdx_head_t *head;
-{
-	ipf_rx_walktree(head, ipf_rx_freenode, head);
-}
-
 #define	NAME(x)	((x)->index < 0 ? (x)->name : (x)->name)
 #define	GNAME(y)	((y) == NULL ? "NULL" : NAME(y))
 
@@ -746,6 +750,7 @@ typedef struct myst {
 	int		printed;
 } myst_t;
 
+static int nodecount = 0;
 myst_t *myst_top = NULL;
 
 void add_addr(ipf_rdx_head_t *, int , int);
@@ -920,6 +925,8 @@ main(int argc, char *argv[])
 	checktree(rnh);
 	printroots(rnh);
 	dumptree(rnh);
+
+	ipf_rx_walktree(rnh, ipf_rx_freenode, rnh);
 
 	return 0;
 }

@@ -910,8 +910,7 @@ ipf_pool_create(softc, softp, op)
 	}
 	bzero(h, sizeof(*h));
 
-	if (ipf_rx_inithead(softp->ipf_radix, (void **)&h->ipo_head,
-			    offsetof(addrfamily_t, adf_addr) << 3) != 0) {
+	if (ipf_rx_inithead(softp->ipf_radix, &h->ipo_head) != 0) {
 		KFREE(h);
 		softc->ipf_interror = 70008;
 		return ENOMEM;

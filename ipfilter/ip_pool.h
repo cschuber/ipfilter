@@ -10,7 +10,7 @@
 #define	__IP_POOL_H__
 
 #include "netinet/ip_lookup.h"
-#include "radix_ipf.h"
+#include "netinet/radix_ipf.h"
 
 #define	IP_POOL_NOMATCH		0
 #define	IP_POOL_POSITIVE	1
