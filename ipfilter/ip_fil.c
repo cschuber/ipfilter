@@ -473,7 +473,6 @@ ipf_fastroute(m, mpp, fin, fdp)
 	(*ifp->if_output)(ifp, (void *)m, NULL, 0);
 # endif
 #endif
-	*mpp = NULL;
 done:
 	fin->fin_ifp = sifp;
 	fin->fin_out = sout;

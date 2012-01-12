@@ -21,7 +21,7 @@
 # include <stdlib.h>
 # include <stdio.h>
 #endif
-#include "radix_ipf.h"
+#include "netinet/radix_ipf.h"
 
 #define	ADF_OFF	offsetof(addrfamily_t, adf_addr)
 static int adf_off = ADF_OFF << 3;
@@ -316,9 +316,9 @@ ipf_rx_insert(head, nodes, dup)
 	}
 
 	KMALLOC(mask, ipf_rdx_mask_t *);
-	if (mask == NULL) {
+	if (mask == NULL)
 		return NULL;
-	}
+	bzero(mask, sizeof(*mask));
 	mask->next = NULL;
 	mask->node = &nodes[0];
 	mask->maskbitcount = nodebits;
@@ -652,6 +652,7 @@ ipf_rx_inithead(softr, headp)
 	*headp = ptr;
 	if (ptr == NULL)
 		return -1;
+	bzero(ptr, sizeof(*ptr));
 	node = ptr->nodes;
 	ptr->root = node + 1;
 	node[0].index = -1 - adf_off;

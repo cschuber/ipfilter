@@ -58,7 +58,7 @@ struct file;
 #include "netinet/ip_compat.h"
 #include "netinet/ip_fil.h"
 #include "netinet/ip_pool.h"
-#include "radix_ipf.h"
+#include "netinet/radix_ipf.h"
 
 /* END OF INCLUDES */
 
