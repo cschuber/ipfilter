@@ -489,6 +489,8 @@ ipf_pr_ipv6hdr(fin)
 	fin->fin_crc += fi->fi_dst.i6[2];
 	fin->fin_crc += fi->fi_dst.i6[3];
 	fin->fin_id = 0;
+	if (IN6_IS_ADDR_MULTICAST(&fi->fi_dst.in6))
+		fin->fin_flx |= FI_MULTICAST|FI_MBCAST;
 
 	hdrcount = 0;
 	while (go && !(fin->fin_flx & FI_SHORT)) {
@@ -1242,6 +1244,8 @@ ipf_pr_icmp(fin)
 	 * type(1) + code(1) + cksum(2) + id(2) seq(2) +
 	 * mask(4)
 	 */
+	case ICMP_IREQ :
+	case ICMP_IREQREPLY :
 	case ICMP_MASKREQ :
 	case ICMP_MASKREPLY :
 		fin->fin_flx |= FI_ICMPQUERY;
@@ -1698,6 +1702,8 @@ ipf_pr_ipv4hdr(fin)
 	fin->fin_crc += fi->fi_saddr;
 	fi->fi_daddr = ip->ip_dst.s_addr;
 	fin->fin_crc += fi->fi_daddr;
+	if (IN_CLASSD(fi->fi_daddr))
+		fin->fin_flx |= FI_MULTICAST|FI_MBCAST;
 
 	/*
 	 * set packet attribute flags based on the offset and
@@ -2975,11 +2981,7 @@ ipf_check(ctx, ip, hlen, ifp, out
 		}
 	}
 	/*
-	 * Check auth now.  This, combined with the check below to see if
-	 * apass is 0 is to ensure that we don't count the packet twice,
-	 * which can otherwise occur when we reprocess it.  As it is, we
-	 * only count it after it has no auth. table matchup.
-	 *
+	 * Check auth now.
 	 * If a packet is found in the auth table, then skip checking
 	 * the access lists for permission but we do need to consider
 	 * the result as if it were from the ACL's.  In addition, being
