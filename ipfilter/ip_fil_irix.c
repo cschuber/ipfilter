@@ -420,7 +420,6 @@ ipf_send_ip(fin, m)
 
 		ip6->ip6_hlim = 127;
 		m = *mpp;
-		*mpp = NULL;
 
 		return ip6_output(m, NULL, NULL, 0, NULL, NULL);
 	}
@@ -932,7 +931,6 @@ done:
 
 	if (ro->ro_rt)
 		RTFREE(ro->ro_rt);
-	*mpp = NULL;
 	return 0;
 bad:
 	if (error == EMSGSIZE) {

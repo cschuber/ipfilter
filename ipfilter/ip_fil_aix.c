@@ -916,11 +916,11 @@ ipf_fastroute(m0, mpp, fin, fdp)
 #endif
 		if ((error != 0) && (*mpp != NULL)) {
 			FREE_MB_T(*mpp);
-			*mpp = NULL;
 		}
 		return error;
 	}
 #ifndef INET
+	FREE_MB_T(*mpp);
 	return EPROTONOSUPPORT;
 #else
 
@@ -1147,7 +1147,6 @@ done:
 	if (ro->ro_rt) {
 		RTFREE(ro->ro_rt);
 	}
-	*mpp = NULL;
 	return error;
 bad:
 	if (error == EMSGSIZE) {
@@ -1228,7 +1227,6 @@ ipf_fastroute6(m0, mpp, fin, fdp)
 		error = ip6_getpmtu(ro, ro, ifp, &finaldst, &mtu, &frag);
 		if ((error == 0) && (m0->m_pkthdr.len <= mtu)) {
 			error = nd6_output(ifp, ifp, *mpp, dst6, rt);
-			*mpp = NULL;
 		} else {
 			error = EMSGSIZE;
 		}

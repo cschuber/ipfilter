@@ -544,7 +544,7 @@ ipf_nextipid(fr_info_t *fin)
  */
 /*ARGSUSED*/
 int
-ipf_fastroute(mb_t *xmin, mb_t **mp, fr_info_t *fin, frdest_t *fdp)
+ipf_fastroute(mb_t *xmin, mb_t **mpp, fr_info_t *fin, frdest_t *fdp)
 {
 	struct net_device *ifp, *sifp;
 	struct in_addr dip;

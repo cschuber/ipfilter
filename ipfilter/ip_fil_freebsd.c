@@ -833,7 +833,6 @@ ipf_fastroute(m0, mpp, fin, fdp)
 		 * currently "to <if>" and "to <if>:ip#" are not supported
 		 * for IPv6
 		 */
-		*mpp = NULL;
 #if  (__FreeBSD_version >= 490000)
 		return ip6_output(m, NULL, NULL, 0, NULL, NULL, NULL);
 #else
@@ -1043,7 +1042,6 @@ done:
 	if ((ro != NULL) && (ro->ro_rt != NULL)) {
 		RTFREE(ro->ro_rt);
 	}
-	*mpp = NULL;
 	return 0;
 bad:
 	if (error == EMSGSIZE) {
