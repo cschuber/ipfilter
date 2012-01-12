@@ -1101,8 +1101,8 @@ ipf_state_insert(softc, is, rev)
 
 		MUTEX_ENTER(&fr->fr_lock);
 		fr->fr_ref++;
-		fr->fr_statecnt++;
 		MUTEX_EXIT(&fr->fr_lock);
+		fr->fr_statecnt++;
 	}
 
 	if (is->is_flags & (SI_WILDP|SI_WILDA)) {
@@ -1553,16 +1553,6 @@ ipf_state_add(softc, fin, stsave, flags)
 		}
 		break;
 #endif
-	if ((fin->fin_v == 4) &&
-	    (fin->fin_flx & (FI_MULTICAST|FI_BROADCAST|FI_MBCAST))) {
-		if (fin->fin_out == 0) {
-			flags |= SI_W_DADDR|SI_CLONE;
-			hv -= is->is_daddr;
-		} else {
-			flags |= SI_W_SADDR|SI_CLONE;
-			hv -= is->is_saddr;
-		}
-	}
 
 	case IPPROTO_TCP :
 		tcp = fin->fin_dp;
@@ -1706,52 +1696,6 @@ ipf_state_add(softc, fin, stsave, flags)
 		}
 
 		is->is_tag = fr->fr_logtag;
-
-		/*
-		 * The name '-' is special for network interfaces and causes
-		 * a NULL name to be present, always, allowing packets to
-		 * match it, regardless of their interface.
-		 */
-		if ((fin->fin_ifp == NULL) ||
-		    (fr->fr_ifnames[out << 1] != -1 &&
-		     fr->fr_names[fr->fr_ifnames[out << 1] + 0] == '-' &&
-		     fr->fr_names[fr->fr_ifnames[out << 1] + 1] == '\0')) {
-			is->is_ifp[out << 1] = fr->fr_ifas[0];
-			strncpy(is->is_ifname[out << 1],
-				fr->fr_names + fr->fr_ifnames[0],
-				sizeof(fr->fr_ifnames[0]));
-		} else {
-			is->is_ifp[out << 1] = fin->fin_ifp;
-			COPYIFNAME(fin->fin_v, fin->fin_ifp,
-				   is->is_ifname[out << 1]);
-		}
-
-		is->is_ifp[(out << 1) + 1] = fr->fr_ifas[1];
-		if (fr->fr_ifnames[1] != -1) {
-			strncpy(is->is_ifname[(out << 1) + 1],
-				fr->fr_names + fr->fr_ifnames[1],
-				sizeof(fr->fr_ifnames[1]));
-		}
-
-		is->is_ifp[(1 - out) << 1] = fr->fr_ifas[2];
-		if (fr->fr_ifnames[2] != -1) {
-			strncpy(is->is_ifname[((1 - out) << 1)],
-				fr->fr_names + fr->fr_ifnames[2],
-				sizeof(fr->fr_ifnames[2]));
-		}
-
-		is->is_ifp[((1 - out) << 1) + 1] = fr->fr_ifas[3];
-		if (fr->fr_ifnames[3] != -1) {
-			strncpy(is->is_ifname[((1 - out) << 1) + 1],
-				fr->fr_names + fr->fr_ifnames[3],
-				sizeof(fr->fr_ifnames[3]));
-		}
-	} else {
-		if (fin->fin_ifp != NULL) {
-			is->is_ifp[out << 1] = fin->fin_ifp;
-			COPYIFNAME(fin->fin_v, fin->fin_ifp,
-				   is->is_ifname[out << 1]);
-		}
 	}
 
 	/*
@@ -1808,6 +1752,59 @@ ipf_state_add(softc, fin, stsave, flags)
 		return -1;
 	}
 
+	/*
+	 * Filling in the interface name is after the insert so that an
+	 * event (such as add/delete) of an interface that is referenced
+	 * by this rule will see this state entry.
+	 */
+	if (fr != NULL) {
+		/*
+		 * The name '-' is special for network interfaces and causes
+		 * a NULL name to be present, always, allowing packets to
+		 * match it, regardless of their interface.
+		 */
+		if ((fin->fin_ifp == NULL) ||
+		    (fr->fr_ifnames[out << 1] != -1 &&
+		     fr->fr_names[fr->fr_ifnames[out << 1] + 0] == '-' &&
+		     fr->fr_names[fr->fr_ifnames[out << 1] + 1] == '\0')) {
+			is->is_ifp[out << 1] = fr->fr_ifas[0];
+			strncpy(is->is_ifname[out << 1],
+				fr->fr_names + fr->fr_ifnames[0],
+				sizeof(fr->fr_ifnames[0]));
+		} else {
+			is->is_ifp[out << 1] = fin->fin_ifp;
+			COPYIFNAME(fin->fin_v, fin->fin_ifp,
+				   is->is_ifname[out << 1]);
+		}
+
+		is->is_ifp[(out << 1) + 1] = fr->fr_ifas[1];
+		if (fr->fr_ifnames[1] != -1) {
+			strncpy(is->is_ifname[(out << 1) + 1],
+				fr->fr_names + fr->fr_ifnames[1],
+				sizeof(fr->fr_ifnames[1]));
+		}
+
+		is->is_ifp[(1 - out) << 1] = fr->fr_ifas[2];
+		if (fr->fr_ifnames[2] != -1) {
+			strncpy(is->is_ifname[((1 - out) << 1)],
+				fr->fr_names + fr->fr_ifnames[2],
+				sizeof(fr->fr_ifnames[2]));
+		}
+
+		is->is_ifp[((1 - out) << 1) + 1] = fr->fr_ifas[3];
+		if (fr->fr_ifnames[3] != -1) {
+			strncpy(is->is_ifname[((1 - out) << 1) + 1],
+				fr->fr_names + fr->fr_ifnames[3],
+				sizeof(fr->fr_ifnames[3]));
+		}
+	} else {
+		if (fin->fin_ifp != NULL) {
+			is->is_ifp[out << 1] = fin->fin_ifp;
+			COPYIFNAME(fin->fin_v, fin->fin_ifp,
+				   is->is_ifname[out << 1]);
+		}
+	}
+
 	if (fin->fin_p == IPPROTO_TCP) {
 		/*
 		* If we're creating state for a starting connection, start the
@@ -1816,10 +1813,8 @@ ipf_state_add(softc, fin, stsave, flags)
 		*/
 		(void) ipf_tcp_age(&is->is_sti, fin, softs->ipf_state_tcptq,
 				   is->is_flags, 2);
-		MUTEX_EXIT(&is->is_lock);
-	} else {
-		MUTEX_EXIT(&is->is_lock);
 	}
+	MUTEX_EXIT(&is->is_lock);
 	if ((is->is_flags & IS_STATESYNC) && ((is->is_flags & SI_CLONE) == 0))
 		is->is_sync = ipf_sync_new(softc, SMC_STATE, fin, is);
 	if (softs->ipf_state_logging)
@@ -1829,7 +1824,6 @@ ipf_state_add(softc, fin, stsave, flags)
 
 	if (stsave != NULL)
 		*stsave = is;
-	fin->fin_rev = IP6_NEQ(&is->is_dst, &fin->fin_daddr);
 	fin->fin_flx |= FI_STATE;
 	if (fin->fin_flx & FI_FRAG)
 		(void) ipf_frag_new(softc, fin, pass);
@@ -2524,51 +2518,23 @@ ipf_matchsrcdst(fin, is, src, dst, tcp, cmask)
 
 		if ((flags & SI_W_SADDR) != 0) {
 			if (rev == 0) {
-#ifdef USE_INET6
-				if (is->is_v == 6 &&
-				    IN6_IS_ADDR_MULTICAST(&fi->fi_src.in6))
-					/*EMPTY*/;
-				else
-#endif
-				{
-					is->is_src = fi->fi_src;
-					is->is_flags &= ~SI_W_SADDR;
-				}
+				is->is_src = fi->fi_src;
+				is->is_flags &= ~SI_W_SADDR;
 			} else {
-#ifdef USE_INET6
-				if (is->is_v == 6 &&
-				    IN6_IS_ADDR_MULTICAST(&fi->fi_dst.in6))
-					/*EMPTY*/;
-				else
-#endif
-				{
+				if (!(fin->fin_flx & (FI_MULTICAST|FI_MBCAST))){
 					is->is_src = fi->fi_dst;
 					is->is_flags &= ~SI_W_SADDR;
 				}
 			}
 		} else if ((flags & SI_W_DADDR) != 0) {
 			if (rev == 0) {
-#ifdef USE_INET6
-				if (is->is_v == 6 &&
-				    IN6_IS_ADDR_MULTICAST(&fi->fi_dst.in6))
-					/*EMPTY*/;
-				else
-#endif
-				{
+				if (!(fin->fin_flx & (FI_MULTICAST|FI_MBCAST))){
 					is->is_dst = fi->fi_dst;
 					is->is_flags &= ~SI_W_DADDR;
 				}
 			} else {
-#ifdef USE_INET6
-				if (is->is_v == 6 &&
-				    IN6_IS_ADDR_MULTICAST(&fi->fi_src.in6))
-					/*EMPTY*/;
-				else
-#endif
-				{
-					is->is_dst = fi->fi_src;
-					is->is_flags &= ~SI_W_DADDR;
-				}
+				is->is_dst = fi->fi_src;
+				is->is_flags &= ~SI_W_DADDR;
 			}
 		}
 		if ((is->is_flags & (SI_WILDA|SI_WILDP)) == 0) {
@@ -3137,8 +3103,7 @@ icmp6again:
 		 * to handle the specific types where that is the case.
 		 */
 		if ((softs->ipf_state_stats.iss_wild != 0) &&
-		    (v == 6) && (tryagain == 0) &&
-		    !IN6_IS_ADDR_MULTICAST(&fin->fin_fi.fi_src.in6)) {
+		    (v == 6) && (tryagain == 0)) {
 			hv -= fin->fin_fi.fi_src.i6[0];
 			hv -= fin->fin_fi.fi_src.i6[1];
 			hv -= fin->fin_fi.fi_src.i6[2];
