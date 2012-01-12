@@ -17,7 +17,7 @@ void eMmutex_enter(mtx, file, line)
 	char *file;
 	int line;
 {
-	if (mutex_debug)
+	if (mutex_debug & 2)
 		fprintf(stderr, "%s:%d:eMmutex_enter(%s)\n", file, line,
 		       mtx->eMm_owner);
 	if (mtx->eMm_magic != EMM_MAGIC) {
@@ -41,7 +41,7 @@ void eMmutex_exit(mtx, file, line)
 	char *file;
 	int line;
 {
-	if (mutex_debug)
+	if (mutex_debug & 2)
 		fprintf(stderr, "%s:%d:eMmutex_exit(%s)\n", file, line,
 		       mtx->eMm_owner);
 	if (mtx->eMm_magic != EMM_MAGIC) {
@@ -69,7 +69,7 @@ void eMmutex_init(mtx, who, file, line)
 	char *file;
 	int line;
 {
-	if (mutex_debug)
+	if (mutex_debug & 1)
 		fprintf(stderr, "%s:%d:eMmutex_init(%p,%s)\n",
 			file, line, mtx, who);
 	if (mtx->eMm_magic == EMM_MAGIC) {	/* safe bet ? */
@@ -93,7 +93,7 @@ void eMmutex_destroy(mtx, file, line)
 	char *file;
 	int line;
 {
-	if (mutex_debug)
+	if (mutex_debug & 1)
 		fprintf(stderr, "%s:%d:eMmutex_destroy(%p,%s)\n", file, line,
 		       mtx, mtx->eMm_owner);
 	if (mtx->eMm_magic != EMM_MAGIC) {
