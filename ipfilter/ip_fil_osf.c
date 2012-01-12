@@ -620,8 +620,7 @@ ipf_fastroute(m0, mpp, fin, fdp)
 		} else {
 			error = ENOBUFS;
 			FREE_MB_T(m);
-			*mpp = NULL;
-			softc->ipf_frouteok[1]++;
+			goto done;
 		}
 	}
 #endif
@@ -652,8 +651,6 @@ ipf_fastroute(m0, mpp, fin, fdp)
                 ip6tx.tx_rawoutput = 0;
                 ip6tx.tx_mtu = ifp->if_mtu;
                 ip6tx.tx_opt = NULL;
-
-		*mpp = NULL;
 
                 /*
                  * currently "to <if>" and "to <if>:ip#" are not supported
@@ -859,7 +856,6 @@ done:
 	if (ro->ro_rt) {
 		RTFREE(ro->ro_rt);
 	}
-	*mpp = NULL;
 	return 0;
 bad:
 	if (error == EMSGSIZE) {

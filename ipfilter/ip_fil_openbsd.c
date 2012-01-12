@@ -593,7 +593,6 @@ ipf_fastroute(m0, mpp, fin, fdp)
 		error = ipf_fastroute6(m, mpp, fin, fdp);
 		if ((error != 0) && (*mpp != NULL)) {
 			FREE_MB_T(*mpp);
-			*mpp = NULL;
 		}
 		return error;
 	}
@@ -787,7 +786,6 @@ done:
 	if (ro->ro_rt) {
 		RTFREE(ro->ro_rt);
 	}
-	*mpp = NULL;
 	return 0;
 bad:
 	if (error == EMSGSIZE) {
@@ -877,7 +875,6 @@ ipf_fastroute6(m0, mpp, fin, fdp)
 			if (m0->m_pkthdr.len <= mtu) {
 				error = nd6_output(ifp, fin->fin_ifp, *mpp,
 						   dst6, ro->ro_rt);
-				*mpp = NULL;
 			} else {
 				error = EMSGSIZE;
 			}

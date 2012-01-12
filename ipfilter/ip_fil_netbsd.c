@@ -1037,13 +1037,12 @@ ipf_fastroute(m0, mpp, fin, fdp)
 #else
 		error = EPROTONOSUPPORT;
 #endif
-		if ((error != 0) && (*mpp != NULL)) {
+		if ((error != 0) && (*mpp != NULL))
 			FREE_MB_T(*mpp);
-			*mpp = NULL;
-		}
 		return error;
 	}
 #ifndef INET
+	FREE_MB_T(*mpp);
 	return EPROTONOSUPPORT;
 #else
 
@@ -1277,7 +1276,6 @@ done:
 		RTFREE(rt);
 	}
 # endif
-	*mpp = NULL;
 	return error;
 bad:
 	if (error == EMSGSIZE) {
@@ -1407,7 +1405,6 @@ ipf_fastroute6(m0, mpp, fin, fdp)
 # else
 			error = nd6_output(ifp, ifp, *mpp, dst6, rt);
 # endif
-			*mpp = NULL;
 		} else {
 			error = EMSGSIZE;
 		}

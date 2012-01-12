@@ -893,7 +893,6 @@ bad_fastroute:
 		freeb(mp);
 	mb->b_prev = NULL;
 	freemsg(*mpp);
-	*mpp = NULL;
 	ipf_frouteok[1]++;
 	return -1;
 }
