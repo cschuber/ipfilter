@@ -955,8 +955,9 @@ typedef	u_int32_t	u_32_t;
 #  include <sys/mutex.h>
 #  if (__FreeBSD_version >= 700014)
 #   include <sys/rwlock.h>
-#   define	KRWLOCK_T		struct rwlock
 #   ifdef _KERNEL
+#    define	KMUTEX_T		struct mtx
+#    define	KRWLOCK_T		struct rwlock
 #    define	READ_ENTER(x)		rw_rlock(&(x)->ipf_lk)
 #    define	WRITE_ENTER(x)		rw_wlock(&(x)->ipf_lk)
 #    define	MUTEX_DOWNGRADE(x)	rw_downgrade(&(x)->ipf_lk)
@@ -977,8 +978,9 @@ typedef	u_int32_t	u_32_t;
  * with a WITNESS kernel, it generates LOR messages.
  */
 #   if (__FreeBSD_version < 700000)
-#    define	KRWLOCK_T		struct mtx
 #    ifdef _KERNEL
+#     define	KMUTEX_T		struct mtx
+#     define	KRWLOCK_T		struct mtx
 #     define	READ_ENTER(x)		mtx_lock(&(x)->ipf_lk)
 #     define	WRITE_ENTER(x)		mtx_lock(&(x)->ipf_lk)
 #     define	RWLOCK_EXIT(x)		mtx_unlock(&(x)->ipf_lk)
@@ -988,8 +990,9 @@ typedef	u_int32_t	u_32_t;
 #     define	RW_DESTROY(x)		mtx_destroy(&(x)->ipf_lk)
 #    endif
 #   else
-#    define	KRWLOCK_T		struct sx
 #    ifdef _KERNEL
+#     define	KRWLOCK_T		struct sx
+#     define	KMUTEX_T		struct mtx
 #     define	READ_ENTER(x)		sx_slock(&(x)->ipf_lk)
 #     define	WRITE_ENTER(x)		sx_xlock(&(x)->ipf_lk)
 #     define	MUTEX_DOWNGRADE(x)	sx_downgrade(&(x)->ipf_lk)
@@ -1008,7 +1011,6 @@ typedef	u_int32_t	u_32_t;
 #    endif
 #   endif
 #  endif
-#  define	KMUTEX_T		struct mtx
 # endif
 
 # include <sys/socket.h>
