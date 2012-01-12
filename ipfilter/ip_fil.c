@@ -197,7 +197,7 @@ ipf_setifpaddr(ifp, addr)
 #endif
 		return;
 
-	ifa = (struct ifaddr *)malloc(sizeof(*ifa));
+	ifa = (struct ifaddr *)calloc(1, sizeof(*ifa));
 #if defined(__NetBSD__) || defined(__OpenBSD__) || defined(__FreeBSD__)
 	ifp->if_addrlist.tqh_first = ifa;
 #else
@@ -283,7 +283,7 @@ get_unit(name, family)
 #endif
 
 	if (!ifneta) {
-		ifneta = (struct ifnet **)malloc(sizeof(ifp) * 2);
+		ifneta = (struct ifnet **)calloc(1, sizeof(ifp) * 2);
 		if (!ifneta)
 			return NULL;
 		ifneta[1] = NULL;
@@ -304,7 +304,7 @@ get_unit(name, family)
 			return NULL;
 		}
 		ifneta[nifs] = NULL;
-		ifneta[nifs - 1] = (struct ifnet *)malloc(sizeof(*ifp));
+		ifneta[nifs - 1] = (struct ifnet *)calloc(1, sizeof(*ifp));
 		if (!ifneta[nifs - 1]) {
 			nifs--;
 			return NULL;
@@ -469,7 +469,6 @@ ipf_fastroute(m, mpp, fin, fdp)
 	(*ifp->if_output)(ifp, (void *)m, NULL, 0);
 # endif
 #endif
-	*mpp = NULL;
 done:
 	fin->fin_ifp = sifp;
 	fin->fin_out = sout;
