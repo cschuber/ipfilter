@@ -1314,7 +1314,7 @@ int ipfrule_add_%s_%s()\n", instr, group);
 	fp = &ipfrule_%s_%s;\n", instr, group);
 		fprintf(fp, "\
 	bzero((char *)fp, sizeof(*fp));\n\
-	fp->fr_type = FR_T_CALLFUNC|FR_T_BUILTIN;\n\
+	fp->fr_type = FR_T_CALLFUNC_BUILTIN;\n\
 	fp->fr_flags = FR_%sQUE|FR_NOMATCH;\n\
 	fp->fr_data = (void *)ipf_rules_%s_%s[0];\n",
 		(in != 0) ? "IN" : "OUT", instr, group);

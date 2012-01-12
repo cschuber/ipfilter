@@ -2421,13 +2421,13 @@ ipf_scanlist(fin, pass)
 		switch (fr->fr_type)
 		{
 		case FR_T_IPF :
-		case FR_T_IPF|FR_T_BUILTIN :
+		case FR_T_IPF_BUILTIN :
 			if (ipf_check_ipf(fin, fr, portcmp))
 				continue;
 			break;
 #if defined(IPFILTER_BPF)
 		case FR_T_BPFOPC :
-		case FR_T_BPFOPC|FR_T_BUILTIN :
+		case FR_T_BPFOPC_BUILTIN :
 		    {
 			u_char *mc;
 			int wlen;
@@ -2443,7 +2443,7 @@ ipf_scanlist(fin, pass)
 			break;
 		    }
 #endif
-		case FR_T_CALLFUNC|FR_T_BUILTIN :
+		case FR_T_CALLFUNC_BUILTIN :
 		    {
 			frentry_t *f;
 
@@ -2456,7 +2456,7 @@ ipf_scanlist(fin, pass)
 		    }
 
 		case FR_T_IPFEXPR :
-		case FR_T_IPFEXPR|FR_T_BUILTIN :
+		case FR_T_IPFEXPR_BUILTIN :
 			if (fin->fin_family != fr->fr_family)
 				continue;
 			if (ipf_fr_matcharray(fin, fr->fr_data) == 0)

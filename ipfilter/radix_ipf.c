@@ -6,6 +6,7 @@
 #include <sys/types.h>
 #include <sys/time.h>
 #include <sys/socket.h>
+#include <sys/param.h>
 #include <netinet/in.h>
 #include <net/if.h>
 #if !defined(_KERNEL)
@@ -14,8 +15,8 @@
 # include <strings.h>
 # include <string.h>
 #endif
-#include "ip_compat.h"
-#include "ip_fil.h"
+#include "netinet/ip_compat.h"
+#include "netinet/ip_fil.h"
 #ifdef RDX_DEBUG
 # include <arpa/inet.h>
 # include <stdlib.h>

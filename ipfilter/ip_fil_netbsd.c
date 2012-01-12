@@ -31,6 +31,9 @@ static const char rcsid[] = "@(#)$Id$";
 #else
 # include <sys/dir.h>
 #endif
+#if (__NetBSD_Version__ >= 599005900)
+# include <sys/cprng.h>
+#endif
 #include <sys/mbuf.h>
 #include <sys/protosw.h>
 #include <sys/socket.h>
@@ -1919,7 +1922,11 @@ ipf_random()
 {
 	int number;
 
+#ifdef _CPRNG_H
+	number = cprng_fast32();
+#else
 	number = arc4random();
+#endif
 	return number;
 }
 
@@ -2093,11 +2100,15 @@ ipf_pcksum(fin, hlen, sum)
 	int hlen;
 	u_int sum;
 {
+	struct mbuf *m;
 	u_int sum2;
+	int off;
 
+	m = fin->fin_m;
+	off = (char *)fin->fin_dp - (char *)fin->fin_ip;
 	m->m_data += hlen;
 	m->m_len -= hlen;
-	sum = in_cksum(fin->fin_m, slen);
+	sum2 = in_cksum(fin->fin_m, fin->fin_plen - off);
 	m->m_len += hlen;
 	m->m_data -= hlen;
 

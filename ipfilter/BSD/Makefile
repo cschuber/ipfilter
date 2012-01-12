@@ -16,7 +16,8 @@ CFLAGS=-g -I$(TOP)
 #
 DEVFS!=/usr/bin/lsvfs 2>&1 | sed -n 's/.*devfs.*/-DDEVFS/p'
 CPU!=uname -m
-INC=-I/usr/include -I/sys -I/sys/sys -I/sys/arch
+COMPDIR!=/bin/ls -1tr /usr/src/sys/arch/${CPU}/compile | tail -1
+INC=-I/usr/include -I/sys -I/sys/sys -I/sys/arch -I/usr/src/sys/arch/${CPU}/compile/${COMPDIR}
 DEF=-D$(CPU) -D__$(CPU)__ -DINET -DKERNEL -D_KERNEL $(INC) $(DEVFS) -fno-builtin
 IPDEF=$(DEF) -DGATEWAY -DDIRECTED_BROADCAST
 VNODESHDIR=/sys/kern
@@ -81,8 +82,10 @@ EXTRA=$(ALLOPTS)
 
 include $(TOP)/lib/Makefile
 
-build all: machine $(OBJ)/libipf.a ipf ipfs ipfstat ipftest ipmon ipnat \
-	   ippool ipscan ipsyncm ipsyncs ipfsyncd $(LKM) $(LKMR)
+build all: machine $(OBJ)/libipf.a tools $(LKM) $(LKMR)
+
+tools: ipf ipfs ipfstat ipftest ipmon ipnat ippool ipscan ipsyncm \
+       ipsyncs ipfsyncd
 	-sh -c 'for i in ipf ipftest ipmon ippool ipnat ipscan ipsyncm ipsyncs ipfsyncd; do /bin/rm -f $(TOP)/$$i; ln -s `pwd`/$$i $(TOP); done'
 	-/bin/rm -f ../tools ./tools
 	-ln -s ../tools .
