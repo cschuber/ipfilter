@@ -2678,8 +2678,6 @@ ipf_nat_delete(softc, nat, logtype)
 	/*
 	 * At this point, nat_ref can be either 0 or -1
 	 */
-	if (nat->nat_flags & SI_WILDP)
-		softn->ipf_nat_stats.ns_wilds--;
 	softn->ipf_nat_stats.ns_proto[nat->nat_pr[0]]--;
 
 	if (nat->nat_sync)
@@ -5083,10 +5081,8 @@ ipf_nat_ipfout(fin, passp)
 		 * it has actually had an influence on the packet so we
 		 * increment counters for it.
 		 */
-		MUTEX_ENTER(&fr->fr_lock);
 		fr->fr_bytes += (U_QUAD_T)fin->fin_plen;
 		fr->fr_hits++;
-		MUTEX_EXIT(&fr->fr_lock);
 		break;
 	}
 
@@ -5664,7 +5660,7 @@ ipf_nat_ipfin(fin, passp)
 		return fr;
 
 	case 0 :
-		return NULL;
+		break;
 
 	case 1 :
 		/*
@@ -5672,11 +5668,9 @@ ipf_nat_ipfin(fin, passp)
 		 * it has actually had an influence on the packet so we
 		 * increment counters for it.
 		 */
-		MUTEX_ENTER(&fr->fr_lock);
 		fr->fr_bytes += (U_QUAD_T)fin->fin_plen;
 		fr->fr_hits++;
-		MUTEX_EXIT(&fr->fr_lock);
-		return NULL;
+		break;
 	}
 
 	return NULL;
