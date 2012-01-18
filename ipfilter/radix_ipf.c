@@ -12,12 +12,11 @@
 # include <stddef.h>
 # include <stdlib.h>
 # include <stdio.h>
-# include <strings.h>
 #endif
 #include "netinet/radix_ipf.h"
 
 #define	ADF_OFF	offsetof(addrfamily_t, adf_addr)
-static int adf_off = ADF_OFF << 3;
+#define	ADF_OFF_BITS	(ADF_OFF << 3)
 
 static void buildnodes(addrfamily_t *, addrfamily_t *, ipf_rdx_node_t n[2]);
 static int count_mask_bits(addrfamily_t *, u_32_t **);
@@ -27,6 +26,26 @@ static ipf_rdx_node_t *ipf_rx_insert(ipf_rdx_head_t *, ipf_rdx_node_t n[2],
 static ipf_rdx_node_t *ipf_rx_match(ipf_rdx_head_t *, addrfamily_t *);
 static void ipf_rx_attach_mask(ipf_rdx_node_t *, ipf_rdx_mask_t *);
 
+/*
+ * Foreword.
+ * ---------
+ * The code in this file has been written to target using the addrfamily_t
+ * data structure to house the address information and no other. Thus there
+ * are certain aspects of thise code (such as offsets to the address itself)
+ * that are hard coded here whilst they might be more variable elsewhere.
+ * Similarly, this code enforces no maximum key length as that's implied by
+ * all keys needing to be stored in addrfamily_t.
+ */
+
+/* ------------------------------------------------------------------------ */
+/* Function:    count_mask_bits                                             */
+/* Returns:     number of consecutive bits starting at "mask".              */
+/*                                                                          */
+/* Count the number of bits set in the address section of addrfamily_t and  */
+/* return both that number and a pointer to the last word with a bit set if */
+/* lastp is not NULL. The bit count is performed using network byte order   */
+/* as the guide for which bit is the most significant bit.                  */
+/* ------------------------------------------------------------------------ */
 static int
 count_mask_bits(mask, lastp)
 	addrfamily_t *mask;
@@ -50,6 +69,20 @@ count_mask_bits(mask, lastp)
 	return count;
 }
 
+
+/* ------------------------------------------------------------------------ */
+/* Function:    buildnodes                                                  */
+/* Returns:     Nil                                                         */
+/* Parameters:  addr(I)  - network address for this radix node              */
+/*              mask(I)  - netmask associated with the above address        */
+/*              nodes(O) - pair of ipf_rdx_node_t's to initialise with data */
+/*                         associated with addr and mask.                   */
+/*                                                                          */
+/* Initialise the fields in a pair of radix tree nodes according to the     */
+/* data supplied in the paramters "addr" and "mask". It is expected that    */
+/* "mask" will contain a consecutive string of bits set. Masks with gaps in */
+/* the middle are not handled by this implementation.                       */
+/* ------------------------------------------------------------------------ */
 static void
 buildnodes(addr, mask, nodes)
 	addrfamily_t *addr, *mask;
@@ -74,7 +107,7 @@ buildnodes(addr, mask, nodes)
 
 	bzero(&nodes[0], sizeof(ipf_rdx_node_t) * 2);
 	nodes[0].maskbitcount = maskbits;
-	nodes[0].index = -1 - (adf_off + maskbits);
+	nodes[0].index = -1 - (ADF_OFF_BITS + maskbits);
 	nodes[0].addrkey = (u_32_t *)addr;
 	nodes[0].maskkey = (u_32_t *)mask;
 	nodes[0].addroff = nodes[0].addrkey + masklen;
@@ -91,6 +124,16 @@ buildnodes(addr, mask, nodes)
 #endif
 }
 
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_rx_find_addr                                            */
+/* Returns:     ipf_rdx_node_t * - pointer to a node in the radix tree.     */
+/* Parameters:  tree(I)  - pointer to first right node in tree to search    */
+/*              addr(I)  - pointer to address to match                      */
+/*                                                                          */
+/* Walk the radix tree given by "tree", looking for a leaf node that is a   */
+/* match for the address given by "addr".                                   */
+/* ------------------------------------------------------------------------ */
 static ipf_rdx_node_t *
 ipf_rx_find_addr(tree, addr)
 	ipf_rdx_node_t *tree;
@@ -109,6 +152,19 @@ ipf_rx_find_addr(tree, addr)
 	return (cur);
 }
 
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_rx_match                                                */
+/* Returns:     ipf_rdx_node_t * - NULL on error, else pointer to the node  */
+/*                                 added to the tree.                       */
+/* Paramters:   head(I)  - pointer to tree head to search                   */
+/*              addr(I)  - pointer to address to find                       */
+/*                                                                          */
+/* Search the radix tree for the best match to the address pointed to by    */
+/* "addr" and return a pointer to that node. This search will not match the */
+/* address information stored in either of the root leaves as neither of    */
+/* them are considered to be part of the tree of data being stored.         */
+/* ------------------------------------------------------------------------ */
 static ipf_rdx_node_t *
 ipf_rx_match(head, addr)
 	ipf_rdx_head_t *head;
@@ -167,6 +223,18 @@ ipf_rx_match(head, addr)
 	return NULL;
 }
 
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_rx_lookup                                               */
+/* Returns:     ipf_rdx_node_t * - NULL on error, else pointer to the node  */
+/*                                 added to the tree.                       */
+/* Paramters:   head(I)  - pointer to tree head to search                   */
+/*              addr(I)  - address part of the key to match                 */
+/*              mask(I)  - netmask part of the key to match                 */
+/*                                                                          */
+/* ipf_rx_lookup searches for an exact match on (addr,mask). The intention  */
+/* is to see if a given key is in the tree, not to see if a route exists.   */
+/* ------------------------------------------------------------------------ */
 ipf_rdx_node_t *
 ipf_rx_lookup(head, addr, mask)
 	ipf_rdx_head_t *head;
@@ -180,13 +248,21 @@ ipf_rx_lookup(head, addr, mask)
 	found = ipf_rx_find_addr(head->root, (u_32_t *)addr);
 	if (found->root == 1)
 		return NULL;
+
+	/*
+	 * It is possible to find a matching address in the tree but for the
+	 * netmask to not match. If the netmask does not match and there is
+	 * no list of alternatives present at dupkey, return a failure.
+	 */
 	count = count_mask_bits(mask, NULL);
-	if (count != found->maskbitcount)
+	if (count != found->maskbitcount && found->dupkey == NULL)
 		return (NULL);
+
 	akey = (u_32_t *)addr;
 	if ((found->addrkey[found->offset] & found->maskkey[found->offset]) !=
 	    akey[found->offset])
 		return NULL;
+
 	if (found->dupkey != NULL) {
 		node = found;
 		while (node != NULL && node->maskbitcount != count)
@@ -198,6 +274,16 @@ ipf_rx_lookup(head, addr, mask)
 	return found;
 }
 
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_rx_attach_mask                                          */
+/* Returns:     Nil                                                         */
+/* Parameters:  node(I)  - pointer to a radix tree node                     */
+/*              mask(I)  - pointer to mask structure to add                 */
+/*                                                                          */
+/* Add the netmask to the given node in an ordering where the most specific */
+/* netmask is at the top of the list.                                       */
+/* ------------------------------------------------------------------------ */
 static void
 ipf_rx_attach_mask(node, mask)
 	ipf_rdx_node_t *node;
@@ -213,6 +299,21 @@ ipf_rx_attach_mask(node, mask)
 	*pm = mask;
 }
 
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_rx_insert                                               */
+/* Returns:     ipf_rdx_node_t * - NULL on error, else pointer to the node  */
+/*                                 added to the tree.                       */
+/* Paramters:   head(I)  - pointer to tree head to add nodes to             */
+/*              nodes(I) - pointer to radix nodes to be added               */
+/*              dup(O)   - set to 1 if node is a duplicate, else 0.         */
+/*                                                                          */
+/* Add the new radix tree entry that owns nodes[] to the tree given by head.*/
+/* If there is already a matching key in the table, "dup" will be set to 1  */
+/* and the existing node pointer returned if there is a complete key match. */
+/* A complete key match is a matching of all key data that is presented by  */
+/* by the netmask.                                                          */
+/* ------------------------------------------------------------------------ */
 static ipf_rdx_node_t *
 ipf_rx_insert(head, nodes, dup)
 	ipf_rdx_head_t *head;
@@ -258,10 +359,18 @@ ipf_rx_insert(head, nodes, dup)
 			break;
 		bits <<= 1;
 	}
-	nlen += adf_off;
+	nlen += ADF_OFF_BITS;
 	nodes[1].index = nlen;
 	nodes[1].bitmask = htonl(0x80000000 >> (nlen & 0x1f));
 
+	/*
+	 * Walk through the tree and look for the correct place to attach
+	 * this node. ipf_rx_fin_addr is not used here because the place
+	 * to attach this node may be an internal node (same key, different
+	 * netmask.) Additionally, the depth of the search is forcibly limited
+	 * here to not exceed the netmask, so that a short netmask will be
+	 * added higher up the tree even if there are lower branches.
+	 */
 	cur = head->root;
 	key = nodes[0].addrkey;
 	do {
@@ -361,9 +470,28 @@ ipf_rx_insert(head, nodes, dup)
 	return (&nodes[0]);
 }
 
-/*
- * ipf_rdx_node * - return of pointer is not used for anything
- */
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_rx_addroute                                             */
+/* Returns:     ipf_rdx_node_t * - NULL on error, else pointer to the node  */
+/*                                 added to the tree.                       */
+/* Paramters:   head(I)  - pointer to tree head to search                   */
+/*              addr(I)  - address portion of "route" to add                */
+/*              mask(I)  - netmask portion of "route" to add                */
+/*              nodes(I) - radix tree data nodes inside allocate structure  */
+/*                                                                          */
+/* Attempt to add a node to the radix tree. The key for the node is the     */
+/* (addr,mask). No memory allocation for the radix nodes themselves is      */
+/* performed here, the data structure that this radix node is being used to */
+/* find is expected to house the node data itself however the call to       */
+/* ipf_rx_insert() will attempt to allocate memory in order for netmask to  */
+/* be promoted further up the tree.                                         */
+/* In this case, the ip_pool_node_t structure from ip_pool.h contains both  */
+/* the key material (addr,mask) and the radix tree nodes[].                 */
+/*                                                                          */
+/* The mechanics of inserting the node into the tree is handled by the      */
+/* function ipf_rx_insert() above. Here, the code deals with the case       */
+/* where the data to be inserted is a duplicate.                            */
+/* ------------------------------------------------------------------------ */
 ipf_rdx_node_t *
 ipf_rx_addroute(head, addr, mask, nodes)
 	ipf_rdx_head_t *head;
@@ -385,8 +513,9 @@ ipf_rx_addroute(head, addr, mask, nodes)
 		prev = NULL;
 		/*
 		 * The duplicate list is kept sorted with the longest
-		 * mask at the top. This list is to allow for duplicates
-		 * such as 128.128.0.0/32 and 128.128.0.0/16.
+		 * mask at the top, meaning that the most specific entry
+		 * in the listis found first. This list thus allows for
+		 * duplicates such as 128.128.0.0/32 and 128.128.0.0/16.
 		 */
 		while ((x != NULL) && (x->maskbitcount > node->maskbitcount)) {
 			prev = x;
@@ -396,7 +525,7 @@ ipf_rx_addroute(head, addr, mask, nodes)
 		/*
 		 * Is it a complete duplicate? If so, return NULL and
 		 * fail the insert. Otherwise, insert it into the list
-		 * of duplicates.
+		 * of netmasks active for this key.
 		 */
 		if ((x != NULL) && (x->maskbitcount == node->maskbitcount))
 			return (NULL);
@@ -422,6 +551,20 @@ ipf_rx_addroute(head, addr, mask, nodes)
 	return &nodes[0];
 }
 
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_rx_delete                                               */
+/* Returns:     ipf_rdx_node_t * - NULL on error, else node removed from    */
+/*                                 the tree.                                */
+/* Paramters:   head(I)  - pointer to tree head to search                   */
+/*              addr(I)  - pointer to the address part of the key           */
+/*              mask(I)  - pointer to the netmask part of the key           */
+/*                                                                          */
+/* Search for an entry in the radix tree that is an exact match for (addr,  */
+/* mask) and remove it if it exists. In the case where (addr,mask) is a not */
+/* a unique key, the tree structure itself is not changed - only the list   */
+/* of duplicate keys.                                                       */
+/* ------------------------------------------------------------------------ */
 ipf_rdx_node_t *
 ipf_rx_delete(head, addr, mask)
         ipf_rdx_head_t *head;
@@ -430,7 +573,6 @@ ipf_rx_delete(head, addr, mask)
 	ipf_rdx_mask_t **pmask;
 	ipf_rdx_node_t *parent;
 	ipf_rdx_node_t *found;
-	ipf_rdx_node_t *rnode;
 	ipf_rdx_node_t *prev;
 	ipf_rdx_node_t *node;
 	ipf_rdx_node_t *cur;
@@ -450,18 +592,27 @@ ipf_rx_delete(head, addr, mask)
 			return (NULL);
 		if (node != found) {
 			/*
-			 * Remove from the dupkey list.
+			 * Remove from the dupkey list. Here, "parent" is
+			 * the previous node on the list (rather than tree)
+			 * and "dupkey" is the next node on the list.
 			 */
-			rnode = node;
 			parent = node->parent;
 			parent->dupkey = node->dupkey;
 			node->dupkey->parent = parent;
 		} else {
 			/*
-			 * Adjust the node that the parent needs to point to.
+			 * 
+			 * When removing the top node of the dupkey list,
+			 * the pointers at the top of the list that point
+			 * to other tree nodes need to be preserved and
+			 * any children must have their parent updated.
 			 */
 			node = node->dupkey;
 			node->parent = found->parent;
+			node->right = found->right;
+			node->left = found->left;
+			found->right->parent = node;
+			found->left->parent = node;
 			if (parent->left == found)
 				parent->left = node;
 			else
@@ -485,17 +636,18 @@ ipf_rx_delete(head, addr, mask)
 				if (prev->right != parent)
 					prev->right->parent = parent;
 				if (cur != prev) {
-					if (parent->left != parent - 1)
+					if (parent->left != parent - 1) {
 						cur->right = parent->left;
-					else
+						parent->left->parent = cur;
+					} else {
 						cur->right = parent - 1;
+						(parent - 1)->parent = cur;
+					}
 				}
 
 				if (cur != prev) {
 					if (parent->left == found)
 						(parent - 1)->parent = parent;
-				} else {
-					parent->left->parent = cur;
 				}
 				if (prev->parent->right == prev) {
 					prev->parent->right = parent;
@@ -597,6 +749,21 @@ ipf_rx_delete(head, addr, mask)
 	return (found);
 }
 
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_rx_walktree                                             */
+/* Returns:     Nil                                                         */
+/* Paramters:   head(I)   - pointer to tree head to search                  */
+/*              walker(I) - function to call for each node in the tree      */
+/*              arg(I)    - parameter to pass to walker, in addition to the */
+/*                          node pointer                                    */
+/*                                                                          */
+/* A standard tree walking function except that it is iterative, rather     */
+/* than recursive and tracks the next node in case the "walker" function    */
+/* should happen to delete and free the current node. It thus goes without  */
+/* saying that the "walker" function is not permitted to cause any change   */
+/* in the validity of the data found at either the left or right child.     */
+/* ------------------------------------------------------------------------ */
 void
 ipf_rx_walktree(head, walker, arg)
 	ipf_rdx_head_t *head;
@@ -630,6 +797,20 @@ ipf_rx_walktree(head, walker, arg)
 	}
 }
 
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_rx_inithead                                             */
+/* Returns:     int       - 0 = success, else failure                       */
+/* Paramters:   softr(I)  - pointer to radix context                        */
+/*              headp(O)  - location for where to store allocated tree head */
+/*                                                                          */
+/* This function allocates and initialises a radix tree head structure.     */
+/* As a traditional radix tree, node 0 is used as the "0" sentinel and node */
+/* "2" is used as the all ones sentinel, leaving node "1" as the root from  */
+/* which the tree is hung with node "0" on its left and node "2" to the     */
+/* right. The context, "softr", is used here to provide a common source of  */
+/* the zeroes and ones data rather than have one per head.                  */
+/* ------------------------------------------------------------------------ */
 int
 ipf_rx_inithead(softr, headp)
 	radix_softc_t *softr;
@@ -645,9 +826,9 @@ ipf_rx_inithead(softr, headp)
 	bzero(ptr, sizeof(*ptr));
 	node = ptr->nodes;
 	ptr->root = node + 1;
-	node[0].index = -1 - adf_off;
-	node[1].index = adf_off;
-	node[2].index = -1 - adf_off;
+	node[0].index = -1 - ADF_OFF_BITS;
+	node[1].index = ADF_OFF_BITS;
+	node[2].index = -1 - ADF_OFF_BITS;
 	node[0].parent = node + 1;
 	node[1].parent = node + 1;
 	node[2].parent = node + 1;
@@ -655,9 +836,9 @@ ipf_rx_inithead(softr, headp)
 	node[0].root = 1;
 	node[1].root = 1;
 	node[2].root = 1;
-	node[0].offset = adf_off >> 5;
-	node[1].offset = adf_off >> 5;
-	node[2].offset = adf_off >> 5;
+	node[0].offset = ADF_OFF_BITS >> 5;
+	node[1].offset = ADF_OFF_BITS >> 5;
+	node[2].offset = ADF_OFF_BITS >> 5;
 	node[1].left = &node[0];
 	node[1].right = &node[2];
 	node[0].addrkey = (u_32_t *)softr->zeros;
@@ -724,22 +905,6 @@ ipf_rx_destroy(ctx)
 
 #ifdef RDX_DEBUG
 
-static void
-ipf_rx_freenode(node, arg)
-	ipf_rdx_node_t *node;
-	void *arg;
-{
-	ipf_rdx_head_t *head = arg;
-	ipf_rdx_node_t *rv;
-	myst_t *stp;
-
-	stp = (myst_t *)node;
-	rv = ipf_rx_delete(head, &stp->addr, &stp->mask);
-	if (rv != NULL) {
-		free(rv);
-	}
-}
-
 #define	NAME(x)	((x)->index < 0 ? (x)->name : (x)->name)
 #define	GNAME(y)	((y) == NULL ? "NULL" : NAME(y))
 
@@ -763,6 +928,22 @@ void printroots(ipf_rdx_head_t *);
 void random_add(ipf_rdx_head_t *);
 void random_delete(ipf_rdx_head_t *);
 void test_addr(ipf_rdx_head_t *rnh, int pref, u_32_t addr, int);
+
+static void
+ipf_rx_freenode(node, arg)
+	ipf_rdx_node_t *node;
+	void *arg;
+{
+	ipf_rdx_head_t *head = arg;
+	ipf_rdx_node_t *rv;
+	myst_t *stp;
+
+	stp = (myst_t *)node;
+	rv = ipf_rx_delete(head, &stp->dst, &stp->mask);
+	if (rv != NULL) {
+		free(rv);
+	}
+}
 
 void
 nodeprinter(node, arg)
@@ -880,9 +1061,11 @@ main(int argc, char *argv[])
 		add_addr(rnh, i, i);
 		checktree(rnh);
 	}
+	ipf_rx_walktree(rnh, nodeprinter, NULL);
 	printf("=== DELETE-0 ===\n");
 	for (i = 0; ttable[i][0] != NULL; i++) {
 		delete_addr(rnh, i);
+		ipf_rx_walktree(rnh, nodeprinter, NULL);
 	}
 	printf("=== ADD-1 ===\n");
 	for (i = 0; ttable[i][0] != NULL; i++) {
@@ -939,7 +1122,6 @@ dumptree(rnh)
 	myst_t *stp;
 
 	printf("VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV\n");
-	printroots(rnh);
 	for (stp = myst_top; stp; stp = stp->next)
 		printnode(stp);
 	printf("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n");
@@ -1031,7 +1213,7 @@ add_addr(rnh, n, item)
 	rn = ipf_rx_addroute(rnh, &stp->dst, &stp->mask, stp->nodes);
 	(void) sprintf(rn[0].name, "%d_NODE.0", item);
 	(void) sprintf(rn[1].name, "%d_NODE.1", item);
-	printf("ADD %d %s/%s\n", item, rn[0].name, rn[1].name);
+	printf("ADD %d/%d %s/%s\n", n, item, rn[0].name, rn[1].name);
 	nodecount++;
 	checktree(rnh);
 }
@@ -1055,7 +1237,7 @@ checktree(ipf_rdx_head_t *head)
 		if (rn->parent->left != rn && rn->parent->right != rn)
 			fault |= 4;
 		if (fault != 0) {
-			printf("FAULT %#x\n", fault);
+			printf("FAULT %#x %s\n", fault, rn->name);
 			printroots(head);
 			dumptree(head);
 			ipf_rx_walktree(head, nodeprinter, NULL);
