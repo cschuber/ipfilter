@@ -1113,10 +1113,15 @@ ipf_fix_outcksum(fin, sp, n)
 		return;
 
 	if (n & NAT_HW_CKSUM) {
+# if SOLARIS && defined(_KERNEL) && defined(NET_HCK_NONE)
+		*sp = (n + htons(fin->fin_dlen)) & 0xffff;
+		return;
+#else
 		n &= 0xffff;
 		n += fin->fin_dlen;
 		n = (n & 0xffff) + (n >> 16);
 		*sp = n & 0xffff;
+#endif
 		return;
 	}
 	sum1 = (~ntohs(*sp)) & 0xffff;
@@ -3550,15 +3555,37 @@ ipf_nat_finalise(fin, nat)
 		break;
 	}
 
-#if SOLARIS && defined(_KERNEL) && (SOLARIS2 >= 6) && defined(ICK_M_CTL_MAGIC)
+#if SOLARIS && defined(_KERNEL)
+# if (SOLARIS2 >= 6) && defined(ICK_M_CTL_MAGIC)
 	if ((flags & IPN_TCP) && dohwcksum &&
 	    (((ill_t *)qpi->qpi_ill)->ill_ick.ick_magic == ICK_M_CTL_MAGIC)) {
-		sum1 = LONG_SUM(ntohl(nat->nat_osrcaddr));
-		sum1 += LONG_SUM(ntohl(nat->nat_odstaddr));
+		sum1 = LONG_SUM(ntohl(nat->nat_nsrcaddr));
+		sum1 += LONG_SUM(ntohl(nat->nat_ndstaddr));
 		sum1 += 30;
 		sum1 = (sum1 & 0xffff) + (sum1 >> 16);
 		nat->nat_sumd[1] = NAT_HW_CKSUM|(sum1 & 0xffff);
 	} else
+# endif
+# if defined(NET_HCK_NONE) 
+	if ((flags & IPN_TCPUDP) && dohwcksum) {
+		mblk_t *m = fin->fin_m;
+		u_int flags = net_ispartialchecksum(softc->ipf_nd_v4, m);
+
+		if (flags & NET_HCK_L4_PART) {
+			sum1 = LONG_SUM(ntohl(nat->nat_nsrcaddr));
+			sum1 += LONG_SUM(ntohl(nat->nat_ndstaddr));
+			sum1 += fin->fin_p;
+			sum1 = htons(sum1);
+
+			nat->nat_sumd[1] = (sum1 & 0xffff) + (sum1 >> 16);
+			nat->nat_sumd[1] |= NAT_HW_CKSUM;
+		} else if (flags & NET_HCK_L4_FULL) {
+			nat->nat_sumd[1] = NAT_HW_CKSUM;
+		} else {
+			nat->nat_sumd[1] = nat->nat_sumd[0];
+		}
+	} else
+# endif
 #endif
 		nat->nat_sumd[1] = nat->nat_sumd[0];
 
