@@ -1958,6 +1958,12 @@ ipf_nat_free_rule(softc, softn, n)
 	if (n->in_apr != NULL)
 		ipf_proxy_free(n->in_apr);
 
+	if (n->in_odst.na_atype == FRI_LOOKUP)
+		ipf_lookup_deref(softc, n->in_odst.na_type, n->in_odst.na_ptr);
+
+	if (n->in_osrc.na_atype == FRI_LOOKUP)
+		ipf_lookup_deref(softc, n->in_osrc.na_type, n->in_osrc.na_ptr);
+
 	if (n->in_ndst.na_atype == FRI_LOOKUP)
 		ipf_lookup_deref(softc, n->in_ndst.na_type, n->in_ndst.na_ptr);
 
@@ -1969,6 +1975,10 @@ ipf_nat_free_rule(softc, softn, n)
 	}
 	if (n->in_redir & (NAT_MAP|NAT_MAPBLK)) {
 		ATOMIC_DEC32(softn->ipf_nat_stats.ns_rules_map);
+	}
+
+	if (n->in_divmp != NULL) {
+		FREE_MB_T(n->in_divmp);
 	}
 	ATOMIC_DEC32(softn->ipf_nat_stats.ns_rules);
 
@@ -2819,13 +2829,6 @@ ipf_nat_delrule(softc, softn, np)
 	ipnat_t *np;
 {
 	if (np->in_use == 0) {
-		if (np->in_apr != NULL)
-			ipf_proxy_free(np->in_apr);
-
-		if (np->in_divmp != NULL) {
-			FREE_MB_T(np->in_divmp);
-		}
-
 		ipf_nat_free_rule(softc, softn, np);
 	} else {
 		np->in_flags |= IPN_DELETE;
@@ -3160,6 +3163,7 @@ ipf_nat_newrdr(fin, nat, ni)
 			np = hm->hm_ipnat;
 			ni->nai_np = np;
 			move = 0;
+			ipf_nat_hostmapdel(&hm);
 		}
 	}
 
@@ -3189,6 +3193,8 @@ ipf_nat_newrdr(fin, nat, ni)
 				np->in_dnip = ntohl(np->in_ndstaddr);
 			}
 		}
+		if (hm != NULL)
+			ipf_nat_hostmapdel(&hm);
 
 	} else if ((np->in_ndstaddr == 0) && (np->in_ndstmsk == 0xffffffff)) {
 		i6addr_t in6;
@@ -7071,7 +7077,7 @@ ipf_nat_getnext(softc, t, itp, objp)
 			softc->ipf_interror = 60049;
 			error = EFAULT;
 		}
-		if ((hm != NULL) && (nexthm != &zerohm)) {
+		if (hm != NULL) {
 			WRITE_ENTER(&softc->ipf_nat);
 			ipf_nat_hostmapdel(&hm);
 			RWLOCK_EXIT(&softc->ipf_nat);
@@ -7082,7 +7088,7 @@ ipf_nat_getnext(softc, t, itp, objp)
 		objp->ipfo_size = nextipnat->in_size;
 		objp->ipfo_type = IPFOBJ_IPNAT;
 		error = ipf_outobjk(softc, objp, nextipnat);
-		if ((ipn != NULL) && (nextipnat != &zeroipn)) {
+		if (ipn != NULL) {
 			WRITE_ENTER(&softc->ipf_nat);
 			ipf_nat_rulederef(softc, &ipn);
 			RWLOCK_EXIT(&softc->ipf_nat);
@@ -7093,7 +7099,7 @@ ipf_nat_getnext(softc, t, itp, objp)
 		objp->ipfo_size = sizeof(nat_t);
 		objp->ipfo_type = IPFOBJ_NAT;
 		error = ipf_outobjk(softc, objp, nextnat);
-		if ((nat != NULL) && (nextnat != &zeronat))
+		if (nat != NULL)
 			ipf_nat_deref(softc, &nat);
 
 		break;
