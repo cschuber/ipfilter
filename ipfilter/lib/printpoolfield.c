@@ -106,7 +106,7 @@ printpoolfield(p, ptype, fieldnum)
 			ip_pool_node_t *node = (ip_pool_node_t *)p;
 
 #ifdef USE_QUAD_T
-			PRINTF("%qu", node->ipn_hits);
+			PRINTF("%"PRIu64"", node->ipn_hits);
 #else
 			PRINTF("%lu", node->ipn_hits);
 #endif
@@ -114,7 +114,7 @@ printpoolfield(p, ptype, fieldnum)
 			iphtent_t *node = (iphtent_t *)p;
 
 #ifdef USE_QUAD_T
-			PRINTF("%qu", node->ipe_hits);
+			PRINTF("%"PRIu64"", node->ipe_hits);
 #else
 			PRINTF("%lu", node->ipe_hits);
 #endif
@@ -128,7 +128,7 @@ printpoolfield(p, ptype, fieldnum)
 			ip_pool_node_t *node = (ip_pool_node_t *)p;
 
 #ifdef USE_QUAD_T
-			PRINTF("%qu", node->ipn_bytes);
+			PRINTF("%"PRIu64"", node->ipn_bytes);
 #else
 			PRINTF("%lu", node->ipn_bytes);
 #endif
@@ -136,7 +136,7 @@ printpoolfield(p, ptype, fieldnum)
 			iphtent_t *node = (iphtent_t *)p;
 
 #ifdef USE_QUAD_T
-			PRINTF("%qu", node->ipe_bytes);
+			PRINTF("%"PRIu64"", node->ipe_bytes);
 #else
 			PRINTF("%lu", node->ipe_bytes);
 #endif
