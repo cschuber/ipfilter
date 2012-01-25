@@ -1326,7 +1326,7 @@ ipf_htable_iter_next(softc, arg, token, ilp)
 			softc->ipf_interror = 30011;
 			err = EFAULT;
 		}
-		if ((iph != NULL) && (nextiph != &zp)) {
+		if (iph != NULL) {
 			WRITE_ENTER(&softc->ipf_poolrw);
 			ipf_htable_deref(softc, softh, iph);
 			RWLOCK_EXIT(&softc->ipf_poolrw);
@@ -1339,7 +1339,7 @@ ipf_htable_iter_next(softc, arg, token, ilp)
 			softc->ipf_interror = 30012;
 			err = EFAULT;
 		}
-		if ((node != NULL) && (nextnode != &zn)) {
+		if (node != NULL) {
 			WRITE_ENTER(&softc->ipf_poolrw);
 			ipf_htent_deref(softc, node);
 			RWLOCK_EXIT(&softc->ipf_poolrw);

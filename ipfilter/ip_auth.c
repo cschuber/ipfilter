@@ -972,7 +972,7 @@ ipf_auth_geniter(softc, token, itp, objp)
 	RWLOCK_EXIT(&softa->ipf_authlk);
 
 	error = ipf_outobjk(softc, objp, next);
-	if ((fae != NULL) && (next == &zero))
+	if (fae != NULL)
 		ipf_auth_deref_unlocked(softa, &fae);
 
 	if (next->fae_next == NULL)

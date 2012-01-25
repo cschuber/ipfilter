@@ -1233,7 +1233,7 @@ ipf_frag_next(softc, token, itp, top
 	if (error != 0)
 		softc->ipf_interror = 20002;
 
-        if ((frag != NULL) && (next != &zero)) {
+        if (frag != NULL) {
 #ifdef USE_MUTEXES
 		ipf_frag_deref(softc, &frag, lock);
 #else
