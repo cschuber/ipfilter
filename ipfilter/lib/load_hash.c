@@ -85,7 +85,6 @@ load_hash(iphp, list, iocfunc)
 		iph.iph_list = list;
 		printhash(&iph, bcopywrap, iph.iph_name, opts, NULL);
 		free(iph.iph_table);
-		iph.iph_table[0] = NULL;
 
 		for (a = list; a != NULL; a = a->ipe_next) {
 			a->ipe_addr.in4_addr = htonl(a->ipe_addr.in4_addr);
