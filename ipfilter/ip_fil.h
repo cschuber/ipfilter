@@ -485,6 +485,7 @@ typedef	struct	ipfunc_resolve	{
 	char		ipfu_name[32];
 	ipfunc_t	ipfu_addr;
 	ipfuncinit_t	ipfu_init;
+	ipfuncinit_t	ipfu_fini;
 } ipfunc_resolve_t;
 
 /*
@@ -1579,20 +1580,20 @@ typedef struct ipf_main_softc_s {
 	int		ipf_minttl;
 	int		ipf_icmpminfragmtu;
 	int		ipf_interror;
-        u_int		ipf_tcpidletimeout;
-        u_int		ipf_tcpclosewait;
-        u_int		ipf_tcplastack;
-        u_int		ipf_tcptimewait;
-        u_int		ipf_tcptimeout;
-        u_int		ipf_tcpsynsent;
-        u_int		ipf_tcpsynrecv;
-        u_int		ipf_tcpclosed;
-        u_int		ipf_tcphalfclosed;
-        u_int		ipf_udptimeout;
-        u_int		ipf_udpacktimeout;
-        u_int		ipf_icmptimeout;
-        u_int		ipf_icmpacktimeout;
-        u_int		ipf_iptimeout;
+	u_int		ipf_tcpidletimeout;
+	u_int		ipf_tcpclosewait;
+	u_int		ipf_tcplastack;
+	u_int		ipf_tcptimewait;
+	u_int		ipf_tcptimeout;
+	u_int		ipf_tcpsynsent;
+	u_int		ipf_tcpsynrecv;
+	u_int		ipf_tcpclosed;
+	u_int		ipf_tcphalfclosed;
+	u_int		ipf_udptimeout;
+	u_int		ipf_udpacktimeout;
+	u_int		ipf_icmptimeout;
+	u_int		ipf_icmpacktimeout;
+	u_int		ipf_iptimeout;
 	u_long		ipf_ticks;
 	u_long		ipf_userifqs;
 	u_long		ipf_rb_no_mem;
