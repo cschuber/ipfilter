@@ -101,24 +101,39 @@ file:	line
 	| file assign
 	;
 
-line:	table role ipftree eol		{ iplo.ipo_unit = $2;
+line:	table role ipftree eol		{ ip_pool_node_t *n;
+					  iplo.ipo_unit = $2;
 					  iplo.ipo_list = $3;
 					  load_pool(&iplo, poolioctl);
+					  while ((n = $3) != NULL) {
+						$3 = n->ipn_next;
+						free(n);
+					  }
 					  resetlexer();
 					  use_inet6 = 0;
 					}
-	| table role ipfhash eol	{ ipht.iph_unit = $2;
+	| table role ipfhash eol	{ iphtent_t *h;
+					  ipht.iph_unit = $2;
 					  ipht.iph_type = IPHASH_LOOKUP;
 					  load_hash(&ipht, $3, poolioctl);
+					  while ((h = $3) != NULL) {
+						$3 = h->ipe_next;
+						free(h);
+					  }
 					  resetlexer();
 					  use_inet6 = 0;
 					}
 	| groupmap role number ipfgroup eol
-					{ ipht.iph_unit = $2;
+					{ iphtent_t *h;
+					  ipht.iph_unit = $2;
 					  strncpy(ipht.iph_name, $3,
 						  sizeof(ipht.iph_name));
 					  ipht.iph_type = IPHASH_GROUPMAP;
 					  load_hash(&ipht, $4, poolioctl);
+					  while ((h = $4) != NULL) {
+						$4 = h->ipe_next;
+						free(h);
+					  }
 					  resetlexer();
 					  use_inet6 = 0;
 					}
@@ -200,14 +215,21 @@ ipfgroup:
 								$1,
 								FR_GROUPLEN);
 					  $$ = $4;
+					  free($1);
 					}
-	| hashopts start setgrouplist end	{ $$ = $3; }
+	| hashopts start setgrouplist end
+					{ $$ = $3; }
 	;
 
 number:	IPT_NUM '=' YY_NUMBER			{ sprintf(poolname, "%u", $3);
 						  $$ = poolname;
 						}
-	| IPT_NAME '=' YY_STR			{ $$ = $3; }
+	| IPT_NAME '=' YY_STR			{ strncpy(poolname, $3,
+							  FR_GROUPLEN);
+						  poolname[FR_GROUPLEN-1]='\0';
+						  free($3);
+						  $$ = poolname;
+						}
 	|					{ $$ = ""; }
 	;
 
@@ -215,6 +237,7 @@ setgroup:
 	IPT_GROUP '=' YY_STR		{ char tmp[FR_GROUPLEN+1];
 					  strncpy(tmp, $3, FR_GROUPLEN);
 					  $$ = strdup(tmp);
+					  free($3);
 					}
 	| IPT_GROUP '=' YY_NUMBER	{ char tmp[FR_GROUPLEN+1];
 					  sprintf(tmp, "%u", $3);
@@ -258,7 +281,9 @@ grouplist:
 #endif
 						$$->ipe_family = AF_INET;
 					}
-	| YY_STR			{ $$ = add_htablehosts($1); }
+	| YY_STR			{ $$ = add_htablehosts($1);
+					  free($1);
+					}
 	;
 
 setgrouplist:
@@ -295,8 +320,12 @@ range:	addrmask			{ $$ = calloc(1, sizeof(*$$));
 					  $$->ipn_mask = $2[1];
 					  ippool_setnodesize($$);
 					}
-	| YY_STR			{ $$ = add_poolhosts($1); }
-	| IPT_WHOIS IPT_FILE YY_STR	{ $$ = read_whoisfile($3); }
+	| YY_STR			{ $$ = add_poolhosts($1);
+					  free($1);
+					}
+	| IPT_WHOIS IPT_FILE YY_STR	{ $$ = read_whoisfile($3);
+					  free($3);
+					}
 	;
 
 hashlist:
@@ -316,7 +345,9 @@ hashentry:
 #endif
 					$$->ipe_family = AF_INET;
 				}
-	| YY_STR		{ $$ = add_htablehosts($1); }
+	| YY_STR		{ $$ = add_htablehosts($1);
+				  free($1);
+				}
 	;
 
 addrmask:
@@ -399,6 +430,7 @@ poolline:
 					  load_dstlist(&ipld, poolioctl, $12);
 					  resetlexer();
 					  use_inet6 = 0;
+					  free($7);
 					}
 	| IPT_POOL unit '/' IPT_TREE '(' IPT_NAME YY_STR ';' ')'
 	  '{' addrlist '}'
@@ -410,6 +442,7 @@ poolline:
 					  load_pool(&iplo, poolioctl);
 					  resetlexer();
 					  use_inet6 = 0;
+					  free($7);
 					}
 	| IPT_POOL '(' IPT_NAME YY_STR ';' ')' '{' addrlist '}'
 					{ bzero((char *)&iplo, sizeof(iplo));
@@ -420,28 +453,41 @@ poolline:
 					  load_pool(&iplo, poolioctl);
 					  resetlexer();
 					  use_inet6 = 0;
+					  free($4);
 					}
 	| IPT_POOL unit '/' IPT_HASH '(' IPT_NAME YY_STR ';' hashoptlist ')'
 	  '{' hashlist '}'
-					{ bzero((char *)&ipht, sizeof(ipht));
+					{ iphtent_t *h;
+					  bzero((char *)&ipht, sizeof(ipht));
 					  strncpy(ipht.iph_name, $7,
 						  sizeof(ipht.iph_name));
 					  ipht.iph_unit = $2;
 					  load_hash(&ipht, $12, poolioctl);
+					  while ((h = ipht.iph_list) != NULL) {
+						ipht.iph_list = h->ipe_next;
+						free(h);
+					  }
 					  resetlexer();
 					  use_inet6 = 0;
+					  free($7);
 					}
 	| IPT_GROUPMAP '(' IPT_NAME YY_STR ';' inout ';' ')'
 	  '{' setgrouplist '}'
-					{ bzero((char *)&ipht, sizeof(ipht));
+					{ iphtent_t *h;
+					  bzero((char *)&ipht, sizeof(ipht));
 					  strncpy(ipht.iph_name, $4,
 						  sizeof(ipht.iph_name));
 					  ipht.iph_type = IPHASH_GROUPMAP;
 					  ipht.iph_unit = IPL_LOGIPF;
 					  ipht.iph_flags = $6;
 					  load_hash(&ipht, $10, poolioctl);
+					  while ((h = ipht.iph_list) != NULL) {
+						ipht.iph_list = h->ipe_next;
+						free(h);
+					  }
 					  resetlexer();
 					  use_inet6 = 0;
+					  free($4);
 					}
 	;
 
@@ -474,6 +520,7 @@ dstentry:
 					$$->ipfd_dest.fd_addr = $3;
 					$$->ipfd_size = size;
 				  }
+				  free($1);
 				}
 	| ipaddr		{ $$ = calloc(1, sizeof(*$$));
 				  if ($$ != NULL) {
