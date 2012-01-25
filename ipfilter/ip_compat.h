@@ -173,7 +173,7 @@ struct file;
 /*
  * because Solaris 2 defines these in two places :-/
  */
-# ifndef	KERNEL
+# ifndef _KERNEL
 #  define	_KERNEL
 #  undef	RES_INIT
 # endif /* _KERNEL */
@@ -227,7 +227,7 @@ typedef unsigned int	u_32_t;
 # endif
 # define	U_32_T	1
 # if SOLARIS2 >= 7
-#  define	USE_QUAD_T
+#  define	USE_QUAD_T	1
 #  define	U_QUAD_T	uint64_t
 #  define	QUAD_T		int64_t
 # endif
@@ -1660,7 +1660,7 @@ typedef	struct	mb_s	{
 # define	M_DUP(x)	dupmbt(x)
 # define	GETKTIME(x)	gettimeofday((struct timeval *)(x), NULL)
 # define	MTOD(m, t)	((t)(m)->mb_data)
-# define	FREE_MB_T(x)
+# define	FREE_MB_T(x)	freembt(x)
 # define	ALLOC_MB_T(m,l)	(m) = allocmbt(l)
 # define	PREP_MB_T(f, m)	do { \
 						(m)->mb_next = *(f)->fin_mp; \
