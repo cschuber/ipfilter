@@ -44,8 +44,9 @@ printpool(pp, copyfunc, name, opts, fields)
 	if (ipp.ipo_list == NULL) {
 		putchar(';');
 	} else {
-		for (ipnp = ipp.ipo_list; ipnp != NULL; ) {
-			ipnp = printpoolnode(ipnp, opts, fields);
+		for (ipnp = ipp.ipo_list; ipnp != NULL; ipnp = ipnpn) {
+			ipnpn = printpoolnode(ipnp, opts, fields);
+			free(ipnp);
 
 			if ((opts & OPT_DEBUG) == 0) {
 				putchar(';');
