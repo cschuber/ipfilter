@@ -175,7 +175,8 @@ printstate(sp, opts, now)
 	PRINTF("\n");
 
 	if ((opts & OPT_VERBOSE) != 0) {
-		PRINTF("\tpkt_flags & %x(%x) = %x\n",
+		PRINTF("\tref %d", sp->is_ref);
+		PRINTF(" pkt_flags & %x(%x) = %x\n",
 			sp->is_flags & 0xf, sp->is_flags, sp->is_flags >> 4);
 		PRINTF("\tpkt_options & %x = %x, %x = %x \n", sp->is_optmsk[0],
 			sp->is_opt[0], sp->is_optmsk[1], sp->is_opt[1]);
