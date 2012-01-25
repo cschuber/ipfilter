@@ -172,6 +172,8 @@ static	int		ipf_geniter __P((ipf_main_softc_t *, ipftoken_t *,
 					 ipfgeniter_t *));
 static	void		ipf_getstat __P((ipf_main_softc_t *,
 					 struct friostat *, int));
+static	int		ipf_grpmapfini __P((struct ipf_main_softc_s *,
+					    frentry_t *));
 static	int		ipf_grpmapinit __P((struct ipf_main_softc_s *,
 					    frentry_t *));
 static	int		ipf_portcheck __P((frpcmp_t *, u_32_t));
@@ -294,8 +296,8 @@ int	ipf_features = 0
  * Table of functions available for use with call rules.
  */
 static ipfunc_resolve_t ipf_availfuncs[] = {
-	{ "srcgrpmap", ipf_srcgrpmap, ipf_grpmapinit },
-	{ "dstgrpmap", ipf_dstgrpmap, ipf_grpmapinit },
+	{ "srcgrpmap", ipf_srcgrpmap, ipf_grpmapinit, ipf_grpmapfini },
+	{ "dstgrpmap", ipf_dstgrpmap, ipf_grpmapinit, ipf_grpmapfini },
 	{ "", NULL, NULL }
 };
 
@@ -4490,9 +4492,12 @@ frrequest(softc, unit, req, data, set, makecopy)
 			error = ESRCH;
 			goto donenolock;
 		}
-		error = ipf_funcinit(softc, fp);
-		if (error != 0)
-			goto donenolock;
+
+		if (addrem == 0) {
+			error = ipf_funcinit(softc, fp);
+			if (error != 0)
+				goto donenolock;
+		}
 	}
 	if ((fp->fr_flags & FR_CALLNOW) &&
 	    ((fp->fr_func == NULL) || (fp->fr_func == (void *)-1))) {
@@ -5204,7 +5209,8 @@ ipf_findlookup(softc, unit, fr, addrp, maskp)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_funcinit                                                */
 /* Returns:     int - 0 == success, else ESRCH: cannot resolve rule details */
-/* Parameters:  fr(I) - pointer to filter rule                              */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              fr(I)    - pointer to filter rule                           */
 /*                                                                          */
 /* If a rule is a call rule, then check if the function it points to needs  */
 /* an init function to be called now the rule has been loaded.              */
@@ -5228,6 +5234,32 @@ ipf_funcinit(softc, fr)
 			break;
 		}
 	return err;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_funcfini                                                */
+/* Returns:     Nil                                                         */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              fr(I)    - pointer to filter rule                           */
+/*                                                                          */
+/* For a given filter rule, call the matching "fini" function if the rule   */
+/* is using a known function that would have resulted in the "init" being   */
+/* called for ealier.                                                       */
+/* ------------------------------------------------------------------------ */
+static void
+ipf_funcfini(softc, fr)
+	ipf_main_softc_t *softc;
+	frentry_t *fr;
+{
+	ipfunc_resolve_t *ft;
+
+	for (ft = ipf_availfuncs; ft->ipfu_addr != NULL; ft++)
+		if (ft->ipfu_addr == fr->fr_func) {
+			if (ft->ipfu_fini != NULL)
+				(void) (*ft->ipfu_fini)(softc, fr);
+			break;
+		}
 }
 
 
@@ -5383,6 +5415,7 @@ ipf_derefrule(softc, frp)
 		MUTEX_EXIT(&fr->fr_lock);
 		MUTEX_DESTROY(&fr->fr_lock);
 
+		ipf_funcfini(softc, fr);
 
 		fdp = &fr->fr_tif;
 		if (fdp->fd_type == FRD_DSTLIST)
@@ -5450,6 +5483,28 @@ ipf_grpmapinit(softc, fr)
 	}
 	iph->iph_ref++;
 	fr->fr_ptr = iph;
+	return 0;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_grpmapfini                                              */
+/* Returns:     int - 0 == success, else ESRCH because table entry not found*/
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              fr(I)    - pointer to rule to release hash table for        */
+/*                                                                          */
+/* For rules that have had ipf_grpmapinit called, ipf_lookup_deref needs to */
+/* be called to undo what ipf_grpmapinit caused to be done.                 */
+/* ------------------------------------------------------------------------ */
+static int
+ipf_grpmapfini(softc, fr)
+	ipf_main_softc_t *softc;
+	frentry_t *fr;
+{
+	iphtable_t *iph;
+	iph = fr->fr_ptr;
+	if (iph != NULL)
+		ipf_lookup_deref(softc, IPLT_HASH, iph);
 	return 0;
 }
 
@@ -7906,7 +7961,10 @@ ipf_ipf_ioctl(softc, data, cmd, mode, uid, ctx)
 				else
 					(void) ipfdetach(softc);
 			} else {
-				error = ipfdetach(softc);
+				if (softc->ipf_running == 1)
+					error = ipfdetach(softc);
+				else
+					error = 0;
 				if (error == 0)
 					softc->ipf_running = -1;
 			}
