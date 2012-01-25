@@ -483,6 +483,7 @@ typedef	struct	ipfunc_resolve	{
 	char		ipfu_name[32];
 	ipfunc_t	ipfu_addr;
 	ipfuncinit_t	ipfu_init;
+	ipfuncinit_t	ipfu_fini;
 } ipfunc_resolve_t;
 
 /*
