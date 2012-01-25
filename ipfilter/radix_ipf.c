@@ -741,6 +741,7 @@ ipf_rx_delete(head, addr, mask)
 				pm = &m->next;
 			}
 	}
+	KFREE(found->mymask);
 
 	/*
 	 * Masks that have been brought up to this node from below need to
@@ -909,7 +910,8 @@ ipf_rx_destroy(ctx)
 {
 	radix_softc_t *softr = ctx;
 
-	KFREES(softr->zeros, 3 * sizeof(addrfamily_t));
+	if (softr->zeros != NULL)
+		KFREES(softr->zeros, 3 * sizeof(addrfamily_t));
 	KFREE(softr);
 }
 
