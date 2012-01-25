@@ -130,6 +130,8 @@ void eMrwlock_destroy(rw)
 			rw->eMrw_owner, rw, rw->eMrw_magic);
 		abort();
 	}
+	if (rw->eMrw_owner != NULL)
+		free(rw->eMrw_owner);
 	memset(rw, 0xa5, sizeof(*rw));
 	initcount--;
 }
