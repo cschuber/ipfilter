@@ -2,14 +2,16 @@
 testitem=$1
 TESTMODE=$2
 mode=$3
-todo=`expr ${testitem} : '.*\/\(.*\)$'`
-resdir=`expr ${testitem} : '\(.*\)\/.*$'`
-args=`awk "/^${todo} / { print; } " test.format`
+
+. ./ipflib.sh
+
+test_init
+
 if [ -z $todo -o -z $resdir ] ; then
-	echo "arg1 wrong - '$1'"
+	echo "arg1 wrong - '$testitem'"
 	exit 1
 fi
-set $args
+
 name=$1
 inputformat=$2
 output=$3
@@ -43,21 +45,18 @@ single)
 		fi
 		echo "$rule" | ../ipftest -M ${TESTMODE} -R $format -b \
 					  -r ${regress_ipf} -N - \
-					  -i ${input} >> ${results}
+					  -i ${input} >> ${results} &
+		back=$!
+		wait $back
 		status=$?
 		if [ ${TESTMODE} = kern ] ; then
 			../ipf -D
 		fi
-		if [ $status -ne 0 ] ; then
-			exit 1;
-		fi
+		test_end_leak $status
 		echo "-------------------------------" >> ${results}
+		next_core
 	done ) < ${regress_nat}
-	cmp ${expected} ${results}
-	status=$?
-	if [ $status = 0 ] ; then
-		$TOUCH ${resdir}/${todo}
-	fi
+	check_results
 	;;
 multi)
 	echo "${todo}...";
@@ -67,20 +66,16 @@ multi)
 		../ipf -E
 	fi
 	../ipftest -M ${TESTMODE} -R $format -b -r ${regress_ipf} \
-		-N ${regress_nat} -i ${input} >> ${results}
+		-N ${regress_nat} -i ${input} >> ${results} &
+	back=$!
+	wait $back
 	status=$?
 	if [ ${TESTMODE} = kern ] ; then
 		../ipf -D
 	fi
-	if [ $status -ne 0 ] ; then
-		exit 2;
-	fi
+	test_end_leak $status
 	echo "-------------------------------" >> ${results}
-	cmp ${expected} ${results}
-	status=$?
-	if [ $status = 0 ] ; then
-		$TOUCH ${resdir}/${todo}
-	fi
+	check_results
 	;;
 esac
 exit $status

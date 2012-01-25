@@ -1,10 +1,10 @@
 #!/bin/sh
 testitem=$1
 TESTMODE=$2
-todo=`expr ${testitem} : '.*\/\(.*\)$'`
-resdir=`expr ${testitem} : '\(.*\)\/.*$'`
-args=`awk "/^${todo} / { print; } " test.format`
-set $args
+
+. ./ipflib.sh
+
+test_init
 
 if [ ${TESTMODE} != user ] ; then
 	exit 0
@@ -13,9 +13,5 @@ fi
 echo "${todo}...";
 /bin/cp /dev/null ${results}
 ../ippool -f ${regress} -nRv 2>/dev/null > ${results}
-cmp ${expected} ${results}
-status=$?
-if [ $status = 0 ] ; then
-	$TOUCH ${resdir}/${todo}
-fi
+check_results
 exit $status

@@ -1,10 +1,10 @@
 #!/bin/sh
 testitem=$1
 TESTMODE=$2
-todo=`expr ${testitem} : '.*\/\(.*\)$'`
-resdir=`expr ${testitem} : '\(.*\)\/.*$'`
-args=`awk "/^${todo} / { print; } " test.format`
-set $args
+
+. ./ipflib.sh
+
+test_init
 
 if [ ${TESTMODE} != user ] ; then
 	exit 0
@@ -14,15 +14,12 @@ echo "${todo}...";
 input=`expr ${todo} : 'bpf-\(.*\)'`
 /bin/cp /dev/null ${results}
 ( while read rule; do
-	echo "$rule" | ../ipftest -Rbr - -i input/$input >> ${results};
-	if [ $? -ne 0 ] ; then
-		exit 1;
-	fi
+	echo "$rule" | ../ipftest -Rbr - -i input/$input >> ${results} &
+	back=$!
+	wait $back
+	test_end_leak $?
+	next_core
 	echo "--------" >> ${results};
 done ) < ${regress}
-cmp ${expected} ${results};
-status=$?
-if [ $status = 0 ] ; then
-	$TOUCH ${resdir}/${todo}
-fi
+check_results
 exit $status

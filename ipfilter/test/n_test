@@ -1,10 +1,12 @@
 #!/bin/sh
 testitem=$1
 TESTMODE=$2
-todo=`expr ${testitem} : '.*\/\(.*\)$'`
-resdir=`expr ${testitem} : '\(.*\)\/.*$'`
-args=`awk "/^${todo} / { print; } " test.format`
-set $args
+
+. ./ipflib.sh
+
+test_init
+
+name=$1
 
 if [ $3 = hex ] ; then
 	format="-xF $2"
@@ -30,19 +32,16 @@ echo "${todo}...";
 		../ipf -E
 	fi
 	echo "$rule" | ../ipftest $format -M ${TESTMODE} -DRbN - \
-				  -i ${input} >> ${results}
+				  -i ${input} >> ${results} &
+	back=$!
+	wait $back
 	status=$?
 	if [ ${TESTMODE} = kern ] ; then
 		../ipf -D
 	fi
-	if [ $status -ne 0 ] ; then
-		exit 1;
-	fi
+	test_end_leak $status
 	echo "-------------------------------" >> ${results}
+	next_core
 done ) < ${regress}
-cmp ${expected} ${results}
-status=$?
-if [ $status = 0 ] ; then
-	$TOUCH ${resdir}/${todo}
-fi
+check_results
 exit $status

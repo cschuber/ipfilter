@@ -1,35 +1,32 @@
 #!/bin/sh
 testitem=$1
 TESTMODE=$2
-todo=`expr ${testitem} : '.*\/\(.*\)$'`
-resdir=`expr ${testitem} : '\(.*\)\/.*$'`
-args=`awk "/^${todo} / { print; } " test.format`
-set $args
 
+. ./ipflib.sh
+
+test_init
 format=$2
+
 # multiple rules at the same time
 
 . ./setup_test.sh
 echo "${todo}...";
 
+set_core $todo 1
+
 if [ ${TESTMODE} = kern ] ; then
 	../ipf -D
 	../ipf -E
 fi
-../ipftest -M ${TESTMODE} -F $format $4 -Rbr ${regress} -i ${input} > ${results}
+../ipftest -M ${TESTMODE} -F $format $4 -Rbr ${regress} -i ${input} > ${results} &
+back=$!
+wait $back
 status=$?
 if [ ${TESTMODE} = kern ] ; then
 	../ipf -D
 fi
-if [ $status -ne 0 ] ; then
-	exit 1
-fi
+test_end_leak $status
 echo "--------" >> ${results}
 
-cmp ${expected} ${results}
-status=$?
-if [ $status -ne 0 ] ; then
-	exit $status
-fi
-$TOUCH ${resdir}/${todo}
-exit 0
+check_results
+exit $status

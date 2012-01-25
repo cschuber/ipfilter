@@ -1,24 +1,5 @@
 #!/bin/sh
 
-if [ ! -d ${resdir} ] ; then
-	mkdir ${resdir}
-fi
-if [ ! -d ${resdir}/results ] ; then
-	mkdir ${resdir}/results
-fi
-
-if [ -f /usr/ucb/touch ] ; then
-	TOUCH=/usr/ucb/touch
-else
-	if [ -f /usr/bin/touch ] ; then
-		TOUCH=/usr/bin/touch
-	else
-		if [ -f /bin/touch ] ; then
-			TOUCH=/bin/touch
-		fi
-	fi
-fi
-
 if [ -f regress/${todo} ] ; then
 	regress=regress/${todo}
 else

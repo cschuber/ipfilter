@@ -1,16 +1,17 @@
 #!/bin/sh
 testitem=$1
 TESTMODE=$2
-todo=`expr ${testitem} : '.*\/\(.*\)$'`
-resdir=`expr ${testitem} : '\(.*\)\/.*$'`
-args=`awk "/^${todo} / { print; } " test.format`
-set $args
+
+. ./ipflib.sh
+
+test_init
 
 if [ ${TESTMODE} != user ] ; then
 	exit 0
 fi
 
 . ./setup_test.sh
+
 echo "${todo}...";
 /bin/cp /dev/null ${results}
 case $3 in
@@ -24,10 +25,6 @@ ipftest)
 	;;
 esac
 if [ $status -eq 0 ] ; then
-	cmp ${expected} ${results}
-	status=$?
-fi
-if [ $status = 0 ] ; then
-	$TOUCH ${resdir}/${todo}
+	check_results $status
 fi
 exit $status

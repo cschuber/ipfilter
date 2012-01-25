@@ -1,25 +1,16 @@
 #!/bin/sh
 testitem=$1
-todo=`expr ${testitem} : '.*\/\(.*\)$'`
-resdir=`expr ${testitem} : '\(.*\)\/.*$'`
-args=`awk "/^${todo} / { print; } " test.format`
-set $args
-results=${resdir}/results/${todo}
 
+. ./ipflib.sh
+
+test_init
+
+name=$1
 format=$2
-mkdir -p results
-if [ -f /usr/ucb/touch ] ; then
-	TOUCH=/usr/ucb/touch
-else
-	if [ -f /usr/bin/touch ] ; then
-		TOUCH=/usr/bin/touch
-	else
-		if [ -f /bin/touch ] ; then
-			TOUCH=/bin/touch
-		fi
-	fi
-fi
-echo "$1...";
+
+. ./setup_test.sh
+
+echo "$todo...";
 
 case `uname -s` in
 OSF1)
@@ -44,6 +35,7 @@ esac
         echo "--------" >> ${results}
 	TZ=$GMT ../ipmon -P /dev/null -bf logout >> ${results}.b
         echo "--------" >> ${results}.b
+	next_core
 done ) < regress/${todo}
 ../ipftest -br regress/${todo} -F $format -i input/${todo} -l logout > /dev/null
 TZ=$GMT ../ipmon -P /dev/null -f logout >> ${results}

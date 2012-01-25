@@ -1,17 +1,19 @@
 #!/bin/sh
 testitem=$1
 TESTMODE=$2
-todo=`expr ${testitem} : '.*\/\(.*\)$'`
-resdir=`expr ${testitem} : '\(.*\)\/.*$'`
-args=`awk "/^${todo} / { print; } " test.format`
-set $args
 
 if [ ${TESTMODE} != user ] ; then
 	exit 0
 fi
+
+. ./ipflib.sh
+
+test_init
+
 . ./setup_test.sh
 
-/bin/rm -f $1
+/bin/rm -f ${testitem}
+
 echo "${todo}...";
 /bin/cp /dev/null ${results}
 if [ ${TESTMODE} = kern ] ; then
@@ -20,26 +22,20 @@ if [ ${TESTMODE} = kern ] ; then
 fi
 if [ -f regress/${todo}.pool -a -f "${regress_ipf}" ] ; then
 	../ipftest -RD -b -P regress/${todo}.pool -r ${regress_ipf} \
-		   -i ${input} >> ${results}
-	status=$?
+		   -i ${input} >> ${results} &
 elif [ -f regress/${todo}.pool -a -f "${regress_nat}" ] ; then
 	../ipftest -RD -b -P regress/${todo}.pool -N ${regress_nat} \
-		   -i ${input} >> ${results}
-	status=$?
+		   -i ${input} >> ${results} &
 else
-	../ipftest -RD -b -r ${regress_ipf} -i ${input} >> ${results}
-	status=$?
+	../ipftest -RD -b -r ${regress_ipf} -i ${input} >> ${results} &
 fi
+back=$!
+wait $back
+status=$?
 if [ ${TESTMODE} = kern ] ; then
 	../ipf -D
 fi
-if [ $status -ne 0 ] ; then
-	exit 1;
-fi
+test_end_leak $status
 echo "-------------------------------" >> ${results}
-cmp ${expected} ${results}
-status=$?
-if [ $status = 0 ] ; then
-	$TOUCH ${resdir}/${todo}
-fi
+check_results
 exit $status
