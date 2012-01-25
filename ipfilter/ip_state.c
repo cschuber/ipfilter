@@ -5039,7 +5039,7 @@ ipf_state_iter(softc, token, itp, obj)
 
 	obj->ipfo_ptr = itp->igi_data;
 	error = ipf_outobjk(softc, obj, next);
-	if ((is != NULL) && (next == &zero))
+	if (is != NULL)
 		ipf_state_deref(softc, &is);
 
 	return error;

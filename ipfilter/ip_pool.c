@@ -1306,7 +1306,7 @@ ipf_pool_iter_next(softc, arg, token, ilp)
 			softc->ipf_interror = 70012;
 			err = EFAULT;
 		}
-		if ((ipo != NULL) && (nextipo != &zp)) {
+		if (ipo != NULL) {
 			WRITE_ENTER(&softc->ipf_poolrw);
 			ipf_pool_deref(softc, softp, ipo);
 			RWLOCK_EXIT(&softc->ipf_poolrw);
@@ -1319,7 +1319,7 @@ ipf_pool_iter_next(softc, arg, token, ilp)
 			softc->ipf_interror = 70013;
 			err = EFAULT;
 		}
-		if ((node != NULL) && (nextnode != &zn)) {
+		if (node != NULL) {
 			WRITE_ENTER(&softc->ipf_poolrw);
 			ipf_pool_node_deref(softp, node);
 			RWLOCK_EXIT(&softc->ipf_poolrw);
