@@ -108,7 +108,7 @@ if [[ -n ${small} ]] ; then
 		update $SBIN ${small}:${small} $i
 	done
 	update /usr/lib/ipf ${small}:${small} ipftest
-	update /usr/kernel/drv ":" ipf
+	update /usr/kernel/drv "${small}:" ipf
 fi
 if [[ -z ${small} && -z ${big} ]] ; then
 	if [[ -z ${small} ]] ; then
