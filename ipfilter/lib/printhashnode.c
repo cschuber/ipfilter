@@ -47,7 +47,7 @@ printhashnode(iph, ipep, copyfunc, opts, fields)
 		PRINTF("\tRef. Count: %d\tGroup: %s\n", ipe.ipe_ref,
 			ipe.ipe_group);
 #ifdef USE_QUAD_T
-		PRINTF("\tHits: %qu\tBytes: %qu\n",
+		PRINTF("\tHits: %"PRIu64"\tBytes: %"PRIu64"\n",
 		       ipe.ipe_hits, ipe.ipe_bytes);
 #else
 		PRINTF("\tHits: %lu\tBytes: %lu\n",

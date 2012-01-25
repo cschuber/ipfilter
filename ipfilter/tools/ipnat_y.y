@@ -1468,7 +1468,7 @@ ipnat_addrule(fd, ioctlfunc, ptr)
 		} else {
 			PRINTF("hits %lu ", ipn->in_hits);
 #ifdef USE_QUAD_T
-			PRINTF("bytes %qu ",
+			PRINTF("bytes %"PRIu64" ",
 			       ipn->in_bytes[0] + ipn->in_bytes[1]);
 #else
 			PRINTF("bytes %lu ",

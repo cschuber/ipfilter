@@ -48,7 +48,7 @@ printstate(sp, opts, now)
 		PRINTF(" state:%d/%d", sp->is_state[0], sp->is_state[1]);
 	}
 
-	PRINTF(" %lu", sp->is_die - now);
+	PRINTF(" %ld", sp->is_die - now);
 	if (sp->is_phnext == NULL)
 		PRINTF(" ORPHAN");
 	if (sp->is_flags & IS_CLONE)
@@ -83,12 +83,13 @@ printstate(sp, opts, now)
 #ifdef	USE_INET6
 		 || sp->is_p == IPPROTO_ICMPV6
 #endif
-		)
+		) {
 		PRINTF("\tid %hu seq %hu type %d\n", sp->is_icmp.ici_id,
 			sp->is_icmp.ici_seq, sp->is_icmp.ici_type);
+	}
 
 #ifdef        USE_QUAD_T
-	PRINTF("\tFWD: IN pkts %qu bytes %qu OUT pkts %qu bytes %qu\n\tREV: IN pkts %qu bytes %qu OUT pkts %qu bytes %qu\n",
+	PRINTF("\tFWD: IN pkts %"PRIu64" bytes %"PRIu64" OUT pkts %"PRIu64" bytes %"PRIu64"\n\tREV: IN pkts %"PRIu64" bytes %"PRIu64" OUT pkts %"PRIu64" bytes %"PRIu64"\n",
 		sp->is_pkts[0], sp->is_bytes[0],
 		sp->is_pkts[1], sp->is_bytes[1],
 		sp->is_pkts[2], sp->is_bytes[2],
@@ -173,7 +174,8 @@ printstate(sp, opts, now)
 	PRINTF("\n");
 
 	if ((opts & OPT_VERBOSE) != 0) {
-		PRINTF("\tpkt_flags & %x(%x) = %x\n",
+		PRINTF("\tref %d", sp->is_ref);
+		PRINTF(" pkt_flags & %x(%x) = %x\n",
 			sp->is_flags & 0xf, sp->is_flags, sp->is_flags >> 4);
 		PRINTF("\tpkt_options & %x = %x, %x = %x \n", sp->is_optmsk[0],
 			sp->is_opt[0], sp->is_optmsk[1], sp->is_opt[1]);

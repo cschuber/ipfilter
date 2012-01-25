@@ -339,6 +339,10 @@ main(argc,argv)
 	ipf_mutex_clean();
 	ipf_rwlock_clean();
 
+	if (getenv("FINDLEAKS")) {
+		fflush(stdout);
+		abort();
+	}
 	return 0;
 }
 
@@ -730,7 +734,7 @@ void dumprules(rulehead)
 
 	for (fr = rulehead; fr != NULL; fr = fr->fr_next) {
 #ifdef	USE_QUAD_T
-		printf("%qu ",(unsigned long long)fr->fr_hits);
+		printf("%"PRIu64" ",(unsigned long long)fr->fr_hits);
 #else
 		printf("%ld ", fr->fr_hits);
 #endif

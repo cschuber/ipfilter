@@ -100,7 +100,7 @@ printnatfield(n, fieldnum)
 
 	case 9:
 #ifdef USE_QUAD_T
-		PRINTF("%qu", n->nat_pkts[0]);
+		PRINTF("%"PRIu64"", n->nat_pkts[0]);
 #else
 		PRINTF("%lu", n->nat_pkts[0]);
 #endif
@@ -108,7 +108,7 @@ printnatfield(n, fieldnum)
 
 	case 10:
 #ifdef USE_QUAD_T
-		PRINTF("%qu", n->nat_pkts[1]);
+		PRINTF("%"PRIu64"", n->nat_pkts[1]);
 #else
 		PRINTF("%lu", n->nat_pkts[1]);
 #endif
@@ -116,7 +116,7 @@ printnatfield(n, fieldnum)
 
 	case 11:
 #ifdef USE_QUAD_T
-		PRINTF("%qu", n->nat_bytes[0]);
+		PRINTF("%"PRIu64"", n->nat_bytes[0]);
 #else
 		PRINTF("%lu", n->nat_bytes[0]);
 #endif
@@ -124,7 +124,7 @@ printnatfield(n, fieldnum)
 
 	case 12:
 #ifdef USE_QUAD_T
-		PRINTF("%qu", n->nat_bytes[1]);
+		PRINTF("%"PRIu64"", n->nat_bytes[1]);
 #else
 		PRINTF("%lu", n->nat_bytes[1]);
 #endif

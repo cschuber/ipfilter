@@ -824,13 +824,13 @@ static void printlivelist(fiop, out, set, fp, group, comment)
 
 		if (opts & (OPT_HITS|OPT_VERBOSE))
 #ifdef	USE_QUAD_T
-			PRINTF("%qu ", (unsigned long long) fp->fr_hits);
+			PRINTF("%"PRIu64" ", (unsigned long long) fp->fr_hits);
 #else
 			PRINTF("%lu ", fp->fr_hits);
 #endif
 		if (opts & (OPT_ACCNT|OPT_VERBOSE))
 #ifdef	USE_QUAD_T
-			PRINTF("%qu ", (unsigned long long) fp->fr_bytes);
+			PRINTF("%"PRIu64" ", (unsigned long long) fp->fr_bytes);
 #else
 			PRINTF("%lu ", fp->fr_bytes);
 #endif
@@ -940,13 +940,13 @@ static void printdeadlist(fiop, out, set, fp, group, comment)
 
 		if (opts & (OPT_HITS|OPT_VERBOSE))
 #ifdef	USE_QUAD_T
-			PRINTF("%qu ", (unsigned long long) fb.fr_hits);
+			PRINTF("%"PRIu64" ", (unsigned long long) fb.fr_hits);
 #else
 			PRINTF("%lu ", fb.fr_hits);
 #endif
 		if (opts & (OPT_ACCNT|OPT_VERBOSE))
 #ifdef	USE_QUAD_T
-			PRINTF("%qu ", (unsigned long long) fb.fr_bytes);
+			PRINTF("%"PRIu64" ", (unsigned long long) fb.fr_bytes);
 #else
 			PRINTF("%lu ", fb.fr_bytes);
 #endif
@@ -1761,7 +1761,7 @@ static void showauthstates(asp)
 	auth.igi_data = &fra;
 
 #ifdef	USE_QUAD_T
-	printf("Authorisation hits: %qu\tmisses %qu\n",
+	printf("Authorisation hits: %"PRIu64"\tmisses %"PRIu64"\n",
 		(unsigned long long) asp->fas_hits,
 		(unsigned long long) asp->fas_miss);
 #else
