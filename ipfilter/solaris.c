@@ -408,13 +408,8 @@ ipf_getinfo(dip, infocmd, arg, result)
 	ddi_info_cmd_t infocmd;
 	void *arg, **result;
 {
-	ipf_main_softc_t *softc;
 	int error;
 
-	softc = GET_SOFTC(0);
-
-	if (softc->ipf_running <= 0)
-		return DDI_FAILURE;
 	error = DDI_FAILURE;
 #ifdef	IPFDEBUG
 	cmn_err(CE_NOTE, "IP Filter: ipf_getinfo(%x,%x,%x)", dip, infocmd, arg);
