@@ -8,7 +8,7 @@
 MODULE_SUPPORTED_DEVICE("ipf");
 MODULE_AUTHOR("Darren Reed");
 MODULE_DESCRIPTION("IP-Filter Firewall");
-MODULE_LICENSE("(C)Copyright 2003-2004 Darren Reed");
+MODULE_LICENSE("(C)Copyright (C) 2010 by Darren Reed.
 #endif
 
 static int ipf_open(struct inode *, struct file *);

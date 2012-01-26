@@ -1,5 +1,5 @@
 /*
- * (C)Copyright March, 2000 - Darren Reed.
+ * (C)Copyright (C) 2007 by Darren Reed.
  */
 #include <sys/types.h>
 #include <sys/stat.h>
