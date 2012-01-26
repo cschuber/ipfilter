@@ -614,7 +614,7 @@ ipf_frag_ipidnew(fin, ipid)
 	fra = ipfr_frag_new(softc, softf, fin, 0, softf->ipfr_ipidtab);
 #endif
 	if (fra != NULL) {
-		fra->ipfr_data = (void *)ipid;
+		fra->ipfr_data = (void *)(intptr_t)ipid;
 		*softf->ipfr_ipidtail = fra;
 		fra->ipfr_prev = softf->ipfr_ipidtail;
 		softf->ipfr_ipidtail = &fra->ipfr_next;
@@ -866,7 +866,7 @@ ipf_frag_ipidknown(fin)
 	ipf = ipf_frag_lookup(softc, softf, fin, softf->ipfr_ipidtab);
 #endif
 	if (ipf != NULL) {
-		id = (u_32_t)ipf->ipfr_data;
+		id = (u_32_t)(intptr_t)ipf->ipfr_data;
 		RWLOCK_EXIT(&softf->ipfr_ipidfrag);
 	} else
 		id = 0xffffffff;

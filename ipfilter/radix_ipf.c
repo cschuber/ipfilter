@@ -839,9 +839,10 @@ ipf_rx_inithead(softr, headp)
 	bzero(ptr, sizeof(*ptr));
 	node = ptr->nodes;
 	ptr->root = node + 1;
-	node[0].index = -1 - ADF_OFF_BITS;
+	node[0].index = ADF_OFF_BITS;
+	node[0].index = -1 - node[0].index;
 	node[1].index = ADF_OFF_BITS;
-	node[2].index = -1 - ADF_OFF_BITS;
+	node[2].index = node[0].index;
 	node[0].parent = node + 1;
 	node[1].parent = node + 1;
 	node[2].parent = node + 1;
