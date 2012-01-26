@@ -6400,12 +6400,12 @@ ipf_nat_sync(softc, ifp)
 #ifdef USE_INET6
 			if (n->in_v[1] == 4) {
 				if (n->in_redir & NAT_MAP) {
-					if (!IP6_ISZERO(n->in_nsrcaddr) ||
-					    !IP6_ISONES(n->in_nsrcmsk))
+					if (!IP6_ISZERO(&n->in_nsrcaddr) ||
+					    !IP6_ISONES(&n->in_nsrcmsk))
 						continue;
 				} else if (n->in_redir & NAT_REDIRECT) {
-					if (!IP6_ISZERO(n->in_ndstaddr) ||
-					    !IP6_ISONES(n->in_ndstmsk))
+					if (!IP6_ISZERO(&n->in_ndstaddr) ||
+					    !IP6_ISONES(&n->in_ndstmsk))
 						continue;
 				}
 			}

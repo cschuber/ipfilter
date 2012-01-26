@@ -9151,7 +9151,7 @@ ipf_settimeout_tcp(t, p, tab)
 /* Create the foundation soft context structure. In circumstances where it  */
 /* is not required to dynamically allocate the context, a pointer can be    */
 /* passed in (rather than NULL) to a structure to be initialised.           */
-/* The main thing of interest* is that a number of locks are initialised    */
+/* The main thing of interest is that a number of locks are initialised     */
 /* here instead of in the where might be expected - in the relevant create  */
 /* function elsewhere.  This is done because the current locking design has */
 /* some areas where these locks are used outside of their module.           */
