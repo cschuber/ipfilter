@@ -85,7 +85,7 @@ void printc(fr)
 	fp = cfile;
 	if (count == 0) {
 		fprintf(fp, "/*\n");
- 		fprintf(fp, "* Copyright (C) 1993-2000 by Darren Reed.\n");
+ 		fprintf(fp, "* Copyright (C) 2012 by Darren Reed.\n");
  		fprintf(fp, "*\n");
  		fprintf(fp, "* Redistribution and use in source and binary forms are permitted\n");
  		fprintf(fp, "* provided that this notice is preserved and due credit is given\n");
