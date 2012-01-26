@@ -37,3 +37,7 @@ state
 streams
 threads
 windows
+SunOS5/i386-5.10
+*.o
+*/*.o
+*/*/*.o
