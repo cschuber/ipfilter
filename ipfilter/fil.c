@@ -167,7 +167,8 @@ static	frentry_t	*ipf_firewall __P((fr_info_t *, u_32_t *));
 static	int		ipf_fr_matcharray __P((fr_info_t *, int *));
 static	int		ipf_frruleiter __P((ipf_main_softc_t *, void *, int,
 					    void *));
-static	int		ipf_funcinit __P((ipf_main_softc_t *, frentry_t *fr));
+static	void		ipf_funcfini __P((ipf_main_softc_t *, frentry_t *));;
+static	int		ipf_funcinit __P((ipf_main_softc_t *, frentry_t *));
 static	int		ipf_geniter __P((ipf_main_softc_t *, ipftoken_t *,
 					 ipfgeniter_t *));
 static	void		ipf_getstat __P((ipf_main_softc_t *,
@@ -298,7 +299,7 @@ int	ipf_features = 0
 static ipfunc_resolve_t ipf_availfuncs[] = {
 	{ "srcgrpmap", ipf_srcgrpmap, ipf_grpmapinit, ipf_grpmapfini },
 	{ "dstgrpmap", ipf_dstgrpmap, ipf_grpmapinit, ipf_grpmapfini },
-	{ "", NULL, NULL }
+	{ "",	      NULL,	      NULL,	      NULL }
 };
 
 static ipftuneable_t ipf_main_tuneables[] = {
