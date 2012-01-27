@@ -76,6 +76,7 @@ static	int	ipfopen __P((dev_t *, int, int, cred_t *));
 static	int	ipfread __P((dev_t, struct uio *, cred_t *));
 static	int	ipfwrite __P((dev_t, struct uio *, cred_t *));
 static	int	ipf_property_update __P((dev_info_t *));
+static	int	ipf_solaris_init __P((void));
 static	int	ipf_stack_init __P((void));
 static	void	ipf_stack_fini __P((void));
 #if !defined(INSTANCES)
@@ -211,22 +212,12 @@ _init()
 #ifdef	IPFDEBUG
 	cmn_err(CE_NOTE, "IP Filter: _init() = %d", rval);
 #endif
-	if (ipf_load_all() != 0) {
+	if (rval != 0)
+		return rval;
+
+	rval = ipf_solaris_init();
+	if (rval != 0)
 		(void) mod_remove(&modlink1);
-		rval = DDI_FAILURE;
-	} else {
-#ifdef	IPFDEBUG
-	cmn_err(CE_NOTE, "IP Filter: ipf_load_all() done\n");
-#endif
-		if (ipf_stack_init() != 0) {
-			ipf_unload_all();
-			(void) mod_remove(&modlink1);
-			rval = DDI_FAILURE;
-		}
-#ifdef	IPFDEBUG
-	cmn_err(CE_NOTE, "IP Filter: ipf_stack_init() done\n");
-#endif
-	}
 	return rval;
 }
 
@@ -236,14 +227,14 @@ _fini(void)
 {
 	int rval;
 
-	ipf_unload_all();
-
-	ipf_stack_fini();
-
 	rval = mod_remove(&modlink1);
 #ifdef	IPFDEBUG
 	cmn_err(CE_NOTE, "IP Filter: _fini() = %d", rval);
 #endif
+	if (rval == 0) {
+		ipf_unload_all();
+		ipf_stack_fini();
+	}
 	return rval;
 }
 
@@ -427,6 +418,34 @@ ipf_getinfo(dip, infocmd, arg, result)
 		break;
 	}
 	return (error);
+}
+
+
+static int
+ipf_solaris_init()
+{
+	int rval = DDI_SUCCESS;
+
+	rval = ipf_load_all();
+	if (rval != 0) {
+#ifdef	IPFDEBUG
+		cmn_err(CE_NOTE, "IP Filter: ipf_load_all() failed\n");
+#endif
+		return rval;
+	}
+
+#ifdef	IPFDEBUG
+	cmn_err(CE_NOTE, "IP Filter: ipf_load_all() done\n");
+#endif
+	rval = ipf_stack_init();
+	if (rval != 0) {
+		ipf_unload_all();
+		return rval;
+	}
+#ifdef	IPFDEBUG
+	cmn_err(CE_NOTE, "IP Filter: ipf_stack_init() done\n");
+#endif
+	return 0;
 }
 
 
@@ -1022,6 +1041,15 @@ static void
 ipf_instance_destroy(netid_t id, void *arg)
 {
 	ipf_main_softc_t *softc = arg;
+	ipf_main_softc_t **instp;
+
+	for (instp = &ipf_instances; *instp != NULL; ) {
+		if (*instp == softc) {
+			*instp = softc->ipf_next;
+			break;
+		}
+		instp = &(*instp)->ipf_next;
+	}
 
 	ipf_destroy_all(softc);
 }
