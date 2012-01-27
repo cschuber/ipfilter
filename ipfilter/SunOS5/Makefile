@@ -86,8 +86,8 @@ MODOBJS=$(OBJ)/ip_fil.o $(OBJ)/solaris.o $(OBJ)/ip_state.o \
     $(OBJ)/ip_frag.o $(OBJ)/ip_nat.o $(OBJ)/ip_proxy.o $(OBJ)/ip_auth.o \
     $(OBJ)/ip_pool.o $(OBJ)/ip_htable.o $(OBJ)/ip_lookup.o $(OBJ)/ip_log.o \
     $(OBJ)/ip_scan.o $(OBJ)/ip_sync.o $(OBJ)/radix_ipf.o $(OBJ)/md5.o \
-    $(OBJ)/ip_nat6.o $(OBJ)/ip_dstlist.o $(OBJ)/arc4random.o \
-    $(OBJ)/fil.o $(OBJ)/mblk_misc.o $(BPFILTER)
+    $(OBJ)/ip_nat6.o $(OBJ)/ip_dstlist.o $(OBJ)/fil.o $(OBJ)/ip_fil_compat.o \
+    $(OBJ)/arc4random.o $(OBJ)/mblk_misc.o $(BPFILTER)
 #	$(OBJ)/ip_trafcon.o
 IPF=$(OBJ)/ipf.o $(OBJ)/ipfcomp.o $(OBJ)/ipf_y.o $(OBJ)/ipf_l.o
 IPT=$(OBJ)/ipftest.o $(OBJ)/ip_fil_u.o $(OBJ)/ip_state_u.o \
@@ -179,7 +179,8 @@ $(OBJ)/fil_u.o: $(TOP)/fil.c $(TOP)/ip_fil.h $(TOP)/ipf.h
 	$(CC) $(CCARGS) $(EXTRA) $(IPFBPF) -c $(TOP)/fil.c -o $@
 
 $(OBJ)/fil.o: $(TOP)/fil.c $(TOP)/ip_fil.h $(TOP)/ipf.h
-	$(CC) -I$(TOP) $(POLICY) $(DFLAGS) $(IPFBPF) -c $(TOP)/fil.c -o $@
+	$(CC) -I$(TOP) $(POLICY) $(DFLAGS) $(IPFBPF) $(COMPATIPF) \
+		-c $(TOP)/fil.c -o $@
 	$(CTFCONVERT) $@
 
 $(OBJ)/ipf.o: $(TOOL)/ipf.c $(TOP)/ip_fil.h $(TOP)/ipf.h
@@ -301,6 +302,11 @@ $(OBJ)/ip_htable.o: $(TOP)/ip_htable.c $(TOP)/ip_compat.h $(TOP)/ip_fil.h \
 $(OBJ)/ip_dstlist.o: $(TOP)/ip_dstlist.c $(TOP)/ip_compat.h $(TOP)/ip_fil.h \
 	$(TOP)/ip_dstlist.h $(TOP)/ip_lookup.h
 	$(CC) $(CCARGS) $(DFLAGS) -c $(TOP)/ip_dstlist.c -o $@
+	$(CTFCONVERT) $@
+
+$(OBJ)/ip_fil_compat.o: $(TOP)/ip_fil_compat.c $(TOP)/ip_compat.h \
+	$(TOP)/ip_fil.h $(TOP)/ip_state.h $(TOP)/ip_nat.h
+	$(CC) $(CCARGS) $(DFLAGS) $(COMPATIPF) -c $(TOP)/ip_fil_compat.c -o $@
 	$(CTFCONVERT) $@
 
 $(OBJ)/ip_lookup.o: $(TOP)/ip_lookup.c $(TOP)/ip_compat.h $(TOP)/ip_fil.h \
