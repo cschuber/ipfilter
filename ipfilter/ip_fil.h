@@ -1332,17 +1332,12 @@ typedef	int	(*ipftq_delete_fn_t)(struct ipf_main_softc_s *, void *);
 typedef	struct	ipfobj	{
 	u_32_t		ipfo_rev;	/* IPFilter version number */
 	u_32_t		ipfo_size;	/* size of object at ipfo_ptr */
-	union {
-		char	ipfou_xx[8];	/* pad out to 64 bits */
-		void	*ipfou_ptr;	/* pointer to object */
-	} ipfo_un;
+	void		*ipfo_ptr;	/* pointer to object */
 	int		ipfo_type;	/* type of object being pointed to */
 	int		ipfo_offset;	/* bytes from ipfo_ptr where to start */
 	int		ipfo_retval;	/* return value */
 	u_char		ipfo_xxxpad[28];	/* reserved for future use */
 } ipfobj_t;
-
-#define	ipfo_ptr	ipfo_un.ipfou_ptr
 
 #define	IPFOBJ_FRENTRY		0	/* struct frentry */
 #define	IPFOBJ_IPFSTAT		1	/* struct friostat */
@@ -1478,6 +1473,7 @@ typedef	struct	ipfruleiter {
 	char		iri_group[FR_GROUPLEN];
 	int		iri_active;
 	int		iri_nrules;
+	int		iri_v;		/* No longer used (compatibility) */
 	frentry_t	*iri_rule;
 } ipfruleiter_t;
 
