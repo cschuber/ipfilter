@@ -93,3 +93,4 @@ extern	ipf_rdx_node_t *ipf_rx_lookup(ipf_rdx_head_t *, addrfamily_t *,
 				      addrfamily_t *);
 extern	void	ipf_rx_walktree(ipf_rdx_head_t *, radix_walk_func_t, void *);
 
+#endif /* __RADIX_IPF_H__ */
