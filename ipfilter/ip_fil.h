@@ -667,7 +667,12 @@ typedef enum fr_rtypes_e {
 	FR_T_CALLFUNC,		/* callout to function in fr_func only */
 	FR_T_COMPIPF,			/* compiled C code */
 	FR_T_IPFEXPR,			/* IPF expression */
-	FR_T_BUILTIN = 0x40000000	/* rule is in kernel space */
+	FR_T_BUILTIN = 0x40000000,	/* rule is in kernel space */
+	FR_T_IPF_BUILTIN,
+	FR_T_BPFOPC_BUILTIN,
+	FR_T_CALLFUNC_BUILTIN,
+	FR_T_COMPIPF_BUILTIN,
+	FR_T_IPFEXPR_BUILTIN
 } fr_rtypes_t;
 
 typedef	struct	frentry	* (* frentfunc_t)(fr_info_t *);
