@@ -564,13 +564,13 @@ ipf_proxy_ctl(softc, arg, ctl)
 		if (softp->ips_proxy_debug > 1)
 			printf("ipf_proxy_ctl: can't find %s/%d\n",
 				ctl->apc_label, ctl->apc_p);
-		softc->ipf_interror = 80001;
+		IPFERROR(80001);
 		error = ESRCH;
 	} else if (a->apr_ctl == NULL) {
 		if (softp->ips_proxy_debug > 1)
 			printf("ipf_proxy_ctl: no ctl function for %s/%d\n",
 				ctl->apc_label, ctl->apc_p);
-		softc->ipf_interror = 80002;
+		IPFERROR(80002);
 		error = ENXIO;
 	} else {
 		error = (*a->apr_ctl)(softc, a->apr_soft, ctl);
@@ -670,7 +670,7 @@ ipf_proxy_ioctl(softc, data, cmd, mode, ctx)
 		if (ctl.apc_dsize > 0) {
 			KMALLOCS(ptr, caddr_t, ctl.apc_dsize);
 			if (ptr == NULL) {
-				softc->ipf_interror = 80003;
+				IPFERROR(80003);
 				error = ENOMEM;
 			} else {
 				error = copyinptr(softc, ctl.apc_data, ptr,
@@ -692,7 +692,7 @@ ipf_proxy_ioctl(softc, data, cmd, mode, ctx)
 		break;
 
 	default :
-		softc->ipf_interror = 80004;
+		IPFERROR(80004);
 		error = EINVAL;
 	}
 	return error;

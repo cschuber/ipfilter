@@ -1249,7 +1249,7 @@ ipf_nat_ioctl(softc, data, cmd, mode, uid, ctx)
 		return EPERM;
 # endif
 	{
-		softc->ipf_interror = 60001;
+		IPFERROR(60001);
 		return EPERM;
 	}
 #endif
@@ -1275,7 +1275,7 @@ ipf_nat_ioctl(softc, data, cmd, mode, uid, ctx)
 
 			KMALLOCS(nt, ipnat_t *, natd.in_size);
 			if (nt == NULL) {
-				softc->ipf_interror = 60070;
+				IPFERROR(60070);
 				error = ENOMEM;
 				goto done;
 			}
@@ -1322,13 +1322,13 @@ ipf_nat_ioctl(softc, data, cmd, mode, uid, ctx)
 		int tmp;
 
 		if (!(mode & FWRITE)) {
-			softc->ipf_interror = 60002;
+			IPFERROR(60002);
 			error = EPERM;
 		} else {
 			tmp = ipf_log_clear(softc, IPL_LOGNAT);
 			error = BCOPYOUT(&tmp, data, sizeof(tmp));
 			if (error != 0) {
-				softc->ipf_interror = 60057;
+				IPFERROR(60057);
 				error = EFAULT;
 			}
 		}
@@ -1337,7 +1337,7 @@ ipf_nat_ioctl(softc, data, cmd, mode, uid, ctx)
 
 	case SIOCSETLG :
 		if (!(mode & FWRITE)) {
-			softc->ipf_interror = 60003;
+			IPFERROR(60003);
 			error = EPERM;
 		} else {
 			error = BCOPYIN(data, &softn->ipf_nat_logging,
@@ -1351,7 +1351,7 @@ ipf_nat_ioctl(softc, data, cmd, mode, uid, ctx)
 		error = BCOPYOUT(&softn->ipf_nat_logging, data,
 				 sizeof(softn->ipf_nat_logging));
 		if (error != 0) {
-			softc->ipf_interror = 60004;
+			IPFERROR(60004);
 			error = EFAULT;
 		}
 		break;
@@ -1360,20 +1360,20 @@ ipf_nat_ioctl(softc, data, cmd, mode, uid, ctx)
 		arg = ipf_log_bytesused(softc, IPL_LOGNAT);
 		error = BCOPYOUT(&arg, data, sizeof(arg));
 		if (error != 0) {
-			softc->ipf_interror = 60005;
+			IPFERROR(60005);
 			error = EFAULT;
 		}
 		break;
 #endif
 	case SIOCADNAT :
 		if (!(mode & FWRITE)) {
-			softc->ipf_interror = 60006;
+			IPFERROR(60006);
 			error = EPERM;
 		} else if (n != NULL) {
-			softc->ipf_interror = 60007;
+			IPFERROR(60007);
 			error = EEXIST;
 		} else if (nt == NULL) {
-			softc->ipf_interror = 60008;
+			IPFERROR(60008);
 			error = ENOMEM;
 		}
 		if (error != 0) {
@@ -1389,11 +1389,11 @@ ipf_nat_ioctl(softc, data, cmd, mode, uid, ctx)
 
 	case SIOCRMNAT :
 		if (!(mode & FWRITE)) {
-			softc->ipf_interror = 60009;
+			IPFERROR(60009);
 			error = EPERM;
 			n = NULL;
 		} else if (n == NULL) {
-			softc->ipf_interror = 60010;
+			IPFERROR(60010);
 			error = ESRCH;
 		}
 
@@ -1468,7 +1468,7 @@ ipf_nat_ioctl(softc, data, cmd, mode, uid, ctx)
 				error = ipf_outobj(softc, data, &nl,
 						   IPFOBJ_NATLOOKUP);
 			} else {
-				softc->ipf_interror = 60011;
+				IPFERROR(60011);
 				error = ESRCH;
 			}
 		}
@@ -1477,7 +1477,7 @@ ipf_nat_ioctl(softc, data, cmd, mode, uid, ctx)
 
 	case SIOCIPFFL :	/* old SIOCFLNAT & SIOCCNATL */
 		if (!(mode & FWRITE)) {
-			softc->ipf_interror = 60012;
+			IPFERROR(60012);
 			error = EPERM;
 			break;
 		}
@@ -1487,7 +1487,7 @@ ipf_nat_ioctl(softc, data, cmd, mode, uid, ctx)
 
 		error = BCOPYIN(data, &arg, sizeof(arg));
 		if (error != 0) {
-			softc->ipf_interror = 60013;
+			IPFERROR(60013);
 			error = EFAULT;
 		} else {
 			if (arg == 0)
@@ -1509,7 +1509,7 @@ ipf_nat_ioctl(softc, data, cmd, mode, uid, ctx)
 
 	case SIOCMATCHFLUSH :
 		if (!(mode & FWRITE)) {
-			softc->ipf_interror = 60014;
+			IPFERROR(60014);
 			error = EPERM;
 			break;
 		}
@@ -1530,7 +1530,7 @@ ipf_nat_ioctl(softc, data, cmd, mode, uid, ctx)
 
 	case SIOCSTLCK :
 		if (!(mode & FWRITE)) {
-			softc->ipf_interror = 60015;
+			IPFERROR(60015);
 			error = EPERM;
 		} else {
 			error = ipf_lock(data, &softn->ipf_nat_lock);
@@ -1541,7 +1541,7 @@ ipf_nat_ioctl(softc, data, cmd, mode, uid, ctx)
 		if ((mode & FWRITE) != 0) {
 			error = ipf_nat_putent(softc, data, getlock);
 		} else {
-			softc->ipf_interror = 60016;
+			IPFERROR(60016);
 			error = EACCES;
 		}
 		break;
@@ -1550,7 +1550,7 @@ ipf_nat_ioctl(softc, data, cmd, mode, uid, ctx)
 		if (softn->ipf_nat_lock) {
 			error = ipf_nat_getsz(softc, data, getlock);
 		} else {
-			softc->ipf_interror = 60017;
+			IPFERROR(60017);
 			error = EACCES;
 		}
 		break;
@@ -1559,7 +1559,7 @@ ipf_nat_ioctl(softc, data, cmd, mode, uid, ctx)
 		if (softn->ipf_nat_lock) {
 			error = ipf_nat_getent(softc, data, getlock);
 		} else {
-			softc->ipf_interror = 60018;
+			IPFERROR(60018);
 			error = EACCES;
 		}
 		break;
@@ -1596,7 +1596,7 @@ ipf_nat_ioctl(softc, data, cmd, mode, uid, ctx)
 			error = ipf_token_del(softc, arg, uid, ctx);
 			SPL_X(s);
 		} else {
-			softc->ipf_interror = 60019;
+			IPFERROR(60019);
 			error = EFAULT;
 		}
 		break;
@@ -1611,7 +1611,7 @@ ipf_nat_ioctl(softc, data, cmd, mode, uid, ctx)
 		break;
 
 	default :
-		softc->ipf_interror = 60020;
+		IPFERROR(60020);
 		error = EINVAL;
 		break;
 	}
@@ -1648,17 +1648,17 @@ ipf_nat_siocaddnat(softc, softn, n, np, getlock)
 	 * be checked for packets coming back in too.
 	 */
 	if ((n->in_flags & IPN_TCPUDP) && (n->in_redir & NAT_ENCAP)) {
-		softc->ipf_interror = 60021;
+		IPFERROR(60021);
 		return EINVAL;
 	}
 
 	if (ipf_nat_resolverule(softc, n) != 0) {
-		softc->ipf_interror = 60022;
+		IPFERROR(60022);
 		return ENOENT;
 	}
 
 	if ((n->in_age[0] == 0) && (n->in_age[1] != 0)) {
-		softc->ipf_interror = 60023;
+		IPFERROR(60023);
 		return EINVAL;
 	}
 
@@ -1822,7 +1822,7 @@ ipf_nat_ruleaddrinit(softc, softn, n)
 
 	if ((n->in_nsrc.na_atype == FRI_LOOKUP) &&
 	    (n->in_nsrc.na_type != IPLT_DSTLIST)) {
-		softc->ipf_interror = 60069;
+		IPFERROR(60069);
 		return EINVAL;
 	}
 	error = ipf_nat_nextaddrinit(softc, n->in_names, &n->in_nsrc, 1,
@@ -1832,7 +1832,7 @@ ipf_nat_ruleaddrinit(softc, softn, n)
 
 	if ((n->in_ndst.na_atype == FRI_LOOKUP) &&
 	    (n->in_ndst.na_type != IPLT_DSTLIST)) {
-		softc->ipf_interror = 60071;
+		IPFERROR(60071);
 		return EINVAL;
 	}
 	error = ipf_nat_nextaddrinit(softc, n->in_names, &n->in_ndst, 1,
@@ -2020,7 +2020,7 @@ ipf_nat_getsz(softc, data, getlock)
 
 	error = BCOPYIN(data, &ng, sizeof(ng));
 	if (error != 0) {
-		softc->ipf_interror = 60024;
+		IPFERROR(60024);
 		return EFAULT;
 	}
 
@@ -2041,7 +2041,7 @@ ipf_nat_getsz(softc, data, getlock)
 			}
 			error = BCOPYOUT(&ng, data, sizeof(ng));
 			if (error != 0) {
-				softc->ipf_interror = 60025;
+				IPFERROR(60025);
 				return EFAULT;
 			}
 			return 0;
@@ -2059,7 +2059,7 @@ ipf_nat_getsz(softc, data, getlock)
 			if (getlock) {
 				RWLOCK_EXIT(&softc->ipf_nat);
 			}
-			softc->ipf_interror = 60026;
+			IPFERROR(60026);
 			return ESRCH;
 		}
 	}
@@ -2080,7 +2080,7 @@ ipf_nat_getsz(softc, data, getlock)
 
 	error = BCOPYOUT(&ng, data, sizeof(ng));
 	if (error != 0) {
-		softc->ipf_interror = 60027;
+		IPFERROR(60027);
 		return EFAULT;
 	}
 	return 0;
@@ -2116,13 +2116,13 @@ ipf_nat_getent(softc, data, getlock)
 		return error;
 
 	if ((ipns.ipn_dsize < sizeof(ipns)) || (ipns.ipn_dsize > 81920)) {
-		softc->ipf_interror = 60028;
+		IPFERROR(60028);
 		return EINVAL;
 	}
 
 	KMALLOCS(ipn, nat_save_t *, ipns.ipn_dsize);
 	if (ipn == NULL) {
-		softc->ipf_interror = 60029;
+		IPFERROR(60029);
 		return ENOMEM;
 	}
 
@@ -2136,7 +2136,7 @@ ipf_nat_getent(softc, data, getlock)
 		nat = softn->ipf_nat_instances;
 		if (nat == NULL) {
 			if (softn->ipf_nat_instances == NULL) {
-				softc->ipf_interror = 60030;
+				IPFERROR(60030);
 				error = ENOENT;
 			}
 			goto finished;
@@ -2151,7 +2151,7 @@ ipf_nat_getent(softc, data, getlock)
 			if (n == nat)
 				break;
 		if (n == NULL) {
-			softc->ipf_interror = 60031;
+			IPFERROR(60031);
 			error = ESRCH;
 			goto finished;
 		}
@@ -2189,7 +2189,7 @@ ipf_nat_getent(softc, data, getlock)
 		char *s;
 
 		if (outsize < sizeof(*aps)) {
-			softc->ipf_interror = 60032;
+			IPFERROR(60032);
 			error = ENOBUFS;
 			goto finished;
 		}
@@ -2201,7 +2201,7 @@ ipf_nat_getent(softc, data, getlock)
 		if ((aps->aps_data != NULL) && (outsize >= aps->aps_psiz))
 			bcopy(aps->aps_data, s, aps->aps_psiz);
 		else {
-			softc->ipf_interror = 60033;
+			IPFERROR(60033);
 			error = ENOBUFS;
 		}
 	}
@@ -2272,14 +2272,14 @@ ipf_nat_putent(softc, data, getlock)
 	 */
 	if (ipn.ipn_dsize > sizeof(ipn)) {
 		if (ipn.ipn_dsize > 81920) {
-			softc->ipf_interror = 60034;
+			IPFERROR(60034);
 			error = ENOMEM;
 			goto junkput;
 		}
 
 		KMALLOCS(ipnn, nat_save_t *, ipn.ipn_dsize);
 		if (ipnn == NULL) {
-			softc->ipf_interror = 60035;
+			IPFERROR(60035);
 			return ENOMEM;
 		}
 
@@ -2293,7 +2293,7 @@ ipf_nat_putent(softc, data, getlock)
 
 	KMALLOC(nat, nat_t *);
 	if (nat == NULL) {
-		softc->ipf_interror = 60037;
+		IPFERROR(60037);
 		error = ENOMEM;
 		goto junkput;
 	}
@@ -2308,7 +2308,7 @@ ipf_nat_putent(softc, data, getlock)
 #endif
 		break;
 	default :
-		softc->ipf_interror = 60061;
+		IPFERROR(60061);
 		error = EPROTONOSUPPORT;
 		goto junkput;
 		/*NOTREACHED*/
@@ -2331,7 +2331,7 @@ ipf_nat_putent(softc, data, getlock)
 		KMALLOCS(in, ipnat_t *, ipnn->ipn_ipnat.in_size);
 		nat->nat_ptr = in;
 		if (in == NULL) {
-			softc->ipf_interror = 60038;
+			IPFERROR(60038);
 			error = ENOMEM;
 			goto junkput;
 		}
@@ -2343,7 +2343,7 @@ ipf_nat_putent(softc, data, getlock)
 		ATOMIC_INC32(softn->ipf_nat_stats.ns_rules);
 
 		if (ipf_nat_resolverule(softc, in) != 0) {
-			softc->ipf_interror = 60039;
+			IPFERROR(60039);
 			error = ESRCH;
 			goto junkput;
 		}
@@ -2390,7 +2390,7 @@ ipf_nat_putent(softc, data, getlock)
 			RWLOCK_EXIT(&softc->ipf_nat);
 		}
 		if (n != NULL) {
-			softc->ipf_interror = 60040;
+			IPFERROR(60040);
 			error = EEXIST;
 			goto junkput;
 		}
@@ -2419,14 +2419,14 @@ ipf_nat_putent(softc, data, getlock)
 			RWLOCK_EXIT(&softc->ipf_nat);
 		}
 		if (n != NULL) {
-			softc->ipf_interror = 60041;
+			IPFERROR(60041);
 			error = EEXIST;
 			goto junkput;
 		}
 		break;
 
 	default :
-		softc->ipf_interror = 60042;
+		IPFERROR(60042);
 		error = EINVAL;
 		goto junkput;
 		break;
@@ -2441,7 +2441,7 @@ ipf_nat_putent(softc, data, getlock)
 		KMALLOC(aps, ap_session_t *);
 		nat->nat_aps = aps;
 		if (aps == NULL) {
-			softc->ipf_interror = 60043;
+			IPFERROR(60043);
 			error = ENOMEM;
 			goto junkput;
 		}
@@ -2452,13 +2452,13 @@ ipf_nat_putent(softc, data, getlock)
 			aps->aps_apr = NULL;
 		if (aps->aps_psiz != 0) {
 			if (aps->aps_psiz > 81920) {
-				softc->ipf_interror = 60044;
+				IPFERROR(60044);
 				error = ENOMEM;
 				goto junkput;
 			}
 			KMALLOCS(aps->aps_data, void *, aps->aps_psiz);
 			if (aps->aps_data == NULL) {
-				softc->ipf_interror = 60045;
+				IPFERROR(60045);
 				error = ENOMEM;
 				goto junkput;
 			}
@@ -2480,7 +2480,7 @@ ipf_nat_putent(softc, data, getlock)
 			KMALLOC(fr, frentry_t *);
 			nat->nat_fr = fr;
 			if (fr == NULL) {
-				softc->ipf_interror = 60046;
+				IPFERROR(60046);
 				error = ENOMEM;
 				goto junkput;
 			}
@@ -2514,7 +2514,7 @@ ipf_nat_putent(softc, data, getlock)
 			}
 
 			if (n == NULL) {
-				softc->ipf_interror = 60047;
+				IPFERROR(60047);
 				error = ESRCH;
 				goto junkput;
 			}
@@ -2544,7 +2544,7 @@ ipf_nat_putent(softc, data, getlock)
 	if (error == 0)
 		return 0;
 
-	softc->ipf_interror = 60048;
+	IPFERROR(60048);
 	error = ENOMEM;
 
 junkput:
@@ -6995,7 +6995,7 @@ ipf_nat_getnext(softc, t, itp, objp)
 	void *nnext;
 
 	if (itp->igi_nitems != 1) {
-		softc->ipf_interror = 60075;
+		IPFERROR(60075);
 		return ENOSPC;
 	}
 
@@ -7061,7 +7061,7 @@ ipf_nat_getnext(softc, t, itp, objp)
 
 	default :
 		RWLOCK_EXIT(&softc->ipf_nat);
-		softc->ipf_interror = 60055;
+		IPFERROR(60055);
 		return EINVAL;
 	}
 
@@ -7074,7 +7074,7 @@ ipf_nat_getnext(softc, t, itp, objp)
 	case IPFGENITER_HOSTMAP :
 		error = COPYOUT(nexthm, objp->ipfo_ptr, sizeof(*nexthm));
 		if (error != 0) {
-			softc->ipf_interror = 60049;
+			IPFERROR(60049);
 			error = EFAULT;
 		}
 		if (hm != NULL) {
@@ -7317,7 +7317,7 @@ ipf_nat_iterator(softc, token, itp, obj)
 	int error;
 
 	if (itp->igi_data == NULL) {
-		softc->ipf_interror = 60052;
+		IPFERROR(60052);
 		return EFAULT;
 	}
 
@@ -7333,7 +7333,7 @@ ipf_nat_iterator(softc, token, itp, obj)
 		error = ipf_frag_nat_next(softc, token, itp);
 		break;
 	default :
-		softc->ipf_interror = 60053;
+		IPFERROR(60053);
 		error = EINVAL;
 		break;
 	}
@@ -8143,11 +8143,11 @@ ipf_nat_nextaddrinit(softc, base, na, initial, ifp)
 							 &na->na_func);
 		}
 		if (na->na_func == NULL) {
-			softc->ipf_interror = 60060;
+			IPFERROR(60060);
 			return ESRCH;
 		}
 		if (na->na_ptr == NULL) {
-			softc->ipf_interror = 60056;
+			IPFERROR(60056);
 			return ESRCH;
 		}
 		break;
@@ -8177,7 +8177,7 @@ ipf_nat_nextaddrinit(softc, base, na, initial, ifp)
 		break;
 
 	default :
-		softc->ipf_interror = 60054;
+		IPFERROR(60054);
 		return EINVAL;
 	}
 
@@ -8647,12 +8647,12 @@ ipf_nat_gettable(softc, softn, data)
 		break;
 
 	default :
-		softc->ipf_interror = 60058;
+		IPFERROR(60058);
 		return EINVAL;
 	}
 
 	if (error != 0) {
-		softc->ipf_interror = 60059;
+		IPFERROR(60059);
 		error = EFAULT;
 	}
 	return error;
@@ -8689,7 +8689,7 @@ ipf_nat_settimeout(softc, t, p)
 	} else if (!strcmp(t->ipft_name, "ip_timeout")) {
 		ipf_apply_timeout(&softn->ipf_nat_iptq, p->ipftu_int);
 	} else {
-		softc->ipf_interror = 60062;
+		IPFERROR(60062);
 		return ESRCH;
 	}
 	return 0;
@@ -8735,14 +8735,14 @@ ipf_nat_rehash(softc, t, p)
 	 */
 	KMALLOCS(newtab[0], nat_t **, newsize * sizeof(nat_t *));
 	if (newtab == NULL) {
-		softc->ipf_interror = 60063;
+		IPFERROR(60063);
 		return ENOMEM;
 	}
 
 	KMALLOCS(newtab[1], nat_t **, newsize * sizeof(nat_t *));
 	if (newtab == NULL) {
 		KFREES(newtab[0], newsize * sizeof(nat_t *));
-		softc->ipf_interror = 60064;
+		IPFERROR(60064);
 		return ENOMEM;
 	}
 
@@ -8750,7 +8750,7 @@ ipf_nat_rehash(softc, t, p)
 	if (bucketlens[0] == NULL) {
 		KFREES(newtab[0], newsize * sizeof(nat_t *));
 		KFREES(newtab[1], newsize * sizeof(nat_t *));
-		softc->ipf_interror = 60065;
+		IPFERROR(60065);
 		return ENOMEM;
 	}
 
@@ -8759,7 +8759,7 @@ ipf_nat_rehash(softc, t, p)
 		KFREES(bucketlens[0], newsize * sizeof(u_int));
 		KFREES(newtab[0], newsize * sizeof(nat_t *));
 		KFREES(newtab[1], newsize * sizeof(nat_t *));
-		softc->ipf_interror = 60066;
+		IPFERROR(60066);
 		return ENOMEM;
 	}
 
@@ -8896,7 +8896,7 @@ ipf_nat_rehash_rules(softc, t, p)
 
 	KMALLOCS(newtab, ipnat_t **, newsize * sizeof(ipnat_t *));
 	if (newtab == NULL) {
-		softc->ipf_interror = 60067;
+		IPFERROR(60067);
 		return ENOMEM;
 	}
 
@@ -8986,7 +8986,7 @@ ipf_nat_hostmap_rehash(softc, t, p)
 
 	KMALLOCS(newtab, hostmap_t **, newsize * sizeof(hostmap_t *));
 	if (newtab == NULL) {
-		softc->ipf_interror = 60068;
+		IPFERROR(60068);
 		return ENOMEM;
 	}
 

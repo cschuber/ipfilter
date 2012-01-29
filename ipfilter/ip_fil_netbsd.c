@@ -308,13 +308,13 @@ ipfattach(softc)
 	if ((softc->ipf_running > 0) || (ipf_checkp == ipf_check)) {
 		printf("IP Filter: already initialized\n");
 		SPL_X(s);
-		softc->ipf_interror = 130017;
+		IPFERROR(130017);
 		return EBUSY;
 	}
 
 	if (ipf_init_all(softc) < 0) {
 		SPL_X(s);
-		softc->ipf_interror = 130015;
+		IPFERROR(130015);
 		return EIO;
 	}
 
@@ -338,7 +338,7 @@ ipfattach(softc)
 #   endif
 	   ) {
 		SPL_X(s);
-		softc->ipf_interror = 130016;
+		IPFERROR(130016);
 		return ENODEV;
 	}
 
@@ -352,7 +352,7 @@ ipfattach(softc)
 			      &inetsw[ip_protox[IPPROTO_IP]].pr_pfh);
 #  endif
 	if (error) {
-		softc->ipf_interror = 130013;
+		IPFERROR(130013);
 		goto pfil_error;
 	}
 # else
@@ -378,7 +378,7 @@ ipfattach(softc)
 	if (error) {
 		pfil_remove_hook((void *)ipf_check, PFIL_IN|PFIL_OUT,
 				 &inetsw[ip_protox[IPPROTO_IP]].pr_pfh);
-		softc->ipf_interror = 130014;
+		IPFERROR(130014);
 		goto pfil_error;
 	}
 #  endif
@@ -519,7 +519,7 @@ ipfdetach(softc)
 #  endif
 	if (error) {
 		SPL_X(s);
-		softc->ipf_interror = 130011;
+		IPFERROR(130011);
 		return error;
 	}
 # else
@@ -538,7 +538,7 @@ ipfdetach(softc)
 #  endif
 	if (error) {
 		SPL_X(s);
-		softc->ipf_interror = 130012;
+		IPFERROR(130012);
 		return error;
 	}
 # endif

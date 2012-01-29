@@ -309,7 +309,7 @@ ipf_lookup_ioctl(softc, data, cmd, mode, uid, ctx)
 		break;
 
 	default :
-		softc->ipf_interror = 50001;
+		IPFERROR(50001);
 		err = EINVAL;
 		break;
 	}
@@ -342,13 +342,13 @@ ipf_lookup_addnode(softc, data, uid)
 
 	err = BCOPYIN(data, &op, sizeof(op));
 	if (err != 0) {
-		softc->ipf_interror = 50002;
+		IPFERROR(50002);
 		return EFAULT;
 	}
 
 	if ((op.iplo_unit < 0 || op.iplo_unit > IPL_LOGMAX) &&
 	    (op.iplo_unit != IPLT_ALL)) {
-		softc->ipf_interror = 50003;
+		IPFERROR(50003);
 		return EINVAL;
 	}
 
@@ -364,7 +364,7 @@ ipf_lookup_addnode(softc, data, uid)
 	}
 
 	if (i == MAX_BACKENDS) {
-		softc->ipf_interror = 50012;
+		IPFERROR(50012);
 		err = EINVAL;
 	}
 
@@ -395,13 +395,13 @@ ipf_lookup_delnode(softc, data, uid)
 
 	err = BCOPYIN(data, &op, sizeof(op));
 	if (err != 0) {
-		softc->ipf_interror = 50042;
+		IPFERROR(50042);
 		return EFAULT;
 	}
 
 	if ((op.iplo_unit < 0 || op.iplo_unit > IPL_LOGMAX) &&
 	    (op.iplo_unit != IPLT_ALL)) {
-		softc->ipf_interror = 50013;
+		IPFERROR(50013);
 		return EINVAL;
 	}
 
@@ -416,7 +416,7 @@ ipf_lookup_delnode(softc, data, uid)
 	}
 
 	if (i == MAX_BACKENDS) {
-		softc->ipf_interror = 50021;
+		IPFERROR(50021);
 		err = EINVAL;
 	}
 	return err;
@@ -444,13 +444,13 @@ ipf_lookup_addtable(softc, data)
 
 	err = BCOPYIN(data, &op, sizeof(op));
 	if (err != 0) {
-		softc->ipf_interror = 50022;
+		IPFERROR(50022);
 		return EFAULT;
 	}
 
 	if ((op.iplo_unit < 0 || op.iplo_unit > IPL_LOGMAX) &&
 	    (op.iplo_unit != IPLT_ALL)) {
-		softc->ipf_interror = 50023;
+		IPFERROR(50023);
 		return EINVAL;
 	}
 
@@ -466,7 +466,7 @@ ipf_lookup_addtable(softc, data)
 	}
 
 	if (i == MAX_BACKENDS) {
-		softc->ipf_interror = 50026;
+		IPFERROR(50026);
 		err = EINVAL;
 	}
 
@@ -477,7 +477,7 @@ ipf_lookup_addtable(softc, data)
 	if ((err == 0) && ((op.iplo_arg & LOOKUP_ANON) != 0)) {
 		err = BCOPYOUT(&op, data, sizeof(op));
 		if (err != 0) {
-			softc->ipf_interror = 50027;
+			IPFERROR(50027);
 			err = EFAULT;
 		}
 	}
@@ -507,13 +507,13 @@ ipf_lookup_deltable(softc, data)
 
 	err = BCOPYIN(data, &op, sizeof(op));
 	if (err != 0) {
-		softc->ipf_interror = 50028;
+		IPFERROR(50028);
 		return EFAULT;
 	}
 
 	if ((op.iplo_unit < 0 || op.iplo_unit > IPL_LOGMAX) &&
 	    (op.iplo_unit != IPLT_ALL)) {
-		softc->ipf_interror = 50029;
+		IPFERROR(50029);
 		return EINVAL;
 	}
 
@@ -529,7 +529,7 @@ ipf_lookup_deltable(softc, data)
 	}
 
 	if (i == MAX_BACKENDS) {
-		softc->ipf_interror = 50030;
+		IPFERROR(50030);
 		err = EINVAL;
 	}
 	return err;
@@ -557,13 +557,13 @@ ipf_lookup_stats(softc, data)
 
 	err = BCOPYIN(data, &op, sizeof(op));
 	if (err != 0) {
-		softc->ipf_interror = 50031;
+		IPFERROR(50031);
 		return EFAULT;
 	}
 
 	if ((op.iplo_unit < 0 || op.iplo_unit > IPL_LOGMAX) &&
 	    (op.iplo_unit != IPLT_ALL)) {
-		softc->ipf_interror = 50032;
+		IPFERROR(50032);
 		return EINVAL;
 	}
 
@@ -577,7 +577,7 @@ ipf_lookup_stats(softc, data)
 	}
 
 	if (i == MAX_BACKENDS) {
-		softc->ipf_interror = 50033;
+		IPFERROR(50033);
 		err = EINVAL;
 	}
 
@@ -606,20 +606,20 @@ ipf_lookup_flush(softc, data)
 
 	err = BCOPYIN(data, &flush, sizeof(flush));
 	if (err != 0) {
-		softc->ipf_interror = 50034;
+		IPFERROR(50034);
 		return EFAULT;
 	}
 
 	unit = flush.iplf_unit;
 	if ((unit < 0 || unit > IPL_LOGMAX) && (unit != IPLT_ALL)) {
-		softc->ipf_interror = 50035;
+		IPFERROR(50035);
 		return EINVAL;
 	}
 
 	flush.iplf_name[sizeof(flush.iplf_name) - 1] = '\0';
 
 	type = flush.iplf_type;
-	softc->ipf_interror = 50036;
+	IPFERROR(50036);
 	err = EINVAL;
 	num = 0;
 
@@ -636,7 +636,7 @@ ipf_lookup_flush(softc, data)
 		flush.iplf_count = num;
 		err = BCOPYOUT(&flush, data, sizeof(flush));
 		if (err != 0) {
-			softc->ipf_interror = 50037;
+			IPFERROR(50037);
 			err = EFAULT;
 		}
 	}
@@ -707,12 +707,12 @@ ipf_lookup_iterate(softc, data, uid, ctx)
 		return err;
 
 	if (iter.ili_unit < IPL_LOGALL && iter.ili_unit > IPL_LOGMAX) {
-		softc->ipf_interror = 50038;
+		IPFERROR(50038);
 		return EINVAL;
 	}
 
 	if (iter.ili_ival != IPFGENITER_LOOKUP) {
-		softc->ipf_interror = 50039;
+		IPFERROR(50039);
 		return EINVAL;
 	}
 
@@ -720,7 +720,7 @@ ipf_lookup_iterate(softc, data, uid, ctx)
 	token = ipf_token_find(softc, iter.ili_key, uid, ctx);
 	if (token == NULL) {
 		SPL_X(s);
-		softc->ipf_interror = 50040;
+		IPFERROR(50040);
 		return ESRCH;
 	}
 
@@ -735,7 +735,7 @@ ipf_lookup_iterate(softc, data, uid, ctx)
 	SPL_X(s);
 
 	if (i == MAX_BACKENDS) {
-		softc->ipf_interror = 50041;
+		IPFERROR(50041);
 		err = EINVAL;
 	}
 

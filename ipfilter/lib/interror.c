@@ -17,7 +17,7 @@ typedef	struct	{
 
 static ipf_error_entry_t *find_error(int);
 
-#define	IPF_NUM_ERRORS	462
+#define	IPF_NUM_ERRORS	470
 
 /*
  * NO REUSE OF NUMBERS!
@@ -181,6 +181,12 @@ static ipf_error_entry_t ipf_errors[IPF_NUM_ERRORS] = {
 	{	153,	"error copying test packet structure to kernel" },
 	{	154,	"unrecognised packet family in test packet structure" },
 	{	155,	"could not allocate packet buffer for test packet" },
+	{	156,	"incorrect size for object to copy out" },
+	{	157,	"object type out of bounds for kernel copyout" },
+	{	158,	"object size too small for kernel copyout" },
+	{	159,	"object size validation failed for kernel copyout" },
+	{	160,	"error copying data out for kernel copyout" },
+	{	161,	"version mismatch for kernel copyout" },
 /* -------------------------------------------------------------------------- */
 	{	10001,	"could not find token for auth iterator" },
 	{	10002,	"write permissions require to add/remove auth rule" },
@@ -479,12 +485,14 @@ log" },
 	{	120017,	"error copying in names for destination" },
 	{	120018,	"destination name is too long/short" },
 	{	120019,	"unrecognised address family in destination" },
-	{	120020,	"statistics not yet supported for dest. lists" },
+	{	120020,	"" },
 	{	120021,	"error copying in new destination table" },
 	{	120022,	"cannot allocate memory for node table" },
 	{	120023,	"stats object size is incorrect for dest. lists" },
 	{	120024,	"stats device unit is invalid for dest. lists" },
 	{	120025,	"error copying out dest. list statistics" },
+	{	120026,	"cannot allocate memory for destination node" },
+	{	120027,	"error copying in destination node" },
 /* -------------------------------------------------------------------------- */
 	{	130001,	"ioctl denied by system security level" },
 	{	130002,	"ioctl operation on invalid minor device" },

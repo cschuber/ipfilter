@@ -233,7 +233,7 @@ ipf_htable_stats_get(softc, arg, op)
 	int err;
 
 	if (op->iplo_size != sizeof(stats)) {
-		softc->ipf_interror = 30001;
+		IPFERROR(30001);
 		return EINVAL;
 	}
 
@@ -244,7 +244,7 @@ ipf_htable_stats_get(softc, arg, op)
 
 	err = COPYOUT(&stats, op->iplo_struct, sizeof(stats));
 	if (err != 0) {
-		softc->ipf_interror = 30013;
+		IPFERROR(30013);
 		return EFAULT;
 	}
 	return 0;
@@ -277,7 +277,7 @@ ipf_htable_create(softc, arg, op)
 		iph = ipf_htable_exists(softh, unit, op->iplo_name);
 		if (iph != NULL) {
 			if ((iph->iph_flags & IPHASH_DELETE) == 0) {
-				softc->ipf_interror = 30004;
+				IPFERROR(30004);
 				return EEXIST;
 			}
 			iph->iph_flags &= ~IPHASH_DELETE;
@@ -289,18 +289,18 @@ ipf_htable_create(softc, arg, op)
 	KMALLOC(iph, iphtable_t *);
 	if (iph == NULL) {
 		softh->ipht_nomem[op->iplo_unit + 1]++;
-		softc->ipf_interror = 30002;
+		IPFERROR(30002);
 		return ENOMEM;
 	}
 	err = COPYIN(op->iplo_struct, iph, sizeof(*iph));
 	if (err != 0) {
 		KFREE(iph);
-		softc->ipf_interror = 30003;
+		IPFERROR(30003);
 		return EFAULT;
 	}
 
 	if (iph->iph_unit != unit) {
-		softc->ipf_interror = 30005;
+		IPFERROR(30005);
 		return EINVAL;
 	}
 
@@ -330,7 +330,7 @@ ipf_htable_create(softc, arg, op)
 	if (iph->iph_table == NULL) {
 		KFREE(iph);
 		softh->ipht_nomem[unit + 1]++;
-		softc->ipf_interror = 30006;
+		IPFERROR(30006);
 		return ENOMEM;
 	}
 
@@ -395,12 +395,12 @@ ipf_htable_destroy(softc, arg, unit, name)
 
 	iph = ipf_htable_find(arg, unit, name);
 	if (iph == NULL) {
-		softc->ipf_interror = 30007;
+		IPFERROR(30007);
 		return ESRCH;
 	}
 
 	if (iph->iph_unit != unit) {
-		softc->ipf_interror = 30008;
+		IPFERROR(30008);
 		return EINVAL;
 	}
 
@@ -521,30 +521,30 @@ ipf_htable_node_del(softc, arg, op, uid)
 	int err;
 
 	if (op->iplo_size != sizeof(hte)) {
-		softc->ipf_interror = 30014;
+		IPFERROR(30014);
 		return EINVAL;
 	}
 
 	err = COPYIN(op->iplo_struct, &hte, sizeof(hte));
 	if (err != 0) {
-		softc->ipf_interror = 30015;
+		IPFERROR(30015);
 		return EFAULT;
 	}
 
 	iph = ipf_htable_find(arg, op->iplo_unit, op->iplo_name);
 	if (iph == NULL) {
-		softc->ipf_interror = 30016;
+		IPFERROR(30016);
 		return ESRCH;
 	}
 
 	ent = ipf_htent_find(iph, &hte);
 	if (ent == NULL) {
-		softc->ipf_interror = 30022;
+		IPFERROR(30022);
 		return ESRCH;
 	}
 
 	if ((uid != 0) && (ent->ipe_uid != uid)) {
-		softc->ipf_interror = 30023;
+		IPFERROR(30023);
 		return EACCES;
 	}
 
@@ -571,7 +571,7 @@ ipf_htable_table_add(softc, arg, op)
 	int err;
 
 	if (ipf_htable_find(arg, op->iplo_unit, op->iplo_name) != NULL) {
-		softc->ipf_interror = 30017;
+		IPFERROR(30017);
 		err = EEXIST;
 	} else {
 		err = ipf_htable_create(softc, arg, op);
@@ -837,25 +837,25 @@ ipf_htable_node_add(softc, arg, op, uid)
 	int err;
 
 	if (op->iplo_size != sizeof(hte)) {
-		softc->ipf_interror = 30018;
+		IPFERROR(30018);
 		return EINVAL;
 	}
 
 	err = COPYIN(op->iplo_struct, &hte, sizeof(hte));
 	if (err != 0) {
-		softc->ipf_interror = 30019;
+		IPFERROR(30019);
 		return EFAULT;
 	}
 	hte.ipe_uid = uid;
 
 	iph = ipf_htable_find(arg, op->iplo_unit, op->iplo_name);
 	if (iph == NULL) {
-		softc->ipf_interror = 30020;
+		IPFERROR(30020);
 		return ESRCH;
 	}
 
 	if (ipf_htent_find(iph, &hte) != NULL) {
-		softc->ipf_interror = 30021;
+		IPFERROR(30021);
 		return EEXIST;
 	}
 
@@ -1280,7 +1280,7 @@ ipf_htable_iter_next(softc, arg, token, ilp)
 			iph = ipf_htable_find(arg, ilp->ili_unit + 1,
 					      ilp->ili_name);
 			if (iph == NULL) {
-				softc->ipf_interror = 30009;
+				IPFERROR(30009);
 				err = ESRCH;
 			} else {
 				nextnode = iph->iph_list;
@@ -1301,7 +1301,7 @@ ipf_htable_iter_next(softc, arg, token, ilp)
 		break;
 
 	default :
-		softc->ipf_interror = 30010;
+		IPFERROR(30010);
 		err = EINVAL;
 		hnext = NULL;
 		break;
@@ -1316,7 +1316,7 @@ ipf_htable_iter_next(softc, arg, token, ilp)
 	case IPFLOOKUPITER_LIST :
 		err = COPYOUT(nextiph, ilp->ili_data, sizeof(*nextiph));
 		if (err != 0) {
-			softc->ipf_interror = 30011;
+			IPFERROR(30011);
 			err = EFAULT;
 		}
 		if (iph != NULL) {
@@ -1329,7 +1329,7 @@ ipf_htable_iter_next(softc, arg, token, ilp)
 	case IPFLOOKUPITER_NODE :
 		err = COPYOUT(nextnode, ilp->ili_data, sizeof(*nextnode));
 		if (err != 0) {
-			softc->ipf_interror = 30012;
+			IPFERROR(30012);
 			err = EFAULT;
 		}
 		if (node != NULL) {
