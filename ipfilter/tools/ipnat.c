@@ -557,6 +557,9 @@ void dostats_live(fd, nsp, opts, filter)
 		printf("\n");
 	}
 
+	i = IPFGENITER_IPNAT;
+	(void) ioctl(fd,SIOCIPFDELTOK, &i);
+
 
 	iter.igi_type = IPFGENITER_NAT;
 	iter.igi_nitems = 1;
@@ -591,6 +594,9 @@ void dostats_live(fd, nsp, opts, filter)
 
 	if (opts & OPT_VERBOSE)
 		showhostmap_live(fd, nsp);
+
+	i = IPFGENITER_NAT;
+	(void) ioctl(fd,SIOCIPFDELTOK, &i);
 }
 
 
@@ -640,6 +646,7 @@ void showhostmap_live(fd, nsp)
 	ipfgeniter_t iter;
 	hostmap_t hm;
 	ipfobj_t obj;
+	int i;
 
 	bzero((char *)&obj, sizeof(obj));
 	obj.ipfo_rev = IPFILTER_VERSION;
@@ -659,6 +666,9 @@ void showhostmap_live(fd, nsp)
 		printhostmap(&hm, hm.hm_hv);
 		nsp->ns_maplist = hm.hm_next;
 	}
+
+	i = IPFGENITER_HOSTMAP;
+	(void) ioctl(fd,SIOCIPFDELTOK, &i);
 }
 
 
