@@ -83,6 +83,8 @@ typedef struct tcpinfo4 {
 	tcpdata_t	ts_data[2];
 } tcpinfo4_t;
 
+static void ipf_v5tcpinfoto4 __P((tcpinfo_t *, tcpinfo4_t *));
+
 static void
 ipf_v5tcpinfoto4(v5, v4)
 	tcpinfo_t *v5;
@@ -145,7 +147,6 @@ typedef struct frdest_4 {
 
 /* ------------------------------------------------------------------------ */
 
-/*
 /* 5.1.0 new release (current)
  * 4.1.34 changed the size of the time structure used for pps
  * 4.1.16 moved the location of fr_flineno
@@ -171,7 +172,7 @@ typedef	struct	frentry_4_1_34 {
 	int		fr_curpps;
 	union	{
 		void		*fru_data;
-		caddr_t		fru_caddr;
+		char		*fru_caddr;
 		fripf4_t	*fru_ipf;
 		frentfunc_t	fru_func;
 	} fr_dun;
@@ -1211,6 +1212,15 @@ typedef	struct	ipfrstat_4_1_1 {
 } ipfrstat_4_1_1_t;
 
 /* ------------------------------------------------------------------------ */
+static int ipf_addfrstr __P((char *, int, char *, int));
+static void ipf_v4iptov5 __P((frip4_t *, fr_ip_t *));
+static void ipf_v5iptov4 __P((fr_ip_t *, frip4_t *));
+static void ipfv4tuctov5 __P((frtuc4_t *, frtuc_t *));
+static void ipfv5tuctov4 __P((frtuc_t *, frtuc4_t *));
+static int ipf_v4fripftov5 __P((fripf4_t *, char *));
+static void ipf_v5fripftov4 __P((fripf_t *, fripf4_t *));
+static int fr_frflags4to5 __P((u_32_t));
+static int fr_frflags5to4 __P((u_32_t));
 
 static void friostat_current_to_4_1_0 __P((void *, friostat_4_1_0_t *, int));
 static void friostat_current_to_4_1_33 __P((void *, friostat_4_1_33_t *, int));
@@ -1222,26 +1232,23 @@ static void frauth_current_to_4_1_11 __P((void *, frauth_4_1_11_t *));
 static void frauth_current_to_4_1_23 __P((void *, frauth_4_1_23_t *));
 static void frauth_current_to_4_1_24 __P((void *, frauth_4_1_24_t *));
 static void frauth_current_to_4_1_29 __P((void *, frauth_4_1_29_t *));
-static void frauth_current_to_4_1_32 __P((void *, frauth_4_1_32_t *));
 static void frentry_current_to_4_1_0 __P((void *, frentry_4_1_0_t *));
 static void frentry_current_to_4_1_16 __P((void *, frentry_4_1_16_t *));
 static void frentry_current_to_4_1_34 __P((void *, frentry_4_1_34_t *));
 static void fr_info_current_to_4_1_11 __P((void *, fr_info_4_1_11_t *));
 static void fr_info_current_to_4_1_23 __P((void *, fr_info_4_1_23_t *));
 static void fr_info_current_to_4_1_24 __P((void *, fr_info_4_1_24_t *));
-static void fr_info_current_to_4_1_32 __P((void *, fr_info_4_1_32_t *));
 static void nat_save_current_to_4_1_3 __P((void *, nat_save_4_1_3_t *));
 static void nat_save_current_to_4_1_14 __P((void *, nat_save_4_1_14_t *));
 static void nat_save_current_to_4_1_16 __P((void *, nat_save_4_1_16_t *));
-static void nat_save_current_to_4_1_34 __P((void *, nat_save_4_1_34_t *));
 static void ipstate_save_current_to_4_1_0 __P((void *, ipstate_save_4_1_0_t *));
 static void ipstate_save_current_to_4_1_16 __P((void *, ipstate_save_4_1_16_t *));
-static void ipstate_save_current_to_4_1_34 __P((void *, ipstate_save_4_1_34_t *));
 static void ips_stat_current_to_4_1_0 __P((void *, ips_stat_4_1_0_t *));
 static void ips_stat_current_to_4_1_21 __P((void *, ips_stat_4_1_21_t *));
-static void ipfrstat_current_to_4_1_1 __P((void *, ipfrstat_4_1_1_t *));
-static void natlookup_current_to_4_1_0 __P((void *, natlookup_4_1_1_t *));
-static void natstats_current_to_4_1 __P((void *, natstat_4_1_32_t *));
+static void natstat_current_to_4_1_0 __P((void *, natstat_4_1_0_t *));
+static void natstat_current_to_4_1_16 __P((void *, natstat_4_1_16_t *));
+static void natstat_current_to_4_1_27 __P((void *, natstat_4_1_27_t *));
+static void natstat_current_to_4_1_32 __P((void *, natstat_4_1_32_t *));
 static void nat_current_to_4_1_3 __P((void *, nat_4_1_3_t *));
 static void nat_current_to_4_1_14 __P((void *, nat_4_1_14_t *));
 static void nat_current_to_4_1_25 __P((void *, nat_4_1_25_t *));
@@ -1265,8 +1272,6 @@ static void fr_info_4_1_32_to_current __P((fr_info_4_1_32_t *, void *));
 static void nat_save_4_1_3_to_current __P((ipf_main_softc_t *, nat_save_4_1_3_t *, void *));
 static void nat_save_4_1_14_to_current __P((ipf_main_softc_t *, nat_save_4_1_14_t *, void *));
 static void nat_save_4_1_16_to_current __P((ipf_main_softc_t *, nat_save_4_1_16_t *, void *));
-static void nat_save_4_1_34_to_current __P((ipf_main_softc_t *, nat_save_4_1_34_t *, void *));
-static void natlookup_4_1_0_to_current __P((void *, natlookup_4_1_1_t *));
 
 /* ------------------------------------------------------------------------ */
 /* In this section is a series of short routines that deal with translating */
@@ -1276,12 +1281,12 @@ static void natlookup_4_1_0_to_current __P((void *, natlookup_4_1_1_t *));
 
 
 static int
-ipf_addfrstr(char *names, int namelen, char *str, int max)
+ipf_addfrstr(char *names, int namelen, char *str, int maxlen)
 {
 	char *t;
 	int i;
 
-	for (i = max, t = str; (*t != '\0') && (i > 0); i--) {
+	for (i = maxlen, t = str; (*t != '\0') && (i > 0); i--) {
 		names[namelen++] = *t++;
 	}
 	names[namelen++] = '\0';
@@ -1383,13 +1388,10 @@ ipf_v4fripftov5(frp4, dst)
 
 
 static void
-ipf_v5fripftov4(frp, dst)
+ipf_v5fripftov4(frp, frp4)
 	fripf_t *frp;
-	char *dst;
-{
 	fripf4_t *frp4;
-
-	frp4 = (fripf4_t *)dst;
+{
 
 	ipf_v5iptov4(&frp->fri_ip, &frp4->fri_ip);
 	ipf_v5iptov4(&frp->fri_mip, &frp4->fri_mip);
@@ -1420,11 +1422,12 @@ ipf_in_compat(softc, obj, ptr, size)
 	int error;
 	int sz;
 
+	IPFERROR(140000);
+	error = EINVAL;
+
 	switch (obj->ipfo_type)
 	{
 	default :
-		IPFERROR(140000);
-		error = EINVAL;
 		break;
 
 	case IPFOBJ_FRENTRY :
@@ -2020,7 +2023,7 @@ frentry_4_1_34_to_current(softc, old, current, size)
 			obj.ipfo_rev = 4010100;
 			obj.ipfo_ptr = old->fr_data;
 
-			if (offset & 7 != 0)
+			if ((offset & 7) != 0)
 				offset += 8 - (offset & 7);
 			error = ipf_in_compat(softc, &obj,
 					      fr->fr_names + offset, 0);
@@ -2151,7 +2154,7 @@ frentry_4_1_16_to_current(softc, old, current, size)
 			obj.ipfo_rev = 4010100;
 			obj.ipfo_ptr = old->fr_data;
 
-			if (offset & 7 != 0)
+			if ((offset & 7) != 0)
 				offset += 8 - (offset & 7);
 			error = ipf_in_compat(softc, &obj,
 					      fr->fr_names + offset, 0);
@@ -2284,7 +2287,8 @@ frentry_4_1_0_to_current(softc, old, current, size)
 			obj.ipfo_rev = 4010100;
 			obj.ipfo_ptr = old->fr_data;
 
-			if (offset & 7 != 0)
+			if ((offset & 7) != 0)
+				offset += 8 - (offset & 7);
 				offset += 8 - (offset & 7);
 			error = ipf_in_compat(softc, &obj,
 					      fr->fr_names + offset, 0);
@@ -2870,8 +2874,8 @@ nat_save_4_1_3_to_current(softc, old, current)
 
 static void
 natstat_current_to_4_1_32(current, old)
-	natstat_4_1_32_t *old;
 	void *current;
+	natstat_4_1_32_t *old;
 {
 	natstat_t *ns = (natstat_t *)current;
 
@@ -2913,8 +2917,8 @@ natstat_current_to_4_1_32(current, old)
 
 static void
 natstat_current_to_4_1_27(current, old)
-	natstat_4_1_27_t *old;
 	void *current;
+	natstat_4_1_27_t *old;
 {
 	natstat_t *ns = (natstat_t *)current;
 
@@ -2952,8 +2956,8 @@ natstat_current_to_4_1_27(current, old)
 
 static void
 natstat_current_to_4_1_16(current, old)
-	natstat_4_1_16_t *old;
 	void *current;
+	natstat_4_1_16_t *old;
 {
 	natstat_t *ns = (natstat_t *)current;
 
@@ -2990,8 +2994,8 @@ natstat_current_to_4_1_16(current, old)
 
 static void
 natstat_current_to_4_1_0(current, old)
-	natstat_4_1_0_t *old;
 	void *current;
+	natstat_4_1_0_t *old;
 {
 	natstat_t *ns = (natstat_t *)current;
 
@@ -3059,14 +3063,13 @@ ipf_out_compat(softc, obj, ptr)
 {
 	frentry_t *fr;
 	int error;
-	int sz;
 
+	IPFERROR(140042);
+	error = EINVAL;
 
 	switch (obj->ipfo_type)
 	{
 	default :
-		IPFERROR(140042);
-		error = EINVAL;
 		break;
 
 	case IPFOBJ_FRENTRY :
@@ -4465,7 +4468,7 @@ ipstate_current_to_4_1_16(current, old)
 	old->is_secmsk = is->is_secmsk;
 	old->is_auth = is->is_auth;
 	old->is_authmsk = is->is_authmsk;
-	ipf_v5tcpinfoto4(&is->is_ps, &old->is_ps);
+	ipf_v5tcpinfoto4(&is->is_tcp, &old->is_tcp);
 	old->is_flags = is->is_flags;
 	old->is_flx[0][0] = is->is_flx[0][0];
 	old->is_flx[0][1] = is->is_flx[0][1];
@@ -4538,7 +4541,7 @@ ipstate_current_to_4_1_0(current, old)
 	old->is_secmsk = is->is_secmsk;
 	old->is_auth = is->is_auth;
 	old->is_authmsk = is->is_authmsk;
-	ipf_v5tcpinfoto4(&is->is_ps, &old->is_ps);
+	ipf_v5tcpinfoto4(&is->is_tcp, &old->is_tcp);
 	old->is_flags = is->is_flags;
 	old->is_flx[0][0] = is->is_flx[0][0];
 	old->is_flx[0][1] = is->is_flx[0][1];
