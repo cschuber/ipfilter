@@ -36,11 +36,11 @@ IPFLOG=-DIPFILTER_LOG
 #
 # To enable IPFilter compatibility with older CLI utilities
 #
-COMPATIPF=-DIPFILTER_COMPAT
+#COMPATIPF=-DIPFILTER_COMPAT
 #
 # To enable synchronisation between IPFilter hosts
 #
-SYNC=-DIPFILTER_SYNC
+#SYNC=-DIPFILTER_SYNC
 #
 # The facility you wish to log messages from ipmon to syslogd with.
 #
