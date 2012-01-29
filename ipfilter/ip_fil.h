@@ -585,7 +585,7 @@ typedef	struct	frpcmp	{
 
 #ifdef IPFILTER_XID
 
-extern int ipf_pr_tcpxid __P((fr_info_t *));
+extern int ipf_pr_tcpxid(fr_info_t *);
 
 typedef struct fr_xdr_callhdr {
 	uint32_t	xid;
@@ -1981,8 +1981,8 @@ extern	int	icmptoicmp6unreach[ICMP_MAX_UNREACH];
 extern	int	icmpreplytype6[ICMP6_MAXTYPE + 1];
 #endif
 #ifdef	IPFILTER_COMPAT
-extern	int	ipf_in_compat __P((ipf_main_softc_t *, ipfobj_t *, void *));
-extern	int	ipf_out_compat __P((ipf_main_softc_t *, ipfobj_t *, void *));
+extern	int	ipf_in_compat(ipf_main_softc_t *, ipfobj_t *, void *);
+extern	int	ipf_out_compat(ipf_main_softc_t *, ipfobj_t *, void *);
 #endif
 extern	int	icmpreplytype4[ICMP_MAXTYPE + 1];
 

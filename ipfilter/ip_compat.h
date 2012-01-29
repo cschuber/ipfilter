@@ -820,6 +820,7 @@ typedef unsigned int    u_32_t;
 #   define HAVE_M_PULLDOWN 1
 #  endif
 # endif
+# include <net/if.h>
 
 # if (__NetBSD_Version__ >= 499000000)
 typedef	char *	caddr_t;
@@ -871,6 +872,9 @@ typedef	char *	caddr_t;
 #   define	POLLWAKEUP(x)	selnotify(softc->ipf_selwait+x, 0, 0)
 #  endif
 typedef struct mbuf mb_t;
+# else
+#  include <strings.h>
+#  include <stdlib.h>
 # endif /* _KERNEL */
 # if (NetBSD <= 1991011) && (NetBSD >= 199606)
 #  define	IFNAME(x)	((struct ifnet *)x)->if_xname
