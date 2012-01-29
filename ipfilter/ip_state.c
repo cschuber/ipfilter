@@ -567,7 +567,7 @@ ipf_state_remove(softc, data)
 		}
 	RWLOCK_EXIT(&softc->ipf_state);
 
-	softc->ipf_interror = 100001;
+	IPFERROR(100001);
 	return ESRCH;
 }
 
@@ -608,7 +608,7 @@ ipf_state_ioctl(softc, data, cmd, mode, uid, ctx)
 	case SIOCIPFFL :
 		error = BCOPYIN(data, &arg, sizeof(arg));
 		if (error != 0) {
-			softc->ipf_interror = 100002;
+			IPFERROR(100002);
 			error = EFAULT;
 
 		} else {
@@ -618,7 +618,7 @@ ipf_state_ioctl(softc, data, cmd, mode, uid, ctx)
 
 			error = BCOPYOUT(&ret, data, sizeof(ret));
 			if (error != 0) {
-				softc->ipf_interror = 100003;
+				IPFERROR(100003);
 				error = EFAULT;
 			}
 		}
@@ -628,7 +628,7 @@ ipf_state_ioctl(softc, data, cmd, mode, uid, ctx)
 	case SIOCIPFL6 :
 		error = BCOPYIN(data, &arg, sizeof(arg));
 		if (error != 0) {
-			softc->ipf_interror = 100004;
+			IPFERROR(100004);
 			error = EFAULT;
 
 		} else {
@@ -638,7 +638,7 @@ ipf_state_ioctl(softc, data, cmd, mode, uid, ctx)
 
 			error = BCOPYOUT(&ret, data, sizeof(ret));
 			if (error != 0) {
-				softc->ipf_interror = 100005;
+				IPFERROR(100005);
 				error = EFAULT;
 			}
 		}
@@ -657,7 +657,7 @@ ipf_state_ioctl(softc, data, cmd, mode, uid, ctx)
 	 */
 	case SIOCIPFFB :
 		if (!(mode & FWRITE)) {
-			softc->ipf_interror = 100008;
+			IPFERROR(100008);
 			error = EPERM;
 		} else {
 			int tmp;
@@ -665,7 +665,7 @@ ipf_state_ioctl(softc, data, cmd, mode, uid, ctx)
 			tmp = ipf_log_clear(softc, IPL_LOGSTATE);
 			error = BCOPYOUT(&tmp, data, sizeof(tmp));
 			if (error != 0) {
-				softc->ipf_interror = 100009;
+				IPFERROR(100009);
 				error = EFAULT;
 			}
 		}
@@ -676,13 +676,13 @@ ipf_state_ioctl(softc, data, cmd, mode, uid, ctx)
 	 */
 	case SIOCSETLG :
 		if (!(mode & FWRITE)) {
-			softc->ipf_interror = 100010;
+			IPFERROR(100010);
 			error = EPERM;
 		} else {
 			error = BCOPYIN(data, &softs->ipf_state_logging,
 					sizeof(softs->ipf_state_logging));
 			if (error != 0) {
-				softc->ipf_interror = 100011;
+				IPFERROR(100011);
 				error = EFAULT;
 			}
 		}
@@ -695,7 +695,7 @@ ipf_state_ioctl(softc, data, cmd, mode, uid, ctx)
 		error = BCOPYOUT(&softs->ipf_state_logging, data,
 				 sizeof(softs->ipf_state_logging));
 		if (error != 0) {
-			softc->ipf_interror = 100012;
+			IPFERROR(100012);
 			error = EFAULT;
 		}
 		break;
@@ -707,7 +707,7 @@ ipf_state_ioctl(softc, data, cmd, mode, uid, ctx)
 		arg = ipf_log_bytesused(softc, IPL_LOGSTATE);
 		error = BCOPYOUT(&arg, data, sizeof(arg));
 		if (error != 0) {
-			softc->ipf_interror = 100013;
+			IPFERROR(100013);
 			error = EFAULT;
 		}
 		break;
@@ -727,7 +727,7 @@ ipf_state_ioctl(softc, data, cmd, mode, uid, ctx)
 	 */
 	case SIOCSTLCK :
 		if (!(mode & FWRITE)) {
-			softc->ipf_interror = 100014;
+			IPFERROR(100014);
 			error = EPERM;
 		} else {
 			error = ipf_lock(data, &softs->ipf_state_lock);
@@ -739,7 +739,7 @@ ipf_state_ioctl(softc, data, cmd, mode, uid, ctx)
 	 */
 	case SIOCSTPUT :
 		if (!softs->ipf_state_lock || !(mode &FWRITE)) {
-			softc->ipf_interror = 100015;
+			IPFERROR(100015);
 			error = EACCES;
 			break;
 		}
@@ -751,7 +751,7 @@ ipf_state_ioctl(softc, data, cmd, mode, uid, ctx)
 	 */
 	case SIOCSTGET :
 		if (!softs->ipf_state_lock) {
-			softc->ipf_interror = 100016;
+			IPFERROR(100016);
 			error = EACCES;
 			break;
 		}
@@ -765,7 +765,7 @@ ipf_state_ioctl(softc, data, cmd, mode, uid, ctx)
 		error = BCOPYOUT(softs->ipf_state_stats.iss_bucketlen, data,
 				 softs->ipf_state_size * sizeof(u_int));
 		if (error != 0) {
-			softc->ipf_interror = 100017;
+			IPFERROR(100017);
 			error = EFAULT;
 		}
 		break;
@@ -791,7 +791,7 @@ ipf_state_ioctl(softc, data, cmd, mode, uid, ctx)
 				ipf_token_deref(softc, token);
 			RWLOCK_EXIT(&softc->ipf_tokens);
 		} else {
-			softc->ipf_interror = 100018;
+			IPFERROR(100018);
 			error = ESRCH;
 		}
 		SPL_X(s);
@@ -805,7 +805,7 @@ ipf_state_ioctl(softc, data, cmd, mode, uid, ctx)
 	case SIOCIPFDELTOK :
 		error = BCOPYIN(data, &arg, sizeof(arg));
 		if (error != 0) {
-			softc->ipf_interror = 100019;
+			IPFERROR(100019);
 			error = EFAULT;
 		} else {
 			SPL_SCHED(s);
@@ -820,7 +820,7 @@ ipf_state_ioctl(softc, data, cmd, mode, uid, ctx)
 		break;
 
 	default :
-		softc->ipf_interror = 100020;
+		IPFERROR(100020);
 		error = EINVAL;
 		break;
 	}
@@ -860,7 +860,7 @@ ipf_state_getent(softc, softs, data)
 		if (isn == NULL) {
 			if (ips.ips_next == NULL) {
 				RWLOCK_EXIT(&softc->ipf_state);
-				softc->ipf_interror = 100021;
+				IPFERROR(100021);
 				return ENOENT;
 			}
 			return 0;
@@ -876,7 +876,7 @@ ipf_state_getent(softc, softs, data)
 				break;
 		if (!is) {
 			RWLOCK_EXIT(&softc->ipf_state);
-			softc->ipf_interror = 100022;
+			IPFERROR(100022);
 			return ESRCH;
 		}
 	}
@@ -920,7 +920,7 @@ ipf_state_putent(softc, softs, data)
 
 	KMALLOC(isn, ipstate_t *);
 	if (isn == NULL) {
-		softc->ipf_interror = 100023;
+		IPFERROR(100023);
 		return ENOMEM;
 	}
 
@@ -952,7 +952,7 @@ ipf_state_putent(softc, softs, data)
 		KMALLOC(fr, frentry_t *);
 		if (fr == NULL) {
 			KFREE(isn);
-			softc->ipf_interror = 100024;
+			IPFERROR(100024);
 			return ENOMEM;
 		}
 		bcopy((char *)&ips.ips_fr, (char *)fr, sizeof(*fr));
@@ -1002,7 +1002,7 @@ ipf_state_putent(softc, softs, data)
 			KFREE(isn);
 			MUTEX_DESTROY(&fr->fr_lock);
 			KFREE(fr);
-			softc->ipf_interror = 100025;
+			IPFERROR(100025);
 			return EFAULT;
 		}
 		READ_ENTER(&softc->ipf_state);
@@ -1026,7 +1026,7 @@ ipf_state_putent(softc, softs, data)
 		RWLOCK_EXIT(&softc->ipf_state);
 
 		if (isn == NULL) {
-			softc->ipf_interror = 100033;
+			IPFERROR(100033);
 			error = ESRCH;
 		}
 	}
@@ -4800,23 +4800,23 @@ ipf_state_iter(softc, token, itp, obj)
 	int error;
 
 	if (itp->igi_data == NULL) {
-		softc->ipf_interror = 100026;
+		IPFERROR(100026);
 		return EFAULT;
 	}
 
 	if (itp->igi_nitems < 1) {
-		softc->ipf_interror = 100027;
+		IPFERROR(100027);
 		return ENOSPC;
 	}
 
 	if (itp->igi_type != IPFGENITER_STATE) {
-		softc->ipf_interror = 100028;
+		IPFERROR(100028);
 		return EINVAL;
 	}
 
 	is = token->ipt_data;
 	if (is == (void *)-1) {
-		softc->ipf_interror = 100029;
+		IPFERROR(100029);
 		return ESRCH;
 	}
 
@@ -4883,14 +4883,14 @@ ipf_state_gettable(softc, softs, data)
 		return error;
 
 	if (table.ita_type != IPFTABLE_BUCKETS) {
-		softc->ipf_interror = 100031;
+		IPFERROR(100031);
 		return EINVAL;
 	}
 
 	error = COPYOUT(softs->ipf_state_stats.iss_bucketlen, table.ita_table,
 			softs->ipf_state_size * sizeof(u_int));
 	if (error != 0) {
-		softc->ipf_interror = 100032;
+		IPFERROR(100032);
 		error = EFAULT;
 	}
 	return error;
@@ -5166,7 +5166,7 @@ ipf_state_settimeout(softc, t, p)
 	} else if (!strcmp(t->ipft_name, "ip_timeout")) {
 		ipf_apply_timeout(&softs->ipf_state_iptq, p->ipftu_int);
 	} else {
-		softc->ipf_interror = 100034;
+		IPFERROR(100034);
 		return ESRCH;
 	}
 
@@ -5212,14 +5212,14 @@ ipf_state_rehash(softc, t, p)
 
 	KMALLOCS(newtab, ipstate_t **, newsize * sizeof(ipstate_t *));
 	if (newtab == NULL) {
-		softc->ipf_interror = 100035;
+		IPFERROR(100035);
 		return ENOMEM;
 	}
 
 	KMALLOCS(bucketlens, u_int *, newsize * sizeof(u_int));
 	if (bucketlens == NULL) {
 		KFREES(newtab, newsize * sizeof(*softs->ipf_state_table));
-		softc->ipf_interror = 100036;
+		IPFERROR(100036);
 		return ENOMEM;
 	}
 

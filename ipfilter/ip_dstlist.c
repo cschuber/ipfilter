@@ -307,12 +307,12 @@ ipf_dstlist_iter_deref(softc, arg, otype, unit, data)
 	void *data;
 {
 	if (data == NULL) {
-		softc->ipf_interror = 120001;
+		IPFERROR(120001);
 		return EINVAL;
 	}
 
 	if (unit < -1 || unit > IPL_LOGMAX) {
-		softc->ipf_interror = 120002;
+		IPFERROR(120002);
 		return EINVAL;
 	}
 
@@ -378,7 +378,7 @@ ipf_dstlist_iter_next(softc, arg, token, iter)
 			list = ipf_dstlist_table_find(arg, iter->ili_unit,
 						      iter->ili_name);
 			if (list == NULL) {
-				softc->ipf_interror = 120004;
+				IPFERROR(120004);
 				err = ESRCH;
 				nextnode = NULL;
 			} else {
@@ -399,7 +399,7 @@ ipf_dstlist_iter_next(softc, arg, token, iter)
 		}
 		break;
 	default :
-		softc->ipf_interror = 120003;
+		IPFERROR(120003);
 		err = EINVAL;
 		break;
 	}
@@ -416,7 +416,7 @@ ipf_dstlist_iter_next(softc, arg, token, iter)
 		token->ipt_data = next;
 		err = COPYOUT(next, iter->ili_data, sizeof(*next));
 		if (err != 0) {
-			softc->ipf_interror = 120005;
+			IPFERROR(120005);
 			err = EFAULT;
 		}
 		break;
@@ -428,7 +428,7 @@ ipf_dstlist_iter_next(softc, arg, token, iter)
 		token->ipt_data = nextnode;
 		err = COPYOUT(nextnode, iter->ili_data, sizeof(*nextnode));
 		if (err != 0) {
-			softc->ipf_interror = 120006;
+			IPFERROR(120006);
 			err = EFAULT;
 		}
 		break;
@@ -471,19 +471,19 @@ ipf_dstlist_node_add(softc, arg, op, uid)
 	int err;
 
 	if (op->iplo_size < sizeof(frdest_t)) {
-		softc->ipf_interror = 120007;
+		IPFERROR(120007);
 		return EINVAL;
 	}
 
 	err = COPYIN(op->iplo_struct, &dest, sizeof(dest));
 	if (err != 0) {
-		softc->ipf_interror = 120009;
+		IPFERROR(120009);
 		return EFAULT;
 	}
 
 	d = ipf_dstlist_table_find(arg, op->iplo_unit, op->iplo_name);
 	if (d == NULL) {
-		softc->ipf_interror = 120010;
+		IPFERROR(120010);
 		return ESRCH;
 	}
 
@@ -493,19 +493,19 @@ ipf_dstlist_node_add(softc, arg, op, uid)
 	case AF_INET6 :
 		break;
 	default :
-		softc->ipf_interror = 120019;
+		IPFERROR(120019);
 		return EINVAL;
 	}
 
 	if (dest.fd_name < -1 || dest.fd_name > 128) {
-		softc->ipf_interror = 120018;
+		IPFERROR(120018);
 		return EINVAL;
 	}
 
 	KMALLOCS(node, ipf_dstnode_t *, sizeof(*node) + dest.fd_name);
 	if (node == NULL) {
 		softd->stats.ipls_nomem++;
-		softc->ipf_interror = 120008;
+		IPFERROR(120008);
 		return ENOMEM;
 	}
 
@@ -515,7 +515,7 @@ ipf_dstlist_node_add(softc, arg, op, uid)
 	err = COPYIN((char *)op->iplo_struct + sizeof(dest), node->ipfd_names,
 		     dest.fd_name);
 	if (err != 0) {
-		softc->ipf_interror = 120017;
+		IPFERROR(120017);
 		KFREES(node, node->ipfd_size);
 		return EFAULT;
 	}
@@ -524,7 +524,7 @@ ipf_dstlist_node_add(softc, arg, op, uid)
 			 sizeof(*nodes) * (d->ipld_maxnodes + 1));
 		if (nodes == NULL) {
 			softd->stats.ipls_nomem++;
-			softc->ipf_interror = 120022;
+			IPFERROR(120022);
 			KFREES(node, node->ipfd_size);
 			return ENOMEM;
 		}
@@ -638,13 +638,13 @@ ipf_dstlist_node_del(softc, arg, op, uid)
 
 	d = ipf_dstlist_table_find(arg, op->iplo_unit, op->iplo_name);
 	if (d == NULL) {
-		softc->ipf_interror = 120012;
+		IPFERROR(120012);
 		return ESRCH;
 	}
 
 	err = COPYIN(op->iplo_struct, &frd, sizeof(frd));
 	if (err != 0) {
-		softc->ipf_interror = 120011;
+		IPFERROR(120011);
 		return EFAULT;
 	}
 
@@ -652,13 +652,13 @@ ipf_dstlist_node_del(softc, arg, op, uid)
 	KMALLOCS(temp, frdest_t *, size);
 	if (temp == NULL) {
 		softd->stats.ipls_nomem++;
-		softc->ipf_interror = 120018;
+		IPFERROR(120026);
 		return ENOMEM;
 	}
 
 	err = COPYIN(op->iplo_struct, temp, size);
 	if (err != 0) {
-		softc->ipf_interror = 120019;
+		IPFERROR(120027);
 		return EFAULT;
 	}
 
@@ -766,7 +766,7 @@ ipf_dstlist_stats_get(softc, arg, op)
 	int unit, i, err = 0;
 
 	if (op->iplo_size != sizeof(ipf_dstl_stat_t)) {
-		softc->ipf_interror = 120023;
+		IPFERROR(120023);
 		return EINVAL;
 	}
 
@@ -785,14 +785,14 @@ ipf_dstlist_stats_get(softc, arg, op)
 			ptr = softd->dstlist[unit + 1];
 		stats.ipls_list[unit + 1] = ptr;
 	} else {
-		softc->ipf_interror = 120024;
+		IPFERROR(120024);
 		err = EINVAL;
 	}
 
 	if (err == 0) {
 		err = COPYOUT(&stats, op->iplo_struct, sizeof(stats));
 		if (err != 0) {
-			softc->ipf_interror = 120025;
+			IPFERROR(120025);
 			return EFAULT;
 		}
 	}
@@ -824,20 +824,20 @@ ipf_dstlist_table_add(softc, arg, op)
 	KMALLOC(new, ippool_dst_t *);
 	if (new == NULL) {
 		softd->stats.ipls_nomem++;
-		softc->ipf_interror = 120014;
+		IPFERROR(120014);
 		return ENOMEM;
 	}
 
 	d = ipf_dstlist_table_find(arg, op->iplo_unit, op->iplo_name);
 	if (d != NULL) {
-		softc->ipf_interror = 120013;
+		IPFERROR(120013);
 		KFREE(new);
 		return EEXIST;
 	}
 
 	err = COPYIN(op->iplo_struct, &user, sizeof(user));
 	if (err != 0) {
-		softc->ipf_interror = 120021;
+		IPFERROR(120021);
 		KFREE(new);
 		return EFAULT;
 	}
@@ -887,12 +887,12 @@ ipf_dstlist_table_del(softc, arg, op)
 
 	d = ipf_dstlist_table_find(arg, op->iplo_unit, op->iplo_name);
 	if (d == NULL) {
-		softc->ipf_interror = 120015;
+		IPFERROR(120015);
 		return ESRCH;
 	}
 
 	if (d->ipld_dests != NULL) {
-		softc->ipf_interror = 120016;
+		IPFERROR(120016);
 		return EBUSY;
 	}
 

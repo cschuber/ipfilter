@@ -244,7 +244,7 @@ ipfioctl(dev, cmd, data, mode, cp, rp)
 #endif
 	unit = getminor(dev);
 	if (IPL_LOGMAX < unit) {
-		softc->ipf_interror = 130002;
+		IPFERROR(130002);
 		return ENXIO;
 	}
 
@@ -252,14 +252,14 @@ ipfioctl(dev, cmd, data, mode, cp, rp)
 
 	if (softc->ipf_running <= 0) {
 		if (unit != IPL_LOGIPF) {
-			softc->ipf_interror = 130003;
+			IPFERROR(130003);
 			return EIO;
 		}
 		if (cmd != SIOCIPFGETNEXT && cmd != SIOCIPFGET &&
 		    cmd != SIOCIPFSET && cmd != SIOCFRENB &&
 		    cmd != SIOCGETFS && cmd != SIOCGETFF &&
 		    cmd != SIOCIPFINTERROR) {
-			softc->ipf_interror = 130004;
+			IPFERROR(130004);
 			return EIO;
 		}
 	}

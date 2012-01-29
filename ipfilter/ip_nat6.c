@@ -4498,11 +4498,11 @@ ipf_nat6_nextaddrinit(softc, base, na, initial, ifp)
 							 &na->na_func);
 		}
 		if (na->na_func == NULL) {
-			softc->ipf_interror = 60072;
+			IPFERROR(60072);
 			return ESRCH;
 		}
 		if (na->na_ptr == NULL) {
-			softc->ipf_interror = 60073;
+			IPFERROR(60073);
 			return ESRCH;
 		}
 		break;
@@ -4532,7 +4532,7 @@ ipf_nat6_nextaddrinit(softc, base, na, initial, ifp)
 		break;
 
 	default :
-		softc->ipf_interror = 60074;
+		IPFERROR(60074);
 		return EINVAL;
 	}
 

@@ -1420,11 +1420,11 @@ ipf_in_compat(softc, obj, ptr, size)
 	int error;
 	int sz;
 
-	error = EINVAL;
-
 	switch (obj->ipfo_type)
 	{
 	default :
+		IPFERROR(140000);
+		error = EINVAL;
 		break;
 
 	case IPFOBJ_FRENTRY :
@@ -1433,6 +1433,7 @@ ipf_in_compat(softc, obj, ptr, size)
 
 			KMALLOC(old, frentry_4_1_34_t *);
 			if (old == NULL) {
+				IPFERROR(140001);
 				error = ENOMEM;
 				break;
 			}
@@ -1440,12 +1441,15 @@ ipf_in_compat(softc, obj, ptr, size)
 			if (error == 0) {
 				if (old->fr_type != FR_T_NONE &&
 				    old->fr_type != FR_T_IPF) {
+					IPFERROR(140002);
 					error = EINVAL;
 					KFREE(old);
 					break;
 				}
 				frentry_4_1_34_to_current(softc, old,
 							  ptr, size);
+			} else {
+				IPFERROR(140003);
 			}
 			KFREE(old);
 		} else if (obj->ipfo_rev >= 4011600) {
@@ -1453,6 +1457,7 @@ ipf_in_compat(softc, obj, ptr, size)
 
 			KMALLOC(old, frentry_4_1_16_t *);
 			if (old == NULL) {
+				IPFERROR(140004);
 				error = ENOMEM;
 				break;
 			}
@@ -1460,12 +1465,15 @@ ipf_in_compat(softc, obj, ptr, size)
 			if (error == 0) {
 				if (old->fr_type != FR_T_NONE &&
 				    old->fr_type != FR_T_IPF) {
+					IPFERROR(140005);
 					error = EINVAL;
 					KFREE(old);
 					break;
 				}
 				frentry_4_1_16_to_current(softc, old,
 							  ptr, size);
+			} else {
+				IPFERROR(140006);
 			}
 			KFREE(old);
 		} else {
@@ -1473,6 +1481,7 @@ ipf_in_compat(softc, obj, ptr, size)
 
 			KMALLOC(old, frentry_4_1_0_t *);
 			if (old == NULL) {
+				IPFERROR(140007);
 				error = ENOMEM;
 				break;
 			}
@@ -1480,11 +1489,14 @@ ipf_in_compat(softc, obj, ptr, size)
 			if (error == 0) {
 				if (old->fr_type != FR_T_NONE &&
 				    old->fr_type != FR_T_IPF) {
+					IPFERROR(140008);
 					error = EINVAL;
 					KFREE(old);
 					break;
 				}
 				frentry_4_1_0_to_current(softc, old, ptr, size);
+			} else {
+				IPFERROR(140009);
 			}
 			KFREE(old);
 		}
@@ -1496,23 +1508,31 @@ ipf_in_compat(softc, obj, ptr, size)
 
 			KMALLOC(old, friostat_4_1_33_t *);
 			if (old == NULL) {
+				IPFERROR(140010);
 				error = ENOMEM;
 				break;
 			}
 			error = COPYIN(obj->ipfo_ptr, old, sizeof(*old));
-			if (error == 0)
+			if (error == 0) {
 				friostat_4_1_33_to_current(old, ptr);
+			} else {
+				IPFERROR(140011);
+			}
 		} else {
 			friostat_4_1_0_t *old;
 
 			KMALLOC(old, friostat_4_1_0_t *);
 			if (old == NULL) {
+				IPFERROR(140012);
 				error = ENOMEM;
 				break;
 			}
 			error = COPYIN(obj->ipfo_ptr, old, sizeof(*old));
-			if (error == 0)
+			if (error == 0) {
 				friostat_4_1_0_to_current(old, ptr);
+			} else {
+				IPFERROR(140013);
+			}
 		}
 		break;
 
@@ -1525,24 +1545,32 @@ ipf_in_compat(softc, obj, ptr, size)
 
 			KMALLOC(old, ipnat_4_1_14_t *);
 			if (old == NULL) {
+				IPFERROR(140014);
 				error = ENOMEM;
 				break;
 			}
 			error = COPYIN(obj->ipfo_ptr, old, sizeof(*old));
-			if (error == 0)
+			if (error == 0) {
 				ipnat_4_1_14_to_current(old, ptr, size);
+			} else {
+				IPFERROR(140015);
+			}
 			KFREE(old);
 		} else {
 			ipnat_4_1_0_t *old;
 
 			KMALLOC(old, ipnat_4_1_0_t *);
 			if (old == NULL) {
+				IPFERROR(140016);
 				error = ENOMEM;
 				break;
 			}
 			error = COPYIN(obj->ipfo_ptr, old, sizeof(*old));
-			if (error == 0)
+			if (error == 0) {
 				ipnat_4_1_0_to_current(old, ptr, size);
+			} else {
+				IPFERROR(140017);
+			}
 			KFREE(old);
 		}
 		break;
@@ -1559,36 +1587,48 @@ ipf_in_compat(softc, obj, ptr, size)
 
 			KMALLOC(old16, nat_save_4_1_16_t *);
 			if (old16 == NULL) {
+				IPFERROR(140018);
 				error = ENOMEM;
 				break;
 			}
 			error = COPYIN(obj->ipfo_ptr, old16, sizeof(*old16));
-			if (error == 0)
+			if (error == 0) {
 				nat_save_4_1_16_to_current(softc, old16, ptr);
+			} else {
+				IPFERROR(140019);
+			}
 			KFREE(old16);
 		} else if (obj->ipfo_rev >= 4011400) {
 			nat_save_4_1_14_t *old14;
 
 			KMALLOC(old14, nat_save_4_1_14_t *);
 			if (old14 == NULL) {
+				IPFERROR(140020);
 				error = ENOMEM;
 				break;
 			}
 			error = COPYIN(obj->ipfo_ptr, old14, sizeof(*old14));
-			if (error == 0)
+			if (error == 0) {
 				nat_save_4_1_14_to_current(softc, old14, ptr);
+			} else {
+				IPFERROR(140021);
+			}
 			KFREE(old14);
 		} else if (obj->ipfo_rev >= 4010300) {
 			nat_save_4_1_3_t *old3;
 
 			KMALLOC(old3, nat_save_4_1_3_t *);
 			if (old3 == NULL) {
+				IPFERROR(140022);
 				error = ENOMEM;
 				break;
 			}
 			error = COPYIN(obj->ipfo_ptr, old3, sizeof(*old3));
-			if (error == 0)
+			if (error == 0) {
 				nat_save_4_1_3_to_current(softc, old3, ptr);
+			} else {
+				IPFERROR(140023);
+			}
 			KFREE(old3);
 		}
 		break;
@@ -1599,39 +1639,42 @@ ipf_in_compat(softc, obj, ptr, size)
 
 			KMALLOC(old, ipstate_save_4_1_34_t *);
 			if (old == NULL) {
+				IPFERROR(140024);
 				error = ENOMEM;
 				break;
 			}
 			error = COPYIN(obj->ipfo_ptr, old, sizeof(*old));
-			if (error == 0)
-				/* ipstate_save_4_1_34_to_current(&old, ptr); */
-				;
+			if (error != 0) {
+				IPFERROR(140025);
+			}
 			KFREE(old);
 		} else if (obj->ipfo_rev >= 4011600) {
 			ipstate_save_4_1_16_t *old;
 
 			KMALLOC(old, ipstate_save_4_1_16_t *);
 			if (old == NULL) {
+				IPFERROR(140026);
 				error = ENOMEM;
 				break;
 			}
 			error = COPYIN(obj->ipfo_ptr, old, sizeof(*old));
-			if (error == 0)
-				/* ipstate_save_4_1_16_to_current(&old, ptr); */
-				;
+			if (error != 0) {
+				IPFERROR(140027);
+			}
 			KFREE(old);
 		} else {
 			ipstate_save_4_1_0_t *old;
 
 			KMALLOC(old, ipstate_save_4_1_0_t *);
 			if (old == NULL) {
+				IPFERROR(140028);
 				error = ENOMEM;
 				break;
 			}
 			error = COPYIN(obj->ipfo_ptr, old, sizeof(*old));
-			if (error == 0)
-				/* ipstate_save_4_1_0_to_current(&old, ptr); */
-				;
+			if (error != 0) {
+				IPFERROR(140029);
+			}
 			KFREE(old);
 		}
 		break;
@@ -1654,42 +1697,55 @@ ipf_in_compat(softc, obj, ptr, size)
 
 			KMALLOC(old32, frauth_4_1_32_t *);
 			if (old32 == NULL) {
+				IPFERROR(140030);
 				error = ENOMEM;
 				break;
 			}
 			error = COPYIN(obj->ipfo_ptr, old32, sizeof(*old32));
-			if (error == 0)
+			if (error == 0) {
 				frauth_4_1_32_to_current(old32, ptr);
+			} else {
+				IPFERROR(140031);
+			}
 			KFREE(old32);
 		} else if (obj->ipfo_rev >= 4012900) {
 			frauth_4_1_29_t *old29;
 
 			KMALLOC(old29, frauth_4_1_29_t *);
 			if (old29 == NULL) {
+				IPFERROR(140032);
 				error = ENOMEM;
 				break;
 			}
 			error = COPYIN(obj->ipfo_ptr, old29, sizeof(*old29));
-			if (error == 0)
+			if (error == 0) {
 				frauth_4_1_29_to_current(old29, ptr);
+			} else {
+				IPFERROR(140033);
+			}
 			KFREE(old29);
 		} else if (obj->ipfo_rev >= 4012400) {
 			frauth_4_1_24_t *old24;
 
 			KMALLOC(old24, frauth_4_1_24_t *);
 			if (old24 == NULL) {
+				IPFERROR(140034);
 				error = ENOMEM;
 				break;
 			}
 			error = COPYIN(obj->ipfo_ptr, old24, sizeof(*old24));
-			if (error == 0)
+			if (error == 0) {
 				frauth_4_1_24_to_current(old24, ptr);
+			} else {
+				IPFERROR(140035);
+			}
 			KFREE(old24);
 		} else if (obj->ipfo_rev >= 4012300) {
 			frauth_4_1_23_t *old23;
 
 			KMALLOC(old23, frauth_4_1_23_t *);
 			if (old23 == NULL) {
+				IPFERROR(140036);
 				error = ENOMEM;
 				break;
 			}
@@ -1702,12 +1758,16 @@ ipf_in_compat(softc, obj, ptr, size)
 
 			KMALLOC(old11, frauth_4_1_11_t *);
 			if (old11 == NULL) {
+				IPFERROR(140037);
 				error = ENOMEM;
 				break;
 			}
 			error = COPYIN(obj->ipfo_ptr, old11, sizeof(*old11));
-			if (error == 0)
+			if (error == 0) {
 				frauth_4_1_11_to_current(old11, ptr);
+			} else {
+				IPFERROR(140038);
+			}
 			KFREE(old11);
 		}
 		break;
@@ -1722,6 +1782,9 @@ ipf_in_compat(softc, obj, ptr, size)
 		}
 		bzero(ptr, sizeof(nat_t));
 		error = COPYIN(obj->ipfo_ptr, ptr, sz);
+		if (error != 0) {
+			IPFERROR(140039);
+		}
 		break;
 
 	case IPFOBJ_FRIPF :
@@ -1730,12 +1793,16 @@ ipf_in_compat(softc, obj, ptr, size)
 
 			KMALLOC(old, fripf4_t *);
 			if (old == NULL) {
+				IPFERROR(140040);
 				error = ENOMEM;
 				break;
 			}
 			error = COPYIN(obj->ipfo_ptr, old, sizeof(*old));
-			if (error == 0)
+			if (error == 0) {
 				ipf_v4fripftov5(old, ptr);
+			} else {
+				IPFERROR(140041);
+			}
 			KFREE(old);
 		}
 		break;
@@ -2994,11 +3061,12 @@ ipf_out_compat(softc, obj, ptr)
 	int error;
 	int sz;
 
-	error = EINVAL;
 
 	switch (obj->ipfo_type)
 	{
 	default :
+		IPFERROR(140042);
+		error = EINVAL;
 		break;
 
 	case IPFOBJ_FRENTRY :
@@ -3007,6 +3075,7 @@ ipf_out_compat(softc, obj, ptr)
 
 			KMALLOC(old, frentry_4_1_34_t *);
 			if (old == NULL) {
+				IPFERROR(140043);
 				error = ENOMEM;
 				break;
 			}
@@ -3019,6 +3088,9 @@ ipf_out_compat(softc, obj, ptr)
 				dst += sizeof(*old);
 				error = COPYOUT(fr->fr_data, dst,
 						old->fr_dsize);
+				if (error != 0) {
+					IPFERROR(140044);
+				}
 			}
 			KFREE(old);
 			obj->ipfo_size = sizeof(*old);
@@ -3027,11 +3099,15 @@ ipf_out_compat(softc, obj, ptr)
 
 			KMALLOC(old, frentry_4_1_16_t *);
 			if (old == NULL) {
+				IPFERROR(140045);
 				error = ENOMEM;
 				break;
 			}
 			frentry_current_to_4_1_16(ptr, old);
 			error = COPYOUT(old, obj->ipfo_ptr, sizeof(*old));
+			if (error != 0) {
+				IPFERROR(140046);
+			}
 			KFREE(old);
 			obj->ipfo_size = sizeof(*old);
 		} else {
@@ -3039,11 +3115,15 @@ ipf_out_compat(softc, obj, ptr)
 
 			KMALLOC(old, frentry_4_1_0_t *);
 			if (old == NULL) {
+				IPFERROR(140047);
 				error = ENOMEM;
 				break;
 			}
 			frentry_current_to_4_1_0(ptr, old);
 			error = COPYOUT(old, obj->ipfo_ptr, sizeof(*old));
+			if (error != 0) {
+				IPFERROR(140048);
+			}
 			KFREE(old);
 			obj->ipfo_size = sizeof(*old);
 		}
@@ -3055,22 +3135,30 @@ ipf_out_compat(softc, obj, ptr)
 
 			KMALLOC(old, friostat_4_1_33_t *);
 			if (old == NULL) {
+				IPFERROR(140049);
 				error = ENOMEM;
 				break;
 			}
 			friostat_current_to_4_1_33(ptr, old, obj->ipfo_rev);
 			error = COPYOUT(old, obj->ipfo_ptr, sizeof(*old));
+			if (error != 0) {
+				IPFERROR(140050);
+			}
 			KFREE(old);
 		} else {
 			friostat_4_1_0_t *old;
 
 			KMALLOC(old, friostat_4_1_0_t *);
 			if (old == NULL) {
+				IPFERROR(140051);
 				error = ENOMEM;
 				break;
 			}
 			friostat_current_to_4_1_0(ptr, old, obj->ipfo_rev);
 			error = COPYOUT(old, obj->ipfo_ptr, sizeof(*old));
+			if (error != 0) {
+				IPFERROR(140052);
+			}
 			KFREE(old);
 		}
 		break;
@@ -3084,22 +3172,30 @@ ipf_out_compat(softc, obj, ptr)
 
 			KMALLOC(old, ipnat_4_1_14_t *);
 			if (old == NULL) {
+				IPFERROR(140053);
 				error = ENOMEM;
 				break;
 			}
 			ipnat_current_to_4_1_14(ptr, old);
 			error = COPYOUT(old, obj->ipfo_ptr, sizeof(*old));
+			if (error != 0) {
+				IPFERROR(140054);
+			}
 			KFREE(old);
 		} else {
 			ipnat_4_1_0_t *old;
 
 			KMALLOC(old, ipnat_4_1_0_t *);
 			if (old == NULL) {
+				IPFERROR(140055);
 				error = ENOMEM;
 				break;
 			}
 			ipnat_current_to_4_1_0(ptr, old);
 			error = COPYOUT(old, obj->ipfo_ptr, sizeof(*old));
+			if (error != 0) {
+				IPFERROR(140056);
+			}
 			KFREE(old);
 		}
 		break;
@@ -3110,44 +3206,60 @@ ipf_out_compat(softc, obj, ptr)
 
 			KMALLOC(old, natstat_4_1_32_t *);
 			if (old == NULL) {
+				IPFERROR(140057);
 				error = ENOMEM;
 				break;
 			}
 			natstat_current_to_4_1_32(ptr, old);
 			error = COPYOUT(old, obj->ipfo_ptr, sizeof(*old));
+			if (error != 0) {
+				IPFERROR(140058);
+			}
 			KFREE(old);
 		} else if (obj->ipfo_rev >= 4012700) {
 			natstat_4_1_27_t *old;
 
 			KMALLOC(old, natstat_4_1_27_t *);
 			if (old == NULL) {
+				IPFERROR(140059);
 				error = ENOMEM;
 				break;
 			}
 			natstat_current_to_4_1_27(ptr, old);
 			error = COPYOUT(old, obj->ipfo_ptr, sizeof(*old));
+			if (error != 0) {
+				IPFERROR(140060);
+			}
 			KFREE(old);
 		} else if (obj->ipfo_rev >= 4011600) {
 			natstat_4_1_16_t *old;
 
 			KMALLOC(old, natstat_4_1_16_t *);
 			if (old == NULL) {
+				IPFERROR(140061);
 				error = ENOMEM;
 				break;
 			}
 			natstat_current_to_4_1_16(ptr, old);
 			error = COPYOUT(old, obj->ipfo_ptr, sizeof(*old));
+			if (error != 0) {
+				IPFERROR(140062);
+			}
 			KFREE(old);
 		} else {
 			natstat_4_1_0_t *old;
 
 			KMALLOC(old, natstat_4_1_0_t *);
 			if (old == NULL) {
+				IPFERROR(140063);
 				error = ENOMEM;
 				break;
 			}
 			natstat_current_to_4_1_0(ptr, old);
 			error = COPYOUT(old, obj->ipfo_ptr, sizeof(*old));
+			if (error != 0) {
+				IPFERROR(140064);
+			}
 			KFREE(old);
 		}
 		break;
@@ -3158,22 +3270,30 @@ ipf_out_compat(softc, obj, ptr)
 
 			KMALLOC(old, ipstate_save_4_1_16_t *);
 			if (old == NULL) {
+				IPFERROR(140065);
 				error = ENOMEM;
 				break;
 			}
 			ipstate_save_current_to_4_1_16(ptr, old);
 			error = COPYOUT(old, obj->ipfo_ptr, sizeof(*old));
+			if (error != 0) {
+				IPFERROR(140066);
+			}
 			KFREE(old);
 		} else {
 			ipstate_save_4_1_0_t *old;
 
 			KMALLOC(old, ipstate_save_4_1_0_t *);
 			if (old == NULL) {
+				IPFERROR(140067);
 				error = ENOMEM;
 				break;
 			}
 			ipstate_save_current_to_4_1_0(ptr, old);
 			error = COPYOUT(old, obj->ipfo_ptr, sizeof(*old));
+			if (error != 0) {
+				IPFERROR(140068);
+			}
 			KFREE(old);
 		}
 		break;
@@ -3184,33 +3304,45 @@ ipf_out_compat(softc, obj, ptr)
 
 			KMALLOC(old16, nat_save_4_1_16_t *);
 			if (old16 == NULL) {
+				IPFERROR(140069);
 				error = ENOMEM;
 				break;
 			}
 			nat_save_current_to_4_1_16(ptr, old16);
 			error = COPYOUT(&old16, obj->ipfo_ptr, sizeof(*old16));
+			if (error != 0) {
+				IPFERROR(140070);
+			}
 			KFREE(old16);
 		} else if (obj->ipfo_rev >= 4011400) {
 			nat_save_4_1_14_t *old14;
 
 			KMALLOC(old14, nat_save_4_1_14_t *);
 			if (old14 == NULL) {
+				IPFERROR(140071);
 				error = ENOMEM;
 				break;
 			}
 			nat_save_current_to_4_1_14(ptr, old14);
 			error = COPYOUT(&old14, obj->ipfo_ptr, sizeof(*old14));
+			if (error != 0) {
+				IPFERROR(140072);
+			}
 			KFREE(old14);
 		} else if (obj->ipfo_rev >= 4010300) {
 			nat_save_4_1_3_t *old3;
 
 			KMALLOC(old3, nat_save_4_1_3_t *);
 			if (old3 == NULL) {
+				IPFERROR(140073);
 				error = ENOMEM;
 				break;
 			}
 			nat_save_current_to_4_1_3(ptr, old3);
 			error = COPYOUT(&old3, obj->ipfo_ptr, sizeof(*old3));
+			if (error != 0) {
+				IPFERROR(140074);
+			}
 			KFREE(old3);
 		}
 		break;
@@ -3221,22 +3353,30 @@ ipf_out_compat(softc, obj, ptr)
 
 			KMALLOC(old, ipstate_4_1_16_t *);
 			if (old == NULL) {
+				IPFERROR(140075);
 				error = ENOMEM;
 				break;
 			}
 			ipstate_current_to_4_1_16(ptr, old);
 			error = COPYOUT(old, obj->ipfo_ptr, sizeof(*old));
+			if (error != 0) {
+				IPFERROR(140076);
+			}
 			KFREE(old);
 		} else {
 			ipstate_4_1_0_t *old;
 
 			KMALLOC(old, ipstate_4_1_0_t *);
 			if (old == NULL) {
+				IPFERROR(140077);
 				error = ENOMEM;
 				break;
 			}
 			ipstate_current_to_4_1_0(ptr, old);
 			error = COPYOUT(old, obj->ipfo_ptr, sizeof(*old));
+			if (error != 0) {
+				IPFERROR(140078);
+			}
 			KFREE(old);
 		}
 		break;
@@ -3247,22 +3387,30 @@ ipf_out_compat(softc, obj, ptr)
 
 			KMALLOC(old, ips_stat_4_1_21_t *);
 			if (old == NULL) {
+				IPFERROR(140079);
 				error = ENOMEM;
 				break;
 			}
 			ips_stat_current_to_4_1_21(ptr, old);
 			error = COPYOUT(old, obj->ipfo_ptr, sizeof(*old));
+			if (error != 0) {
+				IPFERROR(140080);
+			}
 			KFREE(old);
 		} else {
 			ips_stat_4_1_0_t *old;
 
 			KMALLOC(old, ips_stat_4_1_0_t *);
 			if (old == NULL) {
+				IPFERROR(140081);
 				error = ENOMEM;
 				break;
 			}
 			ips_stat_current_to_4_1_0(ptr, old);
 			error = COPYOUT(old, obj->ipfo_ptr, sizeof(*old));
+			if (error != 0) {
+				IPFERROR(140082);
+			}
 			KFREE(old);
 		}
 		break;
@@ -3273,44 +3421,60 @@ ipf_out_compat(softc, obj, ptr)
 
 			KMALLOC(old29, frauth_4_1_29_t *);
 			if (old29 == NULL) {
+				IPFERROR(140083);
 				error = ENOMEM;
 				break;
 			}
 			frauth_current_to_4_1_29(ptr, old29);
 			error = COPYOUT(old29, obj->ipfo_ptr, sizeof(*old29));
+			if (error != 0) {
+				IPFERROR(140084);
+			}
 			KFREE(old29);
 		} else if (obj->ipfo_rev >= 4012400) {
 			frauth_4_1_24_t *old24;
 
 			KMALLOC(old24, frauth_4_1_24_t *);
 			if (old24 == NULL) {
+				IPFERROR(140085);
 				error = ENOMEM;
 				break;
 			}
 			frauth_current_to_4_1_24(ptr, old24);
 			error = COPYOUT(old24, obj->ipfo_ptr, sizeof(*old24));
+			if (error != 0) {
+				IPFERROR(140086);
+			}
 			KFREE(old24);
 		} else if (obj->ipfo_rev >= 4012300) {
 			frauth_4_1_23_t *old23;
 
 			KMALLOC(old23, frauth_4_1_23_t *);
 			if (old23 == NULL) {
+				IPFERROR(140087);
 				error = ENOMEM;
 				break;
 			}
 			frauth_current_to_4_1_23(ptr, old23);
 			error = COPYOUT(old23, obj->ipfo_ptr, sizeof(*old23));
+			if (error != 0) {
+				IPFERROR(140088);
+			}
 			KFREE(old23);
 		} else if (obj->ipfo_rev >= 4011100) {
 			frauth_4_1_11_t *old11;
 
 			KMALLOC(old11, frauth_4_1_11_t *);
 			if (old11 == NULL) {
+				IPFERROR(140089);
 				error = ENOMEM;
 				break;
 			}
 			frauth_current_to_4_1_11(ptr, old11);
 			error = COPYOUT(old11, obj->ipfo_ptr, sizeof(*old11));
+			if (error != 0) {
+				IPFERROR(140090);
+			}
 			KFREE(old11);
 		}
 		break;
@@ -3321,33 +3485,45 @@ ipf_out_compat(softc, obj, ptr)
 
 			KMALLOC(old, nat_4_1_25_t *);
 			if (old == NULL) {
+				IPFERROR(140091);
 				error = ENOMEM;
 				break;
 			}
 			nat_current_to_4_1_25(ptr, old);
 			error = COPYOUT(old, obj->ipfo_ptr, sizeof(*old));
+			if (error != 0) {
+				IPFERROR(140092);
+			}
 			KFREE(old);
 		} else if (obj->ipfo_rev >= 4011400) {
 			nat_4_1_14_t *old;
 
 			KMALLOC(old, nat_4_1_14_t *);
 			if (old == NULL) {
+				IPFERROR(140093);
 				error = ENOMEM;
 				break;
 			}
 			nat_current_to_4_1_14(ptr, old);
 			error = COPYOUT(old, obj->ipfo_ptr, sizeof(*old));
+			if (error != 0) {
+				IPFERROR(140094);
+			}
 			KFREE(old);
 		} else if (obj->ipfo_rev >= 4010300) {
 			nat_4_1_3_t *old;
 
 			KMALLOC(old, nat_4_1_3_t *);
 			if (old == NULL) {
+				IPFERROR(140095);
 				error = ENOMEM;
 				break;
 			}
 			nat_current_to_4_1_3(ptr, old);
 			error = COPYOUT(old, obj->ipfo_ptr, sizeof(*old));
+			if (error != 0) {
+				IPFERROR(140096);
+			}
 			KFREE(old);
 		}
 		break;
@@ -3358,11 +3534,15 @@ ipf_out_compat(softc, obj, ptr)
 
 			KMALLOC(old, fripf4_t *);
 			if (old == NULL) {
+				IPFERROR(140097);
 				error = ENOMEM;
 				break;
 			}
 			ipf_v5fripftov4(ptr, old);
 			error = COPYOUT(old, obj->ipfo_ptr, sizeof(*old));
+			if (error != 0) {
+				IPFERROR(140098);
+			}
 			KFREE(old);
 		}
 		break;

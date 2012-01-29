@@ -124,7 +124,7 @@ ipf_p_dns_ctl(softc, arg, ctl)
 	{
 	case APC_CMD_DEL :
 		if (idns == NULL) {
-			softc->ipf_interror = 80006;
+			IPFERROR(80006);
 			error = ESRCH;
 			break;
 		}
@@ -137,12 +137,12 @@ ipf_p_dns_ctl(softc, arg, ctl)
 		break;
 	case APC_CMD_ADD :
 		if (idns != NULL) {
-			softc->ipf_interror = 80007;
+			IPFERROR(80007);
 			error = EEXIST;
 			break;
 		}
 		if (tmp == NULL) {
-			softc->ipf_interror = 80008;
+			IPFERROR(80008);
 			error = ENOMEM;
 			break;
 		}
@@ -157,7 +157,7 @@ ipf_p_dns_ctl(softc, arg, ctl)
 		ctl->apc_dsize = 0;
 		break;
 	default :
-		softc->ipf_interror = 80009;
+		IPFERROR(80009);
 		error = EINVAL;
 		break;
 	}

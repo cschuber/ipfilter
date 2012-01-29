@@ -661,18 +661,18 @@ ipf_log_read(softc, unit, uio)
 	 * a valid chunk of data.
 	 */
 	if (IPL_LOGMAX < unit) {
-		softc->ipf_interror = 40001;
+		IPFERROR(40001);
 		return ENXIO;
 	}
 	if (uio->uio_resid == 0)
 		return 0;
 
 	if (uio->uio_resid < sizeof(iplog_t)) {
-		softc->ipf_interror = 40002;
+		IPFERROR(40002);
 		return EINVAL;
 	}
 	if (uio->uio_resid > softl->ipl_logsize) {
-		softc->ipf_interror = 40005;
+		IPFERROR(40005);
 		return EINVAL;
 	}
 
@@ -687,7 +687,7 @@ ipf_log_read(softc, unit, uio)
 # if SOLARIS && defined(_KERNEL)
 		if (!cv_wait_sig(&softl->ipl_wait[unit], &softl->ipl_mutex[unit].ipf_lk)) {
 			MUTEX_EXIT(&softl->ipl_mutex[unit]);
-			softc->ipf_interror = 40003;
+			IPFERROR(40003);
 			return EINTR;
 		}
 # else
@@ -717,7 +717,7 @@ ipf_log_read(softc, unit, uio)
 #   endif /* __osf__ */
 #  endif /* __hpux */
 		if (error) {
-			softc->ipf_interror = 40004;
+			IPFERROR(40004);
 			return error;
 		}
 		SPL_NET(s);
@@ -745,7 +745,7 @@ ipf_log_read(softc, unit, uio)
 		if (error) {
 			SPL_NET(s);
 			MUTEX_ENTER(&softl->ipl_mutex[unit]);
-			softc->ipf_interror = 40006;
+			IPFERROR(40006);
 			ipl->ipl_next = softl->iplt[unit];
 			softl->iplt[unit] = ipl;
 			softl->ipl_used[unit] += dlen;

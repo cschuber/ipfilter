@@ -629,7 +629,7 @@ ipf_auth_ioctl(softc, data, cmd, mode, uid, ctx)
 			else
 				ipf_token_deref(softc, token);
 			RWLOCK_EXIT(&softc->ipf_tokens);
-			softc->ipf_interror = 10001;
+			IPFERROR(10001);
 			error = ESRCH;
 		}
 		SPL_X(s);
@@ -640,7 +640,7 @@ ipf_auth_ioctl(softc, data, cmd, mode, uid, ctx)
 	case SIOCADAFR :
 	case SIOCRMAFR :
 		if (!(mode & FWRITE)) {
-			softc->ipf_interror = 10002;
+			IPFERROR(10002);
 			error = EPERM;
 		} else
 			error = frrequest(softc, IPL_LOGAUTH, cmd, data,
@@ -649,7 +649,7 @@ ipf_auth_ioctl(softc, data, cmd, mode, uid, ctx)
 
 	case SIOCSTLCK :
 		if (!(mode & FWRITE)) {
-			softc->ipf_interror = 10003;
+			IPFERROR(10003);
 			error = EPERM;
 		} else {
 			error = ipf_lock(data, &softa->ipf_auth_lock);
@@ -670,7 +670,7 @@ ipf_auth_ioctl(softc, data, cmd, mode, uid, ctx)
 		SPL_X(s);
 		error = BCOPYOUT(&i, data, sizeof(i));
 		if (error != 0) {
-			softc->ipf_interror = 10004;
+			IPFERROR(10004);
 			error = EFAULT;
 		}
 		break;
@@ -684,7 +684,7 @@ ipf_auth_ioctl(softc, data, cmd, mode, uid, ctx)
 		break;
 
 	default :
-		softc->ipf_interror = 10005;
+		IPFERROR(10005);
 		error = EINVAL;
 		break;
 	}
@@ -782,7 +782,7 @@ ipf_auth_precmd(softc, cmd, fr, frptr)
 	SPL_INT(s);
 
 	if ((cmd != SIOCADAFR) && (cmd != SIOCRMAFR)) {
-		softc->ipf_interror = 10006;
+		IPFERROR(10006);
 		return EIO;
 	}
 
@@ -795,11 +795,11 @@ ipf_auth_precmd(softc, cmd, fr, frptr)
 
 	if (cmd == (ioctlcmd_t)SIOCRMAFR) {
 		if (fr == NULL || frptr == NULL) {
-			softc->ipf_interror = 10007;
+			IPFERROR(10007);
 			error = EINVAL;
 
 		} else if (fae == NULL) {
-			softc->ipf_interror = 10008;
+			IPFERROR(10008);
 			error = ESRCH;
 
 		} else {
@@ -832,11 +832,11 @@ ipf_auth_precmd(softc, cmd, fr, frptr)
 			RWLOCK_EXIT(&softa->ipf_authlk);
 			SPL_X(s);
 		} else {
-			softc->ipf_interror = 10009;
+			IPFERROR(10009);
 			error = ENOMEM;
 		}
 	} else {
-		softc->ipf_interror = 10010;
+		IPFERROR(10010);
 		error = EINVAL;
 	}
 	return error;
@@ -934,12 +934,12 @@ ipf_auth_geniter(softc, token, itp, objp)
 	int error;
 
 	if (itp->igi_data == NULL) {
-		softc->ipf_interror = 10011;
+		IPFERROR(10011);
 		return EFAULT;
 	}
 
 	if (itp->igi_type != IPFGENITER_AUTH) {
-		softc->ipf_interror = 10012;
+		IPFERROR(10012);
 		return EINVAL;
 	}
 
@@ -1129,7 +1129,7 @@ ipf_auth_ioctlloop:
 # if	SOLARIS
 	error = 0;
 	if (!cv_wait_sig(&softa->ipf_auth_wait, &softa->ipf_auth_mx.ipf_lk)) {
-		softc->ipf_interror = 10014;
+		IPFERROR(10014);
 		error = EINTR;
 	}
 # else /* SOLARIS */
@@ -1199,13 +1199,13 @@ ipf_auth_reply(softc, softa, data)
 	if ((i < 0) || (i >= softa->ipf_auth_size)) {
 		RWLOCK_EXIT(&softa->ipf_authlk);
 		SPL_X(s);
-		softc->ipf_interror = 10015;
+		IPFERROR(10015);
 		return ESRCH;
 	}
 	if  (fra->fra_info.fin_id != au->fra_info.fin_id) {
 		RWLOCK_EXIT(&softa->ipf_authlk);
 		SPL_X(s);
-		softc->ipf_interror = 10019;
+		IPFERROR(10019);
 		return ESRCH;
 	}
 
@@ -1229,7 +1229,7 @@ ipf_auth_reply(softc, softa, data)
 	if ((m != NULL) && (au->fra_info.fin_out != 0)) {
 		error = ipf_inject(&fin, m);
 		if (error != 0) {
-			softc->ipf_interror = 10016;
+			IPFERROR(10016);
 			error = ENOBUFS;
 			softa->ipf_auth_stats.fas_sendfail++;
 		} else {
@@ -1238,14 +1238,14 @@ ipf_auth_reply(softc, softa, data)
 	} else if (m) {
 		error = ipf_inject(&fin, m);
 		if (error != 0) {
-			softc->ipf_interror = 10017;
+			IPFERROR(10017);
 			error = ENOBUFS;
 			softa->ipf_auth_stats.fas_quefail++;
 		} else {
 			softa->ipf_auth_stats.fas_queok++;
 		}
 	} else {
-		softc->ipf_interror = 10018;
+		IPFERROR(10018);
 		error = EINVAL;
 	}
 

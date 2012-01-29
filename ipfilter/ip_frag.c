@@ -1198,12 +1198,12 @@ ipf_frag_next(softc, token, itp, top
 	int error = 0;
 
 	if (itp->igi_data == NULL) {
-		softc->ipf_interror = 20001;
+		IPFERROR(20001);
 		return EFAULT;
 	}
 
 	if (itp->igi_nitems != 1) {
-		softc->ipf_interror = 20003;
+		IPFERROR(20003);
 		return EFAULT;
 	}
 
@@ -1231,7 +1231,7 @@ ipf_frag_next(softc, token, itp, top
 
 	error = COPYOUT(next, itp->igi_data, sizeof(*next));
 	if (error != 0)
-		softc->ipf_interror = 20002;
+		IPFERROR(20002);
 
         if (frag != NULL) {
 #ifdef USE_MUTEXES

@@ -478,7 +478,7 @@ ipf_sync_write(softc, uio)
 				if (softs->ipf_sync_debug > 2)
 					printf("uiomove(header) invalid %s\n",
 						"magic");
-				softc->ipf_interror = 110001;
+				IPFERROR(110001);
 				return EINVAL;
 			}
 
@@ -486,7 +486,7 @@ ipf_sync_write(softc, uio)
 				if (softs->ipf_sync_debug > 2)
 					printf("uiomove(header) invalid %s\n",
 						"protocol");
-				softc->ipf_interror = 110002;
+				IPFERROR(110002);
 				return EINVAL;
 			}
 
@@ -494,7 +494,7 @@ ipf_sync_write(softc, uio)
 				if (softs->ipf_sync_debug > 2)
 					printf("uiomove(header) invalid %s\n",
 						"command");
-				softc->ipf_interror = 110003;
+				IPFERROR(110003);
 				return EINVAL;
 			}
 
@@ -503,7 +503,7 @@ ipf_sync_write(softc, uio)
 				if (softs->ipf_sync_debug > 2)
 					printf("uiomove(header) invalid %s\n",
 						"table");
-				softc->ipf_interror = 110004;
+				IPFERROR(110004);
 				return EINVAL;
 			}
 
@@ -511,7 +511,7 @@ ipf_sync_write(softc, uio)
 			/* unsufficient data, wait until next call */
 			if (softs->ipf_sync_debug > 2)
 				printf("uiomove(header) insufficient data");
-			softc->ipf_interror = 110005;
+			IPFERROR(110005);
 			return EAGAIN;
 	 	}
 
@@ -526,7 +526,7 @@ ipf_sync_write(softc, uio)
 			if (softs->ipf_sync_debug > 2)
 				printf("uiomove(data zero length %s\n",
 					"not supported");
-			softc->ipf_interror = 110006;
+			IPFERROR(110006);
 			return EINVAL;
 		}
 
@@ -559,7 +559,7 @@ ipf_sync_write(softc, uio)
 				printf("uiomove(data) %s %d bytes, got %d\n",
 					"insufficient data, need",
 					sh.sm_len, uio->uio_resid);
-			softc->ipf_interror = 110007;
+			IPFERROR(110007);
 			return EAGAIN;
 		}
 	}
@@ -589,7 +589,7 @@ ipf_sync_read(softc, uio)
 	int err = 0;
 
 	if ((uio->uio_resid & 3) || (uio->uio_resid < 8)) {
-		softc->ipf_interror = 110008;
+		IPFERROR(110008);
 		return EINVAL;
 	}
 
@@ -604,7 +604,7 @@ ipf_sync_read(softc, uio)
 #   if SOLARIS
 		if (!cv_wait_sig(&softs->ipslwait, &softs->ipsl_mutex.ipf_lk)) {
 			MUTEX_EXIT(&softs->ipsl_mutex);
-			softc->ipf_interror = 110009;
+			IPFERROR(110009);
 			return EINTR;
 		}
 #   else
@@ -616,7 +616,7 @@ ipf_sync_read(softc, uio)
 		err = sleep(&softs->sl_tail, PZERO+1);
 		if (err) {
 			MUTEX_EXIT(&softs->ipsl_mutex);
-			softc->ipf_interror = 110010;
+			IPFERROR(110010);
 			return EINTR;
 		}
 		spinunlock(l);
@@ -626,14 +626,14 @@ ipf_sync_read(softc, uio)
 		err = mpsleep(&softs->sl_tail, PSUSP|PCATCH,  "ipl sleep", 0,
 			      &softs->ipsl_mutex, MS_LOCK_SIMPLE);
 		if (err) {
-			softc->ipf_interror = 110011;
+			IPFERROR(110011);
 			return EINTR;
 		}
 #     else
 		MUTEX_EXIT(&softs->ipsl_mutex);
 		err = SLEEP(&softs->sl_tail, "ipl sleep");
 		if (err) {
-			softc->ipf_interror = 110012;
+			IPFERROR(110012);
 			return EINTR;
 		}
 		MUTEX_ENTER(&softs->ipsl_mutex);
@@ -710,14 +710,14 @@ ipf_sync_state(softc, sp, data)
 		bcopy(data, &sn, sizeof(sn));
 		KMALLOC(is, ipstate_t *);
 		if (is == NULL) {
-			softc->ipf_interror = 110013;
+			IPFERROR(110013);
 			err = ENOMEM;
 			break;
 		}
 
 		KMALLOC(sl, synclist_t *);
 		if (sl == NULL) {
-			softc->ipf_interror = 110014;
+			IPFERROR(110014);
 			err = ENOMEM;
 			KFREE(is);
 			break;
@@ -790,7 +790,7 @@ ipf_sync_state(softc, sp, data)
 				printf("[%d] State not found - can't update\n",
 					sp->sm_num);
 			RWLOCK_EXIT(&softs->ipf_syncstate);
-			softc->ipf_interror = 110015;
+			IPFERROR(110015);
 			err = ENOENT;
 			break;
 		}
@@ -832,7 +832,7 @@ ipf_sync_state(softc, sp, data)
 		break;
 
 	default :
-		softc->ipf_interror = 110016;
+		IPFERROR(110016);
 		err = EINVAL;
 		break;
 	}
@@ -944,14 +944,14 @@ ipf_sync_nat(softc, sp, data)
 	case SMC_CREATE :
 		KMALLOC(n, nat_t *);
 		if (n == NULL) {
-			softc->ipf_interror = 110017;
+			IPFERROR(110017);
 			err = ENOMEM;
 			break;
 		}
 
 		KMALLOC(sl, synclist_t *);
 		if (sl == NULL) {
-			softc->ipf_interror = 110018;
+			IPFERROR(110018);
 			err = ENOMEM;
 			KFREE(n);
 			break;
@@ -987,7 +987,7 @@ ipf_sync_nat(softc, sp, data)
 			if (sl->sl_hdr.sm_num == sp->sm_num)
 				break;
 		if (sl == NULL) {
-			softc->ipf_interror = 110019;
+			IPFERROR(110019);
 			err = ENOENT;
 			break;
 		}
@@ -1006,7 +1006,7 @@ ipf_sync_nat(softc, sp, data)
 		break;
 
 	default :
-		softc->ipf_interror = 110020;
+		IPFERROR(110020);
 		err = EINVAL;
 		break;
 	}
@@ -1312,7 +1312,7 @@ ipf_sync_ioctl(softc, data, cmd, mode, uid, ctx)
         case SIOCIPFFL:
 		error = BCOPYIN(data, &i, sizeof(i));
 		if (error != 0) {
-			softc->ipf_interror = 110023;
+			IPFERROR(110023);
 			error = EFAULT;
 			break;
 		}
@@ -1353,13 +1353,13 @@ ipf_sync_ioctl(softc, data, cmd, mode, uid, ctx)
 
 		error = BCOPYOUT(&i, data, sizeof(i));
 		if (error != 0) {
-			softc->ipf_interror = 110022;
+			IPFERROR(110022);
 			error = EFAULT;
 		}
 		break;
 
 	default :
-		softc->ipf_interror = 110021;
+		IPFERROR(110021);
 		error = EINVAL;
 		break;
 	}

@@ -2706,7 +2706,7 @@ ipf_firewall(fin, passp)
 			fin->fin_reason = FRB_AUTHNEW;
 			fin->fin_error = 0;
 		} else {
-			softc->ipf_interror = 1;
+			IPFERROR(1);
 			fin->fin_error = ENOSPC;
 		}
 	}
@@ -4135,7 +4135,7 @@ copyinptr(softc, src, dst, size)
 # endif
 	error = COPYIN(ca, dst, size);
 	if (error != 0) {
-		softc->ipf_interror = 3;
+		IPFERROR(3);
 		error = EFAULT;
 	}
 	return error;
@@ -4165,7 +4165,7 @@ copyoutptr(softc, src, dst, size)
 	bcopy(dst, (caddr_t)&ca, sizeof(ca));
 	error = COPYOUT(src, ca, size);
 	if (error != 0) {
-		softc->ipf_interror = 4;
+		IPFERROR(4);
 		error = EFAULT;
 	}
 	return error;
@@ -4417,12 +4417,12 @@ frrequest(softc, unit, req, data, set, makecopy)
 			return error;
 		}
 		if ((fp->fr_type & FR_T_BUILTIN) != 0) {
-			softc->ipf_interror = 6;
+			IPFERROR(6);
 			return EINVAL;
 		}
 		KMALLOCS(f, frentry_t *, fp->fr_size);
 		if (f == NULL) {
-			softc->ipf_interror = 131;
+			IPFERROR(131);
 			return ENOMEM;
 		}
 		bzero(f, fp->fr_size);
@@ -4441,7 +4441,7 @@ frrequest(softc, unit, req, data, set, makecopy)
 	} else {
 		fp = (frentry_t *)data;
 		if ((fp->fr_type & FR_T_BUILTIN) == 0) {
-			softc->ipf_interror = 7;
+			IPFERROR(7);
 			return EINVAL;
 		}
 		fp->fr_flags &= ~FR_COPIED;
@@ -4449,7 +4449,7 @@ frrequest(softc, unit, req, data, set, makecopy)
 
 	if (((fp->fr_dsize == 0) && (fp->fr_data != NULL)) ||
 	    ((fp->fr_dsize != 0) && (fp->fr_data == NULL))) {
-		softc->ipf_interror = 8;
+		IPFERROR(8);
 		error = EINVAL;
 		goto donenolock;
 	}
@@ -4465,7 +4465,7 @@ frrequest(softc, unit, req, data, set, makecopy)
 	else if (req == (ioctlcmd_t)SIOCZRLST)
 		addrem = 2;
 	else {
-		softc->ipf_interror = 9;
+		IPFERROR(9);
 		error = EINVAL;
 		goto donenolock;
 	}
@@ -4480,7 +4480,7 @@ frrequest(softc, unit, req, data, set, makecopy)
 		/*EMPTY*/;
 #endif
 	} else if (family != 0) {
-		softc->ipf_interror = 10;
+		IPFERROR(10);
 		error = EINVAL;
 		goto donenolock;
 	}
@@ -4492,7 +4492,7 @@ frrequest(softc, unit, req, data, set, makecopy)
 	 */
 	if ((makecopy == 1) && (fp->fr_func != NULL)) {
 		if (ipf_findfunc(fp->fr_func) == NULL) {
-			softc->ipf_interror = 11;
+			IPFERROR(11);
 			error = ESRCH;
 			goto donenolock;
 		}
@@ -4505,13 +4505,13 @@ frrequest(softc, unit, req, data, set, makecopy)
 	}
 	if ((fp->fr_flags & FR_CALLNOW) &&
 	    ((fp->fr_func == NULL) || (fp->fr_func == (void *)-1))) {
-		softc->ipf_interror = 142;
+		IPFERROR(142);
 		error = ESRCH;
 		goto donenolock;
 	}
 	if (((fp->fr_flags & FR_CMDMASK) == FR_CALL) &&
 	    ((fp->fr_func == NULL) || (fp->fr_func == (void *)-1))) {
-		softc->ipf_interror = 143;
+		IPFERROR(143);
 		error = ESRCH;
 		goto donenolock;
 	}
@@ -4529,7 +4529,7 @@ frrequest(softc, unit, req, data, set, makecopy)
 	if (fp->fr_icmphead != -1) {
 		if ((fp->fr_icmphead < 0) ||
 		    (fp->fr_icmphead >= fp->fr_namelen)) {
-			softc->ipf_interror = 136;
+			IPFERROR(136);
 			error = EINVAL;
 			goto donenolock;
 		}
@@ -4540,7 +4540,7 @@ frrequest(softc, unit, req, data, set, makecopy)
 	if (fp->fr_grhead != -1) {
 		if ((fp->fr_grhead < 0) ||
 		    (fp->fr_grhead >= fp->fr_namelen)) {
-			softc->ipf_interror = 137;
+			IPFERROR(137);
 			error = EINVAL;
 			goto donenolock;
 		}
@@ -4551,7 +4551,7 @@ frrequest(softc, unit, req, data, set, makecopy)
 	if (fp->fr_group != -1) {
 		if ((fp->fr_group < 0) ||
 		    (fp->fr_group >= fp->fr_namelen)) {
-			softc->ipf_interror = 138;
+			IPFERROR(138);
 			error = EINVAL;
 			goto donenolock;
 		}
@@ -4569,7 +4569,7 @@ frrequest(softc, unit, req, data, set, makecopy)
 							   set);
 				}
 				if (fg == NULL) {
-					softc->ipf_interror = 12;
+					IPFERROR(12);
 					error = ESRCH;
 					goto donenolock;
 				}
@@ -4577,7 +4577,7 @@ frrequest(softc, unit, req, data, set, makecopy)
 			if (fg->fg_flags == 0)
 				fg->fg_flags = fp->fr_flags & FR_INOUT;
 			else if (fg->fg_flags != (fp->fr_flags & FR_INOUT)) {
-				softc->ipf_interror = 13;
+				IPFERROR(13);
 				error = ESRCH;
 				goto donenolock;
 			}
@@ -4589,7 +4589,7 @@ frrequest(softc, unit, req, data, set, makecopy)
 		 * isn't in a group, then it does...
 		 */
 		if ((fp->fr_flags & (FR_INQUE|FR_OUTQUE)) == 0) {
-			softc->ipf_interror = 14;
+			IPFERROR(14);
 			error = EINVAL;
 			goto donenolock;
 		}
@@ -4618,7 +4618,7 @@ frrequest(softc, unit, req, data, set, makecopy)
 			fprev = &softc->ipf_rules[in][set];
 	}
 	if (fprev == NULL) {
-		softc->ipf_interror = 15;
+		IPFERROR(15);
 		error = ESRCH;
 		goto donenolock;
 	}
@@ -4633,7 +4633,7 @@ frrequest(softc, unit, req, data, set, makecopy)
 		if (makecopy != 0) {
 			KMALLOCS(ptr, void *, fp->fr_dsize);
 			if (ptr == NULL) {
-				softc->ipf_interror = 16;
+				IPFERROR(16);
 				error = ENOMEM;
 				goto donenolock;
 			}
@@ -4649,7 +4649,7 @@ frrequest(softc, unit, req, data, set, makecopy)
 			} else {
 				error = COPYIN(uptr, ptr, fp->fr_dsize);
 				if (error != 0) {
-					softc->ipf_interror = 17;
+					IPFERROR(17);
 					error = EFAULT;
 					goto donenolock;
 				}
@@ -4672,12 +4672,12 @@ frrequest(softc, unit, req, data, set, makecopy)
 #if defined(IPFILTER_BPF)
 	case FR_T_BPFOPC :
 		if (fp->fr_dsize == 0) {
-			softc->ipf_interror = 19;
+			IPFERROR(19);
 			error = EINVAL;
 			break;
 		}
 		if (!bpf_validate(ptr, fp->fr_dsize/sizeof(struct bpf_insn))) {
-			softc->ipf_interror = 20;
+			IPFERROR(20);
 			error = EINVAL;
 			break;
 		}
@@ -4693,7 +4693,7 @@ frrequest(softc, unit, req, data, set, makecopy)
 			fp->fr_srcptr = NULL;
 
 		if (fp->fr_dsize != sizeof(fripf_t)) {
-			softc->ipf_interror = 21;
+			IPFERROR(21);
 			error = EINVAL;
 			break;
 		}
@@ -4704,7 +4704,7 @@ frrequest(softc, unit, req, data, set, makecopy)
 		 * fail with the out of window (oow) flag set.
 		 */
 		if ((fp->fr_flags & FR_KEEPSTATE) && (fp->fr_flx & FI_OOW)) {
-			softc->ipf_interror = 22;
+			IPFERROR(22);
 			error = EINVAL;
 			break;
 		}
@@ -4717,7 +4717,7 @@ frrequest(softc, unit, req, data, set, makecopy)
 		case FRI_NETMASKED :
 		case FRI_PEERADDR :
 			if (fp->fr_sifpidx < 0) {
-				softc->ipf_interror = 23;
+				IPFERROR(23);
 				error = EINVAL;
 			}
 			break;
@@ -4726,7 +4726,7 @@ frrequest(softc, unit, req, data, set, makecopy)
 						       &fp->fr_src6,
 						       &fp->fr_smsk6);
 			if (fp->fr_srcfunc == NULL) {
-				softc->ipf_interror = 132;
+				IPFERROR(132);
 				error = ESRCH;
 				break;
 			}
@@ -4734,7 +4734,7 @@ frrequest(softc, unit, req, data, set, makecopy)
 		case FRI_NORMAL :
 			break;
 		default :
-			softc->ipf_interror = 133;
+			IPFERROR(133);
 			error = EINVAL;
 			break;
 		}
@@ -4749,7 +4749,7 @@ frrequest(softc, unit, req, data, set, makecopy)
 		case FRI_NETMASKED :
 		case FRI_PEERADDR :
 			if (fp->fr_difpidx < 0) {
-				softc->ipf_interror = 24;
+				IPFERROR(24);
 				error = EINVAL;
 			}
 			break;
@@ -4758,14 +4758,14 @@ frrequest(softc, unit, req, data, set, makecopy)
 						       &fp->fr_dst6,
 						       &fp->fr_dmsk6);
 			if (fp->fr_dstfunc == NULL) {
-				softc->ipf_interror = 134;
+				IPFERROR(134);
 				error = ESRCH;
 			}
 			break;
 		case FRI_NORMAL :
 			break;
 		default :
-			softc->ipf_interror = 135;
+			IPFERROR(135);
 			error = EINVAL;
 		}
 		break;
@@ -4777,13 +4777,13 @@ frrequest(softc, unit, req, data, set, makecopy)
 
 	case FR_T_IPFEXPR :
 		if (ipf_matcharray_verify(fp->fr_data, fp->fr_dsize) == -1) {
-			softc->ipf_interror = 25;
+			IPFERROR(25);
 			error = EINVAL;
 		}
 		break;
 
 	default :
-		softc->ipf_interror = 26;
+		IPFERROR(26);
 		error = EINVAL;
 		break;
 	}
@@ -4793,7 +4793,7 @@ frrequest(softc, unit, req, data, set, makecopy)
 	if (fp->fr_tif.fd_name != -1) {
 		if ((fp->fr_tif.fd_name < 0) ||
 		    (fp->fr_tif.fd_name >= fp->fr_namelen)) {
-			softc->ipf_interror = 139;
+			IPFERROR(139);
 			error = EINVAL;
 			goto donenolock;
 		}
@@ -4802,7 +4802,7 @@ frrequest(softc, unit, req, data, set, makecopy)
 	if (fp->fr_dif.fd_name != -1) {
 		if ((fp->fr_dif.fd_name < 0) ||
 		    (fp->fr_dif.fd_name >= fp->fr_namelen)) {
-			softc->ipf_interror = 140;
+			IPFERROR(140);
 			error = EINVAL;
 			goto donenolock;
 		}
@@ -4811,7 +4811,7 @@ frrequest(softc, unit, req, data, set, makecopy)
 	if (fp->fr_rif.fd_name != -1) {
 		if ((fp->fr_rif.fd_name < 0) ||
 		    (fp->fr_rif.fd_name >= fp->fr_namelen)) {
-			softc->ipf_interror = 141;
+			IPFERROR(141);
 			error = EINVAL;
 			goto donenolock;
 		}
@@ -4874,7 +4874,7 @@ frrequest(softc, unit, req, data, set, makecopy)
 	 */
 	if (addrem == 2) {
 		if (f == NULL) {
-			softc->ipf_interror = 27;
+			IPFERROR(27);
 			error = ESRCH;
 		} else {
 			/*
@@ -4900,7 +4900,7 @@ frrequest(softc, unit, req, data, set, makecopy)
 					error = COPYOUT(f->fr_data, uptr,
 							f->fr_dsize);
 					if (error != 0) {
-						softc->ipf_interror = 28;
+						IPFERROR(28);
 						error = EFAULT;
 					}
 				if (error == 0) {
@@ -4965,7 +4965,7 @@ frrequest(softc, unit, req, data, set, makecopy)
 	 */
 	if (addrem == 1) {
 		if (!f) {
-			softc->ipf_interror = 29;
+			IPFERROR(29);
 			error = ESRCH;
 		} else {
 			/*
@@ -4973,7 +4973,7 @@ frrequest(softc, unit, req, data, set, makecopy)
 			 * with rules not loaded that way.
 			 */
 			if ((makecopy == 1) && !(f->fr_flags & FR_COPIED)) {
-				softc->ipf_interror = 30;
+				IPFERROR(30);
 				error = EPERM;
 				goto done;
 			}
@@ -4983,7 +4983,7 @@ frrequest(softc, unit, req, data, set, makecopy)
 			 * something else (eg state information.)
 			 */
 			if (f->fr_ref > 1) {
-				softc->ipf_interror = 31;
+				IPFERROR(31);
 				error = EBUSY;
 				goto done;
 			}
@@ -5007,7 +5007,7 @@ frrequest(softc, unit, req, data, set, makecopy)
 		 * Not removing, so we must be adding/inserting a rule.
 		 */
 		if (f != NULL) {
-			softc->ipf_interror = 32;
+			IPFERROR(32);
 			error = EEXIST;
 			goto done;
 		}
@@ -5237,7 +5237,7 @@ ipf_funcinit(softc, fr)
 	ipfunc_resolve_t *ft;
 	int err;
 
-	softc->ipf_interror = 34;
+	IPFERROR(34);
 	err = ESRCH;
 
 	for (ft = ipf_availfuncs; ft->ipfu_addr != NULL; ft++)
@@ -5317,7 +5317,7 @@ ipf_resolvefunc(softc, data)
 
 	error = BCOPYIN(data, &res, sizeof(res));
 	if (error != 0) {
-		softc->ipf_interror = 123;
+		IPFERROR(123);
 		return EFAULT;
 	}
 
@@ -5328,7 +5328,7 @@ ipf_resolvefunc(softc, data)
 				res.ipfu_addr = ft->ipfu_addr;
 				res.ipfu_init = ft->ipfu_init;
 				if (COPYOUT(&res, data, sizeof(res)) != 0) {
-					softc->ipf_interror = 35;
+					IPFERROR(35);
 					return EFAULT;
 				}
 				return 0;
@@ -5341,13 +5341,13 @@ ipf_resolvefunc(softc, data)
 					       sizeof(res.ipfu_name));
 				res.ipfu_init = ft->ipfu_init;
 				if (COPYOUT(&res, data, sizeof(res)) != 0) {
-					softc->ipf_interror = 36;
+					IPFERROR(36);
 					return EFAULT;
 				}
 				return 0;
 			}
 	}
-	softc->ipf_interror = 37;
+	IPFERROR(37);
 	return ESRCH;
 }
 
@@ -5488,11 +5488,11 @@ ipf_grpmapinit(softc, fr)
 #endif
 	iph = ipf_lookup_find_htable(softc, IPL_LOGIPF, name);
 	if (iph == NULL) {
-		softc->ipf_interror = 38;
+		IPFERROR(38);
 		return ESRCH;
 	}
 	if ((iph->iph_flags & FR_INOUT) != (fr->fr_flags & FR_INOUT)) {
-		softc->ipf_interror = 39;
+		IPFERROR(39);
 		return ESRCH;
 	}
 	iph->iph_ref++;
@@ -6088,7 +6088,7 @@ ipf_ioctlswitch(softc, unit, data, cmd, mode, uid, ctx)
 		error = BCOPYOUT(&softc->ipf_interror, data,
 				 sizeof(softc->ipf_interror));
 		if (error != 0) {
-			softc->ipf_interror = 40;
+			IPFERROR(40);
 			error = EFAULT;
 		}
 		return error;
@@ -6106,7 +6106,7 @@ ipf_ioctlswitch(softc, unit, data, cmd, mode, uid, ctx)
 			error = ipf_nat_ioctl(softc, data, cmd, mode,
 					      uid, ctx);
 		} else {
-			softc->ipf_interror = 42;
+			IPFERROR(42);
 			error = EIO;
 		}
 		break;
@@ -6115,7 +6115,7 @@ ipf_ioctlswitch(softc, unit, data, cmd, mode, uid, ctx)
 			error = ipf_state_ioctl(softc, data, cmd, mode,
 						uid, ctx);
 		} else {
-			softc->ipf_interror = 43;
+			IPFERROR(43);
 			error = EIO;
 		}
 		break;
@@ -6124,7 +6124,7 @@ ipf_ioctlswitch(softc, unit, data, cmd, mode, uid, ctx)
 			error = ipf_auth_ioctl(softc, data, cmd, mode,
 					       uid, ctx);
 		} else {
-			softc->ipf_interror = 44;
+			IPFERROR(44);
 			error = EIO;
 		}
 		break;
@@ -6134,7 +6134,7 @@ ipf_ioctlswitch(softc, unit, data, cmd, mode, uid, ctx)
 					       uid, ctx);
 		} else {
 			error = EIO;
-			softc->ipf_interror = 45;
+			IPFERROR(45);
 		}
 		break;
 	case IPL_LOGSCAN :
@@ -6146,7 +6146,7 @@ ipf_ioctlswitch(softc, unit, data, cmd, mode, uid, ctx)
 #endif
 		{
 			error = EIO;
-			softc->ipf_interror = 46;
+			IPFERROR(46);
 		}
 		break;
 	case IPL_LOGLOOKUP :
@@ -6155,11 +6155,11 @@ ipf_ioctlswitch(softc, unit, data, cmd, mode, uid, ctx)
 						 uid, ctx);
 		} else {
 			error = EIO;
-			softc->ipf_interror = 47;
+			IPFERROR(47);
 		}
 		break;
 	default :
-		softc->ipf_interror = 48;
+		IPFERROR(48);
 		error = EIO;
 		break;
 	}
@@ -6232,7 +6232,7 @@ ipf_inobj(softc, data, objp, ptr, type)
 	int size;
 
 	if ((type < 0) || (type >= IPFOBJ_COUNT)) {
-		softc->ipf_interror = 49;
+		IPFERROR(49);
 		return EINVAL;
 	}
 
@@ -6240,38 +6240,38 @@ ipf_inobj(softc, data, objp, ptr, type)
 		objp = &obj;
 	error = BCOPYIN(data, objp, sizeof(*objp));
 	if (error != 0) {
-		softc->ipf_interror = 124;
+		IPFERROR(124);
 		return EFAULT;
 	}
 
 	if (objp->ipfo_type != type) {
-		softc->ipf_interror = 50;
+		IPFERROR(50);
 		return EINVAL;
 	}
 
 	if (objp->ipfo_rev >= ipf_objbytes[type][2]) {
 		if ((ipf_objbytes[type][0] & 1) != 0) {
 			if (objp->ipfo_size < ipf_objbytes[type][1]) {
-				softc->ipf_interror = 51;
+				IPFERROR(51);
 				return EINVAL;
 			}
 			size =  ipf_objbytes[type][1];
 		} else if (objp->ipfo_size == ipf_objbytes[type][1]) {
 			size =  objp->ipfo_size;
 		} else {
-			softc->ipf_interror = 52;
+			IPFERROR(52);
 			return EINVAL;
 		}
 		error = COPYIN(objp->ipfo_ptr, ptr, size);
 		if (error != 0) {
-			softc->ipf_interror = 55;
+			IPFERROR(55);
 			error = EFAULT;
 		}
 	} else {
 #ifdef  IPFILTER_COMPAT
 		error = ipf_in_compat(softc, objp, ptr, 0);
 #else
-		softc->ipf_interror = 54;
+		IPFERROR(54);
 		error = EINVAL;
 #endif
 	}
@@ -6305,37 +6305,37 @@ ipf_inobjsz(softc, data, ptr, type, sz)
 	int error;
 
 	if ((type < 0) || (type >= IPFOBJ_COUNT)) {
-		softc->ipf_interror = 56;
+		IPFERROR(56);
 		return EINVAL;
 	}
 
 	error = BCOPYIN(data, &obj, sizeof(obj));
 	if (error != 0) {
-		softc->ipf_interror = 125;
+		IPFERROR(125);
 		return EFAULT;
 	}
 
 	if (obj.ipfo_type != type) {
-		softc->ipf_interror = 58;
+		IPFERROR(58);
 		return EINVAL;
 	}
 
 	if (obj.ipfo_rev >= ipf_objbytes[type][2]) {
 		if (((ipf_objbytes[type][0] & 1) == 0) ||
 		    (sz < ipf_objbytes[type][1])) {
-			softc->ipf_interror = 57;
+			IPFERROR(57);
 			return EINVAL;
 		}
 		error = COPYIN(obj.ipfo_ptr, ptr, sz);
 		if (error != 0) {
-			softc->ipf_interror = 61;
+			IPFERROR(61);
 			error = EFAULT;
 		}
 	} else {
 #ifdef	IPFILTER_COMPAT
 		error = ipf_in_compat(softc, &obj, ptr, sz);
 #else
-		softc->ipf_interror = 60;
+		IPFERROR(60);
 		error = EINVAL;
 #endif
 	}
@@ -6368,37 +6368,37 @@ ipf_outobjsz(softc, data, ptr, type, sz)
 	int error;
 
 	if ((type < 0) || (type >= IPFOBJ_COUNT)) {
-		softc->ipf_interror = 62;
+		IPFERROR(62);
 		return EINVAL;
 	}
 
 	error = BCOPYIN(data, &obj, sizeof(obj));
 	if (error != 0) {
-		softc->ipf_interror = 127;
+		IPFERROR(127);
 		return EFAULT;
 	}
 
 	if (obj.ipfo_type != type) {
-		softc->ipf_interror = 63;
+		IPFERROR(63);
 		return EINVAL;
 	}
 
 	if (obj.ipfo_rev >= ipf_objbytes[type][2]) {
 		if (((ipf_objbytes[type][0] & 1) == 0) ||
 		    (sz < ipf_objbytes[type][1])) {
-			softc->ipf_interror = 61;
+			IPFERROR(146);
 			return EINVAL;
 		}
 		error = COPYOUT(ptr, obj.ipfo_ptr, sz);
 		if (error != 0) {
-			softc->ipf_interror = 66;
+			IPFERROR(66);
 			error = EFAULT;
 		}
 	} else {
 #ifdef	IPFILTER_COMPAT
 		error = ipf_out_compat(softc, &obj, ptr);
 #else
-		softc->ipf_interror = 65;
+		IPFERROR(65);
 		error = EINVAL;
 #endif
 	}
@@ -6428,42 +6428,42 @@ ipf_outobj(softc, data, ptr, type)
 	int error;
 
 	if ((type < 0) || (type >= IPFOBJ_COUNT)) {
-		softc->ipf_interror = 67;
+		IPFERROR(67);
 		return EINVAL;
 	}
 
 	error = BCOPYIN(data, &obj, sizeof(obj));
 	if (error != 0) {
-		softc->ipf_interror = 126;
+		IPFERROR(126);
 		return EFAULT;
 	}
 
 	if (obj.ipfo_type != type) {
-		softc->ipf_interror = 68;
+		IPFERROR(68);
 		return EINVAL;
 	}
 
 	if (obj.ipfo_rev >= ipf_objbytes[type][2]) {
 		if ((ipf_objbytes[type][0] & 1) != 0) {
 			if (obj.ipfo_size < ipf_objbytes[type][1]) {
-				softc->ipf_interror = 69;
+				IPFERROR(69);
 				return EINVAL;
 			}
 		} else if (obj.ipfo_size != ipf_objbytes[type][1]) {
-			softc->ipf_interror = 70;
+			IPFERROR(70);
 			return EINVAL;
 		}
 
 		error = COPYOUT(ptr, obj.ipfo_ptr, obj.ipfo_size);
 		if (error != 0) {
-			softc->ipf_interror = 73;
+			IPFERROR(73);
 			error = EFAULT;
 		}
 	} else {
 #ifdef	IPFILTER_COMPAT
 		error = ipf_out_compat(softc, &obj, ptr);
 #else
-		softc->ipf_interror = 72;
+		IPFERROR(72);
 		error = EINVAL;
 #endif
 	}
@@ -6493,32 +6493,32 @@ int ipf_outobjk(softc, obj, ptr)
 	int error;
 
 	if ((type < 0) || (type >= IPFOBJ_COUNT)) {
-		softc->ipf_interror = 72;
+		IPFERROR(147);
 		return EINVAL;
 	}
 
 	if (obj->ipfo_rev >= ipf_objbytes[type][2]) {
 		if ((ipf_objbytes[type][0] & 1) != 0) {
 			if (obj->ipfo_size < ipf_objbytes[type][1]) {
-				softc->ipf_interror = 72;
+				IPFERROR(148);
 				return EINVAL;
 			}
 
 		} else if (obj->ipfo_size != ipf_objbytes[type][1]) {
-			softc->ipf_interror = 72;
+			IPFERROR(149);
 			return EINVAL;
 		}
 
 		error = COPYOUT(ptr, obj->ipfo_ptr, obj->ipfo_size);
 		if (error != 0) {
-			softc->ipf_interror = 72;
+			IPFERROR(150);
 			error = EFAULT;
 		}
 	} else {
 #ifdef  IPFILTER_COMPAT
 		error = ipf_out_compat(softc, obj, ptr);
 #else
-		softc->ipf_interror = 72;
+		IPFERROR(151);
 		error = EINVAL;
 #endif
 	}
@@ -7053,7 +7053,7 @@ ipf_tune_add(softc, newtune)
 
 	ta = ipf_tune_findbyname(softc->ipf_tuners, newtune->ipft_name);
 	if (ta != NULL) {
-		softc->ipf_interror = 74;
+		IPFERROR(74);
 		return EEXIST;
 	}
 
@@ -7095,7 +7095,7 @@ ipf_tune_del(softc, oldtune)
 
 	if (ta == NULL) {
 		error = ESRCH;
-		softc->ipf_interror = 75;
+		IPFERROR(75);
 	}
 	return error;
 }
@@ -7188,7 +7188,7 @@ ipf_ipftune(softc, cmd, data)
 			 * row fit in what we can return?
 			 */
 			if (ta->ipft_sz > sizeof(tu.ipft_un)) {
-				softc->ipf_interror = 76;
+				IPFERROR(76);
 				return EINVAL;
 			}
 
@@ -7219,7 +7219,7 @@ ipf_ipftune(softc, cmd, data)
 		 * Search by name or by cookie value for a particular entry
 		 * in the tuning paramter table.
 		 */
-		softc->ipf_interror = 77;
+		IPFERROR(77);
 		error = ESRCH;
 		if (cookie != NULL) {
 			ta = ipf_tune_findbycookie(&softc->ipf_tuners,
@@ -7265,14 +7265,14 @@ ipf_ipftune(softc, cmd, data)
 
 			if (((ta->ipft_flags & IPFT_WRDISABLED) != 0) &&
 			    (softc->ipf_running > 0)) {
-				softc->ipf_interror = 78;
+				IPFERROR(78);
 				error = EBUSY;
 				break;
 			}
 
 			in = tu.ipft_vlong;
 			if (in < ta->ipft_min || in > ta->ipft_max) {
-				softc->ipf_interror = 79;
+				IPFERROR(79);
 				error = EINVAL;
 				break;
 			}
@@ -7306,7 +7306,7 @@ ipf_ipftune(softc, cmd, data)
 		break;
 
 	default :
-		softc->ipf_interror = 80;
+		IPFERROR(80);
 		error = EINVAL;
 		break;
 	}
@@ -7382,7 +7382,7 @@ ipf_resolvedest(softc, base, fdp, v)
 						  base + fdp->fd_name,
 						  NULL);
 			if (ifp == NULL) {
-				softc->ipf_interror = 144;
+				IPFERROR(144);
 				errval = ESRCH;
 			}
 		} else {
@@ -7482,7 +7482,7 @@ ipf_token_del(softc, type, uid, ptr)
 	ipftoken_t *it;
 	int error;
 
-	softc->ipf_interror = 82;
+	IPFERROR(82);
 	error = ESRCH;
 
 	WRITE_ENTER(&softc->ipf_tokens);
@@ -7490,7 +7490,7 @@ ipf_token_del(softc, type, uid, ptr)
 		if (ptr == it->ipt_ctx && type == it->ipt_type &&
 		    uid == it->ipt_uid) {
 			ipf_token_free(softc, it);
-			softc->ipf_interror = 83;
+			IPFERROR(83);
 			error = 0;
 			break;
 	}
@@ -7726,7 +7726,7 @@ ipf_getnextrule(softc, t, ptr)
 	char *dst;
 
 	if (t == NULL || ptr == NULL) {
-		softc->ipf_interror = 84;
+		IPFERROR(84);
 		return EFAULT;
 	}
 
@@ -7735,19 +7735,19 @@ ipf_getnextrule(softc, t, ptr)
 		return error;
 
 	if ((it.iri_inout < 0) || (it.iri_inout > 3)) {
-		softc->ipf_interror = 85;
+		IPFERROR(85);
 		return EINVAL;
 	}
 	if ((it.iri_active != 0) && (it.iri_active != 1)) {
-		softc->ipf_interror = 86;
+		IPFERROR(86);
 		return EINVAL;
 	}
 	if (it.iri_nrules == 0) {
-		softc->ipf_interror = 87;
+		IPFERROR(87);
 		return ENOSPC;
 	}
 	if (it.iri_rule == NULL) {
-		softc->ipf_interror = 88;
+		IPFERROR(88);
 		return EFAULT;
 	}
 
@@ -7807,7 +7807,7 @@ ipf_getnextrule(softc, t, ptr)
 			dobj.ipfo_ptr = dst;
 			error = ipf_outobjk(softc, &dobj, next->fr_data);
 			if (error != 0)
-				softc->ipf_interror = 90;
+				IPFERROR(90);
 		}
 	}
 
@@ -7849,7 +7849,7 @@ ipf_frruleiter(softc, data, uid, ctx)
 			ipf_token_deref(softc, token);
 		RWLOCK_EXIT(&softc->ipf_tokens);
 	} else {
-		softc->ipf_interror = 91;
+		IPFERROR(91);
 		error = 0;
 	}
 
@@ -7881,7 +7881,7 @@ ipf_geniter(softc, token, itp)
 		error = ipf_frag_pkt_next(softc, token, itp);
 		break;
 	default :
-		softc->ipf_interror = 92;
+		IPFERROR(92);
 		error = EINVAL;
 		break;
 	}
@@ -7925,7 +7925,7 @@ ipf_genericiter(softc, data, uid, ctx)
 			ipf_token_deref(softc, token);
 		RWLOCK_EXIT(&softc->ipf_tokens);
 	} else {
-		softc->ipf_interror = 93;
+		IPFERROR(93);
 		error = 0;
 	}
 
@@ -7963,12 +7963,12 @@ ipf_ipf_ioctl(softc, data, cmd, mode, uid, ctx)
 	{
 	case SIOCFRENB :
 		if (!(mode & FWRITE)) {
-			softc->ipf_interror = 94;
+			IPFERROR(94);
 			error = EPERM;
 		} else {
 			error = BCOPYIN(data, &tmp, sizeof(tmp));
 			if (error != 0) {
-				softc->ipf_interror = 95;
+				IPFERROR(95);
 				error = EFAULT;
 				break;
 			}
@@ -7997,7 +7997,7 @@ ipf_ipf_ioctl(softc, data, cmd, mode, uid, ctx)
 
 	case SIOCIPFSET :
 		if (!(mode & FWRITE)) {
-			softc->ipf_interror = 96;
+			IPFERROR(96);
 			error = EPERM;
 			break;
 		}
@@ -8009,13 +8009,13 @@ ipf_ipf_ioctl(softc, data, cmd, mode, uid, ctx)
 
 	case SIOCSETFF :
 		if (!(mode & FWRITE)) {
-			softc->ipf_interror = 97;
+			IPFERROR(97);
 			error = EPERM;
 		} else {
 			error = BCOPYIN(data, &softc->ipf_flags,
 					sizeof(softc->ipf_flags));
 			if (error != 0) {
-				softc->ipf_interror = 98;
+				IPFERROR(98);
 				error = EFAULT;
 			}
 		}
@@ -8025,7 +8025,7 @@ ipf_ipf_ioctl(softc, data, cmd, mode, uid, ctx)
 		error = BCOPYOUT(&softc->ipf_flags, data,
 				 sizeof(softc->ipf_flags));
 		if (error != 0) {
-			softc->ipf_interror = 99;
+			IPFERROR(99);
 			error = EFAULT;
 		}
 		break;
@@ -8039,7 +8039,7 @@ ipf_ipf_ioctl(softc, data, cmd, mode, uid, ctx)
 	case SIOCADAFR :
 	case SIOCZRLST :
 		if (!(mode & FWRITE)) {
-			softc->ipf_interror = 100;
+			IPFERROR(100);
 			error = EPERM;
 		} else {
 			error = frrequest(softc, IPL_LOGIPF, cmd, (caddr_t)data,
@@ -8051,7 +8051,7 @@ ipf_ipf_ioctl(softc, data, cmd, mode, uid, ctx)
 	case SIOCRMIFR :
 	case SIOCADIFR :
 		if (!(mode & FWRITE)) {
-			softc->ipf_interror = 101;
+			IPFERROR(101);
 			error = EPERM;
 		} else {
 			error = frrequest(softc, IPL_LOGIPF, cmd, (caddr_t)data,
@@ -8061,14 +8061,14 @@ ipf_ipf_ioctl(softc, data, cmd, mode, uid, ctx)
 
 	case SIOCSWAPA :
 		if (!(mode & FWRITE)) {
-			softc->ipf_interror = 102;
+			IPFERROR(102);
 			error = EPERM;
 		} else {
 			WRITE_ENTER(&softc->ipf_mutex);
 			error = BCOPYOUT(&softc->ipf_active, data,
 					 sizeof(softc->ipf_active));
 			if (error != 0) {
-				softc->ipf_interror = 103;
+				IPFERROR(103);
 				error = EFAULT;
 			} else {
 				softc->ipf_active = 1 - softc->ipf_active;
@@ -8088,7 +8088,7 @@ ipf_ipf_ioctl(softc, data, cmd, mode, uid, ctx)
 
 	case SIOCFRZST :
 		if (!(mode & FWRITE)) {
-			softc->ipf_interror = 104;
+			IPFERROR(104);
 			error = EPERM;
 		} else
 			error = ipf_zerostats(softc, (caddr_t)data);
@@ -8096,7 +8096,7 @@ ipf_ipf_ioctl(softc, data, cmd, mode, uid, ctx)
 
 	case SIOCIPFFL :
 		if (!(mode & FWRITE)) {
-			softc->ipf_interror = 105;
+			IPFERROR(105);
 			error = EPERM;
 		} else {
 			error = BCOPYIN(data, &tmp, sizeof(tmp));
@@ -8104,11 +8104,11 @@ ipf_ipf_ioctl(softc, data, cmd, mode, uid, ctx)
 				tmp = ipf_flush(softc, IPL_LOGIPF, tmp);
 				error = BCOPYOUT(&tmp, data, sizeof(tmp));
 				if (error != 0) {
-					softc->ipf_interror = 106;
+					IPFERROR(106);
 					error = EFAULT;
 				}
 			} else {
-				softc->ipf_interror = 107;
+				IPFERROR(107);
 				error = EFAULT;
 			}
 		}
@@ -8117,7 +8117,7 @@ ipf_ipf_ioctl(softc, data, cmd, mode, uid, ctx)
 #ifdef USE_INET6
 	case SIOCIPFL6 :
 		if (!(mode & FWRITE)) {
-			softc->ipf_interror = 108;
+			IPFERROR(108);
 			error = EPERM;
 		} else {
 			error = BCOPYIN(data, &tmp, sizeof(tmp));
@@ -8125,11 +8125,11 @@ ipf_ipf_ioctl(softc, data, cmd, mode, uid, ctx)
 				tmp = ipf_flush(softc, IPL_LOGIPF, tmp);
 				error = BCOPYOUT(&tmp, data, sizeof(tmp));
 				if (error != 0) {
-					softc->ipf_interror = 109;
+					IPFERROR(109);
 					error = EFAULT;
 				}
 			} else {
-				softc->ipf_interror = 110;
+				IPFERROR(110);
 				error = EFAULT;
 			}
 		}
@@ -8138,7 +8138,7 @@ ipf_ipf_ioctl(softc, data, cmd, mode, uid, ctx)
 
 	case SIOCSTLCK :
 		if (!(mode & FWRITE)) {
-			softc->ipf_interror = 122;
+			IPFERROR(122);
 			error = EPERM;
 		} else {
 			error = BCOPYIN(data, &tmp, sizeof(tmp));
@@ -8148,7 +8148,7 @@ ipf_ipf_ioctl(softc, data, cmd, mode, uid, ctx)
 				ipf_frag_setlock(softc->ipf_frag_soft, tmp);
 				ipf_auth_setlock(softc->ipf_auth_soft, tmp);
 			} else {
-				softc->ipf_interror = 111;
+				IPFERROR(111);
 				error = EFAULT;
 			}
 		}
@@ -8157,13 +8157,13 @@ ipf_ipf_ioctl(softc, data, cmd, mode, uid, ctx)
 #ifdef	IPFILTER_LOG
 	case SIOCIPFFB :
 		if (!(mode & FWRITE)) {
-			softc->ipf_interror = 112;
+			IPFERROR(112);
 			error = EPERM;
 		} else {
 			tmp = ipf_log_clear(softc, IPL_LOGIPF);
 			error = BCOPYOUT(&tmp, data, sizeof(tmp));
 			if (error) {
-				softc->ipf_interror = 113;
+				IPFERROR(113);
 				error = EFAULT;
 			}
 		}
@@ -8172,7 +8172,7 @@ ipf_ipf_ioctl(softc, data, cmd, mode, uid, ctx)
 
 	case SIOCFRSYN :
 		if (!(mode & FWRITE)) {
-			softc->ipf_interror = 114;
+			IPFERROR(114);
 			error = EPERM;
 		} else {
 			WRITE_ENTER(&softc->ipf_global);
@@ -8222,7 +8222,7 @@ ipf_ipf_ioctl(softc, data, cmd, mode, uid, ctx)
 		break;
 
 	default :
-		softc->ipf_interror = 115;
+		IPFERROR(115);
 		error = EINVAL;
 		break;
 	}
@@ -8463,38 +8463,38 @@ ipf_matcharray_load(softc, data, objp, arrayptr)
 
 	error = BCOPYIN(data, objp, sizeof(*objp));
 	if (error != 0) {
-		softc->ipf_interror = 116;
+		IPFERROR(116);
 		return EFAULT;
 	}
 
 	if (objp->ipfo_type != IPFOBJ_IPFEXPR) {
-		softc->ipf_interror = 117;
+		IPFERROR(117);
 		return EINVAL;
 	}
 
 	if (((objp->ipfo_size & 3) != 0) || (objp->ipfo_size == 0) ||
 	    (objp->ipfo_size > 1024)) {
-		softc->ipf_interror = 118;
+		IPFERROR(118);
 		return EINVAL;
 	}
 
 	arraysize = objp->ipfo_size * sizeof(*array);
 	KMALLOCS(array, int *, arraysize);
 	if (array == NULL) {
-		softc->ipf_interror = 119;
+		IPFERROR(119);
 		return ENOMEM;
 	}
 
 	error = COPYIN(objp->ipfo_ptr, array, arraysize);
 	if (error != 0) {
 		KFREES(array, arraysize);
-		softc->ipf_interror = 120;
+		IPFERROR(120);
 		return EFAULT;
 	}
 
 	if (ipf_matcharray_verify(array, arraysize) != 0) {
 		KFREES(array, arraysize);
-		softc->ipf_interror = 121;
+		IPFERROR(121);
 		return EINVAL;
 	}
 

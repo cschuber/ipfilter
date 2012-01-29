@@ -1576,7 +1576,11 @@ typedef struct ipf_main_softc_s {
 	int		ipf_pass;
 	int		ipf_minttl;
 	int		ipf_icmpminfragmtu;
-	int		ipf_interror;
+	int		ipf_interror;	/* Should be in a struct that is per  */
+					/* thread or process. Does not belong */
+					/* here but there's a lot more work   */
+					/* in doing that properly. For now,   */
+					/* it is squatting. */
 	u_int		ipf_tcpidletimeout;
 	u_int		ipf_tcpclosewait;
 	u_int		ipf_tcplastack;
@@ -1663,6 +1667,9 @@ typedef struct ipf_main_softc_s {
 	u_short		ipf_ip_id;
 } ipf_main_softc_t;
 
+#define	IPFERROR(_e)	do { softc->ipf_interror = (_e); \
+			     DT1(user_error, int, _e); \
+			} while (0)
 
 #ifndef	_KERNEL
 extern	int	ipf_check __P((void *, struct ip *, int, void *, int, mb_t **));

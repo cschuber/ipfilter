@@ -378,24 +378,24 @@ ipf_pool_node_add(softc, arg, op, uid)
 	int err;
 
 	if (op->iplo_size != sizeof(node)) {
-		softc->ipf_interror = 70014;
+		IPFERROR(70014);
 		return EINVAL;
 	}
 
 	err = COPYIN(op->iplo_struct, &node, sizeof(node));
 	if (err != 0) {
-		softc->ipf_interror = 70015;
+		IPFERROR(70015);
 		return EFAULT;
 	}
 
 	if (node.ipn_addr.adf_family != node.ipn_mask.adf_family) {
-		softc->ipf_interror = 70016;
+		IPFERROR(70016);
 		return EINVAL;
 	}
 
 	p = ipf_pool_find(arg, op->iplo_unit, op->iplo_name);
 	if (p == NULL) {
-		softc->ipf_interror = 70017;
+		IPFERROR(70017);
 		return ESRCH;
 	}
 
@@ -406,7 +406,7 @@ ipf_pool_node_add(softc, arg, op, uid)
 	 */
 	m = ipf_pool_findeq(arg, p, &node.ipn_addr, &node.ipn_mask);
 	if (m != NULL) {
-		softc->ipf_interror = 70018;
+		IPFERROR(70018);
 		return EEXIST;
 	}
 	err = ipf_pool_insert_node(softc, arg, p, &node);
@@ -436,31 +436,31 @@ ipf_pool_node_del(softc, arg, op, uid)
 
 
 	if (op->iplo_size != sizeof(node)) {
-		softc->ipf_interror = 70019;
+		IPFERROR(70019);
 		return EINVAL;
 	}
 	node.ipn_uid = uid;
 
 	err = COPYIN(op->iplo_struct, &node, sizeof(node));
 	if (err != 0) {
-		softc->ipf_interror = 70020;
+		IPFERROR(70020);
 		return EFAULT;
 	}
 
 	p = ipf_pool_find(arg, op->iplo_unit, op->iplo_name);
 	if (p == NULL) {
-		softc->ipf_interror = 70021;
+		IPFERROR(70021);
 		return ESRCH;
 	}
 
 	m = ipf_pool_findeq(arg, p, &node.ipn_addr, &node.ipn_mask);
 	if (m == NULL) {
-		softc->ipf_interror = 70022;
+		IPFERROR(70022);
 		return ENOENT;
 	}
 
 	if ((uid != 0) && (uid != m->ipn_uid)) {
-		softc->ipf_interror = 70024;
+		IPFERROR(70024);
 		return EACCES;
 	}
 
@@ -488,7 +488,7 @@ ipf_pool_table_add(softc, arg, op)
 
 	if (((op->iplo_arg & LOOKUP_ANON) == 0) &&
 	    (ipf_pool_find(arg, op->iplo_unit, op->iplo_name) != NULL)) {
-		softc->ipf_interror = 70023;
+		IPFERROR(70023);
 		err = EEXIST;
 	} else {
 		err = ipf_pool_create(softc, arg, op);
@@ -537,7 +537,7 @@ ipf_pool_stats_get(softc, arg, op)
 	int unit, i, err = 0;
 
 	if (op->iplo_size != sizeof(ipf_pool_stat_t)) {
-		softc->ipf_interror = 70001;
+		IPFERROR(70001);
 		return EINVAL;
 	}
 
@@ -554,13 +554,13 @@ ipf_pool_stats_get(softc, arg, op)
 		else
 			stats.ipls_list[unit] = softp->ipf_pool_list[unit];
 	} else {
-		softc->ipf_interror = 70025;
+		IPFERROR(70025);
 		err = EINVAL;
 	}
 	if (err == 0) {
 		err = COPYOUT(&stats, op->iplo_struct, sizeof(stats));
 		if (err != 0) {
-			softc->ipf_interror = 70026;
+			IPFERROR(70026);
 			return EFAULT;
 		}
 	}
@@ -776,19 +776,19 @@ ipf_pool_insert_node(softc, softp, ipo, node)
 
 	if ((node->ipn_addr.adf_len > sizeof(*rn)) ||
 	    (node->ipn_addr.adf_len < 4)) {
-		softc->ipf_interror = 70003;
+		IPFERROR(70003);
 		return EINVAL;
 	}
 
 	if ((node->ipn_mask.adf_len > sizeof(*rn)) ||
 	    (node->ipn_mask.adf_len < 4)) {
-		softc->ipf_interror = 70004;
+		IPFERROR(70004);
 		return EINVAL;
 	}
 
 	KMALLOC(x, ip_pool_node_t *);
 	if (x == NULL) {
-		softc->ipf_interror = 70002;
+		IPFERROR(70002);
 		return ENOMEM;
 	}
 
@@ -846,7 +846,7 @@ ipf_pool_insert_node(softc, softp, ipo, node)
 
 	if (rn == NULL) {
 		KFREE(x);
-		softc->ipf_interror = 70005;
+		IPFERROR(70005);
 		return ENOMEM;
 	}
 
@@ -897,7 +897,7 @@ ipf_pool_create(softc, softp, op)
 		h = ipf_pool_exists(softp, unit, op->iplo_name);
 		if (h != NULL) {
 			if ((h->ipo_flags & IPOOL_DELETE) == 0) {
-				softc->ipf_interror = 70006;
+				IPFERROR(70006);
 				return EEXIST;
 			}
 			h->ipo_flags &= ~IPOOL_DELETE;
@@ -907,14 +907,14 @@ ipf_pool_create(softc, softp, op)
 
 	KMALLOC(h, ip_pool_t *);
 	if (h == NULL) {
-		softc->ipf_interror = 70007;
+		IPFERROR(70007);
 		return ENOMEM;
 	}
 	bzero(h, sizeof(*h));
 
 	if (ipf_rx_inithead(softp->ipf_radix, &h->ipo_head) != 0) {
 		KFREE(h);
-		softc->ipf_interror = 70008;
+		IPFERROR(70008);
 		return ENOMEM;
 	}
 
@@ -1029,7 +1029,7 @@ ipf_pool_destroy(softc, softp, unit, name)
 
 	ipo = ipf_pool_exists(softp, unit, name);
 	if (ipo == NULL) {
-		softc->ipf_interror = 70009;
+		IPFERROR(70009);
 		return ESRCH;
 	}
 
@@ -1268,7 +1268,7 @@ ipf_pool_iter_next(softc, arg, token, ilp)
 			ipo = ipf_pool_exists(arg, ilp->ili_unit,
 					      ilp->ili_name);
 			if (ipo == NULL) {
-				softc->ipf_interror = 70010;
+				IPFERROR(70010);
 				err = ESRCH;
 			} else {
 				nextnode = ipo->ipo_list;
@@ -1290,7 +1290,7 @@ ipf_pool_iter_next(softc, arg, token, ilp)
 		break;
 
 	default :
-		softc->ipf_interror = 70011;
+		IPFERROR(70011);
 		pnext = NULL;
 		err = EINVAL;
 		break;
@@ -1305,7 +1305,7 @@ ipf_pool_iter_next(softc, arg, token, ilp)
 	case IPFLOOKUPITER_LIST :
 		err = COPYOUT(nextipo, ilp->ili_data, sizeof(*nextipo));
 		if (err != 0)  {
-			softc->ipf_interror = 70012;
+			IPFERROR(70012);
 			err = EFAULT;
 		}
 		if (ipo != NULL) {
@@ -1318,7 +1318,7 @@ ipf_pool_iter_next(softc, arg, token, ilp)
 	case IPFLOOKUPITER_NODE :
 		err = COPYOUT(nextnode, ilp->ili_data, sizeof(*nextnode));
 		if (err != 0) {
-			softc->ipf_interror = 70013;
+			IPFERROR(70013);
 			err = EFAULT;
 		}
 		if (node != NULL) {
