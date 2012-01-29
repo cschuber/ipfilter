@@ -467,7 +467,8 @@ typedef struct	natinfo	{
 
 
 typedef	struct nat_stat_side {
-	u_int	ns_inuse;
+	u_int	*ns_bucketlen;
+	nat_t	**ns_table;
 	u_long	ns_added;
 	u_long	ns_appr_fail;
 	u_long	ns_badnat;
@@ -494,6 +495,7 @@ typedef	struct nat_stat_side {
 	u_long	ns_ifpaddrfail;
 	u_long	ns_ignored;
 	u_long	ns_insert_fail;
+	u_long	ns_inuse;
 	u_long	ns_log;
 	u_long	ns_lookup_miss;
 	u_long	ns_lookup_nowild;
@@ -507,12 +509,14 @@ typedef	struct nat_stat_side {
 	u_long	ns_xlate_exists;
 	u_long	ns_ipf_proxy_fail;
 	u_long	ns_uncreate[2];
-	u_int	*ns_bucketlen;
-	nat_t	**ns_table;
 } nat_stat_side_t;
 
 
 typedef	struct	natstat	{
+	nat_t		*ns_instances;
+	ipnat_t		*ns_list;
+	hostmap_t	*ns_maplist;
+	hostmap_t	**ns_maptable;
 	u_int		ns_active;
 	u_long		ns_addtrpnt;
 	u_long		ns_divert_build;
@@ -529,10 +533,6 @@ typedef	struct	natstat	{
 	u_long		ns_log_ok;
 	u_long		ns_log_fail;
 	u_int		ns_hostmap_sz;
-	nat_t		*ns_instances;
-	ipnat_t		*ns_list;
-	hostmap_t	*ns_maplist;
-	hostmap_t	**ns_maptable;
 	u_int		ns_nattab_sz;
 	u_int		ns_nattab_max;
 	u_int		ns_orphans;

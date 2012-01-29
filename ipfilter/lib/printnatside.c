@@ -30,7 +30,7 @@ printnatside(side, nsp, ns)
 	PRINTF("%lu\texhausted %s\n", ns->ns_exhausted, side);
 	PRINTF("%lu\ticmp address %s\n", ns->ns_icmp_address, side);
 	PRINTF("%lu\ticmp basic %s\n", ns->ns_icmp_basic, side);
-	PRINTF("%u\tinuse %s\n", ns->ns_inuse, side);
+	PRINTF("%lu\tinuse %s\n", ns->ns_inuse, side);
 	PRINTF("%lu\ticmp mbuf wrong size %s\n", ns->ns_icmp_mbuf, side);
 	PRINTF("%lu\ticmp header unmatched %s\n", ns->ns_icmp_notfound, side);
 	PRINTF("%lu\ticmp rebuild failures %s\n", ns->ns_icmp_rebuild, side);

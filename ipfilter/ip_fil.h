@@ -1345,7 +1345,8 @@ typedef	struct	ipfobj	{
 #define	IPFOBJ_STATETQTAB	19	/* struct ipftq * NSTATES */
 #define	IPFOBJ_IPFEXPR		20
 #define	IPFOBJ_PROXYCTL		21	/* strct ap_ctl */
-#define	IPFOBJ_COUNT		22	/* How many #defines are above this? */
+#define	IPFOBJ_FRIPF		22	/* structfripf */
+#define	IPFOBJ_COUNT		23	/* How many #defines are above this? */
 
 
 typedef	union	ipftunevalptr	{
@@ -1934,7 +1935,7 @@ extern	int	icmptoicmp6unreach[ICMP_MAX_UNREACH];
 extern	int	icmpreplytype6[ICMP6_MAXTYPE + 1];
 #endif
 #ifdef	IPFILTER_COMPAT
-extern	int	ipf_in_compat __P((ipf_main_softc_t *, ipfobj_t *, void *));
+extern	int	ipf_in_compat __P((ipf_main_softc_t *, ipfobj_t *, void *,int));
 extern	int	ipf_out_compat __P((ipf_main_softc_t *, ipfobj_t *, void *));
 #endif
 extern	int	icmpreplytype4[ICMP_MAXTYPE + 1];

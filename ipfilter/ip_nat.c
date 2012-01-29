@@ -1269,31 +1269,37 @@ ipf_nat_ioctl(softc, data, cmd, mode, uid, ctx)
 	if ((cmd == (ioctlcmd_t)SIOCADNAT) || (cmd == (ioctlcmd_t)SIOCRMNAT)) {
 		if (mode & NAT_SYSSPACE) {
 			bcopy(data, (char *)&natd, sizeof(natd));
+			nat = &natd;
 			error = 0;
 		} else {
+			bzero(&natd, sizeof(natd));
 			error = ipf_inobj(softc, data, NULL, &natd,
 					  IPFOBJ_IPNAT);
 			if (error != 0)
 				goto done;
 
+			if (natd.in_size < sizeof(ipnat_t)) {
+				error = EINVAL;
+				goto done;
+			}
 			KMALLOCS(nt, ipnat_t *, natd.in_size);
 			if (nt == NULL) {
 				softc->ipf_interror = 60070;
 				error = ENOMEM;
 				goto done;
 			}
+			bzero(nt, natd.in_size);
 			error = ipf_inobjsz(softc, data, nt, IPFOBJ_IPNAT,
 					    natd.in_size);
 			if (error)
 				goto done;
+			nat = nt;
 		}
-	}
 
-	/*
-	 * For add/delete, look to see if the NAT entry is already present
-	 */
-	if ((cmd == (ioctlcmd_t)SIOCADNAT) || (cmd == (ioctlcmd_t)SIOCRMNAT)) {
-		nat = &natd;
+		/*
+		 * For add/delete, look to see if the NAT entry is
+		 * already present
+		 */
 		nat->in_flags &= IPN_USERFLAGS;
 		if ((nat->in_redir & NAT_MAPBLK) == 0) {
 			if (nat->in_osrcatype == FRI_NORMAL ||
@@ -1383,7 +1389,8 @@ ipf_nat_ioctl(softc, data, cmd, mode, uid, ctx)
 			MUTEX_EXIT(&softn->ipf_nat_io);
 			break;
 		}
-		bcopy((char *)nat, (char *)nt, sizeof(*n));
+		if (nat != nt)
+			bcopy((char *)nat, (char *)nt, sizeof(*n));
 		error = ipf_nat_siocaddnat(softc, softn, nt, np, getlock);
 		MUTEX_EXIT(&softn->ipf_nat_io);
 		if (error == 0)
@@ -2286,6 +2293,7 @@ ipf_nat_putent(softc, data, getlock)
 			return ENOMEM;
 		}
 
+		bzero(ipnn, ipn.ipn_dsize);
 		error = ipf_inobjsz(softc, data, ipnn, IPFOBJ_NATSAVE,
 				    ipn.ipn_dsize);
 		if (error != 0) {

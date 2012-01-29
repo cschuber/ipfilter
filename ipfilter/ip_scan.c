@@ -97,7 +97,7 @@ ipf_scan_init()
 
 
 void
-ipf_scan_unload()
+ipf_scan_unload(void *arg)
 {
 	if (ipf_scan_inited == 1) {
 		RW_DESTROY(&ipf_scan_rwlock);

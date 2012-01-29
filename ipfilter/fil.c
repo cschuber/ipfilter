@@ -4411,6 +4411,7 @@ frrequest(softc, unit, req, data, set, makecopy)
 	fg = NULL;
 	fp = &frd;
 	if (makecopy != 0) {
+		bzero(fp, sizeof(frd));
 		error = ipf_inobj(softc, data, NULL, fp, IPFOBJ_FRENTRY);
 		if (error) {
 			return error;
@@ -4424,6 +4425,7 @@ frrequest(softc, unit, req, data, set, makecopy)
 			softc->ipf_interror = 131;
 			return ENOMEM;
 		}
+		bzero(f, fp->fr_size);
 		error = ipf_inobjsz(softc, data, f, IPFOBJ_FRENTRY,
 				    fp->fr_size);
 		if (error) {
@@ -4433,6 +4435,7 @@ frrequest(softc, unit, req, data, set, makecopy)
 
 		fp = f;
 		f = NULL;
+		fp->fr_dnext = NULL;
 		fp->fr_ref = 0;
 		fp->fr_flags |= FR_COPIED;
 	} else {
@@ -4634,12 +4637,22 @@ frrequest(softc, unit, req, data, set, makecopy)
 				error = ENOMEM;
 				goto donenolock;
 			}
-			error = COPYIN(uptr, ptr, fp->fr_dsize);
-			if (error != 0) {
-				softc->ipf_interror = 17;
-				KFREES(ptr, fp->fr_dsize);
-				error = EFAULT;
-				goto donenolock;
+
+			/*
+			 * The bcopy case is for when the data is appended
+			 * to the rule by ipf_in_compat().
+			 */
+			if (uptr >= (void *)fp &&
+			    uptr < (void *)((char *)fp + fp->fr_size)) {
+				bcopy(uptr, ptr, fp->fr_dsize);
+				error = 0;
+			} else {
+				error = COPYIN(uptr, ptr, fp->fr_dsize);
+				if (error != 0) {
+					softc->ipf_interror = 17;
+					error = EFAULT;
+					goto donenolock;
+				}
 			}
 		} else {
 			ptr = uptr;
@@ -6164,26 +6177,29 @@ ipf_ioctlswitch(softc, unit, data, cmd, mode, uid, ctx)
  * 1 = minimum size, not absolute size
  */
 static	int	ipf_objbytes[IPFOBJ_COUNT][3] = {
-	{ 1,	sizeof(struct frentry),		4013400 },
-	{ 1,	sizeof(struct friostat),	4013300 },
-	{ 0,	sizeof(struct fr_info),		4013200 },
+	{ 1,	sizeof(struct frentry),		5010000 },
+	{ 1,	sizeof(struct friostat),	5010000 },
+	{ 0,	sizeof(struct fr_info),		5010000 },
 	{ 0,	sizeof(struct ipf_authstat),	4010100 },
-	{ 0,	sizeof(struct ipfrstat),	4010100 },
-	{ 1,	sizeof(struct ipnat),		4011400 },
-	{ 0,	sizeof(struct natstat),		4013200 },
-	{ 0,	sizeof(struct ipstate_save),	4013400 },
-	{ 1,	sizeof(struct nat_save),	4013400 },
-	{ 0,	sizeof(struct natlookup),	4010100 },
-	{ 1,	sizeof(struct ipstate),		4011600 },
-	{ 0,	sizeof(struct ips_stat),	4012100 },
-	{ 0,	sizeof(struct frauth),		4013200 },
+	{ 0,	sizeof(struct ipfrstat),	5010000 },
+	{ 1,	sizeof(struct ipnat),		5010000 },
+	{ 0,	sizeof(struct natstat),		5010000 },
+	{ 0,	sizeof(struct ipstate_save),	5010000 },
+	{ 1,	sizeof(struct nat_save),	5010000 },
+	{ 0,	sizeof(struct natlookup),	5010000 },
+	{ 1,	sizeof(struct ipstate),		5010000 },
+	{ 0,	sizeof(struct ips_stat),	5010000 },
+	{ 0,	sizeof(struct frauth),		5010000 },
 	{ 0,	sizeof(struct ipftune),		4010100 },
-	{ 0,	sizeof(struct nat),		4012500 },
+	{ 0,	sizeof(struct nat),		5010000 },
 	{ 0,	sizeof(struct ipfruleiter),	4011400 },
 	{ 0,	sizeof(struct ipfgeniter),	4011400 },
 	{ 0,	sizeof(struct ipftable),	4011400 },
 	{ 0,	sizeof(struct ipflookupiter),	4011400 },
 	{ 0,	sizeof(struct ipftq) * IPF_TCP_NSTATES },
+	{ 0,	0,				0	}, /* IPFEXPR */
+	{ 0,	0,				0	}, /* PROXYCTL */
+	{ 0,	sizeof (struct fripf),		5010000	}
 };
 
 
@@ -6253,7 +6269,7 @@ ipf_inobj(softc, data, objp, ptr, type)
 		}
 	} else {
 #ifdef  IPFILTER_COMPAT
-		error = ipf_in_compat(softc, objp, ptr);
+		error = ipf_in_compat(softc, objp, ptr, 0);
 #else
 		softc->ipf_interror = 54;
 		error = EINVAL;
@@ -6317,7 +6333,7 @@ ipf_inobjsz(softc, data, ptr, type, sz)
 		}
 	} else {
 #ifdef	IPFILTER_COMPAT
-		error = ipf_in_compat(softc, &obj, ptr);
+		error = ipf_in_compat(softc, &obj, ptr, sz);
 #else
 		softc->ipf_interror = 60;
 		error = EINVAL;
@@ -7783,7 +7799,13 @@ ipf_getnextrule(softc, t, ptr)
 	if (error == 0 && t->ipt_data != NULL) {
 		dst += obj.ipfo_size;
 		if (next->fr_data != NULL) {
-			error = COPYOUT(next->fr_data, dst, next->fr_dsize);
+			ipfobj_t dobj;
+
+			dobj.ipfo_type = IPFOBJ_FRIPF;
+			dobj.ipfo_size = next->fr_dsize;
+			dobj.ipfo_rev = obj.ipfo_rev;
+			dobj.ipfo_ptr = dst;
+			error = ipf_outobjk(softc, &dobj, next->fr_data);
 			if (error != 0)
 				softc->ipf_interror = 90;
 		}
