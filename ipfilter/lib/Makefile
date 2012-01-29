@@ -42,7 +42,6 @@ LIBOBJS=$(DEST)/addicmp.o \
      $(DEST)/icmpcode.o \
      $(DEST)/icmptypename.o \
      $(DEST)/icmptypes.o \
-     $(DEST)/inet_addr.o \
      $(DEST)/initparse.o \
      $(DEST)/interror.o \
      $(DEST)/ionames.o \
@@ -234,8 +233,6 @@ $(DEST)/ipferror.o: $(LIBSRC)/ipferror.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/ipferror.c -o $@
 $(DEST)/ipoptsec.o: $(LIBSRC)/ipoptsec.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/ipoptsec.c -o $@
-$(DEST)/inet_addr.o: $(LIBSRC)/inet_addr.c $(INCDEP)
-	$(CC) $(CCARGS) -c $(LIBSRC)/inet_addr.c -o $@
 $(DEST)/initparse.o: $(LIBSRC)/initparse.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/initparse.c -o $@
 $(DEST)/ionames.o: $(LIBSRC)/ionames.c $(INCDEP)
