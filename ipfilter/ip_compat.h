@@ -957,6 +957,8 @@ typedef	u_int32_t	u_32_t;
 #  if (__FreeBSD_version >= 500043)
 #   define NETBSD_PF
 #  endif
+# else
+#  include <inttypes.h>
 # endif /* _KERNEL */
 
 # if (__FreeBSD_version >= 700000)
