@@ -141,7 +141,6 @@ static const char rcsid[] = "@(#)$Id$";
 #ifndef	_KERNEL
 # include "ipf.h"
 # include "ipt.h"
-# include "bpf-ipf.h"
 extern	int	opts;
 extern	int	blockreason;
 #endif /* _KERNEL */
@@ -163,7 +162,7 @@ static	void		*ipf_findlookup(ipf_main_softc_t *, int,
 static	frentry_t	*ipf_firewall(fr_info_t *, u_32_t *);
 static	int		ipf_fr_matcharray(fr_info_t *, int *);
 static	int		ipf_frruleiter(ipf_main_softc_t *, void *, int, void *);
-static	int		ipf_funcfini(ipf_main_softc_t *, frentry_t *fr);
+static	void		ipf_funcfini(ipf_main_softc_t *, frentry_t *fr);
 static	int		ipf_funcinit(ipf_main_softc_t *, frentry_t *fr);
 static	int		ipf_geniter(ipf_main_softc_t *, ipftoken_t *,
 				    ipfgeniter_t *);
@@ -5268,32 +5267,6 @@ ipf_funcfini(softc, fr)
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    ipf_funcfini                                                */
-/* Returns:     Nil                                                         */
-/* Parameters:  softc(I) - pointer to soft context main structure           */
-/*              fr(I)    - pointer to filter rule                           */
-/*                                                                          */
-/* For a given filter rule, call the matching "fini" function if the rule   */
-/* is using a known function that would have resulted in the "init" being   */
-/* called for ealier.                                                       */
-/* ------------------------------------------------------------------------ */
-static void
-ipf_funcfini(softc, fr)
-	ipf_main_softc_t *softc;
-	frentry_t *fr;
-{
-	ipfunc_resolve_t *ft;
-
-	for (ft = ipf_availfuncs; ft->ipfu_addr != NULL; ft++)
-		if (ft->ipfu_addr == fr->fr_func) {
-			if (ft->ipfu_fini != NULL)
-				(void) (*ft->ipfu_fini)(softc, fr);
-			break;
-		}
-}
-
-
-/* ------------------------------------------------------------------------ */
 /* Function:    ipf_findfunc                                                */
 /* Returns:     ipfunc_t - pointer to function if found, else NULL          */
 /* Parameters:  funcptr(I) - function pointer to lookup                     */
@@ -5419,7 +5392,6 @@ ppsratecheck(lasttime, curpps, maxpps)
 }
 #endif
 
-		ipf_funcfini(softc, fr);
 
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_derefrule                                               */
@@ -5514,28 +5486,6 @@ ipf_grpmapinit(softc, fr)
 	}
 	iph->iph_ref++;
 	fr->fr_ptr = iph;
-	return 0;
-}
-
-
-/* ------------------------------------------------------------------------ */
-/* Function:    ipf_grpmapfini                                              */
-/* Returns:     int - 0 == success, else ESRCH because table entry not found*/
-/* Parameters:  softc(I) - pointer to soft context main structure           */
-/*              fr(I)    - pointer to rule to release hash table for        */
-/*                                                                          */
-/* For rules that have had ipf_grpmapinit called, ipf_lookup_deref needs to */
-/* be called to undo what ipf_grpmapinit caused to be done.                 */
-/* ------------------------------------------------------------------------ */
-static int
-ipf_grpmapfini(softc, fr)
-	ipf_main_softc_t *softc;
-	frentry_t *fr;
-{
-	iphtable_t *iph;
-	iph = fr->fr_ptr;
-	if (iph != NULL)
-		ipf_lookup_deref(softc, IPLT_HASH, iph);
 	return 0;
 }
 
@@ -9789,6 +9739,7 @@ ipf_ht_node_make_key(htp, key, family, addr)
 			mask = htonl(0xffffffff << (32 - bits));
 		}
 		key->hn_addr.adf_addr.in4.s_addr = addr->in4.s_addr & mask;
+#ifdef USE_INET6
 	} else {
 		int bits = htp->ht_netmask;
 
@@ -9818,6 +9769,7 @@ ipf_ht_node_make_key(htp, key, family, addr)
 			key->hn_addr.adf_addr.i6[0] = addr->i6[0] &
 					     htonl(0xffffffff << (32 - bits));
 		}
+#endif
 	}
 }
 
