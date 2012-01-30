@@ -174,6 +174,7 @@ struct file;
  * because Solaris 2 defines these in two places :-/
  */
 # ifndef _KERNEL
+#  define	ADD_KERNEL
 #  define	_KERNEL
 #  undef	RES_INIT
 # endif /* _KERNEL */
@@ -193,14 +194,14 @@ struct file;
 # ifdef i386
 #  define _SYS_PROMIF_H
 # endif
+# ifdef	ADD_KERNEL
+#  undef	_KERNEL
+# endif
 # include <inet/mib2.h>
 # include <inet/ip.h>
 # undef COPYOUT
 # if !defined(_SYS_NETI_H)
 #  include <inet/ip_ire.h>
-# endif
-# ifndef	KERNEL
-#  undef	_KERNEL
 # endif
 # if SOLARIS2 >= 8
 #  define SNPRINTF	snprintf
