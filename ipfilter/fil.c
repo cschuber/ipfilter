@@ -3199,7 +3199,9 @@ finished:
 	if (!FR_ISPASS(pass)) {
 		LBUMP(ipf_stats[out].fr_block);
 		if (*mp != NULL) {
+#ifdef _KERNEL
 			FREE_MB_T(*mp);
+#endif
 			m = *mp = NULL;
 		}
 	} else {
