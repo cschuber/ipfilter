@@ -9656,6 +9656,7 @@ ipf_ht_node_make_key(htp, key, family, addr)
 			mask = htonl(0xffffffff << (32 - bits));
 		}
 		key->hn_addr.adf_addr.in4.s_addr = addr->in4.s_addr & mask;
+#ifdef USE_INET6
 	} else {
 		int bits = htp->ht_netmask;
 
@@ -9686,6 +9687,7 @@ ipf_ht_node_make_key(htp, key, family, addr)
 					     htonl(0xffffffff << (32 - bits));
 		}
 	}
+#endif
 }
 
 
