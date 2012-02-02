@@ -154,7 +154,9 @@ static	INLINE int	ipf_check_ipf __P((fr_info_t *, frentry_t *, int));
 static	u_32_t		ipf_checkcipso __P((fr_info_t *, u_char *, int));
 static	u_32_t		ipf_checkripso __P((u_char *));
 static	u_32_t		ipf_decaps __P((fr_info_t *, u_32_t, int));
+#ifdef IPFILTER_LOG
 static	frentry_t	*ipf_dolog __P((fr_info_t *, u_32_t *));
+#endif
 static	int		ipf_flushlist __P((ipf_main_softc_t *, int, minor_t,
 					   int *, frentry_t **));
 static	int		ipf_flush_groups __P((ipf_main_softc_t *,
@@ -9320,11 +9322,13 @@ ipf_create_all(arg)
 	if (softc == NULL)
 		return NULL;
 
+#ifdef IPFILTER_LOG
 	softc->ipf_log_soft = ipf_log_soft_create(softc);
 	if (softc->ipf_log_soft == NULL) {
 		ipf_destroy_all(softc);
 		return NULL;
 	}
+#endif
 
 	softc->ipf_lookup_soft = ipf_lookup_soft_create(softc);
 	if (softc->ipf_lookup_soft == NULL) {
@@ -9423,10 +9427,12 @@ ipf_destroy_all(softc)
 		softc->ipf_lookup_soft = NULL;
 	}
 
+#ifdef IPFILTER_LOG
 	if (softc->ipf_log_soft != NULL) {
 		ipf_log_soft_destroy(softc, softc->ipf_log_soft);
 		softc->ipf_log_soft = NULL;
 	}
+#endif
 
 	ipf_main_soft_destroy(softc, NULL);
 }
@@ -9448,8 +9454,10 @@ ipf_init_all(softc)
 	if (ipf_main_soft_init(softc) == -1)
 		return -1;
 
+#ifdef IPFILTER_LOG
 	if (ipf_log_soft_init(softc, softc->ipf_log_soft) == -1)
 		return -1;
+#endif
 
 	if (ipf_lookup_soft_init(softc, softc->ipf_lookup_soft) == -1)
 		return -1;
@@ -9510,8 +9518,10 @@ ipf_fini_all(softc)
 	if (ipf_lookup_soft_fini(softc, softc->ipf_lookup_soft) == -1)
 		return -1;
 
+#ifdef IPFILTER_LOG
 	if (ipf_log_soft_fini(softc, softc->ipf_log_soft) == -1)
 		return -1;
+#endif
 
 	if (ipf_main_soft_fini(softc) == -1)
 		return -1;
