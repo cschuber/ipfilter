@@ -184,7 +184,7 @@ ipfioctl(dev, cmd, data, mode, cp, rp)
 	}
 
 	if (ipf_running <= 0) {
-		if (unit != IPL_LOGIPF) {
+		if (unit != IPL_LOGIPF && cmd != SIOCIPFINTERROR) {
 			ipfmain.ipf_interror = 130003;
 			return EIO;
 		}

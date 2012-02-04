@@ -149,7 +149,7 @@ ipf_ioctl(struct inode *in, struct file *fp, u_int cmd, u_long arg)
 		return -ENXIO;
 
 	if (ipfmain.ipf_running <= 0) {
-		if (unit != IPL_LOGIPF)
+		if (unit != IPL_LOGIPF && cmd != SIOCIPFINTERROR)
 			return -EIO;
 		if (cmd != SIOCIPFGETNEXT && cmd != SIOCIPFGET &&
 		    cmd != SIOCIPFSET && cmd != SIOCFRENB &&

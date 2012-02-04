@@ -253,7 +253,7 @@ ipfioctl(dev, cmd, data, mode, cp, rp)
 	softc = GET_SOFTC(crgetzoneid(cp));
 
 	if (softc->ipf_running <= 0) {
-		if (unit != IPL_LOGIPF) {
+		if (unit != IPL_LOGIPF && cmd != SIOCIPFINTERROR) {
 			IPFERROR(130003);
 			return EIO;
 		}
