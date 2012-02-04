@@ -344,7 +344,6 @@ rdr le0 0/0 -> 192.168.1.0/24
 .PP
 then you will receive a parsing error.
 .PP
-.PP
 The from-to source-destination matching used with
 .B map
 rules can be used with rdr rules, along with negation, however the
@@ -369,7 +368,6 @@ recommended method is to use a comma (",") like this:
 .nf
 
 rdr le0 0/0 -> 192.168.1.1,192.168.1.2
-.fi
 .fi
 .PP
 If there is a large group of destination addresses that are somewhat
@@ -725,7 +723,6 @@ netbios - Experimental
 R-command - Mature
 (map ... proxy port shell rcmd/tcp)
 .SH KERNEL PROXIES
-.PP
 .SH FILES
 /dev/ipnat
 .br
