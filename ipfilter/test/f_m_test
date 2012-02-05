@@ -5,6 +5,7 @@ TESTMODE=$2
 . ./ipflib.sh
 
 test_init
+set $args
 format=$2
 
 # multiple rules at the same time

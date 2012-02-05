@@ -4,8 +4,12 @@ TESTMODE=$2
 
 . ./ipflib.sh
 
+test_init
+set $args
 format=$2
+
 . ./setup_test.sh
+
 echo "${todo}...";
 /bin/cp /dev/null ${results}
 ../ipftest -6 -r /dev/null -i /dev/null >/dev/null 2>&1

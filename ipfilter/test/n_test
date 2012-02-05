@@ -5,7 +5,7 @@ TESTMODE=$2
 . ./ipflib.sh
 
 test_init
-
+set $args
 name=$1
 
 if [ $3 = hex ] ; then

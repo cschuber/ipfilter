@@ -5,7 +5,8 @@ TESTMODE=$2
 . ./ipflib.sh
 
 test_init
-# $1, etc, are all changed now
+set $args
+
 thistest=$1
 format=$2
 output=$3

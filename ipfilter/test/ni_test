@@ -12,6 +12,7 @@ if [ -z $todo -o -z $resdir ] ; then
 	exit 1
 fi
 
+set $args
 name=$1
 inputformat=$2
 output=$3

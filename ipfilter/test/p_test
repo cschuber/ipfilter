@@ -9,6 +9,7 @@ fi
 . ./ipflib.sh
 
 test_init
+set $args
 
 . ./setup_test.sh
 

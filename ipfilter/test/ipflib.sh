@@ -5,31 +5,44 @@
 # See the IPFILTER.LICENCE file for details on licencing.
 #
 test_init() {
-	mkdir -p results
+	todo=`expr ${testitem} : '.*\/\(.*\)$'`
+	resdir=`expr ${testitem} : '\(.*\)\/.*$'`
+	args=`awk "/^${todo} / { print; } " test.format`
+
+	if [ ! -d ${resdir}/results ] ; then
+		mkdir ${resdir}/results
+	fi
+	if [ ! -d results ] ; then
+		mkdir -p results
+	fi
 	find_touch
-	set_core $name 1
+
+	if [ -n "${FINDLEAKS}" -a -x /bin/mdb ] ; then
+		_findleaks=1
+		_corenum=1
+		set_core ${todo} ${_corenum}
+	else
+		_corenum=0
+		_findleaks=0
+	fi
 }
 
 set_core() {
-	if [ -n "${FINDLEAKS}" -a -x /bin/mdb ] ; then
-		_findleaks=1
-	else
-		_findleaks=0
-	fi
-	if [ -x /bin/coreadm ] ; then
-		_cn="$1.$2.core"
-		coreadm -p "${PWD}/$_cn"
-	else
-		_cn=
+	unset _corename
+	if [ ${_findleaks} = 1 ] ; then
+		if [ -x /bin/coreadm ] ; then
+			_corename="$1.${_corenum}.core"
+			coreadm -p "${PWD}/${_corename}"
+		fi
 	fi
 }
 
 test_end_leak() {
 	if [ $1 -ne 0 ] ; then
-		if [ ${_findleaks} = 1 -a -f $_cn ] ; then
-			echo "==== ${name}:${n} ====" >> leaktest
-			echo '::findleaks' | mdb ../i86/ipftest $_cn >> leaktest
-			rm $_cn
+		if [ ${_findleaks} = 1 -a -f ${_corename} ] ; then
+			echo "==== ${todo}:${n} ====" >> leaktest
+			echo '::findleaks' | mdb ../i86/ipftest ${_corename} >> leaktest
+			rm ${_corename}
 		else
 			exit 2;
 		fi
@@ -37,10 +50,10 @@ test_end_leak() {
 }
 
 check_results() {
-	cmp expected/$1 results/$1
+	cmp ${expected} ${results}
 	status=$?
 	if [ $status = 0 ] ; then
-		$TOUCH $1
+		${TOUCH} ${resdir}/${todo}
 	fi
 }
 
@@ -56,4 +69,9 @@ find_touch() {
 			fi
 		fi
 	fi
+}
+
+next_core() {
+	_corenum=`expr ${_corenum} + 1`
+	set_core ${todo} ${_corenum}
 }

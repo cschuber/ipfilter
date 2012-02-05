@@ -2,13 +2,14 @@
 testitem=$1
 TESTMODE=$2
 
-. ./ipflib.sh
-
-test_init
-
 if [ ${TESTMODE} != user ] ; then
 	exit 0
 fi
+
+. ./ipflib.sh
+
+test_init
+set $args
 . ./setup_test.sh
 echo "${todo}...";
 input=`expr ${todo} : 'bpf-\(.*\)'`
