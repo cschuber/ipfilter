@@ -119,7 +119,7 @@ static	int	addname(ipnat_t **, char *);
 %token	IPNY_TLATE IPNY_POOL IPNY_HASH IPNY_NO IPNY_REWRITE IPNY_PROTO
 %token	IPNY_ON IPNY_SRC IPNY_DST IPNY_IN IPNY_OUT IPNY_DIVERT IPNY_ENCAP
 %token	IPNY_CONFIG IPNY_ALLOW IPNY_DENY IPNY_DNS
-%token	IPNY_SEQUENTIAL IPNY_DSTLIST
+%token	IPNY_SEQUENTIAL IPNY_DSTLIST IPNY_PURGE
 %type	<port> portspec
 %type	<num> hexnumber compare range proto
 %type	<num> saddr daddr sobject dobject mapfrom rdrfrom dip
@@ -353,7 +353,7 @@ redir:	rdrit ifnames addr dport tlate dip nport setproto rdroptions
 	;
 
 rewrite:
-	IPNY_REWRITE oninout rwrproto mapfrom tlate newdst
+	IPNY_REWRITE oninout rwrproto mapfrom tlate newdst newopts
 				{ if (nat->in_redir & NAT_MAP)
 					setmapifnames();
 				  else
@@ -362,7 +362,7 @@ rewrite:
 				}
 	;
 
-divert:	IPNY_DIVERT oninout rwrproto mapfrom tlate divdst
+divert:	IPNY_DIVERT oninout rwrproto mapfrom tlate divdst newopts
 				{ if (nat->in_redir & NAT_MAP) {
 					setmapifnames();
 					nat->in_pr[0] = IPPROTO_UDP;
@@ -374,7 +374,7 @@ divert:	IPNY_DIVERT oninout rwrproto mapfrom tlate divdst
 				}
 	;
 
-encap:	IPNY_ENCAP oninout rwrproto mapfrom tlate encapdst
+encap:	IPNY_ENCAP oninout rwrproto mapfrom tlate encapdst newopts
 				{ if (nat->in_redir & NAT_MAP) {
 					setmapifnames();
 					nat->in_pr[0] = IPPROTO_IPIP;
@@ -1036,11 +1036,11 @@ portstuff:
 	;
 
 mapoptions:
-	rr frag age mssclamp nattag setproto
+	rr frag age mssclamp nattag setproto purge
 	;
 
 rdroptions:
-	rr frag age sticky mssclamp rdrproxy nattag
+	rr frag age sticky mssclamp rdrproxy nattag purge
 	;
 
 nattag:	| IPNY_TAG YY_STR		{ strncpy(nat->in_tag.ipt_tag, $2,
@@ -1087,6 +1087,10 @@ sequential:
 	| IPNY_SEQUENTIAL		{ nat->in_flags |= IPN_SEQUENTIAL; }
 	;
 
+purge:
+	| IPNY_PURGE			{ nat->in_flags |= IPN_PURGE; }
+	;
+
 rdrproxy:
 	IPNY_PROXY YY_STR
 					{ int pos;
@@ -1106,6 +1110,10 @@ rdrproxy:
 				}
 	;
 
+newopts:
+	| IPNY_PURGE			{ nat->in_flags |= IPN_PURGE; }
+	;
+
 proto:	YY_NUMBER			{ $$ = $1;
 					  if ($$ != IPPROTO_TCP &&
 					      $$ != IPPROTO_UDP)
@@ -1113,7 +1121,10 @@ proto:	YY_NUMBER			{ $$ = $1;
 					}
 	| IPNY_TCP			{ $$ = IPPROTO_TCP; }
 	| IPNY_UDP			{ $$ = IPPROTO_UDP; }
-	| YY_STR			{ $$ = getproto($1); free($1);
+	| YY_STR			{ $$ = getproto($1);
+					  free($1);
+					  if ($$ == -1)
+						yyerror("unknwon protocol");
 					  if ($$ != IPPROTO_TCP &&
 					      $$ != IPPROTO_UDP)
 						suggest_port = 0;
@@ -1238,6 +1249,7 @@ static	wordtab_t	yywords[] = {
 	{ "ports",	IPNY_PORTS },
 	{ "proto",	IPNY_PROTO },
 	{ "proxy",	IPNY_PROXY },
+	{ "purge",	IPNY_PURGE },
 	{ "range",	IPNY_RANGE },
 	{ "rewrite",	IPNY_REWRITE },
 	{ "rdr",	IPNY_RDR },
@@ -1431,17 +1443,16 @@ ipnat_addrule(fd, ioctlfunc, ptr)
 	obj.ipfo_size = ipn->in_size;
 	obj.ipfo_type = IPFOBJ_IPNAT;
 	obj.ipfo_ptr = ptr;
-	add = 0;
-	del = 0;
 
 	if ((opts & OPT_DONOTHING) != 0)
 		fd = -1;
 
 	if (opts & OPT_ZERORULEST) {
 		add = SIOCZRLST;
-	} else if (opts & OPT_INACTIVE) {
-		add = SIOCADNAT;
-		del = SIOCRMNAT;
+		del = 0;
+	} else if (opts & OPT_PURGE) {
+		add = 0;
+		del = SIOCPURGENAT;
 	} else {
 		add = SIOCADNAT;
 		del = SIOCRMNAT;

@@ -1,0 +1,6 @@
+map zx0 10.1.1.1/32 -> 10.2.2.2/32 purge
+map zx0 10.1.1.1/32 -> 10.2.2.2/32 tcp purge
+map zx0 10.1.1.1/32 -> 10.2.2.2/32 mssclamp 1000 purge
+map zx0 10.1.1.1/32 -> 10.2.2.2/32 portmap tcp/udp 10000:11000 purge
+map zx0 10.1.1.1/32 -> 10.2.2.2/32 portmap tcp/udp 10000:11000 sequential purge
+map zx0 10.1.1.1/32 -> 10.2.2.2/32 portmap tcp/udp 10000:11000 sequential purge

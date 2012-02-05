@@ -219,7 +219,10 @@ static	void	ipf_nat_addmap(ipf_nat_softc_t *, ipnat_t *);
 static	void	ipf_nat_addrdr(ipf_nat_softc_t *, ipnat_t *);
 static	int	ipf_nat_builddivertmp(ipf_nat_softc_t *, ipnat_t *);
 static	int	ipf_nat_clearlist(ipf_main_softc_t *, ipf_nat_softc_t *);
+static	int	ipf_nat_cmp_rules(ipnat_t *, ipnat_t *);
 static	int	ipf_nat_decap(fr_info_t *, nat_t *);
+static	void	ipf_nat_delrule(ipf_main_softc_t *, ipf_nat_softc_t *,
+				ipnat_t *, int);
 static	int	ipf_nat_encapok(fr_info_t *, nat_t *);
 static	int	ipf_nat_extraflush(ipf_main_softc_t *, ipf_nat_softc_t *, int);
 static	int	ipf_nat_finalise(fr_info_t *, nat_t *);
@@ -1263,7 +1266,8 @@ ipf_nat_ioctl(softc, data, cmd, mode, uid, ctx)
 	nat = NULL;     /* XXX gcc -Wuninitialized */
 	nt = NULL;
 
-	if ((cmd == (ioctlcmd_t)SIOCADNAT) || (cmd == (ioctlcmd_t)SIOCRMNAT)) {
+	if ((cmd == (ioctlcmd_t)SIOCADNAT) || (cmd == (ioctlcmd_t)SIOCRMNAT) ||
+	    (cmd == (ioctlcmd_t)SIOCPURGENAT)) {
 		if (mode & NAT_SYSSPACE) {
 			bcopy(data, (char *)&natd, sizeof(natd));
 			error = 0;
@@ -1309,8 +1313,7 @@ ipf_nat_ioctl(softc, data, cmd, mode, uid, ctx)
 		MUTEX_ENTER(&softn->ipf_nat_io);
 		for (np = &softn->ipf_nat_list; ((n = *np) != NULL);
 		     np = &n->in_next)
-			if (!bcmp((char *)&nat->in_v, (char *)&n->in_v,
-					IPN_CMPSIZ))
+			if (ipf_nat_cmp_rules(nat, n) == 0)
 				break;
 	}
 
@@ -1388,6 +1391,7 @@ ipf_nat_ioctl(softc, data, cmd, mode, uid, ctx)
 		break;
 
 	case SIOCRMNAT :
+	case SIOCPURGENAT :
 		if (!(mode & FWRITE)) {
 			IPFERROR(60009);
 			error = EPERM;
@@ -1400,6 +1404,15 @@ ipf_nat_ioctl(softc, data, cmd, mode, uid, ctx)
 		if (error != 0) {
 			MUTEX_EXIT(&softn->ipf_nat_io);
 			break;
+		}
+		if (cmd == (ioctlcmd_t)SIOCPURGENAT) {
+			error = ipf_outobjsz(softc, data, n, IPFOBJ_IPNAT,
+					     n->in_size);
+			if (error) {
+				MUTEX_EXIT(&softn->ipf_nat_io);
+				goto done;
+			}
+			n->in_flags |= IPN_PURGE;
 		}
 		ipf_nat_siocdelnat(softc, softn, n, np, getlock);
 
@@ -1937,12 +1950,8 @@ ipf_nat_siocdelnat(softc, softn, n, np, getlock)
 
 	*np = n->in_next;
 
-	if (n->in_use == 0) {
-		ipf_nat_free_rule(softc, softn, n);
-	} else {
-		n->in_flags |= IPN_DELETE;
-		n->in_next = NULL;
-	}
+	ipf_nat_delrule(softc, softn, n, 1);
+
 	if (getlock) {
 		RWLOCK_EXIT(&softc->ipf_nat);			/* READ/WRITE */
 	}
@@ -2806,7 +2815,7 @@ ipf_nat_clearlist(softc, softn)
 
 	while ((n = *np) != NULL) {
 		*np = n->in_next;
-		ipf_nat_delrule(softc, softn, n);
+		ipf_nat_delrule(softc, softn, n, 0);
 		i++;
 	}
 #if SOLARIS && !defined(INSTANCES)
@@ -2819,22 +2828,41 @@ ipf_nat_clearlist(softc, softn)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_nat_delrule                                             */
 /* Returns:     Nil                                                         */
-/* Parameters:  np(I) - pointer to NAT rule to delete                       */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              softn(I) - pointer to NAT context structure                 */
+/*              np(I)    - pointer to NAT rule to delete                    */
+/*              purge(I) - 1 == allow purge, 0 == prevent purge             */
+/* Locks:       WRITE(ipf_nat)                                              */
 /*                                                                          */
+/* Preventing "purge" from occuring is allowed because when all of the NAT  */
+/* rules are being removed, allowing the "purge" to walk through the list   */
+/* of NAT sessions, possibly multiple times, would be a large performance   */
+/* hit, on the order of O(N2).                                              */
 /* ------------------------------------------------------------------------ */
-void
-ipf_nat_delrule(softc, softn, np)
+static void
+ipf_nat_delrule(softc, softn, np, purge)
 	ipf_main_softc_t *softc;
 	ipf_nat_softc_t *softn;
 	ipnat_t *np;
+	int purge;
 {
+	if ((purge == 1) && ((np->in_flags & IPN_PURGE) != 0)) {
+		nat_t *next;
+		nat_t *nat;
+
+		for (next = softn->ipf_nat_instances; (nat = next) != NULL;) {
+			next = nat->nat_next;
+			if (nat->nat_ptr == np)
+				ipf_nat_delete(softc, nat, NL_PURGE);
+		}
+	}
+
 	if (np->in_use == 0) {
 		ipf_nat_free_rule(softc, softn, np);
 	} else {
 		np->in_flags |= IPN_DELETE;
 		np->in_next = NULL;
 	}
-
 }
 
 
@@ -9030,7 +9058,7 @@ ipf_nat_add_tq(softc, ttl)
 }
 
 /* ------------------------------------------------------------------------ */
-/* Function:    nat_uncreate                                                */
+/* Function:    ipf_nat_uncreate                                            */
 /* Returns:     Nil                                                         */
 /* Parameters:  fin(I) - pointer to packet information                      */
 /*                                                                          */
@@ -9082,4 +9110,65 @@ ipf_nat_uncreate(fin)
 	}
 
 	RWLOCK_EXIT(&softc->ipf_nat);
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_nat_cmp_rules                                           */
+/* Returns:     int   - 0 == success, else rules do not match.              */
+/* Parameters:  n1(I) - first rule to compare                               */
+/*              n2(I) - first rule to compare                               */
+/*                                                                          */
+/* Compare two rules using pointers to each rule. A straight bcmp will not  */
+/* work as some fields (such as in_dst, in_pkts) actually do change once    */
+/* the rule has been loaded into the kernel. Whilst this function returns   */
+/* various non-zero returns, they're strictly to aid in debugging. Use of   */
+/* this function should simply care if the result is zero or not.           */
+/* ------------------------------------------------------------------------ */
+static int
+ipf_nat_cmp_rules(n1, n2)
+	ipnat_t *n1, *n2;
+{
+	if (n1->in_size != n2->in_size)
+		return 1;
+
+	if (bcmp((char *)&n1->in_v, (char *)&n2->in_v,
+		 offsetof(ipnat_t, in_ndst) - offsetof(ipnat_t, in_v)) != 0)
+		return 2;
+
+	if (bcmp((char *)&n1->in_tuc, (char *)&n2->in_tuc,
+		 offsetof(ipnat_t, in_pkts) - offsetof(ipnat_t, in_tuc)) != 0)
+		return 3;
+	if (bcmp((char *)&n1->in_namelen, (char *)&n2->in_namelen,
+		 n1->in_size  - offsetof(ipnat_t, in_namelen)) != 0)
+		return 4;
+	if (n1->in_ndst.na_atype != n2->in_ndst.na_atype)
+		return 5;
+	if (n1->in_ndst.na_function != n2->in_ndst.na_function)
+		return 6;
+	if (bcmp((char *)&n1->in_ndst.na_addr, (char *)&n2->in_ndst.na_addr,
+		 sizeof(n1->in_ndst.na_addr)))
+		return 7;
+	if (n1->in_nsrc.na_atype != n2->in_nsrc.na_atype)
+		return 8;
+	if (n1->in_nsrc.na_function != n2->in_nsrc.na_function)
+		return 9;
+	if (bcmp((char *)&n1->in_nsrc.na_addr, (char *)&n2->in_nsrc.na_addr,
+		 sizeof(n1->in_nsrc.na_addr)))
+		return 10;
+	if (n1->in_odst.na_atype != n2->in_odst.na_atype)
+		return 11;
+	if (n1->in_odst.na_function != n2->in_odst.na_function)
+		return 12;
+	if (bcmp((char *)&n1->in_odst.na_addr, (char *)&n2->in_odst.na_addr,
+		 sizeof(n1->in_odst.na_addr)))
+		return 13;
+	if (n1->in_osrc.na_atype != n2->in_osrc.na_atype)
+		return 14;
+	if (n1->in_osrc.na_function != n2->in_osrc.na_function)
+		return 15;
+	if (bcmp((char *)&n1->in_osrc.na_addr, (char *)&n2->in_osrc.na_addr,
+		 sizeof(n1->in_osrc.na_addr)))
+		return 16;
+	return 0;
 }

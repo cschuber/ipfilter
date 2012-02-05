@@ -19,11 +19,13 @@
 #define	SIOCRMNAT	_IOW('r', 61, struct ipfobj)
 #define	SIOCGNATS	_IOWR('r', 62, struct ipfobj)
 #define	SIOCGNATL	_IOWR('r', 63, struct ipfobj)
+#define	SIOCPURGENAT	_IOWR('r', 100, struct ipfobj)
 #else
 #define	SIOCADNAT	_IOW(r, 60, struct ipfobj)
 #define	SIOCRMNAT	_IOW(r, 61, struct ipfobj)
 #define	SIOCGNATS	_IOWR(r, 62, struct ipfobj)
 #define	SIOCGNATL	_IOWR(r, 63, struct ipfobj)
+#define	SIOCPURGENAT	_IOWR(r, 100, struct ipfobj)
 #endif
 
 #undef	LARGE_NAT	/* define	this if you're setting up a system to NAT
@@ -362,10 +364,11 @@ typedef	struct	ipnat	{
 #define	IPN_FINDFORWARD	0x100000
 #define	IPN_IN		0x200000
 #define	IPN_SEQUENTIAL	0x400000
+#define	IPN_PURGE	0x800000
 #define	IPN_USERFLAGS	(IPN_TCPUDP|IPN_AUTOPORTMAP|IPN_SIPRANGE|IPN_SPLIT|\
 			 IPN_ROUNDR|IPN_FILTER|IPN_NOTSRC|IPN_NOTDST|IPN_NO|\
 			 IPN_FRAG|IPN_STICKY|IPN_FIXEDDPORT|IPN_ICMPQUERY|\
-			 IPN_DIPRANGE|IPN_SEQUENTIAL)
+			 IPN_DIPRANGE|IPN_SEQUENTIAL|IPN_PURGE)
 
 /*
  * Values for in_redir
@@ -573,6 +576,7 @@ typedef	struct	natlog {
 
 #define	NL_NEW		0
 #define	NL_CLONE	1
+#define	NL_PURGE	0xfffc
 #define	NL_DESTROY	0xfffd
 #define	NL_FLUSH	0xfffe
 #define	NL_EXPIRE	0xffff
@@ -721,8 +725,6 @@ extern	void	ipf_nat_sync(ipf_main_softc_t *, void *);
 extern	nat_t	*ipf_nat_clone(fr_info_t *, nat_t *);
 extern	void	ipf_nat_delmap(ipf_nat_softc_t *, ipnat_t *);
 extern	void	ipf_nat_delrdr(ipf_nat_softc_t *, ipnat_t *);
-extern	void	ipf_nat_delrule(ipf_main_softc_t *, ipf_nat_softc_t *,
-				ipnat_t *);
 extern	int	ipf_nat_wildok(nat_t *, int, int, int, int);
 extern	void	ipf_nat_setlock(void *, int);
 extern	void	ipf_nat_load(void);

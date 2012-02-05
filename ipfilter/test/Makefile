@@ -192,6 +192,7 @@ in_tests: \
 	$(RESDIR)/in5 \
 	$(RESDIR)/in6 \
 	$(RESDIR)/in7 \
+	$(RESDIR)/in8 \
 	$(RESDIR)/in100 \
 	$(RESDIR)/in101 \
 	$(RESDIR)/in102
@@ -586,6 +587,9 @@ $(RESDIR)/in6: expected/in6 regress/in6
 	@/bin/sh ./in_test $@ $(TESTMODE)
 
 $(RESDIR)/in7: expected/in7 regress/in7
+	@/bin/sh ./in_test $@ $(TESTMODE)
+
+$(RESDIR)/in8: expected/in7 regress/in8
 	@/bin/sh ./in_test $@ $(TESTMODE)
 
 $(RESDIR)/in100: expected/in100 regress/in100

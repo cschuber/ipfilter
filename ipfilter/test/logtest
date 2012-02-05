@@ -4,7 +4,7 @@ testitem=$1
 . ./ipflib.sh
 
 test_init
-
+set $args
 name=$1
 format=$2
 
