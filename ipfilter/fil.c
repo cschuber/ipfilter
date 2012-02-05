@@ -7379,13 +7379,13 @@ ipf_resolvedest(softc, base, fdp, v)
 			ifp = GETIFP(base + fdp->fd_name, v);
 			if (ifp == NULL)
 				ifp = (void *)-1;
+
+			if ((ifp != NULL) && (ifp != (void *)-1))
+				fdp->fd_local = ipf_deliverlocal(softc, v, ifp,
+								 &fdp->fd_ip6);
 		}
 	}
 	fdp->fd_ptr = ifp;
-
-	if ((ifp != NULL) && (ifp != (void *)-1)) {
-		fdp->fd_local = ipf_deliverlocal(softc, v, ifp, &fdp->fd_ip6);
-	}
 
 	return errval;
 }
