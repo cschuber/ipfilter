@@ -21,7 +21,7 @@ printbuf(buf, len, zend)
 
 	for (s = buf, i = len; i; i--) {
 		c = *s++;
-		if (ISPRINT(c))
+		if (isprint(c))
 			putchar(c);
 		else
 			PRINTF("\\%03o", c);

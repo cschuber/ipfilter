@@ -52,6 +52,7 @@
 #include "netinet/ip_frag.h"
 #include "netinet/ip_auth.h"
 #include "netinet/ip_state.h"
+#include "netinet/ip_sync.h"
 #include "netinet/ip_lookup.h"
 #ifdef INSTANCES
 # include <sys/hook_event.h>
@@ -383,7 +384,6 @@ ipf_detach(dip, cmd)
 
 		cmn_err(CE_CONT, "!%s detached.\n", ipfilter_version);
 		return (DDI_SUCCESS);
-		break;
 	default:
 		break;
 	}

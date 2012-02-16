@@ -1691,6 +1691,7 @@ extern	int	ipl_disable __P((void));
 extern	int	ipf_check __P((void *, struct ip *, int, void *, int, void *,
 			       mblk_t **));
 #  if SOLARIS
+extern	void	ipf_prependmbt(fr_info_t *, mblk_t *);
 #   if SOLARIS2 >= 7
 extern	int	ipfioctl __P((dev_t, int, intptr_t, int, cred_t *, int *));
 #   else
@@ -1805,7 +1806,6 @@ extern	int	ipf_send_icmp_err __P((int, fr_info_t *, int));
 extern	int	ipf_send_reset __P((fr_info_t *));
 #if  (defined(__FreeBSD_version) && (__FreeBSD_version < 501000)) || \
      !defined(_KERNEL) || defined(linux)
-extern	int	ppsratecheck __P((struct timeval *, int *, int));
 #endif
 extern	void	ipf_apply_timeout __P((ipftq_t *, u_int));
 extern	ipftq_t	*ipf_addtimeoutqueue __P((ipf_main_softc_t *, ipftq_t **,

@@ -1754,7 +1754,7 @@ ipf_p_ftp_eprt4(softf, fin, ip, nat, ftp, dlen)
 	 */
 #if defined(SNPRINTF) && defined(_KERNEL)
 	SNPRINTF(newbuf, sizeof(newbuf), "%s %c1%c%u.%u.%u.%u%c%u%c\r\n",
-		 "EPRT", delim, delim, a1, a2, a3, a4, port, delim);
+		 "EPRT", delim, delim, a1, a2, a3, a4, delim, port, delim);
 #else
 	(void) sprintf(newbuf, "%s %c1%c%u.%u.%u.%u%c%u%c\r\n",
 		       "EPRT", delim, delim, a1, a2, a3, a4, delim, port,

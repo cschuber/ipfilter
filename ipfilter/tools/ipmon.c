@@ -606,7 +606,7 @@ void dumphex(log, dopts, buf, len)
 			sprintf((char *)t, "        ");
 			t += 8;
 			for (k = 16; k; k--, s++)
-				*t++ = (ISPRINT(*s) ? *s : '.');
+				*t++ = (isprint(*s) ? *s : '.');
 			s--;
 		}
 
@@ -624,7 +624,7 @@ void dumphex(log, dopts, buf, len)
 		t += 7;
 		s -= j & 0xf;
 		for (k = j & 0xf; k; k--, s++)
-			*t++ = (ISPRINT(*s) ? *s : '.');
+			*t++ = (isprint(*s) ? *s : '.');
 		*t++ = '\n';
 		*t = '\0';
 	}
@@ -722,6 +722,10 @@ static void print_natlog(conf, buf, blen)
 		strcpy(t, "NAT:DESTROY");
 		break;
 
+	case NL_PURGE :
+		strcpy(t, "NAT:PURGE");
+		break;
+
 	default :
 		sprintf(t, "NAT:Action(%d)", nl->nl_action);
 		break;
@@ -792,7 +796,7 @@ static void print_natlog(conf, buf, blen)
 		sprintf(t, "%s,%s ", hostname(family, nl->nl_nsrcip.i6),
 			portlocalname(res, proto, (u_int)nl->nl_nsrcport));
 		t += strlen(t);
-		sprintf(t, "[%s,%s]", hostname(family, nl->nl_odstip.i6),
+		sprintf(t, "[%s,%s] ", hostname(family, nl->nl_odstip.i6),
 			portlocalname(res, proto, (u_int)nl->nl_odstport));
 	} else {
 		sprintf(t, "%s,%s ", hostname(family, nl->nl_osrcip.i6),
@@ -804,7 +808,7 @@ static void print_natlog(conf, buf, blen)
 		sprintf(t, "%s,%s ", hostname(family, nl->nl_nsrcip.i6),
 			portlocalname(res, proto, (u_int)nl->nl_nsrcport));
 		t += strlen(t);
-		sprintf(t, "%s,%s", hostname(family, nl->nl_ndstip.i6),
+		sprintf(t, "%s,%s ", hostname(family, nl->nl_ndstip.i6),
 			portlocalname(res, proto, (u_int)nl->nl_ndstport));
 	}
 	t += strlen(t);

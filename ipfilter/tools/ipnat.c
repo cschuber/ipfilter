@@ -122,7 +122,7 @@ int main(argc, argv)
 
 	assigndefined(getenv("IPNAT_PREDEFINED"));
 
-	while ((c = getopt(argc, argv, "CdFf:hlm:M:N:nO:rRsv")) != -1)
+	while ((c = getopt(argc, argv, "CdFf:hlm:M:N:nO:prRsv")) != -1)
 		switch (c)
 		{
 		case 'C' :
@@ -160,6 +160,9 @@ int main(argc, argv)
 		case 'O' :
 			nat_fields = parsefields(natfields, optarg);
 			break;
+		case 'p' :
+			opts |= OPT_PURGE;
+			break;
 		case 'R' :
 			opts |= OPT_NORESOLVE;
 			break;
@@ -176,6 +179,12 @@ int main(argc, argv)
 		default :
 			usage(argv[0]);
 		}
+
+	if (((opts & OPT_PURGE) != 0) && ((opts & OPT_REMOVE) == 0)) {
+		(void) fprintf(stderr, "%s: -p must be used with -r\n",
+			       argv[0]);
+		exit(1);
+	}
 
 	initparse();
 

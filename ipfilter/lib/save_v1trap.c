@@ -1,5 +1,5 @@
 #include "ipf.h"
-#include "ipl.h"
+#include "netinet/ipl.h"
 #include "ipmon.h"
 #include <ctype.h>
 

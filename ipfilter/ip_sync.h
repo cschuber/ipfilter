@@ -118,4 +118,4 @@ extern	void ipf_sync_expire __P((ipf_main_softc_t *));
 extern	void	ipf_sync_soft_destroy __P((ipf_main_softc_t *, void *));
 extern	void	*ipf_sync_soft_create __P((ipf_main_softc_t *));
 
-#endif /* IP_SYNC */
+#endif /* __IP_SYNC_H__ */

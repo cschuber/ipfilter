@@ -132,6 +132,8 @@ printnat(np, opts)
 			     np->in_ifnames[0]);
 		if ((np->in_redir & NAT_DIVERTUDP) != 0)
 			PRINTF(",%u udp", np->in_dpmin);
+		if ((np->in_flags & IPN_PURGE) != 0)
+			PRINTF(" purge");
 		PRINTF(";\n");
 
 	} else if (np->in_redir & NAT_REWRITE) {
@@ -177,6 +179,8 @@ printnat(np, opts)
 					PRINTF("-%u", np->in_dpmax);
 			}
 		}
+		if ((np->in_flags & IPN_PURGE) != 0)
+			PRINTF(" purge");
 		PRINTF(";\n");
 
 	} else if (np->in_redir == NAT_REDIRECT) {
@@ -224,6 +228,8 @@ printnat(np, opts)
 			PRINTF(" proxy %s", np->in_names + np->in_plabel);
 		if (np->in_tag.ipt_tag[0] != '\0')
 			PRINTF(" tag %-.*s", IPFTAG_LEN, np->in_tag.ipt_tag);
+		if ((np->in_flags & IPN_PURGE) != 0)
+			PRINTF(" purge");
 		PRINTF("\n");
 		if (opts & OPT_DEBUG)
 			PRINTF("\tpmax %u\n", np->in_dpmax);
@@ -290,6 +296,8 @@ printnat(np, opts)
 			} else {
 				PRINTF(" %d:%d", np->in_spmin, np->in_spmax);
 			}
+			if (np->in_flags & IPN_SEQUENTIAL)
+				PRINTF(" sequential");
 		}
 
 		if (np->in_flags & IPN_FRAG)
@@ -305,6 +313,8 @@ printnat(np, opts)
 			putchar(' ');
 			printproto(pr, proto, np);
 		}
+		if ((np->in_flags & IPN_PURGE) != 0)
+			PRINTF(" purge");
 		PRINTF("\n");
 		if (opts & OPT_DEBUG) {
 			struct in_addr nip;

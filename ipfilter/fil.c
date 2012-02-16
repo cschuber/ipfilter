@@ -169,7 +169,7 @@ static	frentry_t	*ipf_firewall __P((fr_info_t *, u_32_t *));
 static	int		ipf_fr_matcharray __P((fr_info_t *, int *));
 static	int		ipf_frruleiter __P((ipf_main_softc_t *, void *, int,
 					    void *));
-static	void		ipf_funcfini __P((ipf_main_softc_t *, frentry_t *));;
+static	void		ipf_funcfini __P((ipf_main_softc_t *, frentry_t *));
 static	int		ipf_funcinit __P((ipf_main_softc_t *, frentry_t *));
 static	int		ipf_geniter __P((ipf_main_softc_t *, ipftoken_t *,
 					 ipfgeniter_t *));
@@ -206,6 +206,7 @@ static	int		ipf_updateipid __P((fr_info_t *));
 static	int		ipf_settimeout __P((struct ipf_main_softc_s *,
 					    struct ipftuneable *,
 					    ipftuneval_t *));
+static	int		ppsratecheck(struct timeval *, int *, int);
 
 
 /*
@@ -4508,13 +4509,13 @@ frrequest(softc, unit, req, data, set, makecopy)
 		}
 	}
 	if ((fp->fr_flags & FR_CALLNOW) &&
-	    ((fp->fr_func == NULL) || (fp->fr_func == (void *)-1))) {
+	    ((fp->fr_func == NULL) || (fp->fr_func == (ipfunc_t)-1))) {
 		IPFERROR(142);
 		error = ESRCH;
 		goto donenolock;
 	}
 	if (((fp->fr_flags & FR_CMDMASK) == FR_CALL) &&
-	    ((fp->fr_func == NULL) || (fp->fr_func == (void *)-1))) {
+	    ((fp->fr_func == NULL) || (fp->fr_func == (ipfunc_t)-1))) {
 		IPFERROR(143);
 		error = ESRCH;
 		goto donenolock;
@@ -9581,7 +9582,7 @@ static void ipf_ht_node_make_key __P((host_track_t *, host_node_t *, int,
 				      i6addr_t *));
 
 host_node_t RBI_ZERO(ipf_rb);
-RBI_CODE(ipf_rb, host_node_t, hn_entry, ipf_ht_node_cmp);
+RBI_CODE(ipf_rb, host_node_t, hn_entry, ipf_ht_node_cmp)
 
 
 /* ------------------------------------------------------------------------ */

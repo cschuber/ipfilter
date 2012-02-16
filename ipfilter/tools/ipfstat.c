@@ -13,6 +13,7 @@
 # endif
 #endif
 #include <sys/ioctl.h>
+#include <ctype.h>
 #include <fcntl.h>
 #ifdef linux
 # include <linux/a.out.h>

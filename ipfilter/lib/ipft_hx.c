@@ -135,7 +135,7 @@ static	int	hex_readip(mb, ifn, dir)
 				if (t < (char *)ip)
 					putchar('\t');
 				while (t < (char *)ip) {
-					if (ISPRINT(*t) && ISASCII(*t))
+					if (isprint(*t) && isascii(*t))
 						putchar(*t);
 					else
 						putchar('.');
