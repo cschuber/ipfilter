@@ -14,4 +14,4 @@
 
 #define	IPFILTER_VERSION	6000000
 
-#endif
+#endif	/* __IPL_H__ */

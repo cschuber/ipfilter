@@ -558,7 +558,7 @@ ipf_sync_write(softc, uio)
 			if (softs->ipf_sync_debug > 2)
 				printf("uiomove(data) %s %d bytes, got %d\n",
 					"insufficient data, need",
-					sh.sm_len, uio->uio_resid);
+					sh.sm_len, (int)uio->uio_resid);
 			IPFERROR(110007);
 			return EAGAIN;
 		}

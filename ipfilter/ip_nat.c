@@ -1116,7 +1116,7 @@ ipf_fix_outcksum(fin, sp, n)
 		return;
 
 	if (n & NAT_HW_CKSUM) {
-# if SOLARIS && defined(_KERNEL) && defined(NET_HCK_NONE)
+#if SOLARIS && defined(_KERNEL) && defined(NET_HCK_NONE)
 		*sp = (n + htons(fin->fin_dlen)) & 0xffff;
 		return;
 #else
@@ -1124,8 +1124,8 @@ ipf_fix_outcksum(fin, sp, n)
 		n += fin->fin_dlen;
 		n = (n & 0xffff) + (n >> 16);
 		*sp = n & 0xffff;
-#endif
 		return;
+#endif
 	}
 	sum1 = (~ntohs(*sp)) & 0xffff;
 	sum1 += (n);
@@ -2438,7 +2438,6 @@ ipf_nat_putent(softc, data, getlock)
 		IPFERROR(60042);
 		error = EINVAL;
 		goto junkput;
-		break;
 	}
 
 	/*

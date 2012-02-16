@@ -347,6 +347,8 @@ typedef struct qifpkt {
 #  define	m_next		b_cont
 #  define	IPF_PANIC(x,y)	if (x) { printf y; cmn_err(CE_PANIC, "ipf_panic"); }
 typedef mblk_t mb_t;
+extern	void	mb_copydata __P((mblk_t *, size_t, size_t, char *));
+extern	void	mb_copyback __P((mblk_t *, size_t, size_t, char *));
 # endif /* _KERNEL */
 
 # if (SOLARIS2 >= 7)
@@ -1953,9 +1955,7 @@ extern	char	*ipf_getifname(struct ifnet *, char *);
  */
 #define	ISALNUM(x)	isalnum((u_char)(x))
 #define	ISALPHA(x)	isalpha((u_char)(x))
-#define	ISASCII(x)	isascii((u_char)(x))
 #define	ISDIGIT(x)	isdigit((u_char)(x))
-#define	ISPRINT(x)	isprint((u_char)(x))
 #define	ISSPACE(x)	isspace((u_char)(x))
 #define	ISUPPER(x)	isupper((u_char)(x))
 #define	ISXDIGIT(x)	isxdigit((u_char)(x))

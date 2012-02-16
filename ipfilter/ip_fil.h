@@ -1750,6 +1750,7 @@ extern	int	ipl_disable(void);
 extern	int	ipf_check(void *, struct ip *, int, void *, int,
 			  void *, mblk_t **);
 #  if SOLARIS
+extern	void	ipf_prependmbt(fr_info_t *, mblk_t *);
 #   if SOLARIS2 >= 7
 extern	int	ipfioctl(dev_t, int, intptr_t, int, cred_t *, int *);
 #   else

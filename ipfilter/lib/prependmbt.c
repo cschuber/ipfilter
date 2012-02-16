@@ -14,4 +14,5 @@ int prependmbt(fin, m)
 {
 	m->mb_next = *fin->fin_mp;
 	*fin->fin_mp = m;
+	return 0;
 }

@@ -4510,13 +4510,13 @@ frrequest(softc, unit, req, data, set, makecopy)
 		}
 	}
 	if ((fp->fr_flags & FR_CALLNOW) &&
-	    ((fp->fr_func == NULL) || (fp->fr_func == (void *)-1))) {
+	    ((fp->fr_func == NULL) || (fp->fr_func == (ipfunc_t)-1))) {
 		IPFERROR(142);
 		error = ESRCH;
 		goto donenolock;
 	}
 	if (((fp->fr_flags & FR_CMDMASK) == FR_CALL) &&
-	    ((fp->fr_func == NULL) || (fp->fr_func == (void *)-1))) {
+	    ((fp->fr_func == NULL) || (fp->fr_func == (ipfunc_t)-1))) {
 		IPFERROR(143);
 		error = ESRCH;
 		goto donenolock;
@@ -9667,7 +9667,7 @@ static void ipf_ht_node_make_key(host_track_t *, host_node_t *, int,
 				 i6addr_t *);
 
 host_node_t RBI_ZERO(ipf_rb);
-RBI_CODE(ipf_rb, host_node_t, hn_entry, ipf_ht_node_cmp);
+RBI_CODE(ipf_rb, host_node_t, hn_entry, ipf_ht_node_cmp)
 
 
 /* ------------------------------------------------------------------------ */

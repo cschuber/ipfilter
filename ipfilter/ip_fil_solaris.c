@@ -1286,7 +1286,6 @@ ipf_inject(fr_info_t *fin, mb_t *m)
 		return net_inject(softc->ipf_nd_v6, NI_QUEUE_IN, &inject);
 	return net_inject(softc->ipf_nd_v6, NI_QUEUE_OUT, &inject);
 #endif
-	return 0;
 }
 
 
@@ -1381,7 +1380,6 @@ ipf_prependmbt(fr_info_t *fin, mblk_t *m)
 	mblk_t *n = *fin->fin_mp;
 	qpktinfo_t *qpi;
 	int x;
-/*ip_t *ip;*/
 
 	qpi = fin->fin_qpi;
 	qpi->qpi_m = m;

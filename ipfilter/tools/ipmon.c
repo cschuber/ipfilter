@@ -606,7 +606,7 @@ void dumphex(log, dopts, buf, len)
 			sprintf((char *)t, "        ");
 			t += 8;
 			for (k = 16; k; k--, s++)
-				*t++ = (ISPRINT(*s) ? *s : '.');
+				*t++ = (isprint(*s) ? *s : '.');
 			s--;
 		}
 
@@ -624,7 +624,7 @@ void dumphex(log, dopts, buf, len)
 		t += 7;
 		s -= j & 0xf;
 		for (k = j & 0xf; k; k--, s++)
-			*t++ = (ISPRINT(*s) ? *s : '.');
+			*t++ = (isprint(*s) ? *s : '.');
 		*t++ = '\n';
 		*t = '\0';
 	}
