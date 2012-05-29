@@ -1104,10 +1104,10 @@ ipf_nat_hostmapdel(hmp)
 /* Adjusts the 16bit checksum by "n" for packets going out.                 */
 /* ------------------------------------------------------------------------ */
 void
-ipf_fix_outcksum(fin, sp, n)
-	fr_info_t *fin;
+ipf_fix_outcksum(cksum, sp, n, partial)
+	int cksum;
 	u_short *sp;
-	u_32_t n;
+	u_32_t n, partial;
 {
 	u_short sumshort;
 	u_32_t sum1;
@@ -1115,17 +1115,15 @@ ipf_fix_outcksum(fin, sp, n)
 	if (n == 0)
 		return;
 
-	if (n & NAT_HW_CKSUM) {
-#if SOLARIS && defined(_KERNEL) && defined(NET_HCK_NONE)
-		*sp = (n + htons(fin->fin_dlen)) & 0xffff;
+	if (cksum == 4) {
+		*sp = 0;
 		return;
-#else
-		n &= 0xffff;
-		n += fin->fin_dlen;
-		n = (n & 0xffff) + (n >> 16);
-		*sp = n & 0xffff;
+	}
+	if (cksum == 2) {
+		sum1 = partial;
+		sum1 = (sum1 & 0xffff) + (sum1 >> 16);
+		*sp = htons(sum1);
 		return;
-#endif
 	}
 	sum1 = (~ntohs(*sp)) & 0xffff;
 	sum1 += (n);
@@ -1147,10 +1145,10 @@ ipf_fix_outcksum(fin, sp, n)
 /* Adjusts the 16bit checksum by "n" for packets going in.                  */
 /* ------------------------------------------------------------------------ */
 void
-ipf_fix_incksum(fin, sp, n)
-	fr_info_t *fin;
+ipf_fix_incksum(cksum, sp, n, partial)
+	int cksum;
 	u_short *sp;
-	u_32_t n;
+	u_32_t n, partial;
 {
 	u_short sumshort;
 	u_32_t sum1;
@@ -1158,13 +1156,17 @@ ipf_fix_incksum(fin, sp, n)
 	if (n == 0)
 		return;
 
-	if (n & NAT_HW_CKSUM) {
-		n &= 0xffff;
-		n += fin->fin_dlen;
-		n = (n & 0xffff) + (n >> 16);
-		*sp = n & 0xffff;
+	if (cksum == 4) {
+		*sp = 0;
 		return;
 	}
+	if (cksum == 2) {
+		sum1 = partial;
+		sum1 = (sum1 & 0xffff) + (sum1 >> 16);
+		*sp = htons(sum1);
+		return;
+	}
+
 	sum1 = (~ntohs(*sp)) & 0xffff;
 	sum1 += ~(n) & 0xffff;
 	sum1 = (sum1 >> 16) + (sum1 & 0xffff);
@@ -1270,31 +1272,37 @@ ipf_nat_ioctl(softc, data, cmd, mode, uid, ctx)
 	    (cmd == (ioctlcmd_t)SIOCPURGENAT)) {
 		if (mode & NAT_SYSSPACE) {
 			bcopy(data, (char *)&natd, sizeof(natd));
+			nat = &natd;
 			error = 0;
 		} else {
+			bzero(&natd, sizeof(natd));
 			error = ipf_inobj(softc, data, NULL, &natd,
 					  IPFOBJ_IPNAT);
 			if (error != 0)
 				goto done;
 
+			if (natd.in_size < sizeof(ipnat_t)) {
+				error = EINVAL;
+				goto done;
+			}
 			KMALLOCS(nt, ipnat_t *, natd.in_size);
 			if (nt == NULL) {
 				IPFERROR(60070);
 				error = ENOMEM;
 				goto done;
 			}
+			bzero(nt, natd.in_size);
 			error = ipf_inobjsz(softc, data, nt, IPFOBJ_IPNAT,
 					    natd.in_size);
 			if (error)
 				goto done;
+			nat = nt;
 		}
-	}
 
-	/*
-	 * For add/delete, look to see if the NAT entry is already present
-	 */
-	if ((cmd == (ioctlcmd_t)SIOCADNAT) || (cmd == (ioctlcmd_t)SIOCRMNAT)) {
-		nat = &natd;
+		/*
+		 * For add/delete, look to see if the NAT entry is
+		 * already present
+		 */
 		nat->in_flags &= IPN_USERFLAGS;
 		if ((nat->in_redir & NAT_MAPBLK) == 0) {
 			if (nat->in_osrcatype == FRI_NORMAL ||
@@ -1383,7 +1391,8 @@ ipf_nat_ioctl(softc, data, cmd, mode, uid, ctx)
 			MUTEX_EXIT(&softn->ipf_nat_io);
 			break;
 		}
-		bcopy((char *)nat, (char *)nt, sizeof(*n));
+		if (nat != nt)
+			bcopy((char *)nat, (char *)nt, sizeof(*n));
 		error = ipf_nat_siocaddnat(softc, softn, nt, np, getlock);
 		MUTEX_EXIT(&softn->ipf_nat_io);
 		if (error == 0)
@@ -1965,7 +1974,7 @@ ipf_nat_free_rule(softc, softn, n)
 	ipnat_t *n;
 {
 	if (n->in_apr != NULL)
-		ipf_proxy_free(n->in_apr);
+		ipf_proxy_deref(n->in_apr);
 
 	if (n->in_odst.na_atype == FRI_LOOKUP)
 		ipf_lookup_deref(softc, n->in_odst.na_type, n->in_odst.na_ptr);
@@ -2292,6 +2301,7 @@ ipf_nat_putent(softc, data, getlock)
 			return ENOMEM;
 		}
 
+		bzero(ipnn, ipn.ipn_dsize);
 		error = ipf_inobjsz(softc, data, ipnn, IPFOBJ_NATSAVE,
 				    ipn.ipn_dsize);
 		if (error != 0) {
@@ -2572,7 +2582,7 @@ junkput:
 		}
 		if (in != NULL) {
 			if (in->in_apr)
-				ipf_proxy_free(in->in_apr);
+				ipf_proxy_deref(in->in_apr);
 			KFREES(in, in->in_size);
 		}
 		KFREE(nat);
@@ -2654,6 +2664,7 @@ ipf_nat_delete(softc, nat, logtype)
 		*nat->nat_me = NULL;
 		nat->nat_me = NULL;
 		nat->nat_ref--;
+		ASSERT(nat->nat_ref >= 0);
 	}
 
 	if (nat->nat_tqe.tqe_ifq != NULL) {
@@ -2688,6 +2699,7 @@ ipf_nat_delete(softc, nat, logtype)
 			softn->ipf_nat_stats.ns_orphans++;
 		return;
 	}
+	ASSERT(nat->nat_ref >= 0);
 	MUTEX_EXIT(&nat->nat_lock);
 
 	nat->nat_ref = 0;
@@ -2727,7 +2739,7 @@ ipf_nat_delete(softc, nat, logtype)
 
 	MUTEX_DESTROY(&nat->nat_lock);
 
-	aps_free(softc, softc->ipf_proxy_soft, nat->nat_aps);
+	aps_free(softc, nat->nat_aps);
 	softn->ipf_nat_stats.ns_active--;
 
 	/*
@@ -3588,39 +3600,20 @@ ipf_nat_finalise(fin, nat)
 		break;
 	}
 
-#if SOLARIS && defined(_KERNEL)
-# if (SOLARIS2 >= 6) && defined(ICK_M_CTL_MAGIC)
-	if ((flags & IPN_TCP) && dohwcksum &&
-	    (((ill_t *)qpi->qpi_ill)->ill_ick.ick_magic == ICK_M_CTL_MAGIC)) {
+	/*
+	 * Compute the partial checksum, just in case.
+	 * This is only ever placed into outbound packets so care needs
+	 * to be taken over which pair of addresses are used.
+	 */
+	if (nat->nat_dir == NAT_OUTBOUND) {
 		sum1 = LONG_SUM(ntohl(nat->nat_nsrcaddr));
 		sum1 += LONG_SUM(ntohl(nat->nat_ndstaddr));
-		sum1 += 30;
-		sum1 = (sum1 & 0xffff) + (sum1 >> 16);
-		nat->nat_sumd[1] = NAT_HW_CKSUM|(sum1 & 0xffff);
-	} else
-# endif
-# if defined(NET_HCK_NONE) 
-	if ((flags & IPN_TCPUDP) && dohwcksum) {
-		mblk_t *m = fin->fin_m;
-		u_int flags = net_ispartialchecksum(softc->ipf_nd_v4, m);
-
-		if (flags & NET_HCK_L4_PART) {
-			sum1 = LONG_SUM(ntohl(nat->nat_nsrcaddr));
-			sum1 += LONG_SUM(ntohl(nat->nat_ndstaddr));
-			sum1 += fin->fin_p;
-			sum1 = htons(sum1);
-
-			nat->nat_sumd[1] = (sum1 & 0xffff) + (sum1 >> 16);
-			nat->nat_sumd[1] |= NAT_HW_CKSUM;
-		} else if (flags & NET_HCK_L4_FULL) {
-			nat->nat_sumd[1] = NAT_HW_CKSUM;
-		} else {
-			nat->nat_sumd[1] = nat->nat_sumd[0];
-		}
-	} else
-# endif
-#endif
-		nat->nat_sumd[1] = nat->nat_sumd[0];
+	} else {
+		sum1 = LONG_SUM(ntohl(nat->nat_osrcaddr));
+		sum1 += LONG_SUM(ntohl(nat->nat_odstaddr));
+	}
+	sum1 += nat->nat_pr[1];
+	nat->nat_sumd[1] = (sum1 & 0xffff) + (sum1 >> 16);
 
 	sum1 = LONG_SUM(ntohl(nat->nat_osrcaddr));
 	sum2 = LONG_SUM(ntohl(nat->nat_nsrcaddr));
@@ -4256,7 +4249,7 @@ ipf_nat_icmperror(fin, nflags, dir)
 				sumd2 = (sumd2 & 0xffff) + (sumd2 >> 16);
 				sumd2 = (sumd2 & 0xffff) + (sumd2 >> 16);
 				sumd2 = (sumd2 & 0xffff) + (sumd2 >> 16);
-				ipf_fix_incksum(fin, &icmp->icmp_cksum, sumd2);
+				ipf_fix_incksum(0, &icmp->icmp_cksum, sumd2, 0);
 			}
 		}
 	} else if (((flags & IPN_ICMPQUERY) != 0) && (dlen >= 8)) {
@@ -5098,60 +5091,6 @@ ipf_nat_update(fin, nat)
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    ipf_nat_ipfout                                              */
-/* Returns:     frentry_t* - NULL (packet may have been translated, let it  */
-/*                           pass), &ipfnatblock - block/drop the packet.   */
-/* Parameters:  fin(I)   - pointer to packet information                    */
-/*              passp(I) - point to filtering result flags                  */
-/*                                                                          */
-/* This is purely and simply a wrapper around ipf_nat_checkout for the sole */
-/* reason of being able to activate NAT from an ipf rule using "call-now".  */
-/* ------------------------------------------------------------------------ */
-frentry_t *
-ipf_nat_ipfout(fin, passp)
-	fr_info_t *fin;
-	u_32_t *passp;
-{
-	frentry_t *fr = fin->fin_fr;
-
-	if (fin->fin_v == 6) {
-#ifdef USE_INET6
-		return ipf_nat6_ipfout(fin, passp);
-#else
-		return NULL;
-#endif
-	}
-
-	switch (ipf_nat_checkout(fin, passp))
-	{
-	case -1 :
-		fr = &ipfnatblock;
-		MUTEX_ENTER(&fr->fr_lock);
-		fr->fr_ref++;
-		MUTEX_EXIT(&fr->fr_lock);
-		return fr;
-
-	case 0 :
-		break;
-
-	case 1 :
-		/*
-		 * Returing NULL causes this rule to be "ignored" but
-		 * it has actually had an influence on the packet so we
-		 * increment counters for it.
-		 */
-		MUTEX_ENTER(&fr->fr_lock);
-		fr->fr_bytes += (U_QUAD_T)fin->fin_plen;
-		fr->fr_hits++;
-		MUTEX_EXIT(&fr->fr_lock);
-		break;
-	}
-
-	return NULL;
-}
-
-
-/* ------------------------------------------------------------------------ */
 /* Function:    ipf_nat_checkout                                            */
 /* Returns:     int - -1 == packet failed NAT checks so block it,           */
 /*                     0 == no packet translation occurred,                 */
@@ -5433,7 +5372,7 @@ ipf_nat_out(fin, nat, natadd, nflags)
 		CALC_SUMD(s1, s2, sumd);
 		msumd += sumd;
 
-		ipf_fix_outcksum(fin, &fin->fin_ip->ip_sum, msumd);
+		ipf_fix_outcksum(0, &fin->fin_ip->ip_sum, msumd, 0);
 	}
 #if !defined(_KERNEL) || defined(MENTAT) || defined(__sgi) || \
     defined(linux) || defined(BRIDGE_IPF)
@@ -5447,13 +5386,15 @@ ipf_nat_out(fin, nat, natadd, nflags)
 		switch (nat->nat_dir)
 		{
 		case NAT_OUTBOUND :
-			ipf_fix_outcksum(fin, &fin->fin_ip->ip_sum,
-				     nat->nat_ipsumd);
+			ipf_fix_outcksum(fin->fin_cksum & FI_CK_L4PART,
+					 &fin->fin_ip->ip_sum,
+					 nat->nat_ipsumd, 0);
 			break;
 
 		case NAT_INBOUND :
-			ipf_fix_incksum(fin, &fin->fin_ip->ip_sum,
-				    nat->nat_ipsumd);
+			ipf_fix_incksum(fin->fin_cksum & FI_CK_L4PART,
+					&fin->fin_ip->ip_sum,
+					nat->nat_ipsumd, 0);
 			break;
 
 		default :
@@ -5553,7 +5494,7 @@ ipf_nat_out(fin, nat, natadd, nflags)
 
 #if !defined(_KERNEL) || defined(MENTAT) || defined(__sgi) || \
     defined(linux) || defined(BRIDGE_IPF)
-		ipf_fix_outcksum(fin, &ip->ip_sum, sumd);
+		ipf_fix_outcksum(0, &ip->ip_sum, sumd, 0);
 #endif
 		/* TRACE (ip) */
 
@@ -5597,7 +5538,7 @@ ipf_nat_out(fin, nat, natadd, nflags)
 		uh->uh_ulen = htons(uh->uh_ulen);
 #if !defined(_KERNEL) || defined(MENTAT) || defined(__sgi) || \
     defined(linux) || defined(BRIDGE_IPF)
-		ipf_fix_outcksum(fin, &ip->ip_sum, sumd);
+		ipf_fix_outcksum(0, &ip->ip_sum, sumd, 0);
 #endif
 
 		PREP_MB_T(fin, m);
@@ -5654,9 +5595,15 @@ ipf_nat_out(fin, nat, natadd, nflags)
 		 */
 		if (csump != NULL) {
 			if (nat->nat_dir == NAT_OUTBOUND)
-				ipf_fix_outcksum(fin, csump, nat->nat_sumd[1]);
+				ipf_fix_outcksum(fin->fin_cksum, csump,
+						 nat->nat_sumd[0],
+						 nat->nat_sumd[1] +
+						 fin->fin_dlen);
 			else
-				ipf_fix_incksum(fin, csump, nat->nat_sumd[1]);
+				ipf_fix_incksum(fin->fin_cksum, csump,
+						nat->nat_sumd[0],
+						nat->nat_sumd[1] +
+						fin->fin_dlen);
 		}
 	}
 
@@ -5683,60 +5630,6 @@ ipf_nat_out(fin, nat, natadd, nflags)
 	}
 	fin->fin_flx |= FI_NATED;
 	return i;
-}
-
-
-/* ------------------------------------------------------------------------ */
-/* Function:    ipf_nat_ipfin                                               */
-/* Returns:     frentry_t* - NULL (packet may have been translated, let it  */
-/*                           pass), &ipfnatblock - block/drop the packet.   */
-/* Parameters:  fin(I)   - pointer to packet information                    */
-/*              passp(I) - point to filtering result flags                  */
-/*                                                                          */
-/* This is purely and simply a wrapper around ipf_nat_checkin for the sole  */
-/* reason of being able to activate NAT from an ipf rule using "call-now".  */
-/* ------------------------------------------------------------------------ */
-frentry_t *
-ipf_nat_ipfin(fin, passp)
-	fr_info_t *fin;
-	u_32_t *passp;
-{
-	frentry_t *fr = fin->fin_fr;
-
-	if (fin->fin_v == 6) {
-#ifdef USE_INET6
-		return ipf_nat6_ipfin(fin, passp);
-#else
-		return NULL;
-#endif
-	}
-
-	switch (ipf_nat_checkin(fin, passp))
-	{
-	case -1 :
-		fr = &ipfnatblock;
-		MUTEX_ENTER(&fr->fr_lock);
-		fr->fr_ref++;
-		MUTEX_EXIT(&fr->fr_lock);
-		return fr;
-
-	case 0 :
-		return NULL;
-
-	case 1 :
-		/*
-		 * Returing NULL causes this rule to be "ignored" but
-		 * it has actually had an influence on the packet so we
-		 * increment counters for it.
-		 */
-		MUTEX_ENTER(&fr->fr_lock);
-		fr->fr_bytes += (U_QUAD_T)fin->fin_plen;
-		fr->fr_hits++;
-		MUTEX_EXIT(&fr->fr_lock);
-		return NULL;
-	}
-
-	return NULL;
 }
 
 
@@ -6040,7 +5933,7 @@ ipf_nat_in(fin, nat, natadd, nflags)
 		fin->fin_daddr = nat->nat_ndstaddr;
 #if !defined(_KERNEL) || defined(MENTAT) || defined(__sgi) || \
      defined(__osf__) || defined(linux)
-		ipf_fix_outcksum(fin, &fin->fin_ip->ip_sum, ipsumd);
+		ipf_fix_outcksum(0, &fin->fin_ip->ip_sum, ipsumd, 0);
 #endif
 		break;
 
@@ -6058,7 +5951,7 @@ ipf_nat_in(fin, nat, natadd, nflags)
 		fin->fin_daddr = nat->nat_osrcaddr;
 #if !defined(_KERNEL) || defined(MENTAT) || defined(__sgi) || \
      defined(__osf__) || defined(linux)
-		ipf_fix_incksum(fin, &fin->fin_ip->ip_sum, ipsumd);
+		ipf_fix_incksum(0, &fin->fin_ip->ip_sum, ipsumd, 0);
 #endif
 		break;
 
@@ -6094,7 +5987,7 @@ ipf_nat_in(fin, nat, natadd, nflags)
 
 #if !defined(_KERNEL) || defined(MENTAT) || defined(__sgi) || \
      defined(__osf__) || defined(linux)
-		ipf_fix_outcksum(fin, &ip->ip_sum, sumd);
+		ipf_fix_outcksum(0, &ip->ip_sum, sumd, 0);
 #endif
 
 		PREP_MB_T(fin, m);
@@ -6138,7 +6031,7 @@ ipf_nat_in(fin, nat, natadd, nflags)
 
 #if !defined(_KERNEL) || defined(MENTAT) || defined(__sgi) || \
      defined(__osf__) || defined(linux)
-		ipf_fix_outcksum(fin, &ip->ip_sum, sumd);
+		ipf_fix_outcksum(0, &ip->ip_sum, sumd, 0);
 #endif
 		PREP_MB_T(fin, m);
 
@@ -6226,9 +6119,9 @@ ipf_nat_in(fin, nat, natadd, nflags)
 		 */
 		if (csump != NULL) {
 			if (nat->nat_dir == NAT_OUTBOUND)
-				ipf_fix_incksum(fin, csump, nat->nat_sumd[0]);
+				ipf_fix_incksum(0, csump, nat->nat_sumd[0], 0);
 			else
-				ipf_fix_outcksum(fin, csump, nat->nat_sumd[0]);
+				ipf_fix_outcksum(0, csump, nat->nat_sumd[0], 0);
 		}
 	}
 
@@ -6717,6 +6610,7 @@ ipf_nat_deref(softc, natp)
 	MUTEX_ENTER(&nat->nat_lock);
 	if (nat->nat_ref > 1) {
 		nat->nat_ref--;
+		ASSERT(nat->nat_ref >= 0);
 		MUTEX_EXIT(&nat->nat_lock);
 		return;
 	}
@@ -6927,7 +6821,7 @@ ipf_nat_mssclamp(tcp, maxmss, fin, csump)
 					cp[2] = maxmss / 256;
 					cp[3] = maxmss & 0xff;
 					CALC_SUMD(mss, maxmss, sumd);
-					ipf_fix_outcksum(fin, csump, sumd);
+					ipf_fix_outcksum(0, csump, sumd, 0);
 				}
 				break;
 			default:
@@ -7401,6 +7295,7 @@ ipf_nat_setpending(softc, nat)
 		*nat->nat_me = NULL;
 		nat->nat_me = NULL;
 		nat->nat_ref--;
+		ASSERT(nat->nat_ref >= 0);
 	}
 }
 
@@ -7829,7 +7724,7 @@ ipf_nat_decap(fin, nat)
 			fin->fin_daddr = nat->nat_osrcaddr;
 #if !defined(_KERNEL) || defined(MENTAT) || defined(__sgi) || \
      defined(__osf__) || defined(linux)
-			ipf_fix_outcksum(fin, &fin->fin_ip->ip_sum, sumd);
+			ipf_fix_outcksum(0, &fin->fin_ip->ip_sum, sumd, 0);
 #endif
 		}
 		return 0;

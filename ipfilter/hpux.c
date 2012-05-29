@@ -625,6 +625,7 @@ int ipfread(dev, uio)
 #endif /* IPFILTER_LOG */
 
 
+#if 0
 /*
  * ipfread/ipflog
  * both of these must operate with at least splnet() lest they be
@@ -647,3 +648,4 @@ int ipfwrite(dev, uio, cp)
 		return ENXIO;
 	return ipfsync_write(uio);
 }
+#endif /* IPFILTER_SYNC */

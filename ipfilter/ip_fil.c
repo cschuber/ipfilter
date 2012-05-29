@@ -503,6 +503,7 @@ m_freem(m)
 	return;
 }
 
+
 void
 m_copydata(m, off, len, cp)
 	mb_t *m;
@@ -511,6 +512,7 @@ m_copydata(m, off, len, cp)
 {
 	bcopy((char *)m + off, cp, len);
 }
+
 
 int
 ipfuiomove(buf, len, rwflag, uio)

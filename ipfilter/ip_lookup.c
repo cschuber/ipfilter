@@ -80,17 +80,18 @@ static int ipf_lookup_flush(ipf_main_softc_t *, caddr_t);
 static int ipf_lookup_iterate(ipf_main_softc_t *, void *, int, void *);
 static int ipf_lookup_deltok(ipf_main_softc_t *, void *, int, void *);
 
-static ipf_lookup_t *backends[] = {
+#define	MAX_BACKENDS	3
+static ipf_lookup_t *backends[MAX_BACKENDS] = {
 	&ipf_pool_backend,
 	&ipf_htable_backend,
 	&ipf_dstlist_backend
 };
 
-#define	MAX_BACKENDS	(sizeof(backends)/sizeof(backends[0]))
 
 typedef struct ipf_lookup_softc_s {
 	void		*ipf_back[MAX_BACKENDS];
 } ipf_lookup_softc_t;
+
 
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_lookup_init                                             */
@@ -740,7 +741,10 @@ ipf_lookup_iterate(softc, data, uid, ctx)
 	}
 
 	WRITE_ENTER(&softc->ipf_tokens);
-	ipf_token_deref(softc, token);
+	if (i == MAX_BACKENDS)
+		ipf_token_free(softc, token);
+	else
+		ipf_token_deref(softc, token);
 	RWLOCK_EXIT(&softc->ipf_tokens);
 
 	return err;
@@ -780,7 +784,7 @@ ipf_lookup_iterderef(softc, type, data)
 	WRITE_ENTER(&softc->ipf_poolrw);
 
 	for (i = 0; i < MAX_BACKENDS; i++) {
-		if (type == backends[i]->ipfl_type) {
+		if (lkey->ilik_type == backends[i]->ipfl_type) {
 			(*backends[i]->ipfl_iter_deref)(softc,
 							softl->ipf_back[i],
 							lkey->ilik_otype,
@@ -871,7 +875,7 @@ ipf_lookup_res_num(softc, unit, type, number, funcptr)
 /*                                                                          */
 /* Search for the "table" number passed in amongst those configured for     */
 /* that particular type.  If the type is recognised then the function to    */
-/* call to do the IP address search will be change, regardless of whether   */
+/* call to do the IP address search will be changed, regardless of whether  */
 /* or not the "table" number exists.                                        */
 /* ------------------------------------------------------------------------ */
 void *

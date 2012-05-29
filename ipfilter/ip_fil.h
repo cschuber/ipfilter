@@ -390,6 +390,14 @@ typedef enum fr_breasons_e {
 	FRB_NATV6IN
 } fr_breason_t;
 
+typedef enum ipf_cksum_e {
+	FI_CK_BAD = -1,
+	FI_CK_NEEDED = 0,
+	FI_CK_SUMOK = 1,
+	FI_CK_L4PART = 2,
+	FI_CK_L4FULL = 4
+} ipf_cksum_t;
+
 typedef	struct	fr_info	{
 	void	*fin_main_soft;
 	void	*fin_ifp;		/* interface packet is `on' */
@@ -422,7 +430,7 @@ typedef	struct	fr_info	{
 	u_short	fin_off;
 	int	fin_depth;		/* Group nesting depth */
 	int	fin_error;		/* Error code to return */
-	int	fin_cksum;		/* -1 = bad, 1 = good, 0 = not done */
+	ipf_cksum_t	fin_cksum;	/* -1 = bad, 1 = good, 0 = not done */
 	fr_breason_t	fin_reason;	/* why auto blocked */
 	u_int	fin_pktnum;
 	void	*fin_nattag;
@@ -834,9 +842,6 @@ typedef	struct	frentry {
 
 #define	FR_NOLOGTAG	0
 
-#ifndef	offsetof
-#define	offsetof(t,m)	(size_t)((&((t *)0L)->m))
-#endif
 #define	FR_CMPSIZ	(sizeof(struct frentry) - \
 			 offsetof(struct frentry, fr_func))
 #define	FR_NAME(_f, _n)	(_f)->fr_names + (_f)->_n
@@ -1366,7 +1371,8 @@ typedef	struct	ipfobj	{
 #define	IPFOBJ_STATETQTAB	19	/* struct ipftq * NSTATES */
 #define	IPFOBJ_IPFEXPR		20
 #define	IPFOBJ_PROXYCTL		21	/* strct ap_ctl */
-#define	IPFOBJ_COUNT		22	/* How many #defines are above this? */
+#define	IPFOBJ_FRIPF		22	/* structfripf */
+#define	IPFOBJ_COUNT		23	/* How many #defines are above this? */
 
 
 typedef	union	ipftunevalptr	{
@@ -1635,25 +1641,25 @@ typedef struct ipf_main_softc_s {
 	int		ipf_pass;
 	int		ipf_minttl;
 	int		ipf_icmpminfragmtu;
-	int		ipf_interror;
-	int		ipf_specfuncref[3][2];
-#ifdef IPFILTER_XID
-	int		ipf_xid_debug;
-#endif
-        u_int		ipf_tcpidletimeout;
-        u_int		ipf_tcpclosewait;
-        u_int		ipf_tcplastack;
-        u_int		ipf_tcptimewait;
-        u_int		ipf_tcptimeout;
-        u_int		ipf_tcpsynsent;
-        u_int		ipf_tcpsynrecv;
-        u_int		ipf_tcpclosed;
-        u_int		ipf_tcphalfclosed;
-        u_int		ipf_udptimeout;
-        u_int		ipf_udpacktimeout;
-        u_int		ipf_icmptimeout;
-        u_int		ipf_icmpacktimeout;
-        u_int		ipf_iptimeout;
+	int		ipf_interror;	/* Should be in a struct that is per  */
+					/* thread or process. Does not belong */
+					/* here but there's a lot more work   */
+					/* in doing that properly. For now,   */
+					/* it is squatting. */
+	u_int		ipf_tcpidletimeout;
+	u_int		ipf_tcpclosewait;
+	u_int		ipf_tcplastack;
+	u_int		ipf_tcptimewait;
+	u_int		ipf_tcptimeout;
+	u_int		ipf_tcpsynsent;
+	u_int		ipf_tcpsynrecv;
+	u_int		ipf_tcpclosed;
+	u_int		ipf_tcphalfclosed;
+	u_int		ipf_udptimeout;
+	u_int		ipf_udpacktimeout;
+	u_int		ipf_icmptimeout;
+	u_int		ipf_icmpacktimeout;
+	u_int		ipf_iptimeout;
 	u_long		ipf_ticks;
 	u_long		ipf_userifqs;
 	u_long		ipf_rb_no_mem;
@@ -1949,7 +1955,7 @@ extern	int		ipf_zerostats(ipf_main_softc_t *, char *);
 extern	int		ipf_getnextrule(ipf_main_softc_t *, ipftoken_t *,
 					void *);
 extern	int		ipf_sync(ipf_main_softc_t *, void *);
-extern	void		ipf_token_deref(ipf_main_softc_t *, ipftoken_t *);
+extern	int		ipf_token_deref(ipf_main_softc_t *, ipftoken_t *);
 extern	void		ipf_token_expire(ipf_main_softc_t *);
 extern	ipftoken_t	*ipf_token_find(ipf_main_softc_t *, int, int, void *);
 extern	void		ipf_token_free(ipf_main_softc_t *, ipftoken_t *);
@@ -1990,7 +1996,7 @@ extern	int	icmptoicmp6unreach[ICMP_MAX_UNREACH];
 extern	int	icmpreplytype6[ICMP6_MAXTYPE + 1];
 #endif
 #ifdef	IPFILTER_COMPAT
-extern	int	ipf_in_compat(ipf_main_softc_t *, ipfobj_t *, void *);
+extern	int	ipf_in_compat(ipf_main_softc_t *, ipfobj_t *, void *,int);
 extern	int	ipf_out_compat(ipf_main_softc_t *, ipfobj_t *, void *);
 #endif
 extern	int	icmpreplytype4[ICMP_MAXTYPE + 1];

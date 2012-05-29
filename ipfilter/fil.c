@@ -1003,7 +1003,7 @@ ipf_pr_tcp6(fin)
 	if (ipf_pr_tcpcommon(fin) == 0) {
 		u_char p = fin->fin_p;
 
-		fin->fin_p = IPPROTO_UDP;
+		fin->fin_p = IPPROTO_TCP;
 		ipf_checkv6sum(fin);
 		fin->fin_p = p;
 	}
@@ -1781,6 +1781,8 @@ ipf_pr_ipv4hdr(fin)
 	fin->fin_crc += fi->fi_saddr;
 	fi->fi_daddr = ip->ip_dst.s_addr;
 	fin->fin_crc += fi->fi_daddr;
+	if (IN_CLASSD(fi->fi_daddr))
+		fin->fin_flx |= FI_MULTICAST|FI_MBCAST;
 
 	/*
 	 * set packet attribute flags based on the offset and
@@ -2438,8 +2440,8 @@ ipf_scanlist(fin, pass)
 	u_32_t pass;
 {
 	ipf_main_softc_t *softc = fin->fin_main_soft;
-	int rulen, portcmp, off, skip;
 	struct frentry *fr, *fnext;
+	int rulen, portcmp, off;
 	u_32_t passt, passo;
 
 	/*
@@ -2456,7 +2458,6 @@ ipf_scanlist(fin, pass)
 	if (fr == NULL)
 		return pass;
 
-	skip = 0;
 	portcmp = 0;
 	fin->fin_depth++;
 	fin->fin_fr = NULL;
@@ -2597,7 +2598,8 @@ ipf_scanlist(fin, pass)
 		fin->fin_rule = rulen;
 
 		passo = pass;
-		if ((passt & FR_LOGMASK) != FR_LOG) {
+		if (((passt & FR_LOGMASK) != FR_LOG) &&
+		    ((passt & FR_LOGMASK) != FR_DECAPSULATE)) {
 			pass = passt;
 		}
 
@@ -2612,14 +2614,14 @@ ipf_scanlist(fin, pass)
 			fin->fin_group[0] = '\0';
 		}
 
-		FR_DEBUG(("pass %#x\n", pass));
+		FR_DEBUG(("pass %#x/%#x/%x\n", passo, pass, passt));
 
 		if (fr->fr_grp != NULL) {
 
 			fin->fin_fr = *fr->fr_grp;
 			FR_VERBOSE(("group %s\n", FR_NAME(fr, fr_grhead)));
 
-			if (FR_ISDECAPS(pass))
+			if (FR_ISDECAPS(passt))
 				passt = ipf_decaps(fin, pass, fr->fr_icode);
 			else
 				passt = ipf_scanlist(fin, pass);
@@ -3455,6 +3457,7 @@ fr_cksum(fin, ip, l4proto, l4hdr)
 		sum += *sp++;
 		sum += *sp++;
 		sum += *sp++;
+		/* This needs to be routing header aware. */
 		sum += *sp++;	/* ip6_dst */
 		sum += *sp++;
 		sum += *sp++;
@@ -4420,6 +4423,7 @@ frrequest(softc, unit, req, data, set, makecopy)
 	fg = NULL;
 	fp = &frd;
 	if (makecopy != 0) {
+		bzero(fp, sizeof(frd));
 		error = ipf_inobj(softc, data, NULL, fp, IPFOBJ_FRENTRY);
 		if (error) {
 			return error;
@@ -4433,6 +4437,7 @@ frrequest(softc, unit, req, data, set, makecopy)
 			IPFERROR(131);
 			return ENOMEM;
 		}
+		bzero(f, fp->fr_size);
 		error = ipf_inobjsz(softc, data, f, IPFOBJ_FRENTRY,
 				    fp->fr_size);
 		if (error) {
@@ -4442,6 +4447,7 @@ frrequest(softc, unit, req, data, set, makecopy)
 
 		fp = f;
 		f = NULL;
+		fp->fr_dnext = NULL;
 		fp->fr_ref = 0;
 		fp->fr_flags |= FR_COPIED;
 	} else {
@@ -4643,12 +4649,22 @@ frrequest(softc, unit, req, data, set, makecopy)
 				error = ENOMEM;
 				goto donenolock;
 			}
-			error = COPYIN(uptr, ptr, fp->fr_dsize);
-			if (error != 0) {
-				softc->ipf_interror = 17;
-				KFREES(ptr, fp->fr_dsize);
-				error = EFAULT;
-				goto donenolock;
+
+			/*
+			 * The bcopy case is for when the data is appended
+			 * to the rule by ipf_in_compat().
+			 */
+			if (uptr >= (void *)fp &&
+			    uptr < (void *)((char *)fp + fp->fr_size)) {
+				bcopy(uptr, ptr, fp->fr_dsize);
+				error = 0;
+			} else {
+				error = COPYIN(uptr, ptr, fp->fr_dsize);
+				if (error != 0) {
+					IPFERROR(17);
+					error = EFAULT;
+					goto donenolock;
+				}
 			}
 		} else {
 			ptr = uptr;
@@ -6065,6 +6081,9 @@ ipf_getifname(ifp, buffer)
 /* EIO if ipfilter is not running.   Also checks if write perms are req'd   */
 /* for the device in order to execute the ioctl.  A special case is made    */
 /* SIOCIPFINTERROR so that the same code isn't required in every handler.   */
+/* The context data pointer is passed through as this is used as the key    */
+/* for locating a matching token for continued access for walking lists,    */
+/* etc.                                                                     */
 /* ------------------------------------------------------------------------ */
 int
 ipf_ioctlswitch(softc, unit, data, cmd, mode, uid, ctx)
@@ -6170,26 +6189,29 @@ ipf_ioctlswitch(softc, unit, data, cmd, mode, uid, ctx)
  * 1 = minimum size, not absolute size
  */
 static	int	ipf_objbytes[IPFOBJ_COUNT][3] = {
-	{ 1,	sizeof(struct frentry),		4013400 },
-	{ 1,	sizeof(struct friostat),	4013300 },
-	{ 0,	sizeof(struct fr_info),		4013200 },
+	{ 1,	sizeof(struct frentry),		5010000 },
+	{ 1,	sizeof(struct friostat),	5010000 },
+	{ 0,	sizeof(struct fr_info),		5010000 },
 	{ 0,	sizeof(struct ipf_authstat),	4010100 },
-	{ 0,	sizeof(struct ipfrstat),	4010100 },
-	{ 1,	sizeof(struct ipnat),		4011400 },
-	{ 0,	sizeof(struct natstat),		4013200 },
-	{ 0,	sizeof(struct ipstate_save),	4013400 },
-	{ 1,	sizeof(struct nat_save),	4013400 },
-	{ 0,	sizeof(struct natlookup),	4010100 },
-	{ 1,	sizeof(struct ipstate),		4011600 },
-	{ 0,	sizeof(struct ips_stat),	4012100 },
-	{ 0,	sizeof(struct frauth),		4013200 },
+	{ 0,	sizeof(struct ipfrstat),	5010000 },
+	{ 1,	sizeof(struct ipnat),		5010000 },
+	{ 0,	sizeof(struct natstat),		5010000 },
+	{ 0,	sizeof(struct ipstate_save),	5010000 },
+	{ 1,	sizeof(struct nat_save),	5010000 },
+	{ 0,	sizeof(struct natlookup),	5010000 },
+	{ 1,	sizeof(struct ipstate),		5010000 },
+	{ 0,	sizeof(struct ips_stat),	5010000 },
+	{ 0,	sizeof(struct frauth),		5010000 },
 	{ 0,	sizeof(struct ipftune),		4010100 },
-	{ 0,	sizeof(struct nat),		4012500 },
+	{ 0,	sizeof(struct nat),		5010000 },
 	{ 0,	sizeof(struct ipfruleiter),	4011400 },
 	{ 0,	sizeof(struct ipfgeniter),	4011400 },
 	{ 0,	sizeof(struct ipftable),	4011400 },
 	{ 0,	sizeof(struct ipflookupiter),	4011400 },
 	{ 0,	sizeof(struct ipftq) * IPF_TCP_NSTATES },
+	{ 0,	0,				0	}, /* IPFEXPR */
+	{ 0,	0,				0	}, /* PROXYCTL */
+	{ 0,	sizeof (struct fripf),		5010000	}
 };
 
 
@@ -6230,38 +6252,38 @@ ipf_inobj(softc, data, objp, ptr, type)
 		objp = &obj;
 	error = BCOPYIN(data, objp, sizeof(*objp));
 	if (error != 0) {
-		softc->ipf_interror = 124;
+		IPFERROR(124);
 		return EFAULT;
 	}
 
 	if (objp->ipfo_type != type) {
-		softc->ipf_interror = 50;
+		IPFERROR(50);
 		return EINVAL;
 	}
 
 	if (objp->ipfo_rev >= ipf_objbytes[type][2]) {
 		if ((ipf_objbytes[type][0] & 1) != 0) {
 			if (objp->ipfo_size < ipf_objbytes[type][1]) {
-				softc->ipf_interror = 51;
+				IPFERROR(51);
 				return EINVAL;
 			}
 			size =  ipf_objbytes[type][1];
 		} else if (objp->ipfo_size == ipf_objbytes[type][1]) {
 			size =  objp->ipfo_size;
 		} else {
-			softc->ipf_interror = 52;
+			IPFERROR(52);
 			return EINVAL;
 		}
 		error = COPYIN(objp->ipfo_ptr, ptr, size);
 		if (error != 0) {
-			softc->ipf_interror = 55;
+			IPFERROR(55);
 			error = EFAULT;
 		}
 	} else {
 #ifdef  IPFILTER_COMPAT
-		error = ipf_in_compat(softc, objp, ptr);
+		error = ipf_in_compat(softc, objp, ptr, 0);
 #else
-		softc->ipf_interror = 54;
+		IPFERROR(54);
 		error = EINVAL;
 #endif
 	}
@@ -6295,37 +6317,37 @@ ipf_inobjsz(softc, data, ptr, type, sz)
 	int error;
 
 	if ((type < 0) || (type >= IPFOBJ_COUNT)) {
-		softc->ipf_interror = 56;
+		IPFERROR(56);
 		return EINVAL;
 	}
 
 	error = BCOPYIN(data, &obj, sizeof(obj));
 	if (error != 0) {
-		softc->ipf_interror = 125;
+		IPFERROR(125);
 		return EFAULT;
 	}
 
 	if (obj.ipfo_type != type) {
-		softc->ipf_interror = 58;
+		IPFERROR(58);
 		return EINVAL;
 	}
 
 	if (obj.ipfo_rev >= ipf_objbytes[type][2]) {
 		if (((ipf_objbytes[type][0] & 1) == 0) ||
 		    (sz < ipf_objbytes[type][1])) {
-			softc->ipf_interror = 57;
+			IPFERROR(57);
 			return EINVAL;
 		}
 		error = COPYIN(obj.ipfo_ptr, ptr, sz);
 		if (error != 0) {
-			softc->ipf_interror = 61;
+			IPFERROR(61);
 			error = EFAULT;
 		}
 	} else {
 #ifdef	IPFILTER_COMPAT
-		error = ipf_in_compat(softc, &obj, ptr);
+		error = ipf_in_compat(softc, &obj, ptr, sz);
 #else
-		softc->ipf_interror = 60;
+		IPFERROR(60);
 		error = EINVAL;
 #endif
 	}
@@ -6523,24 +6545,16 @@ int ipf_outobjk(softc, obj, ptr)
 /*                                                                          */
 /* If possible, calculate the layer 4 checksum for the packet.  If this is  */
 /* not possible, return without indicating a failure or success but in a    */
-/* way that is ditinguishable.                                              */
+/* way that is ditinguishable. This function should only be called by the   */
+/* ipf_checkv6sum() for each platform.                                      */
 /* ------------------------------------------------------------------------ */
-int
+INLINE int
 ipf_checkl4sum(fin)
 	fr_info_t *fin;
 {
 	u_short sum, hdrsum, *csump;
 	udphdr_t *udp;
 	int dosum;
-
-	if ((fin->fin_flx & FI_NOCKSUM) != 0)
-		return 0;
-
-	if (fin->fin_cksum == -1)
-		return -1;
-
-	if (fin->fin_cksum == 1)
-		return 0;
 
 	/*
 	 * If the TCP packet isn't a fragment, isn't too short and otherwise
@@ -6555,47 +6569,37 @@ ipf_checkl4sum(fin)
 	dosum = 0;
 	sum = 0;
 
-#if SOLARIS && defined(_KERNEL) && (SOLARIS2 >= 6) && defined(ICK_VALID)
-	if (dohwcksum && ((*fin->fin_mp)->b_ick_flag == ICK_VALID)) {
-		hdrsum = 0;
-		sum = 0;
-	} else {
-#endif
-		switch (fin->fin_p)
-		{
-		case IPPROTO_TCP :
-			csump = &((tcphdr_t *)fin->fin_dp)->th_sum;
+	switch (fin->fin_p)
+	{
+	case IPPROTO_TCP :
+		csump = &((tcphdr_t *)fin->fin_dp)->th_sum;
+		dosum = 1;
+		break;
+
+	case IPPROTO_UDP :
+		udp = fin->fin_dp;
+		if (udp->uh_sum != 0) {
+			csump = &udp->uh_sum;
 			dosum = 1;
-			break;
-
-		case IPPROTO_UDP :
-			udp = fin->fin_dp;
-			if (udp->uh_sum != 0) {
-				csump = &udp->uh_sum;
-				dosum = 1;
-			}
-			break;
-
-		case IPPROTO_ICMP :
-			csump = &((struct icmp *)fin->fin_dp)->icmp_cksum;
-			dosum = 1;
-			break;
-
-		default :
-			return 1;
-			/*NOTREACHED*/
 		}
+		break;
 
-		if (csump != NULL)
-			hdrsum = *csump;
+	case IPPROTO_ICMP :
+		csump = &((struct icmp *)fin->fin_dp)->icmp_cksum;
+		dosum = 1;
+		break;
 
-		if (dosum) {
-			sum = fr_cksum(fin, fin->fin_ip,
-				       fin->fin_p, fin->fin_dp);
-		}
-#if SOLARIS && defined(_KERNEL) && (SOLARIS2 >= 6) && defined(ICK_VALID)
+	default :
+		return 1;
+		/*NOTREACHED*/
 	}
-#endif
+
+	if (csump != NULL)
+		hdrsum = *csump;
+
+	if (dosum) {
+		sum = fr_cksum(fin, fin->fin_ip, fin->fin_p, fin->fin_dp);
+	}
 #if !defined(_KERNEL)
 	if (sum == hdrsum) {
 		FR_DEBUG(("checkl4sum: %hx == %hx\n", sum, hdrsum));
@@ -6603,11 +6607,12 @@ ipf_checkl4sum(fin)
 		FR_DEBUG(("checkl4sum: %hx != %hx\n", sum, hdrsum));
 	}
 #endif
+	DT2(l4sums, u_short, hdrsum, u_short, sum);
 	if (hdrsum == sum) {
-		fin->fin_cksum = 1;
+		fin->fin_cksum = FI_CK_SUMOK;
 		return 0;
 	}
-	fin->fin_cksum = -1;
+	fin->fin_cksum = FI_CK_BAD;
 	return -1;
 }
 
@@ -7452,16 +7457,16 @@ ipf_token_expire(softc)
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    ipf_token_del                                                */
+/* Function:    ipf_token_del                                               */
 /* Returns:     int     - 0 = success, else error                           */
-/* Parameters:  softc(I)- pointer to soft context main structure           */
+/* Parameters:  softc(I)- pointer to soft context main structure            */
 /*              type(I) - the token type to match                           */
 /*              uid(I)  - uid owning the token                              */
 /*              ptr(I)  - context pointer for the token                     */
 /*                                                                          */
 /* This function looks for a a token in the current list that matches up    */
 /* the fields (type, uid, ptr).  If none is found, ESRCH is returned, else  */
-/* call ipf_token_free() to remove it from the list.                         */
+/* call ipf_token_free() to remove it from the list.                        */
 /* ------------------------------------------------------------------------ */
 int
 ipf_token_del(softc, type, uid, ptr)
@@ -7476,13 +7481,13 @@ ipf_token_del(softc, type, uid, ptr)
 	error = ESRCH;
 
 	WRITE_ENTER(&softc->ipf_tokens);
-	for (it = softc->ipf_token_head; it != NULL; it = it->ipt_next)
+	for (it = softc->ipf_token_head; it != NULL; it = it->ipt_next) {
 		if (ptr == it->ipt_ctx && type == it->ipt_type &&
 		    uid == it->ipt_uid) {
 			ipf_token_free(softc, it);
-			IPFERROR(83);
 			error = 0;
 			break;
+		}
 	}
 	RWLOCK_EXIT(&softc->ipf_tokens);
 
@@ -7547,7 +7552,7 @@ ipf_token_find(softc, type, uid, ptr)
 		it->ipt_uid = uid;
 		it->ipt_type = type;
 		it->ipt_next = NULL;
-		it->ipt_ref = 2;
+		it->ipt_ref = 1;
 		it->ipt_complete = 0;
 	} else {
 		if (new != NULL) {
@@ -7555,19 +7560,20 @@ ipf_token_find(softc, type, uid, ptr)
 			new = NULL;
 		}
 
-		ipf_token_unlink(softc, it);
-		it->ipt_ref++;
+		if (it->ipt_complete == 1)
+			it = NULL;
+		else
+			ipf_token_unlink(softc, it);
 	}
 
-	if (it->ipt_complete == 0) {
+	if (it != NULL) {
 		it->ipt_pnext = softc->ipf_token_tail;
 		*softc->ipf_token_tail = it;
 		softc->ipf_token_tail = &it->ipt_next;
 		it->ipt_next = NULL;
+		it->ipt_ref++;
 
 		it->ipt_die = softc->ipf_ticks + 20;
-	} else {
-		it = NULL;
 	}
 
 	RWLOCK_EXIT(&softc->ipf_tokens);
@@ -7599,12 +7605,14 @@ ipf_token_unlink(softc, token)
 	*token->ipt_pnext = token->ipt_next;
 	if (token->ipt_next != NULL)
 		token->ipt_next->ipt_pnext = token->ipt_pnext;
+	token->ipt_next = NULL;
+	token->ipt_pnext = NULL;
 }
 
 
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_token_deref                                             */
-/* Returns:     None.                                                       */
+/* Returns:     int      - 0 == token freed, else reference count           */
 /* Parameters:  softc(I) - pointer to soft context main structure           */
 /*              token(I) - pointer to token structure                       */
 /* Write Locks: ipf_tokens                                                  */
@@ -7613,16 +7621,17 @@ ipf_token_unlink(softc, token)
 /* call the dereference function for the token type because it is then      */
 /* possible to free the token data structure.                               */
 /* ------------------------------------------------------------------------ */
-void
+int
 ipf_token_deref(softc, token)
 	ipf_main_softc_t *softc;
 	ipftoken_t *token;
 {
 	void *data, **datap;
 
+	ASSERT(token->ipt_ref > 0);
 	token->ipt_ref--;
 	if (token->ipt_ref > 0)
-		return;
+		return token->ipt_ref;
 
 	data = token->ipt_data;
 	datap = &data;
@@ -7662,6 +7671,7 @@ ipf_token_deref(softc, token)
 	}
 
 	KFREE(token);
+	return 0;
 }
 
 
@@ -7762,6 +7772,7 @@ ipf_getnextrule(softc, t, ptr)
 		}
 	} else {
 		next = fr->fr_next;
+		(void) ipf_derefrule(softc, &fr);
 	}
 
 	obj.ipfo_type = IPFOBJ_FRENTRY;
@@ -7789,7 +7800,13 @@ ipf_getnextrule(softc, t, ptr)
 	if (error == 0 && t->ipt_data != NULL) {
 		dst += obj.ipfo_size;
 		if (next->fr_data != NULL) {
-			error = COPYOUT(next->fr_data, dst, next->fr_dsize);
+			ipfobj_t dobj;
+
+			dobj.ipfo_type = IPFOBJ_FRIPF;
+			dobj.ipfo_size = next->fr_dsize;
+			dobj.ipfo_rev = obj.ipfo_rev;
+			dobj.ipfo_ptr = dst;
+			error = ipf_outobjk(softc, &dobj, next->fr_data);
 			if (error != 0)
 				IPFERROR(90);
 		}
@@ -8434,7 +8451,6 @@ ipf_decaps(fin, pass, l5proto)
 	m->m_len -= elen;
 #endif
 	fin->fin_plen -= elen;
-	fin->fin_ipoff += elen;
 
 	ip = (ip_t *)((char *)fin->fin_ip + elen);
 
@@ -9414,13 +9430,11 @@ ipf_create_all(arg)
 		return NULL;
 	}
 
-#ifdef IPFILTER_SYNC
 	softc->ipf_sync_soft = ipf_sync_soft_create(softc);
 	if (softc->ipf_sync_soft == NULL) {
 		ipf_destroy_all(softc);
 		return NULL;
 	}
-#endif
 
 	softc->ipf_state_soft = ipf_state_soft_create(softc);
 	if (softc->ipf_state_soft == NULL) {
@@ -9497,12 +9511,10 @@ ipf_destroy_all(softc)
 		softc->ipf_proxy_soft = NULL;
 	}
 
-#ifdef IPFILTER_SYNC
 	if (softc->ipf_sync_soft != NULL) {
 		ipf_sync_soft_destroy(softc, softc->ipf_sync_soft);
 		softc->ipf_sync_soft = NULL;
 	}
-#endif
 
 	if (softc->ipf_lookup_soft != NULL) {
 		ipf_lookup_soft_destroy(softc, softc->ipf_lookup_soft);
@@ -9544,10 +9556,8 @@ ipf_init_all(softc)
 	if (ipf_lookup_soft_init(softc, softc->ipf_lookup_soft) == -1)
 		return -1;
 
-#ifdef IPFILTER_SYNC
 	if (ipf_sync_soft_init(softc, softc->ipf_sync_soft) == -1)
 		return -1;
-#endif
 
 	if (ipf_state_soft_init(softc, softc->ipf_state_soft) == -1)
 		return -1;
@@ -9596,10 +9606,8 @@ ipf_fini_all(softc)
 	if (ipf_state_soft_fini(softc, softc->ipf_state_soft) == -1)
 		return -1;
 
-#ifdef IPFILTER_SYNC
 	if (ipf_sync_soft_fini(softc, softc->ipf_sync_soft) == -1)
 		return -1;
-#endif
 
 	if (ipf_lookup_soft_fini(softc, softc->ipf_lookup_soft) == -1)
 		return -1;

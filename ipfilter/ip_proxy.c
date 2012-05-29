@@ -86,12 +86,15 @@ struct file;
 
 /* END OF INCLUDES */
 
+#include "netinet/ip_dns_pxy.c"
 #include "netinet/ip_ftp_pxy.c"
+#include "netinet/ip_tftp_pxy.c"
 #include "netinet/ip_rcmd_pxy.c"
 #include "netinet/ip_pptp_pxy.c"
 #if defined(_KERNEL)
 # include "netinet/ip_irc_pxy.c"
 # include "netinet/ip_raudio_pxy.c"
+# include "netinet/ip_h323_pxy.c"
 # include "netinet/ip_netbios_pxy.c"
 #endif
 #include "netinet/ip_ipsec_pxy.c"
@@ -212,6 +215,21 @@ static	aproxy_t	ips_proxies[] = {
 	  ipf_p_pptp_inout, ipf_p_pptp_inout, NULL,
 	  NULL, NULL, NULL, NULL },
 #endif
+#ifdef  IPF_H323_PROXY
+	{ NULL, NULL, "h323", (char)IPPROTO_TCP, 0, 0, 0,
+	  ipf_p_h323_main_load, ipf_p_h323_main_unload,
+	  NULL, NULL,
+	  NULL, NULL,
+	  ipf_p_h323_new, ipf_p_h323_del,
+	  ipf_p_h323_in, NULL, NULL,
+	  NULL, NULL, NULL, NULL },
+	{ NULL, NULL, "h245", (char)IPPROTO_TCP, 0, 0, 0, NULL, NULL,
+	  NULL, NULL,
+	  NULL, NULL,
+	  ipf_p_h245_new, NULL,
+	  NULL, ipf_p_h245_out, NULL,
+	  NULL, NULL, NULL, NULL },
+#endif
 #ifdef	IPF_RPCB_PROXY
 # ifndef _KERNEL
 	{ NULL, NULL, "rpcbt", (char)IPPROTO_TCP, 0, 0, 0,
@@ -241,10 +259,9 @@ static	aproxy_t	ips_proxies[] = {
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    ipf_proxy_init                                              */
-/* Returns:     int - -1 == error, 0 == success                             */
-/* Parameters:  fin(I) - pointer to packet information                      */
-/*              nat(I) - pointer to current NAT session                     */
+/* Function:    ipf_proxy_main_load                                         */
+/* Returns:     int    - 0 == success, else failure.                        */
+/* Parameters:  Nil                                                         */
 /*                                                                          */
 /* Initialise hook for kernel application proxies.                          */
 /* Call the initialise routine for all the compiled in kernel proxies.      */
@@ -263,8 +280,8 @@ ipf_proxy_main_load()
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    ipf_proxy_unload                                            */
-/* Returns:     Nil                                                         */
+/* Function:    ipf_proxy_main_unload                                       */
+/* Returns:     int - 0 == success, else failure.                           */
 /* Parameters:  Nil                                                         */
 /*                                                                          */
 /* Unload hook for kernel application proxies.                              */
@@ -286,6 +303,13 @@ ipf_proxy_main_unload()
 }
 
 
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_proxy_soft_create                                       */
+/* Returns:     void *   -                                                  */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*                                                                          */
+/* Build the structure to hold all of the run time data to support proxies. */
+/* ------------------------------------------------------------------------ */
 void *
 ipf_proxy_soft_create(softc)
 	ipf_main_softc_t *softc;
@@ -349,6 +373,15 @@ failed:
 }
 
 
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_proxy_soft_create                                       */
+/* Returns:     void *   -                                                  */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              orig(I)  - pointer to proxy definition to copy              */
+/*                                                                          */
+/* This function clones a proxy definition given by orig and returns a      */
+/* a pointer to that copy.                                                  */
+/* ------------------------------------------------------------------------ */
 static aproxy_t *
 ipf_proxy_create_clone(softc, orig)
 	ipf_main_softc_t *softc;
@@ -379,6 +412,16 @@ ipf_proxy_create_clone(softc, orig)
 }
 
 
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_proxy_soft_create                                       */
+/* Returns:     int      - 0 == success, else failure.                      */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              arg(I)   - pointer to proxy contect data                    */
+/*                                                                          */
+/* Initialise the proxy context and walk through each of the proxies and    */
+/* call its initialisation function. This allows for proxies to do any      */
+/* local setup prior to actual use.                                         */
+/* ------------------------------------------------------------------------ */
 int
 ipf_proxy_soft_init(softc, arg)
 	ipf_main_softc_t *softc;
@@ -412,6 +455,16 @@ ipf_proxy_soft_init(softc, arg)
 }
 
 
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_proxy_soft_create                                       */
+/* Returns:     int      - 0 == success, else failure.                      */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              arg(I)   - pointer to proxy contect data                    */
+/*                                                                          */
+/* This function should always succeed. It is responsible for ensuring that */
+/* the proxy context can be safely called when ipf_proxy_soft_destroy is    */
+/* called and suring all of the proxies have similarly been instructed.     */
+/* ------------------------------------------------------------------------ */
 int
 ipf_proxy_soft_fini(softc, arg)
 	ipf_main_softc_t *softc;
@@ -437,6 +490,14 @@ ipf_proxy_soft_fini(softc, arg)
 }
 
 
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_proxy_soft_destroy                                      */
+/* Returns:     Nil                                                         */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              arg(I)   - pointer to proxy contect data                    */
+/*                                                                          */
+/* Free up all of the local data structures allocated during creation.      */
+/* ------------------------------------------------------------------------ */
 void
 ipf_proxy_soft_destroy(softc, arg)
 	ipf_main_softc_t *softc;
@@ -466,9 +527,11 @@ ipf_proxy_soft_destroy(softc, arg)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_proxy_flush                                             */
 /* Returns:     Nil                                                         */
-/* Parameters:  fin(I) - pointer to packet information                      */
-/*              nat(I) - pointer to current NAT session                     */
+/* Parameters:  arg(I)   - pointer to proxy contect data                    */
+/*              how(I)   - indicates the type of flush operation            */
 /*                                                                          */
+/* Walk through all of the proxies and pass on the flush command as either  */
+/* a flush or a clear.                                                      */
 /* ------------------------------------------------------------------------ */
 void
 ipf_proxy_flush(arg, how)
@@ -498,7 +561,7 @@ ipf_proxy_flush(arg, how)
 
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_proxy_add                                               */
-/* Returns:     int - -1 == error, 0 == success                             */
+/* Returns:     int   - 0 == success, else failure.                         */
 /* Parameters:  ap(I) - pointer to proxy structure                          */
 /*                                                                          */
 /* Dynamically add a new kernel proxy.  Ensure that it is unique in the     */
@@ -542,8 +605,10 @@ ipf_proxy_add(arg, ap)
 
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_proxy_ctl                                               */
-/* Returns:     int - 0 == success, else error                              */
-/* Parameters:  ctl(I) - pointer to proxy control structure                 */
+/* Returns:     int    - 0 == success, else error                           */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              arg(I)   - pointer to proxy context                         */
+/*              ctl(I)   - pointer to proxy control structure               */
 /*                                                                          */
 /* Check to see if the proxy this control request has come through for      */
 /* exists, and if it does and it has a control function then invoke that    */
@@ -584,7 +649,7 @@ ipf_proxy_ctl(softc, arg, ctl)
 
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_proxy_del                                               */
-/* Returns:     int - -1 == error, 0 == success                             */
+/* Returns:     int   - 0 == success, else failure.                         */
 /* Parameters:  ap(I) - pointer to proxy structure                          */
 /*                                                                          */
 /* Delete a proxy that has been added dynamically from those available.     */
@@ -614,19 +679,24 @@ ipf_proxy_del(ap)
 
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_proxy_ok                                                */
-/* Returns:     int - 1 == good match else not.                             */
+/* Returns:     int    - 1 == good match else not.                          */
 /* Parameters:  fin(I) - pointer to packet information                      */
+/*              tcp(I) - pointer to TCP/UDP header                          */
 /*              nat(I) - pointer to current NAT session                     */
 /*                                                                          */
+/* This function extends the NAT matching to ensure that a packet that has  */
+/* arrived matches the proxy information attached to the NAT rule. Notably, */
+/* if the proxy is scheduled to be deleted then packets will not match the  */
+/* rule even if the rule is still active.                                   */
 /* ------------------------------------------------------------------------ */
 int
-ipf_proxy_ok(fin, tcp, nat)
+ipf_proxy_ok(fin, tcp, np)
 	fr_info_t *fin;
 	tcphdr_t *tcp;
-	ipnat_t *nat;
+	ipnat_t *np;
 {
-	aproxy_t *apr = nat->in_apr;
-	u_short dport = nat->in_odport;
+	aproxy_t *apr = np->in_apr;
+	u_short dport = np->in_odport;
 
 	if ((apr == NULL) || (apr->apr_flags & APR_DELETE) ||
 	    (fin->fin_p != apr->apr_p))
@@ -639,9 +709,12 @@ ipf_proxy_ok(fin, tcp, nat)
 
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_proxy_ioctl                                             */
-/* Returns:     int - 0 == success, else error                              */
-/* Parameters:  fin(I) - pointer to packet information                      */
-/*              nat(I) - pointer to current NAT session                     */
+/* Returns:     int    - 0 == success, else error                           */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              data(I)  - pointer to ioctl data                            */
+/*              cmd(I)   - ioctl command                                    */
+/*              mode(I)  - mode bits for device                             */
+/*              ctx(I)   - pointer to context information                   */
 /*                                                                          */
 /* ------------------------------------------------------------------------ */
 int
@@ -684,7 +757,8 @@ ipf_proxy_ioctl(softc, data, cmd, mode, ctx)
 		}
 
 		if (error == 0)
-			error = ipf_proxy_ctl(softc, softc->ipf_proxy_soft, &ctl);
+			error = ipf_proxy_ctl(softc, softc->ipf_proxy_soft,
+					      &ctl);
 
 		if ((error != 0) && (ptr != NULL)) {
 			KFREES(ptr, ctl.apc_dsize);
@@ -701,12 +775,14 @@ ipf_proxy_ioctl(softc, data, cmd, mode, ctx)
 
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_proxy_match                                             */
-/* Returns:     int - -1 == error, 0 == success                             */
+/* Returns:     int    - 0 == success, else error                           */
 /* Parameters:  fin(I) - pointer to packet information                      */
 /*              nat(I) - pointer to current NAT session                     */
 /*                                                                          */
 /* If a proxy has a match function, call that to do extended packet         */
-/* matching.                                                                */
+/* matching. Whilst other parts of the NAT code are rather lenient when it  */
+/* comes to the quality of the packet that it will transform, the proxy     */
+/* matching is not because they need to work with data, not just headers.   */
 /* ------------------------------------------------------------------------ */
 int
 ipf_proxy_match(fin, nat)
@@ -754,7 +830,7 @@ ipf_proxy_match(fin, nat)
 
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_proxy_new                                               */
-/* Returns:     int - -1 == error, 0 == success                             */
+/* Returns:     int    - 0 == success, else error                           */
 /* Parameters:  fin(I) - pointer to packet information                      */
 /*              nat(I) - pointer to current NAT session                     */
 /*                                                                          */
@@ -842,16 +918,15 @@ ipf_proxy_check(fin, nat)
 {
 	ipf_main_softc_t *softc = fin->fin_main_soft;
 	ipf_proxy_softc_t *softp = softc->ipf_proxy_soft;
-#if SOLARIS && defined(_KERNEL) && (SOLARIS2 >= 6)
-# if defined(ICK_VALID)
+#if SOLARIS && defined(_KERNEL) && defined(ICK_VALID)
 	mb_t *m;
-# endif
-	int dosum = 1;
 #endif
 	tcphdr_t *tcp = NULL;
 	udphdr_t *udp = NULL;
 	ap_session_t *aps;
 	aproxy_t *apr;
+	short adjlen;
+	int dosum;
 	ip_t *ip;
 	short rv;
 	int err;
@@ -890,13 +965,16 @@ ipf_proxy_check(fin, nat)
 			}
 #endif
 		ip = fin->fin_ip;
+		dosum = 1;
 
 		switch (fin->fin_p)
 		{
 		case IPPROTO_TCP :
 			tcp = (tcphdr_t *)fin->fin_dp;
 
-#if SOLARIS && defined(_KERNEL) && (SOLARIS2 >= 6) && defined(ICK_VALID)
+			if (fin->fin_cksum > FI_CK_SUMOK)
+				dosum = 0;
+#if SOLARIS && defined(_KERNEL) && defined(ICK_VALID)
 			m = fin->fin_qfm;
 			if (dohwcksum && (m->b_ick_flag == ICK_VALID))
 				dosum = 0;
@@ -919,10 +997,12 @@ ipf_proxy_check(fin, nat)
 		err = 0;
 		if (fin->fin_out != 0) {
 			if (apr->apr_outpkt != NULL)
-				err = (*apr->apr_outpkt)(apr->apr_soft, fin, aps, nat);
+				err = (*apr->apr_outpkt)(apr->apr_soft, fin,
+							 aps, nat);
 		} else {
 			if (apr->apr_inpkt != NULL)
-				err = (*apr->apr_inpkt)(apr->apr_soft, fin, aps, nat);
+				err = (*apr->apr_inpkt)(apr->apr_soft, fin,
+							aps, nat);
 		}
 
 		rv = APR_EXIT(err);
@@ -934,7 +1014,7 @@ ipf_proxy_check(fin, nat)
 			return -1;
 
 		if (rv == 2) {
-			ipf_proxy_free(apr);
+			ipf_proxy_deref(apr);
 			nat->nat_aps = NULL;
 			return -1;
 		}
@@ -944,15 +1024,13 @@ ipf_proxy_check(fin, nat)
 		 * so we need to recalculate the header checksums for the
 		 * packet.
 		 */
+		adjlen = err & 0xffff;
 #if !defined(_KERNEL) || defined(MENTAT) || defined(__sgi)
-		if (err != 0) {
-			short adjlen = err & 0xffff;
-
-			s1 = LONG_SUM(fin->fin_plen - adjlen);
-			s2 = LONG_SUM(fin->fin_plen);
-			CALC_SUMD(s1, s2, sd);
-			ipf_fix_outcksum(fin, &ip->ip_sum, sd);
-		}
+		s1 = LONG_SUM(fin->fin_plen - adjlen);
+		s2 = LONG_SUM(fin->fin_plen);
+		CALC_SUMD(s1, s2, sd);
+		if ((err != 0) && (fin->fin_cksum < FI_CK_L4PART))
+			ipf_fix_outcksum(0, &ip->ip_sum, sd, 0);
 #endif
 
 		/*
@@ -966,17 +1044,23 @@ ipf_proxy_check(fin, nat)
 		 */
 		if (tcp != NULL) {
 			err = ipf_proxy_fixseqack(fin, ip, aps, APR_INC(err));
-#if SOLARIS && defined(_KERNEL) && (SOLARIS2 >= 6)
-			if (dosum)
-#endif
+			if (dosum) {
 				tcp->th_sum = fr_cksum(fin, ip,
 						       IPPROTO_TCP, tcp);
+			} else if (fin->fin_cksum == FI_CK_L4PART) {
+				u_short sum = ntohs(tcp->th_sum);
+				sum += adjlen;
+				tcp->th_sum = htons(sum);
+			}
 		} else if ((udp != NULL) && (udp->uh_sum != 0)) {
-#if SOLARIS && defined(_KERNEL) && (SOLARIS2 >= 6)
-			if (dosum)
-#endif
+			if (dosum) {
 				udp->uh_sum = fr_cksum(fin, ip,
 						       IPPROTO_UDP, udp);
+			} else if (fin->fin_cksum == FI_CK_L4PART) {
+				u_short sum = ntohs(udp->uh_sum);
+				sum += adjlen;
+				udp->uh_sum = htons(sum);
+			}
 		}
 		aps->aps_bytes += fin->fin_plen;
 		aps->aps_pkts++;
@@ -989,8 +1073,9 @@ ipf_proxy_check(fin, nat)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_proxy_lookup                                            */
 /* Returns:     int - -1 == error, 0 == success                             */
-/* Parameters:  fin(I) - pointer to packet information                      */
-/*              nat(I) - pointer to current NAT session                     */
+/* Parameters:  arg(I)  - pointer to proxy context information              */
+/*              pr(I)   - protocol number for proxy                         */
+/*              name(I) - proxy name                                        */
 /*                                                                          */
 /* Search for an proxy by the protocol it is being used with and its name.  */
 /* ------------------------------------------------------------------------ */
@@ -1020,13 +1105,14 @@ ipf_proxy_lookup(arg, pr, name)
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    ipf_proxy_free                                              */
+/* Function:    ipf_proxy_deref                                             */
 /* Returns:     Nil                                                         */
 /* Parameters:  ap(I) - pointer to proxy structure                          */
 /*                                                                          */
+/* Drop the reference counter associated with the proxy.                    */
 /* ------------------------------------------------------------------------ */
 void
-ipf_proxy_free(ap)
+ipf_proxy_deref(ap)
 	aproxy_t *ap;
 {
 	ap->apr_ref--;
@@ -1036,18 +1122,19 @@ ipf_proxy_free(ap)
 /* ------------------------------------------------------------------------ */
 /* Function:    aps_free                                                    */
 /* Returns:     Nil                                                         */
-/* Parameters:  fin(I) - pointer to packet information                      */
-/*              nat(I) - pointer to current NAT session                     */
-/*                                                                          */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              aps(I)   - pointer to current proxy session                 */
 /* Locks Held:  ipf_nat_new, ipf_nat(W)                                     */
+/*                                                                          */
+/* Free up proxy session information allocated to be used with a NAT        */
+/* session.                                                                 */
 /* ------------------------------------------------------------------------ */
 void
-aps_free(softc, arg, aps)
+aps_free(softc, aps)
 	ipf_main_softc_t *softc;
-	void *arg;
 	ap_session_t *aps;
 {
-	ipf_proxy_softc_t *softp = arg;
+	ipf_proxy_softc_t *softp = softc->ipf_proxy_soft;
 	ap_session_t *a, **ap;
 	aproxy_t *apr;
 
@@ -1072,10 +1159,16 @@ aps_free(softc, arg, aps)
 
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_proxy_fixseqack                                         */
-/* Returns:     int -  2 if TCP ack/seq is changed, else 0                  */
+/* Returns:     int    - 2 if TCP ack/seq is changed, else 0                */
 /* Parameters:  fin(I) - pointer to packet information                      */
+/*              ip(I)  - pointer to IP header                               */
 /*              nat(I) - pointer to current NAT session                     */
+/*              inc(I) - delta to apply to TCP sequence numbering           */
 /*                                                                          */
+/* Adjust the TCP sequence/acknowledge numbers in the TCP header based on   */
+/* whether or not the new header is past the point at which an adjustment   */
+/* occurred. This might happen because of (say) an FTP string being changed */
+/* and the new string being a different length to the old.                  */
 /* ------------------------------------------------------------------------ */
 static int
 ipf_proxy_fixseqack(fin, ip, aps, inc)

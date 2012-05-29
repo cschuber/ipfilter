@@ -621,8 +621,8 @@ ipf_checkv4sum(fin)
 	if ((fin->fin_flx & FI_SHORT) != 0)
 		return 1;
 
-	if (fin->fin_cksum != 0)
-		return (fin->fin_cksum == 1) ? 0 : -1;
+	if (fin->fin_cksum != FI_CK_NEEDED)
+		return (fin->fin_cksum > FI_CK_NEEDED) ? 0 : -1;
 
 	if (ipf_checkl4sum(fin) == -1) {
 		fin->fin_flx |= FI_BAD;
@@ -643,8 +643,8 @@ ipf_checkv6sum(fin)
 	if ((fin->fin_flx & FI_SHORT) != 0)
 		return 1;
 
-	if (fin->fin_cksum != 0)
-		return (fin->fin_cksum == 1) ? 0 : -1;
+	if (fin->fin_cksum != FI_CK_SUMOK)
+		return (fin->fin_cksum > FI_CK_NEEDED) ? 0 : -1;
 
 	if (ipf_checkl4sum(fin) == -1) {
 		fin->fin_flx |= FI_BAD;

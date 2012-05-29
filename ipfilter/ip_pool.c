@@ -96,7 +96,7 @@ static size_t ipf_pool_flush(ipf_main_softc_t *, void *, iplookupflush_t *);
 static int ipf_pool_node_add(ipf_main_softc_t *, void *, iplookupop_t *, int);
 static int ipf_pool_node_del(ipf_main_softc_t *, void *, iplookupop_t *, int);
 static void ipf_pool_node_deref(ipf_pool_softc_t *, ip_pool_node_t *);
-static int ipf_pool_remove_node(ipf_main_softc_t ipf_pool_softc_t *,
+static int ipf_pool_remove_node(ipf_main_softc_t *, ipf_pool_softc_t *,
 				ip_pool_t *, ip_pool_node_t *);
 static int ipf_pool_search(ipf_main_softc_t *, void *, int, void *, u_int);
 static void *ipf_pool_soft_create(ipf_main_softc_t *);

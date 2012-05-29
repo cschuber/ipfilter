@@ -77,7 +77,8 @@
 #ifndef	APR_LABELLEN
 #define	APR_LABELLEN	16
 #endif
-#define	NAT_HW_CKSUM	0x80000000
+#define	NAT_HW_CKSUM		0x80000000
+#define	NAT_HW_CKSUM_PART	0x40000000
 
 #define	DEF_NAT_AGE	1200     /* 10 minutes (600 seconds) */
 
@@ -470,7 +471,8 @@ typedef struct	natinfo	{
 
 
 typedef	struct nat_stat_side {
-	u_int	ns_inuse;
+	u_int	*ns_bucketlen;
+	nat_t	**ns_table;
 	u_long	ns_added;
 	u_long	ns_appr_fail;
 	u_long	ns_badnat;
@@ -497,6 +499,7 @@ typedef	struct nat_stat_side {
 	u_long	ns_ifpaddrfail;
 	u_long	ns_ignored;
 	u_long	ns_insert_fail;
+	u_long	ns_inuse;
 	u_long	ns_log;
 	u_long	ns_lookup_miss;
 	u_long	ns_lookup_nowild;
@@ -510,12 +513,14 @@ typedef	struct nat_stat_side {
 	u_long	ns_xlate_exists;
 	u_long	ns_ipf_proxy_fail;
 	u_long	ns_uncreate[2];
-	u_int	*ns_bucketlen;
-	nat_t	**ns_table;
 } nat_stat_side_t;
 
 
 typedef	struct	natstat	{
+	nat_t		*ns_instances;
+	ipnat_t		*ns_list;
+	hostmap_t	*ns_maplist;
+	hostmap_t	**ns_maptable;
 	u_int		ns_active;
 	u_long		ns_addtrpnt;
 	u_long		ns_divert_build;
@@ -532,10 +537,6 @@ typedef	struct	natstat	{
 	u_long		ns_log_ok;
 	u_long		ns_log_fail;
 	u_int		ns_hostmap_sz;
-	nat_t		*ns_instances;
-	ipnat_t		*ns_list;
-	hostmap_t	*ns_maplist;
-	hostmap_t	**ns_maptable;
 	u_int		ns_nattab_sz;
 	u_int		ns_nattab_max;
 	u_int		ns_orphans;
@@ -669,8 +670,8 @@ typedef struct ipf_nat_softc_s {
 extern	frentry_t 	ipfnatblock;
 
 extern	void	ipf_fix_datacksum(u_short *, u_32_t);
-extern	void	ipf_fix_incksum(fr_info_t *, u_short *, u_32_t);
-extern	void	ipf_fix_outcksum(fr_info_t *, u_short *, u_32_t);
+extern	void	ipf_fix_incksum(int, u_short *, u_32_t, u_32_t);
+extern	void	ipf_fix_outcksum(int, u_short *, u_32_t, u_32_t);
 
 extern	int	ipf_nat_checkin(fr_info_t *, u_32_t *);
 extern	int	ipf_nat_checkout(fr_info_t *, u_32_t *);
@@ -692,8 +693,6 @@ extern	int	ipf_nat_in(fr_info_t *, nat_t *, int, u_32_t);
 extern	int	ipf_nat_insert(ipf_main_softc_t *, ipf_nat_softc_t *, nat_t *);
 extern	int	ipf_nat_ioctl(ipf_main_softc_t *, caddr_t, ioctlcmd_t,
 			      int, int, void *);
-extern	frentry_t *ipf_nat_ipfin(fr_info_t *, u_32_t *);
-extern	frentry_t *ipf_nat_ipfout(fr_info_t *, u_32_t *);
 extern	void	ipf_nat_log(ipf_main_softc_t *, ipf_nat_softc_t *,
 			    struct nat *, u_int);
 extern	nat_t	*ipf_nat_lookupredir(natlookup_t *);
@@ -710,8 +709,6 @@ extern	void	ipf_nat_setqueue(ipf_main_softc_t *, ipf_nat_softc_t *,
 extern	void	ipf_nat_setpending(ipf_main_softc_t *, nat_t *);
 extern	nat_t	*ipf_nat_tnlookup(fr_info_t *, int);
 extern	void	ipf_nat_update(fr_info_t *, nat_t *);
-extern	frentry_t *ipf_nat_ipfin(fr_info_t *, u_32_t *);
-extern	frentry_t *ipf_nat_ipfout(fr_info_t *, u_32_t *);
 extern	int	ipf_nat_in(fr_info_t *, nat_t *, int, u_32_t);
 extern	int	ipf_nat_out(fr_info_t *, nat_t *, int, u_32_t);
 extern	int	ipf_nat_rehash(ipf_main_softc_t *, ipftuneable_t *,
@@ -750,8 +747,6 @@ extern	nat_t	*ipf_nat6_icmperrorlookup(fr_info_t *, int);
 extern	nat_t	*ipf_nat6_inlookup(fr_info_t *, u_int, u_int,
 				   struct in6_addr *, struct in6_addr *);
 extern	u_32_t	ipf_nat6_ip6subtract(i6addr_t *, i6addr_t *);
-extern	frentry_t *ipf_nat6_ipfin(fr_info_t *, u_32_t *);
-extern	frentry_t *ipf_nat6_ipfout(fr_info_t *, u_32_t *);
 extern	nat_t	*ipf_nat6_lookupredir(natlookup_t *);
 extern	int	ipf_nat6_newmap(fr_info_t *, nat_t *, natinfo_t *);
 extern	int	ipf_nat6_newrdr(fr_info_t *, nat_t *, natinfo_t *);

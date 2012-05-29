@@ -203,10 +203,15 @@ ipf_modload()
 	char *defpass, *c, *str;
 	int i, j, error;
 
+	if (ipf_load_all() != 0)
+		return EIO;
+
+	if (ipf_create_all(&ipfmain) == NULL)
+		return EIO;
+
 	error = ipfattach(&ipfmain);
-	if (error) {
+	if (error)
 		return error;
-	}
 
 	for (i = 0; i < IPL_LOGSIZE; i++)
 		ipf_devs[i] = NULL;

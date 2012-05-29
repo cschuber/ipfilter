@@ -4,6 +4,10 @@
  * See the IPFILTER.LICENCE file for details on licencing.
  */
 #include <sys/types.h>
+#ifdef _KERNEL
+# include <sys/systm.h>
+#endif
+#include <sys/signal.h>
 
 #include "ip_compat.h"
 #include "ip_fil.h"

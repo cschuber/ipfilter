@@ -9,7 +9,7 @@
 
 #include <linux/version.h>
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
-# define __irq_h        1       /* stop it being included! */
+# define __irq_h	1	/* stop it being included! */
 #else
 # define _LINUX_TCP_H
 #endif
@@ -507,8 +507,8 @@ ipf_checkv4sum(fr_info_t *fin)
 	if ((fin->fin_flx & FI_SHORT) != 0)
 		return 1;
 
-	if (fin->fin_cksum != 0)
-		return (fin->fin_cksum == 1) ? 0 : -1;
+	if (fin->fin_cksum != FI_CK_NEEDED)
+		return (fin->fin_cksum > FI_CK_NEEDED) ? 0 : -1;
 
 	/*
 	 * Linux 2.4.20-8smp (RedHat 9)
