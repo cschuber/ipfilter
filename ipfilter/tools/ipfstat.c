@@ -823,13 +823,13 @@ static void printlivelist(fiop, out, set, fp, group, comment)
 
 		n++;
 
-		if (opts & (OPT_HITS|OPT_VERBOSE))
+		if (opts & (OPT_HITS|OPT_DEBUG))
 #ifdef	USE_QUAD_T
 			PRINTF("%"PRIu64" ", (unsigned long long) fp->fr_hits);
 #else
 			PRINTF("%lu ", fp->fr_hits);
 #endif
-		if (opts & (OPT_ACCNT|OPT_VERBOSE))
+		if (opts & (OPT_ACCNT|OPT_DEBUG))
 #ifdef	USE_QUAD_T
 			PRINTF("%"PRIu64" ", (unsigned long long) fp->fr_bytes);
 #else
@@ -842,7 +842,7 @@ static void printlivelist(fiop, out, set, fp, group, comment)
 			fp->fr_die -= fiop->f_ticks;
 
 		printfr(fp, ioctl);
-		if (opts & OPT_VERBOSE) {
+		if (opts & OPT_DEBUG) {
 			binprint(fp, fp->fr_size);
 			if (fp->fr_data != NULL && fp->fr_dsize > 0)
 				binprint(fp->fr_data, fp->fr_dsize);
@@ -939,13 +939,13 @@ static void printdeadlist(fiop, out, set, fp, group, comment)
 			}
 		}
 
-		if (opts & (OPT_HITS|OPT_VERBOSE))
+		if (opts & OPT_HITS)
 #ifdef	USE_QUAD_T
 			PRINTF("%"PRIu64" ", (unsigned long long) fb.fr_hits);
 #else
 			PRINTF("%lu ", fb.fr_hits);
 #endif
-		if (opts & (OPT_ACCNT|OPT_VERBOSE))
+		if (opts & OPT_ACCNT)
 #ifdef	USE_QUAD_T
 			PRINTF("%"PRIu64" ", (unsigned long long) fb.fr_bytes);
 #else
