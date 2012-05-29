@@ -605,6 +605,16 @@ If Path MTU discovery is being used and the "do not fragment" flag
 is set in packets to be encapsulated, an ICMP error message will
 be sent back to the sender if the new packet would need to be
 fragmented.
+.SH COMMON OPTIONS
+This section deals with options that are available with all rules.
+.TP
+.B purge
+When the purge keyword is added to the end of a NAT rule, it will
+cause all of the active NAT sessions to be removed when the rule
+is removed as an individual operation. If all of the NAT rules
+are flushed out, it is expected that the operator will similarly
+flush the NAT table and thus NAT sessions are not removed when the
+NAT rules are flushed out.
 .SH RULE ORDERING
 .PP
 .B NOTE:
