@@ -56,7 +56,7 @@ load_dstlist(dst, iocfunc, nodes)
 	}
 
 	for (a = nodes; a != NULL; a = a->ipfd_next)
-		load_dstlistnode(dst->ipld_unit, dest.ipld_name, a, 0, iocfunc);
+		load_dstlistnode(dst->ipld_unit, dest.ipld_name, a, iocfunc);
 
 	if ((opts & OPT_REMOVE) != 0) {
 		if (pool_ioctl(iocfunc, SIOCLOOKUPDELTABLE, &op))

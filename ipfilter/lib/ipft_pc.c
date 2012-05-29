@@ -213,6 +213,8 @@ static	int	ipcap_readip(mb, ifn, dir)
 	char	*buf;
 	int	cnt;
 
+	ifn = ifn;	/* gcc -Wextra */
+	dir = dir;	/* gcc -Wextra */
 	buf = (char *)mb->mb_buf;
 	cnt = sizeof(mb->mb_buf);
 	l = llcp;

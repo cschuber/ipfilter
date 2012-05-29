@@ -40,7 +40,7 @@ int	opts = 0;
 int	outputc = 0;
 int	use_inet6 = 0;
 
-static	void	procfile(char *, char *);
+static	void	procfile(char *);
 static	void	flushfilter(char *, int *);
 static	void	set_state(u_int);
 static	void	showstats(friostat_t *);
@@ -109,7 +109,7 @@ int main(argc,argv)
 			opts ^= OPT_DEBUG;
 			break;
 		case 'f' :
-			procfile(argv[0], optarg);
+			procfile(optarg);
 			break;
 		case 'F' :
 			flushfilter(optarg, filter);
@@ -234,8 +234,8 @@ static	void	set_state(enable)
 }
 
 
-static	void	procfile(name, file)
-	char	*name, *file;
+static	void	procfile(file)
+	char	*file;
 {
 	(void) opendevice(ipfname, 1);
 

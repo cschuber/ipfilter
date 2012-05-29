@@ -14,8 +14,7 @@ static u_char ipf_trap0_2[] = { 6, 10, 0x2b, 6, 1, 4, 1, 0xcd, 0x4c, 1, 1, 2 };
 
 static int writeint(u_char *, int);
 static int writelength(u_char *, u_int);
-static int maketrap_v1(char *, u_char *, int, u_char *, int, u_32_t,
-		       u_int, time_t);
+static int maketrap_v1(char *, u_char *, int, u_char *, int, u_32_t, time_t);
 static void snmpv1_destroy(void *);
 static void *snmpv1_dup(void *);
 static int snmpv1_match(void *, void *);
@@ -296,14 +295,13 @@ writeint(buffer, value)
  * 1.3.6.1.4.1.9932.1.1
  */
 static int
-maketrap_v1(community, buffer, bufsize, msg, msglen, ipaddr, code, when)
+maketrap_v1(community, buffer, bufsize, msg, msglen, ipaddr, when)
 	char *community;
 	u_char *buffer;
 	int bufsize;
 	u_char *msg;
 	int msglen;
 	u_32_t ipaddr;
-	u_int code;
 	time_t when;
 {
 	u_char *s = buffer, *t, *pdulen, *varlen;
@@ -455,7 +453,7 @@ sendtrap_v1_0(fd, community, msg, msglen, when)
 	int n;
 
 	n = maketrap_v1(community, buffer, sizeof(buffer),
-			(u_char *)msg, msglen, 0, 0, when);
+			(u_char *)msg, msglen, 0, when);
 	if (n > 0) {
 		return send(fd, buffer, n, 0);
 	}

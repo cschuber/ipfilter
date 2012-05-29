@@ -154,7 +154,7 @@ load_http(char *url)
 			u = strchr(buffer, '#');
 			if (u != NULL) {
 				*u = '\0';
-				if (u == buffer);
+				if (u == buffer)
 					continue;
 			}
 

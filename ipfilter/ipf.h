@@ -272,8 +272,7 @@ extern int ippool_parsesome(int, FILE *, ioctlfunc_t);
 extern int kmemcpywrap(void *, void *, size_t);
 extern char *kvatoname(ipfunc_t, ioctlfunc_t);
 extern int load_dstlist(struct ippool_dst *, ioctlfunc_t, ipf_dstnode_t *);
-extern int load_dstlistnode(int, char *, struct ipf_dstnode *, int,
-			    ioctlfunc_t);
+extern int load_dstlistnode(int, char *, struct ipf_dstnode *, ioctlfunc_t);
 extern alist_t *load_file(char *);
 extern int load_hash(struct iphtable_s *, struct iphtent_s *, ioctlfunc_t);
 extern int load_hashnode(int, char *, struct iphtent_s *, int, ioctlfunc_t);
@@ -320,7 +319,7 @@ extern void printlookup(char *, i6addr_t *addr, i6addr_t *mask);
 extern void printmask(int, u_32_t *);
 extern void printnataddr(int, char *, nat_addr_t *, int);
 extern void printnatfield(nat_t *, int);
-extern void printnatside(char *, natstat_t *, nat_stat_side_t *);
+extern void printnatside(char *, nat_stat_side_t *);
 extern void printpacket(int, mb_t *);
 extern void printpacket6(int, mb_t *);
 extern struct ippool_dst *printdstlist(struct ippool_dst *, copyfunc_t,
@@ -352,7 +351,6 @@ extern int remove_hash(struct iphtable_s *, ioctlfunc_t);
 extern int remove_hashnode(int, char *, struct iphtent_s *, ioctlfunc_t);
 extern int remove_pool(ip_pool_t *, ioctlfunc_t);
 extern int remove_poolnode(int, char *, ip_pool_node_t *, ioctlfunc_t);
-extern u_char tcp_flags(char *, u_char *, int);
 extern u_char tcpflags(char *);
 extern void printc(struct frentry *);
 extern void printC(int);
@@ -373,7 +371,7 @@ extern void printipfexpr(int *);
 extern void printstatefield(ipstate_t *, int);
 extern void printstatefieldhdr(int);
 extern int sendtrap_v1_0(int, char *, char *, int, time_t);
-extern int sendtrap_v2_0(int, char *, char *, int, time_t);
+extern int sendtrap_v2_0(int, char *, char *, int);
 extern int vtof(int);
 
 extern void set_variable(char *, char *);

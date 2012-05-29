@@ -493,6 +493,7 @@ log" },
 	{	120025,	"error copying out dest. list statistics" },
 	{	120026,	"cannot allocate memory for destination node" },
 	{	120027,	"error copying in destination node" },
+	{	120028,	"cannot allocate memory for destination context " },
 /* -------------------------------------------------------------------------- */
 	{	130001,	"ioctl denied by system security level" },
 	{	130002,	"ioctl operation on invalid minor device" },

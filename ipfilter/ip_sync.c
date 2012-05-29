@@ -156,8 +156,10 @@ ipf_sync_soft_create(softc)
 	ipf_sync_softc_t *softs;
 
 	KMALLOC(softs, ipf_sync_softc_t *);
-	if (softs == NULL)
+	if (softs == NULL) {
+		IPFERROR(110024);
 		return NULL;
+	}
 
 	bzero((char *)softs, sizeof(*softs));
 

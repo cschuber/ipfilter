@@ -8,9 +8,8 @@
 #include "ipf.h"
 
 void
-printnatside(side, nsp, ns)
+printnatside(side, ns)
 	char *side;
-	natstat_t *nsp;
 	nat_stat_side_t *ns;
 {
 	PRINTF("%lu\tproxy fail %s\n", ns->ns_appr_fail, side);

@@ -33,5 +33,6 @@ void printsbuf(char *buf);
 void printsbuf(buf)
 	char *buf;
 {
+	buf = buf;	/* gcc -Wextra */
 }
 #endif

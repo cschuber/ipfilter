@@ -139,7 +139,6 @@ LIBOBJS=$(DEST)/addicmp.o \
      $(DEST)/save_v1trap.o \
      $(DEST)/save_v2trap.o \
      $(DEST)/tcpflags.o \
-     $(DEST)/tcp_flags.o \
      $(DEST)/var.o \
      $(DEST)/verbose.o \
      $(DEST)/vtof.o \
@@ -427,8 +426,6 @@ $(DEST)/rwlock_emul.o: $(LIBSRC)/rwlock_emul.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/rwlock_emul.c -o $@
 $(DEST)/tcpflags.o: $(LIBSRC)/tcpflags.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/tcpflags.c -o $@
-$(DEST)/tcp_flags.o: $(LIBSRC)/tcp_flags.c $(INCDEP)
-	$(CC) $(CCARGS) -c $(LIBSRC)/tcp_flags.c -o $@
 $(DEST)/var.o: $(LIBSRC)/var.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/var.c -o $@
 $(DEST)/verbose.o: $(LIBSRC)/verbose.c $(INCDEP)

@@ -557,48 +557,48 @@ static void ipfstate_dead(kernel, fiopp, ipsstpp, ifrstpp, frauthstpp, frfp)
 
 	void *rules[2][2];
 	struct nlist deadlist[44] = {
-		{ "ipf_auth_stats" },		/* 0 */
-		{ "fae_list" },
-		{ "ipauth" },
-		{ "ipf_auth_list" },
-		{ "ipf_auth_start" },
-		{ "ipf_auth_end" },		/* 5 */
-		{ "ipf_auth_next" },
-		{ "ipf_auth" },
-		{ "ipf_auth_used" },
-		{ "ipf_auth_size" },
-		{ "ipf_auth_defaultage" },	/* 10 */
-		{ "ipf_auth_pkts" },
-		{ "ipf_auth_lock" },
-		{ "frstats" },
-		{ "ips_stats" },
-		{ "ips_num" },			/* 15 */
-		{ "ips_wild" },
-		{ "ips_list" },
-		{ "ips_table" },
-		{ "ipf_state_max" },
-		{ "ipf_state_size" },		/* 20 */
-		{ "ipf_state_doflush" },
-		{ "ipf_state_lock" },
-		{ "ipfr_heads" },
-		{ "ipfr_nattab" },
-		{ "ipfr_stats" },		/* 25 */
-		{ "ipfr_inuse" },
-		{ "ipf_ipfrttl" },
-		{ "ipf_frag_lock" },
-		{ "ipfr_timer_id" },
-		{ "ipf_nat_lock" },		/* 30 */
-		{ "ipf_rules" },
-		{ "ipf_acct" },
-		{ "ipl_frouteok" },
-		{ "ipf_running" },
-		{ "ipf_groups" },		/* 35 */
-		{ "ipf_active" },
-		{ "ipf_pass" },
-		{ "ipf_flags" },
-		{ "ipf_state_logging" },
-		{ "ips_tqtqb" },		/* 40 */
-		{ NULL }
+		{ "ipf_auth_stats",	0, 0, 0, 0 },		/* 0 */
+		{ "fae_list",		0, 0, 0, 0 },
+		{ "ipauth",		0, 0, 0, 0 },
+		{ "ipf_auth_list",		0, 0, 0, 0 },
+		{ "ipf_auth_start",		0, 0, 0, 0 },
+		{ "ipf_auth_end",		0, 0, 0, 0 },		/* 5 */
+		{ "ipf_auth_next",		0, 0, 0, 0 },
+		{ "ipf_auth",		0, 0, 0, 0 },
+		{ "ipf_auth_used",		0, 0, 0, 0 },
+		{ "ipf_auth_size",		0, 0, 0, 0 },
+		{ "ipf_auth_defaultage",		0, 0, 0, 0 },	/* 10 */
+		{ "ipf_auth_pkts",		0, 0, 0, 0 },
+		{ "ipf_auth_lock",		0, 0, 0, 0 },
+		{ "frstats",		0, 0, 0, 0 },
+		{ "ips_stats",		0, 0, 0, 0 },
+		{ "ips_num",		0, 0, 0, 0 },			/* 15 */
+		{ "ips_wild",		0, 0, 0, 0 },
+		{ "ips_list",		0, 0, 0, 0 },
+		{ "ips_table",		0, 0, 0, 0 },
+		{ "ipf_state_max",		0, 0, 0, 0 },
+		{ "ipf_state_size",		0, 0, 0, 0 },		/* 20 */
+		{ "ipf_state_doflush",		0, 0, 0, 0 },
+		{ "ipf_state_lock",		0, 0, 0, 0 },
+		{ "ipfr_heads",		0, 0, 0, 0 },
+		{ "ipfr_nattab",		0, 0, 0, 0 },
+		{ "ipfr_stats",		0, 0, 0, 0 },		/* 25 */
+		{ "ipfr_inuse",		0, 0, 0, 0 },
+		{ "ipf_ipfrttl",		0, 0, 0, 0 },
+		{ "ipf_frag_lock",		0, 0, 0, 0 },
+		{ "ipfr_timer_id",		0, 0, 0, 0 },
+		{ "ipf_nat_lock",		0, 0, 0, 0 },		/* 30 */
+		{ "ipf_rules",		0, 0, 0, 0 },
+		{ "ipf_acct",		0, 0, 0, 0 },
+		{ "ipl_frouteok",		0, 0, 0, 0 },
+		{ "ipf_running",		0, 0, 0, 0 },
+		{ "ipf_groups",		0, 0, 0, 0 },		/* 35 */
+		{ "ipf_active",		0, 0, 0, 0 },
+		{ "ipf_pass",		0, 0, 0, 0 },
+		{ "ipf_flags",		0, 0, 0, 0 },
+		{ "ipf_state_logging",		0, 0, 0, 0 },
+		{ "ips_tqtqb",		0, 0, 0, 0 },		/* 40 */
+		{ NULL,		0, 0, 0, 0 }
 	};
 
 

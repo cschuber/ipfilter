@@ -19,7 +19,7 @@
 #ifdef	linux
 #include <linux/sockios.h>
 #endif
-#include "tcpip.h"
+#include "netinet/tcpip.h"
 #include "ipt.h"
 
 extern	int	resolve(char *, char *);
