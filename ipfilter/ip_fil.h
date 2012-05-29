@@ -1924,8 +1924,7 @@ extern	u_32_t		ipf_random __P((void));
 
 extern	int		ipf_main_load __P((void));
 extern	void		*ipf_main_soft_create __P((void *));
-extern	void		ipf_main_soft_destroy __P((ipf_main_softc_t *,
-						   void *arg));
+extern	void		ipf_main_soft_destroy __P((ipf_main_softc_t *));
 extern	int		ipf_main_soft_init __P((ipf_main_softc_t *));
 extern	int		ipf_main_soft_fini __P((ipf_main_softc_t *));
 extern	int		ipf_main_unload __P((void));
