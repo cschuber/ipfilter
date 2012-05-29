@@ -998,7 +998,7 @@ ipf_proxy_check(fin, nat)
 			return -1;
 
 		if (rv == 2) {
-			ipf_proxy_free(apr);
+			ipf_proxy_deref(apr);
 			nat->nat_aps = NULL;
 			return -1;
 		}
