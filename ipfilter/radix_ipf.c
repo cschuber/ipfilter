@@ -579,7 +579,9 @@ ipf_rx_delete(head, addr, mask)
 	ipf_rdx_mask_t *m;
 	int count;
 
-	found = ipf_rx_find_addr(head->root, (u_32_t *)addr);
+	found = ipf_rx_lookup(head, addr, mask);
+	if (found == NULL)
+		return NULL;
 	if (found->root == 1)
 		return NULL;
 	count = count_mask_bits(mask, NULL);
@@ -630,8 +632,8 @@ ipf_rx_delete(head, addr, mask)
 		 * attach in place of "found".
 		 */
 		prev = found + 1;
+		cur = parent->parent;
 		if (parent != found + 1) {
-			cur = parent->parent;
 			if (cur->right == parent) {
 				if (prev->right != parent)
 					prev->right->parent = parent;
@@ -876,6 +878,13 @@ ipf_rx_create()
 		return NULL;
 	bzero((char *)softr, sizeof(*softr));
 
+	KMALLOCS(softr->zeros, u_char *, 3 * sizeof(addrfamily_t));
+	if (softr->zeros == NULL) {
+		KFREE(softr);
+		return (NULL);
+	}
+	softr->ones = softr->zeros + sizeof(addrfamily_t);
+
 	return softr;
 }
 
@@ -885,11 +894,9 @@ ipf_rx_init(ctx)
 {
 	radix_softc_t *softr = ctx;
 
-	KMALLOCS(softr->zeros, u_char *, 3 * sizeof(addrfamily_t));
-	if (softr->zeros == NULL)
-		return (-1);
-	softr->ones = softr->zeros + sizeof(addrfamily_t);
+	memset(softr->zeros, 0, 3 * sizeof(addrfamily_t));
 	memset(softr->ones, 0xff, sizeof(addrfamily_t));
+
 	return (0);
 }
 
@@ -1206,7 +1213,6 @@ add_addr(rnh, n, item)
 	stp->dst.adf_family = AF_INET;
 	stp->dst.adf_len = sizeof(stp->dst.adf_addr);
 	stp->dst.adf_addr.in4.s_addr = inet_addr(ttable[item][0]);
-	memset(&stp->mask, 0xff, offsetof(addrfamily_t, adf_addr));
 	stp->mask.adf_len = sizeof(stp->mask.adf_addr);
 	stp->mask.adf_addr.in4.s_addr = inet_addr(ttable[item][1]);
 	stp->next = myst_top;
