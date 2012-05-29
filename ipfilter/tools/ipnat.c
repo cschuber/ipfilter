@@ -488,10 +488,10 @@ void dostats(fd, nsp, opts, alive, filter)
 	 * Show statistics ?
 	 */
 	if (opts & OPT_STAT) {
-		printnatside("in", nsp, &nsp->ns_side[0]);
+		printnatside("in", &nsp->ns_side[0]);
 		dotable(nsp, fd, alive, 0, "in");
 
-		printnatside("out", nsp, &nsp->ns_side[1]);
+		printnatside("out", &nsp->ns_side[1]);
 		dotable(nsp, fd, alive, 1, "out");
 
 		printf("%lu\tlog successes\n", nsp->ns_side[0].ns_log);

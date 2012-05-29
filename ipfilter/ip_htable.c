@@ -142,8 +142,10 @@ ipf_htable_soft_create(softc)
 	ipf_htable_softc_t *softh;
 
 	KMALLOC(softh, ipf_htable_softc_t *);
-	if (softh == NULL)
+	if (softh == NULL) {
+		IPFERROR(30026);
 		return NULL;
+	}
 
 	bzero((char *)softh, sizeof(*softh));
 

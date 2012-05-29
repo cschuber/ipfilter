@@ -17,7 +17,7 @@ typedef	struct	{
 
 static ipf_error_entry_t *find_error __P((int));
 
-#define	IPF_NUM_ERRORS	467
+#define	IPF_NUM_ERRORS	470
 
 /*
  * NO REUSE OF NUMBERS!
@@ -227,6 +227,7 @@ static ipf_error_entry_t ipf_errors[IPF_NUM_ERRORS] = {
 	{	30023,	"uid mismatch on node to delete" },
 	{	30024,	"object size incorrect for hash table" },
 	{	30025,	"hash table size must be at least 1"},
+	{	30026,	"cannot allocate memory for hash table context" },
 /* -------------------------------------------------------------------------- */
 	{	40001,	"invalid minor device numebr for log read" },
 	{	40002,	"read size too small" },
@@ -386,6 +387,7 @@ log" },
 	{	70029,	"incorrect mask length in pool node add" },
 	{	70030,	"incorrect address length in pool node remove" },
 	{	70031,	"incorrect mask length in pool node remove" },
+	{	70032,	"cannot allocate memory for pool context" },
 /* -------------------------------------------------------------------------- */
 	{	80001,	"could not find proxy" },
 	{	80002,	"proxy does not support control operations" },
@@ -490,6 +492,7 @@ log" },
 	{	120025,	"error copying out dest. list statistics" },
 	{	120026,	"cannot allocate memory for destination node" },
 	{	120027,	"error copying in destination node" },
+	{	120028,	"cannot allocate memory for destination context " },
 /* -------------------------------------------------------------------------- */
 	{	130001,	"ioctl denied by system security level" },
 	{	130002,	"ioctl operation on invalid minor device" },

@@ -154,8 +154,10 @@ ipf_dstlist_soft_create(softc)
 	ipf_dstl_softc_t *softd;
 
 	KMALLOC(softd, ipf_dstl_softc_t *);
-	if (softd == NULL)
+	if (softd == NULL) {
+		IPFERROR(120028);
 		return NULL;
+	}
 
 	bzero((char *)softd, sizeof(*softd));
 
@@ -235,7 +237,10 @@ ipf_dstlist_soft_fini(softc, arg)
 /*              arg4(I)  - pointer to local context to use                  */
 /*                                                                          */
 /* There is currently no such thing as searching a destination list for an  */
-/* address so this function becomes a no-op.                                */
+/* address so this function becomes a no-op. Its presence is required as    */
+/* ipf_lookup_res_name() stores the "addr_find" function pointer in the     */
+/* pointer passed in to it as funcptr, although it could be a generic null- */
+/* op function rather than a specific one.                                  */
 /* ------------------------------------------------------------------------ */
 /*ARGSUSED*/
 static int

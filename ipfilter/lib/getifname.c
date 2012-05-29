@@ -85,6 +85,7 @@ char *getifname(ptr)
 char *getifname(ptr)
 	struct ifnet *ptr;
 {
+	ptr = ptr;
 	return "X";
 }
 #endif

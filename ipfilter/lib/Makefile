@@ -137,7 +137,6 @@ LIBOBJS=$(DEST)/addicmp.o \
      $(DEST)/save_v1trap.o \
      $(DEST)/save_v2trap.o \
      $(DEST)/tcpflags.o \
-     $(DEST)/tcp_flags.o \
      $(DEST)/var.o \
      $(DEST)/verbose.o \
      $(DEST)/vtof.o \

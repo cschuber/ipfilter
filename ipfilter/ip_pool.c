@@ -269,13 +269,16 @@ ipf_pool_soft_create(softc)
 	ipf_pool_softc_t *softp;
 
 	KMALLOC(softp, ipf_pool_softc_t *);
-	if (softc == NULL)
+	if (softp == NULL) {
+		IPFERROR(70032);
 		return NULL;
+	}
 
 	bzero((char *)softp, sizeof(*softp));
 
 	softp->ipf_radix = ipf_rx_create();
 	if (softp->ipf_radix == NULL) {
+		IPFERROR(70028);
 		KFREE(softp);
 		return NULL;
 	}
