@@ -7417,6 +7417,7 @@ ipf_resolvenic(softc, name, v)
 {
 	void *nic;
 
+	softc = softc;	/* gcc -Wextra */
 	if (name[0] == '\0')
 		return NULL;
 
@@ -9156,7 +9157,7 @@ ipf_main_soft_create(arg)
 						sizeof(ipf_main_tuneables),
 						ipf_main_tuneables);
 	if (softc->ipf_tuners == NULL) {
-		ipf_main_soft_destroy(softc, NULL);
+		ipf_main_soft_destroy(softc);
 		return NULL;
 	}
 
@@ -9225,7 +9226,6 @@ ipf_main_soft_init(softc)
 /* Function:   ipf_main_soft_destroy                                        */
 /* Returns:    void                                                         */
 /* Parameters: softc(I) - pointer to soft context main structure            */
-/*             arg(I)   - not used (present for symmetry.)                  */
 /*                                                                          */
 /* Undo everything that we did in ipf_main_soft_create.                     */
 /*                                                                          */
@@ -9235,9 +9235,8 @@ ipf_main_soft_init(softc)
 /* ------------------------------------------------------------------------ */
 /*ARGSUSED*/
 void
-ipf_main_soft_destroy(softc, arg)
+ipf_main_soft_destroy(softc)
 	ipf_main_softc_t *softc;
-	void *arg;
 {
 
 	RW_DESTROY(&softc->ipf_frag);
@@ -9528,7 +9527,7 @@ ipf_destroy_all(softc)
 	}
 #endif
 
-	ipf_main_soft_destroy(softc, NULL);
+	ipf_main_soft_destroy(softc);
 }
 
 

@@ -1971,7 +1971,7 @@ extern	int		ipf_test_pkt(ipf_main_softc_t *, void *);
 
 extern	int		ipf_main_load(void);
 extern	void		*ipf_main_soft_create(void *);
-extern	void		ipf_main_soft_destroy(ipf_main_softc_t *, void *arg);
+extern	void		ipf_main_soft_destroy(ipf_main_softc_t *);
 extern	int		ipf_main_soft_init(ipf_main_softc_t *);
 extern	int		ipf_main_soft_fini(ipf_main_softc_t *);
 extern	int		ipf_main_unload(void);
