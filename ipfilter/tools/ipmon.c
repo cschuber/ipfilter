@@ -736,7 +736,7 @@ static void print_natlog(conf, buf, blen)
 	switch (nl->nl_type)
 	{
 	case NAT_MAP :
-		strcpy(t, "-NAT ");
+		strcpy(t, "-MAP ");
 		simple = 1;
 		break;
 
@@ -818,16 +818,17 @@ static void print_natlog(conf, buf, blen)
 
 	if (nl->nl_action == NL_EXPIRE || nl->nl_action == NL_FLUSH) {
 #ifdef	USE_QUAD_T
+# ifdef	PRId64
+		sprintf(t, " Pkts %" PRId64 "/%" PRId64 " Bytes %" PRId64 "/%"
+			PRId64,
+# else
 		sprintf(t, " Pkts %qd/%qd Bytes %qd/%qd",
-				(long long)nl->nl_pkts[0],
-				(long long)nl->nl_pkts[1],
-				(long long)nl->nl_bytes[0],
-				(long long)nl->nl_bytes[1]);
+# endif
 #else
 		sprintf(t, " Pkts %ld/%ld Bytes %ld/%ld",
+#endif
 				nl->nl_pkts[0], nl->nl_pkts[1],
 				nl->nl_bytes[0], nl->nl_bytes[1]);
-#endif
 		t += strlen(t);
 	}
 
