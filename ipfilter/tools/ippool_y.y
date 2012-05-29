@@ -51,7 +51,6 @@ static	ippool_dst_t	ipld;
 static	ioctlfunc_t	poolioctl = NULL;
 static	char		poolname[FR_GROUPLEN];
 
-static void ippool_setnodesize __P((ip_pool_node_t *));
 static iphtent_t *add_htablehosts __P((char *));
 static ip_pool_node_t *add_poolhosts __P((char *));
 static ip_pool_node_t *read_whoisfile __P((char *));
@@ -312,13 +311,11 @@ range:	addrmask			{ $$ = calloc(1, sizeof(*$$));
 					  $$->ipn_info = 0;
 					  $$->ipn_addr = $1[0];
 					  $$->ipn_mask = $1[1];
-					  ippool_setnodesize($$);
 					}
 	| '!' addrmask			{ $$ = calloc(1, sizeof(*$$));
 					  $$->ipn_info = 1;
 					  $$->ipn_addr = $2[0];
 					  $$->ipn_mask = $2[1];
-					  ippool_setnodesize($$);
 					}
 	| YY_STR			{ $$ = add_poolhosts($1);
 					  free($1);
@@ -353,45 +350,55 @@ hashentry:
 addrmask:
 	ipaddr '/' mask		{ $$[0] = $1; $$[1] = $3; }
 	| ipaddr		{ $$[0] = $1;
-				  $$[1].adf_addr.i6[0] = 0xffffffff;
-				  $$[1].adf_addr.i6[1] = 0xffffffff;
-				  $$[1].adf_addr.i6[2] = 0xffffffff;
-				  $$[1].adf_addr.i6[3] = 0xffffffff;
+				  $$[1].adf_len = sizeof($$[1].adf_addr);
+#ifdef USE_INET6
+				  if (use_inet6)
+					memset(&$$[1].adf_addr, 0xff,
+					       sizeof($$[1].adf_addr.in6));
+				  else
+#endif
+					memset(&$$[1].adf_addr, 0xff, 
+					       sizeof($$[1].adf_addr.in4));
 				}
 	;
 
 ipaddr:	ipv4			{ $$.adf_addr.in4 = $1;
 				  $$.adf_family = AF_INET;
+				  $$.adf_len = sizeof($$.adf_addr);
 				  use_inet6 = 0;
 				}
 	| YY_NUMBER		{ $$.adf_addr.in4.s_addr = htonl($1);
 				  $$.adf_family = AF_INET;
+				  $$.adf_len = sizeof($$.adf_addr);
 				  use_inet6 = 0;
 				}
 	| YY_IPV6		{ $$.adf_addr = $1;
+				  $$.adf_len = sizeof($$.adf_addr);
 				  $$.adf_family = AF_INET6;
 				  use_inet6 = 1;
 				}
 	;
 
-mask:	YY_NUMBER	{ if (use_inet6) {
+mask:	YY_NUMBER	{ bzero(&$$, sizeof($$));
+			  $$.adf_len = sizeof($$.adf_addr);
+			  if (use_inet6) {
 				if (ntomask(AF_INET6, $1,
 					    (u_32_t *)&$$.adf_addr) == -1)
 					yyerror("bad bitmask");
-				$$.adf_family = AF_INET6;
 			  } else {
 				if (ntomask(AF_INET, $1,
 					    (u_32_t *)&$$.adf_addr.in4) == -1)
 					yyerror("bad bitmask");
-				$$.adf_family = AF_INET;
 			  }
 			}
-	| ipv4				{ $$.adf_addr.in4 = $1;
-					  $$.adf_family = AF_INET;
-					}
-	| YY_IPV6			{ $$.adf_addr = $1;
-					  $$.adf_family = AF_INET6;
-					}
+	| ipv4		{ bzero(&$$, sizeof($$));
+			  $$.adf_len = sizeof($$.adf_addr);
+			  $$.adf_addr.in4 = $1;
+			}
+	| YY_IPV6	{ bzero(&$$, sizeof($$));
+			  $$.adf_len = sizeof($$.adf_addr);
+			  $$.adf_addr = $1;
+			}
 	;
 
 size:	IPT_SIZE '=' YY_NUMBER		{ ipht.iph_size = $3; }
@@ -643,27 +650,6 @@ ioctlfunc_t iocfunc;
 	return 1;
 }
 
-static void ippool_setnodesize(node)
-ip_pool_node_t *node;
-{
-#ifdef AF_INET6
-	  if (use_inet6) {
-		  node->ipn_addr.adf_len = offsetof(addrfamily_t, adf_addr) +
-					   16;
-		  node->ipn_addr.adf_family = AF_INET6;
-		  node->ipn_mask.adf_len = offsetof(addrfamily_t, adf_addr) +
-					   16;
-		  node->ipn_mask.adf_family = AF_INET6;
-	  } else
-#endif
-	  {
-		  node->ipn_addr.adf_len = offsetof(addrfamily_t, adf_addr) + 4;
-		  node->ipn_addr.adf_family = AF_INET;
-		  node->ipn_mask.adf_len = offsetof(addrfamily_t, adf_addr) + 4;
-		  node->ipn_mask.adf_family = AF_INET;
-	  }
-}
-
 
 static iphtent_t *
 add_htablehosts(url)
@@ -695,10 +681,8 @@ char *url;
 			break;
 
 		h->ipe_family = a->al_family;
-		bcopy((char *)&a->al_addr, (char *)&h->ipe_addr,
-		      sizeof(h->ipe_addr));
-		bcopy((char *)&a->al_mask, (char *)&h->ipe_mask,
-		      sizeof(h->ipe_mask));
+		h->ipe_addr = a->al_i6addr;
+		h->ipe_mask = a->al_i6mask;
 
 		if (hbot != NULL)
 			hbot->ipe_next = h;
@@ -741,27 +725,19 @@ char *url;
 		p = calloc(1, sizeof(*p));
 		if (p == NULL)
 			break;
+		p->ipn_mask.adf_addr = a->al_i6mask;
+		p->ipn_mask.adf_len = sizeof(p->ipn_addr.adf_addr);
+		p->ipn_addr.adf_len = sizeof(p->ipn_addr.adf_addr);
 
 		if (a->al_family == AF_INET) {
 			p->ipn_addr.adf_family = AF_INET;
-			p->ipn_addr.adf_len = 8;
-			p->ipn_mask.adf_family = AF_INET;
-			p->ipn_mask.adf_len = 8;
 #ifdef USE_INET6
 		} else if (a->al_family == AF_INET6) {
 			p->ipn_addr.adf_family = AF_INET6;
-			p->ipn_addr.adf_len = 20;
-			p->ipn_mask.adf_family = AF_INET6;
-			p->ipn_mask.adf_len = 20;
 #endif
 		}
-
+		p->ipn_addr.adf_addr = a->al_i6addr;
 		p->ipn_info = a->al_not;
-
-		bcopy((char *)&a->al_addr, (char *)&p->ipn_addr.adf_addr,
-		      sizeof(p->ipn_addr.adf_addr));
-		bcopy((char *)&a->al_mask, (char *)&p->ipn_mask.adf_addr,
-		      sizeof(p->ipn_mask.adf_addr));
 
 		if (pbot != NULL)
 			pbot->ipn_next = p;
