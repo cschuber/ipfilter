@@ -275,11 +275,31 @@ ipf_htable_create(softc, arg, op)
 	iplookupop_t *op;
 {
 	ipf_htable_softc_t *softh = arg;
-	iphtable_t *iph, *oiph;
+	iphtable_t htab, *iph, *oiph;
 	char name[FR_GROUPLEN];
 	int err, i, unit;
 
+	if (op->iplo_size != sizeof(htab)) {
+		IPFERROR(30024);
+		return EINVAL;
+	}
+	err = COPYIN(op->iplo_struct, &htab, sizeof(htab));
+	if (err != 0) {
+		IPFERROR(30003);
+		return EFAULT;
+	}
+
 	unit = op->iplo_unit;
+	if (htab.iph_unit != unit) {
+		IPFERROR(30005);
+		return EINVAL;
+	}
+	if (htab.iph_size < 1) {
+		IPFERROR(30025);
+		return EINVAL;
+	}
+
+
 	if ((op->iplo_arg & IPHASH_ANON) == 0) {
 		iph = ipf_htable_exists(softh, unit, op->iplo_name);
 		if (iph != NULL) {
@@ -299,17 +319,7 @@ ipf_htable_create(softc, arg, op)
 		IPFERROR(30002);
 		return ENOMEM;
 	}
-	err = COPYIN(op->iplo_struct, iph, sizeof(*iph));
-	if (err != 0) {
-		KFREE(iph);
-		IPFERROR(30003);
-		return EFAULT;
-	}
-
-	if (iph->iph_unit != unit) {
-		IPFERROR(30005);
-		return EINVAL;
-	}
+	*iph = htab;
 
 	if ((op->iplo_arg & IPHASH_ANON) != 0) {
 		i = IPHASH_ANON;
@@ -330,6 +340,10 @@ ipf_htable_create(softc, arg, op)
 		(void)strncpy(iph->iph_name, name, sizeof(iph->iph_name));
 		(void)strncpy(op->iplo_name, name, sizeof(op->iplo_name));
 		iph->iph_type |= IPHASH_ANON;
+	} else {
+		(void)strncpy(iph->iph_name, op->iplo_name,
+			      sizeof(iph->iph_name));
+		iph->iph_name[sizeof(iph->iph_name) - 1] = '\0';
 	}
 
 	KMALLOCS(iph->iph_table, iphtent_t **,
@@ -1284,7 +1298,7 @@ ipf_htable_iter_next(softc, arg, token, ilp)
 	case IPFLOOKUPITER_NODE :
 		node = token->ipt_data;
 		if (node == NULL) {
-			iph = ipf_htable_find(arg, ilp->ili_unit + 1,
+			iph = ipf_htable_find(arg, ilp->ili_unit,
 					      ilp->ili_name);
 			if (iph == NULL) {
 				IPFERROR(30009);
