@@ -67,7 +67,6 @@ typedef struct ipf_rdx_head {
 typedef struct radix_softc {
 	u_char			*zeros;
 	u_char			*ones;
-	int			last_zeroed;
 } radix_softc_t;
 
 #undef	RADIX_NODE_HEAD_LOCK
