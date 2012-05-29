@@ -30,13 +30,13 @@ printfr(fp, iocfunc)
 	if ((fp->fr_type & FR_T_BUILTIN) != 0)
 		PRINTF("# Builtin: ");
 
-	if (opts & OPT_HITS)
+	if (opts & (OPT_HITS|OPT_DEBUG))
 #ifdef  USE_QUAD_T
 		PRINTF("%"PRIu64" ", (unsigned long long) fp->fr_hits);
 #else
 		PRINTF("%lu ", fp->fr_hits);
 #endif
-	if (opts & OPT_ACCNT)
+	if (opts & (OPT_ACCNT|OPT_DEBUG))
 #ifdef  USE_QUAD_T
 		PRINTF("%"PRIu64" ", (unsigned long long) fp->fr_bytes);
 #else
