@@ -73,6 +73,8 @@ printfr(fp, iocfunc)
 		PRINTF("preauth");
 	else if (FR_ISNOMATCH(fp->fr_flags))
 		PRINTF("nomatch");
+	else if (FR_ISDECAPS(fp->fr_flags))
+		PRINTF("decapsulate");
 	else if (FR_ISSKIP(fp->fr_flags))
 		PRINTF("skip %u", fp->fr_arg);
 	else {
