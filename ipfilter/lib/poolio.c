@@ -45,3 +45,9 @@ pool_close()
 		poolfd = -1;
 	}
 }
+
+int
+pool_fd()
+{
+	return poolfd;
+}

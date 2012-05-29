@@ -1516,7 +1516,7 @@ static void flushlogs(file, log)
 			flushed);
 		fflush(stdout);
 	} else
-		perror("SIOCIPFFB");
+		ipferror(fd, "SIOCIPFFB");
 	(void) close(fd);
 
 	if (flushed) {

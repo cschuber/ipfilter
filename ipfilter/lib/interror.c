@@ -17,7 +17,7 @@ typedef	struct	{
 
 static ipf_error_entry_t *find_error __P((int));
 
-#define	IPF_NUM_ERRORS	460
+#define	IPF_NUM_ERRORS	467
 
 /*
  * NO REUSE OF NUMBERS!
@@ -225,6 +225,8 @@ static ipf_error_entry_t ipf_errors[IPF_NUM_ERRORS] = {
 	{	30021,	"node already exists in the table" },
 	{	30022,	"could not find node to delete in table" },
 	{	30023,	"uid mismatch on node to delete" },
+	{	30024,	"object size incorrect for hash table" },
+	{	30025,	"hash table size must be at least 1"},
 /* -------------------------------------------------------------------------- */
 	{	40001,	"invalid minor device numebr for log read" },
 	{	40002,	"read size too small" },
@@ -368,7 +370,7 @@ log" },
 	{	70013,	"error copying out pool node" },
 	{	70014,	"add node size incorrect" },
 	{	70015,	"error copying in pool node" },
-	{	70016,	"node address/mask family mismatch" },
+	{	70016,	"" },
 	{	70017,	"cannot find pool for node" },
 	{	70018,	"node entry already present in pool" },
 	{	70019,	"delete node size incorrect" },
@@ -379,6 +381,11 @@ log" },
 	{	70024,	"uid mismatch for node removal" },
 	{	70025,	"stats device unit is invalid" },
 	{	70026,	"error copying out statistics" },
+	{	70027,	"could not remove node from radix tree" },
+	{	70028,	"incorrect address length in pool node add" },
+	{	70029,	"incorrect mask length in pool node add" },
+	{	70030,	"incorrect address length in pool node remove" },
+	{	70031,	"incorrect mask length in pool node remove" },
 /* -------------------------------------------------------------------------- */
 	{	80001,	"could not find proxy" },
 	{	80002,	"proxy does not support control operations" },

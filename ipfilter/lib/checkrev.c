@@ -31,7 +31,7 @@ int checkrev(ipfname)
 	}
 
 	if (ioctl(vfd, SIOCGETFS, &obj)) {
-		perror("ioctl(SIOCGETFS)");
+		ipferror(vfd, "ioctl(SIOCGETFS)");
 		close(vfd);
 		vfd = -1;
 		return -1;

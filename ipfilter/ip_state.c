@@ -3444,19 +3444,19 @@ ipf_fixoutisn(fin, is)
 	tcp = fin->fin_dp;
 	rev = fin->fin_rev;
 	if ((is->is_flags & IS_ISNSYN) != 0) {
-		if (rev == 0) {
+		if ((rev == 0) && (fin->fin_cksum < FI_CK_L4PART)) {
 			seq = ntohl(tcp->th_seq);
 			seq += is->is_isninc[0];
 			tcp->th_seq = htonl(seq);
-			ipf_fix_outcksum(fin, &tcp->th_sum, is->is_sumd[0]);
+			ipf_fix_outcksum(0, &tcp->th_sum, is->is_sumd[0], 0);
 		}
 	}
 	if ((is->is_flags & IS_ISNACK) != 0) {
-		if (rev == 1) {
+		if ((rev == 1) && (fin->fin_cksum < FI_CK_L4PART)) {
 			seq = ntohl(tcp->th_seq);
 			seq += is->is_isninc[1];
 			tcp->th_seq = htonl(seq);
-			ipf_fix_outcksum(fin, &tcp->th_sum, is->is_sumd[1]);
+			ipf_fix_outcksum(0, &tcp->th_sum, is->is_sumd[1], 0);
 		}
 	}
 }
@@ -3483,19 +3483,19 @@ ipf_fixinisn(fin, is)
 	tcp = fin->fin_dp;
 	rev = fin->fin_rev;
 	if ((is->is_flags & IS_ISNSYN) != 0) {
-		if (rev == 1) {
+		if ((rev == 1) && (fin->fin_cksum < FI_CK_L4PART)) {
 			ack = ntohl(tcp->th_ack);
 			ack -= is->is_isninc[0];
 			tcp->th_ack = htonl(ack);
-			ipf_fix_incksum(fin, &tcp->th_sum, is->is_sumd[0]);
+			ipf_fix_incksum(0, &tcp->th_sum, is->is_sumd[0], 0);
 		}
 	}
 	if ((is->is_flags & IS_ISNACK) != 0) {
-		if (rev == 0) {
+		if ((rev == 0) && (fin->fin_cksum < FI_CK_L4PART)) {
 			ack = ntohl(tcp->th_ack);
 			ack -= is->is_isninc[1];
 			tcp->th_ack = htonl(ack);
-			ipf_fix_incksum(fin, &tcp->th_sum, is->is_sumd[1]);
+			ipf_fix_incksum(0, &tcp->th_sum, is->is_sumd[1], 0);
 		}
 	}
 }

@@ -834,14 +834,36 @@ ipf_nextipid(fr_info_t *fin)
 INLINE int
 ipf_checkv4sum(fr_info_t *fin)
 {
+#if defined(NET_HCK_L4_FULL)
+	ipf_main_softc_t *softc = fin->fin_main_soft;
+#endif
+	int ckbits;
+
 	if ((fin->fin_flx & FI_NOCKSUM) != 0)
 		return 0;
 
 	if ((fin->fin_flx & FI_SHORT) != 0)
 		return 1;
 
-	if (fin->fin_cksum != 0)
-		return (fin->fin_cksum == 1) ? 0 : -1;
+	if (fin->fin_cksum != FI_CK_NEEDED)
+		return (fin->fin_cksum > FI_CK_NEEDED) ? 0 : -1;
+
+#if defined(NET_HCK_L4_FULL)
+	ckbits = net_ispartialchecksum(softc->ipf_nd_v4, fin->fin_m);
+	if (ckbits & NET_HCK_L4_FULL) {
+		fin->fin_cksum = FI_CK_L4FULL;
+		return 0;
+	} else if (ckbits & NET_HCK_L4_PART) {
+		fin->fin_cksum = FI_CK_L4PART;
+		return 0;
+	}
+#endif
+#if SOLARIS && defined(_KERNEL) && (SOLARIS2 >= 6) && defined(ICK_VALID)
+	if (dohwcksum && ((*fin->fin_mp)->b_ick_flag == ICK_VALID)) {
+		fin->fin_cksum = FI_CK_SUMOK;
+		return 0;
+	}
+#endif
 
 	if (ipf_checkl4sum(fin) == -1) {
 		DT1(bad_l4_sum, fr_info_t *, fin);
@@ -856,15 +878,30 @@ ipf_checkv4sum(fr_info_t *fin)
 INLINE int
 ipf_checkv6sum(fr_info_t *fin)
 {
+#if defined(NET_HCK_L4_FULL)
+	ipf_main_softc_t *softc = fin->fin_main_soft;
+#endif
+	int ckbits;
+
 	if ((fin->fin_flx & FI_NOCKSUM) != 0)
 		return 0;
 
 	if ((fin->fin_flx & FI_SHORT) != 0)
 		return 1;
 
-	if (fin->fin_cksum != 0)
-		return (fin->fin_cksum == 1) ? 0 : -1;
+	if (fin->fin_cksum != FI_CK_NEEDED)
+		return (fin->fin_cksum > FI_CK_NEEDED) ? 0 : -1;
 
+#if defined(NET_HCK_L4_FULL)
+	ckbits = net_ispartialchecksum(softc->ipf_nd_v6, fin->fin_m);
+	if (ckbits & NET_HCK_L4_FULL) {
+		fin->fin_cksum = FI_CK_L4FULL;
+		return 0;
+	} else if (ckbits & NET_HCK_L4_PART) {
+		fin->fin_cksum = FI_CK_L4PART;
+		return 0;
+	}
+#endif
 
 	if (ipf_checkl4sum(fin) == -1) {
 		DT1(bad_l4_sum, fr_info_t *, fin);
@@ -1466,8 +1503,7 @@ ipf_pcksum(fin, hlen, sum)
 {
 	u_int sum2;
 
-        sum2 = ip_cksum(fin->fin_qfm,
-			((qpktinfo_t *)fin->fin_qpi)->qpi_off + hlen, sum);
+	sum2 = ip_cksum(fin->fin_m, fin->fin_ipoff + hlen, sum);
 	sum2 = (~sum2 & 0xffff);
 	return sum2;
 }

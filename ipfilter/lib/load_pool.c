@@ -37,11 +37,12 @@ load_pool(plp, iocfunc)
 		op.iplo_arg |= IPOOL_ANON;
 
 	if ((opts & OPT_REMOVE) == 0) {
-		if (pool_ioctl(iocfunc, SIOCLOOKUPADDTABLE, &op))
+		if (pool_ioctl(iocfunc, SIOCLOOKUPADDTABLE, &op)) {
 			if ((opts & OPT_DONOTHING) == 0) {
-				perror("load_pool:SIOCLOOKUPADDTABLE");
-				return -1;
+				return ipf_perror_fd(pool_fd(), iocfunc,
+						     "add lookup table");
 			}
+		}
 	}
 
 	if (op.iplo_arg & IPOOL_ANON)
@@ -60,8 +61,8 @@ load_pool(plp, iocfunc)
 	if ((opts & OPT_REMOVE) != 0) {
 		if (pool_ioctl(iocfunc, SIOCLOOKUPDELTABLE, &op))
 			if ((opts & OPT_DONOTHING) == 0) {
-				perror("load_pool:SIOCLOOKUPDELTABLE");
-				return -1;
+				return ipf_perror_fd(pool_fd(), iocfunc,
+						     "delete lookup table");
 			}
 	}
 	return 0;

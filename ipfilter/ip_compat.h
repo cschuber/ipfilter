@@ -316,7 +316,8 @@ typedef struct	qpktinfo	{
 	int		qpi_flags;	/* COPIED */
 } qpktinfo_t;
 
-#define	QF_GROUP	0x0001
+#define	QF_MULTICAST	0x0001
+#define	QF_BROADCAST	0x0002
 
 typedef struct qifpkt {
 	struct qifpkt	*qp_next;
@@ -970,6 +971,8 @@ typedef	u_int32_t	u_32_t;
 # if (__FreeBSD_version >= 500043)
 #  include <sys/mutex.h>
 #  if (__FreeBSD_version >= 700014)
+#   define	KRWLOCK_FILL_SZ		36
+#   define	KMUTEX_FILL_SZ		24
 #   include <sys/rwlock.h>
 #   ifdef _KERNEL
 #    define	KMUTEX_T		struct mtx
@@ -1574,15 +1577,19 @@ typedef unsigned int    u_32_t;
 /*
  * Userland locking primitives
  */
+#if !defined(KMUTEX_FILL_SZ)
+# define	KMUTEX_FILL_SZ	1
+#endif
+#if !defined(KRWLOCK_FILL_SZ)
+# define	KRWLOCK_FILL_SZ	1
+#endif
+
 typedef	struct	{
 	char	*eMm_owner;
 	char	*eMm_heldin;
 	u_int	eMm_magic;
 	int	eMm_held;
 	int	eMm_heldat;
-#if defined(__hpux) || defined(__linux)
-	char	eMm_fill[8];
-#endif
 } eMmutex_t;
 
 typedef	struct	{
@@ -1592,12 +1599,10 @@ typedef	struct	{
 	short	eMrw_read;
 	short	eMrw_write;
 	int	eMrw_heldat;
-#ifdef __hpux
-	char	eMm_fill[24];
-#endif
 } eMrwlock_t;
 
 typedef union {
+	char	_fill[KMUTEX_FILL_SZ];
 #ifdef KMUTEX_T
 	struct	{
 		KMUTEX_T	ipf_slk;
@@ -1608,6 +1613,7 @@ typedef union {
 } ipfmutex_t;
 
 typedef union {
+	char	_fill[KRWLOCK_FILL_SZ];
 #ifdef KRWLOCK_T
 	struct	{
 		KRWLOCK_T	ipf_slk;

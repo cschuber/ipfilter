@@ -45,7 +45,6 @@ LIBOBJS=$(DEST)/addicmp.o \
      $(DEST)/initparse.o \
      $(DEST)/interror.o \
      $(DEST)/ionames.o \
-     $(DEST)/ipferror.o \
      $(DEST)/ipoptsec.o \
      $(DEST)/ipf_dotuning.o \
      $(DEST)/ipf_perror.o \
@@ -222,8 +221,6 @@ $(DEST)/icmptypes.o: $(LIBSRC)/icmptypes.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/icmptypes.c -o $@
 $(DEST)/interror.o: $(LIBSRC)/interror.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/interror.c -o $@
-$(DEST)/ipferror.o: $(LIBSRC)/ipferror.c $(INCDEP)
-	$(CC) $(CCARGS) -c $(LIBSRC)/ipferror.c -o $@
 $(DEST)/ipoptsec.o: $(LIBSRC)/ipoptsec.c $(INCDEP)
 	$(CC) $(CCARGS) -c $(LIBSRC)/ipoptsec.c -o $@
 $(DEST)/initparse.o: $(LIBSRC)/initparse.c $(INCDEP)

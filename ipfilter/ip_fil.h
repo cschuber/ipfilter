@@ -396,6 +396,14 @@ typedef enum fr_breasons_e {
 	FRB_NATV6IN
 } fr_breason_t;
 
+typedef enum ipf_cksum_e {
+	FI_CK_BAD = -1,
+	FI_CK_NEEDED = 0,
+	FI_CK_SUMOK = 1,
+	FI_CK_L4PART = 2,
+	FI_CK_L4FULL = 4
+} ipf_cksum_t;
+
 typedef	struct	fr_info	{
 	void	*fin_main_soft;
 	void	*fin_ifp;		/* interface packet is `on' */
@@ -428,7 +436,7 @@ typedef	struct	fr_info	{
 	u_short	fin_off;
 	int	fin_depth;		/* Group nesting depth */
 	int	fin_error;		/* Error code to return */
-	int	fin_cksum;		/* -1 = bad, 1 = good, 0 = not done */
+	ipf_cksum_t	fin_cksum;	/* -1 = bad, 1 = good, 0 = not done */
 	fr_breason_t	fin_reason;	/* why auto blocked */
 	u_int	fin_pktnum;
 	void	*fin_nattag;
@@ -1898,7 +1906,7 @@ extern	int		ipf_zerostats __P((ipf_main_softc_t *, char *));
 extern	int		ipf_getnextrule __P((ipf_main_softc_t *, ipftoken_t *,
 					     void *));
 extern	int		ipf_sync __P((ipf_main_softc_t *, void *));
-extern	void		ipf_token_deref __P((ipf_main_softc_t *, ipftoken_t *));
+extern	int		ipf_token_deref __P((ipf_main_softc_t *, ipftoken_t *));
 extern	void		ipf_token_expire __P((ipf_main_softc_t *));
 extern	ipftoken_t	*ipf_token_find __P((ipf_main_softc_t *, int, int,
 					    void *));

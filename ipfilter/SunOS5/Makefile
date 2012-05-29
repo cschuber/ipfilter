@@ -249,7 +249,7 @@ $(OBJ)/md5.o: $(TOP)/md5.c $(TOP)/md5.h
 	$(CC) -I$(TOP) $(DFLAGS) -c $(TOP)/md5.c -o $@
 	$(CTFCONVERT) $@
 
-$(OBJ)/radix_ipf.o: $(TOP)/md5.c $(TOP)/radix_ipf.h
+$(OBJ)/radix_ipf.o: $(TOP)/md5.c $(TOP)/radix_ipf.h $(TOP)/radix_ipf.c
 	$(CC) -I$(TOP) $(DFLAGS) -c $(TOP)/radix_ipf.c -o $@
 	$(CTFCONVERT) $@
 

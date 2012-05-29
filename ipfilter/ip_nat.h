@@ -77,7 +77,8 @@
 #ifndef	APR_LABELLEN
 #define	APR_LABELLEN	16
 #endif
-#define	NAT_HW_CKSUM	0x80000000
+#define	NAT_HW_CKSUM		0x80000000
+#define	NAT_HW_CKSUM_PART	0x40000000
 
 #define	DEF_NAT_AGE	1200     /* 10 minutes (600 seconds) */
 
@@ -669,8 +670,8 @@ typedef struct ipf_nat_softc_s {
 extern	frentry_t 	ipfnatblock;
 
 extern	void	ipf_fix_datacksum __P((u_short *, u_32_t));
-extern	void	ipf_fix_incksum __P((fr_info_t *, u_short *, u_32_t));
-extern	void	ipf_fix_outcksum __P((fr_info_t *, u_short *, u_32_t));
+extern	void	ipf_fix_incksum __P((int, u_short *, u_32_t, u_32_t));
+extern	void	ipf_fix_outcksum __P((int, u_short *, u_32_t, u_32_t));
 
 extern	int	ipf_nat_checkin __P((fr_info_t *, u_32_t *));
 extern	int	ipf_nat_checkout __P((fr_info_t *, u_32_t *));
@@ -693,8 +694,6 @@ extern	int	ipf_nat_insert __P((ipf_main_softc_t *, ipf_nat_softc_t *,
 				    nat_t *));
 extern	int	ipf_nat_ioctl __P((ipf_main_softc_t *, caddr_t, ioctlcmd_t,
 				   int, int, void *));
-extern	frentry_t *ipf_nat_ipfin __P((fr_info_t *, u_32_t *));
-extern	frentry_t *ipf_nat_ipfout __P((fr_info_t *, u_32_t *));
 extern	void	ipf_nat_log __P((ipf_main_softc_t *, ipf_nat_softc_t *,
 				 struct nat *, u_int));
 extern	nat_t	*ipf_nat_lookupredir __P((natlookup_t *));
@@ -712,8 +711,6 @@ extern	void	ipf_nat_setqueue __P((ipf_main_softc_t *, ipf_nat_softc_t *,
 extern	void	ipf_nat_setpending __P((ipf_main_softc_t *, nat_t *));
 extern	nat_t	*ipf_nat_tnlookup __P((fr_info_t *, int));
 extern	void	ipf_nat_update __P((fr_info_t *, nat_t *));
-extern	frentry_t *ipf_nat_ipfin __P((fr_info_t *, u_32_t *));
-extern	frentry_t *ipf_nat_ipfout __P((fr_info_t *, u_32_t *));
 extern	int	ipf_nat_in __P((fr_info_t *, nat_t *, int, u_32_t));
 extern	int	ipf_nat_out __P((fr_info_t *, nat_t *, int, u_32_t));
 extern	int	ipf_nat_rehash __P((ipf_main_softc_t *, ipftuneable_t *,

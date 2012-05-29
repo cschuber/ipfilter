@@ -370,7 +370,7 @@ ipf_p_irc_send(fin, nat)
 		sum2 -= sum1;
 		sum2 = (sum2 & 0xffff) + (sum2 >> 16);
 
-		ipf_fix_outcksum(fin, &ip->ip_sum, sum2);
+		ipf_fix_outcksum(0, &ip->ip_sum, sum2, 0);
 #endif
 		fin->fin_plen += inc;
 		ip->ip_len = htons(fin->fin_plen);

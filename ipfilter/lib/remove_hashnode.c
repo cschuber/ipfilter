@@ -44,10 +44,11 @@ remove_hashnode(unit, name, node, iocfunc)
 		printf("%s\n", inet_ntoa(ipe.ipe_mask.in4));
 	}
 
-	if (pool_ioctl(iocfunc, SIOCLOOKUPDELNODE, &op))
+	if (pool_ioctl(iocfunc, SIOCLOOKUPDELNODE, &op)) {
 		if (!(opts & OPT_DONOTHING)) {
-			perror("remove_hash:SIOCLOOKUPDELNODE");
-			return -1;
+			return ipf_perror_fd(pool_fd(), iocfunc,
+					     "remove lookup hash node");
 		}
+	}
 	return 0;
 }

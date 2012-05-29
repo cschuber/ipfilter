@@ -23,6 +23,7 @@ load_dstlistnode(role, name, node, ttl, iocfunc)
 {
 	iplookupop_t op;
 	frdest_t *dst;
+	char *what;
 	int err;
 
 	if (pool_open() == -1)
@@ -45,19 +46,23 @@ load_dstlistnode(role, name, node, ttl, iocfunc)
 	bcopy(node->ipfd_names, (char *)dst + sizeof(*dst),
 	      node->ipfd_dest.fd_name);
 
-	if ((opts & OPT_REMOVE) == 0)
+	if ((opts & OPT_REMOVE) == 0) {
+		what = "add";
 		err = pool_ioctl(iocfunc, SIOCLOOKUPADDNODE, &op);
-	else
+	} else {
+		what = "delete";
 		err = pool_ioctl(iocfunc, SIOCLOOKUPDELNODE, &op);
+	}
+	free(dst);
 
 	if (err != 0) {
 		if ((opts & OPT_DONOTHING) == 0) {
-			perror("load_dstlistnode:SIOCLOOKUP*NODE");
-			free(dst);
-			return -1;
+			char msg[80];
+
+			sprintf(msg, "%s lookup node", what);
+			return ipf_perror_fd(pool_fd(), iocfunc, msg);
 		}
 	}
-	free(dst);
 
 	return 0;
 }

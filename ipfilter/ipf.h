@@ -198,7 +198,7 @@ typedef	int	(* ioctlfunc_t) __P((int, ioctlcmd_t, ...));
 #else
 typedef	int	(* ioctlfunc_t) __P((dev_t, ioctlcmd_t, void *));
 #endif
-typedef	void	(* addfunc_t) __P((int, ioctlfunc_t, void *));
+typedef	int	(* addfunc_t) __P((int, ioctlfunc_t, void *));
 typedef	int	(* copyfunc_t) __P((void *, void *, size_t));
 
 
@@ -260,17 +260,18 @@ extern u_32_t getv6optbyvalue __P((int));
 extern char *icmptypename __P((int, int));
 extern void initparse __P((void));
 extern void ipf_dotuning __P((int, char *, ioctlfunc_t));
-extern void ipf_addrule __P((int, ioctlfunc_t, void *));
+extern int ipf_addrule __P((int, ioctlfunc_t, void *));
 extern void ipf_mutex_clean __P((void));
 extern int ipf_parsefile __P((int, addfunc_t, ioctlfunc_t *, char *));
 extern int ipf_parsesome __P((int, addfunc_t, ioctlfunc_t *, FILE *));
 extern void ipf_perror __P((int, char *));
+extern int ipf_perror_fd __P(( int, ioctlfunc_t, char *));
 extern void ipf_rwlock_clean __P((void));
 extern char *ipf_strerror __P((int));
 extern void ipferror __P((int, char *));
 extern int ipmon_parsefile __P((char *));
 extern int ipmon_parsesome __P((FILE *));
-extern void ipnat_addrule __P((int, ioctlfunc_t, void *));
+extern int ipnat_addrule __P((int, ioctlfunc_t, void *));
 extern int ipnat_parsefile __P((int, addfunc_t, ioctlfunc_t, char *));
 extern int ipnat_parsesome __P((int, addfunc_t, ioctlfunc_t, FILE *));
 extern int ippool_parsefile __P((int, char *, ioctlfunc_t));
@@ -300,6 +301,7 @@ extern wordtab_t *parsefields __P((wordtab_t *, char *));
 extern int *parseipfexpr __P((char *, char **));
 extern int parsewhoisline __P((char *, addrfamily_t *, addrfamily_t *));
 extern void pool_close __P((void));
+extern int pool_fd __P((void));
 extern int pool_ioctl __P((ioctlfunc_t, ioctlcmd_t, void *));
 extern int pool_open __P((void));
 extern char *portname __P((int, int));

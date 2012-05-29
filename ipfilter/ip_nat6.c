@@ -1401,7 +1401,20 @@ ipf_nat6_finalise(fin, nat)
 		break;
 	}
 
-	nat->nat_sumd[1] = nat->nat_sumd[0];
+	/*
+	 * Compute the partial checksum, just in case.
+	 * This is only ever placed into outbound packets so care needs
+	 * to be taken over which pair of addresses are used.
+	 */
+	if (nat->nat_dir == NAT_OUTBOUND) {
+		sum1 = LONG_SUM6(&nat->nat_nsrc6);
+		sum1 += LONG_SUM6(&nat->nat_ndst6);
+	} else {
+		sum1 = LONG_SUM6(&nat->nat_osrc6);
+		sum1 += LONG_SUM6(&nat->nat_odst6);
+	}
+	sum1 += nat->nat_pr[1];
+	nat->nat_sumd[1] = (sum1 & 0xffff) + (sum1 >> 16);
 
 	if ((nat->nat_flags & SI_CLONE) == 0)
 		nat->nat_sync = ipf_sync_new(softc, SMC_NAT, fin, nat);
@@ -2048,8 +2061,8 @@ ipf_nat6_icmperror(fin, nflags, dir)
 				sumd2 = (sumd2 & 0xffff) + (sumd2 >> 16);
 				sumd2 = (sumd2 & 0xffff) + (sumd2 >> 16);
 				sumd2 = (sumd2 & 0xffff) + (sumd2 >> 16);
-				ipf_fix_incksum(fin, &icmp6->icmp6_cksum,
-						sumd2);
+				ipf_fix_incksum(0, &icmp6->icmp6_cksum,
+						sumd2, 0);
 			}
 		}
 	} else if (((flags & IPN_ICMPQUERY) != 0) && (dlen >= 8)) {
@@ -3249,9 +3262,13 @@ ipf_nat6_out(fin, nat, natadd, nflags)
 	 */
 	if (csump != NULL) {
 		if (nat->nat_dir == NAT_OUTBOUND)
-			ipf_fix_outcksum(fin, csump, nat->nat_sumd[1]);
+			ipf_fix_outcksum(fin->fin_cksum, csump,
+					 nat->nat_sumd[0],
+					 nat->nat_sumd[1] + fin->fin_dlen);
 		else
-			ipf_fix_incksum(fin, csump, nat->nat_sumd[1]);
+			ipf_fix_incksum(fin->fin_cksum, csump,
+					nat->nat_sumd[0],
+					nat->nat_sumd[1] + fin->fin_dlen);
 	}
 	ipf_sync_update(softc, SMC_NAT, fin, nat->nat_sync);
 	/* ------------------------------------------------------------- */
@@ -3752,9 +3769,9 @@ ipf_nat6_in(fin, nat, natadd, nflags)
 	 */
 	if (csump != NULL) {
 		if (nat->nat_dir == NAT_OUTBOUND)
-			ipf_fix_incksum(fin, csump, nat->nat_sumd[0]);
+			ipf_fix_incksum(0, csump, nat->nat_sumd[0], 0);
 		else
-			ipf_fix_outcksum(fin, csump, nat->nat_sumd[0]);
+			ipf_fix_outcksum(0, csump, nat->nat_sumd[0], 0);
 	}
 	fin->fin_flx |= FI_NATED;
 	if (np != NULL && np->in_tag.ipt_num[0] != 0)
