@@ -1254,7 +1254,6 @@ ipf_nat_ioctl(softc, data, cmd, mode, uid, ctx)
 #  else
 	if ((securelevel >= 3) && (mode & FWRITE))
 #  endif
-		return EPERM;
 # endif
 	{
 		IPFERROR(60001);
