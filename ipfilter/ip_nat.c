@@ -3576,8 +3576,8 @@ ipf_nat_finalise(fin, nat)
 	switch (nat->nat_pr[0])
 	{
 	case IPPROTO_ICMP :
-		sum1 = LONG_SUM(ntohs(nat->nat_osport));
-		sum2 = LONG_SUM(ntohs(nat->nat_nsport));
+		sum1 = LONG_SUM(ntohs(nat->nat_oicmpid));
+		sum2 = LONG_SUM(ntohs(nat->nat_nicmpid));
 		CALC_SUMD(sum1, sum2, sumd);
 		nat->nat_sumd[0] = (sumd & 0xffff) + (sumd >> 16);
 
@@ -3676,6 +3676,7 @@ ipf_nat_insert(softc, softn, nat)
 	nat_t *nat;
 {
 	u_int hv0, hv1, rhv0, rhv1;
+	u_int sp, dp;
 	ipnat_t *in;
 	nat_t **natp;
 
@@ -3684,20 +3685,35 @@ ipf_nat_insert(softc, softn, nat)
 	 * entry numbers first and then proceed.
 	 */
 	if ((nat->nat_flags & (SI_W_SPORT|SI_W_DPORT)) == 0) {
-		rhv0 = NAT_HASH_FN(nat->nat_osrcaddr, nat->nat_osport,
-				   0xffffffff);
-		rhv0 = NAT_HASH_FN(nat->nat_odstaddr, rhv0 + nat->nat_odport,
-				   0xffffffff);
-
+		if ((nat->nat_flags & IPN_TCPUDP) != 0) {
+			sp = nat->nat_osport;
+			dp = nat->nat_odport;
+		} else if ((nat->nat_flags & IPN_ICMPQUERY) != 0) {
+			sp = 0;
+			dp = nat->nat_oicmpid;
+		} else {
+			sp = 0;
+			dp = 0;
+		}
+		rhv0 = NAT_HASH_FN(nat->nat_osrcaddr, sp, 0xffffffff);
+		rhv0 = NAT_HASH_FN(nat->nat_odstaddr, rhv0 + dp, 0xffffffff);
 		/*
 		 * TRACE nat_osrcaddr, nat_osport, nat_odstaddr,
 		 * nat_odport, hv0
 		 */
 
-		rhv1 = NAT_HASH_FN(nat->nat_nsrcaddr, nat->nat_nsport,
-				   0xffffffff);
-		rhv1 = NAT_HASH_FN(nat->nat_ndstaddr, rhv1 + nat->nat_ndport,
-				   0xffffffff);
+		if ((nat->nat_flags & IPN_TCPUDP) != 0) {
+			sp = nat->nat_nsport;
+			dp = nat->nat_ndport;
+		} else if ((nat->nat_flags & IPN_ICMPQUERY) != 0) {
+			sp = 0;
+			dp = nat->nat_nicmpid;
+		} else {
+			sp = 0;
+			dp = 0;
+		}
+		rhv1 = NAT_HASH_FN(nat->nat_nsrcaddr, sp, 0xffffffff);
+		rhv1 = NAT_HASH_FN(nat->nat_ndstaddr, rhv1 + dp, 0xffffffff);
 		/*
 		 * TRACE nat_nsrcaddr, nat_nsport, nat_ndstaddr,
 		 * nat_ndport, hv1
@@ -7513,11 +7529,14 @@ ipf_nat_newrewrite(fin, nat, nai)
 	nat->nat_nsrcip = frnat.fin_src;
 	nat->nat_ndstip = frnat.fin_dst;
 
-	if ((flags & IPN_TCPUDPICMP) != 0) {
+	if ((flags & IPN_TCPUDP) != 0) {
 		nat->nat_osport = htons(fin->fin_data[0]);
 		nat->nat_odport = htons(fin->fin_data[1]);
 		nat->nat_nsport = htons(frnat.fin_data[0]);
 		nat->nat_ndport = htons(frnat.fin_data[1]);
+	} else if ((flags & IPN_ICMPQUERY) != 0) {
+		nat->nat_oicmpid = fin->fin_data[1];
+		nat->nat_nicmpid = frnat.fin_data[1];
 	}
 
 	return 0;
@@ -7557,10 +7576,14 @@ ipf_nat_newdivert(fin, nat, nai)
 	nat->nat_pr[0] = 0;
 	nat->nat_osrcaddr = fin->fin_saddr;
 	nat->nat_odstaddr = fin->fin_daddr;
-	nat->nat_osport = htons(fin->fin_data[0]);
-	nat->nat_odport = htons(fin->fin_data[1]);
 	frnat.fin_saddr = htonl(np->in_snip);
 	frnat.fin_daddr = htonl(np->in_dnip);
+	if ((nat->nat_flags & IPN_TCPUDP) != 0) {
+		nat->nat_osport = htons(fin->fin_data[0]);
+		nat->nat_odport = htons(fin->fin_data[1]);
+	} else if ((nat->nat_flags & IPN_ICMPQUERY) != 0) {
+		nat->nat_oicmpid = fin->fin_data[1];
+	}
 
 	if (np->in_redir & NAT_DIVERTUDP) {
 		frnat.fin_data[0] = np->in_spnext;
@@ -7588,10 +7611,13 @@ ipf_nat_newdivert(fin, nat, nai)
 
 	nat->nat_nsrcaddr = frnat.fin_saddr;
 	nat->nat_ndstaddr = frnat.fin_daddr;
-	if (np->in_redir & NAT_DIVERTUDP) {
+	if ((nat->nat_flags & IPN_TCPUDP) != 0) {
 		nat->nat_nsport = htons(frnat.fin_data[0]);
 		nat->nat_ndport = htons(frnat.fin_data[1]);
+	} else if ((nat->nat_flags & IPN_ICMPQUERY) != 0) {
+		nat->nat_nicmpid = frnat.fin_data[1];
 	}
+
 	nat->nat_pr[fin->fin_out] = fin->fin_p;
 	nat->nat_pr[1 - fin->fin_out] = p;
 
