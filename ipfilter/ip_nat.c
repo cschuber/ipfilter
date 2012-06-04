@@ -5093,7 +5093,8 @@ ipf_nat_update(fin, nat)
 			if (nat->nat_pr[0] == IPPROTO_UDP)
 				ifq2 = fin->fin_rev ? &softn->ipf_nat_udpacktq :
 						      &softn->ipf_nat_udptq;
-			else if (nat->nat_pr[0] == IPPROTO_ICMP)
+			else if (nat->nat_pr[0] == IPPROTO_ICMP ||
+				 nat->nat_pr[0] == IPPROTO_ICMPV6)
 				ifq2 = fin->fin_rev ? &softn->ipf_nat_icmpacktq:
 						      &softn->ipf_nat_icmptq;
 			else
@@ -6213,6 +6214,21 @@ ipf_nat_proto(fin, nat, nflags)
 				csump = &icmp->icmp_cksum;
 		}
 		break;
+
+#ifdef USE_INET6
+	case IPPROTO_ICMPV6 :
+	    {
+		struct icmp6_hdr *icmp6 = (struct icmp6_hdr *)fin->fin_dp;
+
+		icmp6 = fin->fin_dp;
+
+		if ((nflags & IPN_ICMPQUERY) != 0) {
+			if (icmp6->icmp6_cksum != 0)
+				csump = &icmp6->icmp6_cksum;
+		}
+		break;
+	    }
+#endif
 	}
 	return csump;
 }
