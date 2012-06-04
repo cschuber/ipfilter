@@ -82,13 +82,6 @@ static	u_short	tx_portnum(name)
 }
 
 
-char	*tx_icmptypes[] = {
-	"echorep", (char *)NULL, (char *)NULL, "unreach", "squench",
-	"redir", (char *)NULL, (char *)NULL, "echo", "routerad",
-	"routersol", "timex", "paramprob", "timest", "timestrep",
-	"inforeq", "inforep", "maskreq", "maskrep", "END"
-};
-
 static	int	text_open(fname)
 	char	*fname;
 {
@@ -303,24 +296,20 @@ static	int	parseline(line, ip, ifn, out)
 			cpp++;
 		}
 	} else if (*cpp && ip->ip_p == IPPROTO_ICMP) {
-		extern	char	*tx_icmptypes[];
-		char	**s, *t;
-		int	i;
+		char	*t;
 
 		t = strchr(*cpp, ',');
 		if (t != NULL)
 			*t = '\0';
 
-		for (s = tx_icmptypes, i = 0; !*s || strcmp(*s, "END");
-		     s++, i++) {
-			if (*s && !strcasecmp(*cpp, *s)) {
-				ic->icmp_type = i;
-				if (t != NULL)
-					ic->icmp_code = atoi(t + 1);
-				cpp++;
-				break;
-			}
-		}
+		ic->icmp_type = geticmptype(AF_INET, *cpp);
+		if (t != NULL)
+			ic->icmp_code = atoi(t + 1);
+		cpp++;
+
+		if (ic->icmp_type == ICMP_ECHO ||
+		    ic->icmp_type == ICMP_ECHOREPLY)
+			ic->icmp_id = htons(getpid());
 		if (t != NULL)
 			*t = ',';
 	}
@@ -487,7 +476,13 @@ int parseipv6(cpp, ip6, ifn, out)
 		if (t != NULL)
 			*t = '\0';
 
-		ic6->icmp6_type = geticmptype(6, *cpp);
+		ic6->icmp6_type = geticmptype(AF_INET6, *cpp);
+		if (t != NULL)
+			ic6->icmp6_code = atoi(t + 1);
+
+		if (ic6->icmp6_type == ICMP6_ECHO_REQUEST ||
+		    ic6->icmp6_type == ICMP6_ECHO_REPLY)
+			ic6->icmp6_id = htons(getpid());
 
 		if (t != NULL)
 			*t = ',';
