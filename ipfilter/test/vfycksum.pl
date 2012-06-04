@@ -196,11 +196,8 @@ sub icmpcheck6 {
 	if ($bytes[$base + 2] > ($cnt - $base) * 2) {
 		print " ICMPv6: missing data(1)";
 		return;
-	} elsif ($bytes[$base + 2] < ($hl << 1) + 8) {
+	} elsif ($bytes[$base + 2] < 8) {
 		print " ICMPv6: missing data(2)";
-		return;
-	} elsif (($cnt - $base) * 2 < ($hl << 1) + 8) {
-		print " ICMPv6: missing data(3)";
 		return;
 	}
 
