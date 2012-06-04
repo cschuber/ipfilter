@@ -839,8 +839,10 @@ test_usermode(r)
 	else
 		fd = (*r->r_open)("-");
 
-	if (fd < 0)
+	if (fd < 0) {
+		perror("error opening input");
 		exit(-1);
+	}
 
 	pcount = 0;
 	m = &mb;
