@@ -1377,14 +1377,21 @@ ipf_nat6_finalise(fin, nat)
 	switch (fin->fin_p)
 	{
 	case IPPROTO_ICMPV6 :
-		sum1 = LONG_SUM(ntohs(nat->nat_osport));
-		sum2 = LONG_SUM(ntohs(nat->nat_nsport));
+		sum1 = LONG_SUM6(&nat->nat_osrc6);
+		sum1 += ntohs(nat->nat_oicmpid);
+		sum2 = LONG_SUM6(&nat->nat_nsrc6);
+		sum2 += ntohs(nat->nat_nicmpid);
 		CALC_SUMD(sum1, sum2, sumd);
 		nat->nat_sumd[0] = (sumd & 0xffff) + (sumd >> 16);
 
+		sum1 = LONG_SUM6(&nat->nat_odst6);
+		sum2 = LONG_SUM6(&nat->nat_ndst6);
+		CALC_SUMD(sum1, sum2, sumd);
+		nat->nat_sumd[0] += (sumd & 0xffff) + (sumd >> 16);
 		break;
 
-	default :
+	case IPPROTO_TCP :
+	case IPPROTO_UDP :
 		sum1 = LONG_SUM6(&nat->nat_osrc6);
 		sum1 += ntohs(nat->nat_osport);
 		sum2 = LONG_SUM6(&nat->nat_nsrc6);
@@ -1396,6 +1403,18 @@ ipf_nat6_finalise(fin, nat)
 		sum1 += ntohs(nat->nat_odport);
 		sum2 = LONG_SUM6(&nat->nat_ndst6);
 		sum2 += ntohs(nat->nat_ndport);
+		CALC_SUMD(sum1, sum2, sumd);
+		nat->nat_sumd[0] += (sumd & 0xffff) + (sumd >> 16);
+		break;
+
+	default :
+		sum1 = LONG_SUM6(&nat->nat_osrc6);
+		sum2 = LONG_SUM6(&nat->nat_nsrc6);
+		CALC_SUMD(sum1, sum2, sumd);
+		nat->nat_sumd[0] = (sumd & 0xffff) + (sumd >> 16);
+
+		sum1 = LONG_SUM6(&nat->nat_odst6);
+		sum2 = LONG_SUM6(&nat->nat_ndst6);
 		CALC_SUMD(sum1, sum2, sumd);
 		nat->nat_sumd[0] += (sumd & 0xffff) + (sumd >> 16);
 		break;
@@ -1467,6 +1486,7 @@ ipf_nat6_insert(softc, softn, nat)
 	nat_t *nat;
 {
 	u_int hv1, hv2;
+	u_32_t sp, dp;
 	nat_t **natp;
 	ipnat_t *in;
 
@@ -1475,20 +1495,36 @@ ipf_nat6_insert(softc, softn, nat)
 	 * entry numbers first and then proceed.
 	 */
 	if ((nat->nat_flags & (SI_W_SPORT|SI_W_DPORT)) == 0) {
-		hv1 = NAT_HASH_FN6(&nat->nat_osrc6, nat->nat_osport,
-				   0xffffffff);
-		hv1 = NAT_HASH_FN6(&nat->nat_odst6, hv1 + nat->nat_odport,
-				   softn->ipf_nat_table_sz);
+		if ((nat->nat_flags & IPN_TCPUDP) != 0) {
+			sp = nat->nat_osport;
+			dp = nat->nat_odport;
+		} else if ((nat->nat_flags & IPN_ICMPQUERY) != 0) {
+			sp = 0;
+			dp = nat->nat_oicmpid;
+		} else {
+			sp = 0;
+			dp = 0;
+		}
+		hv1 = NAT_HASH_FN6(&nat->nat_osrc6, sp, 0xffffffff);
+		hv1 = NAT_HASH_FN6(&nat->nat_odst6, hv1 + dp, softn->ipf_nat_table_sz);
 
 		/*
 		 * TRACE nat6_osrc6, nat6_osport, nat6_odst6,
 		 * nat6_odport, hv1
 		 */
 
-		hv2 = NAT_HASH_FN6(&nat->nat_nsrc6, nat->nat_nsport,
-				   0xffffffff);
-		hv2 = NAT_HASH_FN6(&nat->nat_ndst6, hv2 + nat->nat_ndport,
-				   softn->ipf_nat_table_sz);
+		if ((nat->nat_flags & IPN_TCPUDP) != 0) {
+			sp = nat->nat_nsport;
+			dp = nat->nat_ndport;
+		} else if ((nat->nat_flags & IPN_ICMPQUERY) != 0) {
+			sp = 0;
+			dp = nat->nat_nicmpid;
+		} else {
+			sp = 0;
+			dp = 0;
+		}
+		hv2 = NAT_HASH_FN6(&nat->nat_nsrc6, sp, 0xffffffff);
+		hv2 = NAT_HASH_FN6(&nat->nat_ndst6, hv2 + dp, softn->ipf_nat_table_sz);
 		/*
 		 * TRACE nat6_nsrcaddr, nat6_nsport, nat6_ndstaddr,
 		 * nat6_ndport, hv1
@@ -3999,11 +4035,14 @@ ipf_nat6_newrewrite(fin, nat, nai)
 	nat->nat_nsrc6 = frnat.fin_src6;
 	nat->nat_ndst6 = frnat.fin_dst6;
 
-	if ((flags & IPN_TCPUDPICMP) != 0) {
+	if ((flags & IPN_TCPUDP) != 0) {
 		nat->nat_osport = htons(fin->fin_data[0]);
 		nat->nat_odport = htons(fin->fin_data[1]);
 		nat->nat_nsport = htons(frnat.fin_data[0]);
 		nat->nat_ndport = htons(frnat.fin_data[1]);
+	} else if ((flags & IPN_ICMPQUERY) != 0) {
+		nat->nat_oicmpid = fin->fin_data[1];
+		nat->nat_nicmpid = frnat.fin_data[1];
 	}
 
 	return 0;
@@ -4461,6 +4500,7 @@ ipf_nat6_nextaddr(fin, na, old, dst)
 			new.in6 = na->na_nextip6;
 		}
 		*dst = new;
+		error = 0;
 		break;
 
 	default :
