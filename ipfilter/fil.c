@@ -959,6 +959,13 @@ ipf_pr_icmp6(fin)
 	}
 
 	ipf_pr_short6(fin, minicmpsz);
+	if ((fin->fin_flx & (FI_SHORT|FI_BAD)) == 0) {
+		u_char p = fin->fin_p;
+
+		fin->fin_p = IPPROTO_UDP;
+		ipf_checkv6sum(fin);
+		fin->fin_p = p;
+	}
 }
 
 
@@ -6583,6 +6590,13 @@ ipf_checkl4sum(fin)
 			dosum = 1;
 		}
 		break;
+
+#ifdef USE_INET6
+	case IPPROTO_ICMPV6 :
+		csump = &((struct icmp6_hdr *)fin->fin_dp)->icmp6_cksum;
+		dosum = 1;
+		break;
+#endif
 
 	case IPPROTO_ICMP :
 		csump = &((struct icmp *)fin->fin_dp)->icmp_cksum;
