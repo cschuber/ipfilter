@@ -965,8 +965,10 @@ test_kernmode(r)
 	else
 		fd = (*r->r_open)("-");
 
-	if (fd < 0)
+	if (fd < 0) {
+		perror("error opening input");
 		exit(-1);
+	}
 
 	idcount = 1;
 	m = &mb;
