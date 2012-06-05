@@ -17,7 +17,7 @@ typedef	struct	{
 
 static ipf_error_entry_t *find_error __P((int));
 
-#define	IPF_NUM_ERRORS	470
+#define	IPF_NUM_ERRORS	471
 
 /*
  * NO REUSE OF NUMBERS!
@@ -388,6 +388,7 @@ log" },
 	{	70030,	"incorrect address length in pool node remove" },
 	{	70031,	"incorrect mask length in pool node remove" },
 	{	70032,	"cannot allocate memory for pool context" },
+	{	70033,	"cannot allocate memory for radix tree context" },
 /* -------------------------------------------------------------------------- */
 	{	80001,	"could not find proxy" },
 	{	80002,	"proxy does not support control operations" },
