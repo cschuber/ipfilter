@@ -138,7 +138,7 @@ static	addfunc_t	ipfaddfunc = NULL;
 %token	IPFY_TCPUDP IPFY_TCP IPFY_UDP
 %token	IPFY_FLAGS IPFY_MULTICAST
 %token	IPFY_MASK IPFY_BROADCAST IPFY_NETWORK IPFY_NETMASKED IPFY_PEER
-%token	IPFY_RPC IPFY_PORT
+%token	IPFY_PORT
 %token	IPFY_NOW IPFY_COMMENT IPFY_RULETTL
 %token	IPFY_ICMP IPFY_ICMPTYPE IPFY_ICMPCODE
 %token	IPFY_IPOPTS IPFY_SHORT IPFY_NAT IPFY_BADSRC IPFY_LOWTTL IPFY_FRAG
@@ -276,15 +276,29 @@ ipfrule:
 family:	| IPFY_FAMILY IPFY_INET		{ if (use_inet6 == 1) {
 						YYERROR;
 					  } else {
-						setipftype();
 						frc->fr_family = AF_INET;
+						setipftype();
+					  }
+					}
+	| IPFY_INET			{ if (use_inet6 == 1) {
+						YYERROR;
+					  } else {
+						frc->fr_family = AF_INET;
+						setipftype();
 					  }
 					}
 	| IPFY_FAMILY IPFY_INET6	{ if (use_inet6 == -1) {
 						YYERROR;
 					  } else {
-						setipftype();
 						frc->fr_family = AF_INET6;
+						setipftype();
+					  }
+					}
+	| IPFY_INET6			{ if (use_inet6 == -1) {
+						YYERROR;
+					  } else {
+						frc->fr_family = AF_INET6;
+						setipftype();
 					  }
 					}
 	;
@@ -721,6 +735,9 @@ protocol:
 	YY_NUMBER		{ DOALL(fr->fr_proto = $1; \
 					fr->fr_mproto = 0xff;)
 				  if ($1 == IPPROTO_ICMP) {
+					if (frc->fr_family != AF_UNSPEC &&
+					    frc->fr_family != AF_INET)
+						YYERROR;
 					/*
 					 * This forces IPv4 for ICMP
 					 * packets so that type keyword
@@ -737,6 +754,9 @@ protocol:
 					if (p == -1)
 						yyerror("protocol unknown");
 					if (p == IPPROTO_ICMP) {
+						if (frc->fr_family != AF_UNSPEC &&
+						    frc->fr_family != AF_INET)
+							YYERROR;
 						/*
 						 * This forces IPv4 for ICMP
 						 * packets so that type keyword
@@ -840,7 +860,11 @@ srcobject:
 	;
 
 srcaddr:
-	addr	{ DOREM(fr->fr_ip.fi_src = $1.a; \
+	addr	{ if (frc->fr_family != AF_UNSPEC && $1.f == AF_UNSPEC) {
+			$1.f = frc->fr_family;
+			$1.v = frc->fr_ip.fi_v;
+		  }
+		  DOREM(fr->fr_ip.fi_src = $1.a; \
 			fr->fr_mip.fi_src = $1.m; \
 			fr->fr_family = $1.f; \
 			fr->fr_ip.fi_v = $1.v; \
@@ -854,7 +878,11 @@ srcaddr:
 	;
 
 srcaddrlist:
-	addr	{ DOREM(fr->fr_ip.fi_src = $1.a; \
+	addr	{ if (frc->fr_family != AF_UNSPEC && $1.f == AF_UNSPEC) {
+			$1.f = frc->fr_family;
+			$1.v = frc->fr_ip.fi_v;
+		  }
+		  DOREM(fr->fr_ip.fi_src = $1.a; \
 			fr->fr_mip.fi_src = $1.m; \
 			fr->fr_family = $1.f; \
 			fr->fr_ip.fi_v = $1.v; \
@@ -865,7 +893,11 @@ srcaddrlist:
 			})
 		}
 	| srcaddrlist lmore addr
-		{ DOREM(fr->fr_ip.fi_src = $3.a; \
+		{ if (frc->fr_family != AF_UNSPEC && $3.f == AF_UNSPEC) {
+			$3.f = frc->fr_family;
+			$3.v = frc->fr_ip.fi_v;
+		  }
+		  DOREM(fr->fr_ip.fi_src = $3.a; \
 			fr->fr_mip.fi_src = $3.m; \
 			fr->fr_family = $3.f; \
 			fr->fr_ip.fi_v = $3.v; \
@@ -949,7 +981,7 @@ dstaddrlist:
 			yyerror("src/dst address family mismatch");
 		  if (frc->fr_family != AF_UNSPEC && $1.f == AF_UNSPEC) {
 			$1.f = frc->fr_family;
-			$1.v = frc->fr_family;
+			$1.v = frc->fr_ip.fi_v;
 		  }
 		  DOREM(fr->fr_ip.fi_dst = $1.a; \
 			fr->fr_mip.fi_dst = $1.m; \
@@ -967,7 +999,7 @@ dstaddrlist:
 			yyerror("src/dst address family mismatch");
 		  if (frc->fr_family != AF_UNSPEC && $3.f == AF_UNSPEC) {
 			$3.f = frc->fr_family;
-			$3.v = frc->fr_family;
+			$3.v = frc->fr_ip.fi_v;
 		  }
 		  DOREM(fr->fr_ip.fi_dst = $3.a; \
 			fr->fr_mip.fi_dst = $3.m; \
@@ -1164,19 +1196,29 @@ maskopts:
 
 hostname:
 	ipv4				{ $$.adr.in4 = $1;
+					  if (frc->fr_family == AF_INET6)
+						YYERROR;
 					  $$.f = AF_INET;
 					}
-	| YY_NUMBER			{ $$.adr.in4_addr = $1;
+	| YY_NUMBER			{ if (frc->fr_family == AF_INET6)
+						YYERROR;
+					  $$.adr.in4_addr = $1;
 					  $$.f = AF_INET;
 					}
-	| YY_HEX			{ $$.adr.in4_addr = $1;
+	| YY_HEX			{ if (frc->fr_family == AF_INET6)
+						YYERROR;
+					  $$.adr.in4_addr = $1;
 					  $$.f = AF_INET;
 					}
-	| YY_STR			{ $$.adr.in4_addr = lookuphost($1);
+	| YY_STR			{ if (frc->fr_family == AF_INET6)
+						YYERROR;
+					  $$.adr.in4_addr = lookuphost($1);
 					  $$.f = AF_INET;
 					  free($1);
 					}
-	| YY_IPV6			{ $$.adr = $1;
+	| YY_IPV6			{ if (frc->fr_family == AF_INET)
+						YYERROR;
+					  $$.adr = $1;
 					  $$.f = AF_INET6;
 					}
 	;
@@ -1280,9 +1322,9 @@ itype:	seticmptype icmptype
 	;
 
 seticmptype:
-	IPFY_ICMPTYPE			{ setipftype();
-					  if (frc->fr_family == AF_UNSPEC)
-					      frc->fr_family = AF_INET;
+	IPFY_ICMPTYPE			{ if (frc->fr_family == AF_UNSPEC)
+						frc->fr_family = AF_INET;
+					  setipftype();
 					  yysetdict(NULL);
 					}
 	;
@@ -1390,10 +1432,6 @@ stateopt:
 				}
 	| IPFY_NOLOG
 				{ DOALL(fr->fr_nostatelog = 1;) }
-	| IPFY_RPC
-				{ DOALL(fr->fr_rpc = 1;) }
-	| IPFY_RPC IPFY_IN YY_STR
-				{ DOALL(fr->fr_rpc = 1;) }
 	| IPFY_MAX_SRCS YY_NUMBER
 				{ DOALL(fr->fr_srctrack.ht_max_nodes = $2;) }
 	| IPFY_MAX_PER_SRC YY_NUMBER
@@ -1470,7 +1508,7 @@ opttype:
 	;
 
 ipopts:	optlist		{ DOALL(fr->fr_mip.fi_optmsk |= $1; \
-				if (fr->fr_family == 0) { \
+				if (fr->fr_family == AF_UNSPEC) { \
 					fr->fr_family = AF_INET; \
 				} else if (fr->fr_family != AF_INET) { \
 					YYERROR; \
@@ -1569,7 +1607,7 @@ opt:
 	| IPFY_IPOPT_UMP		{ $$ = getoptbyvalue(IPOPT_UMP); }
 	| setsecclass secname
 			{ DOALL(fr->fr_mip.fi_secmsk |= $2; \
-				if (fr->fr_family == 0) { \
+				if (fr->fr_family == AF_UNSPEC) { \
 					fr->fr_family = AF_INET; \
 				} else if (fr->fr_family != AF_INET) { \
 					YYERROR; \
@@ -1808,7 +1846,6 @@ static	struct	wordtab ipfwords[] = {
 	{ "return-rst",			IPFY_RETRST },
 	{ "route-to",			IPFY_ROUTETO },
 	{ "rule-ttl",			IPFY_RULETTL },
-	{ "rpc",			IPFY_RPC },
 	{ "sec-class",			IPFY_SECCLASS },
 	{ "set",			IPFY_SET },
 	{ "set-tag",			IPFY_SETTAG },
@@ -2064,7 +2101,12 @@ static void setipftype()
 			fr->fr_data = (void *)calloc(sizeof(fripf_t), 1);
 			fr->fr_dsize = sizeof(fripf_t);
 			fr->fr_family = frc->fr_family;
-			fr->fr_ip.fi_v = frc->fr_ip.fi_v;
+			if (fr->fr_family == AF_INET) {
+				fr->fr_ip.fi_v = 4;
+			}
+			else if (fr->fr_family == AF_INET6) {
+				fr->fr_ip.fi_v = 6;
+			}
 			fr->fr_mip.fi_v = 0xf;
 			fr->fr_ipf->fri_sifpidx = -1;
 			fr->fr_ipf->fri_difpidx = -1;
@@ -2353,18 +2395,17 @@ alist_t *list;
 }
 
 
-void ipf_addrule(fd, ioctlfunc, ptr)
+int ipf_addrule(fd, ioctlfunc, ptr)
 int fd;
 ioctlfunc_t ioctlfunc;
 void *ptr;
 {
 	ioctlcmd_t add, del;
-	int save, realerr;
 	frentry_t *fr;
 	ipfobj_t obj;
 
 	if (ptr == NULL)
-		return;
+		return 0;
 
 	fr = ptr;
 	add = 0;
@@ -2406,14 +2447,11 @@ void *ptr;
 
 	if ((opts & OPT_ZERORULEST) != 0) {
 		if ((*ioctlfunc)(fd, add, (void *)&obj) == -1) {
-			save = errno;
-
-			if ((*ioctlfunc)(fd, SIOCIPFINTERROR, &realerr) == -1)
-				realerr = 0;
-
 			if ((opts & OPT_DONOTHING) == 0) {
-				fprintf(stderr, "%d:%d:", realerr, yylineNum);
-				ipf_perror(realerr, "ioctl(SIOCZRLST)");
+				char msg[80];
+
+				sprintf(msg, "%d:ioctl(zero rule)", yylineNum);
+				return ipf_perror_fd(fd, ioctlfunc, msg);
 			}
 		} else {
 #ifdef	USE_QUAD_T
@@ -2428,30 +2466,26 @@ void *ptr;
 		}
 	} else if ((opts & OPT_REMOVE) != 0) {
 		if ((*ioctlfunc)(fd, del, (void *)&obj) == -1) {
-			save = errno;
-
-			if ((*ioctlfunc)(fd, SIOCIPFINTERROR, &realerr) == -1)
-				realerr = 0;
-
 			if ((opts & OPT_DONOTHING) == 0) {
-				fprintf(stderr, "%d:%d:", realerr, yylineNum);
-				ipf_perror(realerr, "ioctl(delete rule)");
+				char msg[80];
+
+				sprintf(msg, "%d:ioctl(delete rule)",
+					yylineNum);
+				return ipf_perror_fd(fd, ioctlfunc, msg);
 			}
 		}
 	} else {
 		if ((*ioctlfunc)(fd, add, (void *)&obj) == -1) {
-			save = errno;
-
-			if ((*ioctlfunc)(fd, SIOCIPFINTERROR, &realerr) == -1)
-				realerr = 0;
-
 			if ((opts & OPT_DONOTHING) == 0) {
-				errno = save;
-				fprintf(stderr, "%d:%d:", realerr, yylineNum);
-				ipf_perror(realerr, "ioctl(add/insert rule)");
+				char msg[80];
+
+				sprintf(msg, "%d:ioctl(add/insert rule)",
+					yylineNum);
+				return ipf_perror_fd(fd, ioctlfunc, msg);
 			}
 		}
 	}
+	return 0;
 }
 
 static void setsyslog()
