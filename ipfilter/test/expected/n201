@@ -9,7 +9,8 @@ List of active MAP/Redirect filters:
 encap out on bge0 proto tcp from 0/0 to 0/0 port = 23 -> src 1.1.1.1/32 dst 192.168.168.1/32;
 
 List of active sessions:
-ENC-MAP 192.168.168.1   0     <- -> 192.168.113.1   23    [192.168.113.3 65501]
+ENC-MAP 192.168.168.1   <- -> 1.1.1.1         [192.168.168.1]
+ENC-MAP 192.168.168.1   23    <- -> 192.168.113.1   23    [192.168.113.3 65501]
 
 Hostmap table:
 List of active state sessions:
