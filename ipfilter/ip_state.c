@@ -4460,7 +4460,7 @@ ipf_checkicmp6matchingstate(fin)
 	 * order. Any change we make must be undone afterwards.
 	 */
 	savelen = oip6->ip6_plen;
-	oip6->ip6_plen = fin->fin_dlen - ICMPERR_ICMPHLEN;
+	oip6->ip6_plen = htons(fin->fin_dlen - ICMPERR_ICMPHLEN);
 	ofin.fin_flx = FI_NOCKSUM;
 	ofin.fin_ip = (ip_t *)oip6;
 	(void) ipf_makefrip(sizeof(*oip6), (ip_t *)oip6, &ofin);
