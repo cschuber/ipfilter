@@ -203,8 +203,10 @@ main(argc,argv)
 	else
 		fd = (*r->r_open)("-");
 
-	if (fd < 0)
+	if (fd < 0) {
+		perror("error opening input");
 		exit(-1);
+	}
 
 	m->m_data = (char *)m->mb_buf;
 	while ((i = (*r->r_readip)(m, &iface, &dir)) > 0) {
