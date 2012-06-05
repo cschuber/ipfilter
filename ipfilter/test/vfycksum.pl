@@ -65,18 +65,19 @@ sub tcpcommon {
 	local($base) = $_[0];
 	local($hl) = $_[1];
 	local($hs) = $_[2];
+	local($lenoffset) = $_[3];
 
 	local($thl) = $bytes[$base + $hl + 6];
 	$thl &= 0xf0;
 	$thl >>= 2;
 
-	local($x) = $bytes[$base + 1];
+	local($x) = $bytes[$base + $lenoffset];
 	local($y) = ($cnt - $base) * 2;
 	local($z) = 0;
 
-	if ($bytes[$base + 1] > ($cnt - $base) * 2) {
+	if ($bytes[$base + $lenoffset] > ($cnt - $base) * 2) {
 		print "[cnt=$cnt base=$base]";
-		$x = $bytes[$base + 1];
+		$x = $bytes[$base + $lenoffset];
 		$y = ($cnt - $base) * 2;
 		$z = 1;
 	} elsif (($cnt - $base) * 2 < $hl + $hl) {
@@ -179,17 +180,17 @@ sub tcpcheck6 {
 	$hs += $len;
 	$hs += &ipv6addrsum($base);
 
-	&tcpcommon($base, $hl, $hs);
+	&tcpcommon($base, $hl, $hs, 2);
 }
 
 sub icmpcheck6 {
 	local($base) = $_[0];
-	local($hl) = $bytes[$base + 0] / 256;
-	return if (($hl >> 4) != 6);
-	$hl = 20;
+	local($hl) = 20;
 
-	local($hs);
-	local($hs2);
+	local($hs) = 58;	# ICMP6
+	local($len) = $bytes[$base + 2];
+	$hs += $len;
+	$hs += &ipv6addrsum($base);
 
 	local($len) = $bytes[$base + 1] - ($hl << 1);
 
@@ -203,7 +204,7 @@ sub icmpcheck6 {
 
 	local($osum) = $bytes[$base + $hl + 1];
 	$bytes[$base + $hl + 1] = 0;
-	$hs2 = &dosum(0, $base + $hl, $cnt);
+	local($hs2) = &dosum($hs, $base + $hl, $cnt);
 	$bytes[$base + $hl + 1] = $osum;
 
 	if ($osum != $hs2) {
@@ -280,7 +281,7 @@ sub tcpcheck {
 	$hs += $len;
 	$hs += &ipv4addrsum($base);
 
-	&tcpcommon($base, $hl, $hs);
+	&tcpcommon($base, $hl, $hs, 1);
 }
 
 sub udpcheck {
