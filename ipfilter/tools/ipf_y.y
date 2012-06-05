@@ -895,7 +895,7 @@ srcaddrlist:
 			})
 		}
 	| srcaddrlist lmore addr
-	addr	{ if (frc->fr_family != AF_UNSPEC && $3.f == AF_UNSPEC) {
+		{ if (frc->fr_family != AF_UNSPEC && $3.f == AF_UNSPEC) {
 			$3.f = frc->fr_family;
 			$3.v = frc->fr_ip.fi_v;
 		  }
