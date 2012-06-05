@@ -278,7 +278,7 @@ ipf_pool_soft_create(softc)
 
 	softp->ipf_radix = ipf_rx_create();
 	if (softp->ipf_radix == NULL) {
-		IPFERROR(70028);
+		IPFERROR(70033);
 		KFREE(softp);
 		return NULL;
 	}
