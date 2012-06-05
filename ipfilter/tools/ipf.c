@@ -39,6 +39,7 @@ int	main(int, char *[]);
 int	opts = 0;
 int	outputc = 0;
 int	use_inet6 = 0;
+int	exitstatus = 0;
 
 static	void	procfile(char *);
 static	void	flushfilter(char *, int *);
@@ -52,7 +53,7 @@ static	char	*ipfname = IPL_NAME;
 static	void	usage(void);
 static	int	showversion(void);
 static	int	get_flags(void);
-static	void	ipf_interceptadd(int, ioctlfunc_t, void *);
+static	int	ipf_interceptadd(int, ioctlfunc_t, void *);
 
 static	int	fd = -1;
 static	ioctlfunc_t	iocfunctions[IPL_LOGSIZE] = { ioctl, ioctl, ioctl,
@@ -169,7 +170,7 @@ int main(argc,argv)
 	if (fd != -1)
 		(void) close(fd);
 
-	return(0);
+	return(exitstatus);
 	/* NOTREACHED */
 }
 
@@ -251,7 +252,7 @@ static	void	procfile(file)
 }
 
 
-static void ipf_interceptadd(fd, ioctlfunc, ptr)
+static int ipf_interceptadd(fd, ioctlfunc, ptr)
 	int fd;
 	ioctlfunc_t ioctlfunc;
 	void *ptr;
@@ -259,7 +260,9 @@ static void ipf_interceptadd(fd, ioctlfunc, ptr)
 	if (outputc)
 		printc(ptr);
 
-	ipf_addrule(fd, ioctlfunc, ptr);
+	if (ipf_addrule(fd, ioctlfunc, ptr) != 0)
+		exitstatus = 1;
+	return 0;
 }
 
 

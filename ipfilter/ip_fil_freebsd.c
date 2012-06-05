@@ -1257,9 +1257,7 @@ ipf_checkv4sum(fin)
 		else
 			sum = in_pseudo(ip->ip_src.s_addr, ip->ip_dst.s_addr,
 					htonl(m->m_pkthdr.csum_data +
-					fin->fin_ip->ip_len -
-					(fin->fin_ip->ip_hl << 2) +
-					fin->fin_p));
+					fin->fin_dlen + fin->fin_p));
 		sum ^= 0xffff;
 		if (sum != 0) {
 			fin->fin_cksum = FI_CK_BAD;
@@ -1310,9 +1308,8 @@ ipf_checkv6sum(fin)
 	if ((fin->fin_flx & FI_SHORT) != 0)
 		return 1;
 
-	if (fin->fin_cksum != FI_CK_SUMOK)
+	if (fin->fin_cksum != FI_CK_NEEDED)
 		return (fin->fin_cksum > FI_CK_NEEDED) ? 0 : -1;
-
 
 	if (ipf_checkl4sum(fin) == -1) {
 		fin->fin_flx |= FI_BAD;

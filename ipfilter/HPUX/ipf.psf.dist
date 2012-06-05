@@ -24,9 +24,9 @@ end
 # Bundle definition(s):
 bundle
 	tag		IPF
-	title		IP Filter 5.0.6
+	title		IP Filter 6.0.0
 	description	Firewall/NAT
-	revision	A.05.00.06
+	revision	A.06.00.00
 	architecture	HP-UX_HPREV_32/64
 	machine_type	9000/[678]??:*
 	os_name		HP-UX
@@ -68,9 +68,9 @@ product
     # InternetSrvcs.IPF-ALL
     fileset
 	tag		IPF-ALL
-	title		IP Filter 5.0.6 : IPF-ALL
+	title		IP Filter 6.0.0 : IPF-ALL
 	description	< ../IPF-ALL/description
-	revision	A.05.00.06
+	revision	A.06.00.00
 	architecture	HP-UX_HPREV_32/64
 	machine_type	9000/[678]??:*
 	os_name		HP-UX

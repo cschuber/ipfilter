@@ -316,7 +316,7 @@ static ipftuneable_t ipf_main_tuneables[] = {
 		stsizeof(ipf_main_softc_t, ipf_chksrc),
 		0,			NULL,	NULL },
 	{ { (void *)offsetof(ipf_main_softc_t, ipf_minttl) },
-		"min_ttl",		0,	4,
+		"min_ttl",		0,	1,
 		stsizeof(ipf_main_softc_t, ipf_minttl),
 		0,			NULL,	NULL },
 	{ { (void *)offsetof(ipf_main_softc_t, ipf_icmpminfragmtu) },

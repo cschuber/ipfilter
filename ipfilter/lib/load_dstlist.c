@@ -44,8 +44,8 @@ load_dstlist(dst, iocfunc, nodes)
 	if ((opts & OPT_REMOVE) == 0) {
 		if (pool_ioctl(iocfunc, SIOCLOOKUPADDTABLE, &op))
 			if ((opts & OPT_DONOTHING) == 0) {
-				perror("load_dstlist:SIOCLOOKUPADDTABLE");
-				return -1;
+				return ipf_perror_fd(pool_fd(), iocfunc,
+						  "add destination list table");
 			}
 	}
 
@@ -61,8 +61,8 @@ load_dstlist(dst, iocfunc, nodes)
 	if ((opts & OPT_REMOVE) != 0) {
 		if (pool_ioctl(iocfunc, SIOCLOOKUPDELTABLE, &op))
 			if ((opts & OPT_DONOTHING) == 0) {
-				perror("load_dstlist:SIOCLOOKUPDELTABLE");
-				return -1;
+				return ipf_perror_fd(pool_fd(), iocfunc,
+					      "delete destination list table");
 			}
 	}
 	return 0;

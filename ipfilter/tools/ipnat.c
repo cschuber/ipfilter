@@ -451,7 +451,7 @@ dotable(nsp, fd, alive, which, side)
 
 	if (alive) {
 		if (ioctl(fd, SIOCGTABL, &obj) != 0) {
-			perror("SIOCFTABL");
+			ipferror(fd, "SIOCFTABL");
 			free(buckets);
 			return;
 		}

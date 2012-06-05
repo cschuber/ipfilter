@@ -43,8 +43,8 @@ remove_poolnode(unit, name, node, iocfunc)
 
 	if (pool_ioctl(iocfunc, SIOCLOOKUPDELNODE, &op)) {
 		if ((opts & OPT_DONOTHING) == 0) {
-			perror("remove_pool:SIOCLOOKUPDELNODE");
-			return -1;
+			return ipf_perror_fd(pool_fd(), iocfunc,
+					     "remove lookup pool node");
 		}
 	}
 

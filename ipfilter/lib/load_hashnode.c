@@ -23,6 +23,7 @@ load_hashnode(unit, name, node, ttl, iocfunc)
 {
 	iplookupop_t op;
 	iphtent_t ipe;
+	char *what;
 	int err;
 
 	if (pool_open() == -1)
@@ -45,15 +46,20 @@ load_hashnode(unit, name, node, ttl, iocfunc)
 	bcopy((char *)&node->ipe_group, (char *)&ipe.ipe_group,
 	      sizeof(ipe.ipe_group));
 
-	if ((opts & OPT_REMOVE) == 0)
+	if ((opts & OPT_REMOVE) == 0) {
+		what = "add";
 		err = pool_ioctl(iocfunc, SIOCLOOKUPADDNODE, &op);
-	else
+	} else {
+		what = "delete";
 		err = pool_ioctl(iocfunc, SIOCLOOKUPDELNODE, &op);
+	}
 
 	if (err != 0)
 		if (!(opts & OPT_DONOTHING)) {
-			perror("load_hash:SIOCLOOKUP*NODE");
-			return -1;
+			char msg[80];
+
+			sprintf(msg, "%s node from lookup hash table", what);
+			return ipf_perror_fd(pool_fd(), iocfunc, msg);
 		}
 	return 0;
 }

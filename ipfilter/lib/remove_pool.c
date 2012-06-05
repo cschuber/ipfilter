@@ -35,11 +35,11 @@ remove_pool(poolp, iocfunc)
 	strncpy(pool.ipo_name, poolp->ipo_name, sizeof(pool.ipo_name));
 	pool.ipo_flags = poolp->ipo_flags;
 
-	if (pool_ioctl(iocfunc, SIOCLOOKUPDELTABLE, &op))
+	if (pool_ioctl(iocfunc, SIOCLOOKUPDELTABLE, &op)) {
 		if ((opts & OPT_DONOTHING) == 0) {
-			perror("remove_pool:SIOCLOOKUPDELTABLE");
-			return -1;
+			return ipf_perror_fd(pool_fd(), iocfunc,
+					     "delete lookup pool");
 		}
-
+	}
 	return 0;
 }

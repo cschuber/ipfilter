@@ -40,10 +40,7 @@ load_hash(iphp, list, iocfunc)
 		op.iplo_arg = IPHASH_ANON;
 	op.iplo_size = sizeof(iph);
 	op.iplo_struct = &iph;
-	iph.iph_unit = iphp->iph_unit;
-	iph.iph_type = iphp->iph_type;
-	strncpy(iph.iph_name, iphp->iph_name, sizeof(iph.iph_name));
-	iph.iph_flags = iphp->iph_flags;
+	iph = *iphp;
 	if (n <= 0)
 		n = 1;
 	if (iphp->iph_size == 0)
@@ -56,7 +53,6 @@ load_hash(iphp, list, iocfunc)
 			iphp->iph_name, "size to match expected use");
 	}
 	iph.iph_size = size;
-	iph.iph_seed = iphp->iph_seed;
 	iph.iph_table = NULL;
 	iph.iph_list = NULL;
 	iph.iph_ref = 0;
@@ -64,8 +60,8 @@ load_hash(iphp, list, iocfunc)
 	if ((opts & OPT_REMOVE) == 0) {
 		if (pool_ioctl(iocfunc, SIOCLOOKUPADDTABLE, &op))
 			if ((opts & OPT_DONOTHING) == 0) {
-				perror("load_hash:SIOCLOOKUPADDTABLE");
-				return -1;
+				return ipf_perror_fd(pool_fd(), iocfunc,
+					"add lookup hash table");
 			}
 	}
 
@@ -101,8 +97,8 @@ load_hash(iphp, list, iocfunc)
 	if ((opts & OPT_REMOVE) != 0) {
 		if (pool_ioctl(iocfunc, SIOCLOOKUPDELTABLE, &op))
 			if ((opts & OPT_DONOTHING) == 0) {
-				perror("load_hash:SIOCLOOKUPDELTABLE");
-				return -1;
+				return ipf_perror_fd(pool_fd(), iocfunc,
+					"delete lookup hash table");
 			}
 	}
 	return 0;

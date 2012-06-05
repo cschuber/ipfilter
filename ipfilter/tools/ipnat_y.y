@@ -1435,14 +1435,13 @@ setnatproto(p)
 }
 
 
-void
+int
 ipnat_addrule(fd, ioctlfunc, ptr)
 	int fd;
 	ioctlfunc_t ioctlfunc;
 	void *ptr;
 {
 	ioctlcmd_t add, del;
-	int save, realerr;
 	ipfobj_t obj;
 	ipnat_t *ipn;
 
@@ -1475,15 +1474,12 @@ ipnat_addrule(fd, ioctlfunc, ptr)
 
 	if ((opts & OPT_ZERORULEST) != 0) {
 		if ((*ioctlfunc)(fd, add, (void *)&obj) == -1) {
-			save = errno;
-
-			if ((*ioctlfunc)(fd, SIOCIPFINTERROR, &realerr))
-				realerr = 0;
-
 			if ((opts & OPT_DONOTHING) == 0) {
-				FPRINTF(stderr, "%d:%d:", realerr, yylineNum);
-				errno = save;
-				ipf_perror(realerr, "ioctl(SIOCZRLST)");
+				char msg[80];
+
+				sprintf(msg, "%d:ioctl(zero nat rule)",
+					yylineNum);
+				return ipf_perror_fd(fd, ioctlfunc, msg);
 			}
 		} else {
 			PRINTF("hits %lu ", ipn->in_hits);
@@ -1498,32 +1494,26 @@ ipnat_addrule(fd, ioctlfunc, ptr)
 		}
 	} else if ((opts & OPT_REMOVE) != 0) {
 		if ((*ioctlfunc)(fd, del, (void *)&obj) == -1) {
-			save = errno;
-
-			if ((*ioctlfunc)(fd, SIOCIPFINTERROR, &realerr))
-				realerr = 0;
-
 			if ((opts & OPT_DONOTHING) == 0) {
-				FPRINTF(stderr, "%d:%d:", realerr, yylineNum);
-				errno = save;
-				ipf_perror(realerr, "ioctl(delete nat rule)");
+				char msg[80];
+
+				sprintf(msg, "%d:ioctl(delete nat rule)",
+					yylineNum);
+				return ipf_perror_fd(fd, ioctlfunc, msg);
 			}
 		}
 	} else {
 		if ((*ioctlfunc)(fd, add, (void *)&obj) == -1) {
-			save = errno;
-
-			if ((*ioctlfunc)(fd, SIOCIPFINTERROR, &realerr))
-				realerr = 0;
-
 			if ((opts & OPT_DONOTHING) == 0) {
-				FPRINTF(stderr, "%d:%d:", realerr, yylineNum);
-				errno = save;
-				ipf_perror(realerr,
-					   "ioctl(add/insert nat rule)");
+				char msg[80];
+
+				sprintf(msg, "%d:ioctl(add/insert nat rule)",
+					yylineNum);
+				return ipf_perror_fd(fd, ioctlfunc, msg);
 			}
 		}
 	}
+	return 0;
 }
 
 
@@ -1664,7 +1654,6 @@ proxy_loadconfig(fd, ioctlfunc, proxy, proto, conf, list)
 	int proto;
 	namelist_t *list;
 {
-	int realerr, save;
 	namelist_t *na;
 	ipfobj_t obj;
 	ap_ctl_t pcmd;
@@ -1691,17 +1680,14 @@ proxy_loadconfig(fd, ioctlfunc, proxy, proto, conf, list)
 		pcmd.apc_config[APR_LABELLEN - 1] = '\0';
 
 		if ((*ioctlfunc)(fd, SIOCPROXY, (void *)&obj) == -1) {
-			save = errno;
+                        if ((opts & OPT_DONOTHING) == 0) {
+                                char msg[80];
 
-			if ((*ioctlfunc)(fd, SIOCIPFINTERROR, &realerr))
-				realerr = 0;
-
-			if ((opts & OPT_DONOTHING) == 0) {
-				FPRINTF(stderr, "%d:%d:", realerr, yylineNum);
-				errno = save;
-				ipf_perror(realerr,
-					   "ioctl(add/remm proxy rule)");
-			}
+                                sprintf(msg, "%d:ioctl(add/remove proxy rule)",
+					yylineNum);
+                                ipf_perror_fd(fd, ioctlfunc, msg);
+				return;
+                        }
 		}
 
 		list = na->na_next;
