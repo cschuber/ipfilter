@@ -185,12 +185,12 @@ sub tcpcheck6 {
 
 sub icmpcheck6 {
 	local($base) = $_[0];
-	local($hl) = $bytes[$base + 0] / 256;
-	return if (($hl >> 4) != 6);
-	$hl = 20;
+	local($hl) = 20;
 
-	local($hs);
-	local($hs2);
+	local($hs) = 58;	# ICMP6
+	local($len) = $bytes[$base + 2];
+	$hs += $len;
+	$hs += &ipv6addrsum($base);
 
 	local($len) = $bytes[$base + 1] - ($hl << 1);
 
@@ -204,7 +204,7 @@ sub icmpcheck6 {
 
 	local($osum) = $bytes[$base + $hl + 1];
 	$bytes[$base + $hl + 1] = 0;
-	$hs2 = &dosum(0, $base + $hl, $cnt);
+	local($hs2) = &dosum($hs, $base + $hl, $cnt);
 	$bytes[$base + $hl + 1] = $osum;
 
 	if ($osum != $hs2) {
