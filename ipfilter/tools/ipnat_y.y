@@ -118,7 +118,7 @@ static	int	addname __P((ipnat_t **, char *));
 %token	IPNY_TCP IPNY_UDP IPNY_TCPUDP IPNY_STICKY IPNY_MSSCLAMP IPNY_TAG
 %token	IPNY_TLATE IPNY_POOL IPNY_HASH IPNY_NO IPNY_REWRITE IPNY_PROTO
 %token	IPNY_ON IPNY_SRC IPNY_DST IPNY_IN IPNY_OUT IPNY_DIVERT IPNY_ENCAP
-%token	IPNY_CONFIG IPNY_ALLOW IPNY_DENY IPNY_DNS
+%token	IPNY_CONFIG IPNY_ALLOW IPNY_DENY IPNY_DNS IPNY_INET IPNY_INET6
 %token	IPNY_SEQUENTIAL IPNY_DSTLIST IPNY_PURGE
 %type	<port> portspec
 %type	<num> hexnumber compare range proto
@@ -354,7 +354,8 @@ redir:	rdrit ifnames addr dport tlate dip nport setproto rdroptions
 
 rewrite:
 	IPNY_REWRITE oninout rwrproto mapfrom tlate newdst newopts
-				{ if (nat->in_redir & NAT_MAP)
+				{ nat->in_v[0] = ftov($4);
+				  if (nat->in_redir & NAT_MAP)
 					setmapifnames();
 				  else
 					setrdrifnames();
@@ -363,7 +364,8 @@ rewrite:
 	;
 
 divert:	IPNY_DIVERT oninout rwrproto mapfrom tlate divdst newopts
-				{ if (nat->in_redir & NAT_MAP) {
+				{ nat->in_v[0] = ftov($4);
+				  if (nat->in_redir & NAT_MAP) {
 					setmapifnames();
 					nat->in_pr[0] = IPPROTO_UDP;
 				  } else {
@@ -375,7 +377,8 @@ divert:	IPNY_DIVERT oninout rwrproto mapfrom tlate divdst newopts
 	;
 
 encap:	IPNY_ENCAP oninout rwrproto mapfrom tlate encapdst newopts
-				{ if (nat->in_redir & NAT_MAP) {
+				{ nat->in_v[0] = ftov($4);
+				  if (nat->in_redir & NAT_MAP) {
 					setmapifnames();
 					nat->in_pr[0] = IPPROTO_IPIP;
 				  } else {
@@ -816,13 +819,17 @@ to:	IPNY_TO				{ yyexpectaddr = 1; }
 	;
 
 ifnames:
-	ifname				{ yyexpectaddr = 1; }
-	| ifname ',' otherifname	{ yyexpectaddr = 1; }
+	ifname family			{ yyexpectaddr = 1; } 
+	| ifname ',' otherifname family	{ yyexpectaddr = 1; }
 	;
 
 ifname:	YY_STR				{ setifname(&nat, 0, $1);
 					  free($1);
 					}
+	;
+
+family:	| IPNY_INET			{ nat->in_v[0] = 4; nat->in_v[1] = 4; }
+	| IPNY_INET6			{ nat->in_v[0] = 6; nat->in_v[1] = 6; }
 	;
 
 otherifname:
@@ -1235,6 +1242,8 @@ static	wordtab_t	yywords[] = {
 	{ "hash",	IPNY_HASH },
 	{ "icmpidmap",	IPNY_ICMPIDMAP },
 	{ "in",		IPNY_IN },
+	{ "inet",	IPNY_INET },
+	{ "inet6",	IPNY_INET6 },
 	{ "mask",	IPNY_MASK },
 	{ "map",	IPNY_MAP },
 	{ "map-block",	IPNY_MAPBLOCK },
