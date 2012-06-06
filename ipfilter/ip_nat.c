@@ -9073,11 +9073,8 @@ ipf_nat_cmp_rules(n1, n2)
 		return 2;
 
 	if (bcmp((char *)&n1->in_tuc, (char *)&n2->in_tuc,
-		 offsetof(ipnat_t, in_pkts) - offsetof(ipnat_t, in_tuc)) != 0)
+		 n1->in_size - offsetof(ipnat_t, in_tuc)) != 0)
 		return 3;
-	if (bcmp((char *)&n1->in_namelen, (char *)&n2->in_namelen,
-		 n1->in_size  - offsetof(ipnat_t, in_namelen)) != 0)
-		return 4;
 	if (n1->in_ndst.na_atype != n2->in_ndst.na_atype)
 		return 5;
 	if (n1->in_ndst.na_function != n2->in_ndst.na_function)
