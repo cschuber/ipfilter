@@ -95,6 +95,11 @@ printipfexpr(array)
 			break;
 
 #ifdef USE_INET6
+		case IPF_EXP_IP6_ADDR :
+			PRINTF("ip6.addr= ");
+			printhostsv6(array + i);
+			break;
+
 		case IPF_EXP_IP6_SRCADDR :
 			PRINTF("ip6.src= ");
 			printhostsv6(array + i);
