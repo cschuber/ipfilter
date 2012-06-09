@@ -4,6 +4,7 @@
  * See the IPFILTER.LICENCE file for details on licencing.
  */
 #include <sys/types.h>
+#include <sys/param.h>
 #ifdef _KERNEL
 # include <sys/systm.h>
 #endif

@@ -38,6 +38,9 @@ parsewhoisline(line, addrp, maskp)
 	if (s == NULL)
 		return -1;
 
+	bzero(addrp, sizeof(*addrp));
+	bzero(maskp, sizeof(*maskp));
+
 	if (*(s + 4) == '6') {
 #ifdef USE_INET6
 		i6addr_t a61, a62;
@@ -61,7 +64,7 @@ parsewhoisline(line, addrp, maskp)
 
 		addrp->adf_addr = a61;
 		addrp->adf_family = AF_INET6;
-		addrp->adf_len = 20;
+		addrp->adf_len = sizeof(addrp->adf_addr);
 
 		maskp->adf_addr.i6[0] = ~(a62.i6[0] ^ a61.i6[0]);
 		maskp->adf_addr.i6[1] = ~(a62.i6[1] ^ a61.i6[1]);
@@ -76,7 +79,7 @@ parsewhoisline(line, addrp, maskp)
 			return -1;
 
 		maskp->adf_family = AF_INET6;
-		maskp->adf_len = 20;
+		maskp->adf_len = sizeof(maskp->adf_addr);
 
 		return 0;
 #else
@@ -103,7 +106,7 @@ parsewhoisline(line, addrp, maskp)
 
 	addrp->adf_addr.in4 = a1;
 	addrp->adf_family = AF_INET;
-	addrp->adf_len = 8;
+	addrp->adf_len = sizeof(addrp->adf_addr);
 	maskp->adf_addr.in4.s_addr = ~(a2.s_addr ^ a1.s_addr);
 
 	/*
@@ -114,7 +117,8 @@ parsewhoisline(line, addrp, maskp)
 		return -1;
 
 	maskp->adf_family = AF_INET;
-	maskp->adf_len = 8;
+	maskp->adf_len = sizeof(maskp->adf_addr);
+	bzero((char *)maskp + maskp->adf_len, sizeof(*maskp) - maskp->adf_len);
 
 	return 0;
 }

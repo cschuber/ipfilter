@@ -115,7 +115,7 @@ static ipf_error_entry_t ipf_errors[IPF_NUM_ERRORS] = {
 	{	87,	"value for iri_nrules is 0" },
 	{	88,	"NULL pointer specified for where to copy rule to" },
 	{	89,	"copyout of rule failed" },
-	{	90,	"copyout of rule data section failed" },
+	{	90,	"" },
 	{	91,	"could not get token for rule iteration" },
 	{	92,	"unrecognised generic iterator" },
 	{	93,	"could not find token for generic iterator" },

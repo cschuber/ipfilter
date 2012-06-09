@@ -1568,7 +1568,8 @@ typedef struct ipfexp {
 	int		ipfe_cmd;
 	int		ipfe_not;
 	int		ipfe_narg;
-	int		ipfe_arg0;
+	int		ipfe_size;
+	int		ipfe_arg0[1];
 } ipfexp_t;
 
 /*

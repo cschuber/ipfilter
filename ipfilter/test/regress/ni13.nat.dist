@@ -1,1 +1,1 @@
-rdr NIC0 NIC0ADDR/32 port 1723 -> 0.0.0.0 port 1723 tcp proxy pptp
+rdr NIC0 0/0 port 1723 -> 0/0 port 1723 tcp proxy pptp

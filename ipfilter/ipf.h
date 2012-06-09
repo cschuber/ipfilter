@@ -296,7 +296,7 @@ extern int pool_open(void);
 extern char *portname(int, int);
 extern int pri_findname(char *);
 extern char *pri_toname(int);
-extern void print_toif(char *, char *, struct frdest *);
+extern void print_toif(int, char *, char *, struct frdest *);
 extern void printaps(ap_session_t *, int, int);
 extern void printaddr(int, int, char *, int, u_32_t *, u_32_t *);
 extern void printbuf(char *, int, int);

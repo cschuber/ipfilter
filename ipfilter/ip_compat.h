@@ -959,6 +959,7 @@ typedef	u_int32_t	u_32_t;
 #  include <sys/selinfo.h>
 # endif
 # if (__FreeBSD_version >= 500043)
+#  include <sys/lock.h>
 #  include <sys/mutex.h>
 #  if (__FreeBSD_version >= 700014)
 #   define	KRWLOCK_FILL_SZ		36

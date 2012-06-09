@@ -80,7 +80,7 @@ sub tcpcommon {
 		$x = $bytes[$base + $lenoffset];
 		$y = ($cnt - $base) * 2;
 		$z = 1;
-	} elsif (($cnt - $base) * 2 < $hl + $hl) {
+	} elsif (($cnt - $base) * 2 < $hl + 20) {
 		$x = ($cnt - $base) * 2;
 		$y = $hl + 20;
 		$z = 2;
@@ -121,17 +121,33 @@ sub udpcommon {
 	local($base) = $_[0];
 	local($hl) = $_[1];
 	local($hs) = $_[2];
+	local($lenoffset) = $_[3];
 
-	if ($bytes[$base + 1] > ($cnt - $base) * 2) {
-		print " UDP: missing data(1)";
-		return;
-	} elsif ($bytes[$base + 1] < ($hl << 1) + 8) {
-		print " UDP: missing data(2)";
-		return;
-	} elsif (($cnt - $base) * 2 < ($hl << 1) + 8) {
-		print " UDP: missing data(3)";
+	local($x) = $bytes[$base + $lenoffset];
+	local($y) = ($cnt - $base) * 2;
+	local($z) = 0;
+
+	if ($bytes[$base + $lenoffset] > ($cnt - $base) * 2) {
+		print "[cnt=$cnt base=$base]";
+		$x = $bytes[$base + $lenoffset];
+		$y = ($cnt - $base) * 2;
+		$z = 1;
+	} elsif (($cnt - $base) * 2 < $hl + 8) {
+		$x = ($cnt - $base) * 2;
+		$y = $hl + 8;
+		$z = 2;
+	} elsif (($cnt - $base) * 2 < 20) {
+		$x = ($cnt - $base) * 2;
+		$y = $len;
+		$z = 5;
+	}
+
+	if ($z) {
+		print " UDP: missing data($x $y $z) $hl";
+#		&dump();
 		return;
 	}
+print "[cnt=$cnt]";
 
 	local($udpat) = $base + $hl;
 	$hs = &dosum($udpsum, $udpat, $cnt);
@@ -158,12 +174,15 @@ sub ipv6check {
 	$hl = $bytes[$base] / 256;
 	return if (($hl >> 4) != 6);	# IPv4 ?
 	$hl = 40;
+	local($proto) = $bytes[$base+3] >> 8;
 
-	print " IPv6($base): ok ";
+	print " IPv6($base): ok[$proto] ";
 
-	if (($bytes[$base + 3] >> 8) == 6) {
+	if ($proto == 6) {
 		&tcpcheck6($base);
-	} elsif (($bytes[$base + 3] >> 8) == 58) {
+	} elsif ($proto == 17) {
+		&udpcheck6($base);
+	} elsif ($proto == 58) {
 		&icmpcheck6($base);
 	}
 	print "\n";
@@ -181,6 +200,20 @@ sub tcpcheck6 {
 	$hs += &ipv6addrsum($base);
 
 	&tcpcommon($base, $hl, $hs, 2);
+}
+
+sub udpcheck6 {
+	local($base) = $_[0];
+	local($hl) = $bytes[$base] / 256;
+	return if (($hl >> 4) != 6);
+	$hl = 20;
+
+	local($hs) = 17;	# UDP
+	local($len) = $bytes[$base + 2];
+	$hs += $len;
+	$hs += &ipv6addrsum($base);
+
+	&udpcommon($base, $hl, $hs, 2);
 }
 
 sub icmpcheck6 {
@@ -300,7 +333,7 @@ sub udpcheck {
 	$hs += $len;
 	$hs += &ipv4addrsum($base);
 	local($udpsum) = $hs;
-	&udpcommon($base, $hl, $hs);
+	&udpcommon($base, $hl, $hs, 1);
 }
 
 sub icmpcheck {

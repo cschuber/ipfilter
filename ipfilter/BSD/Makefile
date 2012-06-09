@@ -255,7 +255,7 @@ ip_log_u.o: $(TOP)/ip_log.c $(TOP)/ip_fil.h $(TOP)/ip_compat.h
 md5_u.o: $(TOP)/md5.c $(TOP)/md5.h
 	$(CC) $(CCARGS) $(EXTRA) -c $(TOP)/md5.c -o $@
 
-radix_ipf_u.o: $(TOP)/md5.c $(TOP)/radix_ipf.h
+radix_ipf_u.o: $(TOP)/md5.c $(TOP)/radix_ipf.h $(TOP)/radix_ipf.c
 	$(CC) $(CCARGS) $(EXTRA) -c $(TOP)/radix_ipf.c -o $@
 
 ipflkm.o: $(MODOBJS)
@@ -356,7 +356,7 @@ ip_lookup.o: $(TOP)/ip_lookup.c $(TOP)/ip_compat.h $(TOP)/ip_fil.h \
 	$(TOP)/ip_dstlist.h
 	$(CC) $(KCARGS) $(DFLAGS) -c $(TOP)/ip_lookup.c -o $@
 
-radix_ipf.o: $(TOP)/md5.c $(TOP)/radix_ipf.h
+radix_ipf.o: $(TOP)/md5.c $(TOP)/radix_ipf.h $(TOP)/radix_ipf.c
 	$(CC) $(KCARGS) $(DFLAGS) -c $(TOP)/radix_ipf.c -o $@
 
 ip_trafcon.o: $(TOP)/ip_trafcon.c $(TOP)/ip_compat.h $(TOP)/ip_fil.h \

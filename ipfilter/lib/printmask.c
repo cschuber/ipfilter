@@ -17,7 +17,7 @@ printmask(family, mask)
 	struct in_addr ipa;
 	int ones;
 
-	if (use_inet6 || (family == AF_INET6)) {
+	if (family == AF_INET6) {
 		PRINTF("/%d", count6bits(mask));
 	} else if ((ones = count4bits(*mask)) == -1) {
 		ipa.s_addr = *mask;
