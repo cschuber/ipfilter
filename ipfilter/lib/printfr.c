@@ -102,11 +102,13 @@ printfr(fp, iocfunc)
 	}
 
 	if (fp->fr_dif.fd_name != -1)
-		print_toif("dup-to", fp->fr_names, &fp->fr_dif);
+		print_toif(fp->fr_family, "dup-to", fp->fr_names,
+			   &fp->fr_dif);
 	if (fp->fr_tif.fd_name != -1)
-		print_toif("to", fp->fr_names, &fp->fr_tif);
+		print_toif(fp->fr_family, "to", fp->fr_names, &fp->fr_tif);
 	if (fp->fr_rif.fd_name != -1)
-		print_toif("reply-to", fp->fr_names, &fp->fr_rif);
+		print_toif(fp->fr_family, "reply-to", fp->fr_names,
+			   &fp->fr_rif);
 	if (fp->fr_flags & FR_FASTROUTE)
 		PRINTF("fastroute ");
 
@@ -350,6 +352,13 @@ printfr(fp, iocfunc)
 			if (!(fp->fr_flx & FI_STATE))
 				PRINTF("not ");
 			PRINTF("state");
+			comma = ",";
+		}
+		if (fp->fr_mflx & FI_V6EXTHDR) {
+			fputs(comma, stdout);
+			if (!(fp->fr_flx & FI_V6EXTHDR))
+				PRINTF("not ");
+			PRINTF("v6hdrs");
 			comma = ",";
 		}
 	}

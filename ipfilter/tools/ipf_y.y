@@ -36,7 +36,7 @@ static	void	doipfexpr __P((char *));
 static	void	do_tuneint __P((char *, int));
 static	void	do_tunestr __P((char *, char *));
 static	void	fillgroup __P((frentry_t *));
-static	u_32_t	lookuphost __P((char *));
+static	int	lookuphost __P((char *, i6addr_t *));
 static	u_int	makehash __P((struct alist_s *));
 static	int	makepool __P((struct alist_s *));
 static	struct	alist_s	*newalist __P((struct alist_s *));
@@ -104,7 +104,7 @@ static	addfunc_t	ipfaddfunc = NULL;
 %type	<port>	portnum
 %type	<num>	facility priority icmpcode seclevel secname icmptype
 %type	<num>	opt compare range opttype flagset optlist ipv6hdrlist ipv6hdr
-%type	<num>	portc porteq ipmask
+%type	<num>	portc porteq ipmask maskopts
 %type	<ip4>	ipv4 ipv4_16 ipv4_24
 %type	<adr>	hostname
 %type	<ipp>	addr ipaddr
@@ -155,8 +155,8 @@ static	addfunc_t	ipfaddfunc = NULL;
 %token	IPFY_SECCLASS IPFY_SEC_UNC IPFY_SEC_CONF IPFY_SEC_RSV1 IPFY_SEC_RSV2
 %token	IPFY_SEC_RSV4 IPFY_SEC_SEC IPFY_SEC_TS IPFY_SEC_RSV3 IPFY_DOI
 
-%token	IPF6_V6HDRS IPFY_IPV6OPT IPFY_IPV6OPT_DSTOPTS IPFY_IPV6OPT_HOPOPTS
-%token	IPFY_IPV6OPT_IPV6 IPFY_IPV6OPT_NONE IPFY_IPV6OPT_ROUTING
+%token	IPFY_V6HDRS IPFY_IPV6OPT IPFY_IPV6OPT_DSTOPTS IPFY_IPV6OPT_HOPOPTS
+%token	IPFY_IPV6OPT_IPV6 IPFY_IPV6OPT_NONE IPFY_IPV6OPT_ROUTING IPFY_V6HDR
 %token	IPFY_IPV6OPT_MOBILITY IPFY_IPV6OPT_ESP IPFY_IPV6OPT_FRAG
 
 %token	IPFY_ICMPT_UNR IPFY_ICMPT_ECHO IPFY_ICMPT_ECHOR IPFY_ICMPT_SQUENCH
@@ -736,17 +736,6 @@ srcdst:	| IPFY_ALL
 protocol:
 	YY_NUMBER		{ DOALL(fr->fr_proto = $1; \
 					fr->fr_mproto = 0xff;)
-				  if ($1 == IPPROTO_ICMP) {
-					if (frc->fr_family != AF_UNSPEC &&
-					    frc->fr_family != AF_INET)
-						YYERROR;
-					/*
-					 * This forces IPv4 for ICMP
-					 * packets so that type keyword
-					 * lookup functions properly.
-					 */
-					DOALL(fr->fr_family = AF_INET;)
-				  }
 				}
 	| YY_STR		{ if (!strcmp($1, "tcp-udp")) {
 					DOALL(fr->fr_flx |= FI_TCPUDP; \
@@ -755,17 +744,6 @@ protocol:
 					int p = getproto($1);
 					if (p == -1)
 						yyerror("protocol unknown");
-					if (p == IPPROTO_ICMP) {
-						if (frc->fr_family != AF_UNSPEC &&
-						    frc->fr_family != AF_INET)
-							YYERROR;
-						/*
-						 * This forces IPv4 for ICMP
-						 * packets so that type keyword
-						 * lookup functions properly.
-						 */
-						DOALL(fr->fr_family = AF_INET;)
-					}
 					DOALL(fr->fr_proto = p; \
 						fr->fr_mproto = 0xff;)
 				  }
@@ -959,7 +937,7 @@ dstobject:
 dstaddr:
 	addr	{ if (($1.f != AF_UNSPEC) && (frc->fr_family != AF_UNSPEC) &&
 		      ($1.f != frc->fr_family))
-			yyerror("src/dst address family mismatch");
+			yyerror("1.src/dst address family mismatch");
 		  if (frc->fr_family != AF_UNSPEC && $1.f == AF_UNSPEC) {
 			$1.f = frc->fr_family;
 			$1.v = frc->fr_ip.fi_v;
@@ -980,7 +958,7 @@ dstaddr:
 dstaddrlist:
 	addr	{ if (($1.f != AF_UNSPEC) && (frc->fr_family != AF_UNSPEC) &&
 		      ($1.f != frc->fr_family))
-			yyerror("src/dst address family mismatch");
+			yyerror("2.src/dst address family mismatch");
 		  if (frc->fr_family != AF_UNSPEC && $1.f == AF_UNSPEC) {
 			$1.f = frc->fr_family;
 			$1.v = frc->fr_ip.fi_v;
@@ -998,7 +976,7 @@ dstaddrlist:
 	| dstaddrlist lmore addr
 		{ if (($3.f != AF_UNSPEC) && (frc->fr_family != AF_UNSPEC) &&
 		      ($3.f != frc->fr_family))
-			yyerror("src/dst address family mismatch");
+			yyerror("3.src/dst address family mismatch");
 		  if (frc->fr_family != AF_UNSPEC && $3.f == AF_UNSPEC) {
 			$3.f = frc->fr_family;
 			$3.v = frc->fr_ip.fi_v;
@@ -1137,6 +1115,15 @@ ipaddr:	IPFY_ANY			{ bzero(&($$), sizeof($$));
 					  $$.f = $1.f;
 					  $$.v = ftov($1.f);
 					  $$.type = ifpflag;
+					  if (ifpflag != 0 && $$.v == 0) {
+						if (frc->fr_family == AF_INET6){
+							$$.v = 6;
+							$$.f = AF_INET6;
+						} else {
+							$$.v = 4;
+							$$.f = AF_INET;
+						}
+					  }
 					  yyresetdict();
 					  yyexpectaddr = 0;
 					}
@@ -1145,15 +1132,35 @@ ipaddr:	IPFY_ANY			{ bzero(&($$), sizeof($$));
 					  $$.ifpos = addname(&fr, $2);
 					  $$.lif = 0;
 					}
-	| '(' YY_STR ')' '/' { ifpflag = FRI_DYNAMIC; } maskopts
+	| '(' YY_STR ')' '/'
+	  { ifpflag = FRI_DYNAMIC; yysetdict(maskwords); }
+	  maskopts
 					{ $$.type = ifpflag;
 					  $$.ifpos = addname(&fr, $2);
 					  $$.lif = 0;
+					  if (frc->fr_family == AF_UNSPEC)
+						frc->fr_family = AF_INET;
+					  if (ifpflag == FRI_DYNAMIC) {
+						ntomask(frc->fr_family,
+							$6, $$.m.i6);
+					  }
+					  yyresetdict();
+					  yyexpectaddr = 0;
 					}
-	| '(' YY_STR ':' YY_NUMBER ')' '/' { ifpflag = FRI_DYNAMIC; } maskopts
+	| '(' YY_STR ':' YY_NUMBER ')' '/'
+	  { ifpflag = FRI_DYNAMIC; yysetdict(maskwords); }
+	  maskopts
 					{ $$.type = ifpflag;
 					  $$.ifpos = addname(&fr, $2);
 					  $$.lif = $4;
+					  if (frc->fr_family == AF_UNSPEC)
+						frc->fr_family = AF_INET;
+					  if (ifpflag == FRI_DYNAMIC) {
+						ntomask(frc->fr_family,
+							$8, $$.m.i6);
+					  }
+					  yyresetdict();
+					  yyexpectaddr = 0;
 					}
 	;
 
@@ -1166,7 +1173,7 @@ ipmask:	ipv4				{ $$ = count4bits($1.s_addr); }
 	| YY_HEX			{ $$ = count4bits(htonl($1)); }
 	| YY_NUMBER			{ $$ = $1; }
 	| YY_IPV6			{ $$ = count6bits($1.i6); }
-	| maskopts			{ $$ = 0; }
+	| maskopts			{ $$ = $1; }
 	;
 
 maskopts:
@@ -1175,25 +1182,30 @@ maskopts:
 					  } else {
 						YYERROR;
 					  }
+					  $$ = 0;
 					}
 	| IPFY_NETWORK			{ if (ifpflag == FRI_DYNAMIC) {
 						ifpflag = FRI_NETWORK;
 					  } else {
 						YYERROR;
 					  }
+					  $$ = 0;
 					}
 	| IPFY_NETMASKED		{ if (ifpflag == FRI_DYNAMIC) {
 						ifpflag = FRI_NETMASKED;
 					  } else {
 						YYERROR;
 					  }
+					  $$ = 0;
 					}
 	| IPFY_PEER			{ if (ifpflag == FRI_DYNAMIC) {
 						ifpflag = FRI_PEERADDR;
 					  } else {
 						YYERROR;
 					  }
+					  $$ = 0;
 					}
+	| YY_NUMBER			{ $$ = $1; }
 	;
 
 hostname:
@@ -1212,10 +1224,8 @@ hostname:
 					  $$.adr.in4_addr = $1;
 					  $$.f = AF_INET;
 					}
-	| YY_STR			{ if (frc->fr_family == AF_INET6)
-						YYERROR;
-					  $$.adr.in4_addr = lookuphost($1);
-					  $$.f = AF_INET;
+	| YY_STR			{ if (lookuphost($1, &$$.adr) == 0)
+						  $$.f = AF_INET;
 					  free($1);
 					}
 	| YY_IPV6			{ if (frc->fr_family == AF_INET)
@@ -1326,6 +1336,16 @@ itype:	seticmptype icmptype
 seticmptype:
 	IPFY_ICMPTYPE			{ if (frc->fr_family == AF_UNSPEC)
 						frc->fr_family = AF_INET;
+					  if (frc->fr_family == AF_INET &&
+					      frc->fr_type == FR_T_IPF &&
+					      frc->fr_proto != IPPROTO_ICMP) {
+						yyerror("proto not icmp");
+					  }
+					  if (frc->fr_family == AF_INET6 &&
+					      frc->fr_type == FR_T_IPF &&
+					      frc->fr_proto != IPPROTO_ICMPV6) {
+						yyerror("proto not ipv6-icmp");
+					  }
 					  setipftype();
 					  yysetdict(NULL);
 					}
@@ -1476,14 +1496,14 @@ withopt:
 	| notwith opttype		{ DOALL(fr->fr_mflx |= $2;) }
 	| ipopt ipopts			{ yyresetdict(); }
 	| notwith ipopt ipopts		{ yyresetdict(); }
-	| startv6hdrs ipv6hdrs		{ yyresetdict(); }
+	| startv6hdr ipv6hdrs		{ yyresetdict(); }
 	;
 
 ipopt:	IPFY_OPT			{ yysetdict(ipv4optwords); }
 	;
 
-startv6hdrs:
-	IPF6_V6HDRS	{ if (frc->fr_family != AF_INET6)
+startv6hdr:
+	IPFY_V6HDR	{ if (frc->fr_family != AF_INET6)
 				yyerror("only available with IPv6");
 			  yysetdict(ipv6optwords);
 			}
@@ -1511,6 +1531,7 @@ opttype:
 	| IPFY_STATE			{ $$ = FI_STATE; }
 	| IPFY_OOW			{ $$ = FI_OOW; }
 	| IPFY_AH			{ $$ = FI_AH; }
+	| IPFY_V6HDRS			{ $$ = FI_V6EXTHDR; }
 	;
 
 ipopts:	optlist		{ DOALL(fr->fr_mip.fi_optmsk |= $1; \
@@ -1868,7 +1889,8 @@ static	struct	wordtab ipfwords[] = {
 	{ "to",				IPFY_TO },
 	{ "ttl",			IPFY_TTL },
 	{ "udp",			IPFY_UDP },
-	{ "v6hdrs",			IPF6_V6HDRS },
+	{ "v6hdr",			IPFY_V6HDR },
+	{ "v6hdrs",			IPFY_V6HDRS },
 	{ "with",			IPFY_WITH },
 	{ NULL,				0 }
 };
@@ -2155,10 +2177,11 @@ static frentry_t *addrule()
 }
 
 
-static u_32_t lookuphost(name)
-char *name;
+static int
+lookuphost(name, addrp)
+	char *name;
+	i6addr_t *addrp;
 {
-	i6addr_t addr;
 	int i;
 
 	hashed = 0;
@@ -2171,15 +2194,15 @@ char *name;
 		if (strcmp(name, fr->fr_names + fr->fr_ifnames[i]) == 0) {
 			ifpflag = FRI_DYNAMIC;
 			dynamic = addname(&fr, name);
-			return 0;
+			return 1;
 		}
 	}
 
-	if (gethost(AF_INET, name, &addr) == -1) {
+	if (gethost(AF_INET, name, addrp) == -1) {
 		fprintf(stderr, "unknown name \"%s\"\n", name);
-		return 0;
+		return -1;
 	}
-	return addr.in4.s_addr;
+	return 0;
 }
 
 

@@ -6206,27 +6206,27 @@ ipf_ioctlswitch(softc, unit, data, cmd, mode, uid, ctx)
  * 1 = minimum size, not absolute size
  */
 static	int	ipf_objbytes[IPFOBJ_COUNT][3] = {
-	{ 1,	sizeof(struct frentry),		5010000 },
+	{ 1,	sizeof(struct frentry),		5010000 },	/* 0 */
 	{ 1,	sizeof(struct friostat),	5010000 },
 	{ 0,	sizeof(struct fr_info),		5010000 },
 	{ 0,	sizeof(struct ipf_authstat),	4010100 },
 	{ 0,	sizeof(struct ipfrstat),	5010000 },
-	{ 1,	sizeof(struct ipnat),		5010000 },
+	{ 1,	sizeof(struct ipnat),		5010000 },	/* 5 */
 	{ 0,	sizeof(struct natstat),		5010000 },
 	{ 0,	sizeof(struct ipstate_save),	5010000 },
 	{ 1,	sizeof(struct nat_save),	5010000 },
 	{ 0,	sizeof(struct natlookup),	5010000 },
-	{ 1,	sizeof(struct ipstate),		5010000 },
+	{ 1,	sizeof(struct ipstate),		5010000 },	/* 10 */
 	{ 0,	sizeof(struct ips_stat),	5010000 },
 	{ 0,	sizeof(struct frauth),		5010000 },
 	{ 0,	sizeof(struct ipftune),		4010100 },
 	{ 0,	sizeof(struct nat),		5010000 },
-	{ 0,	sizeof(struct ipfruleiter),	4011400 },
+	{ 0,	sizeof(struct ipfruleiter),	4011400 },	/* 15 */
 	{ 0,	sizeof(struct ipfgeniter),	4011400 },
 	{ 0,	sizeof(struct ipftable),	4011400 },
 	{ 0,	sizeof(struct ipflookupiter),	4011400 },
 	{ 0,	sizeof(struct ipftq) * IPF_TCP_NSTATES },
-	{ 0,	0,				0	}, /* IPFEXPR */
+	{ 1,	0,				0	}, /* IPFEXPR */
 	{ 0,	0,				0	}, /* PROXYCTL */
 	{ 0,	sizeof (struct fripf),		5010000	}
 };
@@ -6513,7 +6513,8 @@ ipf_outobj(softc, data, ptr, type)
 /* is no point in validating information that comes from the kernel with    */
 /* itself.                                                                  */
 /* ------------------------------------------------------------------------ */
-int ipf_outobjk(softc, obj, ptr)
+int
+ipf_outobjk(softc, obj, ptr)
 	ipf_main_softc_t *softc;
 	ipfobj_t *obj;
 	void *ptr;
@@ -7827,13 +7828,14 @@ ipf_getnextrule(softc, t, ptr)
 		if (next->fr_data != NULL) {
 			ipfobj_t dobj;
 
-			dobj.ipfo_type = IPFOBJ_FRIPF;
+			if (next->fr_type == FR_T_IPFEXPR)
+				dobj.ipfo_type = IPFOBJ_IPFEXPR;
+			else
+				dobj.ipfo_type = IPFOBJ_FRIPF;
 			dobj.ipfo_size = next->fr_dsize;
 			dobj.ipfo_rev = obj.ipfo_rev;
 			dobj.ipfo_ptr = dst;
 			error = ipf_outobjk(softc, &dobj, next->fr_data);
-			if (error != 0)
-				IPFERROR(90);
 		}
 	}
 
@@ -8542,7 +8544,8 @@ int
 ipf_matcharray_verify(array, arraysize)
 	int *array, arraysize;
 {
-	int i, nelem, maxidx, len;
+	int i, nelem, maxidx;
+	ipfexp_t *e;
 
 	nelem = arraysize / sizeof(*array);
 
@@ -8572,17 +8575,18 @@ ipf_matcharray_verify(array, arraysize)
 	}
 
 	for (i = 1; i < maxidx; ) {
-		len = array[i + 2];
+		e = (ipfexp_t *)(array + i);
 
 		/*
 		 * The length of the bits to check must be at least 1
 		 * (or else there is nothing to comapre with!) and it
 		 * cannot exceed the length of the data present.
 		 */
-		if ((len < 1) || (i + 3 + len > maxidx)) {
+		if ((e->ipfe_size < 1 ) ||
+		    (e->ipfe_size + i > maxidx)) {
 			return -1;
 		}
-		i += 3 + len;
+		i += e->ipfe_size;
 	}
 	return 0;
 }
@@ -8603,14 +8607,16 @@ ipf_fr_matcharray(fin, array)
 	fr_info_t *fin;
 	int *array;
 {
-	int i, n, *x, e, p;
+	int i, n, *x, rv, p;
+	ipfexp_t *e;
 
-	e = 0;
+	rv = 0;
 	n = array[0];
 	x = array + 1;
 
-	for (; n > 0; x += 3 + x[3], e = 0) {
-		n -= x[3] + 3;
+	for (; n > 0; x += 3 + x[3], rv = 0) {
+		e = (ipfexp_t *)x;
+		n -= e->ipfe_size;
 
 		/*
 		 * The upper 16 bits currently store the protocol value.
@@ -8618,44 +8624,48 @@ ipf_fr_matcharray(fin, array)
 		 * allows "tcp.port = 80" without requiring an explicit
 		 " "ip.pr = tcp" first.
 		 */
-		p = x[0] >> 16;
+		p = e->ipfe_cmd >> 16;
 		if ((p != 0) && (p != fin->fin_p))
 			break;
 
-		switch (x[0])
+		switch (e->ipfe_cmd)
 		{
 		case IPF_EXP_IP_PR :
-			for (i = 0; !e && i < x[3]; i++) {
-				e |= (fin->fin_p == x[i + 3]);
+			for (i = 0; !rv && i < e->ipfe_narg; i++) {
+				rv |= (fin->fin_p == e->ipfe_arg0[i]);
 			}
 			break;
 
 		case IPF_EXP_IP_SRCADDR :
 			if (fin->fin_v != 4)
 				break;
-			for (i = 0; !e && i < x[3]; i++) {
-				e |= ((fin->fin_saddr & x[i + 4]) ==
-				      x[i + 3]);
+			for (i = 0; !rv && i < e->ipfe_narg; i++) {
+				rv |= ((fin->fin_saddr &
+					e->ipfe_arg0[i * 2 + 1]) ==
+				       e->ipfe_arg0[i * 2]);
 			}
 			break;
 
 		case IPF_EXP_IP_DSTADDR :
 			if (fin->fin_v != 4)
 				break;
-			for (i = 0; !e && i < x[3]; i++) {
-				e |= ((fin->fin_daddr & x[i + 4]) ==
-				      x[i + 3]);
+			for (i = 0; !rv && i < e->ipfe_narg; i++) {
+				rv |= ((fin->fin_daddr &
+					e->ipfe_arg0[i * 2 + 1]) ==
+				       e->ipfe_arg0[i * 2]);
 			}
 			break;
 
 		case IPF_EXP_IP_ADDR :
 			if (fin->fin_v != 4)
 				break;
-			for (i = 0; !e && i < x[3]; i++) {
-				e |= ((fin->fin_saddr & x[i + 4]) ==
-				      x[i + 3]) ||
-				     ((fin->fin_daddr & x[i + 4]) ==
-				      x[i + 3]);
+			for (i = 0; !rv && i < e->ipfe_narg; i++) {
+				rv |= ((fin->fin_saddr &
+					e->ipfe_arg0[i * 2 + 1]) ==
+				       e->ipfe_arg0[i * 2]) ||
+				      ((fin->fin_daddr &
+					e->ipfe_arg0[i * 2 + 1]) ==
+				       e->ipfe_arg0[i * 2]);
 			}
 			break;
 
@@ -8663,68 +8673,74 @@ ipf_fr_matcharray(fin, array)
 		case IPF_EXP_IP6_SRCADDR :
 			if (fin->fin_v != 6)
 				break;
-			for (i = 0; !e && i < x[3]; i++) {
-				e |= IP6_MASKEQ(&fin->fin_src6, x + i + 7,
-						x + i + 3);
+			for (i = 0; !rv && i < e->ipfe_narg; i++) {
+				rv |= IP6_MASKEQ(&fin->fin_src6,
+						 &e->ipfe_arg0[i * 8 + 4],
+						 &e->ipfe_arg0[i * 8]);
 			}
 			break;
 
 		case IPF_EXP_IP6_DSTADDR :
 			if (fin->fin_v != 6)
 				break;
-			for (i = 0; !e && i < x[3]; i++) {
-				e |= IP6_MASKEQ(&fin->fin_dst6, x + i + 7,
-						x + i + 3);
+			for (i = 0; !rv && i < e->ipfe_narg; i++) {
+				rv |= IP6_MASKEQ(&fin->fin_dst6,
+						 &e->ipfe_arg0[i * 8 + 4],
+						 &e->ipfe_arg0[i * 8]);
 			}
 			break;
 
 		case IPF_EXP_IP6_ADDR :
 			if (fin->fin_v != 6)
 				break;
-			for (i = 0; !e && i < x[3]; i++) {
-				e |= IP6_MASKEQ(&fin->fin_src6, x + i + 7,
-						x + i + 3) ||
-				     IP6_MASKEQ(&fin->fin_dst6, x + i + 7,
-						x + i + 3);
+			for (i = 0; !rv && i < e->ipfe_narg; i++) {
+				rv |= IP6_MASKEQ(&fin->fin_src6,
+						 &e->ipfe_arg0[i * 8 + 4],
+						 &e->ipfe_arg0[i * 8]) ||
+				      IP6_MASKEQ(&fin->fin_dst6,
+						 &e->ipfe_arg0[i * 8 + 4],
+						 &e->ipfe_arg0[i * 8]);
 			}
 			break;
 #endif
 
 		case IPF_EXP_UDP_PORT :
 		case IPF_EXP_TCP_PORT :
-			for (i = 0; !e && i < x[3]; i++) {
-				e |= (fin->fin_sport == x[i + 3]) ||
-				     (fin->fin_dport == x[i + 3]);
+			for (i = 0; !rv && i < e->ipfe_narg; i++) {
+				rv |= (fin->fin_sport == e->ipfe_arg0[i]) ||
+				      (fin->fin_dport == e->ipfe_arg0[i]);
 			}
 			break;
 
 		case IPF_EXP_UDP_SPORT :
 		case IPF_EXP_TCP_SPORT :
-			for (i = 0; !e && i < x[3]; i++) {
-				e |= (fin->fin_sport == x[i + 3]);
+			for (i = 0; !rv && i < e->ipfe_narg; i++) {
+				rv |= (fin->fin_sport == e->ipfe_arg0[i]);
 			}
 			break;
 
 		case IPF_EXP_UDP_DPORT :
 		case IPF_EXP_TCP_DPORT :
-			for (i = 0; !e && i < x[3]; i++) {
-				e |= (fin->fin_dport == x[i + 3]);
+			for (i = 0; !rv && i < e->ipfe_narg; i++) {
+				rv |= (fin->fin_dport == e->ipfe_arg0[i]);
 			}
 			break;
 
 		case IPF_EXP_TCP_FLAGS :
-			for (i = 0; !e && i < x[3]; i++) {
-				e |= ((fin->fin_tcpf & x[i + 4]) == x[i + 3]);
+			for (i = 0; !rv && i < e->ipfe_narg; i++) {
+				rv |= ((fin->fin_tcpf &
+					e->ipfe_arg0[i * 2 + 1]) ==
+				       e->ipfe_arg0[i * 2]);
 			}
 			break;
 		}
-		e ^= x[1];
+		rv ^= e->ipfe_not;
 
-		if (!e)
+		if (rv == 0)
 			break;
 	}
 
-	return e;
+	return rv;
 }
 
 

@@ -18,7 +18,7 @@ void optprintv6(sec, optmsk, optbits)
 	struct ipopt_names *io;
 	char *s;
 
-	s = " v6hdrs ";
+	s = " v6hdr ";
 	for (io = v6ionames; io->on_name; io++)
 		if ((io->on_bit & optmsk) &&
 		    ((io->on_bit & optmsk) == (io->on_bit & optbits))) {

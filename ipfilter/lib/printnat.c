@@ -95,6 +95,9 @@ printnat(np, opts)
 	}
 	putchar(' ');
 
+	if (np->in_v[0] == 6)
+		PRINTF("inet6 ");
+
 	if (np->in_redir & (NAT_REWRITE|NAT_ENCAP|NAT_DIVERTUDP)) {
 		if ((proto != 0) || (np->in_flags & IPN_TCPUDP)) {
 			PRINTF("proto ");
