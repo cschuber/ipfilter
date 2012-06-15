@@ -780,10 +780,7 @@ ipf_state_ioctl(softc, data, cmd, mode, uid, ctx)
 		if (token != NULL) {
 			error = ipf_state_iter(softc, token, &iter, &obj);
 			WRITE_ENTER(&softc->ipf_tokens);
-			if (token->ipt_data == NULL)
-				ipf_token_free(softc, token);
-			else
-				ipf_token_deref(softc, token);
+			ipf_token_deref(softc, token);
 			RWLOCK_EXIT(&softc->ipf_tokens);
 		} else {
 			IPFERROR(100018);
@@ -3060,7 +3057,7 @@ ipf_allowstateicmp(fin, is, src)
 	fr = is->is_rule;
 	if (fr != NULL && fr->fr_icmpgrp != NULL) {
 		savefr = fin->fin_fr;
-		fin->fin_fr = *fr->fr_icmpgrp;
+		fin->fin_fr = fr->fr_icmpgrp->fg_start;
 
 		ipass = ipf_scanlist(fin, softc->ipf_pass);
 		fin->fin_fr = savefr;

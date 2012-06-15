@@ -148,7 +148,6 @@ static	void	showgroups_dead(friostat_t *);
 static	void	showgroups_live(friostat_t *);
 static	void	usage(char *);
 static	int	state_matcharray(ipstate_t *, int *);
-static	void	printlivelist(u_long, int, int, char *);
 static	void	printdeadlist(u_long, int, int, frentry_t *, char *);
 static	void	printside(char *, ipf_statistics_t *);
 static	void	parse_ipportstr(const char *, i6addr_t *, int *);
@@ -778,58 +777,7 @@ static void
 ipf_walker(fp)
 	frentry_t *fp;
 {
-	frgroup_t *g;
-
 	printfr(fp, ioctl);
-
-	if (fp->fr_grhead != -1) {
-		for (g = grtop; g != NULL; g = g->fg_next) {
-			if (!strncmp(fp->fr_names + fp->fr_grhead,
-				     g->fg_name,
-				     FR_GROUPLEN))
-				break;
-		}
-		if (g == NULL) {
-			g = calloc(1, sizeof(*g));
-
-			if (g != NULL) {
-				strncpy(g->fg_name,
-					fp->fr_names + fp->fr_grhead,
-					FR_GROUPLEN);
-				if (grtop == NULL) {
-					grtop = g;
-					grtail = g;
-				} else {
-					grtail->fg_next = g;
-					grtail = g;
-				}
-			}
-		}
-	}
-}
-
-
-/*
- * Print out a list of rules from the kernel, starting at the one passed.
- */
-static void
-printlivelist(ticks, out, set, group)
-	u_long ticks;
-	int out, set;
-	char *group;
-{
-	frgroup_t *g;
-
-	walk_live_fr_rules(ticks, out, set, group, ipf_walker);
-
-	if (group == NULL) {
-		while ((g = grtop) != NULL) {
-			printf("# Group %s\n", g->fg_name);
-			printlivelist(ticks, out, set, g->fg_name);
-			grtop = g->fg_next;
-			free(g);
-		}
-	}
 }
 
 
@@ -936,15 +884,25 @@ static	void	showlist(fiop)
 
 	if (opts & OPT_DEBUG)
 		PRINTF("fp %p set %d\n", fp, set);
-	if (!fp) {
-		FPRINTF(stderr, "empty list for %s%s\n",
-			(opts & OPT_INACTIVE) ? "inactive " : "", filters[i]);
-		return;
-	}
-	if (live_kernel == 1)
-		printlivelist(fiop->f_ticks, i, set, NULL);
-	else
+	if (live_kernel == 1) {
+		int printed;
+
+		printed = walk_live_fr_rules(fiop->f_ticks, i, set,
+					     NULL, ipf_walker);
+		if (printed == 0) {
+			FPRINTF(stderr, "empty list for %s%s\n",
+				(opts & OPT_INACTIVE) ? "inactive " : "",
+							filters[i]);
+		}
+	} else {
+		if (!fp) {
+			FPRINTF(stderr, "empty list for %s%s\n",
+				(opts & OPT_INACTIVE) ? "inactive " : "",
+							filters[i]);
+			return;
+		}
 		printdeadlist(fiop->f_ticks, i, set, fp, NULL);
+	}
 }
 
 

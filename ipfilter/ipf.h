@@ -384,7 +384,7 @@ extern void ipfkdebug(char *, ...);
 extern void ipfkverbose(char *, ...);
 
 typedef	void	(* ipf_fr_walk_func_t)(frentry_t *);
-extern void walk_live_fr_rules(u_long, int, int, char *, ipf_fr_walk_func_t);
+extern int walk_live_fr_rules(u_long, int, int, char *, ipf_fr_walk_func_t);
 typedef	void	(* ipf_group_walk_func_t)(frgroupiter_t *);
 extern void walk_live_groups(int, int, ipf_group_walk_func_t);
 typedef	void	(* ipf_state_walk_func_t)(u_long, int *, ipstate_t *);

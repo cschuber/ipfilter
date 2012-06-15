@@ -5,7 +5,7 @@
 
 extern int ipf_fd;
 
-void
+int
 walk_live_fr_rules(ticks, out, set, group, walker)
 	u_long ticks;
 	int out, set;
@@ -17,9 +17,10 @@ walk_live_fr_rules(ticks, out, set, group, walker)
 	frentry_t zero;
 	frentry_t *fp;
 	ipfobj_t obj;
-	int n;
+	int rules;
+	int num;
 
-	n = 0;
+	rules = 0;
 
 	rule.iri_inout = out;
 	rule.iri_active = set;
@@ -38,7 +39,7 @@ walk_live_fr_rules(ticks, out, set, group, walker)
 	obj.ipfo_size = sizeof(rule);
 	obj.ipfo_ptr = &rule;
 
-	do {
+	while (rule.iri_rule != NULL) {
 		u_long array[1000];
 
 		memset(array, 0xff, sizeof(array));
@@ -46,11 +47,13 @@ walk_live_fr_rules(ticks, out, set, group, walker)
 		rule.iri_rule = fp;
 		if (ioctl(ipf_fd, SIOCIPFITER, &obj) == -1) {
 			ipferror(ipf_fd, "ioctl(SIOCIPFITER)");
-			n = IPFGENITER_IPF;
-			(void) ioctl(ipf_fd,SIOCIPFDELTOK, &n);
-			return;
+			num = IPFGENITER_IPF;
+			(void) ioctl(ipf_fd,SIOCIPFDELTOK, &num);
+			return rules;
 		}
 		if (bcmp(fp, &zero, sizeof(zero)) == 0)
+			break;
+		if (rule.iri_rule == NULL)
 			break;
 #ifdef USE_INET6
 		if (use_inet6 != 0) {
@@ -66,10 +69,12 @@ walk_live_fr_rules(ticks, out, set, group, walker)
 			fp->fr_data = (char *)fp + fp->fr_size;
 		if (fp->fr_die != 0)
 			fp->fr_die -= ticks;
+		rules++;
 		walker(fp);
-	} while (fp->fr_next != NULL);
+	}
 
-	n = IPFOBJ_IPFITER;
-	(void) ioctl(ipf_fd,SIOCIPFDELTOK, &n);
+	num = IPFOBJ_IPFITER;
+	(void) ioctl(ipf_fd,SIOCIPFDELTOK, &num);
 
+	return rules;
 }

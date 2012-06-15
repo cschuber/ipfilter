@@ -742,8 +742,6 @@ ipf_lookup_iterate(softc, data, uid, ctx)
 
 	WRITE_ENTER(&softc->ipf_tokens);
 	if (i == MAX_BACKENDS)
-		ipf_token_free(softc, token);
-	else
 		ipf_token_deref(softc, token);
 	RWLOCK_EXIT(&softc->ipf_tokens);
 

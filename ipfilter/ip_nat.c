@@ -1219,9 +1219,12 @@ ipf_fix_datacksum(sp, n)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_nat_ioctl                                               */
 /* Returns:     int - 0 == success, != 0 == failure                         */
-/* Parameters:  data(I) - pointer to ioctl data                             */
-/*              cmd(I)  - ioctl command integer                             */
-/*              mode(I) - file mode bits used with open                     */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              data(I)  - pointer to ioctl data                            */
+/*              cmd(I)   - ioctl command integer                            */
+/*              mode(I)  - file mode bits used with open                    */
+/*              uid(I)   - uid of calling process                           */
+/*              ctx(I)   - pointer used as key for finding context          */
 /*                                                                          */
 /* Processes an ioctl call made to operate on the IP Filter NAT device.     */
 /* ------------------------------------------------------------------------ */
@@ -1600,10 +1603,7 @@ ipf_nat_ioctl(softc, data, cmd, mode, uid, ctx)
 		if (token != NULL) {
 			error  = ipf_nat_iterator(softc, token, &iter, &obj);
 			WRITE_ENTER(&softc->ipf_tokens);
-			if (token->ipt_data == NULL)
-				ipf_token_free(softc, token);
-			else
-				ipf_token_deref(softc, token);
+			ipf_token_deref(softc, token);
 			RWLOCK_EXIT(&softc->ipf_tokens);
 		}
 		SPL_X(s);
@@ -1646,7 +1646,9 @@ done:
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_nat_siocaddnat                                          */
 /* Returns:     int - 0 == success, != 0 == failure                         */
-/* Parameters:  n(I)       - pointer to new NAT rule                        */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              softn(I) - pointer to NAT context structure                 */
+/*              n(I)       - pointer to new NAT rule                        */
 /*              np(I)      - pointer to where to insert new NAT rule        */
 /*              getlock(I) - flag indicating if lock on  is held            */
 /* Mutex Locks: ipf_nat_io                                                   */
@@ -1808,6 +1810,14 @@ ipf_nat_siocaddnat(softc, softn, n, np, getlock)
 }
 
 
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_nat_ruleaddrinit                                        */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              softn(I) - pointer to NAT context structure                 */
+/*              n(I)     - pointer to NAT rule                              */
+/*                                                                          */
+/* Initialise all of the NAT address structures in a NAT rule.              */
+/* ------------------------------------------------------------------------ */
 static int
 ipf_nat_ruleaddrinit(softc, softn, n)
 	ipf_main_softc_t *softc;
@@ -1869,9 +1879,10 @@ ipf_nat_ruleaddrinit(softc, softn, n)
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    nat_resolvrule                                              */
+/* Function:    ipf_nat_resolvrule                                          */
 /* Returns:     Nil                                                         */
-/* Parameters:  n(I)  - pointer to NAT rule                                 */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              n(I)     - pointer to NAT rule                              */
 /*                                                                          */
 /* Handle SIOCADNAT.  Resolve and calculate details inside the NAT rule     */
 /* from information passed to the kernel, then add it  to the appropriate   */
@@ -1914,9 +1925,11 @@ ipf_nat_resolverule(softc, n)
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    nat_siocdelnat                                              */
+/* Function:    ipf_nat_siocdelnat                                          */
 /* Returns:     int - 0 == success, != 0 == failure                         */
-/* Parameters:  n(I)       - pointer to new NAT rule                        */
+/* Parameters:  softc(I)   - pointer to soft context main structure         */
+/*              softn(I)   - pointer to NAT context structure               */
+/*              n(I)       - pointer to new NAT rule                        */
 /*              np(I)      - pointer to where to insert new NAT rule        */
 /*              getlock(I) - flag indicating if lock on  is held            */
 /* Mutex Locks: ipf_nat_io                                                  */
@@ -1944,18 +1957,6 @@ ipf_nat_siocdelnat(softc, softn, n, np, getlock)
 	if (n->in_redir & (NAT_MAPBLK|NAT_MAP))
 		ipf_nat_delmap(softn, n);
 
-	if (n->in_tqehead[0] != NULL) {
-		if (ipf_deletetimeoutqueue(n->in_tqehead[0]) == 0) {
-			ipf_freetimeoutqueue(softc, n->in_tqehead[1]);
-		}
-	}
-
-	if (n->in_tqehead[1] != NULL) {
-		if (ipf_deletetimeoutqueue(n->in_tqehead[1]) == 0) {
-			ipf_freetimeoutqueue(softc, n->in_tqehead[1]);
-		}
-	}
-
 	*np = n->in_next;
 
 	ipf_nat_delrule(softc, softn, n, 1);
@@ -1966,6 +1967,16 @@ ipf_nat_siocdelnat(softc, softn, n, np, getlock)
 }
 
 
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_nat_free_rule                                           */
+/* Returns:     Nil                                                         */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              softn(I) - pointer to NAT context structure                 */
+/*              n(I)     - pointer to NAT rule                              */
+/*                                                                          */
+/* This function is concerned with releasing all of the resources that were */
+/* allocated when the NAT rule structure was constructed.                   */
+/* ------------------------------------------------------------------------ */
 static void
 ipf_nat_free_rule(softc, softn, n)
 	ipf_main_softc_t *softc;
@@ -1997,6 +2008,19 @@ ipf_nat_free_rule(softc, softn, n)
 	if (n->in_divmp != NULL) {
 		FREE_MB_T(n->in_divmp);
 	}
+
+	if (n->in_tqehead[0] != NULL) {
+		if (ipf_deletetimeoutqueue(n->in_tqehead[0]) == 0) {
+			ipf_freetimeoutqueue(softc, n->in_tqehead[1]);
+		}
+	}
+
+	if (n->in_tqehead[1] != NULL) {
+		if (ipf_deletetimeoutqueue(n->in_tqehead[1]) == 0) {
+			ipf_freetimeoutqueue(softc, n->in_tqehead[1]);
+		}
+	}
+
 	ATOMIC_DEC32(softn->ipf_nat_stats.ns_rules);
 
 	MUTEX_DESTROY(&n->in_lock);
@@ -2013,7 +2037,8 @@ ipf_nat_free_rule(softc, softn, n)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_nat_getsz                                               */
 /* Returns:     int - 0 == success, != 0 is the error value.                */
-/* Parameters:  data(I)    - pointer to natget structure with kernel        */
+/* Parameters:  softc(I)   - pointer to soft context main structure         */
+/*              data(I)    - pointer to natget structure with kernel        */
 /*                           pointer get the size of.                       */
 /*              getlock(I) - flag indicating whether or not the caller      */
 /*                           holds a lock on ipf_nat                        */
@@ -2107,7 +2132,8 @@ ipf_nat_getsz(softc, data, getlock)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_nat_getent                                              */
 /* Returns:     int - 0 == success, != 0 is the error value.                */
-/* Parameters:  data(I)    - pointer to natget structure with kernel pointer*/
+/* Parameters:  softc(I)   - pointer to soft context main structure         */
+/*              data(I)    - pointer to natget structure with kernel pointer*/
 /*                           to NAT structure to copy out.                  */
 /*              getlock(I) - flag indicating whether or not the caller      */
 /*                           holds a lock on ipf_nat                        */
@@ -2245,10 +2271,11 @@ finished:
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_nat_putent                                              */
 /* Returns:     int - 0 == success, != 0 is the error value.                */
-/* Parameters:  data(I) -     pointer to natget structure with NAT          */
-/*                            structure information to load into the kernel */
+/* Parameters:  softc(I)   - pointer to soft context main structure         */
+/*              data(I)    - pointer to natget structure with NAT           */
+/*                           structure information to load into the kernel  */
 /*              getlock(I) - flag indicating whether or not a write lock    */
-/*                           on  is already held.                    */
+/*                           on is already held.                            */
 /*                                                                          */
 /* Handle SIOCSTPUT.                                                        */
 /* Loads a NAT table entry from user space, including a NAT rule, proxy and */
@@ -2593,7 +2620,8 @@ junkput:
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_nat_delete                                              */
 /* Returns:     Nil                                                         */
-/* Parameters:  natd(I)    - pointer to NAT structure to delete             */
+/* Parameters:  softc(I)   - pointer to soft context main structure         */
+/*              nat(I)     - pointer to NAT structure to delete             */
 /*              logtype(I) - type of LOG record to create before deleting   */
 /* Write Lock:  ipf_nat                                                     */
 /*                                                                          */
@@ -2755,7 +2783,8 @@ ipf_nat_delete(softc, nat, logtype)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_nat_flushtable                                          */
 /* Returns:     int - number of NAT rules deleted                           */
-/* Parameters:  Nil                                                         */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              softn(I) - pointer to NAT context structure                 */
 /* Write Lock:  ipf_nat                                                     */
 /*                                                                          */
 /* Deletes all currently active NAT sessions.  In deleting each NAT entry a */
@@ -2798,7 +2827,8 @@ ipf_nat_flushtable(softc, softn)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_nat_clearlist                                           */
 /* Returns:     int - number of NAT/RDR rules deleted                       */
-/* Parameters:  Nil                                                         */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              softn(I) - pointer to NAT context structure                 */
 /*                                                                          */
 /* Delete all rules in the current list of rules.  There is nothing elegant */
 /* about this cleanup: simply free all entries on the list of rules and     */
@@ -2847,7 +2877,7 @@ ipf_nat_clearlist(softc, softn)
 /* Preventing "purge" from occuring is allowed because when all of the NAT  */
 /* rules are being removed, allowing the "purge" to walk through the list   */
 /* of NAT sessions, possibly multiple times, would be a large performance   */
-/* hit, on the order of O(N2).                                              */
+/* hit, on the order of O(N^2).                                             */
 /* ------------------------------------------------------------------------ */
 static void
 ipf_nat_delrule(softc, softn, np, purge)
@@ -2867,11 +2897,11 @@ ipf_nat_delrule(softc, softn, np, purge)
 		}
 	}
 
+	np->in_next = NULL;
 	if (np->in_use == 0) {
 		ipf_nat_free_rule(softc, softn, np);
 	} else {
 		np->in_flags |= IPN_DELETE;
-		np->in_next = NULL;
 	}
 }
 
