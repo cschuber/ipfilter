@@ -1,0 +1,19 @@
+#!/usr/sbin/dtrace -Fs
+
+/*
+        if (((nat->nat_dir == NAT_INBOUND) &&
+             (a1 != ntohl(nat->nat_ndstaddr))) ||
+            ((nat->nat_dir == NAT_OUTBOUND) &&
+             (a1 != ntohl(nat->nat_osrcaddr)))) {
+                DT3(ftp_PASV_error_address, nat_t *, nat, ftpside_t *, f,
+                    u_int, a1);
+  0 | ipf_p_ftp_pasv:ftp_PASV_error_address   a1 c0a86556 addr c0a86550
+
+*/
+nat_t *nat;
+ftpside_t *f;
+sdt:ipf::ftp_PASV_error_address{
+	nat = (nat_t *)arg0;
+	f = (ftpside_t *)arg1;
+	printf("a1 %x addr %x", arg2, ntohl(nat->nat_osrc6.i6[0]));
+}

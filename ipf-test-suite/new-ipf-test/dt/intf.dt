@@ -1,0 +1,11 @@
+#!/usr/sbin/dtrace -Fs
+
+fbt:ipf:ipf_check:entry/arg3 == 6 && arg4 == 0/{self->trace = 1; printf("IN");}
+fbt:ipf:ipf_check:entry/arg3 == 6 && arg4 == 1/{self->trace = 1; printf("OUT");}
+fbt:ipf:ipf_check:return/self->trace/{self->trace = 0;}
+
+fbt:ipf::entry/self->trace/{}
+fbt:ipf::return/self->trace/{
+	printf("%x", arg1);
+}
+sdt:ipf::/self->trace/{}

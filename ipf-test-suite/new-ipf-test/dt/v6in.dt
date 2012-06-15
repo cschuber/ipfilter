@@ -1,0 +1,84 @@
+#!/usr/sbin/dtrace -Fs
+
+/*
+log in on e1000g3 all
+log in on e1000g2 all
+pass in on e1000g3 all
+pass in on e1000g2 all
+block in on e1000g3 inet6 proto ipv6-icmp from any to any icmp-type echo
+*/
+fbt:ipf:ipf_hk_v6_in:entry/self->trace==0/{self->trace=1;}
+fbt:ipf:ipf_hk_v6_out:entry/self->trace==0/{self->trace=1;}
+fbt:ipf::entry/self->trace==1/{}
+sdt:ipf::/self->trace==1/{}
+fbt:ipf::return/self->trace==1/{printf("%x",arg1);}
+fbt:ipf:ipf_hk_v6_in:return/self->trace==1/{self->trace=0;}
+fbt:ipf:ipf_hk_v6_out:return/self->trace==1/{self->trace=0;}
+fbt::net_ispartialchecksum:entry/self->trace/{}
+fbt::net_ispartialchecksum:return/self->trace/{printf("%x", arg1);}
+sdt:ipf::l4sum_info/self->trace/{
+printf("sum %x slen %d off %d dif %x", arg0, arg1, arg2, arg3);
+}
+
+
+fr_info_t *fin;
+frentry_t *fr;
+u_int *ld, *lm, *lip;
+fripf_t *fri;
+fr_ip_t *fi;
+
+fbt:ipf:ipf_check_ipf:entry/self->trace/{
+
+	fin = (fr_info_t *)arg0;
+	fr = (frentry_t *)arg1;
+        fi = &fin->fin_fi;
+        fri = fr->fr_dun.fru_ipf;
+        lip = (u_int *)fi;
+        lm = (u_int *)&fri->fri_mip;
+        ld = (u_int *)&fri->fri_ip;
+
+	printf("v:%d==%d\n", fi->fi_v,fri->fri_ip.fi_v);
+	printf("0_.lip(%08x) & lm(%08x) != ld(%08x)\n",
+		ntohl(*lip++), ntohl(*lm++), ntohl(*ld++));
+	printf("1_.lip(%08x) & lm(%08x) != ld(%08x)\n",
+		ntohl(*lip++), ntohl(*lm++), ntohl(*ld++));
+	printf("2a.lip(%08x) & lm(%08x) != ld(%08x)\n",
+		ntohl(*lip++), ntohl(*lm++), ntohl(*ld++));
+	printf("2a.lip(%08x) & lm(%08x) != ld(%08x)\n",
+		ntohl(*lip++), ntohl(*lm++), ntohl(*ld++));
+	printf("2c.lip(%08x) & lm(%08x) != ld(%08x)\n",
+		ntohl(*lip++), ntohl(*lm++), ntohl(*ld++));
+	printf("2d.lip(%08x) & lm(%08x) != ld(%08x)\n",
+		ntohl(*lip++), ntohl(*lm++), ntohl(*ld++));
+	printf("3a.lip(%08x) & lm(%08x) != ld(%08x)\n",
+		ntohl(*lip++), ntohl(*lm++), ntohl(*ld++));
+	printf("3a.lip(%08x) & lm(%08x) != ld(%08x)\n",
+		ntohl(*lip++), ntohl(*lm++), ntohl(*ld++));
+	printf("3c.lip(%08x) & lm(%08x) != ld(%08x)\n",
+		ntohl(*lip++), ntohl(*lm++), ntohl(*ld++));
+	printf("3d.lip(%08x) & lm(%08x) != ld(%08x)\n",
+		ntohl(*lip++), ntohl(*lm++), ntohl(*ld++));
+	printf("4_.lip(%08x) & lm(%08x) != ld(%08x)\n",
+		ntohl(*lip++), ntohl(*lm++), ntohl(*ld++));
+	printf("5_.lip(%08x) & lm(%08x) != ld(%08x)\n",
+		ntohl(*lip++), ntohl(*lm++), ntohl(*ld++));
+}
+
+mblk_t *m;
+u_char *rptr;
+fbt::ip_cksum:entry/self->trace/{
+	m = (mblk_t *)arg0;
+	rptr = (u_char *)m->b_rptr;
+	printf("rptr [%02x] hlen=%d sum=%x", rptr[arg1+1], arg1, arg2);
+}
+fbt::ip_cksum:return/self->trace/{
+	printf("%x", arg1);
+}
+sdt:ipf::l4sums/self->trace/{
+	printf("hdrsum=%x sum=%x", arg0, arg1);
+}
+
+fbt:ipf:fr_cksum:entry/self->trace/{
+	fin = (fr_info_t *)arg0;
+	printf("l4proto=%x fin_p=%08x", arg2, *(u_int *)&fin->fin_fi);
+}
