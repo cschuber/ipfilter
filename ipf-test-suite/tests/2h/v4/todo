@@ -1,0 +1,11 @@
+rdr testing - round robin, multiple servers run? adapt script to use more ports?
+sticky testing too?
+
+various rdr port transformations for destination
+port = x
+port x
+
+mixed pool testing with ipv4 and ipv6
+group-map test?
+pools for nat and ipf
+pools for nat

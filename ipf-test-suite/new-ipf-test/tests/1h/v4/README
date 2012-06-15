@@ -1,0 +1,8 @@
+The majority of the data files used here relate directly to the test files
+used in the IPFilter test suite that is contained within IPFilter.
+
+For example, the data held in 1h_ipf_parse_001_v4.data is the same as that
+found in ipfilter/test/regress/i1.
+
+As this test suite is provided independant of the core IPFilter package,
+the test data is replicated here.

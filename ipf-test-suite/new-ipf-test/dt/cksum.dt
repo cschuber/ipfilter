@@ -1,0 +1,14 @@
+#!/usr/sbin/dtrace -Fs
+
+u_short *sump;
+fr_info_t *fin;
+u_int m, n, *f, o;
+fbt:ipf:ipf_fix_outcksum:entry{
+	self->trace = 1;
+	sump = (u_short *)arg1;
+	printf ("how=%d old=%x diff=%x partial=%x", arg0, ntohs(*(u_short *)arg1), arg2, arg3);
+}
+fbt:ipf:ipf_fix_outcksum:return/self->trace == 1/{
+	self->trace = 0;
+	printf("sum=%x", ntohs(*sump));
+}
