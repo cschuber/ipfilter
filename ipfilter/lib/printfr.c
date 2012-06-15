@@ -119,11 +119,11 @@ printfr(fp, iocfunc)
 		putchar(' ');
 	}
 
+	if (fp->fr_tif.fd_name != -1)
+		print_toif(fp->fr_family, "to", fp->fr_names, &fp->fr_tif);
 	if (fp->fr_dif.fd_name != -1)
 		print_toif(fp->fr_family, "dup-to", fp->fr_names,
 			   &fp->fr_dif);
-	if (fp->fr_tif.fd_name != -1)
-		print_toif(fp->fr_family, "to", fp->fr_names, &fp->fr_tif);
 	if (fp->fr_rif.fd_name != -1)
 		print_toif(fp->fr_family, "reply-to", fp->fr_names,
 			   &fp->fr_rif);
