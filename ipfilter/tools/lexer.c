@@ -192,7 +192,8 @@ int yylex()
 nextchar:
 	c = yygetc(0);
 	if (yydebug > 1)
-		printf("yygetc = (%x) %c [%*.*s]\n", c, c, yypos, yypos, yytexttochar());
+		printf("yygetc = (%x) %c [%*.*s]\n",
+		       c, c, yypos, yypos, yytexttochar());
 
 	switch (c)
 	{
@@ -211,6 +212,8 @@ nextchar:
 			      sizeof(yytext[0]) * (yylast - yypos + 1));
 		}
 		yylast -= yypos;
+		if (yyexpectaddr == 2)
+			yyexpectaddr = 0;
 		yypos = 0;
 		lnext = 0;
 		nokey = 0;
@@ -431,7 +434,8 @@ nextchar:
 	 * 0000:0000:0000:0000:0000:0000:0000:0000
 	 */
 #ifdef	USE_INET6
-	if (yyexpectaddr == 1 && isbuilding == 0 && (ishex(c) || isdigit(c) || c == ':')) {
+	if (yyexpectaddr != 0 && isbuilding == 0 &&
+	    (ishex(c) || isdigit(c) || c == ':')) {
 		char ipv6buf[45 + 1], *s, oc;
 		int start;
 
@@ -552,15 +556,16 @@ done:
 	if (rval == YY_STR) {
 		if (yysavedepth > 0 && !yydictfixed)
 			yyresetdict();
-		if (yyexpectaddr == 1)
+		if (yyexpectaddr != 0)
 			yyexpectaddr = 0;
 	}
 
 	yytokentype = rval;
 
 	if (yydebug)
-		printf("lexed(%s) [%d,%d,%d] => %d @%d\n", yystr, string_start,
-			string_end, pos, rval, yysavedepth);
+		printf("lexed(%s) %d,%d,%d [%d,%d,%d] => %d @%d\n",
+		       yystr, isbuilding, yyexpectaddr, yysavedepth,
+		       string_start, string_end, pos, rval, yysavedepth);
 
 	switch (rval)
 	{

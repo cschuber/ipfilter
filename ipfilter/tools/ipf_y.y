@@ -30,7 +30,9 @@ extern	int	yylineNum;
 
 static	int	addname(frentry_t **, char *);
 static	frentry_t *addrule(void);
-static frentry_t *allocfr(void);
+static	frentry_t *allocfr(void);
+static	void	build_dstaddr_af(frentry_t *, void *);
+static	void	build_srcaddr_af(frentry_t *, void *);
 static	void	dobpf(int, char *);
 static	void	doipfexpr(char *);
 static	void	do_tuneint(char *, int);
@@ -79,7 +81,7 @@ static	addfunc_t	ipfaddfunc = NULL;
 		u_short	p2;
 		int	pc;
 	} pc;
-	struct	{
+	struct ipp_s {
 		int		type;
 		int		ifpos;
 		int		f;
@@ -212,8 +214,6 @@ line:	rule		{ while ((fr = frtop) != NULL) {
 				/* XXX validate ? */
 				(*ipfaddfunc)(ipffd, ipfioctls[IPL_LOGIPF], fr);
 				fr->fr_next = frold;
-				if (frold && frold->fr_data)
-					free(frold->fr_data);
 				frold = fr;
 			  }
 			  resetlexer();
@@ -277,28 +277,24 @@ family:	| IPFY_FAMILY IPFY_INET		{ if (use_inet6 == 1) {
 						YYERROR;
 					  } else {
 						frc->fr_family = AF_INET;
-						setipftype();
 					  }
 					}
 	| IPFY_INET			{ if (use_inet6 == 1) {
 						YYERROR;
 					  } else {
 						frc->fr_family = AF_INET;
-						setipftype();
 					  }
 					}
 	| IPFY_FAMILY IPFY_INET6	{ if (use_inet6 == -1) {
 						YYERROR;
 					  } else {
 						frc->fr_family = AF_INET6;
-						setipftype();
 					  }
 					}
 	| IPFY_INET6			{ if (use_inet6 == -1) {
 						YYERROR;
 					  } else {
 						frc->fr_family = AF_INET6;
-						setipftype();
 					  }
 					}
 	;
@@ -562,7 +558,7 @@ restoregroup:
 logopt:	log
 	;
 
-quick:	IPFY_QUICK			{ fr->fr_flags |= FR_QUICK; }
+quick:	IPFY_QUICK				{ fr->fr_flags |= FR_QUICK; }
 	;
 
 on:	IPFY_ON onname				{ setifname(&fr, 0, $2.if1);
@@ -594,15 +590,15 @@ on:	IPFY_ON onname				{ setifname(&fr, 0, $2.if1);
 
 onlist:	onname			{ DOREM(setifname(&fr, 0, $1.if1);	   \
 					if ($1.if2 != NULL)		   \
-						setifname(&fr, 1, $1.if2);  \
+						setifname(&fr, 1, $1.if2); \
 					)
 				  free($1.if1);
 				  if ($1.if2 != NULL)
 					free($1.if2);
 				}
-	| onlist lmore onname	{ DOREM(setifname(&fr, 0, $3.if1); \
+	| onlist lmore onname	{ DOREM(setifname(&fr, 0, $3.if1);	   \
 					if ($3.if2 != NULL)		   \
-						setifname(&fr, 1, $3.if2);  \
+						setifname(&fr, 1, $3.if2); \
 					)
 				  free($3.if1);
 				  if ($3.if2 != NULL)
@@ -644,6 +640,7 @@ dup:	IPFY_DUPTO name
 	| IPFY_DUPTO name duptoseparator hostname
 	{ int idx = addname(&fr, $2);
 	  fr->fr_dif.fd_name = idx;
+	  fr->fr_dif.fd_ptr = (void *)-1;
 	  fr->fr_dif.fd_ip6 = $4.adr;
 	  if (fr->fr_family == AF_UNSPEC && $4.f != AF_UNSPEC)
 		fr->fr_family = $4.f;
@@ -673,6 +670,7 @@ proute:	routeto name
 	| routeto name duptoseparator hostname
 	{ int idx = addname(&fr, $2);
 	  fr->fr_tif.fd_name = idx;
+	  fr->fr_tif.fd_ptr = (void *)-1;
 	  fr->fr_tif.fd_ip6 = $4.adr;
 	  if (fr->fr_family == AF_UNSPEC && $4.f != AF_UNSPEC)
 		fr->fr_family = $4.f;
@@ -700,6 +698,7 @@ replyto:
 	| IPFY_REPLY_TO name duptoseparator hostname
 	{ int idx = addname(&fr, $2);
 	  fr->fr_rif.fd_name = idx;
+	  fr->fr_rif.fd_ptr = (void *)-1;
 	  fr->fr_rif.fd_ip6 = $4.adr;
 	  if (fr->fr_family == AF_UNSPEC && $4.f != AF_UNSPEC)
 		fr->fr_family = $4.f;
@@ -838,53 +837,14 @@ srcobject:
 	;
 
 srcaddr:
-	addr	{ if (frc->fr_family != AF_UNSPEC && $1.f == AF_UNSPEC) {
-			$1.f = frc->fr_family;
-			$1.v = frc->fr_ip.fi_v;
-		  }
-		  DOREM(fr->fr_ip.fi_src = $1.a; \
-			fr->fr_mip.fi_src = $1.m; \
-			fr->fr_family = $1.f; \
-			fr->fr_ip.fi_v = $1.v; \
-			fr->fr_mip.fi_v = 0xf; \
-			fr->fr_satype = $1.type; \
-			if ($1.ifpos != -1) { \
-				fr->fr_ipf->fri_sifpidx = $1.ifpos; \
-			})
-		}
+	addr	{ build_srcaddr_af(fr, &$1); }
 	| lstart srcaddrlist lend
 	;
 
 srcaddrlist:
-	addr	{ if (frc->fr_family != AF_UNSPEC && $1.f == AF_UNSPEC) {
-			$1.f = frc->fr_family;
-			$1.v = frc->fr_ip.fi_v;
-		  }
-		  DOREM(fr->fr_ip.fi_src = $1.a; \
-			fr->fr_mip.fi_src = $1.m; \
-			fr->fr_family = $1.f; \
-			fr->fr_ip.fi_v = $1.v; \
-			fr->fr_mip.fi_v = 0xf; \
-			fr->fr_satype = $1.type; \
-			if ($1.ifpos != -1) { \
-				fr->fr_ipf->fri_sifpidx = $1.ifpos; \
-			})
-		}
+	addr	{ build_srcaddr_af(fr, &$1); }
 	| srcaddrlist lmore addr
-		{ if (frc->fr_family != AF_UNSPEC && $3.f == AF_UNSPEC) {
-			$3.f = frc->fr_family;
-			$3.v = frc->fr_ip.fi_v;
-		  }
-		  DOREM(fr->fr_ip.fi_src = $3.a; \
-			fr->fr_mip.fi_src = $3.m; \
-			fr->fr_family = $3.f; \
-			fr->fr_ip.fi_v = $3.v; \
-			fr->fr_mip.fi_v = 0xf; \
-			fr->fr_satype = $3.type; \
-			if ($3.ifpos != -1) { \
-				fr->fr_ipf->fri_sifpidx = $3.ifpos; \
-			})
-		}
+		{ build_srcaddr_af(fr, &$3); }
 	;
 
 srcport:
@@ -936,19 +896,7 @@ dstaddr:
 	addr	{ if (($1.f != AF_UNSPEC) && (frc->fr_family != AF_UNSPEC) &&
 		      ($1.f != frc->fr_family))
 			yyerror("1.src/dst address family mismatch");
-		  if (frc->fr_family != AF_UNSPEC && $1.f == AF_UNSPEC) {
-			$1.f = frc->fr_family;
-			$1.v = frc->fr_ip.fi_v;
-		  }
-		  DOREM(fr->fr_ip.fi_dst = $1.a; \
-			fr->fr_mip.fi_dst = $1.m; \
-			fr->fr_family = $1.f; \
-			fr->fr_ip.fi_v = $1.v; \
-			fr->fr_mip.fi_v = 0xf; \
-			fr->fr_datype = $1.type; \
-			if ($1.ifpos != -1) { \
-				fr->fr_ipf->fri_difpidx = $1.ifpos; \
-			})
+		  build_dstaddr_af(fr, &$1);
 		}
 	| lstart dstaddrlist lend
 	;
@@ -957,37 +905,13 @@ dstaddrlist:
 	addr	{ if (($1.f != AF_UNSPEC) && (frc->fr_family != AF_UNSPEC) &&
 		      ($1.f != frc->fr_family))
 			yyerror("2.src/dst address family mismatch");
-		  if (frc->fr_family != AF_UNSPEC && $1.f == AF_UNSPEC) {
-			$1.f = frc->fr_family;
-			$1.v = frc->fr_ip.fi_v;
-		  }
-		  DOREM(fr->fr_ip.fi_dst = $1.a; \
-			fr->fr_mip.fi_dst = $1.m; \
-			fr->fr_family = $1.f; \
-			fr->fr_ip.fi_v = $1.v; \
-			fr->fr_mip.fi_v = 0xf; \
-			fr->fr_datype = $1.type; \
-			if ($1.ifpos != -1) { \
-				fr->fr_ipf->fri_difpidx = $1.ifpos; \
-			})
+		  build_dstaddr_af(fr, &$1);
 		}
 	| dstaddrlist lmore addr
 		{ if (($3.f != AF_UNSPEC) && (frc->fr_family != AF_UNSPEC) &&
 		      ($3.f != frc->fr_family))
 			yyerror("3.src/dst address family mismatch");
-		  if (frc->fr_family != AF_UNSPEC && $3.f == AF_UNSPEC) {
-			$3.f = frc->fr_family;
-			$3.v = frc->fr_ip.fi_v;
-		  }
-		  DOREM(fr->fr_ip.fi_dst = $3.a; \
-			fr->fr_mip.fi_dst = $3.m; \
-			fr->fr_family = $3.f; \
-			fr->fr_ip.fi_v = $3.v; \
-			fr->fr_mip.fi_v = 0xf; \
-			fr->fr_datype = $3.type; \
-			if ($3.ifpos != -1) { \
-				fr->fr_ipf->fri_difpidx = $3.ifpos; \
-			})
+		  build_dstaddr_af(fr, &$3);
 		}
 	;
 
@@ -1034,11 +958,14 @@ addr:	pool '/' YY_NUMBER		{ pooled = 1;
 					  yyexpectaddr = 0;
 					  $$.type = FRI_LOOKUP;
 					  $$.v = 0;
+					  $$.ifpos = -1;
 					  $$.f = AF_UNSPEC;
 					  $$.a.iplookuptype = IPLT_POOL;
 					  $$.a.iplookupsubtype = 0;
 					  $$.a.iplookupnum = $3; }
 	| pool '/' YY_STR		{ pooled = 1;
+					  $$.ifpos = -1;
+					  $$.f = AF_UNSPEC;
 					  $$.type = FRI_LOOKUP;
 					  $$.a.iplookuptype = IPLT_POOL;
 					  $$.a.iplookupsubtype = 1;
@@ -1049,6 +976,7 @@ addr:	pool '/' YY_NUMBER		{ pooled = 1;
 					}
 			poollist ')'	{ yyexpectaddr = 0;
 					  $$.v = 0;
+					  $$.ifpos = -1;
 					  $$.f = AF_UNSPEC;
 					  $$.type = FRI_LOOKUP;
 					  $$.a.iplookuptype = IPLT_POOL;
@@ -1058,6 +986,7 @@ addr:	pool '/' YY_NUMBER		{ pooled = 1;
 	| hash '/' YY_NUMBER		{ hashed = 1;
 					  yyexpectaddr = 0;
 					  $$.v = 0;
+					  $$.ifpos = -1;
 					  $$.f = AF_UNSPEC;
 					  $$.type = FRI_LOOKUP;
 					  $$.a.iplookuptype = IPLT_HASH;
@@ -1067,6 +996,7 @@ addr:	pool '/' YY_NUMBER		{ pooled = 1;
 	| hash '/' YY_STR		{ hashed = 1;
 					  $$.type = FRI_LOOKUP;
 					  $$.v = 0;
+					  $$.ifpos = -1;
 					  $$.f = AF_UNSPEC;
 					  $$.a.iplookuptype = IPLT_HASH;
 					  $$.a.iplookupsubtype = 1;
@@ -1077,6 +1007,7 @@ addr:	pool '/' YY_NUMBER		{ pooled = 1;
 					}
 			addrlist ')'	{ yyexpectaddr = 0;
 					  $$.v = 0;
+					  $$.ifpos = -1;
 					  $$.f = AF_UNSPEC;
 					  $$.type = FRI_LOOKUP;
 					  $$.a.iplookuptype = IPLT_HASH;
@@ -1089,7 +1020,7 @@ addr:	pool '/' YY_NUMBER		{ pooled = 1;
 
 ipaddr:	IPFY_ANY			{ bzero(&($$), sizeof($$));
 					  $$.type = FRI_NORMAL;
-					  yyresetdict();
+					  $$.ifpos = -1;
 					  yyexpectaddr = 0;
 					}
 	| hostname			{ $$.a = $1.adr;
@@ -1099,11 +1030,13 @@ ipaddr:	IPFY_ANY			{ bzero(&($$), sizeof($$));
 					  else if ($1.f == AF_INET)
 						  fill6bits(32, $$.m.i6);
 					  $$.v = ftov($1.f);
+					  $$.ifpos = dynamic;
 					  $$.type = FRI_NORMAL;
 					  yyexpectaddr = 0;
 					}
 	| hostname			{ yyresetdict(); }
-		maskspace		{ yysetdict(maskwords); }
+		maskspace		{ yysetdict(maskwords);
+					  yyexpectaddr = 2; }
 		ipmask			{ ntomask($1.f, $5, $$.m.i6);
 					  $$.a = $1.adr;
 					  $$.a.i6[0] &= $$.m.i6[0];
@@ -1113,6 +1046,7 @@ ipaddr:	IPFY_ANY			{ bzero(&($$), sizeof($$));
 					  $$.f = $1.f;
 					  $$.v = ftov($1.f);
 					  $$.type = ifpflag;
+					  $$.ifpos = dynamic;
 					  if (ifpflag != 0 && $$.v == 0) {
 						if (frc->fr_family == AF_INET6){
 							$$.v = 6;
@@ -1332,21 +1266,30 @@ itype:	seticmptype icmptype
 	;
 
 seticmptype:
-	IPFY_ICMPTYPE			{ if (frc->fr_family == AF_UNSPEC)
-						frc->fr_family = AF_INET;
-					  if (frc->fr_family == AF_INET &&
-					      frc->fr_type == FR_T_IPF &&
-					      frc->fr_proto != IPPROTO_ICMP) {
-						yyerror("proto not icmp");
-					  }
-					  if (frc->fr_family == AF_INET6 &&
-					      frc->fr_type == FR_T_IPF &&
-					      frc->fr_proto != IPPROTO_ICMPV6) {
-						yyerror("proto not ipv6-icmp");
-					  }
-					  setipftype();
-					  yysetdict(NULL);
+	IPFY_ICMPTYPE		{ if (frc->fr_family == AF_UNSPEC)
+					frc->fr_family = AF_INET;
+				  if (frc->fr_family == AF_INET &&
+				      frc->fr_type == FR_T_IPF &&
+				      frc->fr_proto != IPPROTO_ICMP) {
+					yyerror("proto not icmp");
+				  }
+				  if (frc->fr_family == AF_INET6 &&
+				      frc->fr_type == FR_T_IPF &&
+				      frc->fr_proto != IPPROTO_ICMPV6) {
+					yyerror("proto not ipv6-icmp");
+				  }
+				  setipftype();
+				  DOALL(if (fr->fr_family == AF_INET) { \
+						fr->fr_ip.fi_v = 4; \
+						fr->fr_mip.fi_v = 0xf; \
 					}
+					if (fr->fr_family == AF_INET6) { \
+						fr->fr_ip.fi_v = 6; \
+						fr->fr_mip.fi_v = 0xf; \
+					}
+				  )
+				  yysetdict(NULL);
+				}
 	;
 
 icode:	| seticmpcode icmpcode
@@ -1528,13 +1471,15 @@ opttype:
 	| IPFY_V6HDRS			{ $$ = FI_V6EXTHDR; }
 	;
 
-ipopts:	optlist		{ DOALL(fr->fr_mip.fi_optmsk |= $1; \
-				if (fr->fr_family == AF_UNSPEC) { \
-					fr->fr_family = AF_INET; \
-				} else if (fr->fr_family != AF_INET) { \
-					YYERROR; \
-				} \
-				if (!nowith) \
+ipopts:	optlist		{ DOALL(fr->fr_mip.fi_optmsk |= $1;
+				if (fr->fr_family == AF_UNSPEC) {
+					fr->fr_family = AF_INET;
+					fr->fr_ip.fi_v = 4;
+					fr->fr_mip.fi_v = 0xf;
+				} else if (fr->fr_family != AF_INET) {
+					YYERROR;
+				}
+				if (!nowith)
 					fr->fr_ip.fi_optmsk |= $1;)
 			}
 	;
@@ -1627,13 +1572,15 @@ opt:
 	| IPFY_IPOPT_RTRALRT		{ $$ = getoptbyvalue(IPOPT_RTRALRT); }
 	| IPFY_IPOPT_UMP		{ $$ = getoptbyvalue(IPOPT_UMP); }
 	| setsecclass secname
-			{ DOALL(fr->fr_mip.fi_secmsk |= $2; \
-				if (fr->fr_family == AF_UNSPEC) { \
-					fr->fr_family = AF_INET; \
-				} else if (fr->fr_family != AF_INET) { \
-					YYERROR; \
-				} \
-				if (!nowith) \
+			{ DOALL(fr->fr_mip.fi_secmsk |= $2;
+				if (fr->fr_family == AF_UNSPEC) {
+					fr->fr_family = AF_INET;
+					fr->fr_ip.fi_v = 4;
+					fr->fr_mip.fi_v = 0xf;
+				} else if (fr->fr_family != AF_INET) {
+					YYERROR;
+				}
+				if (!nowith)
 					fr->fr_ip.fi_secmsk |= $2;)
 			  $$ = 0;
 			  yyresetdict();
@@ -2561,8 +2508,10 @@ frentry_t *fr;
 		fr->fr_proto = f->fr_proto;
 
 	if ((fr->fr_mproto == 0) && ((fr->fr_flx & FI_TCPUDP) == 0) &&
-	    ((f->fr_flx & FI_TCPUDP) != 0))
+	    ((f->fr_flx & FI_TCPUDP) != 0)) {
 		fr->fr_flx |= FI_TCPUDP;
+		fr->fr_mflx |= FI_TCPUDP;
+	}
 }
 
 
@@ -2712,4 +2661,65 @@ char *name;
 	if (pos == -1)
 		return;
 	(*frp)->fr_icmphead = pos;
+}
+
+
+static void
+build_dstaddr_af(fp, ptr)
+	frentry_t *fp;
+	void *ptr;
+{
+	struct ipp_s *ipp = ptr;
+	frentry_t *f = fp;
+
+	if (f->fr_family != AF_UNSPEC && ipp->f == AF_UNSPEC) {
+		ipp->f = f->fr_family;
+		ipp->v = f->fr_ip.fi_v;
+	}
+	if (ipp->f == AF_INET)
+		ipp->v = 4;
+	else if (ipp->f == AF_INET6)
+		ipp->v = 6;
+
+	for (; f != NULL; f = f->fr_next) {
+		f->fr_ip.fi_dst = ipp->a;
+		f->fr_mip.fi_dst = ipp->m;
+		f->fr_family = ipp->f;
+		f->fr_ip.fi_v = ipp->v;
+		f->fr_mip.fi_v = 0xf;
+		f->fr_datype = ipp->type;
+		if (ipp->ifpos != -1)
+			f->fr_ipf->fri_difpidx = ipp->ifpos;
+	}
+	fr = NULL;
+}
+
+
+static void
+build_srcaddr_af(fp, ptr)
+	frentry_t *fp;
+	void *ptr;
+{
+	struct ipp_s *ipp = ptr;
+	frentry_t *f = fp;
+
+	if (f->fr_family != AF_UNSPEC && ipp->f == AF_UNSPEC) {
+		ipp->f = f->fr_family;
+		ipp->v = f->fr_ip.fi_v;
+	}
+	if (ipp->f == AF_INET)
+		ipp->v = 4;
+	else if (ipp->f == AF_INET6)
+		ipp->v = 6;
+
+	for (; f != NULL; f = f->fr_next) {
+		f->fr_ip.fi_src = ipp->a;
+		f->fr_mip.fi_src = ipp->m;
+		f->fr_family = ipp->f;
+		f->fr_ip.fi_v = ipp->v;
+		f->fr_mip.fi_v = 0xf;
+		f->fr_satype = ipp->type;
+		f->fr_ipf->fri_sifpidx = ipp->ifpos;
+	}
+	fr = NULL;
 }
