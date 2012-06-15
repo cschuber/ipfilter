@@ -678,8 +678,9 @@ typedef	struct	frentry {
 	ipfmutex_t	fr_lock;
 	struct	frentry	*fr_next;
 	struct	frentry	**fr_pnext;
-	struct	frentry	**fr_grp;
-	struct	frentry	**fr_icmpgrp;
+	struct	frgroup	*fr_grp;
+	struct	frgroup	*fr_grphead;
+	struct	frgroup	*fr_icmpgrp;
 	struct	ipscan	*fr_isc;
 	struct	frentry	*fr_dnext;	/* 2 fr_die linked list pointers */
 	struct	frentry	**fr_pdnext;
@@ -1859,7 +1860,8 @@ extern int	ipf_pr_pullup __P((fr_info_t *, int));
 extern	int	ipf_flush __P((ipf_main_softc_t *, minor_t, int));
 extern	frgroup_t *ipf_group_add __P((ipf_main_softc_t *, char *, void *,
 				      u_32_t, minor_t, int));
-extern	int	ipf_group_del __P((ipf_main_softc_t *, char *, minor_t, int));
+extern	void	ipf_group_del __P((ipf_main_softc_t *, frgroup_t *,
+				   frentry_t *));
 extern	int	ipf_derefrule __P((ipf_main_softc_t *, frentry_t **));
 extern	frgroup_t *ipf_findgroup __P((ipf_main_softc_t *, char *, minor_t,
 				      int, frgroup_t ***));
@@ -1911,7 +1913,6 @@ extern	int		ipf_token_deref __P((ipf_main_softc_t *, ipftoken_t *));
 extern	void		ipf_token_expire __P((ipf_main_softc_t *));
 extern	ipftoken_t	*ipf_token_find __P((ipf_main_softc_t *, int, int,
 					    void *));
-extern	void		ipf_token_free __P((ipf_main_softc_t *, ipftoken_t *));
 extern	int		ipf_token_del __P((ipf_main_softc_t *, int, int,
 					  void *));
 extern	void		ipf_token_mark_complete __P((ipftoken_t *));

@@ -624,10 +624,7 @@ ipf_auth_ioctl(softc, data, cmd, mode, uid, ctx)
 			error = ipf_auth_geniter(softc, token, &iter, &obj);
 		else {
 			WRITE_ENTER(&softc->ipf_tokens);
-			if (token->ipt_data == NULL)
-				ipf_token_free(softc, token);
-			else
-				ipf_token_deref(softc, token);
+			ipf_token_deref(softc, token);
 			RWLOCK_EXIT(&softc->ipf_tokens);
 			IPFERROR(10001);
 			error = ESRCH;

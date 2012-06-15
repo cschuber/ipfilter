@@ -143,7 +143,7 @@ static	void	showtqtable_live __P((int));
 static	void	showgroups __P((friostat_t *));
 static	void	usage __P((char *));
 static	int	state_matcharray __P((ipstate_t *, int *));
-static	void	printlivelist __P((friostat_t *, int, int, frentry_t *,
+static	int	printlivelist __P((friostat_t *, int, int, frentry_t *,
 				   char *, char *));
 static	void	printdeadlist __P((friostat_t *, int, int, frentry_t *,
 				   char *, char *));
@@ -762,7 +762,8 @@ static	void	showstats(fp, frf)
 /*
  * Print out a list of rules from the kernel, starting at the one passed.
  */
-static void printlivelist(fiop, out, set, fp, group, comment)
+static int
+printlivelist(fiop, out, set, fp, group, comment)
 	struct friostat *fiop;
 	int out, set;
 	frentry_t *fp;
@@ -773,9 +774,10 @@ static void printlivelist(fiop, out, set, fp, group, comment)
 	frentry_t zero;
 	frgroup_t *g;
 	ipfobj_t obj;
-	int n;
+	int rules;
+	int num;
 
-	n = 0;
+	rules = 0;
 
 	rule.iri_inout = out;
 	rule.iri_active = set;
@@ -794,7 +796,7 @@ static void printlivelist(fiop, out, set, fp, group, comment)
 	obj.ipfo_size = sizeof(rule);
 	obj.ipfo_ptr = &rule;
 
-	do {
+	while (rule.iri_rule != NULL) {
 		u_long array[1000];
 
 		memset(array, 0xff, sizeof(array));
@@ -802,11 +804,13 @@ static void printlivelist(fiop, out, set, fp, group, comment)
 		rule.iri_rule = fp;
 		if (ioctl(ipf_fd, SIOCIPFITER, &obj) == -1) {
 			ipferror(ipf_fd, "ioctl(SIOCIPFITER)");
-			n = IPFGENITER_IPF;
-			(void) ioctl(ipf_fd,SIOCIPFDELTOK, &n);
-			return;
+			num = IPFGENITER_IPF;
+			(void) ioctl(ipf_fd,SIOCIPFDELTOK, &num);
+			return rules;
 		}
 		if (bcmp(fp, &zero, sizeof(zero)) == 0)
+			break;
+		if (rule.iri_rule == NULL)
 			break;
 #ifdef USE_INET6
 		if (use_inet6 != 0) {
@@ -821,7 +825,7 @@ static void printlivelist(fiop, out, set, fp, group, comment)
 		if (fp->fr_data != NULL)
 			fp->fr_data = (char *)fp + fp->fr_size;
 
-		n++;
+		rules++;
 
 		if (opts & (OPT_HITS|OPT_DEBUG))
 #ifdef	USE_QUAD_T
@@ -836,7 +840,7 @@ static void printlivelist(fiop, out, set, fp, group, comment)
 			PRINTF("%lu ", fp->fr_bytes);
 #endif
 		if (opts & OPT_SHOWLINENO)
-			PRINTF("@%d ", n);
+			PRINTF("@%d ", rules);
 
 		if (fp->fr_die != 0)
 			fp->fr_die -= fiop->f_ticks;
@@ -872,23 +876,15 @@ static void printlivelist(fiop, out, set, fp, group, comment)
 			}
 		}
 		if (fp->fr_type == FR_T_CALLFUNC) {
-			printlivelist(fiop, out, set, fp->fr_data, group,
-				      "# callfunc: ");
-		}
-	} while (fp->fr_next != NULL);
-
-	n = IPFGENITER_IPF;
-	(void) ioctl(ipf_fd,SIOCIPFDELTOK, &n);
-
-	if (group == NULL) {
-		while ((g = grtop) != NULL) {
-			printf("# Group %s\n", g->fg_name);
-			printlivelist(fiop, out, set, NULL, g->fg_name,
-				      comment);
-			grtop = g->fg_next;
-			free(g);
+			rules += printlivelist(fiop, out, set, fp->fr_data,
+					       group, "# callfunc: ");
 		}
 	}
+
+	num = IPFGENITER_IPF;
+	(void) ioctl(ipf_fd,SIOCIPFDELTOK, &num);
+
+	return rules;
 }
 
 
@@ -1029,15 +1025,25 @@ static	void	showlist(fiop)
 
 	if (opts & OPT_DEBUG)
 		PRINTF("fp %p set %d\n", fp, set);
-	if (!fp) {
-		FPRINTF(stderr, "empty list for %s%s\n",
-			(opts & OPT_INACTIVE) ? "inactive " : "", filters[i]);
-		return;
+
+	if (live_kernel == 1) {
+		int printed;
+
+		printed = printlivelist(fiop, i, set, fp, NULL, NULL);
+		if (printed == 0) {
+			FPRINTF(stderr, "empty list for %s%s\n",
+				(opts & OPT_INACTIVE) ? "inactive " : "",
+							filters[i]);
+		}
+	} else {
+		if (!fp) {
+			FPRINTF(stderr, "empty list for %s%s\n",
+				(opts & OPT_INACTIVE) ? "inactive " : "",
+							filters[i]);
+		} else {
+			printdeadlist(fiop, i, set, fp, NULL, NULL);
+		}
 	}
-	if (live_kernel == 1)
-		printlivelist(fiop, i, set, fp, NULL, NULL);
-	else
-		printdeadlist(fiop, i, set, fp, NULL, NULL);
 }
 
 
