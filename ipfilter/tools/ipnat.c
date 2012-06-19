@@ -242,7 +242,7 @@ main(argc, argv)
 	if (opts & (OPT_FLUSH|OPT_CLEAR))
 		flushtable(ipnat_fd, opts, natfilter);
 	if (file) {
-		ipnat_parsefile(ipnat_fd, ipnat_addrule, ioctl, file);
+		return ipnat_parsefile(ipnat_fd, ipnat_addrule, ioctl, file);
 	}
 	if (opts & (OPT_LIST|OPT_STAT))
 		dostats(ipnat_fd, nsp, opts, 1, natfilter);
