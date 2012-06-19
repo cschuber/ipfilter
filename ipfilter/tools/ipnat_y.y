@@ -59,6 +59,7 @@ static	ioctlfunc_t	natioctlfunc = NULL;
 static	addfunc_t	nataddfunc = NULL;
 static	int		suggest_port = 0;
 static	proxyrule_t	*prules = NULL;
+static	int		parser_error = 0;
 
 static	void	newnatrule __P((void));
 static	void	setnatproto __P((int));
@@ -136,16 +137,19 @@ file:	line
 	| file pconf ';'
 	;
 
-line:	xx rule		{ while ((nat = nattop) != NULL) {
+line:	xx rule		{ int err;
+			  while ((nat = nattop) != NULL) {
 				if (nat->in_v[0] == 0)
 					nat->in_v[0] = 4;
 				if (nat->in_v[1] == 0)
 					nat->in_v[1] = nat->in_v[0];
 				nattop = nat->in_next;
-				(*nataddfunc)(natfd, natioctlfunc, nat);
+				err = (*nataddfunc)(natfd, natioctlfunc, nat);
 				free(nat);
+				if (err != 0)
+					parser_error = err;
 			  }
-			  if (prules != NULL) {
+			  if (parser_error == 0 && prules != NULL) {
 				proxy_loadrules(natfd, natioctlfunc, prules);
 				prules = NULL;
 			  }
@@ -1294,6 +1298,7 @@ ipnat_parsefile(fd, addfunc, ioctlfunc, filename)
 	char *filename;
 {
 	FILE *fp = NULL;
+	int rval;
 	char *s;
 
 	(void) yysettab(yywords);
@@ -1314,11 +1319,15 @@ ipnat_parsefile(fd, addfunc, ioctlfunc, filename)
 	} else
 		fp = stdin;
 
-	while (ipnat_parsesome(fd, addfunc, ioctlfunc, fp) == 1)
+	while ((rval = ipnat_parsesome(fd, addfunc, ioctlfunc, fp)) == 0)
 		;
 	if (fp != NULL)
 		fclose(fp);
-	return 0;
+	if (rval == -1)
+		rval = 0;
+	else if (rval != 0)
+		rval = 1;
+	return rval;
 }
 
 
@@ -1335,18 +1344,19 @@ ipnat_parsesome(fd, addfunc, ioctlfunc, fp)
 	yylineNum = 1;
 
 	natfd = fd;
+	parser_error = 0;
 	nataddfunc = addfunc;
 	natioctlfunc = ioctlfunc;
 
 	if (feof(fp))
-		return 0;
+		return -1;
 	i = fgetc(fp);
 	if (i == EOF)
-		return 0;
+		return -1;
 	if (ungetc(i, fp) == EOF)
-		return 0;
+		return -1;
 	if (feof(fp))
-		return 0;
+		return -1;
 	s = getenv("YYDEBUG");
 	if (s)
 		yydebug = atoi(s);
@@ -1355,7 +1365,7 @@ ipnat_parsesome(fd, addfunc, ioctlfunc, fp)
 
 	yyin = fp;
 	yyparse();
-	return 1;
+	return parser_error;
 }
 
 
