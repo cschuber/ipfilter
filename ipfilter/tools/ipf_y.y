@@ -1034,7 +1034,6 @@ ipaddr:	IPFY_ANY			{ bzero(&($$), sizeof($$));
 					  $$.v = ftov($1.f);
 					  $$.ifpos = dynamic;
 					  $$.type = FRI_NORMAL;
-					  yyexpectaddr = 0;
 					}
 	| hostname			{ yyresetdict(); }
 		maskspace		{ yysetdict(maskwords);
@@ -1147,25 +1146,30 @@ hostname:
 					  if (frc->fr_family == AF_INET6)
 						YYERROR;
 					  $$.f = AF_INET;
+					  yyexpectaddr = 2;
 					}
 	| YY_NUMBER			{ if (frc->fr_family == AF_INET6)
 						YYERROR;
 					  $$.adr.in4_addr = $1;
 					  $$.f = AF_INET;
+					  yyexpectaddr = 2;
 					}
 	| YY_HEX			{ if (frc->fr_family == AF_INET6)
 						YYERROR;
 					  $$.adr.in4_addr = $1;
 					  $$.f = AF_INET;
+					  yyexpectaddr = 2;
 					}
 	| YY_STR			{ if (lookuphost($1, &$$.adr) == 0)
 						  $$.f = AF_INET;
 					  free($1);
+					  yyexpectaddr = 2;
 					}
 	| YY_IPV6			{ if (frc->fr_family == AF_INET)
 						YYERROR;
 					  $$.adr = $1;
 					  $$.f = AF_INET6;
+					  yyexpectaddr = 2;
 					}
 	;
 
