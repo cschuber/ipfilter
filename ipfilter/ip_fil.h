@@ -333,6 +333,7 @@ typedef	struct	fr_ip	{
 #define	FI_ENCAP	0x100000	/* encap/decap with NAT */
 #define	FI_AH		0x200000	/* AH header present */
 #define	FI_NOCKSUM	0x20000000	/* don't do a L4 checksum validation */
+#define	FI_NOWILD	0x40000000	/* Do not do wildcard searches */
 #define	FI_IGNORE	0x80000000
 
 #define	fi_secmsk	fi_ipso.ipso_ripso[0]
