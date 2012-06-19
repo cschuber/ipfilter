@@ -2300,7 +2300,7 @@ find_in_wild_ports:
 		NBUMPSIDE6DX(0, ns_lookup_miss, ns_lookup_miss_1);
 		return NULL;
 	}
-	if (softn->ipf_nat_stats.ns_wilds == 0) {
+	if (softn->ipf_nat_stats.ns_wilds == 0 || (fin->fin_flx & FI_NOWILD)) {
 		NBUMPSIDE6D(0, ns_lookup_nowild);
 		return NULL;
 	}
@@ -2618,7 +2618,7 @@ find_out_wild_ports:
 		NBUMPSIDE6DX(1, ns_lookup_miss, ns_lookup_miss_3);
 		return NULL;
 	}
-	if (softn->ipf_nat_stats.ns_wilds == 0) {
+	if (softn->ipf_nat_stats.ns_wilds == 0 || (fin->fin_flx & FI_NOWILD)) {
 		NBUMPSIDE6D(1, ns_lookup_nowild);
 		return NULL;
 	}

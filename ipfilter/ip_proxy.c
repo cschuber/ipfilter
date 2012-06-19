@@ -140,11 +140,11 @@ static	aproxy_t	ips_proxies[] = {
 	  NULL, NULL, NULL, NULL },
 #endif
 #ifdef	IPF_TFTP_PROXY
-	{ NULL, NULL, "tftp", (char)IPPROTO_TCP, 0, 0, 0,
+	{ NULL, NULL, "tftp", (char)IPPROTO_UDP, 0, 0, 0,
 	  ipf_p_tftp_main_load, ipf_p_tftp_main_unload,
+	  ipf_p_tftp_soft_create, ipf_p_tftp_soft_destroy,
 	  NULL, NULL,
-	  NULL, NULL,
-	  ipf_p_tftp_new, NULL, ipf_p_tftp_in, ipf_p_tftp_out, NULL,
+	  ipf_p_tftp_new, ipf_p_tftp_del, ipf_p_tftp_in, ipf_p_tftp_out, NULL,
 	  NULL, NULL, NULL, NULL },
 #endif
 #ifdef	IPF_IRC_PROXY
@@ -965,27 +965,21 @@ ipf_proxy_check(fin, nat)
 			}
 #endif
 		ip = fin->fin_ip;
-		dosum = 1;
+		if (fin->fin_cksum > FI_CK_SUMOK)
+			dosum = 0;
+		else
+			dosum = 1;
 
 		switch (fin->fin_p)
 		{
 		case IPPROTO_TCP :
 			tcp = (tcphdr_t *)fin->fin_dp;
-
-			if (fin->fin_cksum > FI_CK_SUMOK)
-				dosum = 0;
 #if SOLARIS && defined(_KERNEL) && defined(ICK_VALID)
 			m = fin->fin_qfm;
 			if (dohwcksum && (m->b_ick_flag == ICK_VALID))
 				dosum = 0;
 #endif
-			/*
-			 * Don't bother the proxy with these...or in fact,
-			 * should we free up proxy stuff when seen?
-			 */
-			if ((fin->fin_tcpf & TH_RST) != 0)
-				break;
-			/*FALLTHROUGH*/
+			break;
 		case IPPROTO_UDP :
 			udp = (udphdr_t *)fin->fin_dp;
 			break;

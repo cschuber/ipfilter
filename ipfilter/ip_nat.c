@@ -4194,20 +4194,14 @@ ipf_nat_icmperror(fin, nflags, dir)
 		oip->ip_src.s_addr = htonl(a1.s_addr);
 		odst = 0;
 	}
+	sum1 = 0;
+	sum2 = 0;
 	sumd = 0;
-	if ((a3.s_addr != a2.s_addr) || (a1.s_addr != a4.s_addr)) {
-		if (a3.s_addr > a2.s_addr)
-			sumd = a2.s_addr - a3.s_addr - 1;
-		else
-			sumd = a2.s_addr - a3.s_addr;
-		if (a1.s_addr > a4.s_addr)
-			sumd += a4.s_addr - a1.s_addr - 1;
-		else
-			sumd += a4.s_addr - a1.s_addr;
-		sumd = ~sumd;
-
+	CALC_SUMD(a2.s_addr, a3.s_addr, sum1);
+	CALC_SUMD(a4.s_addr, a1.s_addr, sum2);
+	sumd = sum2 + sum1;
+	if (sumd != 0)
 		ipf_fix_datacksum(&oip->ip_sum, sumd);
-	}
 
 	sumd2 = sumd;
 	sum1 = 0;
@@ -4218,7 +4212,8 @@ ipf_nat_icmperror(fin, nflags, dir)
 	 * IP address change.
 	 */
 	if (((flags & IPN_TCPUDP) != 0) && (dlen >= 4)) {
-		u_32_t sum3, sum4;
+		u_32_t sum3, sum4, sumt;
+
 		/*
 		 * Step 2 :
 		 * For offending TCP/UDP IP packets, translate the ports as
@@ -4249,8 +4244,10 @@ ipf_nat_icmperror(fin, nflags, dir)
 			tcp->th_dport = htons(sum3);
 			tcp->th_sport = htons(sum1);
 		}
-		sumd += sum1 - sum4;
-		sumd += sum3 - sum2;
+		CALC_SUMD(sum4, sum1, sumt);
+		sumd += sumt;
+		CALC_SUMD(sum2, sum3, sumt);
+		sumd += sumt;
 
 		if (sumd != 0 || sumd2 != 0) {
 			/*
@@ -4271,23 +4268,17 @@ ipf_nat_icmperror(fin, nflags, dir)
 				if ((dlen >= 8) && (*csump != 0)) {
 					ipf_fix_datacksum(csump, sumd);
 				} else {
-					sumd2 = sum4 - sum1;
-					if (sum1 > sum4)
-						sumd2--;
-					sumd2 += sum2 - sum3;
-					if (sum3 > sum2)
-						sumd2--;
+					CALC_SUMD(sum1, sum4, sumd2);
+					CALC_SUMD(sum3, sum2, sumt);
+					sumd2 += sumt;
 				}
 			} else if (oip->ip_p == IPPROTO_TCP) {
 				if (dlen >= 18) {
 					ipf_fix_datacksum(csump, sumd);
 				} else {
-					sumd2 = sum4 - sum1;
-					if (sum1 > sum4)
-						sumd2--;
-					sumd2 += sum2 - sum3;
-					if (sum3 > sum2)
-						sumd2--;
+					CALC_SUMD(sum1, sum4, sumd2);
+					CALC_SUMD(sum3, sum2, sumt);
+					sumd2 += sumt;
 				}
 			}
 			if (sumd2 != 0) {
@@ -4323,7 +4314,7 @@ ipf_nat_icmperror(fin, nflags, dir)
 				 * overall icmp->icmp_cksum
 				 */
 				sum1 = ntohs(orgicmp->icmp_id);
-				sum2 = ntohs(nat->nat_osport);
+				sum2 = ntohs(nat->nat_oicmpid);
 				CALC_SUMD(sum1, sum2, sumd);
 				orgicmp->icmp_id = nat->nat_oicmpid;
 				ipf_fix_datacksum(&orgicmp->icmp_cksum, sumd);
@@ -4508,7 +4499,7 @@ find_in_wild_ports:
 		NBUMPSIDEX(0, ns_lookup_miss, ns_lookup_miss_0);
 		return NULL;
 	}
-	if (softn->ipf_nat_stats.ns_wilds == 0) {
+	if (softn->ipf_nat_stats.ns_wilds == 0 || (fin->fin_flx & FI_NOWILD)) {
 		NBUMPSIDEX(0, ns_lookup_nowild, ns_lookup_nowild_0);
 		return NULL;
 	}
@@ -4835,7 +4826,7 @@ find_out_wild_ports:
 		NBUMPSIDEX(1, ns_lookup_miss, ns_lookup_miss_1);
 		return NULL;
 	}
-	if (softn->ipf_nat_stats.ns_wilds == 0) {
+	if (softn->ipf_nat_stats.ns_wilds == 0 || (fin->fin_flx & FI_NOWILD)) {
 		NBUMPSIDEX(1, ns_lookup_nowild, ns_lookup_nowild_1);
 		return NULL;
 	}

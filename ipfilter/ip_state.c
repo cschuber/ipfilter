@@ -1098,6 +1098,7 @@ ipf_state_insert(softc, is, rev)
 	}
 
 	if (is->is_flags & (SI_WILDP|SI_WILDA)) {
+		DT(iss_wild_plus_one);
 		SINCL(ipf_state_stats.iss_wild);
 	}
 
@@ -1792,6 +1793,7 @@ ipf_state_add(softc, fin, stsave, flags)
 	is->is_rule = fr;
 	is->is_flags = flags & IS_INHERITED;
 	is->is_rulen = fin->fin_rule;
+DT3(state_insert, ipstate_t *, is, u_int, hv, u_32_t, flags);
 
 	/*
 	 * Look for identical state.
@@ -3279,6 +3281,7 @@ icmp6again:
 		 * to handle the specific types where that is the case.
 		 */
 		if ((softs->ipf_state_stats.iss_wild != 0) &&
+		    ((fin->fin_flx & FI_NOWILD) == 0) &&
 		    (v == 6) && (tryagain == 0) &&
 		    !IN6_IS_ADDR_MULTICAST(&fin->fin_fi.fi_src.in6)) {
 			hv -= fin->fin_fi.fi_src.i6[0];
@@ -3369,7 +3372,8 @@ retry_tcpudp:
 		}
 		RWLOCK_EXIT(&softc->ipf_state);
 
-		if (softs->ipf_state_stats.iss_wild) {
+		if ((softs->ipf_state_stats.iss_wild != 0) &&
+		    ((fin->fin_flx & FI_NOWILD) == 0)) {
 			if (tryagain == 0) {
 				hv -= dport;
 				hv -= sport;
