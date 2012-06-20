@@ -100,7 +100,7 @@ main(argc, argv)
 
 	assigndefined(getenv("IPPOOL_PREDEFINED"));
 
-	switch (getopt(argc, argv, "aAf:FlrRs"))
+	switch (getopt(argc, argv, "aAf:FlnrRsv"))
 	{
 	case 'a' :
 		err = poolnodecommand(0, argc, argv);
@@ -117,6 +117,9 @@ main(argc, argv)
 	case 'l' :
 		err = poollist(argc, argv);
 		break;
+	case 'n' :
+		opts |= OPT_DONOTHING|OPT_DONTOPEN;
+		break;
 	case 'r' :
 		err = poolnodecommand(1, argc, argv);
 		break;
@@ -125,6 +128,9 @@ main(argc, argv)
 		break;
 	case 's' :
 		err = poolstats(argc, argv);
+		break;
+	case 'v' :
+		opts |= OPT_VERBOSE;
 		break;
 	default :
 		exit(1);
@@ -937,7 +943,9 @@ showpools_live(fd, role, plstp, poolname)
 			ipferror(fd, "ioctl(SIOCLOOKUPITER)");
 			break;
 		}
-		printpool_live(&pool, fd, poolname, opts, pool_fields);
+		if (((pool.ipo_flags & IPOOL_DELETE) == 0) ||
+		    ((opts & OPT_DEBUG) != 0))
+			printpool_live(&pool, fd, poolname, opts, pool_fields);
 
 		plstp->ipls_list[role + 1] = pool.ipo_next;
 	}
