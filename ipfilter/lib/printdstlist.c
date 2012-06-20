@@ -25,10 +25,8 @@ printdstlist(pp, copyfunc, name, opts, nodes, fields)
 	if ((name != NULL) && strncmp(name, dst.ipld_name, FR_GROUPLEN))
 		return dst.ipld_next;
 
-	if (fields == NULL) {
+	if (fields == NULL)
 		printdstlistdata(&dst, opts);
-		putchar('\n');
-	}
 
 	if ((dst.ipld_flags & IPDST_DELETE) != 0)
 		PRINTF("# ");

@@ -32,6 +32,7 @@ load_pool(plp, iocfunc)
 	op.iplo_size = sizeof(pool);
 	op.iplo_struct = &pool;
 	bzero((char *)&pool, sizeof(pool));
+	pool.ipo_unit = plp->ipo_unit;
 	strncpy(pool.ipo_name, plp->ipo_name, sizeof(pool.ipo_name));
 	if (plp->ipo_name[0] == '\0')
 		op.iplo_arg |= IPOOL_ANON;
