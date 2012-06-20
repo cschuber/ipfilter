@@ -146,8 +146,10 @@ line:	xx rule		{ int err;
 				nattop = nat->in_next;
 				err = (*nataddfunc)(natfd, natioctlfunc, nat);
 				free(nat);
-				if (err != 0)
+				if (err != 0) {
 					parser_error = err;
+					break;
+				}
 			  }
 			  if (parser_error == 0 && prules != NULL) {
 				proxy_loadrules(natfd, natioctlfunc, prules);
@@ -1301,6 +1303,8 @@ ipnat_parsefile(fd, addfunc, ioctlfunc, filename)
 	int rval;
 	char *s;
 
+	yylineNum = 1;
+
 	(void) yysettab(yywords);
 
 	s = getenv("YYDEBUG");
@@ -1340,8 +1344,6 @@ ipnat_parsesome(fd, addfunc, ioctlfunc, fp)
 {
 	char *s;
 	int i;
-
-	yylineNum = 1;
 
 	natfd = fd;
 	parser_error = 0;
@@ -1387,6 +1389,7 @@ newnatrule()
 		nat = n;
 	}
 
+	n->in_flineno = yylineNum;
 	n->in_ifnames[0] = -1;
 	n->in_ifnames[1] = -1;
 	n->in_plabel = -1;
@@ -1522,6 +1525,10 @@ ipnat_addrule(fd, ioctlfunc, ptr)
 
 				sprintf(msg, "%d:ioctl(add/insert nat rule)",
 					yylineNum);
+				if (errno == EEXIST) {
+					sprintf(msg + strlen(msg), "(line %d)",
+						ipn->in_flineno);
+				}
 				return ipf_perror_fd(fd, ioctlfunc, msg);
 			}
 		}
