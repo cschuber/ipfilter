@@ -1386,6 +1386,8 @@ ipf_nat_ioctl(softc, data, cmd, mode, uid, ctx)
 			IPFERROR(60006);
 			error = EPERM;
 		} else if (n != NULL) {
+			natd.in_flineno = n->in_flineno;
+			(void) ipf_outobj(softc, data, &natd, IPFOBJ_IPNAT);
 			IPFERROR(60007);
 			error = EEXIST;
 		} else if (nt == NULL) {
