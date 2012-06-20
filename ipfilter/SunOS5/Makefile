@@ -460,7 +460,7 @@ ipscan_l.c: $(TOOL)/lexer.c $(TOP)/ip_scan.h
 ipscan_l.h: $(TOOL)/lexer.h
 	(cd $(TOOL); make "DEST=../$(HERE)" ../$(HERE)/$@)
 
-$(OBJ)/ippool: $(IPPOOL)
+$(OBJ)/ippool: $(IPPOOL) $(OBJ)/libipf.a
 	$(CC) $(CCARGS) -I. $(IPPOOL) -o $@ $(LIBS) -ll -lkvm
 
 $(OBJ)/ippool.o: $(TOOL)/ippool.c $(TOP)/ip_pool.h
