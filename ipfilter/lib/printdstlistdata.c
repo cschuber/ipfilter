@@ -33,7 +33,7 @@ printdstlistdata(pool, opts)
 			printdstlistpolicy(pool->ipld_policy);
 			putchar(';');
 		}
-		PRINTF(")");
+		PRINTF(")\n");
 	} else {
 		putchar(' ');
 
