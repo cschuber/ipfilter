@@ -7596,6 +7596,8 @@ ipf_token_find(softc, type, uid, ptr)
 	ipftoken_t *it, *new;
 
 	KMALLOC(new, ipftoken_t *);
+	if (new != NULL)
+		bzero((char *)new, sizeof(*new));
 
 	WRITE_ENTER(&softc->ipf_tokens);
 	for (it = softc->ipf_token_head; it != NULL; it = it->ipt_next) {
@@ -7611,13 +7613,10 @@ ipf_token_find(softc, type, uid, ptr)
 			RWLOCK_EXIT(&softc->ipf_tokens);
 			return NULL;
 		}
-		it->ipt_data = NULL;
 		it->ipt_ctx = ptr;
 		it->ipt_uid = uid;
 		it->ipt_type = type;
-		it->ipt_next = NULL;
 		it->ipt_ref = 1;
-		it->ipt_complete = 0;
 	} else {
 		if (new != NULL) {
 			KFREE(new);
