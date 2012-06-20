@@ -362,7 +362,7 @@ ipf_dstlist_iter_next(softc, arg, token, iter)
 		}
 
 		if (next != NULL) {
-			ATOMIC_INC32(list->ipld_ref);
+			ATOMIC_INC32(next->ipld_ref);
 			token->ipt_data = next;
 		} else {
 			bzero((char *)&zero, sizeof(zero));
@@ -507,6 +507,7 @@ ipf_dstlist_node_add(softc, arg, op, uid)
 		IPFERROR(120008);
 		return ENOMEM;
 	}
+	bzero((char *)node, sizeof(*node) + dest.fd_name);
 
 	bcopy(&dest, &node->ipfd_dest, sizeof(dest));
 	node->ipfd_size = sizeof(*node) + dest.fd_name;
@@ -548,12 +549,8 @@ ipf_dstlist_node_add(softc, arg, op, uid)
 
 	MUTEX_INIT(&node->ipfd_lock, "ipf dst node lock");
 	node->ipfd_plock = &d->ipld_lock;
-	node->ipfd_next = NULL;
 	node->ipfd_uid = uid;
-	node->ipfd_states = 0;
 	node->ipfd_ref = 1;
-	node->ipfd_syncat = 0;
-	node->ipfd_dest.fd_name = 0;
 	(void) ipf_resolvedest(softc, node->ipfd_names, &node->ipfd_dest,
 			       AF_INET);
 #ifdef USE_INET6
@@ -782,7 +779,7 @@ ipf_dstlist_stats_get(softc, arg, op)
 						     op->iplo_name);
 		else
 			ptr = softd->dstlist[unit + 1];
-		stats.ipls_list[unit + 1] = ptr;
+		stats.ipls_list[unit] = ptr;
 	} else {
 		IPFERROR(120024);
 		err = EINVAL;
@@ -820,26 +817,25 @@ ipf_dstlist_table_add(softc, arg, op)
 	ippool_dst_t user, *d, *new;
 	int unit, err;
 
-	KMALLOC(new, ippool_dst_t *);
-	if (new == NULL) {
-		softd->stats.ipls_nomem++;
-		IPFERROR(120014);
-		return ENOMEM;
-	}
-
 	d = ipf_dstlist_table_find(arg, op->iplo_unit, op->iplo_name);
 	if (d != NULL) {
 		IPFERROR(120013);
-		KFREE(new);
 		return EEXIST;
 	}
 
 	err = COPYIN(op->iplo_struct, &user, sizeof(user));
 	if (err != 0) {
 		IPFERROR(120021);
-		KFREE(new);
 		return EFAULT;
 	}
+
+	KMALLOC(new, ippool_dst_t *);
+	if (new == NULL) {
+		softd->stats.ipls_nomem++;
+		IPFERROR(120014);
+		return ENOMEM;
+	}
+	bzero((char *)new, sizeof(*new));
 
 	MUTEX_INIT(&new->ipld_lock, "ipf dst table lock");
 
@@ -848,12 +844,6 @@ ipf_dstlist_table_add(softc, arg, op)
 	new->ipld_unit = unit;
 	new->ipld_policy = user.ipld_policy;
 	new->ipld_seed = ipf_random();
-	new->ipld_dests = NULL;
-	new->ipld_nodes = 0;
-	new->ipld_maxnodes = 0;
-	new->ipld_selected = NULL;
-	new->ipld_ref = 0;
-	new->ipld_flags = 0;
 
 	new->ipld_pnext = &softd->dstlist[unit + 1];
 	new->ipld_next = softd->dstlist[unit + 1];
@@ -993,6 +983,9 @@ ipf_dstlist_table_clearnodes(softd, dst)
 	ippool_dst_t *dst;
 {
 	ipf_dstnode_t *node;
+
+	if (dst->ipld_dests == NULL)
+		return;
 
 	while ((node = *dst->ipld_dests) != NULL) {
 		ipf_dstlist_node_free(softd, dst, node);
