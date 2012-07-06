@@ -69,10 +69,6 @@ load_hash(iphp, list, iocfunc)
 	strncpy(iphp->iph_name, op.iplo_name, sizeof(op.iplo_name));
 
 	if (opts & OPT_VERBOSE) {
-		for (a = list; a != NULL; a = a->ipe_next) {
-			a->ipe_addr.in4_addr = ntohl(a->ipe_addr.in4_addr);
-			a->ipe_mask.in4_addr = ntohl(a->ipe_mask.in4_addr);
-		}
 		iph.iph_table = calloc(size, sizeof(*iph.iph_table));
 		if (iph.iph_table == NULL) {
 			perror("calloc(size, sizeof(*iph.iph_table))");

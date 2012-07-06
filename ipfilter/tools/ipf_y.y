@@ -1177,11 +1177,11 @@ addrlist:
 			  $$->al_i6addr = $1.a;
 			  $$->al_i6mask = $1.m;
 			}
-	| addrlist ',' { yyexpectaddr = 1; } ipaddr
-			{ $$ = newalist($1);
-			  $$->al_family = $4.f;
-			  $$->al_i6addr = $4.a;
-			  $$->al_i6mask = $4.m;
+	| ipaddr ',' { yyexpectaddr = 1; } addrlist
+			{ $$ = newalist($4);
+			  $$->al_family = $1.f;
+			  $$->al_i6addr = $1.a;
+			  $$->al_i6mask = $1.m;
 			}
 	;
 

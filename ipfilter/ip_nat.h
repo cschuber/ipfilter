@@ -635,18 +635,10 @@ typedef struct ipf_nat_softc_s {
 	u_int		ipf_nat_defage;
 	u_int		ipf_nat_defipage;
 	u_int		ipf_nat_deficmpage;
-	int		ipf_nat_map_max;
-	int		ipf_nat_map_masks[33];
-	u_32_t		ipf_nat_map_active_masks[33];
-	int		ipf_nat6_map_max;
-	int		ipf_nat6_map_masks[129];
-	i6addr_t	ipf_nat6_map_active_masks[129];
-	int		ipf_nat_rdr_max;
-	int		ipf_nat_rdr_masks[33];
-	u_32_t		ipf_nat_rdr_active_masks[33];
-	int		ipf_nat6_rdr_max;
-	int		ipf_nat6_rdr_masks[129];
-	i6addr_t	ipf_nat6_rdr_active_masks[129];
+	ipf_v4_masktab_t	ipf_nat_map_mask;
+	ipf_v6_masktab_t	ipf_nat6_map_mask;
+	ipf_v4_masktab_t	ipf_nat_rdr_mask;
+	ipf_v6_masktab_t	ipf_nat6_rdr_mask;
 	nat_t		**ipf_nat_table[2];
 	nat_t		*ipf_nat_instances;
 	ipnat_t		*ipf_nat_list;
@@ -665,6 +657,15 @@ typedef struct ipf_nat_softc_s {
 	ipftq_t		ipf_nat_tcptq[IPF_TCP_NSTATES];
 	natstat_t	ipf_nat_stats;
 } ipf_nat_softc_t ;
+
+#define	ipf_nat_map_max			ipf_nat_map_mask.imt4_max
+#define	ipf_nat_rdr_max			ipf_nat_rdr_mask.imt4_max
+#define	ipf_nat6_map_max		ipf_nat6_map_mask.imt6_max
+#define	ipf_nat6_rdr_max		ipf_nat6_rdr_mask.imt6_max
+#define	ipf_nat_map_active_masks	ipf_nat_map_mask.imt4_active
+#define	ipf_nat_rdr_active_masks	ipf_nat_rdr_mask.imt4_active
+#define	ipf_nat6_map_active_masks	ipf_nat6_map_mask.imt6_active
+#define	ipf_nat6_rdr_active_masks	ipf_nat6_rdr_mask.imt6_active
 
 extern	frentry_t 	ipfnatblock;
 

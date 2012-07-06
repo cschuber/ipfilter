@@ -21,7 +21,7 @@ void ipf_p_tftp_main_load(void);
 void ipf_p_tftp_main_unload(void);
 int ipf_p_tftp_new(void *, fr_info_t *, ap_session_t *, nat_t *);
 int ipf_p_tftp_out(void *, fr_info_t *, ap_session_t *, nat_t *);
-int ipf_p_tftp_server(fr_info_t *, ap_session_t *, nat_t *);
+int ipf_p_tftp_server(ipf_tftp_softc_t *, fr_info_t *, ap_session_t *, nat_t *);
 void *ipf_p_tftp_soft_create(ipf_main_softc_t *);
 void ipf_p_tftp_soft_destroy(ipf_main_softc_t *, void *);
 

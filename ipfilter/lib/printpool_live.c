@@ -17,7 +17,7 @@ printpool_live(pool, fd, name, opts, fields)
 	int opts;
 	wordtab_t *fields;
 {
-	ip_pool_node_t entry, *top, *node;
+	ip_pool_node_t entry;
 	ipflookupiter_t iter;
 	int printed, last;
 	ipfobj_t obj;
@@ -46,30 +46,17 @@ printpool_live(pool, fd, name, opts, fields)
 	strncpy(iter.ili_name, pool->ipo_name, FR_GROUPLEN);
 
 	last = 0;
-	top = NULL;
 	printed = 0;
 
 	if (pool->ipo_list != NULL) {
 		while (!last && (ioctl(fd, SIOCLOOKUPITER, &obj) == 0)) {
 			if (entry.ipn_next == NULL)
 				last = 1;
-			node = malloc(sizeof(*top));
-			if (node == NULL)
-				break;
-			bcopy(&entry, node, sizeof(entry));
-			node->ipn_next = top;
-			top = node;
+			(void) printpoolnode(&entry, opts, fields);
+			if ((opts & OPT_DEBUG) == 0)
+				putchar(';');
+			printed++;
 		}
-	}
-
-	while (top != NULL) {
-		node = top;
-		(void) printpoolnode(node, opts, fields);
-		if ((opts & OPT_DEBUG) == 0)
-			putchar(';');
-		top = node->ipn_next;
-		free(node);
-		printed++;
 	}
 
 	if (printed == 0)

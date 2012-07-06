@@ -463,10 +463,12 @@ ipscan_l.h: $(TOOL)/lexer.h
 $(OBJ)/ippool: $(IPPOOL) $(OBJ)/libipf.a
 	$(CC) $(CCARGS) -I. $(IPPOOL) -o $@ $(LIBS) -ll -lkvm
 
-$(OBJ)/ippool.o: $(TOOL)/ippool.c $(TOP)/ip_pool.h
+$(OBJ)/ippool.o: $(TOOL)/ippool.c $(TOP)/ip_pool.h $(TOP)/ip_htable.h \
+		 $(TOP)/ip_dstlist.h
 	$(CC) $(CCARGS) -c $(TOOL)/ippool.c -o $@
 
-$(OBJ)/ippool_y.o: ippool_y.c ippool_y.h $(TOP)/ip_pool.h ippool_l.h
+$(OBJ)/ippool_y.o: ippool_y.c ippool_y.h $(TOP)/ip_pool.h ippool_l.h \
+		   $(TOP)/ip_htable.h $(TOP)/ip_dstlist.h
 	$(CC) $(CCARGS) -c ippool_y.c -o $@
 
 $(OBJ)/ippool_l.o: ippool_l.c ippool_y.h $(TOP)/ip_pool.h ippool_l.h

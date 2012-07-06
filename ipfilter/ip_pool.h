@@ -37,6 +37,7 @@ typedef	struct ip_pool_s {
 	struct ip_pool_s	**ipo_pnext;
 	ipf_rdx_head_t		*ipo_head;
 	ip_pool_node_t		*ipo_list;
+	ip_pool_node_t		**ipo_tail;
 	ip_pool_node_t		*ipo_nextaddr;
 	void			*ipo_radix;
 	u_long			ipo_hits;

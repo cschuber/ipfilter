@@ -1,4 +1,4 @@
-#! /bin/sh
+#!/bin/sh
 if [ ! -f netinet/done ] ; then
 	echo "Do NOT run this script directly, do 'make solaris'!"
 	exit 1

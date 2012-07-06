@@ -15,7 +15,7 @@ printpool(pp, copyfunc, name, opts, fields)
 	int opts;
 	wordtab_t *fields;
 {
-	ip_pool_node_t *ipnp, *ipnpn, ipn;
+	ip_pool_node_t *ipnp, *ipnpn, ipn, **pnext;
 	ip_pool_t ipp;
 
 	if ((*copyfunc)(pp, &ipp, sizeof(ipp)))
@@ -33,12 +33,14 @@ printpool(pp, copyfunc, name, opts, fields)
 
 	ipnpn = ipp.ipo_list;
 	ipp.ipo_list = NULL;
+	pnext = &ipp.ipo_list;
 	while (ipnpn != NULL) {
 		ipnp = (ip_pool_node_t *)malloc(sizeof(*ipnp));
 		(*copyfunc)(ipnpn, ipnp, sizeof(ipn));
 		ipnpn = ipnp->ipn_next;
-		ipnp->ipn_next = ipp.ipo_list;
-		ipp.ipo_list = ipnp;
+		*pnext = ipnp;
+		pnext = &ipnp->ipn_next;
+		ipnp->ipn_next = NULL;
 	}
 
 	if (ipp.ipo_list == NULL) {

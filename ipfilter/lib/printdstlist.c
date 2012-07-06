@@ -49,9 +49,6 @@ printdstlist(pp, copyfunc, name, opts, nodes, fields)
 
 			node = printdstlistnode(n, bcopywrap, opts, fields);
 
-			if ((opts & OPT_DEBUG) == 0) {
-				putchar(';');
-			}
 			free(n);
 		}
 	}

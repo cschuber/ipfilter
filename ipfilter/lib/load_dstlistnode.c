@@ -36,14 +36,17 @@ load_dstlistnode(role, name, node, iocfunc)
 	op.iplo_type = IPLT_DSTLIST;
 	op.iplo_arg = 0;
 	op.iplo_struct = dst;
-	op.iplo_size = sizeof(*dst) + node->ipfd_dest.fd_name;
-	strncpy(op.iplo_name, name, sizeof(op.iplo_name));
+	op.iplo_size = sizeof(*dst);
+	if (node->ipfd_dest.fd_name >= 0)
+		op.iplo_size += node->ipfd_dest.fd_name;
+	(void) strncpy(op.iplo_name, name, sizeof(op.iplo_name));
 
 	dst->fd_addr = node->ipfd_dest.fd_addr;
 	dst->fd_type = node->ipfd_dest.fd_type;
 	dst->fd_name = node->ipfd_dest.fd_name;
-	bcopy(node->ipfd_names, (char *)dst + sizeof(*dst),
-	      node->ipfd_dest.fd_name);
+	if (node->ipfd_dest.fd_name >= 0)
+		bcopy(node->ipfd_names, (char *)dst + sizeof(*dst),
+		      node->ipfd_dest.fd_name);
 
 	if ((opts & OPT_REMOVE) == 0) {
 		what = "add";
@@ -58,7 +61,7 @@ load_dstlistnode(role, name, node, iocfunc)
 		if ((opts & OPT_DONOTHING) == 0) {
 			char msg[80];
 
-			sprintf(msg, "%s lookup node", what);
+			(void) sprintf(msg, "%s lookup node", what);
 			return ipf_perror_fd(pool_fd(), iocfunc, msg);
 		}
 	}

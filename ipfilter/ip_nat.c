@@ -259,12 +259,6 @@ static	int	ipf_nat_siocaddnat(ipf_main_softc_t *, ipf_nat_softc_t *,
 static	void	ipf_nat_siocdelnat(ipf_main_softc_t *, ipf_nat_softc_t *,
 				   ipnat_t *, ipnat_t **, int);
 static	void	ipf_nat_tabmove(ipf_nat_softc_t *, nat_t *);
-static	void	ipf_nat_add_active(int, u_32_t *);
-static	void	ipf_nat_del_active(int, u_32_t *);
-static	void	ipf_nat_add_map_mask(ipf_nat_softc_t *, int);
-static	void	ipf_nat_add_rdr_mask(ipf_nat_softc_t *, int);
-static	void	ipf_nat_del_map_mask(ipf_nat_softc_t *, int);
-static	void	ipf_nat_del_rdr_mask(ipf_nat_softc_t *, int);
 
 
 /* ------------------------------------------------------------------------ */
@@ -633,144 +627,6 @@ ipf_nat_setlock(arg, tmp)
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    ipf_nat_add_active                                          */
-/* Returns:     Nil                                                         */
-/* Parameters:  bitcount(I) - number of bits set in the netmask             */
-/*              active(O)   - array to insert the new bitmask into          */
-/*                                                                          */
-/* Insert the 32bit bitmask represented by "bitcount" into the array of     */
-/* active netmasks at active[]. The array should never have a duplicate of  */
-/* any particular mask, except for "0".                                     */
-/* ------------------------------------------------------------------------ */
-static void
-ipf_nat_add_active(bitcount, active)
-	int bitcount;
-	u_32_t *active;
-{
-	u_32_t mask = 0xffffffff << (32 - bitcount);
-	int i;
-
-	for (i = 0; i < 33; i++) {
-		if (ntohl(active[i]) < mask) {
-			int j;
-
-			for (j = i + 1; j < 33; j++)
-				active[j] = active[j - 1];
-			active[i] = htonl(mask);
-			break;
-		}
-	}
-}
-
-
-/* ------------------------------------------------------------------------ */
-/* Function:    ipf_nat_del_active                                          */
-/* Returns:     Nil                                                         */
-/* Parameters:  bitcount(I) - number of bits set in the netmask             */
-/*              active(O)   - array to remove the bitmask from              */
-/*                                                                          */
-/* REmove the 32bit bitmask represented by "bitcount" from the array of     */
-/* active netmasks at active[].                                             */
-/* ------------------------------------------------------------------------ */
-static void
-ipf_nat_del_active(bitcount, active)
-	int bitcount;
-	u_32_t *active;
-{
-	u_32_t mask = htonl(0xffffffff << (32 - bitcount));
-	int i;
-
-	for (i = 0; i < 33; i++) {
-		if (active[i] == mask) {
-			int j;
-
-			for (j = i + 1; j < 33; j++)
-				active[j - 1] = active[j];
-			break;
-		}
-	}
-}
-
-
-/* ------------------------------------------------------------------------ */
-/* Function:    ipf_nat_add_map_mask                                        */
-/* Returns:     Nil                                                         */
-/* Parameters:  softn(I)    - pointer to nat context information            */
-/*              bitcount(I) - bitcount of mask to add                       */
-/*                                                                          */
-/* When called, bitcount represents the mask of a new map rule that has     */
-/* just been added. This function inserts the bitmask into the array of     */
-/* masks to search when searching for a matching map rule for a packet.     */
-/* ------------------------------------------------------------------------ */
-static void
-ipf_nat_add_map_mask(softn, bitcount)
-	ipf_nat_softc_t *softn;
-	int bitcount;
-{
-	ipf_nat_add_active(bitcount, softn->ipf_nat_map_active_masks);
-	softn->ipf_nat_map_max++;
-}
-
-
-/* ------------------------------------------------------------------------ */
-/* Function:    ipf_nat_add_rdr_mask                                        */
-/* Returns:     Nil                                                         */
-/* Parameters:  softn(I)    - pointer to nat context information            */
-/*              bitcount(I) - bitcount of mask to add                       */
-/*                                                                          */
-/* When called, bitcount represents the mask of a new rdr rule that has     */
-/* just been added. This function inserts the bitmask into the array of     */
-/* masks to search when searching for a matching rdr rule for a packet.     */
-/* ------------------------------------------------------------------------ */
-static void
-ipf_nat_add_rdr_mask(softn, bitcount)
-	ipf_nat_softc_t *softn;
-	int bitcount;
-{
-	ipf_nat_add_active(bitcount, softn->ipf_nat_rdr_active_masks);
-	softn->ipf_nat_rdr_max++;
-}
-
-
-/* ------------------------------------------------------------------------ */
-/* Function:    ipf_nat_del_map_mask                                        */
-/* Returns:     Nil                                                         */
-/* Parameters:  softn(I)    - pointer to nat context information            */
-/*              bitcount(I) - bitcount of mask to add                       */
-/*                                                                          */
-/* This function performs the opposite action to ipf_nat_add_map_mask by    */
-/* removing the mask described by bitcount from the active mask array.      */
-/* ------------------------------------------------------------------------ */
-static void
-ipf_nat_del_map_mask(softn, bitcount)
-	ipf_nat_softc_t *softn;
-	int bitcount;
-{
-	ipf_nat_del_active(bitcount, softn->ipf_nat_map_active_masks);
-	softn->ipf_nat_map_max--;
-}
-
-
-/* ------------------------------------------------------------------------ */
-/* Function:    ipf_nat_del_rdr_mask                                        */
-/* Returns:     Nil                                                         */
-/* Parameters:  softn(I)    - pointer to nat context information            */
-/*              bitcount(I) - bitcount of mask to add                       */
-/*                                                                          */
-/* This function performs the opposite action to ipf_nat_add_rdr_mask by    */
-/* removing the mask described by bitcount from the active mask array.      */
-/* ------------------------------------------------------------------------ */
-static void
-ipf_nat_del_rdr_mask(softn, bitcount)
-	ipf_nat_softc_t *softn;
-	int bitcount;
-{
-	ipf_nat_del_active(bitcount, softn->ipf_nat_rdr_active_masks);
-	softn->ipf_nat_rdr_max--;
-}
-
-
-/* ------------------------------------------------------------------------ */
 /* Function:    ipf_nat_addrdr                                              */
 /* Returns:     Nil                                                         */
 /* Parameters:  n(I) - pointer to NAT rule to add                           */
@@ -792,15 +648,11 @@ ipf_nat_addrdr(softn, n)
 
 	if (n->in_odstatype == FRI_NORMAL) {
 		k = count4bits(n->in_odstmsk);
-		softn->ipf_nat_rdr_masks[k]++;
-		if (softn->ipf_nat_rdr_masks[k] == 1)
-			ipf_nat_add_rdr_mask(softn, k);
+		ipf_inet_mask_add(k, &softn->ipf_nat_rdr_mask);
 		j = (n->in_odstaddr & n->in_odstmsk);
 		rhv = NAT_HASH_FN(j, 0, 0xffffffff);
 	} else {
-		softn->ipf_nat_rdr_masks[0]++;
-		if (softn->ipf_nat_rdr_masks[0] == 1)
-			ipf_nat_add_rdr_mask(softn, 0);
+		ipf_inet_mask_add(0, &softn->ipf_nat_rdr_mask);
 		j = 0;
 		rhv = 0;
 	}
@@ -837,15 +689,11 @@ ipf_nat_addmap(softn, n)
 
 	if (n->in_osrcatype == FRI_NORMAL) {
 		k = count4bits(n->in_osrcmsk);
-		softn->ipf_nat_map_masks[k]++;
-		if (softn->ipf_nat_map_masks[k] == 1)
-			ipf_nat_add_map_mask(softn, k);
+		ipf_inet_mask_add(k, &softn->ipf_nat_map_mask);
 		j = (n->in_osrcaddr & n->in_osrcmsk);
 		rhv = NAT_HASH_FN(j, 0, 0xffffffff);
 	} else {
-		softn->ipf_nat_map_masks[0]++;
-		if (softn->ipf_nat_map_masks[0] == 1)
-			ipf_nat_add_map_mask(softn, 0);
+		ipf_inet_mask_add(0, &softn->ipf_nat_map_mask);
 		j = 0;
 		rhv = 0;
 	}
@@ -902,9 +750,7 @@ ipf_nat_addencap(softn, n)
 	 * the reverse of how it is used elsewhere...
 	 */
 	if (n->in_redir & NAT_MAP) {
-		softn->ipf_nat_rdr_masks[k]++;
-		if (softn->ipf_nat_rdr_masks[k] == 1)
-			ipf_nat_add_rdr_mask(softn, k);
+		ipf_inet_mask_add(k, &softn->ipf_nat_rdr_mask);
 		hv = rhv % softn->ipf_nat_maprules_sz;
 		np = softn->ipf_nat_rdr_rules + hv;
 		while (*np != NULL)
@@ -915,9 +761,7 @@ ipf_nat_addencap(softn, n)
 		*np = n;
 	}
 	if (n->in_redir & NAT_REDIRECT) {
-		softn->ipf_nat_map_masks[k]++;
-		if (softn->ipf_nat_map_masks[k] == 1)
-			ipf_nat_add_map_mask(softn, k);
+		ipf_inet_mask_add(k, &softn->ipf_nat_map_mask);
 		hv = rhv % softn->ipf_nat_rdrrules_sz;
 		np = softn->ipf_nat_map_rules + hv;
 		while (*np != NULL)
@@ -946,13 +790,9 @@ ipf_nat_delrdr(softn, n)
 {
 	if (n->in_odstatype == FRI_NORMAL) {
 		int k = count4bits(n->in_odstmsk);
-		softn->ipf_nat_rdr_masks[k]--;
-		if (softn->ipf_nat_rdr_masks[k] == 0)
-			ipf_nat_del_rdr_mask(softn, k);
+		ipf_inet_mask_del(k, &softn->ipf_nat_rdr_mask);
 	} else {
-		softn->ipf_nat_rdr_masks[0]--;
-		if (softn->ipf_nat_rdr_masks[0] == 0)
-			ipf_nat_del_rdr_mask(softn, 0);
+		ipf_inet_mask_del(0, &softn->ipf_nat_rdr_mask);
 	}
 	if (n->in_rnext)
 		n->in_rnext->in_prnext = n->in_prnext;
@@ -974,13 +814,9 @@ ipf_nat_delmap(softn, n)
 {
 	if (n->in_osrcatype == FRI_NORMAL) {
 		int k = count4bits(n->in_osrcmsk);
-		softn->ipf_nat_map_masks[k]--;
-		if (softn->ipf_nat_map_masks[k] == 0)
-			ipf_nat_del_map_mask(softn, k);
+		ipf_inet_mask_del(k, &softn->ipf_nat_map_mask);
 	} else {
-		softn->ipf_nat_map_masks[0]--;
-		if (softn->ipf_nat_map_masks[0] == 0)
-			ipf_nat_del_map_mask(softn, 0);
+		ipf_inet_mask_del(0, &softn->ipf_nat_map_mask);
 	}
 	if (n->in_mnext != NULL)
 		n->in_mnext->in_pmnext = n->in_pmnext;

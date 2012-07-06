@@ -531,6 +531,7 @@ typedef	struct	{
 	i6addr_t	adf_addr;
 } addrfamily_t;
 
+
 RBI_LINK(ipf_rb, host_node_s);
 
 typedef	struct	host_node_s {
@@ -1526,6 +1527,19 @@ typedef	struct	ipftable {
 #define	IPFTABLE_BUCKETS_NATOUT	3
 
 
+typedef struct ipf_v4_masktab_s {
+	u_32_t	imt4_active[33];
+	int	imt4_masks[33];
+	int	imt4_max;
+} ipf_v4_masktab_t;
+
+typedef struct ipf_v6_masktab_s {
+	i6addr_t	imt6_active[129];
+	int		imt6_masks[129];
+	int		imt6_max;
+} ipf_v6_masktab_t;
+
+
 /*
  *
  */
@@ -1940,6 +1954,12 @@ extern	void		ipf_forgetifp(ipf_main_softc_t *, void *);
 extern	frentry_t 	*ipf_getrulen(ipf_main_softc_t *, int, char *, u_32_t);
 extern	int		ipf_ifpaddr(ipf_main_softc_t *, int, int, void *,
 				    i6addr_t *, i6addr_t *);
+extern	void		ipf_inet_mask_add(int, ipf_v4_masktab_t *);
+extern	void		ipf_inet_mask_del(int, ipf_v4_masktab_t *);
+#ifdef	USE_INET6
+extern	void		ipf_inet6_mask_add(int, i6addr_t *, ipf_v6_masktab_t *);
+extern	void		ipf_inet6_mask_del(int, i6addr_t *, ipf_v6_masktab_t *);
+#endif
 extern	int		ipf_initialise(void);
 extern	int		ipf_lock(caddr_t, int *);
 extern  int		ipf_makefrip(int, ip_t *, fr_info_t *);

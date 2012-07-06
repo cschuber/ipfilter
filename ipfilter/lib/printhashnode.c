@@ -24,14 +24,6 @@ printhashnode(iph, ipep, copyfunc, opts, fields)
 
 	hv = IPE_V4_HASH_FN(ipe.ipe_addr.i6[0], ipe.ipe_mask.i6[0],
 			    iph->iph_size);
-	ipe.ipe_addr.i6[0] = htonl(ipe.ipe_addr.i6[0]);
-	ipe.ipe_addr.i6[1] = htonl(ipe.ipe_addr.i6[1]);
-	ipe.ipe_addr.i6[2] = htonl(ipe.ipe_addr.i6[2]);
-	ipe.ipe_addr.i6[3] = htonl(ipe.ipe_addr.i6[3]);
-	ipe.ipe_mask.i6[0] = htonl(ipe.ipe_mask.i6[0]);
-	ipe.ipe_mask.i6[1] = htonl(ipe.ipe_mask.i6[1]);
-	ipe.ipe_mask.i6[2] = htonl(ipe.ipe_mask.i6[2]);
-	ipe.ipe_mask.i6[3] = htonl(ipe.ipe_mask.i6[3]);
 
 	if (fields != NULL) {
 		for (i = 0; fields[i].w_value != 0; i++) {

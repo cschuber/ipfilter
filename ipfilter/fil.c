@@ -7524,7 +7524,10 @@ ipf_token_expire(softc)
 /*                                                                          */
 /* This function looks for a a token in the current list that matches up    */
 /* the fields (type, uid, ptr).  If none is found, ESRCH is returned, else  */
-/* call ipf_token_dewref() to remove it from the list.                      */
+/* call ipf_token_dewref() to remove it from the list. In the event that    */
+/* the token has a reference held elsewhere, setting ipt_complete to 2      */
+/* enables debugging to distinguish between the two paths that ultimately   */
+/* lead to a token to be deleted.                                           */
 /* ------------------------------------------------------------------------ */
 int
 ipf_token_del(softc, type, uid, ptr)
@@ -7542,6 +7545,7 @@ ipf_token_del(softc, type, uid, ptr)
 	for (it = softc->ipf_token_head; it != NULL; it = it->ipt_next) {
 		if (ptr == it->ipt_ctx && type == it->ipt_type &&
 		    uid == it->ipt_uid) {
+			it->ipt_complete = 2;
 			ipf_token_deref(softc, it);
 			error = 0;
 			break;
@@ -7558,13 +7562,14 @@ ipf_token_del(softc, type, uid, ptr)
 /* Returns:     None.                                                       */
 /* Parameters:  token(I) - pointer to token structure                       */
 /*                                                                          */
-/* Mark a token as being ineligable for being found with ipf_token_find     */
+/* Mark a token as being ineligable for being found with ipf_token_find.    */
 /* ------------------------------------------------------------------------ */
 void
 ipf_token_mark_complete(token)
 	ipftoken_t *token;
 {
-	token->ipt_complete = 1;
+	if (token->ipt_complete == 0)
+		token->ipt_complete = 1;
 }
 
 
@@ -7595,8 +7600,8 @@ ipf_token_find(softc, type, uid, ptr)
 
 	WRITE_ENTER(&softc->ipf_tokens);
 	for (it = softc->ipf_token_head; it != NULL; it = it->ipt_next) {
-		if (ptr == it->ipt_ctx && type == it->ipt_type &&
-		    uid == it->ipt_uid)
+		if ((ptr == it->ipt_ctx) && (type == it->ipt_type) &&
+		    (uid == it->ipt_uid) && (it->ipt_complete < 2))
 			break;
 	}
 
@@ -7617,7 +7622,7 @@ ipf_token_find(softc, type, uid, ptr)
 			new = NULL;
 		}
 
-		if (it->ipt_complete == 1)
+		if (it->ipt_complete > 0)
 			it = NULL;
 		else
 			ipf_token_unlink(softc, it);
@@ -10095,6 +10100,149 @@ ipf_slowtimer(softc)
 	timeout_add(&ipf_slowtimer_ch, hz/2);
 #   endif
 }
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_inet_mask_add                                           */
+/* Returns:     Nil                                                         */
+/* Parameters:  bits(I) - pointer to nat context information                */
+/*              mtab(I) - pointer to mask hash table structure              */
+/*                                                                          */
+/* When called, bits represents the mask of a new NAT rule that has just    */
+/* been added. This function inserts a bitmask into the array of masks to   */
+/* search when searching for a matching NAT rule for a packet.              */
+/* Prevention of duplicate masks is achieved by checking the use count for  */
+/* a given netmask.                                                         */
+/* ------------------------------------------------------------------------ */
+void
+ipf_inet_mask_add(bits, mtab)
+	int bits;
+	ipf_v4_masktab_t *mtab;
+{
+	u_32_t mask;
+	int i, j;
+
+	mtab->imt4_masks[bits]++;
+	if (mtab->imt4_masks[bits] > 1)
+		return;
+
+	mask = 0xffffffff << (32 - bits);
+
+	for (i = 0; i < 33; i++) {
+		if (ntohl(mtab->imt4_active[i]) < mask) {
+			for (j = i + 1; j < 33; j++)
+				mtab->imt4_active[j] = mtab->imt4_active[j - 1];
+			mtab->imt4_active[i] = htonl(mask);
+			break;
+		}
+	}
+	mtab->imt4_max++;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_inet_mask_del                                           */
+/* Returns:     Nil                                                         */
+/* Parameters:  bits(I) - number of bits set in the netmask                 */
+/*              mtab(I) - pointer to mask hash table structure              */
+/*                                                                          */
+/* Remove the 32bit bitmask represented by "bits" from the collection of    */
+/* netmasks stored inside of mtab.                                          */
+/* ------------------------------------------------------------------------ */
+void
+ipf_inet_mask_del(bits, mtab)
+	int bits;
+	ipf_v4_masktab_t *mtab;
+{
+	u_32_t mask;
+	int i, j;
+
+	mtab->imt4_masks[bits]--;
+	if (mtab->imt4_masks[bits] > 0)
+		return;
+
+	mask = htonl(0xffffffff << (32 - bits));
+	for (i = 0; i < 33; i++) {
+		if (mtab->imt4_active[i] == mask) {
+			for (j = i + 1; j < 33; j++)
+				mtab->imt4_active[j - 1] = mtab->imt4_active[j];
+			break;
+		}
+	}
+	mtab->imt4_max--;
+}
+
+
+#ifdef USE_INET6
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_inet6_mask_add                                          */
+/* Returns:     Nil                                                         */
+/* Parameters:  bits(I) - number of bits set in mask                        */
+/*              mask(I) - pointer to mask to add                            */
+/*              mtab(I) - pointer to mask hash table structure              */
+/*                                                                          */
+/* When called, bitcount represents the mask of a IPv6 NAT map rule that    */
+/* has just been added. This function inserts a bitmask into the array of   */
+/* masks to search when searching for a matching NAT rule for a packet.     */
+/* Prevention of duplicate masks is achieved by checking the use count for  */
+/* a given netmask.                                                         */
+/* ------------------------------------------------------------------------ */
+void
+ipf_inet6_mask_add(bits, mask, mtab)
+	int bits;
+	i6addr_t *mask;
+	ipf_v6_masktab_t *mtab;
+{
+	int i, j;
+
+	mtab->imt6_masks[bits]++;
+	if (mtab->imt6_masks[bits] > 1)
+		return;
+
+	for (i = 0; i < 129; i++) {
+		if (IP6_LT(&mtab->imt6_active[i], mask)) {
+			for (j = i + 1; j < 129; j++)
+				mtab->imt6_active[j] = mtab->imt6_active[j - 1];
+			mtab->imt6_active[i] = *mask;
+			break;
+		}
+	}
+	mtab->imt6_max++;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_inet6_mask_del                                          */
+/* Returns:     Nil                                                         */
+/* Parameters:  bits(I) - number of bits set in mask                        */
+/*              mask(I) - pointer to mask to remove                         */
+/*              mtab(I) - pointer to mask hash table structure              */
+/*                                                                          */
+/* Remove the 128bit bitmask represented by "bits" from the collection of   */
+/* netmasks stored inside of mtab.                                          */
+/* ------------------------------------------------------------------------ */
+void
+ipf_inet6_mask_del(bits, mask, mtab)
+	int bits;
+	i6addr_t *mask;
+	ipf_v6_masktab_t *mtab;
+{
+	int i, j;
+
+	mtab->imt6_masks[bits]--;
+	if (mtab->imt6_masks[bits] > 0)
+		return;
+
+	for (i = 0; i < 129; i++) {
+		if (IP6_EQ(&mtab->imt6_active[i], mask)) {
+			for (j = i + 1; j < 129; j++)
+				mtab->imt6_active[j - 1] = mtab->imt6_active[j];
+			break;
+		}
+	}
+	mtab->imt6_max--;
+}
+#endif
 
 
 /* ------------------------------------------------------------------------ */
