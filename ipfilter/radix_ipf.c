@@ -62,7 +62,7 @@ count_mask_bits(mask, lastp)
 	int mlen;
 
 	mlen = mask->adf_len - offsetof(addrfamily_t, adf_addr);
-	for (mlen = mask->adf_len; mlen > 0; mlen -= 4, mp++) {
+	for (; mlen > 0; mlen -= 4, mp++) {
 		if ((m = ntohl(*mp)) == 0)
 			break;
 		if (lastp != NULL)
@@ -194,9 +194,10 @@ ipf_rx_match(head, addr)
 	 * Search the dupkey list for a potential match.
 	 */
 	for (cur = node; (cur != NULL) && (cur->root == 0); cur = cur->dupkey) {
-		data = cur[0].addroff;
-		mask = cur[0].maskoff;
-		key = (u_32_t *)addr + cur[0].offset;
+		i = cur[0].addroff - cur[0].addrkey;
+		data = cur[0].addrkey + i;
+		mask = cur[0].maskkey + i;
+		key = (u_32_t *)addr + i;
 		for (; key < end; data++, key++, mask++)
 			if ((*key & *mask) != *data)
 				break;
@@ -349,7 +350,7 @@ ipf_rx_insert(head, nodes, dup)
 	key = (u_32_t *)&((addrfamily_t *)addr)->adf_addr;
 	data= (u_32_t *)&((addrfamily_t *)node->addrkey)->adf_addr;
 	end = (u_32_t *)((u_char *)addr + len);
-	for (; key < end; data++, key++)
+	for (nlen = 0; key < end; data++, key++, nlen += 32)
 		if (*key != *data)
 			break;
 	if (end == data) {
@@ -359,7 +360,7 @@ ipf_rx_insert(head, nodes, dup)
 	*dup = 0;
 
 	bits = (ntohl(*data) ^ ntohl(*key));
-	for (nlen = 0; bits != 0; nlen++) {
+	for (; bits != 0; nlen++) {
 		if ((bits & 0x80000000) != 0)
 			break;
 		bits <<= 1;
@@ -367,6 +368,8 @@ ipf_rx_insert(head, nodes, dup)
 	nlen += ADF_OFF_BITS;
 	nodes[1].index = nlen;
 	nodes[1].bitmask = htonl(0x80000000 >> (nlen & 0x1f));
+	nodes[0].offset = nlen / 32;
+	nodes[1].offset = nlen / 32;
 
 	/*
 	 * Walk through the tree and look for the correct place to attach
@@ -394,7 +397,7 @@ ipf_rx_insert(head, nodes, dup)
 	}
 	cur->parent = &nodes[1];
 	nodes[1].parent = prev;
-	if ((key[cur->offset] & nodes[1].bitmask) == 0) {
+	if ((key[nodes[1].offset] & nodes[1].bitmask) == 0) {
 		nodes[1].right = cur;
 	} else {
 		nodes[1].right = &nodes[0];
@@ -584,7 +587,7 @@ ipf_rx_delete(head, addr, mask)
 	ipf_rdx_mask_t *m;
 	int count;
 
-	found = ipf_rx_lookup(head, addr, mask);
+	found = ipf_rx_find_addr(head->root, (u_32_t *)addr);
 	if (found == NULL)
 		return NULL;
 	if (found->root == 1)
@@ -639,56 +642,36 @@ ipf_rx_delete(head, addr, mask)
 		prev = found + 1;
 		cur = parent->parent;
 		if (parent != found + 1) {
+			if ((found + 1)->parent->right == found + 1)
+				(found + 1)->parent->right = parent;
+			else
+				(found + 1)->parent->left = parent;
 			if (cur->right == parent) {
-				if (prev->right != parent)
-					prev->right->parent = parent;
-				if (cur != prev) {
-					if (parent->left != parent - 1) {
-						cur->right = parent->left;
-						parent->left->parent = cur;
-					} else {
-						cur->right = parent - 1;
-						(parent - 1)->parent = cur;
-					}
-				}
-
-				if (cur != prev) {
-					if (parent->left == found)
-						(parent - 1)->parent = parent;
-				}
-				if (prev->parent->right == prev) {
-					prev->parent->right = parent;
+				if (parent->left == found) {
+					cur->right = parent->right;
+				} else if (parent->left != parent - 1) {
+					cur->right = parent->left;
 				} else {
-					prev->parent->left = parent;
+					cur->right = parent - 1;
 				}
-				if (prev->left->index > 0) {
-					prev->left->parent = parent;
-					if (parent->left != found)
-						parent->right = parent->left;
-					parent->left = prev->left;
-				}
-				if (prev->right->index > 0) {
-					if (prev->right != parent) {
-						prev->right->parent = parent;
-						parent->right = prev->right;
-					} else if (parent->left->index < 0) {
-						parent->right = parent - 1;
-					}
-				} else if (parent->right == found) {
-					parent->right = parent - 1;
-				}
-				parent->parent = prev->parent;
+				cur->right->parent = cur;
 			} else {
-				parent->left = parent - 1;
-
-				if (cur->parent->right == cur)
-					cur->parent->right = parent;
-				else
-					cur->parent->left = parent;
-				cur->right->parent = parent;
-				parent->parent = cur->parent;
-				parent->right = cur->right;
+				if (parent->right == found) {
+					cur->left = parent->left;
+				} else if (parent->right != parent - 1) {
+					cur->left = parent->right;
+				} else {
+					cur->left = parent - 1;
+				}
+				cur->left->parent = cur;
 			}
+			parent->left = (found + 1)->left;
+			if ((found + 1)->right != parent)
+				parent->right = (found + 1)->right;
+			parent->left->parent = parent;
+			parent->right->parent = parent;
+			parent->parent = (found + 1)->parent;
+
 			parent->bitmask = prev->bitmask;
 			parent->offset = prev->offset;
 			parent->index = prev->index;
@@ -866,6 +849,15 @@ ipf_rx_inithead(softr, headp)
 	return 0;
 }
 
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_rx_freehead                                             */
+/* Returns:     Nil                                                         */
+/* Paramters:   head(I)  - pointer to tree head to free                     */
+/*                                                                          */
+/* This function simply free's up the radix tree head. Prior to calling     */
+/* this function, it is expected that the tree will have been emptied.      */
+/* ------------------------------------------------------------------------ */
 void
 ipf_rx_freehead(head)
 	ipf_rdx_head_t *head;
@@ -873,6 +865,12 @@ ipf_rx_freehead(head)
 	KFREE(head);
 }
 
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_rx_create                                               */
+/* Parameters:  Nil                                                         */
+/*                                                                          */
+/* ------------------------------------------------------------------------ */
 void *
 ipf_rx_create()
 {
@@ -893,6 +891,12 @@ ipf_rx_create()
 	return softr;
 }
 
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_rx_init                                                 */
+/* Returns:     int       - 0 = success (always)                            */
+/*                                                                          */
+/* ------------------------------------------------------------------------ */
 int
 ipf_rx_init(ctx)
 	void *ctx;
@@ -905,6 +909,12 @@ ipf_rx_init(ctx)
 	return (0);
 }
 
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_rx_destroy                                              */
+/* Returns:     Nil                                                         */
+/*                                                                          */
+/* ------------------------------------------------------------------------ */
 void
 ipf_rx_destroy(ctx)
 	void *ctx;
@@ -919,7 +929,9 @@ ipf_rx_destroy(ctx)
 /* ====================================================================== */
 
 #ifdef RDX_DEBUG
-
+/*
+ * To compile this file as a standalone test unit, use -DRDX_DEBUG=1
+ */
 #define	NAME(x)	((x)->index < 0 ? (x)->name : (x)->name)
 #define	GNAME(y)	((y) == NULL ? "NULL" : NAME(y))
 
@@ -931,8 +943,74 @@ typedef struct myst {
 	int		printed;
 } myst_t;
 
+typedef struct tabe_s {
+	char	*host;
+	char	*mask;
+	char	*what;
+} tabe_t;
+
+tabe_t builtin[] = {
+#if 1
+	{ "192:168:100::0",	"48",			"d" },
+	{ "192:168:100::2",	"128",			"d" },
+#else
+	{ "127.192.0.0",	"255.255.255.0",	"d" },
+	{ "127.128.0.0",	"255.255.255.0",	"d" },
+	{ "127.96.0.0",		"255.255.255.0",	"d" },
+	{ "127.80.0.0",		"255.255.255.0",	"d" },
+	{ "127.72.0.0",		"255.255.255.0",	"d" },
+	{ "127.64.0.0",		"255.255.255.0",	"d" },
+	{ "127.56.0.0",		"255.255.255.0",	"d" },
+	{ "127.48.0.0",		"255.255.255.0",	"d" },
+	{ "127.40.0.0",		"255.255.255.0",	"d" },
+	{ "127.32.0.0",		"255.255.255.0",	"d" },
+	{ "127.24.0.0",		"255.255.255.0",	"d" },
+	{ "127.16.0.0",		"255.255.255.0",	"d" },
+	{ "127.8.0.0",		"255.255.255.0",	"d" },
+	{ "124.0.0.0",		"255.0.0.0",		"d" },
+	{ "125.0.0.0",		"255.0.0.0",		"d" },
+	{ "126.0.0.0",		"255.0.0.0",		"d" },
+	{ "127.0.0.0",		"255.0.0.0",		"d" },
+	{ "10.0.0.0",		"255.0.0.0",		"d" },
+	{ "128.250.0.0",	"255.255.0.0",		"d" },
+	{ "192.168.0.0",	"255.255.0.0",		"d" },
+	{ "192.168.1.0",	"255.255.255.0",	"d" },
+#endif
+	{ NULL, NULL, NULL }
+};
+
+char *mtable[][1] = {
+#if 1
+	{ "192:168:100::2" },
+	{ "192:168:101::2" },
+#else
+	{ "9.0.0.0" },
+	{ "9.0.0.1" },
+	{ "11.0.0.0" },
+	{ "11.0.0.1" },
+	{ "127.0.0.1" },
+	{ "127.0.1.0" },
+	{ "255.255.255.0" },
+	{ "126.0.0.1" },
+	{ "128.251.0.0" },
+	{ "128.251.0.1" },
+	{ "128.251.255.255" },
+	{ "129.250.0.0" },
+	{ "129.250.0.1" },
+	{ "192.168.255.255" },
+#endif
+	{ NULL }
+};
+
+
+int forder[22] = {
+	14, 13, 12,  5, 10,  3, 19,  7,  4, 20,  8,
+	 2, 17,  9, 16, 11, 15,  1,  6, 18,  0, 21
+};
+
 static int nodecount = 0;
 myst_t *myst_top = NULL;
+tabe_t *ttable = NULL;
 
 void add_addr(ipf_rdx_head_t *, int , int);
 void checktree(ipf_rdx_head_t *);
@@ -942,7 +1020,8 @@ void nodeprinter(ipf_rdx_node_t *, void *);
 void printroots(ipf_rdx_head_t *);
 void random_add(ipf_rdx_head_t *);
 void random_delete(ipf_rdx_head_t *);
-void test_addr(ipf_rdx_head_t *rnh, int pref, u_32_t addr, int);
+void test_addr(ipf_rdx_head_t *rnh, int pref, addrfamily_t *, int);
+
 
 static void
 ipf_rx_freenode(node, arg)
@@ -959,6 +1038,96 @@ ipf_rx_freenode(node, arg)
 		free(rv);
 	}
 }
+
+
+const char *
+addrname(ap)
+	addrfamily_t *ap;
+{
+	static char name[80];
+	const char *txt;
+
+	bzero((char *)name, sizeof(name));
+	txt =  inet_ntop(ap->adf_family, &ap->adf_addr, name,
+			 sizeof(name));
+	return txt;
+}
+
+
+void
+fill6bits(bits, msk)
+	int bits;
+	u_int *msk;
+{
+	if (bits == 0) {
+		msk[0] = 0;
+		msk[1] = 0;
+		msk[2] = 0;
+		msk[3] = 0;
+		return;
+	}
+
+	msk[0] = 0xffffffff;
+	msk[1] = 0xffffffff;
+	msk[2] = 0xffffffff;
+	msk[3] = 0xffffffff;
+
+	if (bits == 128)
+		return;
+	if (bits > 96) {
+		msk[3] = htonl(msk[3] << (128 - bits));
+	} else if (bits > 64) {
+		msk[3] = 0;
+		msk[2] = htonl(msk[2] << (96 - bits));
+	} else if (bits > 32) {
+		msk[3] = 0;
+		msk[2] = 0;
+		msk[1] = htonl(msk[1] << (64 - bits));
+	} else {
+		msk[3] = 0;
+		msk[2] = 0;
+		msk[1] = 0;
+		msk[0] = htonl(msk[0] << (32 - bits));
+	}
+}
+
+
+void
+setaddr(afp, str)
+	addrfamily_t *afp;
+	char *str;
+{
+
+	bzero((char *)afp, sizeof(*afp));
+
+	if (strchr(str, ':') == NULL) {
+		afp->adf_family = AF_INET;
+		afp->adf_len = offsetof(addrfamily_t, adf_addr) + 4;
+	} else {
+		afp->adf_family = AF_INET6;
+		afp->adf_len = offsetof(addrfamily_t, adf_addr) + 16;
+	}
+	inet_pton(afp->adf_family, str, &afp->adf_addr);
+}
+
+
+void
+setmask(afp, str)
+	addrfamily_t *afp;
+	char *str;
+{
+	if (strchr(str, '.') != NULL) {
+		afp->adf_addr.in4.s_addr = inet_addr(str);
+		afp->adf_len = offsetof(addrfamily_t, adf_addr) + 4;
+	} else if (afp->adf_family == AF_INET) {
+		afp->adf_addr.i6[0] = htonl(0xffffffff << (32 - atoi(str)));
+		afp->adf_len = offsetof(addrfamily_t, adf_addr) + 4;
+	} else if (afp->adf_family == AF_INET6) {
+		fill6bits(atoi(str), afp->adf_addr.i6);
+		afp->adf_len = offsetof(addrfamily_t, adf_addr) + 16;
+	}
+}
+
 
 void
 nodeprinter(node, arg)
@@ -988,56 +1157,44 @@ printnode(stp)
 	printf("R %-9.9s ", GNAME(node[1].right));
 	printf("P %9.9s", GNAME(node[0].parent));
 	printf("/%-9.9s ", GNAME(node[1].parent));
-	printf("%s\n", inet_ntoa(stp->dst.adf_addr.in4));
+	printf("%s P%d\n", addrname(&stp->dst), stp->printed);
 }
 
-char *ttable[22][3] = {
-	{ "127.192.0.0",	"255.255.255.0",	"d" },
-	{ "127.128.0.0",	"255.255.255.0",	"d" },
-	{ "127.96.0.0",		"255.255.255.0",	"d" },
-	{ "127.80.0.0",		"255.255.255.0",	"d" },
-	{ "127.72.0.0",		"255.255.255.0",	"d" },
-	{ "127.64.0.0",		"255.255.255.0",	"d" },
-	{ "127.56.0.0",		"255.255.255.0",	"d" },
-	{ "127.48.0.0",		"255.255.255.0",	"d" },
-	{ "127.40.0.0",		"255.255.255.0",	"d" },
-	{ "127.32.0.0",		"255.255.255.0",	"d" },
-	{ "127.24.0.0",		"255.255.255.0",	"d" },
-	{ "127.16.0.0",		"255.255.255.0",	"d" },
-	{ "127.8.0.0",		"255.255.255.0",	"d" },
-	{ "124.0.0.0",		"255.0.0.0",		"d" },
-	{ "125.0.0.0",		"255.0.0.0",		"d" },
-	{ "126.0.0.0",		"255.0.0.0",		"d" },
-	{ "127.0.0.0",		"255.0.0.0",		"d" },
-	{ "10.0.0.0",		"255.0.0.0",		"d" },
-	{ "128.250.0.0",	"255.255.0.0",		"d" },
-	{ "192.168.0.0",	"255.255.0.0",		"d" },
-	{ "192.168.1.0",	"255.255.255.0",	"d" },
-	{ NULL, NULL }
-};
 
-char *mtable[15][1] = {
-	{ "9.0.0.0" },
-	{ "9.0.0.1" },
-	{ "11.0.0.0" },
-	{ "11.0.0.1" },
-	{ "127.0.0.1" },
-	{ "127.0.1.0" },
-	{ "255.255.255.0" },
-	{ "126.0.0.1" },
-	{ "128.251.0.0" },
-	{ "128.251.0.1" },
-	{ "128.251.255.255" },
-	{ "129.250.0.0" },
-	{ "129.250.0.1" },
-	{ "192.168.255.255" },
-	{ NULL }
-};
+void
+buildtab(void)
+{
+	char line[80], *s;
+	tabe_t *tab;
+	int lines;
+	FILE *fp;
 
-int forder[22] = {
-	14, 13, 12,  5, 10,  3, 19,  7,  4, 20,  8,
-	 2, 17,  9, 16, 11, 15,  1,  6, 18,  0, 21
-};
+	lines = 0;
+	fp = fopen("hosts", "r");
+
+	while (fgets(line, sizeof(line), fp) != NULL) {
+		s = strchr(line, '\n');
+		if (s != NULL)
+			*s = '\0';
+		lines++;
+		if (lines == 1)
+			tab = malloc(sizeof(*tab) * 2);
+		else
+			tab = realloc(tab, (lines + 1) * sizeof(*tab));
+		tab[lines - 1].host = strdup(line);
+		s = strchr(tab[lines - 1].host, '/');
+		*s++ = '\0';
+		tab[lines - 1].mask = s;
+		tab[lines - 1].what = "d";
+	}
+	fclose(fp);
+
+	tab[lines].host = NULL;
+	tab[lines].mask = NULL;
+	tab[lines].what = NULL;
+	ttable = tab;
+}
+
 
 void
 printroots(rnh)
@@ -1057,9 +1214,11 @@ printroots(rnh)
 		GNAME(rnh->nodes[2].left), GNAME(rnh->nodes[2].right));
 }
 
+
 int
 main(int argc, char *argv[])
 {
+	addrfamily_t af;
 	ipf_rdx_head_t *rnh;
 	radix_softc_t *ctx;
 	int j;
@@ -1067,68 +1226,73 @@ main(int argc, char *argv[])
 
 	rnh = NULL;
 
+	buildtab();
 	ctx = ipf_rx_create();
 	ipf_rx_init(ctx);
 	ipf_rx_inithead(ctx, &rnh);
 
 	printf("=== ADD-0 ===\n");
-	for (i = 0; ttable[i][0] != NULL; i++) {
+	for (i = 0; ttable[i].host != NULL; i++) {
 		add_addr(rnh, i, i);
 		checktree(rnh);
 	}
+	printroots(rnh);
 	ipf_rx_walktree(rnh, nodeprinter, NULL);
 	printf("=== DELETE-0 ===\n");
-	for (i = 0; ttable[i][0] != NULL; i++) {
+	for (i = 0; ttable[i].host != NULL; i++) {
 		delete_addr(rnh, i);
+		printroots(rnh);
 		ipf_rx_walktree(rnh, nodeprinter, NULL);
 	}
 	printf("=== ADD-1 ===\n");
-	for (i = 0; ttable[i][0] != NULL; i++) {
-		add_addr(rnh, i, forder[i]);
+	for (i = 0; ttable[i].host != NULL; i++) {
+		setaddr(&af, ttable[i].host);
+		add_addr(rnh, i, i); /*forder[i]); */
 		checktree(rnh);
 	}
-	printroots(rnh);
 	dumptree(rnh);
 	ipf_rx_walktree(rnh, nodeprinter, NULL);
 	printf("=== TEST-1 ===\n");
-	for (i = 0; ttable[i][0] != NULL; i++) {
-		test_addr(rnh, i, inet_addr(ttable[i][0]), -1);
+	for (i = 0; ttable[i].host != NULL; i++) {
+		setaddr(&af, ttable[i].host);
+		test_addr(rnh, i, &af, -1);
 	}
 
 	printf("=== TEST-2 ===\n");
 	for (i = 0; mtable[i][0] != NULL; i++) {
-		test_addr(rnh, i, inet_addr(mtable[i][0]), -1);
+		setaddr(&af, mtable[i][0]);
+		test_addr(rnh, i, &af, -1);
 	}
 	printf("=== DELETE-1 ===\n");
-	for (i = 0; ttable[i][0] != NULL; i++) {
-		if (ttable[i][2][0] != 'd')
+	for (i = 0; ttable[i].host != NULL; i++) {
+		if (ttable[i].what[0] != 'd')
 			continue;
 		delete_addr(rnh, i);
-		for (j = 0; ttable[j][0] != NULL; j++) {
-			test_addr(rnh, i, inet_addr(ttable[j][0]), 3);
+		for (j = 0; ttable[j].host != NULL; j++) {
+			setaddr(&af, ttable[j].host);
+			test_addr(rnh, i, &af, 3);
 		}
+		printroots(rnh);
 		ipf_rx_walktree(rnh, nodeprinter, NULL);
 	}
 
-	printroots(rnh);
 	dumptree(rnh);
 
 	printf("=== ADD-2 ===\n");
 	random_add(rnh);
 	checktree(rnh);
-	printroots(rnh);
 	dumptree(rnh);
 	ipf_rx_walktree(rnh, nodeprinter, NULL);
 	printf("=== DELETE-2 ===\n");
 	random_delete(rnh);
 	checktree(rnh);
-	printroots(rnh);
 	dumptree(rnh);
 
 	ipf_rx_walktree(rnh, ipf_rx_freenode, rnh);
 
 	return 0;
 }
+
 
 void
 dumptree(rnh)
@@ -1137,26 +1301,30 @@ dumptree(rnh)
 	myst_t *stp;
 
 	printf("VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV\n");
+	printroots(rnh);
 	for (stp = myst_top; stp; stp = stp->next)
 		printnode(stp);
 	printf("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n");
 }
 
+
 void
 test_addr(rnh, pref, addr, limit)
 	ipf_rdx_head_t *rnh;
 	int pref;
-	u_32_t addr;
+	addrfamily_t *addr;
 {
 	static int extras[14] = { 0, -1, 1, 3, 5, 8, 9,
 				  15, 16, 19, 255, 256, 65535, 65536
 	};
 	ipf_rdx_node_t *rn;
 	addrfamily_t af;
+	char name[80];
 	myst_t *stp;
 	int i;
 
 	memset(&af, 0, sizeof(af));
+#if 0
 	af.adf_len = sizeof(af.adf_addr);
 	if (limit < 0 || limit > 14)
 		limit = 14;
@@ -1170,7 +1338,15 @@ test_addr(rnh, pref, addr, limit)
 			rn ? inet_ntoa(stp->dst.adf_addr.in4) : "NULL",
 			rn ? rn->maskbitcount : 0);
 	}
+#else
+	printf("%d.%d.LOOKUP(%s)", pref, -1, addrname(addr));
+	rn = ipf_rx_match(rnh, addr);
+	stp = (myst_t *)rn;
+	printf(" = %s (%s/%d)\n", GNAME(rn),
+		rn ? addrname(&stp->dst) : "NULL", rn ? rn->maskbitcount : 0);
+#endif
 }
+
 
 void
 delete_addr(rnh, item)
@@ -1185,25 +1361,36 @@ delete_addr(rnh, item)
 
 	memset(&af, 0, sizeof(af));
 	memset(&mask, 0, sizeof(mask));
-	af.adf_family = AF_INET;
-	af.adf_len = sizeof(af.adf_addr);
-	mask.adf_len = sizeof(mask.adf_addr);
+	setaddr(&af, ttable[item].host);
+	mask.adf_family = af.adf_family;
+	setmask(&mask, ttable[item].mask);
 
-	af.adf_addr.in4.s_addr = inet_addr(ttable[item][0]);
-	mask.adf_addr.in4.s_addr = inet_addr(ttable[item][1]);
-	printf("DELETE(%s)\n", inet_ntoa(af.adf_addr.in4));
+	printf("DELETE(%s)\n", addrname(&af));
 	rn = ipf_rx_delete(rnh, &af, &mask);
-	printf("%d.delete(%s) = %s\n", item,
-	       inet_ntoa(af.adf_addr.in4), GNAME(rn));
+	if (rn == NULL) {
+		printf("FAIL LOOKUP DELETE\n");
+		checktree(rnh);
+		for (stp = myst_top; stp != NULL; stp = stp->next)
+			if (stp->printed != -1)
+				stp->printed = -2;
+		ipf_rx_walktree(rnh, nodeprinter, NULL);
+		dumptree(rnh);
+		abort();
+	}
+	printf("%d.delete(%s) = %s\n", item, addrname(&af), GNAME(rn));
 
 	for (pstp = &myst_top; (stp = *pstp) != NULL; pstp = &stp->next)
 		if (stp == (myst_t *)rn)
 			break;
+	stp->printed = -1;
+	stp->nodes[0].parent = &stp->nodes[0];
+	stp->nodes[1].parent = &stp->nodes[1];
 	*pstp = stp->next;
 	free(stp);
 	nodecount--;
 	checktree(rnh);
 }
+
 
 void
 add_addr(rnh, n, item)
@@ -1215,11 +1402,9 @@ add_addr(rnh, n, item)
 
 	stp = calloc(1, sizeof(*stp));
 	rn = (ipf_rdx_node_t *)stp;
-	stp->dst.adf_family = AF_INET;
-	stp->dst.adf_len = sizeof(stp->dst.adf_addr);
-	stp->dst.adf_addr.in4.s_addr = inet_addr(ttable[item][0]);
-	stp->mask.adf_len = sizeof(stp->mask.adf_addr);
-	stp->mask.adf_addr.in4.s_addr = inet_addr(ttable[item][1]);
+	setaddr(&stp->dst, ttable[item].host);
+	stp->mask.adf_family = stp->dst.adf_family;
+	setmask(&stp->mask, ttable[item].mask);
 	stp->next = myst_top;
 	myst_top = stp;
 	(void) sprintf(rn[0].name, "_BORN.0");
@@ -1232,6 +1417,7 @@ add_addr(rnh, n, item)
 	checktree(rnh);
 }
 
+
 void
 checktree(ipf_rdx_head_t *head)
 {
@@ -1243,6 +1429,8 @@ checktree(ipf_rdx_head_t *head)
 
 	for (s1 = myst_top; s1 != NULL; s1 = s1->next) {
 		int fault = 0;
+		if (s1->printed == -1)
+			continue;
 		rn = &s1->nodes[1];
 		if (rn->right->parent != rn)
 			fault |= 1;
@@ -1252,12 +1440,16 @@ checktree(ipf_rdx_head_t *head)
 			fault |= 4;
 		if (fault != 0) {
 			printf("FAULT %#x %s\n", fault, rn->name);
-			printroots(head);
 			dumptree(head);
 			ipf_rx_walktree(head, nodeprinter, NULL);
+			fflush(stdout);
+			fflush(stderr);
+			printf("--\n");
+			abort();
 		}
 	}
 }
+
 
 int *
 randomize(int *pnitems)
@@ -1287,6 +1479,7 @@ randomize(int *pnitems)
 	return order;
 }
 
+
 void
 random_add(rnh)
 	ipf_rdx_head_t *rnh;
@@ -1302,6 +1495,7 @@ random_add(rnh)
 		checktree(rnh);
 	}
 }
+
 
 void
 random_delete(rnh)
