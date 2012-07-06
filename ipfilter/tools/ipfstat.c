@@ -2036,87 +2036,150 @@ static int fetchfrag(fd, type, frp)
 }
 
 
-static int state_matcharray(state, array)
-	ipstate_t *state;
+static int state_matcharray(stp, array)
+	ipstate_t *stp;
 	int *array;
 {
-	int i, n, *x, e, p;
+	int i, n, *x, rv, p;
+	ipfexp_t *e;
 
-	e = 0;
-	n = array[0];
-	x = array + 1;
+	rv = 0;
 
-	for (; n > 0; x += 3 + x[3]) {
-		if (x[0] == IPF_EXP_END)
+	for (n = array[0], x = array + 1; n > 0; x += e->ipfe_size) {
+		e = (ipfexp_t *)x;
+		if (e->ipfe_cmd == IPF_EXP_END)
 			break;
-		e = 0;
+		n -= e->ipfe_size;
 
-		n -= x[3] + 3;
-
-		p = x[0] >> 16;
-		if (p != 0 && p != state->is_p)
+		rv = 0;
+		/*
+		 * The upper 16 bits currently store the protocol value.
+		 * This is currently used with TCP and UDP port compares and
+		 * allows "tcp.port = 80" without requiring an explicit
+		 " "ip.pr = tcp" first.
+		 */
+		p = e->ipfe_cmd >> 16;
+		if ((p != 0) && (p != stp->is_p))
 			break;
 
-		switch (x[0])
+		switch (e->ipfe_cmd)
 		{
 		case IPF_EXP_IP_PR :
-			for (i = 0; !e && i < x[3]; i++) {
-				e |= (state->is_p == x[i + 3]);
+			for (i = 0; !rv && i < e->ipfe_narg; i++) {
+				rv |= (stp->is_p == e->ipfe_arg0[i]);
 			}
 			break;
 
 		case IPF_EXP_IP_SRCADDR :
-			for (i = 0; !e && i < x[3]; i++) {
-				e |= ((state->is_saddr & x[i + 4]) ==
-				      x[i + 3]);
+			if (stp->is_v != 4)
+				break;
+			for (i = 0; !rv && i < e->ipfe_narg; i++) {
+				rv |= ((stp->is_saddr &
+					e->ipfe_arg0[i * 2 + 1]) ==
+				       e->ipfe_arg0[i * 2]);
 			}
 			break;
 
 		case IPF_EXP_IP_DSTADDR :
-			for (i = 0; !e && i < x[3]; i++) {
-				e |= ((state->is_daddr & x[i + 4]) ==
-				      x[i + 3]);
+			if (stp->is_v != 4)
+				break;
+			for (i = 0; !rv && i < e->ipfe_narg; i++) {
+				rv |= ((stp->is_daddr &
+					e->ipfe_arg0[i * 2 + 1]) ==
+				       e->ipfe_arg0[i * 2]);
 			}
 			break;
 
 		case IPF_EXP_IP_ADDR :
-			for (i = 0; !e && i < x[3]; i++) {
-				e |= ((state->is_saddr & x[i + 4]) ==
-				      x[i + 3]) ||
-				     ((state->is_daddr & x[i + 4]) ==
-				      x[i + 3]);
+			if (stp->is_v != 4)
+				break;
+			for (i = 0; !rv && i < e->ipfe_narg; i++) {
+				rv |= ((stp->is_saddr &
+					e->ipfe_arg0[i * 2 + 1]) ==
+				       e->ipfe_arg0[i * 2]) ||
+				      ((stp->is_daddr &
+					e->ipfe_arg0[i * 2 + 1]) ==
+				       e->ipfe_arg0[i * 2]);
 			}
 			break;
 
+#ifdef USE_INET6
+		case IPF_EXP_IP6_SRCADDR :
+			if (stp->is_v != 6)
+				break;
+			for (i = 0; !rv && i < e->ipfe_narg; i++) {
+				rv |= IP6_MASKEQ(&stp->is_src,
+						 &e->ipfe_arg0[i * 8 + 4],
+						 &e->ipfe_arg0[i * 8]);
+			}
+			break;
+
+		case IPF_EXP_IP6_DSTADDR :
+			if (stp->is_v != 6)
+				break;
+			for (i = 0; !rv && i < e->ipfe_narg; i++) {
+				rv |= IP6_MASKEQ(&stp->is_dst,
+						 &e->ipfe_arg0[i * 8 + 4],
+						 &e->ipfe_arg0[i * 8]);
+			}
+			break;
+
+		case IPF_EXP_IP6_ADDR :
+			if (stp->is_v != 6)
+				break;
+			for (i = 0; !rv && i < e->ipfe_narg; i++) {
+				rv |= IP6_MASKEQ(&stp->is_src,
+						 &e->ipfe_arg0[i * 8 + 4],
+						 &e->ipfe_arg0[i * 8]) ||
+				      IP6_MASKEQ(&stp->is_dst,
+						 &e->ipfe_arg0[i * 8 + 4],
+						 &e->ipfe_arg0[i * 8]);
+			}
+			break;
+#endif
+
 		case IPF_EXP_UDP_PORT :
 		case IPF_EXP_TCP_PORT :
-			for (i = 0; !e && i < x[3]; i++) {
-				e |= (state->is_sport == x[i + 3]) ||
-				     (state->is_dport == x[i + 3]);
+			for (i = 0; !rv && i < e->ipfe_narg; i++) {
+				rv |= (stp->is_sport == e->ipfe_arg0[i]) ||
+				      (stp->is_dport == e->ipfe_arg0[i]);
 			}
 			break;
 
 		case IPF_EXP_UDP_SPORT :
 		case IPF_EXP_TCP_SPORT :
-			for (i = 0; !e && i < x[3]; i++) {
-				e |= (state->is_sport == x[i + 3]);
+			for (i = 0; !rv && i < e->ipfe_narg; i++) {
+				rv |= (stp->is_sport == e->ipfe_arg0[i]);
 			}
 			break;
 
 		case IPF_EXP_UDP_DPORT :
 		case IPF_EXP_TCP_DPORT :
-			for (i = 0; !e && i < x[3]; i++) {
-				e |= (state->is_dport == x[i + 3]);
+			for (i = 0; !rv && i < e->ipfe_narg; i++) {
+				rv |= (stp->is_dport == e->ipfe_arg0[i]);
+			}
+			break;
+
+		case IPF_EXP_IDLE_GT :
+			for (i = 0; !rv && i < e->ipfe_narg; i++) {
+				rv |= (stp->is_die < e->ipfe_arg0[i]);
+			}
+			break;
+
+		case IPF_EXP_TCP_STATE :
+			for (i = 0; !rv && i < e->ipfe_narg; i++) {
+				rv |= (stp->is_state[0] == e->ipfe_arg0[i]) ||
+				      (stp->is_state[1] == e->ipfe_arg0[i]);
 			}
 			break;
 		}
-		e ^= x[1];
+		rv ^= e->ipfe_not;
 
-		if (!e)
+		if (rv == 0)
 			break;
 	}
 
-	return e;
+	return rv;
 }
 
 
