@@ -10,15 +10,18 @@
 
 #define	EMM_MAGIC	0x9d7adba3
 
-static int mutex_debug = 0;
+static	int	mutex_debug = 0;
+static	FILE	*mutex_file = NULL;
+static	int	initcount = 0;
 
-void eMmutex_enter(mtx, file, line)
+void
+eMmutex_enter(mtx, file, line)
 	eMmutex_t *mtx;
 	char *file;
 	int line;
 {
 	if (mutex_debug & 2)
-		fprintf(stderr, "%s:%d:eMmutex_enter(%s)\n", file, line,
+		fprintf(mutex_file, "%s:%d:eMmutex_enter(%s)\n", file, line,
 		       mtx->eMm_owner);
 	if (mtx->eMm_magic != EMM_MAGIC) {
 		fprintf(stderr, "%s:eMmutex_enter(%p): bad magic: %#x\n",
@@ -36,13 +39,14 @@ void eMmutex_enter(mtx, file, line)
 }
 
 
-void eMmutex_exit(mtx, file, line)
+void
+eMmutex_exit(mtx, file, line)
 	eMmutex_t *mtx;
 	char *file;
 	int line;
 {
 	if (mutex_debug & 2)
-		fprintf(stderr, "%s:%d:eMmutex_exit(%s)\n", file, line,
+		fprintf(mutex_file, "%s:%d:eMmutex_exit(%s)\n", file, line,
 		       mtx->eMm_owner);
 	if (mtx->eMm_magic != EMM_MAGIC) {
 		fprintf(stderr, "%s:eMmutex_exit(%p): bad magic: %#x\n",
@@ -60,17 +64,17 @@ void eMmutex_exit(mtx, file, line)
 }
 
 
-static int initcount = 0;
-
-
-void eMmutex_init(mtx, who, file, line)
+void
+eMmutex_init(mtx, who, file, line)
 	eMmutex_t *mtx;
 	char *who;
 	char *file;
 	int line;
 {
+	if (mutex_file == NULL && mutex_debug)
+		mutex_file = fopen("ipf_mutex_log", "w");
 	if (mutex_debug & 1)
-		fprintf(stderr, "%s:%d:eMmutex_init(%p,%s)\n",
+		fprintf(mutex_file, "%s:%d:eMmutex_init(%p,%s)\n",
 			file, line, mtx, who);
 	if (mtx->eMm_magic == EMM_MAGIC) {	/* safe bet ? */
 		fprintf(stderr,
@@ -88,21 +92,24 @@ void eMmutex_init(mtx, who, file, line)
 }
 
 
-void eMmutex_destroy(mtx, file, line)
+void
+eMmutex_destroy(mtx, file, line)
 	eMmutex_t *mtx;
 	char *file;
 	int line;
 {
 	if (mutex_debug & 1)
-		fprintf(stderr, "%s:%d:eMmutex_destroy(%p,%s)\n", file, line,
-		       mtx, mtx->eMm_owner);
+		fprintf(mutex_file,
+			"%s:%d:eMmutex_destroy(%p,%s)\n", file, line,
+			mtx, mtx->eMm_owner);
 	if (mtx->eMm_magic != EMM_MAGIC) {
 		fprintf(stderr, "%s:eMmutex_destroy(%p): bad magic: %#x\n",
 			mtx->eMm_owner, mtx, mtx->eMm_magic);
 		abort();
 	}
 	if (mtx->eMm_held != 0) {
-		fprintf(stderr, "%s:eMmutex_enter(%p): still locked: %d\n",
+		fprintf(stderr,
+			"%s:eMmutex_enter(%p): still locked: %d\n",
 			mtx->eMm_owner, mtx, mtx->eMm_held);
 		abort();
 	}
@@ -113,10 +120,12 @@ void eMmutex_destroy(mtx, file, line)
 }
 
 
-void ipf_mutex_clean()
+void
+ipf_mutex_clean(void)
 {
 	if (initcount != 0) {
-		fprintf(stderr, "initcount non-zero %d\n", initcount);
+		if (mutex_file)
+			fprintf(mutex_file, "initcount %d\n", initcount);
 		abort();
 	}
 }
