@@ -93,7 +93,7 @@ main(argc, argv)
 	int argc;
 	char *argv[];
 {
-	int err;
+	int err = 1;
 
 	if (argc < 2)
 		usage(argv[0]);
@@ -1048,9 +1048,18 @@ setnodeaddr(int type, int role, void *ptr, char *arg)
 	if (type == IPLT_POOL) {
 		ip_pool_node_t *node = ptr;
 
-		node->ipn_addr.adf_len = sizeof(node->ipn_addr);
+		if (node->ipn_addr.adf_family == AF_INET)
+			node->ipn_addr.adf_len = offsetof(addrfamily_t,
+							  adf_addr) +
+						 sizeof(struct in_addr);
+#ifdef USE_INET6
+		else
+			node->ipn_addr.adf_len = offsetof(addrfamily_t,
+							  adf_addr) +
+						 sizeof(struct in6_addr);
+#endif
 		node->ipn_addr.adf_addr.in4.s_addr = inet_addr(arg);
-		node->ipn_mask.adf_len = sizeof(node->ipn_mask);
+		node->ipn_mask.adf_len = node->ipn_addr.adf_len;
 		node->ipn_mask.adf_addr.in4.s_addr = mask.s_addr;
 	} else if (type == IPLT_HASH) {
 		iphtent_t *node = ptr;

@@ -12,7 +12,6 @@
 typedef struct ipf_dstnode {
 	struct ipf_dstnode	*ipfd_next;
 	struct ipf_dstnode	**ipfd_pnext;
-	ipfmutex_t		*ipfd_plock;
 	ipfmutex_t		ipfd_lock;
 	frdest_t		ipfd_dest;
 	u_long			ipfd_syncat;

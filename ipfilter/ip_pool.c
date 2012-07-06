@@ -368,6 +368,9 @@ ipf_pool_soft_destroy(softc, arg)
 /*             arg(I)   - pointer to local context to use                   */
 /*             op(I) - pointer to lookup operatin data                      */
 /*                                                                          */
+/* When adding a new node, a check is made to ensure that the address/mask  */
+/* pair supplied has been appropriately prepared by applying the mask to    */
+/* the address prior to calling for the pair to be added.                   */
 /* ------------------------------------------------------------------------ */
 static int
 ipf_pool_node_add(softc, arg, op, uid)
@@ -397,14 +400,49 @@ ipf_pool_node_add(softc, arg, op, uid)
 		return ESRCH;
 	}
 
-	if (node.ipn_addr.adf_len != sizeof(node.ipn_addr.adf_addr)) {
-		IPFERROR(70028);
-		return EINVAL;
+	if (node.ipn_addr.adf_family == AF_INET) {
+		if (node.ipn_addr.adf_len != offsetof(addrfamily_t, adf_addr) +
+					     sizeof(struct in_addr)) {
+			IPFERROR(70028);
+			return EINVAL;
+		}
 	}
-	if (node.ipn_mask.adf_len != sizeof(node.ipn_mask.adf_addr)) {
+#ifdef USE_INET6
+	else if (node.ipn_addr.adf_family == AF_INET6) {
+		if (node.ipn_addr.adf_len != offsetof(addrfamily_t, adf_addr) +
+					     sizeof(struct in6_addr)) {
+			IPFERROR(77777);
+			return EINVAL;
+		}
+	}
+#endif
+	if (node.ipn_mask.adf_len != node.ipn_addr.adf_len) {
+printf("%d != %d\n",node.ipn_mask.adf_len, node.ipn_addr.adf_len);
 		IPFERROR(70029);
 		return EINVAL;
 	}
+
+	/*
+	 * Check that the address/mask pair works.
+	 */
+	if (node.ipn_addr.adf_family == AF_INET) {
+		if ((node.ipn_addr.adf_addr.in4.s_addr &
+		     node.ipn_mask.adf_addr.in4.s_addr) !=
+		    node.ipn_addr.adf_addr.in4.s_addr) {
+			IPFERROR(77777);
+			return EINVAL;
+		}
+	}
+#ifdef USE_INET6
+	else if (node.ipn_addr.adf_family == AF_INET6) {
+		if (IP6_MASKNEQ(&node.ipn_addr.adf_addr.in6,
+				&node.ipn_mask.adf_addr.in6,
+				&node.ipn_addr.adf_addr.in6)) {
+			IPFERROR(77777);
+			return EINVAL;
+		}
+	}
+#endif
 
 	/*
 	 * add an entry to a pool - return an error if it already
@@ -454,11 +492,23 @@ ipf_pool_node_del(softc, arg, op, uid)
 		return EFAULT;
 	}
 
-	if (node.ipn_addr.adf_len != sizeof(node.ipn_addr.adf_addr)) {
-		IPFERROR(70030);
-		return EINVAL;
+	if (node.ipn_addr.adf_family == AF_INET) {
+		if (node.ipn_addr.adf_len != offsetof(addrfamily_t, adf_addr) +
+					     sizeof(struct in_addr)) {
+			IPFERROR(70030);
+			return EINVAL;
+		}
 	}
-	if (node.ipn_mask.adf_len != sizeof(node.ipn_mask.adf_addr)) {
+#ifdef USE_INET6
+	else if (node.ipn_addr.adf_family == AF_INET6) {
+		if (node.ipn_addr.adf_len != offsetof(addrfamily_t, adf_addr) +
+					     sizeof(struct in6_addr)) {
+			IPFERROR(77777);
+			return EINVAL;
+		}
+	}
+#endif
+	if (node.ipn_mask.adf_len != node.ipn_addr.adf_len) {
 		IPFERROR(70031);
 		return EINVAL;
 	}
@@ -737,16 +787,17 @@ ipf_pool_search(softc, tptr, ipversion, dptr, bytes)
 	m = NULL;
 	addr = (i6addr_t *)dptr;
 	bzero(&v, sizeof(v));
-	v.adf_len = offsetof(addrfamily_t, adf_addr);
 
 	if (ipversion == 4) {
 		v.adf_family = AF_INET;
-		v.adf_len += sizeof(addr->in4);
+		v.adf_len = offsetof(addrfamily_t, adf_addr) +
+			    sizeof(struct in_addr);
 		v.adf_addr.in4 = addr->in4;
 #ifdef USE_INET6
 	} else if (ipversion == 6) {
 		v.adf_family = AF_INET6;
-		v.adf_len += sizeof(addr->in6);
+		v.adf_len = offsetof(addrfamily_t, adf_addr) +
+			    sizeof(struct in6_addr);
 		v.adf_addr.in6 = addr->in6;
 #endif
 	} else
@@ -867,11 +918,9 @@ ipf_pool_insert_node(softc, softp, ipo, node)
 	}
 
 	x->ipn_ref = 1;
-	x->ipn_next = ipo->ipo_list;
-	x->ipn_pnext = &ipo->ipo_list;
-	if (ipo->ipo_list != NULL)
-		ipo->ipo_list->ipn_pnext = &x->ipn_next;
-	ipo->ipo_list = x;
+	x->ipn_pnext = ipo->ipo_tail;
+	*ipo->ipo_tail = x;
+	ipo->ipo_tail = &x->ipn_next;
 
 	softp->ipf_pool_stats.ipls_nodes++;
 
@@ -969,6 +1018,7 @@ ipf_pool_create(softc, softp, op)
 	h->ipo_radix = softp->ipf_radix;
 	h->ipo_ref = 1;
 	h->ipo_list = NULL;
+	h->ipo_tail = &h->ipo_list;
 	h->ipo_unit = unit;
 	h->ipo_next = softp->ipf_pool_list[unit + 1];
 	if (softp->ipf_pool_list[unit + 1] != NULL)
@@ -1000,6 +1050,9 @@ ipf_pool_remove_node(softc, softp, ipo, ipe)
 	ip_pool_node_t *ipe;
 {
 	void *ptr;
+
+	if (ipo->ipo_tail == &ipe->ipn_next)
+		ipo->ipo_tail = ipe->ipn_pnext;
 
 	if (ipe->ipn_pnext != NULL)
 		*ipe->ipn_pnext = ipe->ipn_next;

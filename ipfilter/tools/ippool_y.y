@@ -54,6 +54,7 @@ static	char		poolname[FR_GROUPLEN];
 static iphtent_t *add_htablehosts __P((char *));
 static ip_pool_node_t *add_poolhosts __P((char *));
 static ip_pool_node_t *read_whoisfile __P((char *));
+static void setadflen __P((addrfamily_t *));
 
 %}
 
@@ -348,9 +349,14 @@ hashentry:
 	;
 
 addrmask:
-	ipaddr '/' mask		{ $$[0] = $1; $$[1] = $3; }
+	ipaddr '/' mask		{ $$[0] = $1;
+				  setadflen(&$$[0]);
+				  $$[1] = $3;
+				  $$[1].adf_len = $$[0].adf_len;
+				}
 	| ipaddr		{ $$[0] = $1;
-				  $$[1].adf_len = sizeof($$[1].adf_addr);
+				  setadflen(&$$[1]);
+				  $$[1].adf_len = $$[0].adf_len;
 #ifdef USE_INET6
 				  if (use_inet6)
 					memset(&$$[1].adf_addr, 0xff,
@@ -364,23 +370,22 @@ addrmask:
 
 ipaddr:	ipv4			{ $$.adf_addr.in4 = $1;
 				  $$.adf_family = AF_INET;
-				  $$.adf_len = sizeof($$.adf_addr);
+				  setadflen(&$$);
 				  use_inet6 = 0;
 				}
 	| YY_NUMBER		{ $$.adf_addr.in4.s_addr = htonl($1);
 				  $$.adf_family = AF_INET;
-				  $$.adf_len = sizeof($$.adf_addr);
+				  setadflen(&$$);
 				  use_inet6 = 0;
 				}
 	| YY_IPV6		{ $$.adf_addr = $1;
-				  $$.adf_len = sizeof($$.adf_addr);
 				  $$.adf_family = AF_INET6;
+				  setadflen(&$$);
 				  use_inet6 = 1;
 				}
 	;
 
 mask:	YY_NUMBER	{ bzero(&$$, sizeof($$));
-			  $$.adf_len = sizeof($$.adf_addr);
 			  if (use_inet6) {
 				if (ntomask(AF_INET6, $1,
 					    (u_32_t *)&$$.adf_addr) == -1)
@@ -392,11 +397,9 @@ mask:	YY_NUMBER	{ bzero(&$$, sizeof($$));
 			  }
 			}
 	| ipv4		{ bzero(&$$, sizeof($$));
-			  $$.adf_len = sizeof($$.adf_addr);
 			  $$.adf_addr.in4 = $1;
 			}
 	| YY_IPV6	{ bzero(&$$, sizeof($$));
-			  $$.adf_len = sizeof($$.adf_addr);
 			  $$.adf_addr = $1;
 			}
 	;
@@ -428,7 +431,7 @@ end:	'}'				{ yyexpectaddr = 0; }
 
 poolline:
 	IPT_POOL unit '/' IPT_DSTLIST '(' IPT_NAME YY_STR ';' dstopts ')'
-	'{' dstlist '}'
+	start dstlist end
 					{ bzero((char *)&ipld, sizeof(ipld));
 					  strncpy(ipld.ipld_name, $7,
 						  sizeof(ipld.ipld_name));
@@ -440,7 +443,7 @@ poolline:
 					  free($7);
 					}
 	| IPT_POOL unit '/' IPT_TREE '(' IPT_NAME YY_STR ';' ')'
-	  '{' addrlist '}'
+	  start addrlist end
 					{ bzero((char *)&iplo, sizeof(iplo));
 					  strncpy(iplo.ipo_name, $7,
 						  sizeof(iplo.ipo_name));
@@ -451,7 +454,7 @@ poolline:
 					  use_inet6 = 0;
 					  free($7);
 					}
-	| IPT_POOL '(' IPT_NAME YY_STR ';' ')' '{' addrlist '}'
+	| IPT_POOL '(' IPT_NAME YY_STR ';' ')' start addrlist end
 					{ bzero((char *)&iplo, sizeof(iplo));
 					  strncpy(iplo.ipo_name, $4,
 						  sizeof(iplo.ipo_name));
@@ -463,7 +466,7 @@ poolline:
 					  free($4);
 					}
 	| IPT_POOL unit '/' IPT_HASH '(' IPT_NAME YY_STR ';' hashoptlist ')'
-	  '{' hashlist '}'
+	  start hashlist end
 					{ iphtent_t *h;
 					  bzero((char *)&ipht, sizeof(ipht));
 					  strncpy(ipht.iph_name, $7,
@@ -479,7 +482,7 @@ poolline:
 					  free($7);
 					}
 	| IPT_GROUPMAP '(' IPT_NAME YY_STR ';' inout ';' ')'
-	  '{' setgrouplist '}'
+	  start setgrouplist end
 					{ iphtent_t *h;
 					  bzero((char *)&ipht, sizeof(ipht));
 					  strncpy(ipht.iph_name, $4,
@@ -531,6 +534,7 @@ dstentry:
 				}
 	| ipaddr		{ $$ = calloc(1, sizeof(*$$));
 				  if ($$ != NULL) {
+					$$->ipfd_dest.fd_name = -1;
 					$$->ipfd_dest.fd_addr = $1;
 					$$->ipfd_size = sizeof(*$$);
 				  }
@@ -726,8 +730,6 @@ char *url;
 		if (p == NULL)
 			break;
 		p->ipn_mask.adf_addr = a->al_i6mask;
-		p->ipn_mask.adf_len = sizeof(p->ipn_addr.adf_addr);
-		p->ipn_addr.adf_len = sizeof(p->ipn_addr.adf_addr);
 
 		if (a->al_family == AF_INET) {
 			p->ipn_addr.adf_family = AF_INET;
@@ -736,8 +738,10 @@ char *url;
 			p->ipn_addr.adf_family = AF_INET6;
 #endif
 		}
+		setadflen(&p->ipn_addr);
 		p->ipn_addr.adf_addr = a->al_i6addr;
 		p->ipn_info = a->al_not;
+		p->ipn_mask.adf_len = p->ipn_addr.adf_len;
 
 		if (pbot != NULL)
 			pbot->ipn_next = p;
@@ -784,4 +788,25 @@ read_whoisfile(file)
 	}
 	fclose(fp);
 	return ntop;
+}
+
+
+static void
+setadflen(afp)
+	addrfamily_t *afp;
+{
+	afp->adf_len = offsetof(addrfamily_t, adf_addr);
+	switch (afp->adf_family)
+	{
+	case AF_INET :
+		afp->adf_len += sizeof(struct in_addr);
+		break;
+#ifdef USE_INET6
+	case AF_INET6 :
+		afp->adf_len += sizeof(struct in6_addr);
+		break;
+#endif
+	default :
+		break;
+	}
 }
