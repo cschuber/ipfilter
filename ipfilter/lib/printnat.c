@@ -25,7 +25,17 @@ printnat(np, opts)
 {
 	struct protoent *pr;
 	char *base;
+	int family;
 	int proto;
+
+	if (np->in_v[0] == 4)
+		family = AF_INET;
+#ifdef USE_INET6
+	else if (np->in_v[0] == 6)
+		family = AF_INET6;
+#endif
+	else
+		family = AF_UNSPEC;
 
 	if (np->in_flags & IPN_NO)
 		PRINTF("no ");
@@ -95,7 +105,7 @@ printnat(np, opts)
 	}
 	putchar(' ');
 
-	if (np->in_v[0] == 6)
+	if (family == AF_INET6)
 		PRINTF("inet6 ");
 
 	if (np->in_redir & (NAT_REWRITE|NAT_ENCAP|NAT_DIVERTUDP)) {
@@ -320,12 +330,9 @@ printnat(np, opts)
 			PRINTF(" purge");
 		PRINTF("\n");
 		if (opts & OPT_DEBUG) {
-			struct in_addr nip;
-
-			nip.s_addr = htonl(np->in_snip);
-
-			PRINTF("\tnextip %s pnext %d\n",
-			       inet_ntoa(nip), np->in_spnext);
+			PRINTF("\tnextip ");
+			printip(family, &np->in_snip);
+			PRINTF(" pnext %d\n", np->in_spnext);
 		}
 	}
 
