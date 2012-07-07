@@ -434,17 +434,25 @@ ipfr_frag_new(softc, softf, fin, pass, table
 	frag.ipfr_auth = fin->fin_fi.fi_auth;
 
 	off = fin->fin_off >> 3;
-#ifdef USE_INET6
-	if ((off == 0) && (fin->fin_v == 6)) {
+	if (off == 0) {
 		char *ptr;
 		int end;
 
-		ptr = (char *)fin->fin_fraghdr + sizeof(struct ip6_frag);
+#ifdef USE_INET6
+		if (fin->fin_v == 6) {
+
+			ptr = (char *)fin->fin_fraghdr +
+			      sizeof(struct ip6_frag);
+		} else
+#endif
+		{
+			ptr = fin->fin_dp;
+		}
 		end = fin->fin_plen - (ptr - (char *)fin->fin_ip);
 		frag.ipfr_firstend = end >> 3;
-	} else
-#endif
+	} else {
 		frag.ipfr_firstend = 0;
+	}
 
 	/*
 	 * allocate some memory, if possible, if not, just record that we
@@ -565,7 +573,7 @@ ipf_frag_natnew(softc, fin, pass, nat)
 	ipf_frag_softc_t *softf = softc->ipf_frag_soft;
 	ipfr_t	*fra;
 
-	if ((fin->fin_v != 4) || (softf->ipfr_lock != 0))
+	if (softf->ipfr_lock != 0)
 		return 0;
 
 #ifdef USE_MUTEXES
@@ -582,8 +590,9 @@ ipf_frag_natnew(softc, fin, pass, nat)
 		softf->ipfr_nattail = &fra->ipfr_next;
 		fra->ipfr_next = NULL;
 		RWLOCK_EXIT(&softf->ipfr_natfrag);
+		return 0;
 	}
-	return fra ? 0 : -1;
+	return -1;
 }
 
 
@@ -725,7 +734,9 @@ ipf_frag_lookup(softc, softf, fin, table
 				 */
 				if ((f->ipfr_firstend != 0) &&
 				    (off < f->ipfr_firstend)) {
-					FBUMPD(ifs_overlap);
+					FBUMP(ifs_overlap);
+					DT2(ifs_overlap, u_short, off,
+					    ipfr_t *, f);
 					fin->fin_flx |= FI_BAD;
 					break;
 				}
@@ -855,8 +866,7 @@ ipf_frag_ipidknown(fin)
 	ipfr_t	*ipf;
 	u_32_t	id;
 
-	if ((fin->fin_v != 4) || (softf->ipfr_lock) ||
-	    !softf->ipfr_ipidlist)
+	if (softf->ipfr_lock || !softf->ipfr_ipidlist)
 		return 0xffffffff;
 
 #ifdef USE_MUTEXES
