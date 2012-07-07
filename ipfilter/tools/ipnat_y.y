@@ -862,7 +862,8 @@ mapport:
 					  nat->in_spmax = 65535;
 					}
 	| IPNY_ICMPIDMAP YY_STR portpair sequential
-			{ if (strcmp($2, "icmp") != 0) {
+			{ if (strcmp($2, "icmp") != 0 &&
+			      strcmp($2, "ipv6-icmp") != 0) {
 				yyerror("icmpidmap not followed by icmp");
 			  }
 			  free($2);
@@ -870,8 +871,13 @@ mapport:
 				yyerror("invalid ICMP Id number");
 			  if ($3.p2 < 0 || $3.p2 > 65535)
 				yyerror("invalid ICMP Id number");
-			  nat->in_pr[0] = IPPROTO_ICMP;
-			  nat->in_pr[1] = IPPROTO_ICMP;
+			  if (strcmp($2, "ipv6-icmp") == 0) {
+				nat->in_pr[0] = IPPROTO_ICMPV6;
+				nat->in_pr[1] = IPPROTO_ICMPV6;
+			  } else {
+				nat->in_pr[0] = IPPROTO_ICMP;
+				nat->in_pr[1] = IPPROTO_ICMP;
+			  }
 			  nat->in_flags = IPN_ICMPQUERY;
 			  nat->in_spmin = $3.p1;
 			  nat->in_spmax = $3.p2;
