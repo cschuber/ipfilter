@@ -1228,31 +1228,23 @@ void *
 ipf_pullup(mb_t *xmin, fr_info_t *fin, int len)
 {
 	qpktinfo_t *qpi = fin->fin_qpi;
-	int out = fin->fin_out, dpoff, ipoff;
-	mb_t *m = xmin;
+	int out = fin->fin_out, dpoff;
 	char *ip;
+	mb_t *m;
 
-	if (m == NULL)
+	if (xmin == NULL)
 		return NULL;
 
 	ip = (char *)fin->fin_ip;
 	if ((fin->fin_flx & FI_COALESCE) != 0)
 		return ip;
 
-	ipoff = fin->fin_ipoff;
-	if (fin->fin_dp != NULL)
-		dpoff = (char *)fin->fin_dp - (char *)ip;
-	else
-		dpoff = 0;
+	len += fin->fin_ipoff;
 
-	if (M_LEN(m) < len) {
+	if (M_LEN(xmin) < len) {
+		mblk_t *mnew = msgpullup(xmin, len);
 
-		/*
-		 * pfil_precheck ensures the IP header is on a 32bit
-		 * aligned address so simply fail if that isn't currently
-		 * the case (should never happen).
-		 */
-		if (((ipoff & 3) != 0) || (pullupmsg(m, len + ipoff) == 0)) {
+		if (mnew == NULL) {
 			FREE_MB_T(*fin->fin_mp);
 			*fin->fin_mp = NULL;
 			fin->fin_m = NULL;
@@ -1262,14 +1254,53 @@ ipf_pullup(mb_t *xmin, fr_info_t *fin, int len)
 			return NULL;
 		}
 
-		fin->fin_m = m;
-		ip = MTOD(m, char *) + ipoff;
-		qpi->qpi_data = ip;
-	}
+		if (fin->fin_dp != NULL)
+			dpoff = (char *)fin->fin_dp - (char *)ip;
+		else
+			dpoff = 0;
 
-	fin->fin_ip = (ip_t *)ip;
-	if (fin->fin_dp != NULL)
-		fin->fin_dp = (char *)fin->fin_ip + dpoff;
+		if (*fin->fin_mp == xmin) {
+			dblk_t *dt, *dm;
+
+			/*
+			 * These fields are not preserved by msgpullup and as
+			 * they are used by hardware checksum code, preserving
+			 * them is necessary or else the packet is dropped.
+			 * This information is only stored in the first dblk
+			 * in an mblk chain and because the change here is to
+			 * how much data is in the dblk and not where the data
+			 * is relative to the start of the dblk, copying the
+			 * values is safe.
+			 */
+			dt = mnew->b_datap;
+			dm = xmin->b_datap;
+			dt->db_cksumstart = dm->db_cksumstart;
+			dt->db_cksumend = dm->db_cksumend;
+			dt->db_cksumstuff = dm->db_cksumstuff;
+			dt->db_struioun = dm->db_struioun;
+			freemsg(*fin->fin_mp);
+			*fin->fin_mp = mnew;
+		} else {
+			for (m = *fin->fin_mp; m != NULL; m = m->b_cont)
+				if (m->b_cont == xmin)
+					break;
+			freemsg(m->b_cont);
+			m->b_cont = mnew;
+		}
+
+		fin->fin_qfm = mnew;
+		fin->fin_m = mnew;
+		ip = MTOD(mnew, char *) + fin->fin_ipoff;
+		if (fin->fin_dp != NULL)
+			fin->fin_dp = (char *)ip + dpoff;
+		if (fin->fin_fraghdr != NULL)
+			fin->fin_fraghdr = (char *)ip +
+					   ((char *)fin->fin_fraghdr -
+					    (char *)fin->fin_ip);
+		fin->fin_ip = (ip_t *)ip;
+		qpi->qpi_data = ip;
+		qpi->qpi_m = mnew;
+	}
 
 	if (len == fin->fin_plen)
 		fin->fin_flx |= FI_COALESCE;
