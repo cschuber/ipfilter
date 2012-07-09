@@ -1051,6 +1051,10 @@ ipf_pullup(mb_t *xmin, fr_info_t *fin, int len)
 	fin->fin_ip = (ip_t *)ip;
 	if (fin->fin_dp != NULL)
 		fin->fin_dp = (char *)fin->fin_ip + dpoff;
+	if (fin->fin_fraghdr != NULL)
+		fin->fin_fraghdr = (char *)ip +
+				   ((char *)fin->fin_fraghdr -
+				    (char *)fin->fin_ip);
 
 	if (len == fin->fin_plen)
 		fin->fin_flx |= FI_COALESCE;
