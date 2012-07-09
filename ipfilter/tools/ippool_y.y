@@ -91,7 +91,7 @@ static void setadflen(addrfamily_t *);
 %type	<ipe> groupentry setgrouplist grouplist
 %type	<ipa> ipaddr mask
 %type	<ip4> ipv4
-%type	<str> number setgroup
+%type	<str> number setgroup name
 %type	<ipd> dstentry dstentries dstlist
 
 %%
@@ -430,74 +430,81 @@ end:	'}'				{ yyexpectaddr = 0; }
 	;
 
 poolline:
-	IPT_POOL unit '/' IPT_DSTLIST '(' IPT_NAME YY_STR ';' dstopts ')'
+	IPT_POOL unit '/' IPT_DSTLIST '(' name ';' dstopts ')'
 	start dstlist end
 					{ bzero((char *)&ipld, sizeof(ipld));
-					  strncpy(ipld.ipld_name, $7,
+					  strncpy(ipld.ipld_name, $6,
 						  sizeof(ipld.ipld_name));
 					  ipld.ipld_unit = $2;
-					  ipld.ipld_policy = $9;
-					  load_dstlist(&ipld, poolioctl, $12);
+					  ipld.ipld_policy = $8;
+					  load_dstlist(&ipld, poolioctl, $11);
 					  resetlexer();
 					  use_inet6 = 0;
-					  free($7);
+					  free($6);
 					}
-	| IPT_POOL unit '/' IPT_TREE '(' IPT_NAME YY_STR ';' ')'
+	| IPT_POOL unit '/' IPT_TREE '(' name ';' ')'
 	  start addrlist end
 					{ bzero((char *)&iplo, sizeof(iplo));
-					  strncpy(iplo.ipo_name, $7,
+					  strncpy(iplo.ipo_name, $6,
 						  sizeof(iplo.ipo_name));
-					  iplo.ipo_list = $11;
+					  iplo.ipo_list = $10;
 					  iplo.ipo_unit = $2;
 					  load_pool(&iplo, poolioctl);
 					  resetlexer();
 					  use_inet6 = 0;
-					  free($7);
+					  free($6);
 					}
-	| IPT_POOL '(' IPT_NAME YY_STR ';' ')' start addrlist end
+	| IPT_POOL '(' name ';' ')' start addrlist end
 					{ bzero((char *)&iplo, sizeof(iplo));
-					  strncpy(iplo.ipo_name, $4,
+					  strncpy(iplo.ipo_name, $3,
 						  sizeof(iplo.ipo_name));
-					  iplo.ipo_list = $8;
+					  iplo.ipo_list = $7;
 					  iplo.ipo_unit = IPL_LOGALL;
 					  load_pool(&iplo, poolioctl);
 					  resetlexer();
 					  use_inet6 = 0;
-					  free($4);
+					  free($3);
 					}
-	| IPT_POOL unit '/' IPT_HASH '(' IPT_NAME YY_STR ';' hashoptlist ')'
+	| IPT_POOL unit '/' IPT_HASH '(' name ';' hashoptlist ')'
 	  start hashlist end
 					{ iphtent_t *h;
 					  bzero((char *)&ipht, sizeof(ipht));
-					  strncpy(ipht.iph_name, $7,
+					  strncpy(ipht.iph_name, $6,
 						  sizeof(ipht.iph_name));
 					  ipht.iph_unit = $2;
-					  load_hash(&ipht, $12, poolioctl);
+					  load_hash(&ipht, $11, poolioctl);
 					  while ((h = ipht.iph_list) != NULL) {
 						ipht.iph_list = h->ipe_next;
 						free(h);
 					  }
 					  resetlexer();
 					  use_inet6 = 0;
-					  free($7);
+					  free($6);
 					}
-	| IPT_GROUPMAP '(' IPT_NAME YY_STR ';' inout ';' ')'
+	| IPT_GROUPMAP '(' name ';' inout ';' ')'
 	  start setgrouplist end
 					{ iphtent_t *h;
 					  bzero((char *)&ipht, sizeof(ipht));
-					  strncpy(ipht.iph_name, $4,
+					  strncpy(ipht.iph_name, $3,
 						  sizeof(ipht.iph_name));
 					  ipht.iph_type = IPHASH_GROUPMAP;
 					  ipht.iph_unit = IPL_LOGIPF;
-					  ipht.iph_flags = $6;
-					  load_hash(&ipht, $10, poolioctl);
+					  ipht.iph_flags = $5;
+					  load_hash(&ipht, $9, poolioctl);
 					  while ((h = ipht.iph_list) != NULL) {
 						ipht.iph_list = h->ipe_next;
 						free(h);
 					  }
 					  resetlexer();
 					  use_inet6 = 0;
-					  free($4);
+					  free($3);
+					}
+	;
+
+name:	IPT_NAME YY_STR			{ $$ = $2; }
+	| IPT_NUM YY_NUMBER		{ char name[80];
+					  sprintf(name, "%d", $2);
+					  $$ = strdup(name);
 					}
 	;
 
