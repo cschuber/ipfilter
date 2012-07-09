@@ -1152,7 +1152,7 @@ ipf_pr_pullup(fin, plen)
 			plen += (char *)fin->fin_dp -
 				((char *)fin->fin_ip + fin->fin_hlen);
 		plen += fin->fin_hlen;
-		if (M_LEN(fin->fin_m) < plen) {
+		if (M_LEN(fin->fin_m) < plen + fin->fin_ipoff) {
 #if defined(_KERNEL)
 			if (ipf_pullup(fin->fin_m, fin, plen) == NULL) {
 				DT(ipf_pullup_fail);
