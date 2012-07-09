@@ -10126,7 +10126,10 @@ ipf_inet_mask_add(bits, mtab)
 	if (mtab->imt4_masks[bits] > 1)
 		return;
 
-	mask = 0xffffffff << (32 - bits);
+	if (bits == 0)
+		mask = 0;
+	else
+		mask = 0xffffffff << (32 - bits);
 
 	for (i = 0; i < 33; i++) {
 		if (ntohl(mtab->imt4_active[i]) < mask) {
@@ -10170,6 +10173,7 @@ ipf_inet_mask_del(bits, mtab)
 		}
 	}
 	mtab->imt4_max--;
+	ASSERT(mtab->imt4_max >= 0);
 }
 
 
@@ -10193,11 +10197,20 @@ ipf_inet6_mask_add(bits, mask, mtab)
 	i6addr_t *mask;
 	ipf_v6_masktab_t *mtab;
 {
+	i6addr_t zero;
 	int i, j;
 
 	mtab->imt6_masks[bits]++;
 	if (mtab->imt6_masks[bits] > 1)
 		return;
+
+	if (bits == 0) {
+		mask = &zero;
+		zero.i6[0] = 0;
+		zero.i6[1] = 0;
+		zero.i6[2] = 0;
+		zero.i6[3] = 0;
+	}
 
 	for (i = 0; i < 129; i++) {
 		if (IP6_LT(&mtab->imt6_active[i], mask)) {
@@ -10227,20 +10240,32 @@ ipf_inet6_mask_del(bits, mask, mtab)
 	i6addr_t *mask;
 	ipf_v6_masktab_t *mtab;
 {
+	i6addr_t zero;
 	int i, j;
 
 	mtab->imt6_masks[bits]--;
 	if (mtab->imt6_masks[bits] > 0)
 		return;
 
+	if (bits == 0)
+		mask = &zero;
+	zero.i6[0] = 0;
+	zero.i6[1] = 0;
+	zero.i6[2] = 0;
+	zero.i6[3] = 0;
+
 	for (i = 0; i < 129; i++) {
 		if (IP6_EQ(&mtab->imt6_active[i], mask)) {
-			for (j = i + 1; j < 129; j++)
+			for (j = i + 1; j < 129; j++) {
 				mtab->imt6_active[j - 1] = mtab->imt6_active[j];
+				if (IP6_EQ(&mtab->imt6_active[j - 1], &zero))
+					break;
+			}
 			break;
 		}
 	}
 	mtab->imt6_max--;
+	ASSERT(mtab->imt6_max >= 0);
 }
 #endif
 
