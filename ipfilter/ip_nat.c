@@ -258,6 +258,8 @@ static	nat_t	*ipf_nat_rebuildencapicmp __P((fr_info_t *, nat_t *));
 static	int	ipf_nat_resolverule __P((ipf_main_softc_t *, ipnat_t *));
 static	int	ipf_nat_ruleaddrinit __P((ipf_main_softc_t *,
 					  ipf_nat_softc_t *, ipnat_t *));
+static	int	ipf_nat_rule_init __P((ipf_main_softc_t *, ipf_nat_softc_t *,
+				       ipnat_t *));
 static	int	ipf_nat_siocaddnat __P((ipf_main_softc_t *, ipf_nat_softc_t *,
 					ipnat_t *, ipnat_t **, int));
 static	void	ipf_nat_siocdelnat __P((ipf_main_softc_t *, ipf_nat_softc_t *,
@@ -1159,6 +1161,11 @@ ipf_nat_ioctl(softc, data, cmd, mode, uid, ctx)
 					nat->in_ndstaddr &= nat->in_ndstmsk;
 			}
 		}
+
+		error = ipf_nat_rule_init(softc, softn, nat);
+		if (error != 0)
+			goto done;
+
 		MUTEX_ENTER(&softn->ipf_nat_io);
 		for (np = &softn->ipf_nat_list; ((n = *np) != NULL);
 		     np = &n->in_next)
@@ -1526,46 +1533,6 @@ ipf_nat_siocaddnat(softc, softn, n, np, getlock)
 		return EINVAL;
 	}
 
-	n->in_use = 0;
-
-	if ((n->in_flags & IPN_SIPRANGE) != 0)
-		n->in_nsrcatype = FRI_RANGE;
-
-	if ((n->in_flags & IPN_DIPRANGE) != 0)
-		n->in_ndstatype = FRI_RANGE;
-
-	if ((n->in_flags & IPN_SPLIT) != 0)
-		n->in_ndstatype = FRI_SPLIT;
-
-	if ((n->in_redir & (NAT_MAP|NAT_REWRITE|NAT_DIVERTUDP)) != 0)
-		n->in_spnext = n->in_spmin;
-
-	if ((n->in_redir & (NAT_REWRITE|NAT_DIVERTUDP)) != 0) {
-		n->in_dpnext = n->in_dpmin;
-	} else if (n->in_redir == NAT_REDIRECT) {
-		n->in_dpnext = n->in_dpmin;
-	}
-
-	n->in_stepnext = 0;
-
-	switch (n->in_v[0])
-	{
-	case 4 :
-		error = ipf_nat_ruleaddrinit(softc, softn, n);
-		if (error != 0)
-			return error;
-		break;
-#ifdef USE_INET6
-	case 6 :
-		error = ipf_nat6_ruleaddrinit(softc, softn, n);
-		if (error != 0)
-			return error;
-		break;
-#endif
-	default :
-		break;
-	}
-
 	if (n->in_redir == (NAT_DIVERTUDP|NAT_MAP)) {
 		/*
 		 * Prerecord whether or not the destination of the divert
@@ -1793,11 +1760,6 @@ ipf_nat_siocdelnat(softc, softn, n, np, getlock)
 	if (getlock) {
 		WRITE_ENTER(&softc->ipf_nat);
 	}
-	if (n->in_redir & NAT_REDIRECT)
-		ipf_nat_delrdr(softn, n);
-	if (n->in_redir & (NAT_MAPBLK|NAT_MAP))
-		ipf_nat_delmap(softn, n);
-
 	*np = n->in_next;
 
 	ipf_nat_delrule(softc, softn, n, 1);
@@ -2736,6 +2698,31 @@ ipf_nat_delrule(softc, softn, np, purge)
 		}
 	}
 
+	if ((np->in_flags & IPN_DELETE) == 0) {
+		if (np->in_redir & NAT_REDIRECT) {
+			switch (np->in_v[0])
+			{
+			case 4 :
+				ipf_nat_delrdr(softn, np);
+				break;
+			case 6 :
+				ipf_nat6_delrdr(softn, np);
+				break;
+			}
+		}
+		if (np->in_redir & (NAT_MAPBLK|NAT_MAP)) {
+			switch (np->in_v[0])
+			{
+			case 4 :
+				ipf_nat_delmap(softn, np);
+				break;
+			case 6 :
+				ipf_nat6_delmap(softn, np);
+				break;
+			}
+		}
+	}
+
 	np->in_next = NULL;
 	if (np->in_use == 0) {
 		ipf_nat_free_rule(softc, softn, np);
@@ -3366,8 +3353,10 @@ ipf_nat_add(fin, np, natsave, flags, direction)
 	nat->nat_dlocal = np->in_dlocal;
 
 	if ((np->in_apr != NULL) && ((nat->nat_flags & NAT_SLAVE) == 0))
-		if (ipf_proxy_new(fin, nat) == -1)
+		if (ipf_proxy_new(fin, nat) == -1) {
+			NBUMPSIDED(fin->fin_out, ns_appr_fail);
 			goto badnat;
+		}
 
 	nat->nat_ifps[0] = np->in_ifps[0];
 	if (np->in_ifps[0] != NULL) {
@@ -5496,9 +5485,9 @@ ipf_nat_out(fin, nat, natadd, nflags)
 	/* ------------------------------------------------------------- */
 	if ((np != NULL) && (np->in_apr != NULL)) {
 		i = ipf_proxy_check(fin, nat);
-		if (i == 0)
+		if (i == 0) {
 			i = 1;
-		else if (i == -1) {
+		} else if (i == -1) {
 			NBUMPSIDED(1, ns_ipf_proxy_fail);
 		}
 	} else {
@@ -8963,4 +8952,66 @@ ipf_nat_cmp_rules(n1, n2)
 		 sizeof(n1->in_osrc.na_addr)))
 		return 16;
 	return 0;
+}
+
+
+static int
+ipf_nat_rule_init(softc, softn, n)
+	ipf_main_softc_t *softc;
+	ipf_nat_softc_t *softn;
+	ipnat_t *n;
+{
+	int error = 0;
+
+	n->in_use = 0;
+
+	if ((n->in_flags & IPN_SIPRANGE) != 0)
+		n->in_nsrcatype = FRI_RANGE;
+
+	if ((n->in_flags & IPN_DIPRANGE) != 0)
+		n->in_ndstatype = FRI_RANGE;
+
+	if ((n->in_flags & IPN_SPLIT) != 0)
+		n->in_ndstatype = FRI_SPLIT;
+
+	if ((n->in_redir & (NAT_MAP|NAT_REWRITE|NAT_DIVERTUDP)) != 0)
+		n->in_spnext = n->in_spmin;
+
+	if ((n->in_redir & (NAT_REWRITE|NAT_DIVERTUDP)) != 0) {
+		n->in_dpnext = n->in_dpmin;
+	} else if (n->in_redir == NAT_REDIRECT) {
+		n->in_dpnext = n->in_dpmin;
+	}
+
+	n->in_stepnext = 0;
+
+	switch (n->in_v[0])
+	{
+	case 4 :
+		error = ipf_nat_ruleaddrinit(softc, softn, n);
+		if (error != 0)
+			return error;
+		break;
+#ifdef USE_INET6
+	case 6 :
+		error = ipf_nat6_ruleaddrinit(softc, softn, n);
+		if (error != 0)
+			return error;
+		break;
+#endif
+	default :
+		break;
+	}
+
+	if (n->in_redir == (NAT_DIVERTUDP|NAT_MAP)) {
+		/*
+		 * Prerecord whether or not the destination of the divert
+		 * is local or not to the interface the packet is going
+		 * to be sent out.
+		 */
+		n->in_dlocal = ipf_deliverlocal(softc, n->in_v[1],
+						n->in_ifps[1], &n->in_ndstip6);
+	}
+
+	return error;
 }

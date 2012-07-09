@@ -744,6 +744,8 @@ extern	void	ipf_nat6_addmap __P((ipf_nat_softc_t *, ipnat_t *));
 extern	void	ipf_nat6_addencap __P((ipf_nat_softc_t *, ipnat_t *));
 extern	int	ipf_nat6_checkout __P((fr_info_t *, u_32_t *));
 extern	int	ipf_nat6_checkin __P((fr_info_t *, u_32_t *));
+extern	void	ipf_nat6_delmap __P((ipf_nat_softc_t *, ipnat_t *));
+extern	void	ipf_nat6_delrdr __P((ipf_nat_softc_t *, ipnat_t *));
 extern	int	ipf_nat6_finalise __P((fr_info_t *, nat_t *));
 extern	nat_t	*ipf_nat6_icmperror __P((fr_info_t *, u_int *, int));
 extern	nat_t	*ipf_nat6_icmperrorlookup __P((fr_info_t *, int));
