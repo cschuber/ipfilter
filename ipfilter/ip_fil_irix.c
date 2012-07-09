@@ -1231,7 +1231,10 @@ ipf_pullup(xmin, fin, len)
 	fin->fin_ip = (ip_t *)ip;
 	if (fin->fin_dp != NULL)
 		fin->fin_dp = (char *)fin->fin_ip + dpoff;
-
+	if (fin->fin_fraghdr != NULL)
+		fin->fin_fraghdr = (char *)ip +
+				   ((char *)fin->fin_fraghdr -
+				    (char *)fin->fin_ip);
 	return ip;
 }
 
