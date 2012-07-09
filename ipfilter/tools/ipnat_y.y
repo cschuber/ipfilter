@@ -191,10 +191,8 @@ eol:	| ';'
 
 map:	mapit ifnames addr tlate rhsaddr proxy mapoptions
 				{ nat->in_v[0] = $3.v;
-				  if ($3.f != 0 && $3.f != $5.f && $5.f != 0) {
-fprintf(stderr,"3.f=%d 5.f=%d\n", $3.f, $5.f);
+				  if ($3.f != 0 && $3.f != $5.f && $5.f != 0)
 					yyerror("3.address family mismatch");
-}
 				  if (nat->in_v[0] == 0 && $5.v != 0)
 					nat->in_v[0] = $5.v;
 				  if (nat->in_v[1] == 0 && $5.v != 0)
@@ -1442,16 +1440,26 @@ setnatproto(p)
 			nat->in_flags &= ~IPN_TCPUDP;
 			nat->in_dcmp = 0;
 			nat->in_scmp = 0;
-			nat->in_spmin = 0;
-			nat->in_spmax = 0;
-			nat->in_spnext = 0;
 			nat->in_dpmin = 0;
 			nat->in_dpmax = 0;
 			nat->in_dpnext = 0;
+			nat->in_spmin = 0;
+			nat->in_spmax = 0;
+			nat->in_spnext = 0;
 		}
 		break;
 	}
 
+	if ((nat->in_flags & (IPN_TCP|IPN_UDP)) == 0) {
+		nat->in_stop = 0;
+		nat->in_dtop = 0;
+		nat->in_osport = 0;
+		nat->in_odport = 0;
+		nat->in_stop = 0;
+		nat->in_osport = 0;
+		nat->in_dtop = 0;
+		nat->in_odport = 0;
+	}
 	if ((nat->in_flags & (IPN_TCPUDP|IPN_FIXEDDPORT)) == IPN_FIXEDDPORT)
 		nat->in_flags &= ~IPN_FIXEDDPORT;
 }
