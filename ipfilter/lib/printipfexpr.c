@@ -96,17 +96,17 @@ printipfexpr(array)
 
 #ifdef USE_INET6
 		case IPF_EXP_IP6_ADDR :
-			PRINTF("ip6.addr= ");
+			PRINTF("ip6.addr %s= ", not ? "!" : "");
 			printhostsv6(array + i);
 			break;
 
 		case IPF_EXP_IP6_SRCADDR :
-			PRINTF("ip6.src= ");
+			PRINTF("ip6.src %s= ", not ? "!" : "");
 			printhostsv6(array + i);
 			break;
 
 		case IPF_EXP_IP6_DSTADDR :
-			PRINTF("ip6.dst= ");
+			PRINTF("ip6.dst %s= ", not ? "!" : "");
 			printhostsv6(array + i);
 			break;
 #endif
