@@ -502,7 +502,7 @@ ipf_state_setlock(arg, tmp)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_state_stats                                             */
 /* Returns:     ips_state_t* - pointer to state stats structure             */
-/* Parameters:  Nil                                                         */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
 /*                                                                          */
 /* Put all the current numbers and pointers into a single struct and return */
 /* a pointer to it.                                                         */
@@ -533,7 +533,8 @@ ipf_state_stats(softc)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_state_remove                                            */
 /* Returns:     int - 0 == success, != 0 == failure                         */
-/* Parameters:  data(I) - pointer to state structure to delete from table   */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              data(I)  - pointer to state structure to delete from table  */
 /*                                                                          */
 /* Search for a state structure that matches the one passed, according to   */
 /* the IP addresses and other protocol specific information.                */
@@ -575,9 +576,12 @@ ipf_state_remove(softc, data)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_state_ioctl                                             */
 /* Returns:     int - 0 == success, != 0 == failure                         */
-/* Parameters:  data(I) - pointer to ioctl data                             */
-/*              cmd(I)  - ioctl command integer                             */
-/*              mode(I) - file mode bits used with open                     */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              data(I)  - pointer to ioctl data                            */
+/*              cmd(I)   - ioctl command integer                            */
+/*              mode(I)  - file mode bits used with open                    */
+/*              uid(I)   - uid of process making the ioctl call             */
+/*              ctx(I)   - pointer specific to context of the call          */
 /*                                                                          */
 /* Processes an ioctl call made to operate on the IP Filter state device.   */
 /* ------------------------------------------------------------------------ */
@@ -828,7 +832,9 @@ ipf_state_ioctl(softc, data, cmd, mode, uid, ctx)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_state_getent                                            */
 /* Returns:     int - 0 == success, != 0 == failure                         */
-/* Parameters:  data(I) - pointer to state structure to retrieve from table */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              softs(I) - pointer to state context structure               */
+/*              data(I)  - pointer to state structure to retrieve from table*/
 /*                                                                          */
 /* Copy out state information from the kernel to a user space process.  If  */
 /* there is a filter rule associated with the state entry, copy that out    */
@@ -892,7 +898,9 @@ ipf_state_getent(softc, softs, data)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_state_putent                                            */
 /* Returns:     int - 0 == success, != 0 == failure                         */
-/* Parameters:  data(I) - pointer to state information struct               */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              softs(I) - pointer to state context structure               */
+/*              data(I)  - pointer to state information struct              */
 /*                                                                          */
 /* This function implements the SIOCSTPUT ioctl: insert a state entry into  */
 /* the state table.  If the state info. includes a pointer to a filter rule */
@@ -1033,10 +1041,11 @@ ipf_state_putent(softc, softs, data)
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:   ipf_state_insert                                             */
-/* Returns:    int    - 0 == success, -1 == failure                         */
-/* Parameters: is(I)  - pointer to state structure                          */
-/*             rev(I) - flag indicating forward/reverse direction of packet */
+/* Function:    ipf_state_insert                                            */
+/* Returns:     int    - 0 == success, -1 == failure                        */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/* Parameters:  is(I)    - pointer to state structure                       */
+/*              rev(I) - flag indicating direction of packet                */
 /*                                                                          */
 /* Inserts a state structure into the hash table (for lookups) and the list */
 /* of state entries (for enumeration).  Resolves all of the interface names */
@@ -1339,7 +1348,8 @@ ipf_state_match(is1, is2)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_state_add                                               */
 /* Returns:     ipstate_t - 0 = success                                     */
-/* Parameters:  fin(I)    - pointer to packet information                   */
+/* Parameters:  softc(I)  - pointer to soft context main structure          */
+/*              fin(I)    - pointer to packet information                   */
 /*              stsave(O) - pointer to place to save pointer to created     */
 /*                          state structure.                                */
 /*              flags(I)  - flags to use when creating the structure        */
@@ -1645,7 +1655,6 @@ ipf_state_add(softc, fin, stsave, flags)
 	is->is_rule = fr;
 	is->is_flags = flags & IS_INHERITED;
 	is->is_rulen = fin->fin_rule;
-DT3(state_insert, ipstate_t *, is, u_int, hv, u_32_t, flags);
 
 	/*
 	 * Look for identical state.
@@ -1861,7 +1870,8 @@ DT3(state_insert, ipstate_t *, is, u_int, hv, u_32_t, flags);
 /* Function:    ipf_tcpoptions                                              */
 /* Returns:     int - 1 == packet matches state entry, 0 == it does not,    */
 /*                   -1 == packet has bad TCP options data                  */
-/* Parameters:  fin(I) - pointer to packet information                      */
+/* Parameters:  softs(I) - pointer to state context structure               */
+/*              fin(I) - pointer to packet information                      */
 /*              tcp(I) - pointer to TCP packet header                       */
 /*              td(I)  - pointer to TCP data held as part of the state      */
 /*                                                                          */
@@ -1965,7 +1975,9 @@ ipf_tcpoptions(softs, fin, tcp, td)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_state_tcp                                               */
 /* Returns:     int - 1 == packet matches state entry, 0 == it does not     */
-/* Parameters:  fin(I)   - pointer to packet information                    */
+/* Parameters:  softc(I)  - pointer to soft context main structure          */
+/*              softs(I) - pointer to state context structure               */
+/*              fin(I)   - pointer to packet information                    */
 /*              tcp(I)   - pointer to TCP packet header                     */
 /*              is(I)  - pointer to master state structure                  */
 /*                                                                          */
@@ -2391,11 +2403,12 @@ ipf_state_clone(fin, tcp, is)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_matchsrcdst                                             */
 /* Returns:     Nil                                                         */
-/* Parameters:  fin(I) - pointer to packet information                      */
-/*              is(I)  - pointer to state structure                         */
-/*              src(I) - pointer to source address                          */
-/*              dst(I) - pointer to destination address                     */
-/*              tcp(I) - pointer to TCP/UDP header                          */
+/* Parameters:  fin(I)   - pointer to packet information                    */
+/*              is(I)    - pointer to state structure                       */
+/*              src(I)   - pointer to source address                        */
+/*              dst(I)   - pointer to destination address                   */
+/*              tcp(I)   - pointer to TCP/UDP header                        */
+/*              cmask(I) - mask of FI_* bits to check                       */
 /*                                                                          */
 /* Match a state table entry against an IP packet.  The logic below is that */
 /* ret gets set to one if the match succeeds, else remains 0.  If it is     */
@@ -2857,6 +2870,7 @@ ipf_checkicmpmatchingstate(fin)
 /* Returns:     int - 1 = packet denied, 0 = packet allowed                 */
 /* Parameters:  fin(I) - pointer to packet information                      */
 /*              is(I)  - pointer to state table entry                       */
+/*              src(I) - source address to check permission for             */
 /*                                                                          */
 /* For an ICMP packet that has so far matched a state table entry, check if */
 /* there are any further refinements that might mean we want to block this  */
@@ -2981,11 +2995,13 @@ ipf_ipsmove(softs, is, hv)
 /* Function:    ipf_state_lookup                                            */
 /* Returns:     ipstate_t* - NULL == no matching state found,               */
 /*                           else pointer to state information is returned  */
-/* Parameters:  fin(I) - pointer to packet information                      */
-/*              tcp(I) - pointer to TCP/UDP header.                         */
+/* Parameters:  fin(I)  - pointer to packet information                     */
+/*              tcp(I)  - pointer to TCP/UDP header.                        */
+/*              ifqp(O) - pointer for storing tailq timeout                 */
 /*                                                                          */
 /* Search the state table for a matching entry to the packet described by   */
-/* the contents of *fin.                                                    */
+/* the contents of *fin. For certain protocols, when a match is found the   */
+/* timeout queue is also selected and stored in ifpq if it is non-NULL.     */
 /*                                                                          */
 /* If we return NULL then no lock on ipf_state is held.                     */
 /* If we return non-null then a read-lock on ipf_state is held.             */
@@ -3268,7 +3284,7 @@ retry_tcpudp:
 /* Function:    ipf_state_check                                             */
 /* Returns:     frentry_t* - NULL == search failed,                         */
 /*                           else pointer to rule for matching state        */
-/* Parameters:  ifp(I)   - pointer to interface                             */
+/* Parameters:  fin(I)   - pointer to packet information                    */
 /*              passp(I) - pointer to filtering result flags                */
 /*                                                                          */
 /* Check if a packet is associated with an entry in the state table.        */
@@ -3427,7 +3443,7 @@ ipf_state_check(fin, passp)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_fixoutisn                                               */
 /* Returns:     Nil                                                         */
-/* Parameters:  fin(I)   - pointer to packet information                    */
+/* Parameters:  fin(I) - pointer to packet information                      */
 /*              is(I)  - pointer to master state structure                  */
 /*                                                                          */
 /* Called only for outbound packets, adjusts the sequence number and the    */
@@ -3505,7 +3521,8 @@ ipf_fixinisn(fin, is)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_state_sync                                              */
 /* Returns:     Nil                                                         */
-/* Parameters:  ifp(I) - pointer to interface                               */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              ifp(I)   - pointer to interface                             */
 /*                                                                          */
 /* Walk through all state entries and if an interface pointer match is      */
 /* found then look it up again, based on its name in case the pointer has   */
@@ -3551,7 +3568,8 @@ ipf_state_sync(softc, ifp)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_state_del                                               */
 /* Returns:     int    - 0 = deleted, else refernce count on active struct  */
-/* Parameters:  is(I)  - pointer to state structure to delete               */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              is(I)  - pointer to state structure to delete               */
 /*              why(I) - if not 0, log reason why it was deleted            */
 /* Write Locks: ipf_state                                                   */
 /*                                                                          */
@@ -3692,7 +3710,7 @@ ipf_state_del(softc, is, why)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_state_expire                                            */
 /* Returns:     Nil                                                         */
-/* Parameters:  Nil                                                         */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
 /*                                                                          */
 /* Slowly expire held state for thingslike UDP and ICMP.  The algorithm     */
 /* used here is to keep the queue sorted with the oldest things at the top  */
@@ -3755,7 +3773,9 @@ ipf_state_expire(softc)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_state_flush                                             */
 /* Returns:     int - 0 == success, -1 == failure                           */
-/* Parameters:  Nil                                                         */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              which(I) - which flush action to perform                    */
+/*              proto(I) - which protocol to flush (0 == ALL)               */
 /* Write Locks: ipf_state                                                   */
 /*                                                                          */
 /* Flush state tables.  Three actions currently defined:                    */
@@ -3927,7 +3947,8 @@ ipf_state_flush(softc, which, proto)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_state_flush_entry                                       */
 /* Returns:     int - 0 = entry deleted, else not deleted                   */
-/* Parameters:  entry(I)  - pointer to state structure to delete            */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              entry(I)  - pointer to state structure to delete            */
 /* Write Locks: ipf_state                                                   */
 /*                                                                          */
 /* This function is a stepping stone between ipf_queueflush() and           */
@@ -3946,7 +3967,7 @@ ipf_state_flush_entry(softc, entry)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_tcp_age                                                 */
 /* Returns:     int - 1 == state transition made, 0 == no change (rejected) */
-/* Parameters:  tq(I)    - pointer to timeout queue information             */
+/* Parameters:  tqe(I)   - pointer to timeout queue information             */
 /*              fin(I)   - pointer to packet information                    */
 /*              tqtab(I) - TCP timeout queue table this is in               */
 /*              flags(I) - flags from state/NAT entry                       */
@@ -4326,8 +4347,9 @@ ipf_tcp_age(tqe, fin, tqtab, flags, ok)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_state_log                                               */
 /* Returns:     Nil                                                         */
-/* Parameters:  is(I)   - pointer to state structure                        */
-/*              type(I) - type of log entry to create                       */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              is(I)    - pointer to state structure                       */
+/*              type(I)  - type of log entry to create                      */
 /*                                                                          */
 /* Creates a state table log entry using the state structure and type info. */
 /* passed in.  Log packet/byte counts, source/destination address and other */
@@ -4598,7 +4620,8 @@ ipf_checkicmp6matchingstate(fin)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_sttab_init                                              */
 /* Returns:     Nil                                                         */
-/* Parameters:  tqp(I) - pointer to an array of timeout queues for TCP      */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              tqp(I)   - pointer to an array of timeout queues for TCP    */
 /*                                                                          */
 /* Initialise the array of timeout queues for TCP.                          */
 /* ------------------------------------------------------------------------ */
@@ -4651,7 +4674,8 @@ ipf_sttab_destroy(tqp)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_state_deref                                             */
 /* Returns:     Nil                                                         */
-/* Parameters:  isp(I) - pointer to pointer to state table entry            */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              isp(I) - pointer to pointer to state table entry            */
 /*                                                                          */
 /* Decrement the reference counter for this state table entry and free it   */
 /* if there are no more things using it.                                    */
@@ -4712,8 +4736,9 @@ ipf_state_deref(softc, isp)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_state_setqueue                                          */
 /* Returns:     Nil                                                         */
-/* Parameters:  is(I) - pointer to state structure                          */
-/*              rev(I) - forward(0) or reverse(1) direction                 */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              is(I)    - pointer to state structure                       */
+/*              rev(I)   - forward(0) or reverse(1) direction               */
 /* Locks:       ipf_state (read or write)                                   */
 /*                                                                          */
 /* Put the state entry on its default queue entry, using rev as a helped in */
@@ -4783,8 +4808,10 @@ ipf_state_setqueue(softc, is, rev)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_state_iter                                              */
 /* Returns:     int - 0 == success, else error                              */
-/* Parameters:  token(I) - pointer to ipftoken structure                    */
+/* Parameters:  softc(I) - pointer to main soft context                     */
+/*              token(I) - pointer to ipftoken structure                    */
 /*              itp(I)   - pointer to ipfgeniter structure                  */
+/*              obj(I)   - pointer to data description structure            */
 /*                                                                          */
 /* This function handles the SIOCGENITER ioctl for the state tables and     */
 /* walks through the list of entries in the state table list (softs->ipf_state_list.)    */
@@ -4865,7 +4892,9 @@ ipf_state_iter(softc, token, itp, obj)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_state_gettable                                          */
 /* Returns:     int     - 0 = success, else error                           */
-/* Parameters:  data(I) - pointer to ioctl data                             */
+/* Parameters:  softc(I) - pointer to main soft context                     */
+/*              softs(I) - pointer to state context structure               */
+/*              data(I)  - pointer to ioctl data                             */
 /*                                                                          */
 /* This function handles ioctl requests for tables of state information.    */
 /* At present the only table it deals with is the hash bucket statistics.   */
@@ -4901,7 +4930,8 @@ ipf_state_gettable(softc, softs, data)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_state_setpending                                        */
 /* Returns:     Nil                                                         */
-/* Parameters:  is(I) - pointer to state structure                          */
+/* Parameters:  softc(I) - pointer to main soft context                     */
+/*              is(I)    - pointer to state structure                       */
 /* Locks:       ipf_state (read or write)                                   */
 /*                                                                          */
 /* Put the state entry on to the pending queue - this queue has a very      */
@@ -4935,7 +4965,8 @@ ipf_state_setpending(softc, is)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_state_matchflush                                        */
 /* Returns:     Nil                                                         */
-/* Parameters:  is(I) - pointer to state structure                          */
+/* Parameters:  softc(I) - pointer to main soft context                     */
+/*              data(I)  - pointer to state structure                       */
 /* Locks:       ipf_state (read or write)                                   */
 /*                                                                          */
 /* Flush all entries from the list of state entries that match the          */
@@ -4977,7 +5008,9 @@ ipf_state_matchflush(softc, data)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_state_matcharray                                        */
 /* Returns:     int   - 0 = no match, 1 = match                             */
-/* Parameters:  is(I) - pointer to state structure                          */
+/* Parameters:  state(I) - pointer to state structure                       */
+/*              array(I) - pointer to ipf matching expression               */
+/*              ticks(I) - current value of ipfilter tick timer             */
 /* Locks:       ipf_state (read or write)                                   */
 /*                                                                          */
 /* Compare a state entry with the match array passed in and return a value  */
@@ -5131,8 +5164,9 @@ ipf_state_matcharray(state, array, ticks)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_state_settimeout                                        */
 /* Returns:     int 0 = success, else failure                               */
-/* Parameters:  t(I) - pointer to tuneable being changed                    */
-/*              p(I) - pointer to the new value                             */
+/* Parameters:  softc(I)  - pointer to main soft context                    */
+/*              t(I)      - pointer to tuneable being changed               */
+/*              p(I)      - pointer to the new value                        */
 /*                                                                          */
 /* Sets a timeout value for one of the many timeout queues.  We find the    */
 /* correct queue using a somewhat manual process of comparing the timeout   */
@@ -5183,8 +5217,9 @@ ipf_state_settimeout(softc, t, p)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_state_rehash                                            */
 /* Returns:     int 0 = success, else failure                               */
-/* Parameters:  t(I) - pointer to tuneable being changed                    */
-/*              p(I) - pointer to the new value                             */
+/* Parameters:  softc(I)  - pointer to main soft context                    */
+/*              t(I)      - pointer to tuneable being changed               */
+/*              p(I)      - pointer to the new value                        */
 /*                                                                          */
 /* To change the size of the state hash table at runtime, a new table has   */
 /* to be allocated and then all of the existing entries put in it, bumping  */
