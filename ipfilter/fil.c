@@ -10044,7 +10044,7 @@ ipf_inet_mask_add(bits, mtab)
 
 	for (i = 0; i < 33; i++) {
 		if (ntohl(mtab->imt4_active[i]) < mask) {
-			for (j = i + 1; j < 33; j++)
+			for (j = 32; j > i; j--)
 				mtab->imt4_active[j] = mtab->imt4_active[j - 1];
 			mtab->imt4_active[i] = htonl(mask);
 			break;
@@ -10125,7 +10125,7 @@ ipf_inet6_mask_add(bits, mask, mtab)
 
 	for (i = 0; i < 129; i++) {
 		if (IP6_LT(&mtab->imt6_active[i], mask)) {
-			for (j = i + 1; j < 129; j++)
+			for (j = 128; j > i; j--)
 				mtab->imt6_active[j] = mtab->imt6_active[j - 1];
 			mtab->imt6_active[i] = *mask;
 			break;
