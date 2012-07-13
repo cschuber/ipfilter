@@ -2056,6 +2056,7 @@ static void newrule()
 	fr->fr_isc = (void *)-1;
 	fr->fr_logtag = FR_NOLOGTAG;
 	fr->fr_type = FR_T_NONE;
+	fr->fr_flineno = yylineNum;
 
 	if (use_inet6 == 1)
 		fr->fr_family = AF_INET6;
@@ -2424,7 +2425,8 @@ void *ptr;
 			if ((opts & OPT_DONOTHING) == 0) {
 				char msg[80];
 
-				sprintf(msg, "%d:ioctl(zero rule)", yylineNum);
+				sprintf(msg, "%d:ioctl(zero rule)",
+					fr->fr_flineno);
 				return ipf_perror_fd(fd, ioctlfunc, msg);
 			}
 		} else {
@@ -2444,7 +2446,7 @@ void *ptr;
 				char msg[80];
 
 				sprintf(msg, "%d:ioctl(delete rule)",
-					yylineNum);
+					fr->fr_flineno);
 				return ipf_perror_fd(fd, ioctlfunc, msg);
 			}
 		}
@@ -2454,7 +2456,7 @@ void *ptr;
 				char msg[80];
 
 				sprintf(msg, "%d:ioctl(add/insert rule)",
-					yylineNum);
+					fr->fr_flineno);
 				return ipf_perror_fd(fd, ioctlfunc, msg);
 			}
 		}
