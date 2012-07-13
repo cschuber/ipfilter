@@ -707,7 +707,7 @@ extern	int	ipf_nat_out(fr_info_t *, nat_t *, int, u_32_t);
 extern	nat_t	*ipf_nat_outlookup(fr_info_t *, u_int, u_int,
 				   struct in_addr, struct in_addr);
 extern	u_short	*ipf_nat_proto(fr_info_t *, nat_t *, u_int);
-extern	void	ipf_nat_rulederef(ipf_main_softc_t *, ipnat_t **);
+extern	void	ipf_nat_rule_deref(ipf_main_softc_t *, ipnat_t **);
 extern	void	ipf_nat_setqueue(ipf_main_softc_t *, ipf_nat_softc_t *,
 				 nat_t *);
 extern	void	ipf_nat_setpending(ipf_main_softc_t *, nat_t *);
@@ -745,6 +745,8 @@ extern	void	ipf_nat6_addmap(ipf_nat_softc_t *, ipnat_t *);
 extern	void	ipf_nat6_addencap(ipf_nat_softc_t *, ipnat_t *);
 extern	int	ipf_nat6_checkout(fr_info_t *, u_32_t *);
 extern	int	ipf_nat6_checkin(fr_info_t *, u_32_t *);
+extern	void	ipf_nat6_delmap(ipf_nat_softc_t *, ipnat_t *);
+extern	void	ipf_nat6_delrdr(ipf_nat_softc_t *, ipnat_t *);
 extern	int	ipf_nat6_finalise(fr_info_t *, nat_t *);
 extern	nat_t	*ipf_nat6_icmperror(fr_info_t *, u_int *, int);
 extern	nat_t	*ipf_nat6_icmperrorlookup(fr_info_t *, int);

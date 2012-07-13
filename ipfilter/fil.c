@@ -192,10 +192,11 @@ static	void		ipf_rule_delete(ipf_main_softc_t *, frentry_t *f,
 static	void		ipf_rule_expire_insert(ipf_main_softc_t *,
 					       frentry_t *, int);
 static	int		ipf_synclist(ipf_main_softc_t *, frentry_t *, void *);
+static	void		ipf_token_flush(ipf_main_softc_t *);
+static	void		ipf_token_unlink(ipf_main_softc_t *, ipftoken_t *);
 static	ipftuneable_t	*ipf_tune_findbyname(ipftuneable_t *, const char *);
 static	ipftuneable_t	*ipf_tune_findbycookie(ipftuneable_t **, void *,
 					       void **);
-static	void		ipf_token_unlink(ipf_main_softc_t *, ipftoken_t *);
 static	int		ipf_updateipid(fr_info_t *);
 static	int		ipf_settimeout(struct ipf_main_softc_s *,
 				       struct ipftuneable *, ipftuneval_t *);
@@ -7515,6 +7516,32 @@ ipf_token_expire(softc)
 
 
 /* ------------------------------------------------------------------------ */
+/* Function:    ipf_token_flush                                             */
+/* Returns:     None.                                                       */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*                                                                          */
+/* Loop through all of the existing tokens and call deref to see if they    */
+/* can be freed. Normally a function like this might just loop on           */
+/* ipf_token_head but there is a chance that a token might have a ref count */
+/* of greater than one and in that case the the reference would drop twice  */
+/* by code that is only entitled to drop it once.                           */
+/* ------------------------------------------------------------------------ */
+static void
+ipf_token_flush(softc)
+	ipf_main_softc_t *softc;
+{
+	ipftoken_t *it, *next;
+
+	WRITE_ENTER(&softc->ipf_tokens);
+	for (it = softc->ipf_token_head; it != NULL; it = next) {
+		next = it->ipt_next;
+		(void) ipf_token_deref(softc, it);
+	}
+	RWLOCK_EXIT(&softc->ipf_tokens);
+}
+
+
+/* ------------------------------------------------------------------------ */
 /* Function:    ipf_token_del                                               */
 /* Returns:     int     - 0 = success, else error                           */
 /* Parameters:  softc(I)- pointer to soft context main structure            */
@@ -7706,7 +7733,7 @@ ipf_token_deref(softc, token)
 			break;
 		case IPFGENITER_IPNAT :
 			WRITE_ENTER(&softc->ipf_nat);
-			ipf_nat_rulederef(softc, (ipnat_t **)datap);
+			ipf_nat_rule_deref(softc, (ipnat_t **)datap);
 			RWLOCK_EXIT(&softc->ipf_nat);
 			break;
 		case IPFGENITER_NAT :
@@ -9717,6 +9744,8 @@ int
 ipf_fini_all(softc)
 	ipf_main_softc_t *softc;
 {
+
+	ipf_token_flush(softc);
 
 	if (ipf_proxy_soft_fini(softc, softc->ipf_proxy_soft) == -1)
 		return -1;

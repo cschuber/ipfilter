@@ -255,7 +255,7 @@ ipf_p_tftp_del(softc, aps)
 	tftp = aps->aps_data;
 	if (tftp != NULL) {
 		tftp->ti_rule->in_flags |= IPN_DELETE;
-		ipf_nat_rulederef(softc, &tftp->ti_rule);
+		ipf_nat_rule_deref(softc, &tftp->ti_rule);
 	}
 }
 

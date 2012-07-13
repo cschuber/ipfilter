@@ -217,11 +217,14 @@ ipf_dstlist_soft_fini(softc, arg)
 	ipf_dstl_softc_t *softd = arg;
 	int i;
 
-	for (i = -1; i <= IPL_LOGMAX; i++)
-		while (softd->dstlist[i + 1] != NULL)
+	for (i = -1; i <= IPL_LOGMAX; i++) {
+		while (softd->dstlist[i + 1] != NULL) {
 			ipf_dstlist_table_remove(softc, softd,
 						 softd->dstlist[i + 1]);
+		}
+	}
 
+	ASSERT(softd->stats.ipls_numdereflists == 0);
 	ASSERT(softd->stats.ipls_numderefnodes == 0);
 }
 
@@ -915,8 +918,10 @@ ipf_dstlist_table_del(softc, arg, op)
 /*                                                                          */
 /* Remove a given destination list from existance. While the IPDST_DELETE   */
 /* flag is set every time we call this function and the reference count is  */
-/* non-zero, the "numdereflists" counter is only incremented when the entry */
-/* is removed from the list as it only becomes dereferenced once.           */
+/* non-zero, the "numdereflists" counter is always incremented because the  */
+/* decision about whether it will be freed or not is not made here. This    */
+/* means that the only action the code can take here is to treat it as if   */
+/* it will become a detached.                                               */
 /* ------------------------------------------------------------------------ */
 static void
 ipf_dstlist_table_remove(softc, softd, d)
@@ -928,11 +933,8 @@ ipf_dstlist_table_remove(softc, softd, d)
 	if (softd->tails[d->ipld_unit + 1] == &d->ipld_next)
 		softd->tails[d->ipld_unit + 1] = d->ipld_pnext;
 
-	if (d->ipld_pnext != NULL) {
+	if (d->ipld_pnext != NULL)
 		*d->ipld_pnext = d->ipld_next;
-		if (d->ipld_ref > 1)
-			softd->stats.ipls_numdereflists++;
-	}
 	if (d->ipld_next != NULL)
 		d->ipld_next->ipld_pnext = d->ipld_pnext;
 	d->ipld_pnext = NULL;
@@ -940,13 +942,10 @@ ipf_dstlist_table_remove(softc, softd, d)
 
 	ipf_dstlist_table_clearnodes(softd, d);
 
-	d->ipld_ref--;
-	if (d->ipld_ref > 0) {
-		d->ipld_flags |= IPDST_DELETE;
-		return;
-	}
+	softd->stats.ipls_numdereflists++;
+	d->ipld_flags |= IPDST_DELETE;
 
-	ipf_dstlist_table_free(softd, d);
+	ipf_dstlist_table_deref(softc, softd, d);
 }
 
 

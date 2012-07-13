@@ -423,6 +423,6 @@ ipf_p_ipsec_del(softc, aps)
 		ipsec->ipsc_state = NULL;
 		ipsec->ipsc_nat = NULL;
 		ipsec->ipsc_rule->in_flags |= IPN_DELETE;
-		ipf_nat_rulederef(softc, &ipsec->ipsc_rule);
+		ipf_nat_rule_deref(softc, &ipsec->ipsc_rule);
 	}
 }
