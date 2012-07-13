@@ -3238,7 +3238,10 @@ finished:
 	SPL_X(s);
 
 #ifdef _KERNEL
-	return (FR_ISPASS(pass)) ? 0 : fin->fin_error;
+	if (FR_ISPASS(pass))
+		return 0;
+	LBUMP(ipf_stats[out].fr_blocked[fin->fin_reason]);
+	return fin->fin_error;
 #else /* _KERNEL */
 	if (*mp != NULL)
 		(*mp)->mb_ifp = fin->fin_ifp;
