@@ -371,25 +371,26 @@ typedef	struct {
 } frdat_t;
 
 typedef enum fr_breasons_e {
+	FRB_BLOCKED = 0,
 	FRB_LOGFAIL = 1,
-	FRB_PPSRATE,
-	FRB_JUMBO,
-	FRB_MAKEFRIP,
-	FRB_STATEADD,
-	FRB_UPDATEIPID,
-	FRB_LOGFAIL2,
-	FRB_DECAPFRIP,
-	FRB_AUTHNEW,
-	FRB_AUTHCAPTURE,
-	FRB_COALESCE,
-	FRB_PULLUP,
-	FRB_AUTHFEEDBACK,
-	FRB_BADFRAG,
-	FRB_NATV4OUT,
-	FRB_NATV4IN,
-	FRB_NATV6OUT,
-	FRB_NATV6IN
+	FRB_PPSRATE = 2,
+	FRB_JUMBO = 3,
+	FRB_MAKEFRIP = 4,
+	FRB_STATEADD = 5,
+	FRB_UPDATEIPID = 6,
+	FRB_LOGFAIL2 = 7,
+	FRB_DECAPFRIP = 8,
+	FRB_AUTHNEW = 9,
+	FRB_AUTHCAPTURE = 10,
+	FRB_COALESCE = 11,
+	FRB_PULLUP = 12,
+	FRB_AUTHFEEDBACK = 13,
+	FRB_BADFRAG = 14,
+	FRB_NATV4 = 15,
+	FRB_NATV6 = 16,
 } fr_breason_t;
+
+#define	FRB_MAX_VALUE	16
 
 typedef enum ipf_cksum_e {
 	FI_CK_BAD = -1,
@@ -1008,6 +1009,7 @@ typedef	struct	ipf_statistics {
 	u_long	fr_ipv6;	/* IPv6 packets in/out */
 	u_long	fr_ppshit;	/* dropped because of pps ceiling */
 	u_long	fr_ipud;	/* IP id update failures */
+	u_long	fr_blocked[FRB_MAX_VALUE + 1];
 } ipf_statistics_t;
 
 /*

@@ -103,6 +103,26 @@ frgroup_t *grtail = NULL;
 static char *gnames[3] = { "Filter", "Accounting", "Authentication" };
 static int gnums[3] = { IPL_LOGIPF, IPL_LOGCOUNT, IPL_LOGAUTH };
 
+char *blockreasons[FRB_MAX_VALUE + 1] = {
+	"packet blocked",
+	"log rule failure",
+	"pps rate exceeded",
+	"jumbogram",
+	"makefrip failed",
+	"cannot add state",
+	"IP ID update failed",
+	"log-or-block failed",
+	"decapsulate failure",
+	"cannot create new auth entry",
+	"packet queued for auth",
+	"buffer coalesce failure",
+	"buffer pullup failure",
+	"auth feedback",
+	"bad fragment",
+	"IPv4 NAT failure",
+	"IPv6 NAT failure"
+};
+
 #ifdef STATETOP
 #define	STSTRSIZE 	80
 #define	STGROWSIZE	16
@@ -715,6 +735,8 @@ static void printside(side, frs)
 	char *side;
 	ipf_statistics_t *frs;
 {
+	int i;
+
 	PRINTF("%lu\t%s bad packets\n", frs->fr_bad, side);
 #ifdef	USE_INET6
 	PRINTF("%lu\t%s IPv6 packets\n", frs->fr_ipv6, side);
@@ -737,6 +759,9 @@ static void printside(side, frs)
 	PRINTF("%lu\t%s pullups succeeded\n", frs->fr_pull[0], side);
 	PRINTF("%lu\t%s pullups failed\n", frs->fr_pull[1], side);
 	PRINTF("%lu\t%s TCP checksum failures\n", frs->fr_tcpbad, side);
+	for (i = 0; i <= FRB_MAX_VALUE; i++)
+		PRINTF("%lu\t%s block reason %s\n",
+			frs->fr_blocked[i], side, blockreasons[i]);
 }
 
 
@@ -890,14 +915,14 @@ static	void	showlist(fiop)
 		printed = walk_live_fr_rules(fiop->f_ticks, i, set,
 					     NULL, ipf_walker);
 		if (printed == 0) {
-			FPRINTF(stderr, "empty list for %s%s\n",
-				(opts & OPT_INACTIVE) ? "inactive " : "",
+			FPRINTF(stderr, "# empty list for %s%s\n",
+			        (opts & OPT_INACTIVE) ? "inactive " : "",
 							filters[i]);
 		}
 	} else {
 		if (!fp) {
-			FPRINTF(stderr, "empty list for %s%s\n",
-				(opts & OPT_INACTIVE) ? "inactive " : "",
+			FPRINTF(stderr, "# empty list for %s%s\n",
+			        (opts & OPT_INACTIVE) ? "inactive " : "",
 							filters[i]);
 			return;
 		}

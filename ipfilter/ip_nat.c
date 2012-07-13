@@ -5169,7 +5169,7 @@ outmatchfail:
 			DT1(frb_natv4out, fr_info_t *, fin);
 			NBUMPSIDED(1, ns_drop);
 			*passp = FR_BLOCK;
-			fin->fin_reason = FRB_NATV4OUT;
+			fin->fin_reason = FRB_NATV4;
 		}
 		fin->fin_flx |= FI_BADNAT;
 		NBUMPSIDED(1, ns_badnat);
@@ -5707,7 +5707,7 @@ inmatchfail:
 			DT1(frb_natv4in, fr_info_t *, fin);
 			NBUMPSIDED(0, ns_drop);
 			*passp = FR_BLOCK;
-			fin->fin_reason = FRB_NATV4IN;
+			fin->fin_reason = FRB_NATV4;
 		}
 		fin->fin_flx |= FI_BADNAT;
 		NBUMPSIDED(0, ns_badnat);

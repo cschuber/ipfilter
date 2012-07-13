@@ -2894,7 +2894,7 @@ outmatchfail:
 		if (passp != NULL) {
 			NBUMPSIDE6D(1, ns_drop);
 			*passp = FR_BLOCK;
-			fin->fin_reason = FRB_NATV6OUT;
+			fin->fin_reason = FRB_NATV6;
 		}
 		fin->fin_flx |= FI_BADNAT;
 		NBUMPSIDE6D(1, ns_badnat);
@@ -3327,7 +3327,7 @@ inmatchfail:
 		if (passp != NULL) {
 			NBUMPSIDE6D(0, ns_drop);
 			*passp = FR_BLOCK;
-			fin->fin_reason = FRB_NATV6IN;
+			fin->fin_reason = FRB_NATV6;
 		}
 		fin->fin_flx |= FI_BADNAT;
 		NBUMPSIDE6D(0, ns_badnat);

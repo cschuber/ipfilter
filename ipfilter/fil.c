@@ -3276,7 +3276,14 @@ filterdone:
 
 finished:
 	if (!FR_ISPASS(pass)) {
-		LBUMP(ipf_stats[out].fr_block);
+		LBUMP(ipf_stats[out].fr_blocked[fin->fin_reason]);
+#if !defined(_KERNEL)
+		blockreason = fin->fin_reason;
+#else
+# if defined(MENTAT)
+		((qpktinfo_t *)qif)->qpi_reason = fin->fin_reason;
+# endif
+#endif
 		if (*mp != NULL) {
 #ifdef _KERNEL
 			FREE_MB_T(*mp);
@@ -3292,13 +3299,6 @@ finished:
 		}
 #endif
 	}
-#if defined(_KERNEL) && defined(MENTAT)
-	((qpktinfo_t *)qif)->qpi_reason = fin->fin_reason;
-#endif
-#if !defined(_KERNEL)
-	blockreason = fin->fin_reason;
-#endif
-
 	SPL_X(s);
 
 	return (pass);
