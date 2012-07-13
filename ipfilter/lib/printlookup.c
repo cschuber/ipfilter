@@ -39,7 +39,4 @@ printlookup(base, addr, mask)
 		name[sizeof(name) - 1] = '\0';
 		PRINTF("%s", name);
 	}
-
-	if (mask->iplookupptr == NULL)
-		PRINTF("(!)");
 }
