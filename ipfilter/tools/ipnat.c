@@ -507,10 +507,28 @@ dostats(fd, nsp, opts, alive, filter)
 
 		printf("%lu\tlog successes\n", nsp->ns_side[0].ns_log);
 		printf("%lu\tlog failures\n", nsp->ns_side[1].ns_log);
-		printf("%lu\tadded in\n%lu\tadded out\n",
+		printf("%lu\tadded in\n%lu\tadded out\n%",
 			nsp->ns_side[0].ns_added,
 			nsp->ns_side[1].ns_added);
+		printf("%lu\tactive\n", nsp->ns_active);
+		printf("%lu\ttransparent adds\n", nsp->ns_addtrpnt);
+		printf("%lu\tdivert build\n", nsp->ns_divert_build);
 		printf("%lu\texpired\n", nsp->ns_expire);
+		printf("%lu\tflush all\n", nsp->ns_flush_all);
+		printf("%lu\tflush closing\n", nsp->ns_flush_closing);
+		printf("%lu\tflush queue\n", nsp->ns_flush_queue);
+		printf("%lu\tflush state\n", nsp->ns_flush_state);
+		printf("%lu\tflush timeout\n", nsp->ns_flush_timeout);
+		printf("%lu\thostmap new\n", nsp->ns_hm_new);
+		printf("%lu\thostmap fails\n", nsp->ns_hm_newfail);
+		printf("%lu\thostmap add\n", nsp->ns_hm_addref);
+		printf("%lu\thostmap NULL rule\n", nsp->ns_hm_nullnp);
+		printf("%lu\tlog ok\n", nsp->ns_log_ok);
+		printf("%lu\tlog fail\n", nsp->ns_log_fail);
+		printf("%u\torphan count\n", nsp->ns_orphans);
+		printf("%u\trule count\n", nsp->ns_rules);
+		printf("%u\tmap rules\n", nsp->ns_rules_map);
+		printf("%u\trdr rules\n", nsp->ns_rules_rdr);
 		printf("%u\twilds\n", nsp->ns_wilds);
 		if (opts & OPT_VERBOSE)
 			printf("list %p\n", nsp->ns_list);
