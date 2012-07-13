@@ -227,7 +227,6 @@ static	int	ipf_nat_encapok __P((fr_info_t *, nat_t *));
 static	int	ipf_nat_extraflush __P((ipf_main_softc_t *, ipf_nat_softc_t *, int));
 static	int	ipf_nat_finalise __P((fr_info_t *, nat_t *));
 static	int	ipf_nat_flushtable __P((ipf_main_softc_t *, ipf_nat_softc_t *));
-static	void	ipf_nat_free_rule __P((ipf_main_softc_t *, ipf_nat_softc_t *, ipnat_t *));
 static	int	ipf_nat_getnext __P((ipf_main_softc_t *, ipftoken_t *,
 				     ipfgeniter_t *, ipfobj_t *));
 static	int	ipf_nat_gettable __P((ipf_main_softc_t *, ipf_nat_softc_t *,
@@ -258,6 +257,7 @@ static	nat_t	*ipf_nat_rebuildencapicmp __P((fr_info_t *, nat_t *));
 static	int	ipf_nat_resolverule __P((ipf_main_softc_t *, ipnat_t *));
 static	int	ipf_nat_ruleaddrinit __P((ipf_main_softc_t *,
 					  ipf_nat_softc_t *, ipnat_t *));
+static	void	ipf_nat_rule_fini __P((ipf_main_softc_t *, ipnat_t *));
 static	int	ipf_nat_rule_init __P((ipf_main_softc_t *, ipf_nat_softc_t *,
 				       ipnat_t *));
 static	int	ipf_nat_siocaddnat __P((ipf_main_softc_t *, ipf_nat_softc_t *,
@@ -934,7 +934,7 @@ ipf_nat_hostmapdel(softc, hmp)
 
 	hm->hm_ref--;
 	if (hm->hm_ref == 0) {
-		ipf_nat_rulederef(softc, &hm->hm_ipnat);
+		ipf_nat_rule_deref(softc, &hm->hm_ipnat);
 		if (hm->hm_hnext)
 			hm->hm_hnext->hm_phnext = hm->hm_phnext;
 		*hm->hm_phnext = hm->hm_hnext;
@@ -1090,7 +1090,7 @@ ipf_nat_ioctl(softc, data, cmd, mode, uid, ctx)
 {
 	ipf_nat_softc_t *softn = softc->ipf_nat_soft;
 	int error = 0, ret, arg, getlock;
-	ipnat_t *nat, *nt, *n = NULL;
+	ipnat_t *nat, *nt, *n;
 	ipnat_t natd;
 	SPL_INT(s);
 
@@ -1119,8 +1119,9 @@ ipf_nat_ioctl(softc, data, cmd, mode, uid, ctx)
 	getlock = (mode & NAT_LOCKHELD) ? 0 : 1;
 #endif
 
-	nat = NULL;     /* XXX gcc -Wuninitialized */
+	n = NULL;
 	nt = NULL;
+	nat = NULL;
 
 	if ((cmd == (ioctlcmd_t)SIOCADNAT) || (cmd == (ioctlcmd_t)SIOCRMNAT) ||
 	    (cmd == (ioctlcmd_t)SIOCPURGENAT)) {
@@ -1255,8 +1256,10 @@ ipf_nat_ioctl(softc, data, cmd, mode, uid, ctx)
 			bcopy((char *)nat, (char *)nt, sizeof(*n));
 		error = ipf_nat_siocaddnat(softc, softn, nt, getlock);
 		MUTEX_EXIT(&softn->ipf_nat_io);
-		if (error == 0)
+		if (error == 0) {
+			nat = NULL;
 			nt = NULL;
+		}
 		break;
 
 	case SIOCRMNAT :
@@ -1495,6 +1498,8 @@ ipf_nat_ioctl(softc, data, cmd, mode, uid, ctx)
 		break;
 	}
 done:
+	if (nat != NULL)
+		ipf_nat_rule_fini(softc, nat);
 	if (nt != NULL)
 		KFREES(nt, nt->in_size);
 	return error;
@@ -1647,6 +1652,17 @@ ipf_nat_ruleaddrinit(softc, softn, n)
 {
 	int idx, error;
 
+	if ((n->in_ndst.na_atype == FRI_LOOKUP) &&
+	    (n->in_ndst.na_type != IPLT_DSTLIST)) {
+		IPFERROR(60071);
+		return EINVAL;
+	}
+	if ((n->in_nsrc.na_atype == FRI_LOOKUP) &&
+	    (n->in_nsrc.na_type != IPLT_DSTLIST)) {
+		IPFERROR(60069);
+		return EINVAL;
+	}
+
 	if (n->in_redir == NAT_BIMAP) {
 		n->in_ndstaddr = n->in_osrcaddr;
 		n->in_ndstmsk = n->in_osrcmsk;
@@ -1672,21 +1688,11 @@ ipf_nat_ruleaddrinit(softc, softn, n)
 	if (error != 0)
 		return error;
 
-	if ((n->in_nsrc.na_atype == FRI_LOOKUP) &&
-	    (n->in_nsrc.na_type != IPLT_DSTLIST)) {
-		IPFERROR(60069);
-		return EINVAL;
-	}
 	error = ipf_nat_nextaddrinit(softc, n->in_names, &n->in_nsrc, 1,
 				     n->in_ifps[idx]);
 	if (error != 0)
 		return error;
 
-	if ((n->in_ndst.na_atype == FRI_LOOKUP) &&
-	    (n->in_ndst.na_type != IPLT_DSTLIST)) {
-		IPFERROR(60071);
-		return EINVAL;
-	}
 	error = ipf_nat_nextaddrinit(softc, n->in_names, &n->in_ndst, 1,
 				     n->in_ifps[idx]);
 	if (error != 0)
@@ -1778,79 +1784,6 @@ ipf_nat_siocdelnat(softc, softn, n, getlock)
 	if (getlock) {
 		RWLOCK_EXIT(&softc->ipf_nat);			/* READ/WRITE */
 	}
-}
-
-
-/* ------------------------------------------------------------------------ */
-/* Function:    ipf_nat_free_rule                                           */
-/* Returns:     Nil                                                         */
-/* Parameters:  softc(I) - pointer to soft context main structure           */
-/*              softn(I) - pointer to NAT context structure                 */
-/*              n(I)     - pointer to NAT rule                              */
-/*                                                                          */
-/* This function is concerned with releasing all of the resources that were */
-/* allocated when the NAT rule structure was constructed.                   */
-/* ------------------------------------------------------------------------ */
-static void
-ipf_nat_free_rule(softc, softn, n)
-	ipf_main_softc_t *softc;
-	ipf_nat_softc_t *softn;
-	ipnat_t *n;
-{
-	if (n->in_apr != NULL)
-		ipf_proxy_deref(n->in_apr);
-
-	if (n->in_odst.na_atype == FRI_LOOKUP)
-		ipf_lookup_deref(softc, n->in_odst.na_type, n->in_odst.na_ptr);
-
-	if (n->in_osrc.na_atype == FRI_LOOKUP)
-		ipf_lookup_deref(softc, n->in_osrc.na_type, n->in_osrc.na_ptr);
-
-	if (n->in_ndst.na_atype == FRI_LOOKUP)
-		ipf_lookup_deref(softc, n->in_ndst.na_type, n->in_ndst.na_ptr);
-
-	if (n->in_nsrc.na_atype == FRI_LOOKUP)
-		ipf_lookup_deref(softc, n->in_nsrc.na_type, n->in_nsrc.na_ptr);
-
-	if (n->in_redir & NAT_REDIRECT) {
-		if ((n->in_flags & IPN_PROXYRULE) == 0) {
-			ATOMIC_DEC32(softn->ipf_nat_stats.ns_rules_rdr);
-		}
-	}
-	if (n->in_redir & (NAT_MAP|NAT_MAPBLK)) {
-		if ((n->in_flags & IPN_PROXYRULE) == 0) {
-			ATOMIC_DEC32(softn->ipf_nat_stats.ns_rules_map);
-		}
-	}
-
-	if (n->in_divmp != NULL) {
-		FREE_MB_T(n->in_divmp);
-	}
-
-	if (n->in_tqehead[0] != NULL) {
-		if (ipf_deletetimeoutqueue(n->in_tqehead[0]) == 0) {
-			ipf_freetimeoutqueue(softc, n->in_tqehead[1]);
-		}
-	}
-
-	if (n->in_tqehead[1] != NULL) {
-		if (ipf_deletetimeoutqueue(n->in_tqehead[1]) == 0) {
-			ipf_freetimeoutqueue(softc, n->in_tqehead[1]);
-		}
-	}
-
-	if ((n->in_flags & IPN_PROXYRULE) == 0) {
-		ATOMIC_DEC32(softn->ipf_nat_stats.ns_rules);
-	}
-
-	MUTEX_DESTROY(&n->in_lock);
-
-	KFREES(n, n->in_size);
-
-#if SOLARIS && !defined(INSTANCES)
-	if (softn->ipf_nat_stats.ns_rules == 0)
-		pfil_delayed_copy = 1;
-#endif
 }
 
 
@@ -2584,7 +2517,8 @@ ipf_nat_delete(softc, nat, logtype)
 	nat->nat_ptr = NULL;
 
 	if (ipn != NULL) {
-		ipf_nat_rulederef(softc, &ipn);
+		ipn->in_space++;
+		ipf_nat_rule_deref(softc, &ipn);
 	}
 
 	if (nat->nat_aps != NULL) {
@@ -2758,7 +2692,7 @@ ipf_nat_delrule(softc, softn, np, purge)
 	}
 
 	np->in_flags |= IPN_DELETE;
-	ipf_nat_rulederef(softc, &np);
+	ipf_nat_rule_deref(softc, &np);
 }
 
 
@@ -4481,7 +4415,8 @@ find_in_wild_ports:
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_nat_tabmove                                             */
 /* Returns:     Nil                                                         */
-/* Parameters:  nat(I) - pointer to NAT structure                           */
+/* Parameters:  softn(I) - pointer to NAT context structure                 */
+/*              nat(I)   - pointer to NAT structure                         */
 /* Write Lock:  ipf_nat                                                     */
 /*                                                                          */
 /* This function is only called for TCP/UDP NAT table entries where the     */
@@ -6141,7 +6076,7 @@ ipf_nat_proto(fin, nat, nflags)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_nat_expire                                              */
 /* Returns:     Nil                                                         */
-/* Parameters:  Nil                                                         */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
 /*                                                                          */
 /* Check all of the timeout queues for entries at the top which need to be  */
 /* expired.                                                                 */
@@ -6199,7 +6134,8 @@ ipf_nat_expire(softc)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_nat_sync                                                */
 /* Returns:     Nil                                                         */
-/* Parameters:  ifp(I) - pointer to network interface                       */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              ifp(I) - pointer to network interface                       */
 /*                                                                          */
 /* Walk through all of the currently active NAT sessions, looking for those */
 /* which need to have their translated address updated.                     */
@@ -6397,7 +6333,9 @@ ipf_nat_icmpquerytype(icmptype)
 /* ------------------------------------------------------------------------ */
 /* Function:    nat_log                                                     */
 /* Returns:     Nil                                                         */
-/* Parameters:  nat(I)    - pointer to NAT structure                        */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              softn(I) - pointer to NAT context structure                 */
+/*              nat(I)    - pointer to NAT structure                        */
 /*              action(I) - action related to NAT structure being performed */
 /*                                                                          */
 /* Creates a NAT log entry.                                                 */
@@ -6492,33 +6430,79 @@ ipf_nat_ifdetach(ifp)
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    ipf_nat_rulederef                                           */
+/* Function:    ipf_nat_rule_deref                                          */
 /* Returns:     Nil                                                         */
-/* Parameters:  isp(I) - pointer to pointer to NAT rule                     */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              inp(I)   - pointer to pointer to NAT rule                   */
 /* Write Locks: ipf_nat                                                     */
 /*                                                                          */
+/* Dropping the refernce count for a rule means that whatever held the      */
+/* pointer to this rule (*inp) is no longer interested in it and when the   */
+/* reference count drops to zero, any resources allocated for the rule can  */
+/* be released and the rule itself free'd.                                  */
 /* ------------------------------------------------------------------------ */
 void
-ipf_nat_rulederef(softc, inp)
+ipf_nat_rule_deref(softc, inp)
 	ipf_main_softc_t *softc;
 	ipnat_t **inp;
 {
 	ipf_nat_softc_t *softn = softc->ipf_nat_soft;
-	ipnat_t *np;
+	ipnat_t *n;
 
-	np = *inp;
+	n = *inp;
 	*inp = NULL;
-	np->in_space++;
-	np->in_use--;
-	if (np->in_use == 0)
-		ipf_nat_free_rule(softc, softn, np);
+	n->in_use--;
+	if (n->in_use > 0)
+		return;
+
+	if (n->in_apr != NULL)
+		ipf_proxy_deref(n->in_apr);
+
+	ipf_nat_rule_fini(softc, n);
+
+	if (n->in_redir & NAT_REDIRECT) {
+		if ((n->in_flags & IPN_PROXYRULE) == 0) {
+			ATOMIC_DEC32(softn->ipf_nat_stats.ns_rules_rdr);
+		}
+	}
+	if (n->in_redir & (NAT_MAP|NAT_MAPBLK)) {
+		if ((n->in_flags & IPN_PROXYRULE) == 0) {
+			ATOMIC_DEC32(softn->ipf_nat_stats.ns_rules_map);
+		}
+	}
+
+	if (n->in_tqehead[0] != NULL) {
+		if (ipf_deletetimeoutqueue(n->in_tqehead[0]) == 0) {
+			ipf_freetimeoutqueue(softc, n->in_tqehead[1]);
+		}
+	}
+
+	if (n->in_tqehead[1] != NULL) {
+		if (ipf_deletetimeoutqueue(n->in_tqehead[1]) == 0) {
+			ipf_freetimeoutqueue(softc, n->in_tqehead[1]);
+		}
+	}
+
+	if ((n->in_flags & IPN_PROXYRULE) == 0) {
+		ATOMIC_DEC32(softn->ipf_nat_stats.ns_rules);
+	}
+
+	MUTEX_DESTROY(&n->in_lock);
+
+	KFREES(n, n->in_size);
+
+#if SOLARIS && !defined(INSTANCES)
+	if (softn->ipf_nat_stats.ns_rules == 0)
+		pfil_delayed_copy = 1;
+#endif
 }
 
 
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_nat_deref                                               */
 /* Returns:     Nil                                                         */
-/* Parameters:  isp(I) - pointer to pointer to NAT table entry              */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              natp(I)  - pointer to pointer to NAT table entry            */
 /*                                                                          */
 /* Decrement the reference counter for this NAT table entry and free it if  */
 /* there are no more things using it.                                       */
@@ -6770,10 +6754,11 @@ ipf_nat_mssclamp(tcp, maxmss, fin, csump)
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    softn->ipf_nat_setqueue                                            */
+/* Function:    ipf_nat_setqueue                                            */
 /* Returns:     Nil                                                         */
-/* Parameters:  nat(I)- pointer to NAT structure                            */
-/*              rev(I) - forward(0) or reverse(1) direction                 */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              softn(I) - pointer to NAT context structure                 */
+/*              nat(I)- pointer to NAT structure                            */
 /* Locks:       ipf_nat (read or write)                                     */
 /*                                                                          */
 /* Put the NAT entry on its default queue entry, using rev as a helped in   */
@@ -6828,7 +6813,8 @@ ipf_nat_setqueue(softc, softn, nat)
 /* ------------------------------------------------------------------------ */
 /* Function:    nat_getnext                                                 */
 /* Returns:     int - 0 == ok, else error                                   */
-/* Parameters:  t(I)   - pointer to ipftoken structure                      */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              t(I)   - pointer to ipftoken structure                      */
 /*              itp(I) - pointer to ipfgeniter_t structure                  */
 /*                                                                          */
 /* Fetch the next nat/ipnat structure pointer from the linked list and      */
@@ -6945,7 +6931,7 @@ ipf_nat_getnext(softc, t, itp, objp)
 		error = ipf_outobjk(softc, objp, nextipnat);
 		if (ipn != NULL) {
 			WRITE_ENTER(&softc->ipf_nat);
-			ipf_nat_rulederef(softc, &ipn);
+			ipf_nat_rule_deref(softc, &ipn);
 			RWLOCK_EXIT(&softc->ipf_nat);
 		}
 		break;
@@ -6970,7 +6956,9 @@ ipf_nat_getnext(softc, t, itp, objp)
 /* ------------------------------------------------------------------------ */
 /* Function:    nat_extraflush                                              */
 /* Returns:     int - 0 == success, -1 == failure                           */
-/* Parameters:  which(I) - how to flush the active NAT table                */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              softn(I) - pointer to NAT context structure                 */
+/*              which(I) - how to flush the active NAT table                */
 /* Write Locks: ipf_nat                                                     */
 /*                                                                          */
 /* Flush nat tables.  Three actions currently defined:                      */
@@ -7133,7 +7121,8 @@ ipf_nat_extraflush(softc, softn, which)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_nat_flush_entry                                         */
 /* Returns:     0 - always succeeds                                         */
-/* Parameters:  entry(I) - pointer to NAT entry                             */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              entry(I) - pointer to NAT entry                             */
 /* Write Locks: ipf_nat                                                     */
 /*                                                                          */
 /* This function is a stepping stone between ipf_queueflush() and           */
@@ -7154,8 +7143,10 @@ ipf_nat_flush_entry(softc, entry)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_nat_iterator                                            */
 /* Returns:     int - 0 == ok, else error                                   */
-/* Parameters:  token(I) - pointer to ipftoken structure                    */
-/*              itp(I) - pointer to ipfgeniter_t structure                  */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              token(I) - pointer to ipftoken structure                    */
+/*              itp(I)   - pointer to ipfgeniter_t structure                */
+/*              obj(I)   - pointer to data description structure            */
 /*                                                                          */
 /* This function acts as a handler for the SIOCGENITER ioctls that use a    */
 /* generic structure to iterate through a list.  There are three different  */
@@ -7200,7 +7191,8 @@ ipf_nat_iterator(softc, token, itp, obj)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_nat_setpending                                          */
 /* Returns:     Nil                                                         */
-/* Parameters:  nat(I) - pointer to NAT structure                           */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              nat(I)   - pointer to NAT structure                         */
 /* Locks:       ipf_nat (read or write)                                     */
 /*                                                                          */
 /* Put the NAT entry on to the pending queue - this queue has a very short  */
@@ -7558,7 +7550,8 @@ ipf_nat_newdivert(fin, nat, nai)
 /* ------------------------------------------------------------------------ */
 /* Function:    nat_builddivertmp                                           */
 /* Returns:     int - -1 == error, 0 == success                             */
-/* Parameters:  np(I) - pointer to a NAT rule                               */
+/* Parameters:  softn(I) - pointer to NAT context structure                 */
+/*              np(I)    - pointer to a NAT rule                            */
 /*                                                                          */
 /* For encap/divert rules, a skeleton packet representing what will be      */
 /* prepended to the real packet is created.  Even though we don't have the  */
@@ -7732,8 +7725,9 @@ ipf_nat_decap(fin, nat)
 /* ------------------------------------------------------------------------ */
 /* Function:    nat_matchencap                                              */
 /* Returns:     int - -1 == packet error, 1 == success, 0 = no match        */
-/* Parameters:  fin(I) - pointer to packet information                      */
-/*              np(I) - pointer to a NAT rule                               */
+/* Parameters:  softn(I) - pointer to NAT context structure                 */
+/*              fin(I)   - pointer to packet information                    */
+/*              np(I)    - pointer to a NAT rule                            */
 /*                                                                          */
 /* To properly compare a packet travelling in the reverse direction to an   */
 /* encap rule, it needs to be pseudo-decapsulated so we can check if a      */
@@ -7969,7 +7963,8 @@ ipf_nat_nextaddr(fin, na, old, dst)
 /* ------------------------------------------------------------------------ */
 /* Function:    nat_nextaddrinit                                            */
 /* Returns:     int - 0 == success, else error number                       */
-/* Parameters:  na(I)      - NAT address information for generating new addr*/
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              na(I)      - NAT address information for generating new addr*/
 /*              initial(I) - flag indicating if it is the first call for    */
 /*                           this "na" structure.                           */
 /*              ifp(I)     - network interface to derive address            */
@@ -8247,8 +8242,9 @@ ipf_nat_rebuildencapicmp(fin, nat)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_nat_matchflush                                          */
 /* Returns:     int - -1 == error, 0 == success                             */
-/* Parameters:  fin(I) - pointer to packet information                      */
-/*              nat(I) - pointer to current NAT session                     */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              softn(I) - pointer to NAT context structure                 */
+/*              nat(I)   - pointer to current NAT session                   */
 /*                                                                          */
 /* ------------------------------------------------------------------------ */
 static int
@@ -8480,7 +8476,9 @@ ipf_nat_matcharray(nat, array, ticks)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_nat_gettable                                            */
 /* Returns:     int     - 0 = success, else error                           */
-/* Parameters:  data(I) - pointer to ioctl data                             */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              softn(I) - pointer to NAT context structure                 */
+/*              data(I)  - pointer to ioctl data                            */
 /*                                                                          */
 /* This function handles ioctl requests for tables of nat information.      */
 /* At present the only table it deals with is the hash bucket statistics.   */
@@ -8528,7 +8526,8 @@ ipf_nat_gettable(softc, softn, data)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_nat_settimeout                                          */
 /* Returns:     int  - 0 = success, else failure			    */
-/* Parameters:  t(I) - pointer to tunable                                   */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              t(I) - pointer to tunable                                   */
 /*              p(I) - pointer to new tuning data                           */
 /*                                                                          */
 /* Apply the timeout change to the NAT timeout queues.                      */
@@ -8565,7 +8564,8 @@ ipf_nat_settimeout(softc, t, p)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_nat_rehash                                              */
 /* Returns:     int  - 0 = success, else failure			    */
-/* Parameters:  t(I) - pointer to tunable                                   */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              t(I) - pointer to tunable                                   */
 /*              p(I) - pointer to new tuning data                           */
 /*                                                                          */
 /* To change the size of the basic NAT table, we need to first allocate the */
@@ -8748,7 +8748,8 @@ badrehash:
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_nat_rehash_rules                                        */
 /* Returns:     int  - 0 = success, else failure			    */
-/* Parameters:  t(I) - pointer to tunable                                   */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              t(I) - pointer to tunable                                   */
 /*              p(I) - pointer to new tuning data                           */
 /*                                                                          */
 /* All of the NAT rules hang off of a hash table that is searched with a    */
@@ -8855,7 +8856,8 @@ ipf_nat_rehash_rules(softc, t, p)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_nat_hostmap_rehash                                      */
 /* Returns:     int  - 0 = success, else failure			    */
-/* Parameters:  t(I) - pointer to tunable                                   */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              t(I) - pointer to tunable                                   */
 /*              p(I) - pointer to new tuning data                           */
 /*                                                                          */
 /* Allocate and populate a new hash table that will contain a reference to  */
@@ -9038,6 +9040,14 @@ ipf_nat_cmp_rules(n1, n2)
 }
 
 
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_nat_rule_init                                           */
+/* Returns:     int   - 0 == success, else rules do not match.              */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              softn(I) - pointer to NAT context structure                 */
+/*              n(I)     - first rule to compare                            */
+/*                                                                          */
+/* ------------------------------------------------------------------------ */
 static int
 ipf_nat_rule_init(softc, softn, n)
 	ipf_main_softc_t *softc;
@@ -9095,4 +9105,37 @@ ipf_nat_rule_init(softc, softn, n)
 	}
 
 	return error;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_nat_rule_fini                                           */
+/* Returns:     int   - 0 == success, else rules do not match.              */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              n(I)     - rule to work on                                  */
+/*                                                                          */
+/* This function is used to release any objects that were referenced during */
+/* the rule initialisation. This is useful both when free'ing the rule and  */
+/* when handling ioctls that need to initialise these fields but not        */
+/* actually use them after the ioctl processing has finished.               */
+/* ------------------------------------------------------------------------ */
+static void
+ipf_nat_rule_fini(softc, n)
+	ipf_main_softc_t *softc;
+	ipnat_t *n;
+{
+	if (n->in_odst.na_atype == FRI_LOOKUP && n->in_odst.na_ptr != NULL)
+		ipf_lookup_deref(softc, n->in_odst.na_type, n->in_odst.na_ptr);
+
+	if (n->in_osrc.na_atype == FRI_LOOKUP && n->in_osrc.na_ptr != NULL)
+		ipf_lookup_deref(softc, n->in_osrc.na_type, n->in_osrc.na_ptr);
+
+	if (n->in_ndst.na_atype == FRI_LOOKUP && n->in_ndst.na_ptr != NULL)
+		ipf_lookup_deref(softc, n->in_ndst.na_type, n->in_ndst.na_ptr);
+
+	if (n->in_nsrc.na_atype == FRI_LOOKUP && n->in_nsrc.na_ptr != NULL)
+		ipf_lookup_deref(softc, n->in_nsrc.na_type, n->in_nsrc.na_ptr);
+
+	if (n->in_divmp != NULL)
+		FREE_MB_T(n->in_divmp);
 }

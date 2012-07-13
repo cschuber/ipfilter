@@ -709,7 +709,7 @@ extern	int	ipf_nat_out __P((fr_info_t *, nat_t *, int, u_32_t));
 extern	nat_t	*ipf_nat_outlookup __P((fr_info_t *, u_int, u_int,
 				       struct in_addr, struct in_addr));
 extern	u_short	*ipf_nat_proto __P((fr_info_t *, nat_t *, u_int));
-extern	void	ipf_nat_rulederef __P((ipf_main_softc_t *, ipnat_t **));
+extern	void	ipf_nat_rule_deref __P((ipf_main_softc_t *, ipnat_t **));
 extern	void	ipf_nat_setqueue __P((ipf_main_softc_t *, ipf_nat_softc_t *,
 				      nat_t *));
 extern	void	ipf_nat_setpending __P((ipf_main_softc_t *, nat_t *));

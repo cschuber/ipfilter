@@ -155,7 +155,7 @@ ipf_p_rcmd_del(softc, aps)
 	rci = aps->aps_data;
 	if (rci != NULL) {
 		rci->rcmd_rule->in_flags |= IPN_DELETE;
-		ipf_nat_rulederef(softc, &rci->rcmd_rule);
+		ipf_nat_rule_deref(softc, &rci->rcmd_rule);
 	}
 }
 

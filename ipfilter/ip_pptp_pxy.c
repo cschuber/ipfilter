@@ -572,6 +572,6 @@ ipf_p_pptp_del(softc, aps)
 		if (pptp->pptp_nat != NULL)
 			ipf_nat_setpending(softc, pptp->pptp_nat);
 		pptp->pptp_rule->in_flags |= IPN_DELETE;
-		ipf_nat_rulederef(softc, &pptp->pptp_rule);
+		ipf_nat_rule_deref(softc, &pptp->pptp_rule);
 	}
 }

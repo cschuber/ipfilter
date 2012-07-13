@@ -496,10 +496,10 @@ void dostats(fd, nsp, opts, alive, filter)
 
 		printf("%lu\tlog successes\n", nsp->ns_side[0].ns_log);
 		printf("%lu\tlog failures\n", nsp->ns_side[1].ns_log);
-		printf("%lu\tadded in\n%lu\tadded out\n%",
+		printf("%lu\tadded in\n%lu\tadded out\n",
 			nsp->ns_side[0].ns_added,
 			nsp->ns_side[1].ns_added);
-		printf("%lu\tactive\n", nsp->ns_active);
+		printf("%u\tactive\n", nsp->ns_active);
 		printf("%lu\ttransparent adds\n", nsp->ns_addtrpnt);
 		printf("%lu\tdivert build\n", nsp->ns_divert_build);
 		printf("%lu\texpired\n", nsp->ns_expire);
