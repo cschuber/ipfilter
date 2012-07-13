@@ -130,8 +130,6 @@ static int ipf_nat6_builddivertmp(ipf_nat_softc_t *, ipnat_t *);
 static int ipf_nat6_nextaddrinit(ipf_main_softc_t *, char *,
 				 nat_addr_t *, int, void *);
 static int ipf_nat6_insert(ipf_main_softc_t *, ipf_nat_softc_t *, nat_t *);
-static void ipf_nat6_delmap(ipf_nat_softc_t *, ipnat_t *);
-static void ipf_nat6_delrdr(ipf_nat_softc_t *, ipnat_t *);
 
 
 #define	NINCLSIDE6(y,x)	ATOMIC_INCL(softn->ipf_nat_stats.ns_side6[y].x)
@@ -208,7 +206,7 @@ ipf_nat6_ruleaddrinit(softc, softn, n)
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    ipf_nat6_add_rdr                                            */
+/* Function:    ipf_nat6_addrdr                                             */
 /* Returns:     Nil                                                         */
 /* Parameters:  n(I) - pointer to NAT rule to add                           */
 /*                                                                          */
@@ -221,31 +219,30 @@ ipf_nat6_addrdr(softn, n)
 	ipf_nat_softc_t *softn;
 	ipnat_t *n;
 {
+	i6addr_t *mask;
 	ipnat_t **np;
 	i6addr_t j;
 	u_int hv;
 	int k;
 
-	 if ((n->in_redir & NAT_BIMAP) == NAT_BIMAP) {
+	if ((n->in_redir & NAT_BIMAP) == NAT_BIMAP) {
 		k = count6bits(n->in_nsrcmsk6.i6);
-		ipf_inet6_mask_add(k, &n->in_nsrcmsk6,
-				   &softn->ipf_nat6_rdr_mask);
-
+		mask = &n->in_nsrcmsk6;
 		IP6_AND(&n->in_odstip6, &n->in_odstmsk6, &j);
 		hv = NAT_HASH_FN6(&j, 0, softn->ipf_nat_rdrrules_sz);
 
 	} else if (n->in_odstatype == FRI_NORMAL) {
 		k = count6bits(n->in_odstmsk6.i6);
-		ipf_inet6_mask_add(k, &n->in_odstmsk6,
-				   &softn->ipf_nat6_rdr_mask);
-
+		mask = &n->in_odstmsk6;
 		IP6_AND(&n->in_odstip6, &n->in_odstmsk6, &j);
 		hv = NAT_HASH_FN6(&j, 0, softn->ipf_nat_rdrrules_sz);
 	} else {
-		ipf_inet6_mask_add(0, &n->in_odstmsk6,
-				   &softn->ipf_nat6_rdr_mask);
+		k = 0;
 		hv = 0;
+		mask = NULL;
 	}
+	ipf_inet6_mask_add(k, mask, &softn->ipf_nat6_rdr_mask);
+
 	np = softn->ipf_nat_rdr_rules + hv;
 	while (*np != NULL)
 		np = &(*np)->in_rnext;
@@ -271,6 +268,7 @@ ipf_nat6_addmap(softn, n)
 	ipf_nat_softc_t *softn;
 	ipnat_t *n;
 {
+	i6addr_t *mask;
 	ipnat_t **np;
 	i6addr_t j;
 	u_int hv;
@@ -278,15 +276,15 @@ ipf_nat6_addmap(softn, n)
 
 	if (n->in_osrcatype == FRI_NORMAL) {
 		k = count6bits(n->in_osrcmsk6.i6);
-		ipf_inet6_mask_add(k, &n->in_osrcmsk6,
-				   &softn->ipf_nat6_map_mask);
+		mask = &n->in_osrcmsk6;
 		IP6_AND(&n->in_osrcip6, &n->in_osrcmsk6, &j);
 		hv = NAT_HASH_FN6(&j, 0, softn->ipf_nat_maprules_sz);
 	} else {
-		ipf_inet6_mask_add(0, &n->in_osrcmsk6,
-				   &softn->ipf_nat6_map_mask);
+		k = 0;
 		hv = 0;
+		mask = NULL;
 	}
+	ipf_inet6_mask_add(k, mask, &softn->ipf_nat6_map_mask);
 
 	np = softn->ipf_nat_map_rules + hv;
 	while (*np != NULL)
@@ -306,19 +304,25 @@ ipf_nat6_addmap(softn, n)
 /*                                                                          */
 /* Removes a NAT rdr rule from the hash table of NAT rdr rules.             */
 /* ------------------------------------------------------------------------ */
-static void
+void
 ipf_nat6_delrdr(softn, n)
 	ipf_nat_softc_t *softn;
-	ipnat_t *n; 
+	ipnat_t *n;
 {
+	i6addr_t *mask;
 	int k;
 
-	if (n->in_osrcatype == FRI_NORMAL) {
-		k = count6bits(n->in_osrcmsk6.i6);
+	if ((n->in_redir & NAT_BIMAP) == NAT_BIMAP) {
+		k = count6bits(n->in_nsrcmsk6.i6);
+		mask = &n->in_nsrcmsk6;
+	} else if (n->in_odstatype == FRI_NORMAL) {
+		k = count6bits(n->in_odstmsk6.i6);
+		mask = &n->in_odstmsk6;
 	} else {
 		k = 0;
+		mask = NULL;
 	}
-	ipf_inet6_mask_del(k, &n->in_osrcmsk6, &softn->ipf_nat6_map_mask);
+	ipf_inet6_mask_del(k, mask, &softn->ipf_nat6_rdr_mask);
 
 	if (n->in_rnext != NULL)
 		n->in_rnext->in_prnext = n->in_prnext;
@@ -334,19 +338,22 @@ ipf_nat6_delrdr(softn, n)
 /*                                                                          */
 /* Removes a NAT map rule from the hash table of NAT map rules.             */
 /* ------------------------------------------------------------------------ */
-static void
+void
 ipf_nat6_delmap(softn, n)
 	ipf_nat_softc_t *softn;
-	ipnat_t *n; 
+	ipnat_t *n;
 {
+	i6addr_t *mask;
 	int k;
 
 	if (n->in_osrcatype == FRI_NORMAL) {
-		k = count6bits(n->in_odstmsk6.i6);
+		k = count6bits(n->in_osrcmsk6.i6);
+		mask = &n->in_osrcmsk6;
 	} else {
 		k = 0;
+		mask = NULL;
 	}
-	ipf_inet6_mask_del(k, &n->in_odstmsk6, &softn->ipf_nat6_map_mask);
+	ipf_inet6_mask_del(k, mask, &softn->ipf_nat6_map_mask);
 
 	if (n->in_mnext != NULL)
 		n->in_mnext->in_pmnext = n->in_pmnext;
@@ -3085,7 +3092,7 @@ ipf_nat6_out(fin, nat, natadd, nflags)
 		if (i == 0)
 			i = 1;
 		else if (i == -1) {
-			NBUMPSIDE6D(1, ns_appr_fail);
+			NBUMPSIDE6D(1, ns_ipf_proxy_fail);
 		}
 #else
 		i = 1;
@@ -3350,7 +3357,7 @@ ipf_nat6_in(fin, nat, natadd, nflags)
 #ifdef IPF_V6_PROXIES
 			i = appr_check(fin, nat);
 			if (i == -1) {
-				NBUMPSIDE6D(0, ns_appr_fail);
+				NBUMPSIDE6D(0, ns_ipf_proxy_fail);
 				return -1;
 			}
 #endif
