@@ -417,7 +417,6 @@ ipf_pool_node_add(softc, arg, op, uid)
 	}
 #endif
 	if (node.ipn_mask.adf_len != node.ipn_addr.adf_len) {
-printf("%d != %d\n",node.ipn_mask.adf_len, node.ipn_addr.adf_len);
 		IPFERROR(70029);
 		return EINVAL;
 	}

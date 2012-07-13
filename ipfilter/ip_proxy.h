@@ -180,6 +180,21 @@ typedef struct  ftpinfo {
 
 
 /*
+ * IPsec proxy
+ */
+typedef u_32_t		ipsec_cookie_t[2];
+
+typedef struct ipsec_pxy {
+	ipsec_cookie_t	ipsc_icookie;
+	ipsec_cookie_t	ipsc_rcookie;
+	int		ipsc_rckset;
+	nat_t		*ipsc_nat;
+	struct ipstate	*ipsc_state;
+	ipnat_t		*ipsc_rule;
+} ipsec_pxy_t;
+
+
+/*
  * For the irc proxy.
  */
 typedef	struct	ircinfo {
@@ -193,15 +208,6 @@ typedef	struct	ircinfo {
 	u_short	irc_port;
 } ircinfo_t;
 
-
-/*
- * For the rcmd proxy. rcmd_rule must be last for names in ipnat_t
- */
-typedef	struct rcmdinfo	{
-	u_32_t	rcmd_port;	/* Port number seen */
-	u_32_t	rcmd_portseq;	/* Sequence number where port is first seen */
-	ipnat_t	rcmd_rule;	/* Template rule for back connection */
-} rcmdinfo_t;
 
 /*
  * For the DNS "proxy"
@@ -255,43 +261,6 @@ typedef	struct	msnrpcinfo	{
 	struct	in_addr	mri_raddr;
 	u_short		mri_rport;
 } msnrpcinfo_t;
-
-
-/*
- * IPSec proxy. ipsc_rule must be last for names in ipnat_t
- */
-typedef	u_32_t	ipsec_cookie_t[2];
-
-typedef struct ipsec_pxy {
-	ipsec_cookie_t	ipsc_icookie;
-	ipsec_cookie_t	ipsc_rcookie;
-	int		ipsc_rckset;
-	nat_t		*ipsc_nat;
-	struct ipstate	*ipsc_state;
-	ipnat_t		ipsc_rule;
-} ipsec_pxy_t;
-
-/*
- * PPTP proxy. pptp_rule must be last for names in ipnat_t
- */
-typedef	struct pptp_side {
-	u_32_t		pptps_nexthdr;
-	u_32_t		pptps_next;
-	int		pptps_state;
-	int		pptps_gothdr;
-	int		pptps_len;
-	int		pptps_bytes;
-	char		*pptps_wptr;
-	char		pptps_buffer[512];
-} pptp_side_t;
-
-typedef	struct pptp_pxy {
-	nat_t		*pptp_nat;
-	struct ipstate 	*pptp_state;
-	u_short		pptp_call[2];
-	pptp_side_t	pptp_side[2];
-	ipnat_t		pptp_rule;
-} pptp_pxy_t;
 
 
 /*
@@ -478,7 +447,7 @@ extern	aproxy_t	*ipf_proxy_lookup __P((void *, u_int, char *));
 extern	int	ipf_proxy_match __P((fr_info_t *, struct nat *));
 extern	int	ipf_proxy_new __P((fr_info_t *, struct nat *));
 extern	int	ipf_proxy_ok __P((fr_info_t *, tcphdr_t *, struct ipnat *));
-extern	void	aps_free __P((ipf_main_softc_t *, ap_session_t *));
+extern	void	ipf_proxy_free __P((ipf_main_softc_t *, ap_session_t *));
 extern	int	ipf_proxy_main_load __P((void));
 extern	int	ipf_proxy_main_unload __P((void));
 extern	void	*ipf_proxy_soft_create __P((ipf_main_softc_t *));
