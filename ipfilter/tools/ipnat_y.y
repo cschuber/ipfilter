@@ -190,8 +190,7 @@ eol:	| ';'
 	;
 
 map:	mapit ifnames addr tlate rhsaddr proxy mapoptions
-				{ nat->in_v[0] = $3.v;
-				  if ($3.f != 0 && $3.f != $5.f && $5.f != 0)
+				{ if ($3.f != 0 && $3.f != $5.f && $5.f != 0)
 					yyerror("3.address family mismatch");
 				  if (nat->in_v[0] == 0 && $5.v != 0)
 					nat->in_v[0] = $5.v;
@@ -216,7 +215,6 @@ map:	mapit ifnames addr tlate rhsaddr proxy mapoptions
 					yyerror("4.address family mismatch");
 				  if (nat->in_v[1] == 0 && $5.v != 0)
 					nat->in_v[1] = $5.v;
-				  nat->in_v[0] = $3.v;
 				  if (nat->in_v[0] == 0 && $5.v != 0)
 					nat->in_v[0] = $5.v;
 				  nat->in_osrcatype = $3.t;
@@ -234,7 +232,8 @@ map:	mapit ifnames addr tlate rhsaddr proxy mapoptions
 				  setmapifnames();
 				}
 	| no mapit ifnames addr setproto ';'
-				{ nat->in_v[0] = $4.v;
+				{ if (nat->in_v[0] == 0)
+					nat->in_v[0] = $4.v;
 				  nat->in_osrcatype = $4.t;
 				  bcopy(&$4.a, &nat->in_osrc.na_addr[0],
 					sizeof($4.a));
@@ -244,8 +243,7 @@ map:	mapit ifnames addr tlate rhsaddr proxy mapoptions
 				  setmapifnames();
 				}
 	| mapit ifnames mapfrom tlate rhsaddr proxy mapoptions
-				{ nat->in_v[0] = ftov($3);
-				  if ($3 != 0 && $5.f != 0 && $3 != $5.f)
+				{ if ($3 != 0 && $5.f != 0 && $3 != $5.f)
 					yyerror("5.address family mismatch");
 				  if (nat->in_v[0] == 0 && $5.v != 0)
 					nat->in_v[0] = $5.v;
@@ -265,8 +263,7 @@ map:	mapit ifnames addr tlate rhsaddr proxy mapoptions
 				  setmapifnames();
 				}
 	| mapit ifnames mapfrom tlate rhsaddr mapport mapoptions
-				{ nat->in_v[0] = ftov($3);
-				  if ($3 != 0 && $5.f != 0 && $3 != $5.f)
+				{ if ($3 != 0 && $5.f != 0 && $3 != $5.f)
 					yyerror("6.address family mismatch");
 				  if (nat->in_v[0] == 0 && $5.v != 0)
 					nat->in_v[0] = $5.v;
@@ -285,8 +282,7 @@ map:	mapit ifnames addr tlate rhsaddr proxy mapoptions
 
 mapblock:
 	mapblockit ifnames addr tlate addr ports mapoptions
-				{ nat->in_v[0] = $3.v;
-				  if ($3.f != 0 && $5.f != 0 && $3.f != $5.f)
+				{ if ($3.f != 0 && $5.f != 0 && $3.f != $5.f)
 					yyerror("7.address family mismatch");
 				  if (nat->in_v[0] == 0 && $5.v != 0)
 					nat->in_v[0] = $5.v;
@@ -307,7 +303,10 @@ mapblock:
 				  setmapifnames();
 				}
 	| no mapblockit ifnames { yyexpectaddr = 1; } addr setproto ';'
-				{ nat->in_v[0] = $5.v;
+				{ if (nat->in_v[0] == 0)
+					nat->in_v[0] = $5.v;
+				  if (nat->in_v[1] == 0)
+					nat->in_v[1] = $5.v;
 				  nat->in_osrcatype = $5.t;
 				  bcopy(&$5.a, &nat->in_osrc.na_addr[0],
 					sizeof($5.a));
@@ -321,10 +320,12 @@ mapblock:
 redir:	rdrit ifnames addr dport tlate dip nport setproto rdroptions
 				{ if ($6 != 0 && $3.f != 0 && $6 != $3.f)
 					yyerror("21.address family mismatch");
-				  if ($3.v != AF_UNSPEC)
-					nat->in_v[0] = ftov($3.f);
-				  else
-					nat->in_v[0] = ftov($6);
+				  if (nat->in_v[0] == 0) {
+					if ($3.v != AF_UNSPEC)
+						nat->in_v[0] = ftov($3.f);
+					  else
+						nat->in_v[0] = ftov($6);
+				  }
 				  nat->in_odstatype = $3.t;
 				  bcopy(&$3.a, &nat->in_odst.na_addr[0],
 					sizeof($3.a));
@@ -334,7 +335,8 @@ redir:	rdrit ifnames addr dport tlate dip nport setproto rdroptions
 				  setrdrifnames();
 				}
 	| no rdrit ifnames addr dport setproto ';'
-				{ nat->in_v[0] = ftov($4.f);
+				{ if (nat->in_v[0] == 0)
+					nat->in_v[0] = ftov($4.f);
 				  nat->in_odstatype = $4.t;
 				  bcopy(&$4.a, &nat->in_odst.na_addr[0],
 					sizeof($4.a));
@@ -346,10 +348,12 @@ redir:	rdrit ifnames addr dport tlate dip nport setproto rdroptions
 	| rdrit ifnames rdrfrom tlate dip nport setproto rdroptions
 				{ if ($5 != 0 && $3 != 0 && $5 != $3)
 					yyerror("20.address family mismatch");
-				  if ($3 != AF_UNSPEC)
-					nat->in_v[0] = ftov($3);
-				  else
-					nat->in_v[0] = ftov($5);
+				  if (nat->in_v[0] == 0) {
+					  if ($3 != AF_UNSPEC)
+						nat->in_v[0] = ftov($3);
+					  else
+						nat->in_v[0] = ftov($5);
+				  }
 				  setrdrifnames();
 				}
 	| no rdrit ifnames rdrfrom setproto ';'
@@ -361,7 +365,8 @@ redir:	rdrit ifnames addr dport tlate dip nport setproto rdroptions
 
 rewrite:
 	IPNY_REWRITE oninout rwrproto mapfrom tlate newdst newopts
-				{ nat->in_v[0] = ftov($4);
+				{ if (nat->in_v[0] == 0)
+					nat->in_v[0] = ftov($4);
 				  if (nat->in_redir & NAT_MAP)
 					setmapifnames();
 				  else
@@ -371,7 +376,8 @@ rewrite:
 	;
 
 divert:	IPNY_DIVERT oninout rwrproto mapfrom tlate divdst newopts
-				{ nat->in_v[0] = ftov($4);
+				{ if (nat->in_v[0] == 0)
+					nat->in_v[0] = ftov($4);
 				  if (nat->in_redir & NAT_MAP) {
 					setmapifnames();
 					nat->in_pr[0] = IPPROTO_UDP;
@@ -384,7 +390,8 @@ divert:	IPNY_DIVERT oninout rwrproto mapfrom tlate divdst newopts
 	;
 
 encap:	IPNY_ENCAP oninout rwrproto mapfrom tlate encapdst newopts
-				{ nat->in_v[0] = ftov($4);
+				{ if (nat->in_v[0] == 0)
+					nat->in_v[0] = ftov($4);
 				  if (nat->in_redir & NAT_MAP) {
 					setmapifnames();
 					nat->in_pr[0] = IPPROTO_IPIP;
@@ -421,7 +428,7 @@ dnsline:
 	;
 
 oninout:
-	inout IPNY_ON ifnames	{ nat->in_v[0] = 4; }
+	inout IPNY_ON ifnames	{ ; }
 	;
 
 inout:	IPNY_IN			{ nat->in_redir = NAT_REDIRECT; }
@@ -944,14 +951,14 @@ addr:	IPNY_ANY			{ yyexpectaddr = 0;
 	| hostname slash YY_NUMBER
 					{ bzero(&$$, sizeof($$));
 					  $$.a = $1.a;
+					  $$.f = $1.f;
+					  $$.v = ftov($1.f);
 					  $$.t = FRI_NORMAL;
 					  ntomask($$.f, $3, (u_32_t *)&$$.m);
 					  $$.a.i6[0] &= $$.m.i6[0];
 					  $$.a.i6[1] &= $$.m.i6[1];
 					  $$.a.i6[2] &= $$.m.i6[2];
 					  $$.a.i6[3] &= $$.m.i6[3];
-					  $$.f = $1.f;
-					  $$.v = ftov($1.f);
 					  yyexpectaddr = 0;
 					}
 	| hostname slash ipaddr		{ bzero(&$$, sizeof($$));
@@ -977,6 +984,8 @@ addr:	IPNY_ANY			{ yyexpectaddr = 0;
 					  $$.a.in4.s_addr &= $$.m.in4.s_addr;
 					  $$.f = $1.f;
 					  $$.v = ftov($1.f);
+					  if ($$.f == AF_INET6)
+						yyerror("incorrect inet6 mask");
 					}
 	| hostname mask ipaddr		{ bzero(&$$, sizeof($$));
 					  if ($1.f != $3.f) {
@@ -1508,7 +1517,7 @@ ipnat_addrule(fd, ioctlfunc, ptr)
 				char msg[80];
 
 				sprintf(msg, "%d:ioctl(zero nat rule)",
-					yylineNum);
+					ipn->in_flineno);
 				return ipf_perror_fd(fd, ioctlfunc, msg);
 			}
 		} else {
@@ -1528,7 +1537,7 @@ ipnat_addrule(fd, ioctlfunc, ptr)
 				char msg[80];
 
 				sprintf(msg, "%d:ioctl(delete nat rule)",
-					yylineNum);
+					ipn->in_flineno);
 				return ipf_perror_fd(fd, ioctlfunc, msg);
 			}
 		}
@@ -1538,7 +1547,7 @@ ipnat_addrule(fd, ioctlfunc, ptr)
 				char msg[80];
 
 				sprintf(msg, "%d:ioctl(add/insert nat rule)",
-					yylineNum);
+					ipn->in_flineno);
 				if (errno == EEXIST) {
 					sprintf(msg + strlen(msg), "(line %d)",
 						ipn->in_flineno);
