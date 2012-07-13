@@ -523,8 +523,8 @@ dstlist:
 	;
 
 dstentries:
-	dstentry ';'			{ $$ = $1; }
-	| dstentry ';' dstentries	{ $1->ipfd_next = $3; $$ = $1; }
+	dstentry next			{ $$ = $1; }
+	| dstentry next dstentries	{ $1->ipfd_next = $3; $$ = $1; }
 	;
 
 dstentry:
