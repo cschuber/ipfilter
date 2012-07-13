@@ -135,6 +135,7 @@ static void ipf_nat6_delrdr(ipf_nat_softc_t *, ipnat_t *);
 
 
 #define	NINCLSIDE6(y,x)	ATOMIC_INCL(softn->ipf_nat_stats.ns_side6[y].x)
+#define	NBUMPSIDE(y,x)	softn->ipf_nat_stats.ns_side[y].x++
 #define	NBUMPSIDE6(y,x)	softn->ipf_nat_stats.ns_side6[y].x++
 #define	NBUMPSIDE6D(y,x) \
 			do { \
@@ -251,6 +252,7 @@ ipf_nat6_addrdr(softn, n)
 	n->in_rnext = NULL;
 	n->in_prnext = np;
 	n->in_hv[0] = hv;
+	n->in_use++;
 	*np = n;
 }
 
@@ -292,6 +294,7 @@ ipf_nat6_addmap(softn, n)
 	n->in_mnext = NULL;
 	n->in_pmnext = np;
 	n->in_hv[1] = hv;
+	n->in_use++;
 	*np = n;
 }
 
@@ -320,6 +323,7 @@ ipf_nat6_delrdr(softn, n)
 	if (n->in_rnext != NULL)
 		n->in_rnext->in_prnext = n->in_prnext;
 	*n->in_prnext = n->in_rnext;
+	n->in_use--;
 }
 
 
@@ -347,6 +351,7 @@ ipf_nat6_delmap(softn, n)
 	if (n->in_mnext != NULL)
 		n->in_mnext->in_pmnext = n->in_pmnext;
 	*n->in_pmnext = n->in_mnext;
+	n->in_use--;
 }
 
 
@@ -400,6 +405,7 @@ ipf_nat6_addencap(softn, n)
 		n->in_rnext = NULL;
 		n->in_prnext = np;
 		n->in_hv[0] = hv;
+		n->in_use++;
 		*np = n;
 	} else if (n->in_redir & NAT_REDIRECT) {
 		ipf_inet6_mask_add(k, &n->in_nsrcip6,
@@ -410,6 +416,7 @@ ipf_nat6_addencap(softn, n)
 		n->in_mnext = NULL;
 		n->in_pmnext = np;
 		n->in_hv[1] = hv;
+		n->in_use++;
 		*np = n;
 	}
 
@@ -482,6 +489,7 @@ ipf_nat6_hostmap(softn, np, src, dst, map, port)
 			softn->ipf_hm_maptable[hv]->hm_phnext = &hm->hm_hnext;
 		softn->ipf_hm_maptable[hv] = hm;
 		hm->hm_ipnat = np;
+		np->in_use++;
 		hm->hm_osrcip6 = *src;
 		hm->hm_odstip6 = *dst;
 		hm->hm_nsrcip6 = *map;
@@ -567,7 +575,7 @@ ipf_nat6_newmap(fin, nat, ni)
 			if (hm != NULL)
 				in = hm->hm_nsrcip6;
 		} else if ((l == 1) && (hm != NULL)) {
-			ipf_nat_hostmapdel(&hm);
+			ipf_nat_hostmapdel(softc, &hm);
 		}
 
 		nat->nat_hm = hm;
@@ -1184,7 +1192,7 @@ ipf_nat6_add(fin, np, natsave, flags, direction)
 badnat:
 	NBUMPSIDE6(fin->fin_out, ns_badnatnew);
 	if ((hm = nat->nat_hm) != NULL)
-		ipf_nat_hostmapdel(&hm);
+		ipf_nat_hostmapdel(softc, &hm);
 	KFREE(nat);
 	nat = NULL;
 done:
@@ -1312,11 +1320,12 @@ ipf_nat6_finalise(fin, nat)
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:   ipf_nat6_insert                                              */
-/* Returns:    int - 0 == sucess, -1 == failure                             */
-/* Parameters: nat(I) - pointer to NAT structure                            */
-/*             rev(I) - flag indicating forward/reverse direction of packet */
-/* Write Lock: ipf_nat                                                      */
+/* Function:    ipf_nat6_insert                                             */
+/* Returns:     int - 0 == sucess, -1 == failure                            */
+/* Parameters:  softc(I) - pointer to soft context main structure           */
+/*              softn(I) - pointer to NAT context structure                 */
+/*              nat(I) - pointer to NAT structure                           */
+/* Write Lock:  ipf_nat                                                     */
 /*                                                                          */
 /* Insert a NAT entry into the hash tables for searching and add it to the  */
 /* list of active NAT entries.  Adjust global counters when complete.       */
@@ -1329,7 +1338,6 @@ ipf_nat6_insert(softc, softn, nat)
 {
 	u_int hv1, hv2;
 	u_32_t sp, dp;
-	nat_t **natp;
 	ipnat_t *in;
 
 	/*
@@ -1348,7 +1356,8 @@ ipf_nat6_insert(softc, softn, nat)
 			dp = 0;
 		}
 		hv1 = NAT_HASH_FN6(&nat->nat_osrc6, sp, 0xffffffff);
-		hv1 = NAT_HASH_FN6(&nat->nat_odst6, hv1 + dp, softn->ipf_nat_table_sz);
+		hv1 = NAT_HASH_FN6(&nat->nat_odst6, hv1 + dp,
+				   softn->ipf_nat_table_sz);
 
 		/*
 		 * TRACE nat6_osrc6, nat6_osport, nat6_odst6,
@@ -1366,7 +1375,8 @@ ipf_nat6_insert(softc, softn, nat)
 			dp = 0;
 		}
 		hv2 = NAT_HASH_FN6(&nat->nat_nsrc6, sp, 0xffffffff);
-		hv2 = NAT_HASH_FN6(&nat->nat_ndst6, hv2 + dp, softn->ipf_nat_table_sz);
+		hv2 = NAT_HASH_FN6(&nat->nat_ndst6, hv2 + dp,
+				   softn->ipf_nat_table_sz);
 		/*
 		 * TRACE nat6_nsrcaddr, nat6_nsport, nat6_ndstaddr,
 		 * nat6_ndport, hv1
@@ -1383,36 +1393,13 @@ ipf_nat6_insert(softc, softn, nat)
 		/* TRACE nat6_nsrcip6, nat6_ndstip6, hv2 */
 	}
 
-	if (softn->ipf_nat_stats.ns_side[0].ns_bucketlen[hv1] >=
-	    softn->ipf_nat_maxbucket) {
-		NBUMPSIDE6D(0, ns_bucket_max);
-		return -1;
-	}
-
-	if (softn->ipf_nat_stats.ns_side[1].ns_bucketlen[hv2] >=
-	    softn->ipf_nat_maxbucket) {
-		NBUMPSIDE6D(1, ns_bucket_max);
-		return -1;
-	}
-	if (nat->nat_dir == NAT_INBOUND || nat->nat_dir == NAT_ENCAPIN ||
-	    nat->nat_dir == NAT_DIVERTIN) {
-		u_int swap;
-
-		swap = hv2;
-		hv2 = hv1;
-		hv1 = swap;
-	}
 	nat->nat_hv[0] = hv1;
 	nat->nat_hv[1] = hv2;
 
 	MUTEX_INIT(&nat->nat_lock, "nat entry lock");
 
 	in = nat->nat_ptr;
-	nat->nat_ref = 1;
-	nat->nat_bytes[0] = 0;
-	nat->nat_pkts[0] = 0;
-	nat->nat_bytes[1] = 0;
-	nat->nat_pkts[1] = 0;
+	nat->nat_ref = nat->nat_me ? 2 : 1;
 
 	nat->nat_ifnames[0][LIFNAMSIZ - 1] = '\0';
 	nat->nat_ifps[0] = ipf_resolvenic(softc, nat->nat_ifnames[0],
@@ -1440,37 +1427,7 @@ ipf_nat6_insert(softc, softn, nat)
 		nat->nat_mtu[1] = GETIFMTU_6(nat->nat_ifps[1]);
 	}
 
-	nat->nat_next = softn->ipf_nat_instances;
-	nat->nat_pnext = &softn->ipf_nat_instances;
-	if (softn->ipf_nat_instances)
-		softn->ipf_nat_instances->nat_pnext = &nat->nat_next;
-	softn->ipf_nat_instances = nat;
-
-	natp = &softn->ipf_nat_table[0][hv1];
-	if (*natp)
-		(*natp)->nat_phnext[0] = &nat->nat_hnext[0];
-	else
-		NBUMPSIDE6(0, ns_inuse);
-	nat->nat_phnext[0] = natp;
-	nat->nat_hnext[0] = *natp;
-	*natp = nat;
-	softn->ipf_nat_stats.ns_side[0].ns_bucketlen[hv1]++;
-
-	natp = &softn->ipf_nat_table[1][hv2];
-	if (*natp)
-		(*natp)->nat_phnext[1] = &nat->nat_hnext[1];
-	else
-		NBUMPSIDE6(1, ns_inuse);
-	nat->nat_phnext[1] = natp;
-	nat->nat_hnext[1] = *natp;
-	*natp = nat;
-	softn->ipf_nat_stats.ns_side[1].ns_bucketlen[hv2]++;
-
-	ipf_nat_setqueue(softc, softn, nat);
-
-	softn->ipf_nat_stats.ns_side[1].ns_added++;
-	softn->ipf_nat_stats.ns_active++;
-	return 0;
+	return ipf_nat_hashtab_add(softc, softn, nat);
 }
 
 

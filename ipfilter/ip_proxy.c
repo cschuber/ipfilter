@@ -143,7 +143,8 @@ static	aproxy_t	ips_proxies[] = {
 	  ipf_p_tftp_main_load, ipf_p_tftp_main_unload,
 	  ipf_p_tftp_soft_create, ipf_p_tftp_soft_destroy,
 	  NULL, NULL,
-	  ipf_p_tftp_new, ipf_p_tftp_del, ipf_p_tftp_in, ipf_p_tftp_out, NULL,
+	  ipf_p_tftp_new, ipf_p_tftp_del,
+	  ipf_p_tftp_in, ipf_p_tftp_out, NULL,
 	  NULL, NULL, NULL, NULL },
 #endif
 #ifdef	IPF_IRC_PROXY
@@ -1113,7 +1114,7 @@ ipf_proxy_deref(ap)
 
 
 /* ------------------------------------------------------------------------ */
-/* Function:    aps_free                                                    */
+/* Function:    ipf_proxy_free                                              */
 /* Returns:     Nil                                                         */
 /* Parameters:  softc(I) - pointer to soft context main structure           */
 /*              aps(I)   - pointer to current proxy session                 */
@@ -1123,7 +1124,7 @@ ipf_proxy_deref(ap)
 /* session.                                                                 */
 /* ------------------------------------------------------------------------ */
 void
-aps_free(softc, aps)
+ipf_proxy_free(softc, aps)
 	ipf_main_softc_t *softc;
 	ap_session_t *aps;
 {

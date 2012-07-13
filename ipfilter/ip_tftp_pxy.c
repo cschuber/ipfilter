@@ -42,7 +42,7 @@ typedef struct tftpinfo {
 	int		ti_lastblk;
 	int		ti_lasterror;
 	char		ti_filename[80];
-	ipnat_t		ti_rule;
+	ipnat_t		*ti_rule;
 } tftpinfo_t;
 
 
@@ -170,23 +170,34 @@ ipf_p_tftp_new(arg, fin, aps, nat)
 	udphdr_t *udp;
 	tftpinfo_t *ti;
 	ipnat_t *ipn;
+	ipnat_t *np;
+	int size;
+
+	fin = fin;	/* LINT */
+
+	np = nat->nat_ptr;
+	size = np->in_size;
 
 	KMALLOC(ti, tftpinfo_t *);
 	if (ti == NULL)
 		return -1;
-
-	nat = nat;	/* LINT */
-	fin = fin;	/* LINT */
-
-	aps->aps_psiz = sizeof(*ti);
+	KMALLOCS(ipn, ipnat_t *, size);
+	if (ipn == NULL) {
+		KFREE(ti);
+		return -1;
+	}
 
 	aps->aps_data = ti;
+	aps->aps_psiz = sizeof(*ti);
 	bzero((char *)ti, sizeof(*ti));
+	bzero((char *)ipn, size);
+	ti->ti_rule = ipn;
+
 	udp = (udphdr_t *)fin->fin_dp;
 	aps->aps_sport = udp->uh_sport;
 	aps->aps_dport = udp->uh_dport;
 
-	ipn = &ti->ti_rule;
+	ipn->in_size = size;
 	ipn->in_ifps[0] = nat->nat_ifps[0];
 	ipn->in_ifps[1] = nat->nat_ifps[1];
 	ipn->in_apr = NULL;
@@ -194,7 +205,7 @@ ipf_p_tftp_new(arg, fin, aps, nat)
 	ipn->in_hits = 1;
 	ipn->in_ippip = 1;
 
-	if ((nat->nat_ptr->in_redir & NAT_REDIRECT) != 0) {
+	if ((np->in_redir & NAT_REDIRECT) != 0) {
 		ipn->in_redir = NAT_MAP;
 		ipn->in_snip = ntohl(nat->nat_odstaddr);
 		ipn->in_nsrcaddr = nat->nat_odstaddr;
@@ -220,13 +231,13 @@ ipf_p_tftp_new(arg, fin, aps, nat)
 	ipn->in_ndstmsk = 0xffffffff;
 	ipn->in_pr[0] = IPPROTO_UDP;
 	ipn->in_pr[1] = IPPROTO_UDP;
-	ipn->in_flags = IPN_UDP|IPN_FIXEDDPORT;
+	ipn->in_flags = IPN_UDP|IPN_FIXEDDPORT|IPN_PROXYRULE;
 	MUTEX_INIT(&ipn->in_lock, "tftp proxy NAT rule");
 
-	ipn->in_namelen = nat->nat_ptr->in_namelen;
-	bcopy(nat->nat_ptr->in_names, ipn->in_ifnames, ipn->in_namelen);
-	ipn->in_ifnames[0] = nat->nat_ptr->in_ifnames[0];
-	ipn->in_ifnames[1] = nat->nat_ptr->in_ifnames[1];
+	ipn->in_namelen = np->in_namelen;
+	bcopy(np->in_names, ipn->in_ifnames, ipn->in_namelen);
+	ipn->in_ifnames[0] = np->in_ifnames[0];
+	ipn->in_ifnames[1] = np->in_ifnames[1];
 
 	ti->ti_lastcmd = 0;
 
@@ -243,7 +254,8 @@ ipf_p_tftp_del(softc, aps)
 
 	tftp = aps->aps_data;
 	if (tftp != NULL) {
-		MUTEX_DESTROY(&tftp->ti_rule.in_lock);
+		tftp->ti_rule->in_flags |= IPN_DELETE;
+		ipf_nat_rulederef(softc, &tftp->ti_rule);
 	}
 }
 
@@ -288,12 +300,12 @@ ipf_p_tftp_backchannel(fin, aps, nat)
 	ip->ip_len = htons(fin->fin_hlen + sizeof(udp));
 	bzero((char *)&udp, sizeof(udp));
 	udp.uh_sport = 0;	/* XXX - don't specify remote port */
-	udp.uh_dport = ti->ti_rule.in_ndport;
+	udp.uh_dport = ti->ti_rule->in_ndport;
 	udp.uh_ulen = htons(sizeof(udp));
 	udp.uh_sum = 0;
 	fi.fin_dp = (char *)&udp;
 	fi.fin_fr = &tftpfr;
-	fi.fin_dport = ntohs(ti->ti_rule.in_ndport);
+	fi.fin_dport = ntohs(ti->ti_rule->in_ndport);
 	fi.fin_sport = 0;
 	fi.fin_dlen = sizeof(udp);
 	fi.fin_plen = fi.fin_hlen + sizeof(udp);
@@ -315,12 +327,23 @@ ipf_p_tftp_backchannel(fin, aps, nat)
 	nflags |= NAT_NOTRULEPORT;
 
 	MUTEX_ENTER(&softn->ipf_nat_new);
-	nat2 = ipf_nat_add(&fi, &ti->ti_rule, NULL, nflags, dir);
+	nat2 = ipf_nat_add(&fi, ti->ti_rule, NULL, nflags, dir);
 	MUTEX_EXIT(&softn->ipf_nat_new);
 	if (nat2 != NULL) {
 		(void) ipf_nat_proto(&fi, nat2, IPN_UDP);
 		ipf_nat_update(&fi, nat2);
 		fi.fin_ifp = NULL;
+		if (ti->ti_rule->in_redir == NAT_MAP) {
+			fi.fin_fi.fi_saddr = nat->nat_ndstaddr;
+			ip->ip_src = nat->nat_ndstip;
+			fi.fin_fi.fi_daddr = nat->nat_nsrcaddr;
+			ip->ip_dst = nat->nat_nsrcip;
+		} else {
+			fi.fin_fi.fi_saddr = nat->nat_odstaddr;
+			ip->ip_src = nat->nat_odstip;
+			fi.fin_fi.fi_daddr = nat->nat_osrcaddr;
+			ip->ip_dst = nat->nat_osrcip;
+		}
 		if (ipf_state_add(softc, &fi, NULL, SI_W_SPORT) != 0) {
 			ipf_nat_setpending(softc, nat2);
 		}

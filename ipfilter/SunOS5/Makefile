@@ -175,10 +175,10 @@ $(OBJ)/ipfs.o: $(TOOL)/ipfs.c $(TOP)/ip_fil.h $(TOP)/ipf.h $(TOP)/ip_state.h \
 		$(TOP)/ip_nat.h
 	$(CC) $(CCARGS) -c $(TOOL)/ipfs.c -o $@
 
-$(OBJ)/fil_u.o: $(TOP)/fil.c $(TOP)/ip_fil.h $(TOP)/ipf.h
+$(OBJ)/fil_u.o: $(TOP)/fil.c $(TOP)/ip_fil.h $(TOP)/ipf.h $(TOP)/ip_nat.h
 	$(CC) $(CCARGS) $(EXTRA) $(IPFBPF) -c $(TOP)/fil.c -o $@
 
-$(OBJ)/fil.o: $(TOP)/fil.c $(TOP)/ip_fil.h $(TOP)/ipf.h
+$(OBJ)/fil.o: $(TOP)/fil.c $(TOP)/ip_fil.h $(TOP)/ipf.h $(TOP)/ip_nat.h
 	$(CC) -I$(TOP) $(POLICY) $(DFLAGS) $(IPFBPF) $(COMPATIPF) \
 		-c $(TOP)/fil.c -o $@
 	$(CTFCONVERT) $@
@@ -277,7 +277,8 @@ $(OBJ)/ip_sync.o: $(TOP)/ip_sync.c $(TOP)/ip_sync.h $(TOP)/ip_compat.h
 $(OBJ)/ip_proxy.o: $(TOP)/ip_proxy.c $(TOP)/ip_proxy.h $(TOP)/ip_compat.h \
         $(TOP)/ip_ftp_pxy.c $(TOP)/ip_rcmd_pxy.c $(TOP)/ip_raudio_pxy.c \
         $(TOP)/ip_rpcb_pxy.c $(TOP)/ip_ipsec_pxy.c $(TOP)/ip_nat.h \
-	$(TOP)/ip_dns_pxy.c $(TOP)/ip_tftp_pxy.c $(TOP)/ip_fil.h
+	$(TOP)/ip_dns_pxy.c $(TOP)/ip_tftp_pxy.c $(TOP)/ip_pptp_pxy.c \
+	$(TOP)/ip_fil.h
 	$(CC) -I$(TOP) $(DFLAGS) -c $(TOP)/ip_proxy.c -o $@
 	$(CTFCONVERT) $@
 
@@ -384,7 +385,8 @@ $(OBJ)/ip_auth_u.o: $(TOP)/ip_auth.c $(TOP)/ip_auth.h $(TOP)/ip_compat.h
 $(OBJ)/ip_proxy_u.o: $(TOP)/ip_proxy.c $(TOP)/ip_proxy.h $(TOP)/ip_compat.h \
         $(TOP)/ip_ftp_pxy.c $(TOP)/ip_rcmd_pxy.c $(TOP)/ip_raudio_pxy.c \
         $(TOP)/ip_rpcb_pxy.c $(TOP)/ip_ipsec_pxy.c $(TOP)/ip_nat.h \
-	$(TOP)/ip_dns_pxy.c $(TOP)/ip_tftp_pxy.c $(TOP)/ip_fil.h
+	$(TOP)/ip_dns_pxy.c $(TOP)/ip_tftp_pxy.c $(TOP)/ip_pptp_pxy.c \
+	$(TOP)/ip_fil.h
 	$(CC) $(CCARGS) $(EXTRA) -c $(TOP)/ip_proxy.c -o $@
 
 $(OBJ)/ip_rules.c: $(OBJ)/ipf.exe $(TOP)/tools/ipfcomp.c $(TOP)/rules/ip_rules

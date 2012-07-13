@@ -7723,7 +7723,7 @@ ipf_token_deref(softc, token)
 			break;
 		case IPFGENITER_HOSTMAP :
 			WRITE_ENTER(&softc->ipf_nat);
-			ipf_nat_hostmapdel((hostmap_t **)datap);
+			ipf_nat_hostmapdel(softc, (hostmap_t **)datap);
 			RWLOCK_EXIT(&softc->ipf_nat);
 			break;
 		default :

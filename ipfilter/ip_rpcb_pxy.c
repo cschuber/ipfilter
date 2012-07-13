@@ -1256,6 +1256,7 @@ ipf_p_rpcb_getnat(fin, nat, proto, port)
 			return(-1);
 		}
 
+		natl->nat_ptr = ipn;
 		fi.fin_saddr = natl->nat_nsrcaddr;
 		fi.fin_daddr = natl->nat_ndstaddr;
 		ipn->in_use++;

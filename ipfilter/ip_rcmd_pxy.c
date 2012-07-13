@@ -11,6 +11,12 @@
 
 #define	IPF_RCMD_PROXY
 
+typedef struct rcmdinfo {
+	u_32_t	rcmd_port;	/* Port number seen */
+	u_32_t	rcmd_portseq;	/* Sequence number where port is first seen */
+	ipnat_t	*rcmd_rule;	/* Template rule for back connection */
+} rcmdinfo_t;
+
 void ipf_p_rcmd_main_load(void);
 void ipf_p_rcmd_main_unload(void);
 
@@ -65,12 +71,14 @@ ipf_p_rcmd_new(arg, fin, aps, nat)
 	tcphdr_t *tcp = (tcphdr_t *)fin->fin_dp;
 	rcmdinfo_t *rc;
 	ipnat_t *ipn;
+	ipnat_t *np;
+	int size;
 
 	fin = fin;	/* LINT */
-	nat = nat;	/* LINT */
 
-	aps->aps_psiz = sizeof(rcmdinfo_t) + nat->nat_ptr->in_namelen + 1;
-	KMALLOCS(rc, rcmdinfo_t *, aps->aps_psiz);
+	np = nat->nat_ptr;
+	size = np->in_size;
+	KMALLOC(rc, rcmdinfo_t *);
 	if (rc == NULL) {
 #ifdef IP_RCMD_PROXY_DEBUG
 		printf("ipf_p_rcmd_new:KMALLOCS(%d) failed\n", sizeof(*rc));
@@ -78,12 +86,22 @@ ipf_p_rcmd_new(arg, fin, aps, nat)
 		return -1;
 	}
 
+	KMALLOCS(ipn, ipnat_t *, size);
+	if (ipn == NULL) {
+		KFREE(rc);
+		return -1;
+	}
+
 	aps->aps_data = rc;
+	aps->aps_psiz = sizeof(*rc);
 	bzero((char *)rc, sizeof(*rc));
+	bzero((char *)ipn, size);
+	rc->rcmd_rule = ipn;
+
 	aps->aps_sport = tcp->th_sport;
 	aps->aps_dport = tcp->th_dport;
 
-	ipn = &rc->rcmd_rule;
+	ipn->in_size = size;
 	ipn->in_ifps[0] = nat->nat_ifps[0];
 	ipn->in_ifps[1] = nat->nat_ifps[1];
 	ipn->in_apr = NULL;
@@ -91,7 +109,7 @@ ipf_p_rcmd_new(arg, fin, aps, nat)
 	ipn->in_hits = 1;
 	ipn->in_ippip = 1;
 
-	if ((nat->nat_ptr->in_redir & NAT_REDIRECT) != 0) {
+	if ((np->in_redir & NAT_REDIRECT) != 0) {
 		ipn->in_redir = NAT_MAP;
 		ipn->in_snip = ntohl(nat->nat_odstaddr);
 		ipn->in_nsrcaddr = nat->nat_odstaddr;
@@ -115,10 +133,11 @@ ipf_p_rcmd_new(arg, fin, aps, nat)
 	ipn->in_ndstmsk = 0xffffffff;
 	ipn->in_pr[0] = IPPROTO_TCP;
 	ipn->in_pr[1] = IPPROTO_TCP;
+	ipn->in_flags = (np->in_flags | IPN_PROXYRULE);
 	MUTEX_INIT(&ipn->in_lock, "rcmd proxy NAT rule");
 
-	ipn->in_namelen = nat->nat_ptr->in_namelen;
-	bcopy(nat->nat_ptr->in_names, ipn->in_ifnames, ipn->in_namelen);
+	ipn->in_namelen = np->in_namelen;
+	bcopy(np->in_names, ipn->in_ifnames, ipn->in_namelen);
 	ipn->in_ifnames[0] = nat->nat_ptr->in_ifnames[0];
 	ipn->in_ifnames[1] = nat->nat_ptr->in_ifnames[1];
 
@@ -135,7 +154,8 @@ ipf_p_rcmd_del(softc, aps)
 
 	rci = aps->aps_data;
 	if (rci != NULL) {
-		MUTEX_DESTROY(&rci->rcmd_rule.in_lock);
+		rci->rcmd_rule->in_flags |= IPN_DELETE;
+		ipf_nat_rulederef(softc, &rci->rcmd_rule);
 	}
 }
 
@@ -283,7 +303,7 @@ ipf_p_rcmd_portmsg(fin, aps, nat)
 
 		nflags |= NAT_SLAVE|IPN_TCP;
 		MUTEX_ENTER(&softn->ipf_nat_new);
-		nat2 = ipf_nat_add(&fi, &rc->rcmd_rule, NULL, nflags,
+		nat2 = ipf_nat_add(&fi, rc->rcmd_rule, NULL, nflags,
 				   direction);
 		MUTEX_EXIT(&softn->ipf_nat_new);
 

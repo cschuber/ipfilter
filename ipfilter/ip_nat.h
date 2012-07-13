@@ -231,7 +231,7 @@ typedef	struct	ipnat	{
 	u_long		in_space;
 	u_long		in_hits;
 	int		in_size;
-	u_int		in_use;
+	int		in_use;
 	u_int		in_hv[2];
 	int		in_flineno;		/* conf. file line number */
 	int		in_stepnext;
@@ -365,6 +365,7 @@ typedef	struct	ipnat	{
 #define	IPN_IN		0x200000
 #define	IPN_SEQUENTIAL	0x400000
 #define	IPN_PURGE	0x800000
+#define	IPN_PROXYRULE	0x1000000
 #define	IPN_USERFLAGS	(IPN_TCPUDP|IPN_AUTOPORTMAP|IPN_SIPRANGE|IPN_SPLIT|\
 			 IPN_ROUNDR|IPN_FILTER|IPN_NOTSRC|IPN_NOTDST|IPN_NO|\
 			 IPN_FRAG|IPN_STICKY|IPN_FIXEDDPORT|IPN_ICMPQUERY|\
@@ -642,6 +643,7 @@ typedef struct ipf_nat_softc_s {
 	nat_t		**ipf_nat_table[2];
 	nat_t		*ipf_nat_instances;
 	ipnat_t		*ipf_nat_list;
+	ipnat_t		**ipf_nat_list_tail;
 	ipnat_t		**ipf_nat_map_rules;
 	ipnat_t		**ipf_nat_rdr_rules;
 	ipftq_t		*ipf_nat_utqe;
@@ -678,7 +680,9 @@ extern	int	ipf_nat_checkout(fr_info_t *, u_32_t *);
 extern	void	ipf_nat_delete(ipf_main_softc_t *, struct nat *, int);
 extern	void	ipf_nat_deref(ipf_main_softc_t *, nat_t **);
 extern	void	ipf_nat_expire(ipf_main_softc_t *);
-extern	void	ipf_nat_hostmapdel(hostmap_t **);
+extern	int	ipf_nat_hashtab_add(ipf_main_softc_t *, ipf_nat_softc_t *,
+				    nat_t *);
+extern	void	ipf_nat_hostmapdel(ipf_main_softc_t *, hostmap_t **);
 extern	int	ipf_nat_hostmap_rehash(ipf_main_softc_t *,
 				       ipftuneable_t *, ipftuneval_t *);
 extern	nat_t	*ipf_nat_icmperrorlookup(fr_info_t *, int);
