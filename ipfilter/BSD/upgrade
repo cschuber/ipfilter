@@ -21,12 +21,32 @@ objdir=${os}-${rev}-${plat}
 # try to bomb out fast if anything fails....
 set -e
 
+if [ "$1" = "backout" ] ; then
+	for i in ipf ipfstat ipmon ipnat ippool; do
+		if [ -f /sbin/${i}.dist ] ; then
+			mv /sbin/${i}.dist /sbin/${i}
+		else
+			mv /usr/sbin/${i}.dist /usr/sbin/${i}
+		fi
+	done
+	if [ -f /boot/kernel/ipl.ko ] ; then
+		mv /boot/kernel/ipl.ko.dist /boot/kernel/ipl.ko
+		mv /boot/kernel/ipl.ko.symbols.dist /boot/kernel/ipl.ko.symbols
+	fi
+	exit 0
+fi
+
 for i in ipf ipfstat ipmon ipnat ippool; do
-	if [ ! -f /sbin/${i}.dist ] ; then
+	if [ ! -f /sbin/${i}.dist -a -f /sbin/${i} ] ; then
 		mv /sbin/${i} /sbin/${i}.dist
 		cp -p /sbin/${i}.dist /sbin/${i}
+		cp ${objdir}/${i} /sbin/
 	fi
-	cp ${objdir}/${i} /sbin/
+	if [ ! -f /usr/sbin/${i}.dist -a -f /usr/sbin/${i} ] ; then
+		mv /usr/sbin/${i} /usr/sbin/${i}.dist
+		cp -p /usr/sbin/${i}.dist /usr/sbin/${i}
+		cp ${objdir}/${i} /usr/sbin/
+	fi
 done
 if [ -f /boot/kernel/ipl.ko ] ; then
 	if [ ! -f /boot/kernel/ipl.ko.dist ] ; then
