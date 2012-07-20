@@ -150,6 +150,9 @@ ipf_p_ipsec_new(arg, fin, aps, nat)
 	ip_t *ip;
 	mb_t *m;
 
+	if (fin->fin_v != 4)
+		return -1;
+
 	off = fin->fin_plen - fin->fin_dlen + fin->fin_ipoff;
 	bzero(softi->ipsec_buffer, sizeof(softi->ipsec_buffer));
 	ip = fin->fin_ip;

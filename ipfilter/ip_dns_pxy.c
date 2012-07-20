@@ -183,6 +183,9 @@ ipf_p_dns_new(arg, fin, aps, nat)
 	dnsinfo_t *di;
 	int dlen;
 
+	if (fin->fin_v != 4)
+		return -1;
+
 	dlen = fin->fin_dlen - sizeof(udphdr_t);
 	if (dlen < sizeof(ipf_dns_hdr_t)) {
 		/*

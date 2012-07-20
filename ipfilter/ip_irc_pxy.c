@@ -232,11 +232,13 @@ ipf_p_irc_new(arg, fin, aps, nat)
 {
 	ircinfo_t *irc;
 
+	if (fin->fin_v != 4)
+		return -1;
+
 	KMALLOC(irc, ircinfo_t *);
 	if (irc == NULL)
 		return -1;
 
-	fin = fin;	/* LINT */
 	nat = nat;	/* LINT */
 
 	aps->aps_data = irc;
@@ -356,6 +358,7 @@ ipf_p_irc_send(fin, nat)
 	/* the mbuf chain will be extended if necessary by m_copyback() */
 #endif
 	COPYBACK(m, off, nlen, newbuf);
+	fin->fin_flx |= FI_DOCKSUM;
 
 	if (inc != 0) {
 #if defined(MENTAT) || defined(__sgi)

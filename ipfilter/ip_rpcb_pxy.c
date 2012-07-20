@@ -148,8 +148,10 @@ ipf_p_rpcb_new(arg, fin, aps, nat)
 {
 	rpcb_session_t *rs;
 
-	fin = fin;	/* LINT */
 	nat = nat;	/* LINT */
+
+	if (fin->fin_v != 4)
+		return -1;
 
 	KMALLOC(rs, rpcb_session_t *);
 	if (rs == NULL)
