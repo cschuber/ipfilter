@@ -16,7 +16,8 @@ printbuf(buf, len, zend)
 	char *buf;
 	int len, zend;
 {
-	char *s, c;
+	char *s;
+	int c;
 	int i;
 
 	for (s = buf, i = len; i; i--) {
