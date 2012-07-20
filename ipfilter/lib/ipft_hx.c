@@ -132,11 +132,12 @@ static	int	hex_readip(mb, ifn, dir)
 		ip = (ip_t *)readhex(s, (char *)ip);
 		if ((opts & OPT_DEBUG) != 0) {
 			if (opts & OPT_ASCII) {
+				int c = *t;
 				if (t < (char *)ip)
 					putchar('\t');
 				while (t < (char *)ip) {
-					if (isprint(*t) && isascii(*t))
-						putchar(*t);
+					if (isprint(c) && isascii(c))
+						putchar(c);
 					else
 						putchar('.');
 					t++;
