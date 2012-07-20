@@ -11,7 +11,7 @@ __EOF__
 
 gen_ipnat_conf() {
 	cat <<__EOF__
-rdr ${SUT_NET0_IFP_NAME} ${SUT_NET0_ADDR_V4} -> ${RECEIVER_NET1_ADDR_V4} proxy port 21 ftp/tcp
+rdr ${SUT_NET0_IFP_NAME} ${RECEIVER_NET1_ADDR_V4} -> ${RECEIVER_NET1_ADDR_V4} proxy port 21 ftp/tcp
 __EOF__
 	return 0;
 }
@@ -21,7 +21,7 @@ gen_ippool_conf() {
 }
 
 do_test() {
-	ftp_test ${SENDER_CTL_HOSTNAME} ${SUT_NET0_ADDR_V4} ${FTP_PATH} pass
+	ftp_test ${SENDER_CTL_HOSTNAME} ${RECEIVER_NET1_ADDR_V4} ${FTP_PATH} pass
 	return $?;
 }
 

@@ -15,7 +15,7 @@ rel=`uname -r`
 
 try() {
 	if ! $@ 2>&1; then
-		echo "FAILED: $*"
+		print "FAILED: $*"
 	fi
 }
 
@@ -26,6 +26,7 @@ SunOS5.*)
 	fi
 	case $3 in
 	*:*)
+		ifconfig $2 $1 up >/dev/null 2>&1
 		try ifconfig $2 $1 addif $3/$4 up
 		;;
 	*)

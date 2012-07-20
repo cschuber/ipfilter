@@ -1,3 +1,15 @@
+no_base_ruleset=1
+capture_net0=0
+capture_net1=0
+capture_ipmon=0
+capture_sender=0
+capture_receiver=0
+preserve_net0=0
+preserve_net1=0
+preserve_ipmon=0
+preserve_sender=0
+preserve_receiver=0
+
 gen_ipf_conf() {
 	cat 1h/v4/1h_ipf_parse_017_v4.data
 	return 0;

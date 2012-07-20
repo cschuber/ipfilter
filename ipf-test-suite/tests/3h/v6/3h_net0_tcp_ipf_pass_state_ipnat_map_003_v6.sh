@@ -1,5 +1,4 @@
-#!/bin/ksh
-# ni7
+
 gen_ipf_conf() {
 	generate_block_rules
 	generate_test_hdr
@@ -26,7 +25,8 @@ do_test() {
 	tcp_test ${SENDER_CTL_HOSTNAME} ${RECEIVER_NET1_ADDR_V6} 5059 pass
 	ret=$?
 	stop_tcp_server ${RECEIVER_CTL_HOSTNAME} 1
-	ret=$((ret + $?))
+	x=$?
+	ret=$((ret + x))
 	return $ret;
 }
 
@@ -35,8 +35,7 @@ do_tune() {
 }
 
 do_verify() {
-	${IPF_BIN_DIR}/log.sh verify_srcdst_1 \
-	    ${NET1_FAKE_ADDR_V6} ${RECEIVER_NET1_ADDR_V6}
+	verify_srcdst_1 ${NET1_FAKE_ADDR_V6} ${RECEIVER_NET1_ADDR_V6}
 	if [[ $? -eq 0 ]] ; then
 		echo "No packets ${NET1_FAKE_ADDR_V6},${RECEIVER_NET1_ADDR_V6}"
 		return 1

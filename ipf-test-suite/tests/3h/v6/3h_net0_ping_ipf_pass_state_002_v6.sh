@@ -1,10 +1,9 @@
-#!/bin/ksh
 
 gen_ipf_conf() {
 	generate_block_rules
 	generate_test_hdr
 	cat << __EOF__
-pass in on ${SUT_NET0_IFP_NAME} proto ipv6-icmp all icmp-type echo keep state
+pass in on ${SUT_NET0_IFP_NAME} inet6 proto ipv6-icmp all icmp-type echo keep state
 __EOF__
 	return 0;
 }
@@ -27,5 +26,5 @@ do_tune() {
 }
 
 do_verify() {
-	return 0;
+	return 2;
 }

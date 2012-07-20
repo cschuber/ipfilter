@@ -1,3 +1,15 @@
+no_base_ruleset=1
+capture_net0=0
+capture_net1=0
+capture_ipmon=0
+capture_sender=0
+capture_receiver=0
+preserve_net0=0
+preserve_net1=0
+preserve_ipmon=0
+preserve_sender=0
+preserve_receiver=0
+
 gen_ipf_conf() {
 	return 1;
 }
@@ -12,20 +24,22 @@ gen_ippool_conf() {
 }
 
 do_test() {
-	count_ipnat_rules
+	count_ipnat_rules 2>&1
 	active=$?
 	if [[ $active = 0 ]] ; then
-		echo "-- no ipnat rules loaded prior to flush"
+		print - "-- ERROR no ipnat rules loaded prior to flush"
 		return 1
 	fi
-	${BIN_IPNAT} -C
-	count_ipnat_rules
+	${BIN_IPNAT} -C 2>&1
+	count_ipnat_rules 2>&1
 	active=$?
-	if [[ $active = 0 ]] ; then
-		return 0
+	active=$((active))
+	if [[ $active != 0 ]] ; then
+		print - "-- ERROR $active ipnat rules remaining after flush"
+		return 1;
 	fi
-	echo "-- ipnat rules remaining after flush"
-	return 1;
+	print - "-- OK no ipnat rules remaining"
+	return 0
 }
 
 do_tune() {

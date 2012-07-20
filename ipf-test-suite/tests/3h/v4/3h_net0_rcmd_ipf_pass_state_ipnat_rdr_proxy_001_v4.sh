@@ -21,7 +21,7 @@ gen_ippool_conf() {
 }
 
 do_test() {
-	rcmd_test ${SENDER_CTL_HOSTNAME} ${RECEIVER_NET1_ADDR_V4} pass
+	rcmd_test ${SENDER_CTL_HOSTNAME} ${SUT_NET0_ADDR_V4} pass
 	return $?;
 }
 

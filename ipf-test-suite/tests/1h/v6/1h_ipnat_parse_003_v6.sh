@@ -1,15 +1,22 @@
+no_base_ruleset=1
+capture_net0=0
+capture_net1=0
+capture_ipmon=0
+capture_sender=0
+capture_receiver=0
+preserve_net0=0
+preserve_net1=0
+preserve_ipmon=0
+preserve_sender=0
+preserve_receiver=0
+dump_stats=0
+
 gen_ipf_conf() {
-	return 0;
+	return 1;
 }
 
 gen_ipnat_conf() {
-	cat <<__EOF__
-bimap le0 0/0 -> 0/128
-bimap le0 1::/128 -> 1::/128
-bimap le0 128::/1 -> 0/0
-bimap le0 10::/8 -> 1:2:3::/96
-bimap le0 10::5:6/96 -> 1:2:3::4/96
-__EOF__
+	cat 1h_ipnat_parse_003_v6.sh
 	return 0;
 }
 
@@ -18,8 +25,8 @@ gen_ippool_conf() {
 }
 
 do_test() {
-	validate_loaded_ipf_conf
-	return 0
+	validate_loaded_ipnat_conf
+	return $?
 }
 
 do_tune() {

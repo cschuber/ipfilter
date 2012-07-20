@@ -21,13 +21,9 @@ gen_ippool_conf() {
 }
 
 do_test() {
-	start_udp_server ${RECEIVER_CTL_HOSTNAME} ${RECEIVER_NET1_ADDR_V4} 5059
-	sleep 3
-	udp_test ${SENDER_CTL_HOSTNAME} ${RECEIVER_NET1_ADDR_V4} 5059 pass
-	ret=$?
-	stop_udp_server ${RECEIVER_CTL_HOSTNAME} 1
-	ret=$((ret + $?))
-	return $ret;
+	basic_udp_test ${RECEIVER_CTL_HOSTNAME} ${RECEIVER_NET1_ADDR_V4} \
+	    5059 ${SENDER_CTL_HOSTNAME} ${RECEIVER_NET1_ADDR_V4} pass
+	return $?;
 }
 
 do_tune() {
@@ -35,8 +31,7 @@ do_tune() {
 }
 
 do_verify() {
-	${IPF_BIN_DIR}/log.sh verify_srcdst_1 \
-	    ${NET1_FAKE_ADDR_V4} ${RECEIVER_NET1_ADDR_V4}
+	verify_srcdst_1 ${NET1_FAKE_ADDR_V4} ${RECEIVER_NET1_ADDR_V4}
 	if [[ $? -eq 0 ]] ; then
 		echo "No packets ${NET1_FAKE_ADDR_V4},${RECEIVER_NET1_ADDR_V4}"
 		return 1

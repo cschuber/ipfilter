@@ -1,14 +1,18 @@
+no_base_ruleset=1
+capture_net0=0
+capture_net1=0
+capture_ipmon=0
+capture_sender=0
+capture_receiver=0
+preserve_net0=0
+preserve_net1=0
+preserve_ipmon=0
+preserve_sender=0
+preserve_receiver=0
+dump_stats=0
+
 gen_ipf_conf() {
-	cat <<__EOF__
-log in inet6 proto tcp all
-pass in inet6 proto 6 from any to any
-pass in inet6 proto udp from ::1 to ::1
-block in inet6 proto ipv6 from any to any
-block in inet6 proto 17 from any to any
-block in inet6 proto 250 from any to any
-pass in inet6 proto tcp/udp from any to any
-block in inet6 proto tcp-udp from any to any
-__EOF__
+	cat 1h/v6/1h_ipf_parse_002_v6.data
 	return 0;
 }
 

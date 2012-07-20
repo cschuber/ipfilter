@@ -19,10 +19,10 @@ fi
 
 case `uname -s` in
 SunOS)
-	echo "ping -s ${dest} ${size} 3"
-	ping -s ${dest} ${size} 3 &
+	print "| ping -s ${dest} ${size} 3"
+	ping -s ${dest} ${size} 3 2>&1 &
 	job=$!
-	(sleep 6 && kill -INT $job 2>/dev/null || echo "ping kill failed") &
+	(sleep 6 && kill -INT $job 2>/dev/null || print "| ping kill failed") &
 	wait $job
 	ret=$?
 	;;
@@ -35,23 +35,21 @@ SunOS)
 		pingprog="ping -n"
 		;;
 	esac
-	echo "${pingprog} -c 3 -s ${size} ${dest}"
-	${pingprog} -c 3 -s ${size} ${dest} &
+	print "| ${pingprog} -c 3 -s ${size} ${dest}"
+	${pingprog} -c 3 -s ${size} ${dest} 2>&1 &
 	job=$!
-	(sleep 6 && kill -INT $job 2>/dev/null || echo "ping kill failed") &
+	(sleep 6 && kill -INT $job 2>/dev/null || print "| ping kill failed") &
 	wait $job
 	ret=$?
 	;;
 esac
-echo "ping returned $ret expected $expected";
-if [[ $ret == 0 && $expected == 0 ]] ; then
-	echo "PASS ping result matches expected"
+print "| ping returned $ret expected $expected";
+if [[ $ret != 0 ]] ; then
+	ret=1
+fi
+if [[ $ret = $expected ]] ; then
+	print "PASS ping result matches expected"
 else
-	if [[ $ret != 0 && $expected != 0 ]] ; then
-		echo "PASS ping result matches expected"
-		ret=0
-	else
-		echo "FAIL ping result does not match expected"
-	fi
+	print "FAIL ping result does not match expected"
 fi
 exit $ret

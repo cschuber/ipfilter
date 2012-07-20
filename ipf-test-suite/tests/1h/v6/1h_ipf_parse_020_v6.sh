@@ -1,10 +1,18 @@
+no_base_ruleset=1
+capture_net0=0
+capture_net1=0
+capture_ipmon=0
+capture_sender=0
+capture_receiver=0
+preserve_net0=0
+preserve_net1=0
+preserve_ipmon=0
+preserve_sender=0
+preserve_receiver=0
+dump_stats=0
+
 gen_ipf_conf() {
-	cat <<__EOF__
-pass in on ppp0 inet6 from ppp0/peer to ppp0/128
-block in on hme0 inet6 from any to hme0/broadcast
-pass in on bge0 inet6 from bge0/network to bge0/128
-block in on eri0 inet6 from any to eri0/netmasked
-__EOF__
+	cat 1h/v6/1h_ipf_parse_020_v6.data
 	return 0;
 }
 

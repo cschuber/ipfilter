@@ -19,23 +19,23 @@ esac
 #
 URL=ftp://${addr}${2}
 
-FTP_OUTPUT=${3}/ftp.out
-echo "PASSIVE FTP download test"
-echo "${wget} ${WGETOPTS} ${URL} > ${FTP_OUTPUT}"
-${wget} ${WGETOPTS} ${URL} >${FTP_OUTPUT} 2>&1
+FTP_OUTPUT=${3}/ftp-job.out
+print "| PASSIVE FTP download test" > ${FTP_OUTPUT}
+print "| ${wget} ${WGETOPTS} ${URL} >> ${FTP_OUTPUT}"
+${wget} ${WGETOPTS} ${URL} >> ${FTP_OUTPUT} 2>&1
 if [[ $? -ne 0 ]] ; then
 	cat ${FTP_OUTPUT}
-	echo "FAIL passive ftp downloaded ${URL}"
+	print "FAIL passive ftp downloaded ${URL}"
 	exit 1
 fi
-echo "ACTIVE FTP download test"
-echo "${wget} --no-passive-ftp ${WGETOPTS} ${URL} >> ${FTP_OUTPUT}"
+print "| ACTIVE FTP download test" >> ${FTP_OUTPUT}
+print "| ${wget} --no-passive-ftp ${WGETOPTS} ${URL} >> ${FTP_OUTPUT}"
 ${wget} --no-passive-ftp ${WGETOPTS} ${URL} >> ${FTP_OUTPUT} 2>&1
 if [[ $? -ne 0 ]] ; then
 	cat ${FTP_OUTPUT}
-	echo "FAIL active ftp downloaded ${URL}"
+	print "FAIL active ftp downloaded ${URL}"
 	exit 1
 fi
 cat ${FTP_OUTPUT}
-echo "PASS ftp downloaded ${URL}"
+print "PASS ftp downloaded ${URL}"
 exit 0

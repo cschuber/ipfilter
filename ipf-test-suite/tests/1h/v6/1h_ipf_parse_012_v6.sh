@@ -1,13 +1,18 @@
+no_base_ruleset=1
+capture_net0=0
+capture_net1=0
+capture_ipmon=0
+capture_sender=0
+capture_receiver=0
+preserve_net0=0
+preserve_net1=0
+preserve_ipmon=0
+preserve_sender=0
+preserve_receiver=0
+dump_stats=0
+
 gen_ipf_conf() {
-	cat <<__EOF__
-pass in inet6 from 1:1::1:1/128 to 2:2::2:2/128
-pass in inet6 from {2:2::2:2/24,3::3:3:3/128} to 4:4:4:4::/128
-pass in inet6 from {2:2::2:2/24,3::3:3:3/128} to {::5:5:5:5/128,6:6:6::6/128}
-pass in inet6 from {2:2::2:2/24,3::3:3:3/128} to {::5:5:5:5/128,6:6:6::6/128} port = {22,25}
-pass in inet6 proto tcp from {2:2::2:2/24,3::3:3:3/128} port = {53,9} to {::5:5:5:5/128,6:6:6::6/128}
-pass in inet6 proto udp from {2:2::2:2/24,3::3:3:3/128} to {::5:5:5:5/128,6:6:6::6/128} port = {53,9}
-pass in inet6 from 10:10:10::10 to 11:11:11::11
-__EOF__
+	cat 1h/v6/1h_ipf_parse_012_v6.data
 	return 0;
 }
 

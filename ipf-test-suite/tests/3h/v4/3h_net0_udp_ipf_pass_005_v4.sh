@@ -5,9 +5,9 @@ gen_ipf_conf() {
 	generate_test_hdr
 	cat << __EOF__
 pass in on ${SUT_NET0_IFP_NAME} proto udp from any to ${RECEIVER_NET1_ADDR_V4} port <= 5055
-pass out on ${SUT_NET0_IFP_NAME} proto udp from ${RECEIVER_NET1_ADDR_V4} port <= 5055 to ${RECEIVER_NET1_ADDR_V4}
 pass out on ${SUT_NET1_IFP_NAME} proto udp from any to ${RECEIVER_NET1_ADDR_V4} port <= 5055
-pass in on ${SUT_NET1_IFP_NAME} proto udp from ${RECEIVER_NET1_ADDR_V4} port <= 5055 to ${RECEIVER_NET1_ADDR_V4}
+pass in on ${SUT_NET1_IFP_NAME} proto udp from ${RECEIVER_NET1_ADDR_V4} port <= 5055 to any
+pass out on ${SUT_NET0_IFP_NAME} proto udp from ${RECEIVER_NET1_ADDR_V4} port <= 5055 to any
 __EOF__
 	return 0;
 }
@@ -21,13 +21,9 @@ gen_ippool_conf() {
 }
 
 do_test() {
-	start_udp_server ${RECEIVER_CTL_HOSTNAME} ${RECEIVER_NET1_ADDR_V4} 5055
-	sleep 1
-	udp_test ${SENDER_CTL_HOSTNAME} ${RECEIVER_NET1_ADDR_V4} 5055 pass
-	ret=$?
-	stop_udp_server ${RECEIVER_CTL_HOSTNAME} 1
-	ret=$((ret + $?))
-	return $ret;
+	basic_udp_test ${RECEIVER_CTL_HOSTNAME} ${RECEIVER_NET1_ADDR_V4} \
+	    5055 ${SENDER_CTL_HOSTNAME} ${RECEIVER_NET1_ADDR_V4} pass
+	return $?;
 }
 
 do_tune() {
@@ -35,5 +31,5 @@ do_tune() {
 }
 
 do_verify() {
-	return 0;
+	return 2;
 }

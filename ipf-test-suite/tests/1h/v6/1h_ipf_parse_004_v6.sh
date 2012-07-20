@@ -1,15 +1,18 @@
+no_base_ruleset=1
+capture_net0=0
+capture_net1=0
+capture_ipmon=0
+capture_sender=0
+capture_receiver=0
+preserve_net0=0
+preserve_net1=0
+preserve_ipmon=0
+preserve_sender=0
+preserve_receiver=0
+dump_stats=0
+
 gen_ipf_conf() {
-	cat <<__EOF__
-log in inet6 proto tcp from any port > 0 to any
-log in inet6 proto tcp from any to any port > 0
-pass in inet6 proto 6 from any port != 0 to any port 0 >< 65535
-pass in inet6 proto 17 from ::1 port > 32000 to ::1 port < 29000
-block in inet6 proto udp from any port != \ntp to any port < echo
-block in inet6 proto tcp from any port = smtp to any port > 25
-pass in inet6 proto tcp/udp from any port 1 >< 3 to any port 1 <> 3
-pass in inet6 proto tcp/udp from any port 2:2 to any port 10:20
-pass in log first quick inet6 proto tcp from any port > 1023 to any port = 1723 flags S keep state
-__EOF__
+	cat 1h/v6/1h_ipf_parse_004_v6.data
 	return 0;
 }
 

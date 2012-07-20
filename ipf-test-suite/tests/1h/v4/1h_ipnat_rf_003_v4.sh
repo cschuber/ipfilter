@@ -1,3 +1,15 @@
+no_base_ruleset=1
+capture_net0=0
+capture_net1=0
+capture_ipmon=0
+capture_sender=0
+capture_receiver=0
+preserve_net0=0
+preserve_net1=0
+preserve_ipmon=0
+preserve_sender=0
+preserve_receiver=0
+
 gen_ipf_conf() {
 	return 1;
 }
@@ -12,13 +24,20 @@ gen_ippool_conf() {
 }
 
 do_test() {
-	dump_ipnat_rules
+	dump_ipnat_rules 2>&1
 	ret=$?
 	if [[ $ret != 0 ]] ; then
+		print - "-- ERROR dumping ipnat rules returned an error"
 		return $ret
 	fi
-	${BIN_IPNAT} -rf ${IPF_TMP_DIR}/ipnat.conf.a
-	return $?;
+	${BIN_IPNAT} -rf ${IPF_TMP_DIR}/ipnat.conf.a 2>&1
+	ret=$?
+	if [[ $ret != 0 ]] ; then
+		print - "-- ERROR removing ipnat rules returned an error"
+		return $ret
+	fi
+	print - "-- OK ipnat rules removed"
+	return 0;
 }
 
 do_tune() {
@@ -26,17 +45,13 @@ do_tune() {
 }
 
 do_verify() {
-	dump_ipnat_rules
-	ret=$?
-	if [[ $ret != 0 ]] ; then
-		return $ret
-	fi
-	active=$(ccat < ${IPF_TMP_DIR}/ipnat.conf.a | wc -l)
-	active=$((active))
+	count_ipnat_rules 2>&1
+	active=$?
 	if [[ $active != 0 ]] ; then
-		echo "-- Not all ipnat rules removed"
-		${BIN_IPNAT} -l
+		print - "-- ERROR $active ipnat rules were not removed"
+		${BIN_IPNAT} -l 2>&1
 		return 1
 	fi
+	print - "-- OK no ipnat rules remaining"
 	return 0;
 }

@@ -13,7 +13,7 @@ rel=`uname -r`
 try() {
 	$@ 2>&1
 	if [ $? -ne 0 ] ; then
-		echo "FAILED: $*"
+		print "FAILED: $*"
 	fi
 }
 
@@ -21,7 +21,7 @@ unplumb() {
 	ifconfig $2 $1 > /dev/null 2>&1
 	ret=$?
 	if [[ $ret -ne 0 ]]; then
-		echo "FAILED: ifconfig $2"
+		print "FAILED: ifconfig $2"
 		return $ret
 	fi
 	ifconfig $2 $1 | egrep "	$1 " | egrep -v ' fe80:' | \

@@ -24,7 +24,7 @@ do_test() {
 	count_ipf_rules
 	active=$?
 	if [[ $active != 6 ]] ; then
-		echo "-- incorrect rule count ($active) prior to flush"
+		print - "-- ERROR incorrect rule count ($active) prior to flush"
 		ccat < ${IPF_TMP_DIR}/ipf.conf.a
 		return 1
 	fi
@@ -34,7 +34,7 @@ do_test() {
 	if [[ $active = 3 ]] ; then
 		return 0
 	fi
-	echo "-- incorrect rule count ($active) after flush"
+	print - "-- ERROR incorrect rule count ($active) after flush"
 	ccat < ${IPF_TMP_DIR}/ipf.conf.a
 	return 1;
 }

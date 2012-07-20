@@ -1,4 +1,3 @@
-#!/bin/ksh
 
 gen_ipf_conf() {
 	generate_pass_rules
@@ -22,6 +21,7 @@ do_test() {
 	sleep 1
 	udp_test ${SENDER_CTL_HOSTNAME} ${RECEIVER_NET1_ADDR_V4} 5050 block
 	ret=$?
+	ret=$((ret))
 	stop_udp_server ${RECEIVER_CTL_HOSTNAME} 0
 	ret=$((ret + $?))
 	return $ret;

@@ -13,10 +13,10 @@ Proto => 'udp'
 ) ||
 die "ERROR creating UDP socket $ARGV[0],$ARGV[1]: $!";
 
-$socket->send($data, 0, $remote);
-
 eval {
 	local $SIG{ALRM} = sub { $died = 1; die "alarm\n" };
+	alarm($tout);
+	$socket->send($data, 0, $remote);
 	alarm($tout);
 	$remote = $socket->recv($back, 1024);
 };

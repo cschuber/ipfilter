@@ -1,9 +1,18 @@
+no_base_ruleset=1
+capture_net0=0
+capture_net1=0
+capture_ipmon=0
+capture_sender=0
+capture_receiver=0
+preserve_net0=0
+preserve_net1=0
+preserve_ipmon=0
+preserve_sender=0
+preserve_receiver=0
+dump_stats=0
+
 gen_ipf_conf() {
-	cat <<__EOF__
-pass in exp { "ip6.src != 1:1:1::0/96; tcp.dport = 80;" }
-pass in exp { "ip6.addr = 1:2:3:4:5:6:7:8,10:20:30:40:50:60:70:80;" }
-block out exp { "ip6.dst= 127::/32;" }
-__EOF__
+	cat 1h/v6/1h_ipf_parse_022_v6.data
 	return 0;
 }
 

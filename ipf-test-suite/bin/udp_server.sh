@@ -6,5 +6,6 @@
 #
 PATH=/usr/local/bin:/opt/sfw/bin:/usr/sfw/bin:/usr/pkg/bin:/usr/bin:/bin
 #
-. $(dirname $0)/../vars.sh
+dir=${0%/*}
+. ${dir}/../config.sh
 exec perl ${IPF_BIN_DIR}/udp_server.pl $* 2>&1

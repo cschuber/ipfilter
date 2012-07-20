@@ -15,7 +15,7 @@ do_test() {
 	count_ipf_rules
 	active=$?
 	if [[ $active = 0 ]] ; then
-		echo "-- no rules loaded prior to switch"
+		print - "|  no rules loaded prior to switch"
 		return 1
 	fi
 	${BIN_IPF} -IFa
@@ -23,7 +23,7 @@ do_test() {
 	count_ipf_rules
 	active=$?
 	if [[ $active != 0 ]] ; then
-		echo "-- rules present after switch"
+		print - "|  rules present after switch"
 		return 1
 	fi
 	return 0;
