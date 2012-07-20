@@ -476,6 +476,9 @@ static int read_log(fd, lenp, buf, bufsize)
 {
 	int	nr;
 
+	if (bufsize > IPFILTER_LOGSIZE)
+		bufsize = IPFILTER_LOGSIZE;
+
 	nr = read(fd, buf, bufsize);
 	if (!nr)
 		return 2;
@@ -1816,7 +1819,7 @@ static void openlogs(config_t *conf)
 
 static int read_loginfo(config_t *conf)
 {
-	char buf[DEFAULT_IPFLOGSIZE];
+	iplog_t buf[DEFAULT_IPFLOGSIZE/sizeof(iplog_t)+1];
 	int n, tr, nr, i;
 	logsource_t *l;
 	fd_set fdr;
@@ -1846,7 +1849,7 @@ static int read_loginfo(config_t *conf)
 		}
 
 		n = 0;
-		tr = read_log(l->fd, &n, buf, sizeof(buf));
+		tr = read_log(l->fd, &n, (char *)buf, sizeof(buf));
 		if (donehup) {
 			if (conf->file != NULL) {
 				if (conf->log != NULL) {
@@ -1875,8 +1878,9 @@ static int read_loginfo(config_t *conf)
 		case -1 :
 			if (ipmonopts & IPMON_SYSLOG)
 				syslog(LOG_CRIT, "read: %m\n");
-			else
-				perror("read");
+			else {
+				ipferror(l->fd, "read");
+			}
 			return 0;
 		case 1 :
 			if (ipmonopts & IPMON_SYSLOG)
@@ -1889,7 +1893,7 @@ static int read_loginfo(config_t *conf)
 		case 0 :
 			nr += tr;
 			if (n > 0) {
-				print_log(conf, l, buf, n);
+				print_log(conf, l, (char *)buf, n);
 				if (!(ipmonopts & IPMON_SYSLOG))
 					fflush(conf->log);
 			}
