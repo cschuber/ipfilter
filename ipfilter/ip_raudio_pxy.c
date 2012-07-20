@@ -56,12 +56,14 @@ ipf_p_raudio_new(arg, fin, aps, nat)
 {
 	raudio_t *rap;
 
+	nat = nat;	/* LINT */
+
+	if (fin->fin_v != 4)
+		return -1;
+
 	KMALLOCS(aps->aps_data, void *, sizeof(raudio_t));
 	if (aps->aps_data == NULL)
 		return -1;
-
-	fin = fin;	/* LINT */
-	nat = nat;	/* LINT */
 
 	bzero(aps->aps_data, sizeof(raudio_t));
 	rap = aps->aps_data;

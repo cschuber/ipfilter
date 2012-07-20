@@ -119,6 +119,9 @@ ipf_p_pptp_new(arg, fin, aps, nat)
 	int size;
 	ip_t *ip;
 
+	if (fin->fin_v != 4)
+		return -1;
+
 	ip = fin->fin_ip;
 	np = nat->nat_ptr;
 	size = np->in_size;
