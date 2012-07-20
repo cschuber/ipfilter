@@ -25,8 +25,6 @@ printnatside(side, ns)
 	PRINTF("%lu\tdivert dup %s\n", ns->ns_divert_dup, side);
 	PRINTF("%lu\tdivert exist %s\n", ns->ns_divert_exist, side);
 	PRINTF("%lu\tdrop %s\n", ns->ns_drop, side);
-	PRINTF("%lu\tencap dup %s\n", ns->ns_encap_dup, side);
-	PRINTF("%lu\tencap pullup %s\n", ns->ns_encap_pullup, side);
 	PRINTF("%lu\texhausted %s\n", ns->ns_exhausted, side);
 	PRINTF("%lu\ticmp address %s\n", ns->ns_icmp_address, side);
 	PRINTF("%lu\ticmp basic %s\n", ns->ns_icmp_basic, side);

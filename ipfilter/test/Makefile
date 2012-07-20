@@ -135,8 +135,7 @@ ntests: \
 	$(RESDIR)/n104 \
 	$(RESDIR)/n105 \
 	$(RESDIR)/n106 \
-	$(RESDIR)/n200 \
-	$(RESDIR)/n201
+	$(RESDIR)/n200
 
 #
 # Basic IPv6 NAT tests
@@ -461,12 +460,6 @@ $(RESDIR)/n106: expected/$(RESDIR)/n106 regress/$(RESDIR)/n106 input/$(RESDIR)/n
 	@/bin/sh ./n_test $@ $(TESTMODE)
 
 $(RESDIR)/n200: expected/$(RESDIR)/n200 regress/$(RESDIR)/n200 input/$(RESDIR)/n200
-	@/bin/sh ./n_test $@ $(TESTMODE)
-
-$(RESDIR)/n201: expected/$(RESDIR)/n201 regress/$(RESDIR)/n201 input/$(RESDIR)/n201
-	@/bin/sh ./n_test $@ $(TESTMODE)
-
-$(RESDIR)/n202: expected/n202 regress/n202 input/n202
 	@/bin/sh ./n_test $@ $(TESTMODE)
 
 $(RESDIR)/n1_6: expected/$(RESDIR)/n1_6 regress/$(RESDIR)/n1_6 input/$(RESDIR)/n1_6
