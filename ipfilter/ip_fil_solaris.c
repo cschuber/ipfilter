@@ -721,6 +721,7 @@ ipf_ifpaddr(softc, v, atype, qifptr, inp, inpmask)
 	struct sockaddr_in sin[2];
 	net_ifaddr_t types[2];
 	void *array;
+	int error;
 
 	if ((qifptr == NULL) || (qifptr == (void *)-1))
 		return -1;
@@ -740,9 +741,18 @@ ipf_ifpaddr(softc, v, atype, qifptr, inp, inpmask)
 	types[1] = NA_NETMASK;
 
 	if (v == 4) {
+		int logical = 0;
+
 		array = sin;
-		net_getlifaddr(softc->ipf_nd_v4, (phy_if_t)qifptr, 0,
-			       2, types, sin);
+		do {
+			error = net_getlifaddr(softc->ipf_nd_v4,
+					       (phy_if_t)qifptr, logical,
+					       2, types, sin);
+			logical++;
+		} while (types[0] == NA_ADDRESS && error == 0 &&
+			 sin[0].sin_addr.s_addr == 0);
+		if (sin[0].sin_addr.s_addr == 0 && error != 0)
+			return error;
 	} else {
 		array = sin6;
 		net_getlifaddr(softc->ipf_nd_v6, (phy_if_t)qifptr, 0,
