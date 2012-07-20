@@ -56,10 +56,10 @@ for j in auth frag nat proxy scan state sync pool dstlist htable lookup rules \
 	done
 done
 echo -n " net/radix_ipf.h"
-cp net/radix_ipf.h $ipfdir/../net
-chmod 644 $ipfdir/../net/radix_ipf.h
-echo -n " radix.c -> $ipfdir/radix_ipf.c"
-cp radix.c $ipfdir/radix_ipf.c
+cp radix_ipf.h $ipfdir
+chmod 644 $ipfdir/radix_ipf.h
+echo -n " radix_ipf.c -> $ipfdir/radix_ipf.c"
+cp radix_ipf.c $ipfdir/radix_ipf.c
 chmod 644 $ipfdir/radix_ipf.c
 
 case $os in
@@ -97,7 +97,7 @@ if [ -f $ipfdir/ip_fil.c ] ; then
 fi
 
 for i in ip_nat6.c ip_fil.h fil.c ip_log.c ip_compat.h ipl.h ip_*_pxy.c \
-	 ip_fil_compat.c; do
+	 ip_fil_compat.c ipf_rb.h; do
 	echo -n " $i"
 	cp $i $ipfdir
 	chmod 644 $ipfdir/$i
@@ -113,7 +113,7 @@ for j in auth compat fil frag nat proxy scan state sync pool htable dstlist \
 		chmod 644 /usr/include/netinet/$i
 	fi
 done
-for j in ipl.h; do
+for j in ipl.h ipf_rb.h; do
 	if [ -f "$j" ] ; then
 		echo -n " $j"
 		cp $j /usr/include/netinet/$j

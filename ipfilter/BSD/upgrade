@@ -22,11 +22,16 @@ objdir=${os}-${rev}-${plat}
 set -e
 
 for i in ipf ipfstat ipmon ipnat ippool; do
-	if [ ! -f /sbin/${i}.dist ] ; then
+	if [ ! -f /sbin/${i}.dist -a -f /sbin/${i} ] ; then
 		mv /sbin/${i} /sbin/${i}.dist
 		cp -p /sbin/${i}.dist /sbin/${i}
+		cp ${objdir}/${i} /sbin/
 	fi
-	cp ${objdir}/${i} /sbin/
+	if [ ! -f /usr/sbin/${i}.dist -a -f /usr/sbin/${i} ] ; then
+		mv /usr/sbin/${i} /usr/sbin/${i}.dist
+		cp -p /usr/sbin/${i}.dist /usr/sbin/${i}
+		cp ${objdir}/${i} /usr/sbin/
+	fi
 done
 if [ -f /boot/kernel/ipl.ko ] ; then
 	if [ ! -f /boot/kernel/ipl.ko.dist ] ; then
