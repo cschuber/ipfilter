@@ -1,6 +1,0 @@
-#!/usr/sbin/dtrace -Fs
-
-fbt:ipf:ipf_lookup_res_name:entry{
-	printf("unit %d type %d name %s", arg1, arg2, stringof(arg3));
-}
-
