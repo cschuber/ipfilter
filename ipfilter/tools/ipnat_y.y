@@ -119,7 +119,7 @@ static	int	addname(ipnat_t **, char *);
 %token	IPNY_ROUNDROBIN IPNY_FRAG IPNY_AGE IPNY_ICMPIDMAP IPNY_PROXY
 %token	IPNY_TCP IPNY_UDP IPNY_TCPUDP IPNY_STICKY IPNY_MSSCLAMP IPNY_TAG
 %token	IPNY_TLATE IPNY_POOL IPNY_HASH IPNY_NO IPNY_REWRITE IPNY_PROTO
-%token	IPNY_ON IPNY_SRC IPNY_DST IPNY_IN IPNY_OUT IPNY_DIVERT IPNY_ENCAP
+%token	IPNY_ON IPNY_SRC IPNY_DST IPNY_IN IPNY_OUT IPNY_DIVERT
 %token	IPNY_CONFIG IPNY_ALLOW IPNY_DENY IPNY_DNS IPNY_INET IPNY_INET6
 %token	IPNY_SEQUENTIAL IPNY_DSTLIST IPNY_PURGE
 %type	<port> portspec
@@ -180,7 +180,6 @@ rule:	map eol
 	| redir eol
 	| rewrite ';'
 	| divert ';'
-	| encap ';'
 	;
 
 no:	IPNY_NO				{ nat->in_flags |= IPN_NO; }
@@ -194,8 +193,12 @@ map:	mapit ifnames addr tlate rhsaddr proxy mapoptions
 					yyerror("3.address family mismatch");
 				  if (nat->in_v[0] == 0 && $5.v != 0)
 					nat->in_v[0] = $5.v;
+				  else if (nat->in_v[0] == 0 && $3.v != 0)
+					nat->in_v[0] = $3.v;
 				  if (nat->in_v[1] == 0 && $5.v != 0)
 					nat->in_v[1] = $5.v;
+				  else if (nat->in_v[1] == 0 && $3.v != 0)
+					nat->in_v[1] = $3.v;
 				  nat->in_osrcatype = $3.t;
 				  bcopy(&$3.a, &nat->in_osrc.na_addr[0],
 					sizeof($3.a));
@@ -215,8 +218,12 @@ map:	mapit ifnames addr tlate rhsaddr proxy mapoptions
 					yyerror("4.address family mismatch");
 				  if (nat->in_v[1] == 0 && $5.v != 0)
 					nat->in_v[1] = $5.v;
+				  else if (nat->in_v[0] == 0 && $3.v != 0)
+					nat->in_v[0] = $3.v;
 				  if (nat->in_v[0] == 0 && $5.v != 0)
 					nat->in_v[0] = $5.v;
+				  else if (nat->in_v[1] == 0 && $3.v != 0)
+					nat->in_v[1] = $3.v;
 				  nat->in_osrcatype = $3.t;
 				  bcopy(&$3.a, &nat->in_osrc.na_addr[0],
 					sizeof($3.a));
@@ -247,8 +254,12 @@ map:	mapit ifnames addr tlate rhsaddr proxy mapoptions
 					yyerror("5.address family mismatch");
 				  if (nat->in_v[0] == 0 && $5.v != 0)
 					nat->in_v[0] = $5.v;
+				  else if (nat->in_v[0] == 0 && $3 != 0)
+					nat->in_v[0] = ftov($3);
 				  if (nat->in_v[1] == 0 && $5.v != 0)
 					nat->in_v[1] = $5.v;
+				  else if (nat->in_v[1] == 0 && $3 != 0)
+					nat->in_v[1] = ftov($3);
 				  nat->in_nsrcatype = $5.t;
 				  nat->in_nsrcafunc = $5.u;
 				  bcopy(&$5.a, &nat->in_nsrc.na_addr[0],
@@ -267,8 +278,12 @@ map:	mapit ifnames addr tlate rhsaddr proxy mapoptions
 					yyerror("6.address family mismatch");
 				  if (nat->in_v[0] == 0 && $5.v != 0)
 					nat->in_v[0] = $5.v;
+				  else if (nat->in_v[0] == 0 && $3 != 0)
+					nat->in_v[0] = ftov($3);
 				  if (nat->in_v[1] == 0 && $5.v != 0)
 					nat->in_v[1] = $5.v;
+				  else if (nat->in_v[1] == 0 && $3 != 0)
+					nat->in_v[1] = ftov($3);
 				  nat->in_nsrcatype = $5.t;
 				  nat->in_nsrcafunc = $5.u;
 				  bcopy(&$5.a, &nat->in_nsrc.na_addr[0],
@@ -286,8 +301,12 @@ mapblock:
 					yyerror("7.address family mismatch");
 				  if (nat->in_v[0] == 0 && $5.v != 0)
 					nat->in_v[0] = $5.v;
+				  else if (nat->in_v[0] == 0 && $3.v != 0)
+					nat->in_v[0] = $3.v;
 				  if (nat->in_v[1] == 0 && $5.v != 0)
 					nat->in_v[1] = $5.v;
+				  else if (nat->in_v[1] == 0 && $3.v != 0)
+					nat->in_v[1] = $3.v;
 				  nat->in_osrcatype = $3.t;
 				  bcopy(&$3.a, &nat->in_osrc.na_addr[0],
 					sizeof($3.a));
@@ -389,20 +408,6 @@ divert:	IPNY_DIVERT oninout rwrproto mapfrom tlate divdst newopts
 				}
 	;
 
-encap:	IPNY_ENCAP oninout rwrproto mapfrom tlate encapdst newopts
-				{ if (nat->in_v[0] == 0)
-					nat->in_v[0] = ftov($4);
-				  if (nat->in_redir & NAT_MAP) {
-					setmapifnames();
-					nat->in_pr[0] = IPPROTO_IPIP;
-				  } else {
-					setrdrifnames();
-					nat->in_pr[1] = IPPROTO_IPIP;
-				  }
-				  nat->in_flags &= ~IPN_TCPUDP;
-				}
-	;
-
 tlate:	IPNY_TLATE		{ yyexpectaddr = 1; }
 	;
 
@@ -479,15 +484,6 @@ divdst:	src addr ',' portspec dst addr ',' portspec IPNY_UDP
 				  nat->in_ndports[1] = $8;
 
 				  nat->in_redir |= NAT_DIVERTUDP;
-				}
-	;
-
-encapdst:
-	src addr dst addr	{ nat->in_nsrc.na_addr[0] = $2.a;
-				  nat->in_nsrc.na_addr[1] = $2.m;
-				  nat->in_ndst.na_addr[0] = $4.a;
-				  nat->in_ndst.na_addr[1] = $4.m;
-				  nat->in_redir |= NAT_ENCAP;
 				}
 	;
 
@@ -1258,7 +1254,6 @@ static	wordtab_t	yywords[] = {
 	{ "divert",	IPNY_DIVERT },
 	{ "dst",	IPNY_DST },
 	{ "dstlist",	IPNY_DSTLIST },
-	{ "encap",	IPNY_ENCAP },
 	{ "frag",	IPNY_FRAG },
 	{ "from",	IPNY_FROM },
 	{ "hash",	IPNY_HASH },
