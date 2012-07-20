@@ -8740,6 +8740,8 @@ ipf_fr_matcharray(fin, array)
 
 	for (; n > 0; x += 3 + x[3], rv = 0) {
 		e = (ipfexp_t *)x;
+		if (e->ipfe_cmd == IPF_EXP_END)
+			break;
 		n -= e->ipfe_size;
 
 		/*
