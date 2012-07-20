@@ -1166,34 +1166,80 @@ static void showstatestats(ipsp)
 		}
 	}
 
+	PRINTF("%u\tactive state table entries\n",ipsp->iss_active);
+	PRINTF("%lu\tadd bad\n", ipsp->iss_add_bad);
+	PRINTF("%lu\tadd duplicate\n", ipsp->iss_add_dup);
+	PRINTF("%lu\tadd locked\n", ipsp->iss_add_locked);
+	PRINTF("%lu\tadd oow\n", ipsp->iss_add_oow);
+	PRINTF("%lu\tbucket full\n", ipsp->iss_bucket_full);
+	PRINTF("%lu\tcheck bad\n", ipsp->iss_check_bad);
+	PRINTF("%lu\tcheck miss\n", ipsp->iss_check_miss);
+	PRINTF("%lu\tcheck nattag\n", ipsp->iss_check_nattag);
+	PRINTF("%lu\tclone nomem\n", ipsp->iss_clone_nomem);
+	PRINTF("%lu\tcheck notag\n", ipsp->iss_check_notag);
+	PRINTF("%lu\tcheck success\n", ipsp->iss_hits);
+	PRINTF("%lu\tcloned\n", ipsp->iss_cloned);
+	PRINTF("%lu\texpired\n", ipsp->iss_expire);
+	PRINTF("%lu\tflush all\n", ipsp->iss_flush_all);
+	PRINTF("%lu\tflush closing\n", ipsp->iss_flush_closing);
+	PRINTF("%lu\tflush queue\n", ipsp->iss_flush_queue);
+	PRINTF("%lu\tflush state\n", ipsp->iss_flush_state);
+	PRINTF("%lu\tflush timeout\n", ipsp->iss_flush_timeout);
+	PRINTF("%u\thash buckets in use\n", ipsp->iss_inuse);
+	PRINTF("%lu\tICMP bad\n", ipsp->iss_icmp_bad);
+	PRINTF("%lu\tICMP banned\n", ipsp->iss_icmp_banned);
+	PRINTF("%lu\tICMP errors\n", ipsp->iss_icmp_icmperr);
+	PRINTF("%lu\tICMP head block\n", ipsp->iss_icmp_headblock);
+	PRINTF("%lu\tICMP hits\n", ipsp->iss_icmp_hits);
+	PRINTF("%lu\tICMP not query\n",	ipsp->iss_icmp_notquery);
+	PRINTF("%lu\tICMP short\n", ipsp->iss_icmp_short);
+	PRINTF("%lu\tICMP too many\n", ipsp->iss_icmp_toomany);
+	PRINTF("%lu\tICMPv6 errors\n", ipsp->iss_icmp6_icmperr);
+	PRINTF("%lu\tICMPv6 miss\n", ipsp->iss_icmp6_miss);
+	PRINTF("%lu\tICMPv6 not info\n", ipsp->iss_icmp6_notinfo);
+	PRINTF("%lu\tICMPv6 not query\n", ipsp->iss_icmp6_notquery);
+	PRINTF("%lu\tlog fail\n", ipsp->iss_log_fail);
+	PRINTF("%lu\tlog ok\n", ipsp->iss_log_ok);
+	PRINTF("%lu\tlookup interface mismatch\n", ipsp->iss_lookup_badifp);
+	PRINTF("%lu\tlookup mask mismatch\n", ipsp->iss_miss_mask);
+	PRINTF("%lu\tlookup port mismatch\n", ipsp->iss_lookup_badport);
+	PRINTF("%lu\tlookup miss\n", ipsp->iss_lookup_miss);
+	PRINTF("%lu\tmaximum rule references\n", ipsp->iss_max_ref);
+	PRINTF("%lu\tmaximum hosts per rule\n", ipsp->iss_max_track);
+	PRINTF("%lu\tno memory\n", ipsp->iss_nomem);
+	PRINTF("%lu\tout of window\n", ipsp->iss_oow);
+	PRINTF("%lu\torphans\n", ipsp->iss_orphan);
+	PRINTF("%lu\tscan block\n", ipsp->iss_scan_block);
+	PRINTF("%lu\tstate table maximum reached\n", ipsp->iss_max);
+	PRINTF("%lu\tTCP closing\n", ipsp->iss_tcp_closing);
+	PRINTF("%lu\tTCP OOW\n", ipsp->iss_tcp_oow);
+	PRINTF("%lu\tTCP RST add\n", ipsp->iss_tcp_rstadd);
+	PRINTF("%lu\tTCP too small\n", ipsp->iss_tcp_toosmall);
+	PRINTF("%lu\tTCP bad options\n", ipsp->iss_tcp_badopt);
+	PRINTF("%lu\tTCP removed\n", ipsp->iss_fin);
+	PRINTF("%lu\tTCP FSM\n", ipsp->iss_tcp_fsm);
+	PRINTF("%lu\tTCP strict\n", ipsp->iss_tcp_strict);
+	PRINTF("%lu\tTCP wild\n", ipsp->iss_wild);
+	PRINTF("%lu\tMicrosoft Windows SACK\n", ipsp->iss_winsack);
+
+	PRINTF("State logging %sabled\n", state_logging ? "en" : "dis");
+
 	PRINTF("IP states added:\n");
 	for (i = 0; i < 256; i++) {
 		if (ipsp->iss_proto[i] != 0) {
 			struct protoent *proto;
 
 			proto = getprotobynumber(i);
-			PRINTF("\t%lu", ipsp->iss_proto[i]);
+			PRINTF("%lu", ipsp->iss_proto[i]);
 			if (proto != NULL)
 				PRINTF("\t%s\n", proto->p_name);
 			else
 				PRINTF("\t%d\n", i);
 		}
 	}
-	PRINTF("\t%lu hits\n\t%lu misses\n", ipsp->iss_hits,
-		ipsp->iss_lookup_miss);
-	PRINTF("\t%lu bucket full\n", ipsp->iss_bucket_full);
-	PRINTF("\t%lu maximum rule references\n", ipsp->iss_max_ref);
-	PRINTF("\t%lu maximum hosts per rule\n", ipsp->iss_max_track);
-	PRINTF("\t%lu maximum\n\t%lu no memory\n\t%u bkts in use\n",
-		ipsp->iss_max, ipsp->iss_nomem, ipsp->iss_inuse);
-	PRINTF("\t%u active\n\t%lu expired\n\t%lu closed\n",
-		ipsp->iss_active, ipsp->iss_expire, ipsp->iss_fin);
-
-	PRINTF("State logging %sabled\n",
-		state_logging ? "en" : "dis");
 
 	PRINTF("\nState table bucket statistics:\n");
-	PRINTF("\t%u in use\n", ipsp->iss_inuse);
+	PRINTF("%u\tin use\n", ipsp->iss_inuse);
 
 	minlen = ipsp->iss_max;
 	totallen = 0;
@@ -1207,12 +1253,12 @@ static void showstatestats(ipsp)
 		totallen += buckets[i];
 	}
 
-	PRINTF("\t%d hash efficiency\n",
+	PRINTF("%d\thash efficiency\n",
 		totallen ? ipsp->iss_inuse * 100 / totallen : 0);
-	PRINTF("\t%2.2f%% bucket usage\n\t%u minimal length\n",
+	PRINTF("%2.2f%%\tbucket usage\n%u\tminimal length\n",
 		((float)ipsp->iss_inuse / ipsp->iss_state_size) * 100.0,
 		minlen);
-	PRINTF("\t%u maximal length\n\t%.3f average length\n",
+	PRINTF("%u\tmaximal length\n%.3f\taverage length\n",
 		maxlen,
 		ipsp->iss_inuse ? (float) totallen/ ipsp->iss_inuse :
 				  0.0);
@@ -1704,13 +1750,13 @@ static void showfrstates(ifsp, ticks)
 	/*
 	 * print out the numeric statistics
 	 */
-	PRINTF("IP fragment states:\n\t%lu new\n\t%lu expired\n\t%lu hits\n",
+	PRINTF("IP fragment states:\n%lu\tnew\n%lu\texpired\n%lu\thits\n",
 		ifsp->ifs_new, ifsp->ifs_expire, ifsp->ifs_hits);
-	PRINTF("\t%lu retrans\n\t%lu too short\n",
+	PRINTF("%lu\tretrans\n%lu\ttoo short\n",
 		ifsp->ifs_retrans0, ifsp->ifs_short);
-	PRINTF("\t%lu no memory\n\t%lu already exist\n",
+	PRINTF("%lu\tno memory\n%lu\talready exist\n",
 		ifsp->ifs_nomem, ifsp->ifs_exists);
-	PRINTF("\t%lu inuse\n", ifsp->ifs_inuse);
+	PRINTF("%lu\tinuse\n", ifsp->ifs_inuse);
 	PRINTF("\n");
 
 	if (live_kernel == 0) {
