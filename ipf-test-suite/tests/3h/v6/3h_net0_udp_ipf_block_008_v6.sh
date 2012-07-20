@@ -1,10 +1,9 @@
-#!/bin/ksh
 
 gen_ipf_conf() {
 	generate_pass_rules
 	generate_test_hdr
 	cat << __EOF__
-block in on ${SUT_NET1_IFP_NAME} proto udp from ${RECEIVER_NET1_ADDR_V6} port 5050:5058 to ${SENDER_NET0_ADDR_V6}
+block out on ${SUT_NET1_IFP_NAME} proto udp from any to ${RECEIVER_NET1_ADDR_V6} port 5050:5058
 __EOF__
 	return 0;
 }
@@ -23,7 +22,8 @@ do_test() {
 	udp_test ${SENDER_CTL_HOSTNAME} ${RECEIVER_NET1_ADDR_V6} 5058 block
 	ret=$?
 	stop_udp_server ${RECEIVER_CTL_HOSTNAME} 0
-	ret=$((ret + $?))
+	x=$?
+	ret=$((ret + x))
 	return $ret;
 }
 
@@ -32,5 +32,5 @@ do_tune() {
 }
 
 do_verify() {
-	return 0;
+	return 2;
 }

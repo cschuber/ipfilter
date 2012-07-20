@@ -1,7 +1,8 @@
+
 gen_ipf_conf() {
 	generate_test_hdr
 	cat << __EOF__
-block out quick on ${SUT_NET1_IFP_NAME} proto icmp from any to ${RECEIVER_NET1_ADDR_V4}/${NET0_NETMASK_V4} to any
+block out quick on ${SUT_NET1_IFP_NAME} proto icmp from any to ${RECEIVER_NET1_ADDR_V4}/${NET1_NETMASK_V4}
 __EOF__
 	generate_pass_rules
 	return 0;

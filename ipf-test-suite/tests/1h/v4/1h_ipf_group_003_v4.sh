@@ -27,9 +27,9 @@ do_test() {
 	count=$(ccat < ${IPF_TMP_DIR}/ipf.conf.a | wc -l)
 	count=$((count))
 	if [[ $count != 4 ]] ; then
-		echo "-- incorrect rule count ($count)"
+		print - "-- ERROR incorrect rule count ($count)"
 		cat ${IPF_TMP_DIR}/ipf.conf.a
-		echo "--"
+		print - "| "
 		return 1
 	fi
 	return 0

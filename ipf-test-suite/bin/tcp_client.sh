@@ -5,5 +5,6 @@
 # at a new home.
 #
 PATH=/usr/local/bin:/opt/sfw/bin:/usr/sfw/bin:/usr/pkg/bin:/usr/bin:/bin
-. $(dirname $0)/../vars.sh
-exec perl ${IPF_BIN_DIR}/tcp_client.pl $1 $2 2>&1
+dir=${0%/*}
+. ${dir}/../config.sh
+exec perl ${IPF_BIN_DIR}/tcp_client.pl $@ 2>&1

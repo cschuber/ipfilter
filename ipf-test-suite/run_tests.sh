@@ -1,8 +1,14 @@
 #!/bin/ksh
 #
 . ./vars.sh
+. ./config.sh
 . lib/ipf_lib.sh
 
+${BIN_IPF} -V >/dev/null 2>&1
+if [[ $? -ne 0 ]] ; then
+	print "ABORT: Cannot query IP Filter in the kernel"
+	exit 1
+fi
 trap interrupt_testing INT HUP
 
 IPF_TEST_LIST=${IPF_TMP_DIR}/test_list.txt
@@ -19,31 +25,37 @@ RUNHOST=$(uname -n)
 export RUNHOST
 
 interrupt_testing() {
-	echo "TESTING INTERRUPTED"
+	print "TESTING INTERRUPTED"
 	stop_tests=1
 	if [[ $testjob != 0 ]] ; then
-		echo "kill -INT ${testjob}"
+		print "kill -INT ${testjob}"
 		kill -USR1 ${testjob}
 		wait $testjob
 	fi
 }
 
 dotest() {
-	name=$(basename $1)
-	echo "Running $name $counter/$total"
+	name=${1##*/}
+	print -n "Running $name $counter/$total"
 	rsh_sut ${IPF_VAR_DIR}/one_test.sh ${IPF_VAR_DIR}/ $1 > \
 	    ${IPF_LOG_DIR}/$$.$name 2>&1 &
 	testjob=$!
 	wait $testjob
 	testjob=0
 	cat ${IPF_LOG_DIR}/$$.$name >> ${IPF_LOG_ALL}
+	res=$(awk ' /^RESULT/ { print $2; } ' ${IPF_LOG_DIR}/$$.$name)
+	print " $res"
 	counter=$((counter + 1))
+	return 0
 }
 
 runtests() {
 	rev=$1
-	cat ${IPF_TEST_LIST} | while [[ $stop_tests = 0 ]] && read name; do
-		dotest ${name} 
+	for name in $(cat ${IPF_TEST_LIST}); do
+		dotest ${name}
+		if [[ $stop_tests -eq 1 ]] ; then
+			return
+		fi
 	done
 }
 
@@ -55,7 +67,8 @@ counttests() {
 }
 
 buildtestlist() {
-	find . -name "${1}".sh | sed -e 's@\./@@' >> ${IPF_TEST_LIST}
+	name=$(print "$1" | sed -e 's/__/_\*_/g')
+	find . -name "${name}".sh | sed -e 's@\./@@' >> ${IPF_TEST_LIST}
 }
 
 cd tests
@@ -91,11 +104,11 @@ done
 
 counttests
 
-echo "LOG FILE ${IPF_LOG_ALL}"
+print "LOG FILE ${IPF_LOG_ALL}"
 
 runtests
 
-echo "LOG FILE ${IPF_LOG_ALL}"
 ${IPF_BIN_DIR}/summary.sh ${IPF_LOG_ALL}
+print "LOG FILE ${IPF_LOG_ALL}"
 
 exit 0

@@ -1,4 +1,3 @@
-#!/bin/ksh
 
 gen_ipf_conf() {
 	generate_block_rules
@@ -21,7 +20,7 @@ gen_ippool_conf() {
 }
 
 do_test() {
-	rcmd_test ${SENDER_CTL_HOSTNAME} ${RECEIVER_NET1_ADDR_V6} pass
+	rcmd_test ${SENDER_CTL_HOSTNAME} ${SUT_NET0_ADDR_V6} pass
 	return $?;
 }
 
@@ -30,5 +29,5 @@ do_tune() {
 }
 
 do_verify() {
-	return 0;
+	return 2;
 }

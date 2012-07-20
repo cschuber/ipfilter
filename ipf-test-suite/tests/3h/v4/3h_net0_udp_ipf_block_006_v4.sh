@@ -22,7 +22,8 @@ do_test() {
 	sleep 1
 	udp_test ${SENDER_CTL_HOSTNAME} ${RECEIVER_NET1_ADDR_V4} 5056 block
 	ret=$?
-	stop_udp_server ${RECEIVER_CTL_HOSTNAME} 0
+	ret=$((ret))
+	stop_udp_server ${RECEIVER_CTL_HOSTNAME} 1
 	ret=$((ret + $?))
 	return $ret;
 }

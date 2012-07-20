@@ -1,11 +1,12 @@
+
 gen_ipf_conf() {
 	generate_block_rules
 	generate_test_hdr
 	cat << __EOF__
-pass in on ${SUT_NET0_IFP_NAME} proto ipv6-icmp from any to any icmp-type echo
-pass out on ${SUT_NET0_IFP_NAME} proto ipv6-icmp from any to any icmp-type echorep
-pass out on ${SUT_NET1_IFP_NAME} proto ipv6-icmp from any to any icmp-type echo
-pass in on ${SUT_NET1_IFP_NAME} proto ipv6-icmp from any to any icmp-type echorep
+pass in on ${SUT_NET0_IFP_NAME} inet6 proto ipv6-icmp from any to any icmp-type echo
+pass out on ${SUT_NET1_IFP_NAME} inet6 proto ipv6-icmp from any to any icmp-type echo
+pass in on ${SUT_NET1_IFP_NAME} inet6 proto ipv6-icmp from any to any icmp-type echorep
+pass out on ${SUT_NET0_IFP_NAME} inet6 proto ipv6-icmp from any to any icmp-type echorep
 __EOF__
 	return 0;
 }
@@ -28,5 +29,5 @@ do_tune() {
 }
 
 do_verify() {
-	return 0;
+	return 2;
 }

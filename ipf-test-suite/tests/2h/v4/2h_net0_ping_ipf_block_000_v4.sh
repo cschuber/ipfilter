@@ -1,3 +1,6 @@
+capture_net1=0;
+preserve_net1=0;
+
 gen_ipf_conf() {
 	generate_pass_rules
 	generate_test_hdr
@@ -19,7 +22,7 @@ gen_ippool_conf() {
 do_test() {
 	ping_test ${SENDER_CTL_HOSTNAME} ${SUT_NET0_ADDR_V4} small block
 	ret=$?
-	echo "PING result=$ret"
+	print - "|--- PING result=$ret"
 	return $ret;
 }
 
@@ -28,5 +31,5 @@ do_tune() {
 }
 
 do_verify() {
-	return 0;
+	return 2;
 }

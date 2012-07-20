@@ -58,7 +58,15 @@ Each of SUT, SENDER and RECEIVER must allow password-less access remotely
 via either ssh or rsh to the host running the test. Configuration of ssh
 via authorised_keys and rsh via .rhosts/hosts.equiv to allow root on those
 machines to be remotely accessed from the user running the tests is a
-prerequisite for the successful execution of this test. 
+prerequisite for the successful execution of this test. Configuring rsh
+or ssh to support passwordless remote access is beyond the scope of this
+document.
+
+On systems that start the shell daemon to be used for remote passwordless
+access during testing using inetd, it is necessary to check if inetd
+applies rate limiting to the number of sessions. On systems where this
+feature is present, inetd should be configured to support at least 120
+sessions per minute.
 
 Services
 --------
@@ -144,6 +152,9 @@ of the systems involved in testing using the "distribute.sh" script to
 the directory "IPF_VAR_DIR".  This ensures that each system involved
 is working from the same set of environment variables and that any
 irregularities in paths or command line options can be managed.
+
+On systems based on OpenSolaris, including IllumOS and Solaris 11 and
+later, it is necessary to disable NWAM prior to using the setup script.
 
 Running Tests
 =============

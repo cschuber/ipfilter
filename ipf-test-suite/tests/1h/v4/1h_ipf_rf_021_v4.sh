@@ -1,4 +1,14 @@
 no_base_ruleset=1
+capture_net0=0
+capture_net1=0
+capture_ipmon=0
+capture_sender=0
+capture_receiver=0
+preserve_net0=0
+preserve_net1=0
+preserve_ipmon=0
+preserve_sender=0
+preserve_receiver=0
 
 gen_ipf_conf() {
 	cat 1h/v4/1h_ipf_parse_021_v4.data
@@ -17,11 +27,17 @@ do_test() {
 	${BIN_IPFSTAT} -io > ${IPF_TMP_DIR}/ipf.conf.a
 	ret=$?
 	if [[ $ret != 0 ]] ; then
-		echo "-- error dumping active ipf.conf rules"
+		print - "|  error dumping active ipf.conf rules"
 		return $ret
 	fi
-	${BIN_IPF} -rf ${IPF_TMP_DIR}/ipf.conf.a
-	return $?;
+	${BIN_IPF} -rf ${IPF_TMP_DIR}/ipf.conf.a 2>&1
+	ret=$?
+	if [[ $ret != 0 ]] ; then
+		print - "-- ERROR removing ${IPF_TMP_DIR}/ipf.conf.a rules"
+		return $ret
+	fi
+	print - "-- OK rules removed"
+	return 0;
 }
 
 do_tune() {
@@ -29,11 +45,14 @@ do_tune() {
 }
 
 do_verify() {
-	count_ipf_rules
-	if [[ $? != 0 ]] ; then
-		echo "-- Not all rules removed"
-		${BIN_IPFSTAT} -io
+	count_ipf_rules 2>&1
+	count=$?
+	count=$((count))
+	if [[ $count != 0 ]] ; then
+		print - "-- ERROR $count rules were not removed"
+		${BIN_IPFSTAT} -io 2>&1
 		return 1
 	fi
+	print - "-- OK no rules present"
 	return 0;
 }

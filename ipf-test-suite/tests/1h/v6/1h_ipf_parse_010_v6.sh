@@ -1,11 +1,18 @@
+no_base_ruleset=1
+capture_net0=0
+capture_net1=0
+capture_ipmon=0
+capture_sender=0
+capture_receiver=0
+preserve_net0=0
+preserve_net1=0
+preserve_ipmon=0
+preserve_sender=0
+preserve_receiver=0
+dump_stats=0
+
 gen_ipf_conf() {
-	cat <<__EOF__
-pass in from localhost to localhost with opt sec
-pass in from localhost to localhost with opt lsrr not opt sec
-block in from any to any with not opt sec-class topsecret
-block in from any to any with not opt sec-class topsecret,secret
-pass in from any to any with opt sec-class topsecret,confid not opt sec-class unclass
-__EOF__
+	cat 1h/v6/1h_ipf_parse_010_v6.data
 	return 0;
 }
 

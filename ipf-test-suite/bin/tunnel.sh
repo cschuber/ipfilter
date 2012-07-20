@@ -4,7 +4,7 @@ PATH=/sbin:/usr/sbin:/bin:/usr/bin
 try() {
 	$@
 	if [ $? -ne 0 ] ; then
-		echo "FAILED: $*"
+		print "FAILED: $*"
 	fi
 }
 
@@ -25,6 +25,11 @@ tun_set_local() {
 tun_create() {
 	case `uname -s` in
 	SunOS)
+		if ifconfig ip.tun900 >/dev/null 2>&1; then
+			try ifconfig ip.tun900 inet unplumb
+			try ifconfig ip.tun900 inet6 unplumb
+			try dladm delete-iptun ip.tun900
+		fi
 		try dladm create-iptun -t -T ipv4 -a local=$1 -a remote=$2 ip.tun900
 		try ifconfig ip.tun900 inet plumb
 		try ifconfig ip.tun900 inet ${localv4addr} ${remotev4addr} up
@@ -33,6 +38,9 @@ tun_create() {
 		try ifconfig ip.tun900 inet6 ${localv6addr}/128 ${remotev6addr} up
 		;;
 	*BSD)
+		if ifconfig gif900 >/dev/null 2>&1; then
+			try ifconfig gif900 destroy
+		fi
 		try ifconfig gif900 create
 		try ifconfig gif900 tunnel $1 $2
 		try ifconfig gif900 ${localav4ddr} ${remotev4addr} up

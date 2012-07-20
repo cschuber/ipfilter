@@ -1,17 +1,16 @@
-#!/bin/ksh
-# ni7
+
 gen_ipf_conf() {
 	generate_block_rules
 	generate_test_hdr
 	cat << __EOF__
-pass in on ${SUT_NET1_IFP_NAME} proto tcp from any to any port = 5057 flags S keep state
+pass in on ${SUT_NET0_IFP_NAME} inet6 proto tcp from any to any port = 5057 flags S keep state
 __EOF__
 	return 0;
 }
 
 gen_ipnat_conf() {
 	cat <<__EOF__
-map ${SUT_NET0_IFP_NAME} ${SUT_NET0_ADDR_V6} -> ${NET0_FAKE_ADDR_V6} tcp
+map ${SUT_NET1_IFP_NAME} ${SENDER_NET0_ADDR_V6} -> ${NET1_FAKE_ADDR_V6} tcp
 __EOF__
 	return 0;
 }
@@ -21,12 +20,14 @@ gen_ippool_conf() {
 }
 
 do_test() {
-	start_tcp_server ${SENDER_CTL_HOSTNAME} ${SENDER_NET0_ADDR_V6} 5057
+	start_tcp_server ${RECEIVER_CTL_HOSTNAME} ${RECEIVER_NET1_ADDR_V6} 5057
 	sleep 3
-	tcp_test ${SENDER_CTL_HOSTNAME} ${SENDER_NET0_ADDR_V6} 5057 pass
+	ret=0
+	tcp_test ${SENDER_CTL_HOSTNAME} ${RECEIVER_NET1_ADDR_V6} 5057 pass
 	ret=$?
 	stop_tcp_server ${RECEIVER_CTL_HOSTNAME} 1
-	ret=$((ret + $?))
+	x=$?
+	ret=$((ret + x))
 	return $ret;
 }
 
@@ -35,8 +36,7 @@ do_tune() {
 }
 
 do_verify() {
-	${IPF_BIN_DIR}/log.sh verify_srcdst_0 \
-	    ${NET0_FAKE_ADDR_V6} ${SENDER_NET0_ADDR_V6}
+	verify_srcdst_1 ${NET1_FAKE_ADDR_V6} ${RECEIVER_NET1_ADDR_V6}
 	if [[ $? -eq 0 ]] ; then
 		echo "No packets ${NET0_FAKE_ADDR_V6},${SENDER_NET0_ADDR_V6}"
 		return 1

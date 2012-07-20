@@ -1,11 +1,12 @@
+
 gen_ipf_conf() {
 	generate_block_rules
 	generate_test_hdr
 	cat << __EOF__
 pass in on ${SUT_NET0_IFP_NAME} proto ipv6-icmp from any to ${RECEIVER_NET1_ADDR_V6}/${NET0_NETMASK_V6}
-pass out on ${SUT_NET0_IFP_NAME} proto ipv6-icmp from ${RECEIVER_NET1_ADDR_V6}/${NET0_NETMASK_V6} to any
 pass out on ${SUT_NET1_IFP_NAME} proto ipv6-icmp from any to ${RECEIVER_NET1_ADDR_V6}/${NET0_NETMASK_V6}
 pass in on ${SUT_NET1_IFP_NAME} proto ipv6-icmp from ${RECEIVER_NET1_ADDR_V6}/${NET0_NETMASK_V6} to any
+pass out on ${SUT_NET0_IFP_NAME} proto ipv6-icmp from ${RECEIVER_NET1_ADDR_V6}/${NET0_NETMASK_V6} to any
 __EOF__
 	return 0;
 }
@@ -28,5 +29,5 @@ do_tune() {
 }
 
 do_verify() {
-	return 0;
+	return 2;
 }

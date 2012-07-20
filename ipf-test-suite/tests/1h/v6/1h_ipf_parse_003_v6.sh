@@ -1,20 +1,18 @@
+no_base_ruleset=1
+capture_net0=0
+capture_net1=0
+capture_ipmon=0
+capture_sender=0
+capture_receiver=0
+preserve_net0=0
+preserve_net1=0
+preserve_ipmon=0
+preserve_sender=0
+preserve_receiver=0
+dump_stats=0
+
 gen_ipf_conf() {
-	cat <<__EOF__
-log in inet6 all
-pass in inet6 from 128:16::/64 to 129:10:10::/96
-pass in inet6 from 128:0:0::1/96 to 1\
-28\
-:\
-0:0::1/64
-pass in inet6 from 128:1:0::1/96 to 128:1:0::1/64
-pass in inet6 from 128:0:1::1/96 to 128:0:1::1/64
-pass in inet6 from 128:2:0::1/96 to 128:2:2::1/64
-pass in inet6 from 128:0:2::1/96 to 128:2:2::1/64
-pass in inet6 from ::1 to ::1
-block in log inet6 from 0::0/0 to 0/0
-block in log level auth.info on hme0 inet6 all
-log level local5.warn out inet6 all
-__EOF__
+	cat 1h/v6/1h_ipf_parse_003_v6.data
 	return 0;
 }
 

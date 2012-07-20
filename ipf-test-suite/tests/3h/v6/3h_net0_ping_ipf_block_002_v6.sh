@@ -1,3 +1,4 @@
+
 gen_ipf_conf() {
 	generate_pass_rules
 	generate_test_hdr
@@ -25,5 +26,5 @@ do_tune() {
 }
 
 do_verify() {
-	return 0;
+	return 2;
 }

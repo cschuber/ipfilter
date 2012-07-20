@@ -1,3 +1,6 @@
+capture_net1=0;
+preserve_net1=0;
+
 gen_ipf_conf() {
 	generate_test_hdr
 	cat << __EOF__

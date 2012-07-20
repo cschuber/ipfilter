@@ -5,9 +5,9 @@ gen_ipf_conf() {
 	generate_test_hdr
 	cat << __EOF__
 pass in on ${SUT_NET0_IFP_NAME} proto tcp from any to ${RECEIVER_NET1_ADDR_V4} port <= 5055
-pass out on ${SUT_NET0_IFP_NAME} proto tcp from ${RECEIVER_NET1_ADDR_V4} port <= 5055 to ${RECEIVER_NET1_ADDR_V4}
+pass out on ${SUT_NET0_IFP_NAME} proto tcp from ${RECEIVER_NET1_ADDR_V4} port <= 5055 to any
 pass out on ${SUT_NET1_IFP_NAME} proto tcp from any to ${RECEIVER_NET1_ADDR_V4} port <= 5055
-pass in on ${SUT_NET1_IFP_NAME} proto tcp from ${RECEIVER_NET1_ADDR_V4} port <= 5055 to ${RECEIVER_NET1_ADDR_V4}
+pass in on ${SUT_NET1_IFP_NAME} proto tcp from ${RECEIVER_NET1_ADDR_V4} port <= 5055 to any
 __EOF__
 	return 0;
 }
@@ -25,6 +25,7 @@ do_test() {
 	sleep 1
 	tcp_test ${SENDER_CTL_HOSTNAME} ${RECEIVER_NET1_ADDR_V4} 5055 pass
 	ret=$?
+	ret=$((ret))
 	stop_tcp_server ${RECEIVER_CTL_HOSTNAME} 1
 	ret=$((ret + $?))
 	return $ret;

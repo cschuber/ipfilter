@@ -1,22 +1,18 @@
+no_base_ruleset=1
+capture_net0=0
+capture_net1=0
+capture_ipmon=0
+capture_sender=0
+capture_receiver=0
+preserve_net0=0
+preserve_net1=0
+preserve_ipmon=0
+preserve_sender=0
+preserve_receiver=0
+dump_stats=0
+
 gen_ipf_conf() {
-	cat <<__EOF__
-pass in inet6 from ::1 to ::1 with short,frags
-block in inet6 from any to any with v6hdrs
-pass in inet6 from ::1 to ::1 and not frag
-block in inet6 from any to any with not v6hdrs
-pass in inet6 from ::1 to ::1 with frags,frag-body
-pass in inet6 proto tcp all flags S with not oow keep state
-block in inet6 proto tcp all with oow
-pass in inet6 proto tcp all flags S with not bad,bad-src,bad-nat
-block in inet6 proto tcp all flags S with bad,not bad-src,not bad-nat
-pass in quick inet6 all with not short
-block in quick inet6 all with not nat
-pass in quick inet6 all with not frag-body
-block in quick inet6 all with not lowttl
-pass in inet6 all with mbcast,not bcast,multicast,not state,not v6hdrs
-block in inet6 all with not mbcast,bcast,not multicast,state
-pass in inet6 from any to any with v6hdr dstopts, esp, hopopts, ipv6, none, routing, frag, mobility
-__EOF__
+	cat 1h/v6/1h_ipf_parse_009_v6.data
 	return 0;
 }
 
@@ -40,6 +36,3 @@ do_tune() {
 do_verify() {
 	return 0;
 }
-
-
-

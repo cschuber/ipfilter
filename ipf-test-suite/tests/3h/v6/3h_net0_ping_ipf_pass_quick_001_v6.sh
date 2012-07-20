@@ -1,3 +1,4 @@
+
 gen_ipf_conf() {
 	generate_test_hdr
 	cat << __EOF__
@@ -28,5 +29,5 @@ do_tune() {
 }
 
 do_verify() {
-	return 0;
+	return 2;
 }

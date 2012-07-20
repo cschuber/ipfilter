@@ -1,16 +1,18 @@
+no_base_ruleset=1
+capture_net0=0
+capture_net1=0
+capture_ipmon=0
+capture_sender=0
+capture_receiver=0
+preserve_net0=0
+preserve_net1=0
+preserve_ipmon=0
+preserve_sender=0
+preserve_receiver=0
+dump_stats=0
+
 gen_ipf_conf() {
-	cat <<__EOF__
-pass in on ed0 inet6 proto tcp from ::1 to ::1 port = 23 flags S/SA
-block in on lo0 inet6 proto tcp from any to any flags A
-pass in on lo0 inet6 proto tcp from any to any flags /SAP
-block in on lo0 inet6 proto tcp from any to any flags 0x80/A
-pass in on lo0 inet6 proto tcp from any to any flags S/18
-block in on lo0 inet6 proto tcp from any to any flags 2/18
-pass in on lo0 inet6 proto tcp from any to any flags 2
-block in on lo0 inet6 proto tcp from any to any flags S
-pass in on lo0 inet6 proto tcp from any to any flags 2/SAF
-block in on lo0 inet6 proto tcp from any to any flags /16
-__EOF__
+	cat 1h/v6/1h_ipf_parse_007_v6.data
 	return 0;
 }
 

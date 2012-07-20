@@ -14,31 +14,49 @@ esac
 FULLNAME=${1%.sh}
 TESTNAME=${FULLNAME#*h/v?/}
 
+no_base_ruleset=0
+capture_net0=1
+capture_net1=1
+capture_ipmon=1
+capture_sender=1
+capture_receiver=1
+preserve_net0=1
+preserve_net1=1
+preserve_ipmon=1
+preserve_sender=1
+preserve_receiver=1
+dump_stats=1
+export no_base_ruleset dump_stats
+export capture_net0 capture_net1 capture_ipmon
+export capture_sender capture_receiver
+export preserve_net0 preserve_net1 preserve_ipmon
+export preserve_sender preserve_receiver
+
 trap one_interrupt_test USR1
 
 one_interrupt_test() {
-	echo "TEST RUN INTERTUPTED" >&2
-	echo "TEST RUN INTERTUPTED"
-	. ../vars.sh
+	print "TEST RUN INTERTUPTED" >&2
+	print "TEST RUN INTERTUPTED"
+	. ../config.sh
 	abort_test
 }
 
 abort_test() {
-	${IPF_VAR_DIR}/bin/log.sh stop ${testprefix}
-#	echo "#"
-#	date '+# end time %c'
-	echo "#"
+	logging_stop ${testprefix}
+	print "#"
 	reset_ipfilter
-	echo "#"
-	echo "RESULT FAIL ${TESTNAME} ABORTED"
-	echo "#"
-	echo '#################################################################'
-	exit 1
+	print "#"
+	date '+# end time %c'
+	print "#"
+	print "RESULT FAIL ${TESTNAME} ABORTED"
+	print "#"
+	print '#################################################################'
+	return 1
 }
 
 if [[ $# -lt 1 ]] ; then
-	echo "No test name supplied [$#][$@]" >&2
-	exit 1
+	print "No test name supplied [$#][$@]" >&2
+	return 1
 fi
 
 if [[ $TESTNAME = $FULLNAME ]] ; then
@@ -54,88 +72,108 @@ case $indir in
 *)
 	cd tests
 	if [[ -z ${IPT_VAR_DIR} ]]; then
-		. ../vars.sh
+		. ../config.sh
 	fi
 	;;
 esac
 . ${IPF_VAR_DIR}/lib/ipf_lib.sh
+. ${IPF_VAR_DIR}/bin/log.sh
 
-echo '#################################################################'
-#echo "#"
-#date '+# start time %c'
-echo "#"
-echo "START ${TESTNAME}"
-echo "#"
-echo "FULLNAME=${FULLNAME}"
-echo "TESTNAME=${TESTNAME}"
-echo "#"
+print '#################################################################'
+print "#"
+date '+# start time %c'
+print "#"
+print "START ${TESTNAME}"
+print "#"
+print "FULLNAME=${FULLNAME}"
+print "TESTNAME=${TESTNAME}"
+print "#"
 
 if ! reset_ipfilter; then
-	echo "ABORT: Enabling ipfilter failed."
-	exit 1
+	print "ABORT: Enabling ipfilter failed."
+	return 1
 fi
 cleanup_ipfilter
 
 testprefix=${1%${1#?h}}
+#
+# run test
+#
+. ${FULLNAME}.sh
 
-${IPF_VAR_DIR}/bin/log.sh start ${testprefix} 2>&1
+logging_start ${testprefix} 2>&1
 
 #
 # build test configuration
 #
 ${IPF_BIN_DIR}/build_ippool_conf.sh ${TESTNAME} ${FULLNAME} 2>&1
 if [[ $? -ne 0 ]] ; then
-	echo 'FAIL Loading ippool configuration'
+	print 'FAIL Loading ippool configuration'
 	abort_test
 fi
 ${IPF_BIN_DIR}/build_ipf_rules.sh ${TESTNAME} ${FULLNAME} 2>&1
 if [[ $? -ne 0 ]] ; then
-	echo 'FAIL Loading ipf configuration'
+	print 'FAIL Loading ipf configuration'
 	abort_test
 fi
 ${IPF_BIN_DIR}/build_ipnat_rules.sh ${TESTNAME} ${FULLNAME} 2>&1
 if [[ $? -ne 0 ]] ; then
-	echo 'FAIL Loading ipnat configuration'
+	print 'FAIL Loading ipnat configuration'
 	abort_test
 fi
-
 #
-# run test
-#
-. ${FULLNAME}.sh
-#
-#ipf -T ftp_debug=10
 netstat -s > ${IPF_TMP_DIR}/netstat.1
-do_test
+${BIN_IPFSTAT} > ${IPF_TMP_DIR}/ipfstat.1
+${BIN_IPFSTAT} -s >> ${IPF_TMP_DIR}/ipfstat.1
+${BIN_IPNAT} -s >> ${IPF_TMP_DIR}/ipfstat.1
+do_test 2>&1
 ret=$?
 netstat -s > ${IPF_TMP_DIR}/netstat.2
-#ipf -T ftp_debug=0
+${BIN_IPFSTAT} > ${IPF_TMP_DIR}/ipfstat.2
+${BIN_IPFSTAT} -s >> ${IPF_TMP_DIR}/ipfstat.2
+${BIN_IPNAT} -s >> ${IPF_TMP_DIR}/ipfstat.2
 #
-${IPF_VAR_DIR}/bin/log.sh stop ${testprefix}
+logging_stop ${testprefix}
 #
-do_verify
-#
-if [[ $ret = 0 ]] ; then
-	echo "RESULT PASS ${TESTNAME}"
+if [[ $ret -eq 0 ]] ; then
+	do_verify
+	ret=$?
+	if [[ $ret -eq 2 ]] ; then
+		print -- "-- OK no verify present"
+		ret=0
+	fi
 else
-	echo '-----------------------------------------------------------------'
-	echo '|'
-	echo '| netstat changes'
-	echo '|'
-	diff -u ${IPF_TMP_DIR}/netstat.1 ${IPF_TMP_DIR}/netstat.2
-	echo '|'
-	echo '-----------------------------------------------------------------'
-	dump_all
-	echo '-----------------------------------------------------------------'
-	echo "| Preserving log files in ${IPF_LOG_DIR}/${TESTNAME}"
-	${IPF_BIN_DIR}/log.sh preserve ${testprefix} \
-	    "${IPF_LOG_DIR}/${TESTNAME}"
-	echo "RESULT FAIL ${TESTNAME}"
+	print "|--- test failed for ${TESTNAME}, verify not performed"
 fi
 #
-#echo '#'
-#date '+# end time %c'
-echo '#'
-echo '#################################################################'
+if [[ $ret = 0 ]] ; then
+	print "RESULT PASS ${TESTNAME}"
+else
+	print - '-----------------------------------------------------------------'
+	if [[ $dump_stats -eq 1 ]]  then
+		print '|'
+		print '| netstat changes'
+		print '|'
+		diff -u ${IPF_TMP_DIR}/netstat.1 ${IPF_TMP_DIR}/netstat.2
+		print '|'
+		print '| ipfstat changes'
+		print '|'
+		diff -u ${IPF_TMP_DIR}/ipfstat.1 ${IPF_TMP_DIR}/ipfstat.2
+		print '|'
+		print - '-----------------------------------------------------------------'
+		dump_all
+		print - '-----------------------------------------------------------------'
+	else
+		print "| dumping statistical changes disabled"
+	fi
+	print "| Preserving log files in ${IPF_LOG_DIR}/${TESTNAME}"
+	logging_preserve ${testprefix} "${IPF_LOG_DIR}/${TESTNAME}"
+	print "RESULT FAIL ${TESTNAME}"
+fi
 #
-exit 0
+print "#"
+date '+# end time %c'
+print '#'
+print '#################################################################'
+#
+return 0

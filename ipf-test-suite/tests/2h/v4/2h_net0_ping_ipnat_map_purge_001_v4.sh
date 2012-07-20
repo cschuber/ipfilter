@@ -1,5 +1,8 @@
 #!/bin/ksh
 
+capture_net1=0;
+preserve_net1=0;
+
 gen_ipf_conf() {
 	generate_pass_rules
 	generate_test_hdr
@@ -21,36 +24,41 @@ do_test() {
 	ping_test ${SUT_CTL_HOSTNAME} ${SENDER_NET0_ADDR_V4} small pass ${SUT_NET0_ADDR_V4}
 	ret=$?
 	if [[ $ret != 0 ]] ; then
-		echo "-- error ($ret) returned from ping_test"
+		print - "-- ERROR ($ret) returned from ping_test"
 		return $ret
 	fi
-	echo "-- look for at least one NAT session for ping"
+	#
+	# NAT is locked to prevent more NAT sessions being created between
+	# the running of "ipnat -l" and "ipnat -rf"
+	#
+	${BIN_IPF} -T nat_lock=1 2>&1
+	print - "|--- look for at least one NAT session for ping"
 	${BIN_IPNAT} -l > ${IPF_TMP_DIR}/ipnat.out
 	active=$(egrep '^MAP' ${IPF_TMP_DIR}/ipnat.out | wc -l)
 	active=$((active))
-	echo "-- active=$active"
+	print - "|--- active=$active"
 	if [[ $active != 1 ]] ; then
-		echo "MAP entry not present when one should be active"
-		echo "-- ipnat -l output"
+		print - "|--- MAP entry not present when one should be active"
+		print - "|--- ipnat -l output"
 		cat ${IPF_TMP_DIR}/ipnat.out
+		${BIN_IPF} -T nat_lock=0 2>&1
 		return 1
 	fi
-	echo "-- remove conf entries in ${TEST_IPNAT_CONF}"
+	print - "|--- remove conf entries in ${TEST_IPNAT_CONF}"
 	${BIN_IPNAT} -rf ${TEST_IPNAT_CONF}
-	echo "-- veirfy NAT configuration is empty"
+	print - "|--- verify NAT configuration is empty"
 	${BIN_IPNAT} -l > ${IPF_TMP_DIR}/ipnat.out
+	${BIN_IPF} -T nat_lock=0 2>&1
 	active=$(egrep '^MAP' ${IPF_TMP_DIR}/ipnat.out | wc -l)
 	active=$((active))
-	echo "-- active=$active"
+	print - "|--- active=$active"
 	if [[ $active != 0 ]] ; then
-		echo "MAP entry present when none should be active"
-		echo "-- ipnat -l output"
+		print - "|--- MAP entry present when none should be active"
+		print - "|--- ipnat -l output"
 		cat ${IPF_TMP_DIR}/ipnat.out
-		ret=1
-	else
-		ret=0
+		return 1;
 	fi
-	return $ret;
+	return 0;
 }
 
 do_tune() {
@@ -63,8 +71,9 @@ do_verify() {
 	count_purged_nat_sessions
 	purged=$?
 	if [[ $count != $purged ]] ; then
-		echo "-- NAT sessions ($count) do not equal purged ($purged)"
+		print - "-- ERROR NAT sessions ($count) do not equal purged ($purged)"
 		return 1
 	fi
+	print - "-- OK NAT sessions ($count) equals purged ($purged)"
 	return 0;
 }

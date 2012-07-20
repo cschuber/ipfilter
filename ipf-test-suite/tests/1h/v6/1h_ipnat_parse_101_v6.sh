@@ -1,14 +1,22 @@
+no_base_ruleset=1
+capture_net0=0
+capture_net1=0
+capture_ipmon=0
+capture_sender=0
+capture_receiver=0
+preserve_net0=0
+preserve_net1=0
+preserve_ipmon=0
+preserve_sender=0
+preserve_receiver=0
+dump_stats=0
+
 gen_ipf_conf() {
-	return 0;
+	return 1;
 }
 
 gen_ipnat_conf() {
-	cat <<__EOF__
-rewrite in on bge0 proto icmp from 1:1:1::1 to 2:2::2:2 -> src 3::3:3:3 dst 4:4:4:4::;
-rewrite in on bge0 proto udp from 1:1:1::1 to 2:2::2:2 -> src 3::3:3:3 dst 4:4:4:4::;
-rewrite out on bge0 proto tcp from 1:1:1::1/128 to 2:2::2:2 -> src 3:3:3::/96 dst 4:4:4:4::;
-rewrite in on bge0 proto tcp/udp from 1:1:1::1/128 to 2:2::2:2/128 -> src 3:3:3::/96,20202 dst 4:4:4::/96,10101;
-__EOF__
+	cat 1h_ipnat_parse_101_v6.sh
 	return 0;
 }
 
@@ -17,8 +25,8 @@ gen_ippool_conf() {
 }
 
 do_test() {
-	validate_loaded_ipf_conf
-	return 0
+	validate_loaded_ipnat_conf
+	return $?
 }
 
 do_tune() {

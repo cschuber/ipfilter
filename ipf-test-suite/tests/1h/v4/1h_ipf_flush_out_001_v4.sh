@@ -24,7 +24,7 @@ do_test() {
 	count_ipf_rules
 	active=$?
 	if [[ $active != 6 ]] ; then
-		echo "-- incorrect rule count prior to flush"
+		print - "-- ERROR  incorrect rule count prior to flush"
 		return 1
 	fi
 	${BIN_IPF} -Fo
@@ -33,7 +33,7 @@ do_test() {
 	if [[ $active = 3 ]] ; then
 		return 0
 	fi
-	echo "-- incorrect rule count after flush"
+	print - "-- ERROR  incorrect rule count after flush"
 	return 1;
 }
 

@@ -1,13 +1,18 @@
+no_base_ruleset=1
+capture_net0=0
+capture_net1=0
+capture_ipmon=0
+capture_sender=0
+capture_receiver=0
+preserve_net0=0
+preserve_net1=0
+preserve_ipmon=0
+preserve_sender=0
+preserve_receiver=0
+dump_stats=0
+
 gen_ipf_conf() {
-	cat <<__EOF__
-pass in inet6 from port = 10101
-pass out inet6 from any to port != 22
-block in inet6 from port 20:21
-block out inet6 from any to port 10 <> 100
-pass out inet6 from any to port = {3,5,7,9}
-block in inet6 from port = {20,25}
-pass in inet6 from any port = {11:12, 21:22} to any port = {1:2, 4:5, 8:9}
-__EOF__
+	cat 1h/v6/1h_ipf_parse_021_v6.data
 	return 0;
 }
 

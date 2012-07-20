@@ -35,8 +35,7 @@ do_tune() {
 }
 
 do_verify() {
-	${IPF_BIN_DIR}/log.sh verify_srcdst_1 \
-	    ${NET1_FAKE_ADDR_V4} ${RECEIVER_NET1_ADDR_V4}
+	verify_srcdst_1 ${NET1_FAKE_ADDR_V4} ${RECEIVER_NET1_ADDR_V4}
 	if [[ $? -eq 0 ]] ; then
 		echo "No packets ${NET1_FAKE_ADDR_V4},${RECEIVER_NET1_ADDR_V4}"
 		return 1

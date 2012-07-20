@@ -1,18 +1,18 @@
+no_base_ruleset=1
+capture_net0=0
+capture_net1=0
+capture_ipmon=0
+capture_sender=0
+capture_receiver=0
+preserve_net0=0
+preserve_net1=0
+preserve_ipmon=0
+preserve_sender=0
+preserve_receiver=0
+dump_stats=0
+
 gen_ipf_conf() {
-	cat <<__EOF__
-pass in on ed0 inet6 proto tcp from ::1 to ::1 port = telnet keep state
-block in log first on lo0 inet6 proto tcp/udp from any to any port = echo keep state
-pass in inet6 proto udp from ::1 to ::1 port = 20499 keep frag
-pass in inet6 proto udp from ::1 to ::1 port = 2049 keep frag(strict)
-pass in inet6 proto udp from ::1 to ::1 port = 53 keep state keep frags
-pass in on ed0 out-via vx0 inet6 proto udp from any to any keep state
-pass out on ppp0 in-via le0 inet6 proto tcp from any to any keep state
-pass in on ed0,vx0 out-via vx0,ed0 inet6 proto udp from any to any keep state
-pass in inet6 proto tcp from any port gt 1024 to ::1 port eq 1024 keep state
-pass in inet6 proto tcp all flags S keep state(strict,newisn,no-icmp-err,limit 101,age 600)
-pass in inet6 proto tcp all flags S keep state(loose,newisn,no-icmp-err,limit 101,age 600)
-pass in inet6 proto udp all keep state(age 10/20,sync)
-__EOF__
+	cat 1h/v6/1h_ipf_parse_011_v6.data
 	return 0;
 }
 

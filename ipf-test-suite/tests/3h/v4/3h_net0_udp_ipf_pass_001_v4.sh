@@ -21,13 +21,9 @@ gen_ippool_conf() {
 }
 
 do_test() {
-	start_udp_server ${RECEIVER_CTL_HOSTNAME} ${RECEIVER_NET1_ADDR_V4} 5051
-	sleep 1
-	udp_test ${SENDER_CTL_HOSTNAME} ${RECEIVER_NET1_ADDR_V4} 5051 pass
-	ret=$?
-	stop_udp_server ${RECEIVER_CTL_HOSTNAME} 1
-	ret=$((ret + $?))
-	return $ret;
+	basic_udp_test ${RECEIVER_CTL_HOSTNAME} ${RECEIVER_NET1_ADDR_V4} \
+	    5051 ${SENDER_CTL_HOSTNAME} ${RECEIVER_NET1_ADDR_V4} pass
+	return $?;
 }
 
 do_tune() {

@@ -1,5 +1,8 @@
 #!/bin/ksh
 
+capture_net1=0;
+preserve_net1=0;
+
 gen_ipf_conf() {
 	generate_block_rules
 	generate_test_hdr
@@ -35,8 +38,7 @@ do_tune() {
 }
 
 do_verify() {
-	${IPF_BIN_DIR}/log.sh verify_srcdst_0 \
-	    ${NET0_FAKE_ADDR_V6} ${SENDER_NET0_ADDR_V6_A1}
+	verify_srcdst_0 ${NET0_FAKE_ADDR_V6} ${SENDER_NET0_ADDR_V6_A1}
 	if [[ $? -eq 0 ]] ; then
 		echo "No packets ${NET0_FAKE_ADDR_V6},${SENDER_NET0_ADDR_V6_A1}"
 		return 1

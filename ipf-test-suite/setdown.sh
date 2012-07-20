@@ -1,6 +1,6 @@
 #!/bin/ksh
 
-. ./vars.sh
+. ./config.sh
 
 #
 for h in sut sender receiver; do

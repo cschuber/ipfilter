@@ -1,9 +1,15 @@
 #!/bin/ksh
 
-. ./vars.sh
+. ./config.sh
+
+if [[ $# -gt 0 ]] ; then
+	list=$@
+else
+	list="SUT SENDER RECEIVER"
+fi
 
 #
-for h in SUT SENDER RECEIVER; do
+for h in $list; do
 	host=$(eval "echo \${${h}_CTL_HOSTNAME}")
 	echo "Copying to $h:$host"
 	if [[ ${host} != DONOTUSE ]] ; then

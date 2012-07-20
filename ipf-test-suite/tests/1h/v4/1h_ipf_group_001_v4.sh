@@ -30,13 +30,13 @@ do_test() {
 	count=$(ccat < ${IPF_TMP_DIR}/ipf.conf.b | wc -l)
 	count=$((count))
 	if [[ $count != 4 ]] ; then
-		echo "-- incorrect group rule count ($count)"
+		print - "-- ERROR incorrect group rule count ($count)"
 		return 1
 	fi
 	${BIN_IPF} -rf ${IPF_TMP_DIR}/ipf.conf.b
 	ret=$?
 	if [[ $ret != 0 ]] ; then
-		echo "-- error removing rules with group"
+		print - "-- ERROR error removing rules with group"
 		return $ret
 	fi
 	return 0
@@ -55,7 +55,7 @@ do_verify() {
 	count=$(ccat < ${IPF_TMP_DIR}/ipf.conf.a | wc -l)
 	count=$((count))
 	if [[ $count != 2 ]] ; then
-		echo "-- incorrect rule count ($count) after group removal"
+		print - "-- ERROR incorrect rule count ($count) after group removal"
 		return 1
 	fi
 	return 0;

@@ -1,0 +1,7 @@
+pass in inet6 from port = 10101
+pass out inet6 from any to port != 22
+block in inet6 from port 20:21
+block out inet6 from any to port 10 <> 100
+pass out inet6 from any to port = {3,5,7,9}
+block in inet6 from port = {20,25}
+pass in inet6 from any port = {11:12, 21:22} to any port = {1:2, 4:5, 8:9}

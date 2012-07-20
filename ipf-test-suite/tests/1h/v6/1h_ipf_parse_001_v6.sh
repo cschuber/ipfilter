@@ -1,22 +1,18 @@
+no_base_ruleset=1
+capture_net0=0
+capture_net1=0
+capture_ipmon=0
+capture_sender=0
+capture_receiver=0
+preserve_net0=0
+preserve_net1=0
+preserve_ipmon=0
+preserve_sender=0
+preserve_receiver=0
+dump_stats=0
+
 gen_ipf_conf() {
-	cat <<__EOF__
-pass in inet6 all
-block out inet6 \
-all
-log in inet6 all
-log body in inet6 all
-pass in inet6 from !any to any pps 10
-pass in on ed0 inet6 from ::1 to ::1
-pass in on ed0,vx0 inet6 from ::1 to ::1
-block in log first on lo0 inet6 from any to any
-pass in log body or-block quick inet6 from any to any
-block in inet6 from any to !any
-block return-rst in quick on le0 inet6 proto tcp from any to any
-block return-icmp in on qe0 inet6 from any to any
-block return-icmp(1) in on qe0 inet6 from any to any
-block return-icmp-as-dest in on le0 inet6 from any to any
-block return-icmp-as-dest(port-unr) in on qe0 inet6 from any to any
-__EOF__
+	cat 1h/v6/1h_ipf_parse_001_v6.data
 	return 0;
 }
 

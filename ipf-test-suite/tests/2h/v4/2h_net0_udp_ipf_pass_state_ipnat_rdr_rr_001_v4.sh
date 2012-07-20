@@ -1,5 +1,8 @@
 #!/bin/ksh
 # ni9
+capture_net1=0;
+preserve_net1=0;
+
 gen_ipf_conf() {
 	generate_block_rules
 	generate_test_hdr
@@ -47,5 +50,5 @@ do_tune() {
 }
 
 do_verify() {
-	return 0;
+	return 2;
 }

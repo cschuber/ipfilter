@@ -1,0 +1,22 @@
+#
+# This test file contains only syslog facilities that are common to all
+# platforms.
+#
+block in quick log level user.debug inet6 proto icmp all
+block in quick log level mail.info inet6 proto icmp all
+block in quick log level daemon.notice inet6 proto icmp all
+block in quick log level auth.warn inet6 proto icmp all
+block in quick log level syslog.err inet6 proto icmp all
+block in quick log level lpr.crit inet6 proto icmp all
+block in quick log level news.alert inet6 proto icmp all
+block in quick log level uucp.emerg inet6 proto icmp all
+block in quick log level local0.err inet6 proto icmp all
+block in quick log level local1.crit inet6 proto icmp all
+block in quick log level local2.alert inet6 proto icmp all
+block in quick log level local3.emerg inet6 proto icmp all
+block in quick log level local4.debug inet6 proto icmp all
+block in quick log level local5.info inet6 proto icmp all
+block in quick log level local6.notice inet6 proto icmp all
+block in quick log level local7.warn inet6 proto icmp all
+block in quick log level kern.err inet6 proto icmp all
+block in quick log level security.emerg inet6 proto icmp all

@@ -1,0 +1,8 @@
+log in inet6 proto tcp all
+pass in inet6 proto 6 from any to any
+pass in inet6 proto udp from ::1 to ::1
+block in inet6 proto ipv6 from any to any
+block in inet6 proto 17 from any to any
+block in inet6 proto 250 from any to any
+pass in inet6 proto tcp/udp from any to any
+block in inet6 proto tcp-udp from any to any

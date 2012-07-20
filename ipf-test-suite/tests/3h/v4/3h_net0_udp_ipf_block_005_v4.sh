@@ -1,4 +1,3 @@
-#!/bin/ksh
 
 gen_ipf_conf() {
 	generate_pass_rules

@@ -1,4 +1,3 @@
-#!/bin/ksh
 
 gen_ipf_conf() {
 	generate_pass_rules
@@ -23,7 +22,8 @@ do_test() {
 	tcp_test ${SENDER_CTL_HOSTNAME} ${RECEIVER_NET1_ADDR_V6} 5057 block
 	ret=$?
 	stop_tcp_server ${RECEIVER_CTL_HOSTNAME} 0
-	ret=$((ret + $?))
+	x=$?
+	ret=$((ret + x))
 	return $ret;
 }
 
@@ -32,5 +32,5 @@ do_tune() {
 }
 
 do_verify() {
-	return 0;
+	return 2;
 }

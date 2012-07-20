@@ -1,5 +1,4 @@
-#!/bin/ksh
-# ni7
+
 gen_ipf_conf() {
 	generate_block_rules
 	generate_test_hdr
@@ -11,7 +10,7 @@ __EOF__
 
 gen_ipnat_conf() {
 	cat <<__EOF__
-map ${SUT_NET1_IFP_NAME} ${SUT_NET1_ADDR_V6} -> ${NET1_FAKE_ADDR_V6} portmap udp 10000:11000
+map ${SUT_NET1_IFP_NAME} ${SENDER_NET0_ADDR_V6} -> ${NET1_FAKE_ADDR_V6} portmap udp 10000:11000
 __EOF__
 	return 0;
 }
@@ -21,13 +20,9 @@ gen_ippool_conf() {
 }
 
 do_test() {
-	start_udp_server ${RECEIVER_CTL_HOSTNAME} ${RECEIVER_NET1_ADDR_V6} 5050
-	sleep 3
-	udp_test ${SENDER_CTL_HOSTNAME} ${RECEIVER_NET1_ADDR_V6} 5050 pass
-	ret=$?
-	stop_udp_server ${RECEIVER_CTL_HOSTNAME} 1
-	ret=$((ret + $?))
-	return $ret;
+	basic_udp_test ${RECEIVER_CTL_HOSTNAME} ${RECEIVER_NET1_ADDR_V6} \
+	    5050 ${SENDER_CTL_HOSTNAME} ${RECEIVER_NET1_ADDR_V6} pass
+	return $?;
 }
 
 do_tune() {
@@ -35,8 +30,7 @@ do_tune() {
 }
 
 do_verify() {
-	${IPF_BIN_DIR}/log.sh verify_srcdst_1 \
-	    ${NET1_FAKE_ADDR_V6} ${RECEIVER_NET1_ADDR_V6}
+	verify_srcdst_1 ${NET1_FAKE_ADDR_V6} ${RECEIVER_NET1_ADDR_V6}
 	if [[ $? -eq 0 ]] ; then
 		echo "No packets ${NET1_FAKE_ADDR_V6},${RECEIVER_NET1_ADDR_V6}"
 		return 1

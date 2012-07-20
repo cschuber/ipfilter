@@ -1,30 +1,74 @@
 #!/bin/ksh
 
-. ./vars.sh
+./vars.sh
 
-(cd tests/1h/v4; ./gen_XXX_test_sh)
+. ./config.sh
 
+appcheck() {
+	print -n "Checking for RSH at ${1} - "
+	rsh -n -l root ${1} who >/dev/null 2>&1
+	if [[ $? -ne 0 ]] ; then
+		print "NOT AVAILABLE"
+		print "REQUIRED for testing. Aborting"
+		print "Failed command: rsh -n -l root ${1} who"
+		exit 1
+	fi
+	print "OK"
+	print -n "Checking for FTP at ${1} - "
+	if [[ $1 = @(*:*) ]] ; then
+		addr="[$1]"
+	else
+		addr=$1
+	fi
+	wget -O /dev/null "ftp://${addr}/${FTP_PATH}" >/dev/null 2>&1
+	if [[ $? -ne 0 ]] ; then
+		print "NOT AVAILABLE"
+		print "REQUIRED for testing. Aborting"
+		print "Failed command: wget ftp://${addr}/${FTP_PATH}"
+		exit 1
+	fi
+	print "OK"
+	print -n "Checking for TFTP at ${1} - "
+	echo "get ${FTP_PATH} /dev/null;quit" | tftp ${1} > /dev/null 2>&1
+	if [[ $? -ne 0 ]] ; then
+		print "NOT AVAILABLE"
+		print "REQUIRED for testing. Aborting"
+		print "Failed command: echo 'get ${FTP_PATH}' | tftp ${1}"
+		exit 1
+	fi
+	print "OK"
+	return 0
+}
+
+#(cd tests/1h/v4; ./gen_XXX_test_sh)
+
+if [[ $# -gt 0 ]] ; then
+	list=$@
+else
+	list="SUT SENDER RECEIVER"
+fi
 #
 # Test remote access
 #
-for h in SUT SENDER RECEIVER; do
+for h in $list; do
 	host=$(eval "echo \${${h}_CTL_HOSTNAME}")
 	if [[ ${host} != DONOTUSE ]] ; then
 		x=$(${RRSH} -n -l root ${host} echo hello_world)
 		if [[ $x != hello_world ]] ; then
-			echo "Remote access to ${host} not operational"
+			print "Remote access to ${host} not operational"
 			exit 1
 		fi
 	fi
 done
 
-./distribute.sh
+./distribute.sh $list
+#
 
-for h in sut sender receiver; do
-	echo > ${IPF_TMP_DIR}/${h}_config_net_up.sh
-	echo > ${IPF_TMP_DIR}/${h}_config_net_down.sh
-	echo "Configuring $h"
-	H=$(echo $h | tr '[a-z]' '[A-Z]')
+for h in $list; do
+	print > ${IPF_TMP_DIR}/${h}_config_net_up.sh
+	print > ${IPF_TMP_DIR}/${h}_config_net_down.sh
+	print "Configuring $h"
+	H=$h
 	n0=$(eval echo \$${H}_NET0_IFP_NAME)
 	n0v4=$(eval echo \$${H}_NET0_ADDR_V4)
 	n0v4m=$(eval echo \$NET0_NETMASK_V4)
@@ -118,30 +162,22 @@ __EOF__
 	fi
 done
 #
-wget -O /dev/null ftp://${SUT_NET0_ADDR_V4}/${FTP_PATH} >/dev/null 2>&1
-if [[ $? -ne 0 ]] ; then
-	echo "FTP not available at ${SUT_NET0_ADDR_V4}"
-	echo "REQUIRED for testing"
-	exit 1
-	exit 1
-fi
-if [[ ${RECEIVER_CTL_HOSTNAME} != DONOTUSE ]]; then
-	wget -O /dev/null ftp://${RECEIVER_NET1_ADDR_V4}/${FTP_PATH} >/dev/null 2>&1
-	if [[ $? -ne 0 ]] ; then
-		echo "FTP not available at ${RECEIVER_NET1_ADDR_V4}"
-		echo "REQUIRED for testing"
-		exit 1
-		exit 1
-	fi
-fi
-#
-
 ./routing.sh
-
 #
+if [[ $list = @(*SUT*) ]] ; then
+	appcheck ${SUT_NET0_ADDR_V4}
+	appcheck ${SUT_NET0_ADDR_V6}
+fi
+if [[ ${SENDER_CTL_HOSTNAME} != DONOTUSE && $list = @(*SENDER*) ]]; then
+	appcheck ${SENDER_NET0_ADDR_V4}
+	appcheck ${SENDER_NET0_ADDR_V6}
+fi
+if [[ ${RECEIVER_CTL_HOSTNAME} != DONOTUSE && $list = @(*RECEIVER*) ]]; then
+	appcheck ${RECEIVER_NET1_ADDR_V4}
+	appcheck ${RECEIVER_NET1_ADDR_V6}
+fi
 #
 ${RRSH} ${SUT_CTL_HOSTNAME} pkill ipmon
 ${RRSH} ${SUT_CTL_HOSTNAME} ${IPF_BIN_DIR}/forwarding.sh
-#
 #
 exit 0

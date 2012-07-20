@@ -1,10 +1,9 @@
-#!/bin/ksh
 
 gen_ipf_conf() {
 	generate_pass_rules
 	generate_test_hdr
 	cat << __EOF__
-block in on ${SUT_NET1_IFP_NAME} proto udp ${RECEIVER_NET1_ADDR_V4} port < 5055 to any
+block in on ${SUT_NET1_IFP_NAME} proto udp from ${RECEIVER_NET1_ADDR_V4} port < 5055 to any
 __EOF__
 	return 0;
 }
@@ -22,7 +21,8 @@ do_test() {
 	sleep 1
 	udp_test ${SENDER_CTL_HOSTNAME} ${RECEIVER_NET1_ADDR_V4} 5054 block
 	ret=$?
-	stop_udp_server ${RECEIVER_CTL_HOSTNAME} 0
+	ret=$((ret))
+	stop_udp_server ${RECEIVER_CTL_HOSTNAME} 1
 	ret=$((ret + $?))
 	return $ret;
 }
@@ -32,5 +32,12 @@ do_tune() {
 }
 
 do_verify() {
-	return 0;
+	verify_src_0 ${RECEIVER_NET1_ADDR_V4} 5052
+	count=$?
+	if [[ $count -ne 0 ]] ; then
+		print - "-- ERROR ${count} packets seen from ${RECEIVER_NET1_ADDR_V4}"
+		return 1
+	fi
+	print - "-- OK no packets seen from ${RECEIVER_NET1_ADDR_V4}"
+	return 0
 }

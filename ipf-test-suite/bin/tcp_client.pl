@@ -14,6 +14,7 @@ eval {
 	$socket = new IO::Socket::IP(
 		PeerHost => $ARGV[0],
 		PeerPort => $ARGV[1],
+		LocalHost => $ARGV[2],
 		ReuseAddr => true,
 		Proto => 'tcp',
 	) || die "ERROR creating socket to $ARGV[0],$ARGV[1]: $!";

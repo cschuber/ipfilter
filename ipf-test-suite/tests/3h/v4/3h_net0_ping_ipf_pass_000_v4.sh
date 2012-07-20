@@ -20,9 +20,7 @@ gen_ippool_conf() {
 
 do_test() {
 	ping_test ${SENDER_CTL_HOSTNAME} ${RECEIVER_NET1_ADDR_V4} small pass
-	ret=$?
-	echo "PING result=$ret"
-	return $ret;
+	return $?;
 }
 
 do_tune() {

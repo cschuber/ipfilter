@@ -1,17 +1,18 @@
+no_base_ruleset=1
+capture_net0=0
+capture_net1=0
+capture_ipmon=0
+capture_sender=0
+capture_receiver=0
+preserve_net0=0
+preserve_net1=0
+preserve_ipmon=0
+preserve_sender=0
+preserve_receiver=0
+dump_stats=0
+
 gen_ipf_conf() {
-	cat <<__EOF__
-pass in on lo0 fastroute inet6 from any to any
-pass in on lo0 to qe0 inet6 from ::1 to ::1
-pass in on le0 to qe0:10:0::0:1 inet6 from ::1 to ::1
-pass in on lo0 dup-to qe0 inet6 from ::1 to ::1
-pass in on le0 dup-to qe0:10:0::0:1 inet6 from ::1 to ::1
-pass in on le0 to hme0:10:1:1::1 dup-to qe0:127:0:0::1 inet6 from ::1 to ::1
-block in quick on qe0 to qe1 inet6 from any to any
-block in quick to qe1 inet6 from any to any
-pass out quick dup-to hme0 inet6 from any to any
-pass out quick on hme0 reply-to hme1 inet6 from any to any
-pass in on le0 dup-to qe0:127:0:0::1 reply-to hme1:10:10:10::10 inet6 all
-__EOF__
+	cat 1h/v6/1h_ipf_parse_006_v6.data
 	return 0;
 }
 
