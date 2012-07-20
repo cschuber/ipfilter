@@ -3763,7 +3763,7 @@ frentry_current_to_4_1_34(current, old)
 
 	old->fr_lock = fr->fr_lock;
 	old->fr_next = fr->fr_next;
-	old->fr_grp = fr->fr_grp;
+	old->fr_grp = (void *)fr->fr_grp;
 	old->fr_isc = fr->fr_isc;
 	old->fr_ifas[0] = fr->fr_ifas[0];
 	old->fr_ifas[1] = fr->fr_ifas[1];
@@ -3858,7 +3858,7 @@ frentry_current_to_4_1_16(current, old)
 
 	old->fr_lock = fr->fr_lock;
 	old->fr_next = fr->fr_next;
-	old->fr_grp = fr->fr_grp;
+	old->fr_grp = (void *)fr->fr_grp;
 	old->fr_isc = fr->fr_isc;
 	old->fr_ifas[0] = fr->fr_ifas[0];
 	old->fr_ifas[1] = fr->fr_ifas[1];
@@ -3953,7 +3953,7 @@ frentry_current_to_4_1_0(current, old)
 
 	old->fr_lock = fr->fr_lock;
 	old->fr_next = fr->fr_next;
-	old->fr_grp = fr->fr_grp;
+	old->fr_grp = (void *)fr->fr_grp;
 	old->fr_isc = fr->fr_isc;
 	old->fr_ifas[0] = fr->fr_ifas[0];
 	old->fr_ifas[1] = fr->fr_ifas[1];
