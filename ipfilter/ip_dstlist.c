@@ -230,7 +230,6 @@ ipf_dstlist_soft_fini(softc, arg)
 		}
 	}
 
-	ASSERT(softd->stats.ipls_numdereflists == 0);
 	ASSERT(softd->stats.ipls_numderefnodes == 0);
 }
 
