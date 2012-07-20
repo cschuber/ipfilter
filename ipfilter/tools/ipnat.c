@@ -703,81 +703,154 @@ int nat_matcharray(nat, array)
 	nat_t *nat;
 	int *array;
 {
-	int i, n, *x, e, p;
+	int i, n, *x, rv, p;
+	ipfexp_t *e;
 
-	e = 0;
+	rv = 0;
 	n = array[0];
 	x = array + 1;
 
-	for (; n > 0; x += 3 + x[3]) {
-		if (x[0] == IPF_EXP_END)
+	for (; n > 0; x += 3 + x[3], rv = 0) {
+		e = (ipfexp_t *)x;
+		if (e->ipfe_cmd == IPF_EXP_END)
 			break;
-		e = 0;
+		n -= e->ipfe_size;
 
-		n -= x[3] + 3;
-
-		p = x[0] >> 16;
-		if (p != 0 && p != nat->nat_pr[1])
+		p = e->ipfe_cmd >> 16;
+		if ((p != 0) && (p != nat->nat_pr[1]))
 			break;
 
-		switch (x[0])
+		switch (e->ipfe_cmd)
 		{
 		case IPF_EXP_IP_PR :
-			for (i = 0; !e && i < x[3]; i++) {
-				e |= (nat->nat_pr[1] == x[i + 3]);
+			for (i = 0; !rv && i < e->ipfe_narg; i++) {
+				rv |= (nat->nat_pr[1] == e->ipfe_arg0[i]);
 			}
 			break;
 
 		case IPF_EXP_IP_SRCADDR :
-			for (i = 0; !e && i < x[3]; i++) {
-				e |= ((nat->nat_nsrcaddr & x[i + 4]) ==
-				      x[i + 3]);
+			if (nat->nat_v[0] != 4)
+				break;
+			for (i = 0; !rv && i < e->ipfe_narg; i++) {
+				rv |= ((nat->nat_osrcaddr &
+					e->ipfe_arg0[i * 2 + 1]) ==
+				       e->ipfe_arg0[i * 2]) ||
+				      ((nat->nat_nsrcaddr &
+					e->ipfe_arg0[i * 2 + 1]) ==
+				       e->ipfe_arg0[i * 2]);
 			}
 			break;
 
 		case IPF_EXP_IP_DSTADDR :
-			for (i = 0; !e && i < x[3]; i++) {
-				e |= ((nat->nat_ndstaddr & x[i + 4]) ==
-				      x[i + 3]);
+			if (nat->nat_v[0] != 4)
+				break;
+			for (i = 0; !rv && i < e->ipfe_narg; i++) {
+				rv |= ((nat->nat_odstaddr &
+					e->ipfe_arg0[i * 2 + 1]) ==
+				       e->ipfe_arg0[i * 2]) ||
+				      ((nat->nat_ndstaddr &
+					e->ipfe_arg0[i * 2 + 1]) ==
+				       e->ipfe_arg0[i * 2]);
 			}
 			break;
 
 		case IPF_EXP_IP_ADDR :
-			for (i = 0; !e && i < x[3]; i++) {
-				e |= ((nat->nat_nsrcaddr & x[i + 4]) ==
-				      x[i + 3]) ||
-				     ((nat->nat_ndstaddr & x[i + 4]) ==
-				      x[i + 3]);
+			if (nat->nat_v[0] != 4)
+				break;
+			for (i = 0; !rv && i < e->ipfe_narg; i++) {
+				rv |= ((nat->nat_osrcaddr &
+					e->ipfe_arg0[i * 2 + 1]) ==
+				       e->ipfe_arg0[i * 2]) ||
+				      ((nat->nat_nsrcaddr &
+					e->ipfe_arg0[i * 2 + 1]) ==
+				       e->ipfe_arg0[i * 2]) ||
+				     ((nat->nat_odstaddr &
+					e->ipfe_arg0[i * 2 + 1]) ==
+				       e->ipfe_arg0[i * 2]) ||
+				     ((nat->nat_ndstaddr &
+					e->ipfe_arg0[i * 2 + 1]) ==
+				       e->ipfe_arg0[i * 2]);
 			}
 			break;
 
+#ifdef USE_INET6
+		case IPF_EXP_IP6_SRCADDR :
+			if (nat->nat_v[0] != 6)
+				break;
+			for (i = 0; !rv && i < e->ipfe_narg; i++) {
+				rv |= IP6_MASKEQ(&nat->nat_osrc6,
+						 &e->ipfe_arg0[i * 8 + 4],
+						 &e->ipfe_arg0[i * 8]) ||
+				      IP6_MASKEQ(&nat->nat_nsrc6,
+						 &e->ipfe_arg0[i * 8 + 4],
+						 &e->ipfe_arg0[i * 8]);
+			}
+			break;
+
+		case IPF_EXP_IP6_DSTADDR :
+			if (nat->nat_v[0] != 6)
+				break;
+			for (i = 0; !rv && i < e->ipfe_narg; i++) {
+				rv |= IP6_MASKEQ(&nat->nat_odst6,
+						 &e->ipfe_arg0[i * 8 + 4],
+						 &e->ipfe_arg0[i * 8]) ||
+				      IP6_MASKEQ(&nat->nat_ndst6,
+						 &e->ipfe_arg0[i * 8 + 4],
+						 &e->ipfe_arg0[i * 8]);
+			}
+			break;
+
+		case IPF_EXP_IP6_ADDR :
+			if (nat->nat_v[0] != 6)
+				break;
+			for (i = 0; !rv && i < e->ipfe_narg; i++) {
+				rv |= IP6_MASKEQ(&nat->nat_osrc6,
+						 &e->ipfe_arg0[i * 8 + 4],
+						 &e->ipfe_arg0[i * 8]) ||
+				      IP6_MASKEQ(&nat->nat_nsrc6,
+						 &e->ipfe_arg0[i * 8 + 4],
+						 &e->ipfe_arg0[i * 8]) ||
+				      IP6_MASKEQ(&nat->nat_odst6,
+						 &e->ipfe_arg0[i * 8 + 4],
+						 &e->ipfe_arg0[i * 8]) ||
+				      IP6_MASKEQ(&nat->nat_ndst6,
+						 &e->ipfe_arg0[i * 8 + 4],
+						 &e->ipfe_arg0[i * 8]);
+			}
+			break;
+#endif
+
 		case IPF_EXP_UDP_PORT :
 		case IPF_EXP_TCP_PORT :
-			for (i = 0; !e && i < x[3]; i++) {
-				e |= (nat->nat_nsport == x[i + 3]) ||
-				     (nat->nat_ndport == x[i + 3]);
+			for (i = 0; !rv && i < e->ipfe_narg; i++) {
+				rv |= (nat->nat_osport == e->ipfe_arg0[i]) ||
+				      (nat->nat_nsport == e->ipfe_arg0[i]) ||
+				      (nat->nat_odport == e->ipfe_arg0[i]) ||
+				      (nat->nat_ndport == e->ipfe_arg0[i]);
 			}
 			break;
 
 		case IPF_EXP_UDP_SPORT :
 		case IPF_EXP_TCP_SPORT :
-			for (i = 0; !e && i < x[3]; i++) {
-				e |= (nat->nat_nsport == x[i + 3]);
+			for (i = 0; !rv && i < e->ipfe_narg; i++) {
+				rv |= (nat->nat_osport == e->ipfe_arg0[i]) ||
+				      (nat->nat_nsport == e->ipfe_arg0[i]);
 			}
 			break;
 
 		case IPF_EXP_UDP_DPORT :
 		case IPF_EXP_TCP_DPORT :
-			for (i = 0; !e && i < x[3]; i++) {
-				e |= (nat->nat_ndport == x[i + 3]);
+			for (i = 0; !rv && i < e->ipfe_narg; i++) {
+				rv |= (nat->nat_odport == e->ipfe_arg0[i]) ||
+				      (nat->nat_ndport == e->ipfe_arg0[i]);
 			}
 			break;
 		}
-		e ^= x[2];
+		rv ^= e->ipfe_not;
 
-		if (!e)
+		if (rv == 0)
 			break;
 	}
 
-	return e;
+	return rv;
 }
