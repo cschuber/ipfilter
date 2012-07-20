@@ -119,7 +119,7 @@ typedef struct ipf_proxy_softc_s {
 
 static ipftuneable_t ipf_proxy_tuneables[] = {
 	{ { (void *)offsetof(ipf_proxy_softc_t, ips_proxy_debug) },
-		"ips_proxy_debug",	0,	10,
+		"proxy_debug",	0,	0x1f,
 		stsizeof(ipf_proxy_softc_t, ips_proxy_debug),
 		0,	NULL,	NULL },
 	{ { NULL },		NULL,			0,	0,
@@ -564,7 +564,7 @@ ipf_proxy_add(arg, ap)
 		if ((a->apr_p == ap->apr_p) &&
 		    !strncmp(a->apr_label, ap->apr_label,
 			     sizeof(ap->apr_label))) {
-			if (softp->ips_proxy_debug > 1)
+			if (softp->ips_proxy_debug & 0x01)
 				printf("ipf_proxy_add: %s/%d present (B)\n",
 				       a->apr_label, a->apr_p);
 			return -1;
@@ -574,7 +574,7 @@ ipf_proxy_add(arg, ap)
 		if ((a->apr_p == ap->apr_p) &&
 		    !strncmp(a->apr_label, ap->apr_label,
 			     sizeof(ap->apr_label))) {
-			if (softp->ips_proxy_debug > 1)
+			if (softp->ips_proxy_debug & 0x01)
 				printf("ipf_proxy_add: %s/%d present (D)\n",
 				       a->apr_label, a->apr_p);
 			return -1;
@@ -610,20 +610,20 @@ ipf_proxy_ctl(softc, arg, ctl)
 
 	a = ipf_proxy_lookup(arg, ctl->apc_p, ctl->apc_label);
 	if (a == NULL) {
-		if (softp->ips_proxy_debug > 1)
+		if (softp->ips_proxy_debug & 0x01)
 			printf("ipf_proxy_ctl: can't find %s/%d\n",
 				ctl->apc_label, ctl->apc_p);
 		IPFERROR(80001);
 		error = ESRCH;
 	} else if (a->apr_ctl == NULL) {
-		if (softp->ips_proxy_debug > 1)
+		if (softp->ips_proxy_debug & 0x01)
 			printf("ipf_proxy_ctl: no ctl function for %s/%d\n",
 				ctl->apc_label, ctl->apc_p);
 		IPFERROR(80002);
 		error = ENXIO;
 	} else {
 		error = (*a->apr_ctl)(softc, a->apr_soft, ctl);
-		if ((error != 0) && (softp->ips_proxy_debug > 1))
+		if ((error != 0) && (softp->ips_proxy_debug & 0x02))
 			printf("ipf_proxy_ctl: %s/%d ctl error %d\n",
 				a->apr_label, a->apr_p, error);
 	}
@@ -780,13 +780,13 @@ ipf_proxy_match(fin, nat)
 	int result;
 
 	ipn = nat->nat_ptr;
-	if (softp->ips_proxy_debug > 8)
+	if (softp->ips_proxy_debug & 0x04)
 		printf("ipf_proxy_match(%lx,%lx) aps %lx ptr %lx\n",
 			(u_long)fin, (u_long)nat, (u_long)nat->nat_aps,
 			(u_long)ipn);
 
 	if ((fin->fin_flx & (FI_SHORT|FI_BAD)) != 0) {
-		if (softp->ips_proxy_debug > 0)
+		if (softp->ips_proxy_debug & 0x08)
 			printf("ipf_proxy_match: flx 0x%x (BAD|SHORT)\n",
 				fin->fin_flx);
 		return -1;
@@ -794,7 +794,7 @@ ipf_proxy_match(fin, nat)
 
 	apr = ipn->in_apr;
 	if ((apr == NULL) || (apr->apr_flags & APR_DELETE)) {
-		if (softp->ips_proxy_debug > 0)
+		if (softp->ips_proxy_debug & 0x08)
 			printf("ipf_proxy_match:apr %lx apr_flags 0x%x\n",
 				(u_long)apr, apr ? apr->apr_flags : 0);
 		return -1;
@@ -803,7 +803,7 @@ ipf_proxy_match(fin, nat)
 	if (apr->apr_match != NULL) {
 		result = (*apr->apr_match)(fin, nat->nat_aps, nat);
 		if (result != 0) {
-			if (softp->ips_proxy_debug > 4)
+			if (softp->ips_proxy_debug & 0x08)
 				printf("ipf_proxy_match: result %d\n", result);
 			return -1;
 		}
@@ -832,11 +832,11 @@ ipf_proxy_new(fin, nat)
 	register ap_session_t *aps;
 	aproxy_t *apr;
 
-	if (softp->ips_proxy_debug > 8)
+	if (softp->ips_proxy_debug & 0x04)
 		printf("ipf_proxy_new(%lx,%lx) \n", (u_long)fin, (u_long)nat);
 
 	if ((nat->nat_ptr == NULL) || (nat->nat_aps != NULL)) {
-		if (softp->ips_proxy_debug > 0)
+		if (softp->ips_proxy_debug & 0x08)
 			printf("ipf_proxy_new: nat_ptr %lx nat_aps %lx\n",
 				(u_long)nat->nat_ptr, (u_long)nat->nat_aps);
 		return -1;
@@ -846,7 +846,7 @@ ipf_proxy_new(fin, nat)
 
 	if ((apr->apr_flags & APR_DELETE) ||
 	    (fin->fin_p != apr->apr_p)) {
-		if (softp->ips_proxy_debug > 2)
+		if (softp->ips_proxy_debug & 0x08)
 			printf("ipf_proxy_new: apr_flags 0x%x p %d/%d\n",
 				apr->apr_flags, fin->fin_p, apr->apr_p);
 		return -1;
@@ -854,7 +854,7 @@ ipf_proxy_new(fin, nat)
 
 	KMALLOC(aps, ap_session_t *);
 	if (!aps) {
-		if (softp->ips_proxy_debug > 0)
+		if (softp->ips_proxy_debug & 0x08)
 			printf("ipf_proxy_new: malloc failed (%lu)\n",
 				(u_long)sizeof(ap_session_t));
 		return -1;
@@ -870,7 +870,7 @@ ipf_proxy_new(fin, nat)
 				KFREES(aps->aps_data, aps->aps_psiz);
 			}
 			KFREE(aps);
-			if (softp->ips_proxy_debug > 2)
+			if (softp->ips_proxy_debug & 0x08)
 				printf("ipf_proxy_new: new(%lx) failed\n",
 					(u_long)apr->apr_new);
 			return -1;
@@ -919,14 +919,15 @@ ipf_proxy_check(fin, nat)
 #endif
 
 	if (fin->fin_flx & FI_BAD) {
-		if (softp->ips_proxy_debug > 0)
-			printf("ipf_proxy_check: flx 0x%x (BAD)\n", fin->fin_flx);
+		if (softp->ips_proxy_debug & 0x08)
+			printf("ipf_proxy_check: flx 0x%x (BAD)\n",
+			       fin->fin_flx);
 		return -1;
 	}
 
 #ifndef IPFILTER_CKSUM
 	if ((fin->fin_out == 0) && (ipf_checkl4sum(fin) == -1)) {
-		if (softp->ips_proxy_debug > 0)
+		if (softp->ips_proxy_debug & 0x08)
 			printf("ipf_proxy_check: l4 checksum failure %d\n",
 				fin->fin_p);
 		if (fin->fin_p == IPPROTO_TCP)
@@ -944,8 +945,9 @@ ipf_proxy_check(fin, nat)
 #if defined(MENTAT) || defined(HAVE_M_PULLDOWN)
 		if ((fin->fin_dlen > 0) && !(fin->fin_flx & FI_COALESCE))
 			if (ipf_coalesce(fin) == -1) {
-				if (softp->ips_proxy_debug > 0)
-					printf("ipf_proxy_check: coalesce failed %x\n", fin->fin_flx);
+				if (softp->ips_proxy_debug & 0x08)
+					printf("ipf_proxy_check: %s %x\n",
+					       "coalesce failed", fin->fin_flx);
 				return -1;
 			}
 #endif
@@ -985,8 +987,8 @@ ipf_proxy_check(fin, nat)
 		}
 
 		rv = APR_EXIT(err);
-		if (((softp->ips_proxy_debug > 0) && (rv != 0)) ||
-		    (softp->ips_proxy_debug > 8))
+		if (((softp->ips_proxy_debug & 0x08) && (rv != 0)) ||
+		    (softp->ips_proxy_debug & 0x04))
 			printf("ipf_proxy_check: out %d err %x rv %d\n",
 				fin->fin_out, err, rv);
 		if (rv == 1)
@@ -1003,14 +1005,17 @@ ipf_proxy_check(fin, nat)
 		 * so we need to recalculate the header checksums for the
 		 * packet.
 		 */
-		adjlen = err & 0xffff;
+		adjlen = APR_INC(err);
 #if !defined(_KERNEL) || defined(MENTAT) || defined(__sgi)
 		s1 = LONG_SUM(fin->fin_plen - adjlen);
 		s2 = LONG_SUM(fin->fin_plen);
 		CALC_SUMD(s1, s2, sd);
-		if ((err != 0) && (fin->fin_cksum < FI_CK_L4PART))
+		if ((err != 0) && (fin->fin_cksum < FI_CK_L4PART) &&
+		    fin->fin_v == 4)
 			ipf_fix_outcksum(0, &ip->ip_sum, sd, 0);
 #endif
+		if (fin->fin_flx & FI_DOCKSUM)
+			dosum = 1;
 
 		/*
 		 * For TCP packets, we may need to adjust the sequence and
@@ -1022,23 +1027,23 @@ ipf_proxy_check(fin, nat)
 		 * changed or not.
 		 */
 		if (tcp != NULL) {
-			err = ipf_proxy_fixseqack(fin, ip, aps, APR_INC(err));
-			if (dosum) {
-				tcp->th_sum = fr_cksum(fin, ip,
-						       IPPROTO_TCP, tcp);
-			} else if (fin->fin_cksum == FI_CK_L4PART) {
+			err = ipf_proxy_fixseqack(fin, ip, aps, adjlen);
+			if (fin->fin_cksum == FI_CK_L4PART) {
 				u_short sum = ntohs(tcp->th_sum);
 				sum += adjlen;
 				tcp->th_sum = htons(sum);
+			} else if (fin->fin_cksum < FI_CK_L4PART) {
+				tcp->th_sum = fr_cksum(fin, ip,
+						       IPPROTO_TCP, tcp);
 			}
 		} else if ((udp != NULL) && (udp->uh_sum != 0)) {
-			if (dosum) {
-				udp->uh_sum = fr_cksum(fin, ip,
-						       IPPROTO_UDP, udp);
-			} else if (fin->fin_cksum == FI_CK_L4PART) {
+			if (fin->fin_cksum == FI_CK_L4PART) {
 				u_short sum = ntohs(udp->uh_sum);
 				sum += adjlen;
 				udp->uh_sum = htons(sum);
+			} else if (dosum) {
+				udp->uh_sum = fr_cksum(fin, ip,
+						       IPPROTO_UDP, udp);
 			}
 		}
 		aps->aps_bytes += fin->fin_plen;
@@ -1067,7 +1072,7 @@ ipf_proxy_lookup(arg, pr, name)
 	ipf_proxy_softc_t *softp = arg;
 	aproxy_t *ap;
 
-	if (softp->ips_proxy_debug > 8)
+	if (softp->ips_proxy_debug & 0x04)
 		printf("ipf_proxy_lookup(%d,%s)\n", pr, name);
 
 	for (ap = softp->ips_proxies; ap != NULL; ap = ap->apr_next)
@@ -1077,7 +1082,7 @@ ipf_proxy_lookup(arg, pr, name)
 			return ap;
 		}
 
-	if (softp->ips_proxy_debug > 2)
+	if (softp->ips_proxy_debug & 0x08)
 		printf("ipf_proxy_lookup: failed for %d/%s\n", pr, name);
 	return NULL;
 }
@@ -1168,8 +1173,8 @@ ipf_proxy_fixseqack(fin, ip, aps, inc)
 	/*
 	 * ip_len has already been adjusted by 'inc'.
 	 */
-	nlen = fin->fin_plen;
-	nlen -= (IP_HL(ip) << 2) + (TCP_OFF(tcp) << 2);
+	nlen = fin->fin_dlen;
+	nlen -= (TCP_OFF(tcp) << 2);
 
 	inc2 = inc;
 	inc = (int)inc2;
@@ -1181,7 +1186,7 @@ ipf_proxy_fixseqack(fin, ip, aps, inc)
 		/* switch to other set ? */
 		if ((aps->aps_seqmin[!sel] > aps->aps_seqmin[sel]) &&
 		    (seq1 > aps->aps_seqmin[!sel])) {
-			if (softp->ips_proxy_debug > 7)
+			if (softp->ips_proxy_debug & 0x10)
 				printf("proxy out switch set seq %d -> %d %x > %x\n",
 					sel, !sel, seq1,
 					aps->aps_seqmin[!sel]);
@@ -1201,7 +1206,7 @@ ipf_proxy_fixseqack(fin, ip, aps, inc)
 		if (inc && (seq1 > aps->aps_seqmin[!sel])) {
 			aps->aps_seqmin[sel] = seq1 + nlen - 1;
 			aps->aps_seqoff[sel] = aps->aps_seqoff[sel] + inc;
-			if (softp->ips_proxy_debug > 7)
+			if (softp->ips_proxy_debug & 0x10)
 				printf("proxy seq set %d at %x to %d + %d\n",
 					sel, aps->aps_seqmin[sel],
 					aps->aps_seqoff[sel], inc);
@@ -1215,7 +1220,7 @@ ipf_proxy_fixseqack(fin, ip, aps, inc)
 		/* switch to other set ? */
 		if ((aps->aps_ackmin[!sel] > aps->aps_ackmin[sel]) &&
 		    (seq1 > aps->aps_ackmin[!sel])) {
-			if (softp->ips_proxy_debug > 7)
+			if (softp->ips_proxy_debug & 0x10)
 				printf("proxy out switch set ack %d -> %d %x > %x\n",
 					sel, !sel, seq1,
 					aps->aps_ackmin[!sel]);
@@ -1234,7 +1239,7 @@ ipf_proxy_fixseqack(fin, ip, aps, inc)
 		/* switch to other set ? */
 		if ((aps->aps_ackmin[!sel] > aps->aps_ackmin[sel]) &&
 		    (seq1 > aps->aps_ackmin[!sel])) {
-			if (softp->ips_proxy_debug > 7)
+			if (softp->ips_proxy_debug & 0x10)
 				printf("proxy in switch set ack %d -> %d %x > %x\n",
 					sel, !sel, seq1, aps->aps_ackmin[!sel]);
 			sel = aps->aps_sel[out] = !sel;
@@ -1254,7 +1259,7 @@ ipf_proxy_fixseqack(fin, ip, aps, inc)
 			aps->aps_ackmin[!sel] = seq1 + nlen - 1;
 			aps->aps_ackoff[!sel] = aps->aps_ackoff[sel] + inc;
 
-			if (softp->ips_proxy_debug > 7)
+			if (softp->ips_proxy_debug & 0x10)
 				printf("proxy ack set %d at %x to %d + %d\n",
 					!sel, aps->aps_seqmin[!sel],
 					aps->aps_seqoff[sel], inc);
@@ -1268,14 +1273,14 @@ ipf_proxy_fixseqack(fin, ip, aps, inc)
 		/* switch to other set ? */
 		if ((aps->aps_seqmin[!sel] > aps->aps_seqmin[sel]) &&
 		    (seq1 > aps->aps_seqmin[!sel])) {
-			if (softp->ips_proxy_debug > 7)
+			if (softp->ips_proxy_debug & 0x10)
 				printf("proxy in switch set seq %d -> %d %x > %x\n",
 					sel, !sel, seq1, aps->aps_seqmin[!sel]);
 			sel = aps->aps_sel[1 - out] = !sel;
 		}
 
 		if (aps->aps_seqoff[sel] != 0) {
-			if (softp->ips_proxy_debug > 7)
+			if (softp->ips_proxy_debug & 0x10)
 				printf("sel %d seqoff %d seq1 %x seqmin %x\n",
 					sel, aps->aps_seqoff[sel], seq1,
 					aps->aps_seqmin[sel]);
@@ -1287,8 +1292,175 @@ ipf_proxy_fixseqack(fin, ip, aps, inc)
 		}
 	}
 
-	if (softp->ips_proxy_debug > 8)
-		printf("ipf_proxy_fixseqack: seq %x ack %x\n",
+	if (softp->ips_proxy_debug & 0x10)
+		printf("ipf_proxy_fixseqack: seq %u ack %u\n",
 			(u_32_t)ntohl(tcp->th_seq), (u_32_t)ntohl(tcp->th_ack));
 	return ch ? 2 : 0;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_proxy_rule_rev                                          */
+/* Returns:     ipnat_t * - NULL = failure, else pointer to new rule        */
+/* Parameters:  nat(I) - pointer to NAT session to create rule from         */
+/*                                                                          */
+/* This function creates a NAT rule that is based upon the reverse packet   */
+/* flow associated with this NAT session. Thus if this NAT session was      */
+/* created with a map rule then this function will create a rdr rule.       */ 
+/* Only address fields and network interfaces are assigned in this function */
+/* and the address fields are formed such that an exact is required. If the */
+/* original rule had a netmask, that is not replicated here not is it       */
+/* desired. The ultimate goal here is to create a NAT rule to support a NAT */
+/* session being created that does not have a user configured rule. The     */
+/* classic example is supporting the FTP proxy, where a data channel needs  */
+/* to be setup, based on the addresses used for the control connection. In  */
+/* that case, this function is used to handle creating NAT rules to support */
+/* data connections with the PORT and EPRT commands.                        */
+/* ------------------------------------------------------------------------ */ 
+ipnat_t *
+ipf_proxy_rule_rev(nat)
+	nat_t *nat;
+{
+	ipnat_t *old;
+	ipnat_t *ipn;
+	int size;
+
+	old = nat->nat_ptr;
+	size = old->in_size;
+
+	KMALLOCS(ipn, ipnat_t *, size);
+	if (ipn == NULL)
+		return NULL;
+
+	bzero((char *)ipn, size);
+
+	ipn->in_use = 1;
+	ipn->in_hits = 1;
+	ipn->in_ippip = 1;
+	ipn->in_apr = NULL;
+	ipn->in_size = size;
+	ipn->in_pr[0] = old->in_pr[1];
+	ipn->in_pr[1] = old->in_pr[0];
+	ipn->in_v[0] = old->in_v[1];
+	ipn->in_v[1] = old->in_v[0];
+	ipn->in_ifps[0] = old->in_ifps[1];
+	ipn->in_ifps[1] = old->in_ifps[0];
+	ipn->in_flags = (old->in_flags | IPN_PROXYRULE);
+
+	ipn->in_nsrcip6 = nat->nat_odst6;
+	ipn->in_osrcip6 = nat->nat_ndst6;
+
+	if ((old->in_redir & NAT_REDIRECT) != 0) {
+		ipn->in_redir = NAT_MAP;
+		if (ipn->in_v[0] == 4) {
+			ipn->in_snip = ntohl(nat->nat_odstaddr);
+			ipn->in_dnip = ntohl(nat->nat_nsrcaddr);
+		} else {
+#ifdef USE_INET6
+			ipn->in_snip6 = nat->nat_odst6;
+			ipn->in_dnip6 = nat->nat_nsrc6;
+#endif
+		}
+		ipn->in_ndstip6 = nat->nat_nsrc6;
+		ipn->in_odstip6 = nat->nat_osrc6;
+	} else {
+		ipn->in_redir = NAT_REDIRECT;
+		if (ipn->in_v[0] == 4) {
+			ipn->in_snip = ntohl(nat->nat_odstaddr);
+			ipn->in_dnip = ntohl(nat->nat_osrcaddr);
+		} else {
+#ifdef USE_INET6
+			ipn->in_snip6 = nat->nat_odst6;
+			ipn->in_dnip6 = nat->nat_osrc6;
+#endif
+		}
+		ipn->in_ndstip6 = nat->nat_osrc6;
+		ipn->in_odstip6 = nat->nat_nsrc6;
+	}
+
+	IP6_SETONES(&ipn->in_osrcmsk6);
+	IP6_SETONES(&ipn->in_nsrcmsk6);
+	IP6_SETONES(&ipn->in_odstmsk6);
+	IP6_SETONES(&ipn->in_ndstmsk6);
+
+	ipn->in_namelen = old->in_namelen;
+	ipn->in_ifnames[0] = old->in_ifnames[1];
+	ipn->in_ifnames[1] = old->in_ifnames[0];
+	bcopy(old->in_names, ipn->in_names, ipn->in_namelen);
+	MUTEX_INIT(&ipn->in_lock, "ipnat rev rule lock");
+
+	return ipn;
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    ipf_proxy_rule_fwd                                          */
+/* Returns:     ipnat_t * - NULL = failure, else pointer to new rule        */
+/* Parameters:  nat(I) - pointer to NAT session to create rule from         */
+/*                                                                          */
+/* The purpose and rationale of this function is much the same as the above */
+/* function, ipf_proxy_rule_rev, except that a rule is created that matches */
+/* the same direction as that of the existing NAT session. Thus if this NAT */ 
+/* session was created with a map rule then this function will also create  */
+/* a data structure to represent a map rule. Whereas ipf_proxy_rule_rev is  */
+/* used to support PORT/EPRT, this function supports PASV/EPSV.             */
+/* ------------------------------------------------------------------------ */ 
+ipnat_t *
+ipf_proxy_rule_fwd(nat)
+	nat_t *nat;
+{
+	ipnat_t *old;
+	ipnat_t *ipn;
+	int size;
+
+	old = nat->nat_ptr;
+	size = old->in_size;
+
+	KMALLOCS(ipn, ipnat_t *, size);
+	if (ipn == NULL)
+		return NULL;
+
+	bzero((char *)ipn, size);
+
+	ipn->in_use = 1;
+	ipn->in_hits = 1;
+	ipn->in_ippip = 1;
+	ipn->in_apr = NULL;
+	ipn->in_size = size;
+	ipn->in_pr[0] = old->in_pr[0];
+	ipn->in_pr[1] = old->in_pr[1];
+	ipn->in_v[0] = old->in_v[0];
+	ipn->in_v[1] = old->in_v[1];
+	ipn->in_ifps[0] = nat->nat_ifps[0];
+	ipn->in_ifps[1] = nat->nat_ifps[1];
+	ipn->in_flags = (old->in_flags | IPN_PROXYRULE);
+
+	ipn->in_nsrcip6 = nat->nat_nsrc6;
+	ipn->in_osrcip6 = nat->nat_osrc6;
+	ipn->in_ndstip6 = nat->nat_ndst6;
+	ipn->in_odstip6 = nat->nat_odst6;
+	ipn->in_redir = old->in_redir;
+
+	if (ipn->in_v[0] == 4) {
+		ipn->in_snip = ntohl(nat->nat_nsrcaddr);
+		ipn->in_dnip = ntohl(nat->nat_ndstaddr);
+	} else {
+#ifdef USE_INET6
+		ipn->in_snip6 = nat->nat_nsrc6;
+		ipn->in_dnip6 = nat->nat_ndst6;
+#endif
+	}
+
+	IP6_SETONES(&ipn->in_osrcmsk6);
+	IP6_SETONES(&ipn->in_nsrcmsk6);
+	IP6_SETONES(&ipn->in_odstmsk6);
+	IP6_SETONES(&ipn->in_ndstmsk6);
+
+	ipn->in_namelen = old->in_namelen;
+	ipn->in_ifnames[0] = old->in_ifnames[0];
+	ipn->in_ifnames[1] = old->in_ifnames[1];
+	bcopy(old->in_names, ipn->in_names, ipn->in_namelen);
+	MUTEX_INIT(&ipn->in_lock, "ipnat fwd rule lock");
+
+	return ipn;
 }

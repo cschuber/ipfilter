@@ -450,6 +450,8 @@ extern	int	ipf_proxy_ok __P((fr_info_t *, tcphdr_t *, struct ipnat *));
 extern	void	ipf_proxy_free __P((ipf_main_softc_t *, ap_session_t *));
 extern	int	ipf_proxy_main_load __P((void));
 extern	int	ipf_proxy_main_unload __P((void));
+extern	ipnat_t	*ipf_proxy_rule_fwd __P((nat_t *));
+extern	ipnat_t	*ipf_proxy_rule_rev __P((nat_t *));
 extern	void	*ipf_proxy_soft_create __P((ipf_main_softc_t *));
 extern	void	ipf_proxy_soft_destroy __P((ipf_main_softc_t *, void *));
 extern	int	ipf_proxy_soft_init __P((ipf_main_softc_t *, void *));

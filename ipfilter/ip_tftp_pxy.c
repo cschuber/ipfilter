@@ -199,40 +199,55 @@ ipf_p_tftp_new(arg, fin, aps, nat)
 	aps->aps_dport = udp->uh_dport;
 
 	ipn->in_size = size;
-	ipn->in_ifps[0] = nat->nat_ifps[0];
-	ipn->in_ifps[1] = nat->nat_ifps[1];
 	ipn->in_apr = NULL;
 	ipn->in_use = 1;
 	ipn->in_hits = 1;
 	ipn->in_ippip = 1;
+	ipn->in_pr[0] = IPPROTO_UDP;
+	ipn->in_pr[1] = IPPROTO_UDP;
+	ipn->in_ifps[0] = nat->nat_ifps[0];
+	ipn->in_ifps[1] = nat->nat_ifps[1];
+	ipn->in_v[0] = nat->nat_ptr->in_v[1];
+	ipn->in_v[1] = nat->nat_ptr->in_v[0];
+	ipn->in_flags = IPN_UDP|IPN_FIXEDDPORT|IPN_PROXYRULE;
+
+	ipn->in_nsrcip6 = nat->nat_odst6;
+	ipn->in_osrcip6 = nat->nat_ndst6;
 
 	if ((np->in_redir & NAT_REDIRECT) != 0) {
 		ipn->in_redir = NAT_MAP;
-		ipn->in_snip = ntohl(nat->nat_odstaddr);
-		ipn->in_nsrcaddr = nat->nat_odstaddr;
-		ipn->in_dnip = ntohl(nat->nat_nsrcaddr);
-		ipn->in_ndstaddr = nat->nat_nsrcaddr;
-		ipn->in_osrcaddr = nat->nat_ndstaddr;
-		ipn->in_odstaddr = nat->nat_osrcaddr;
+		if (ipn->in_v[0] == 4) {
+			ipn->in_snip = ntohl(nat->nat_odstaddr);
+			ipn->in_dnip = ntohl(nat->nat_nsrcaddr);
+		} else {
+#ifdef USE_INET6
+			ipn->in_snip6 = nat->nat_odst6;
+			ipn->in_dnip6 = nat->nat_nsrc6;
+#endif
+		}
+		ipn->in_ndstip6 = nat->nat_nsrc6;
+		ipn->in_odstip6 = nat->nat_osrc6;
 	} else {
 		ipn->in_redir = NAT_REDIRECT;
-		ipn->in_snip = ntohl(nat->nat_odstaddr);
-		ipn->in_nsrcaddr = nat->nat_odstaddr;
-		ipn->in_dnip = ntohl(nat->nat_osrcaddr);
-		ipn->in_ndstaddr = nat->nat_osrcaddr;
-		ipn->in_osrcaddr = nat->nat_ndstaddr;
-		ipn->in_odstaddr = nat->nat_nsrcaddr;
+		if (ipn->in_v[0] == 4) {
+			ipn->in_snip = ntohl(nat->nat_odstaddr);
+			ipn->in_dnip = ntohl(nat->nat_osrcaddr);
+		} else {
+#ifdef USE_INET6
+			ipn->in_snip6 = nat->nat_odst6;
+			ipn->in_dnip6 = nat->nat_osrc6;
+#endif
+		}
+		ipn->in_ndstip6 = nat->nat_osrc6;
+		ipn->in_odstip6 = nat->nat_nsrc6;
 	}
 	ipn->in_odport = htons(fin->fin_sport);
 	ipn->in_ndport = htons(fin->fin_sport);
 
-	ipn->in_osrcmsk = 0xffffffff;
-	ipn->in_nsrcmsk = 0xffffffff;
-	ipn->in_odstmsk = 0xffffffff;
-	ipn->in_ndstmsk = 0xffffffff;
-	ipn->in_pr[0] = IPPROTO_UDP;
-	ipn->in_pr[1] = IPPROTO_UDP;
-	ipn->in_flags = IPN_UDP|IPN_FIXEDDPORT|IPN_PROXYRULE;
+	IP6_SETONES(&ipn->in_osrcmsk6);
+	IP6_SETONES(&ipn->in_nsrcmsk6);
+	IP6_SETONES(&ipn->in_odstmsk6);
+	IP6_SETONES(&ipn->in_ndstmsk6);
 	MUTEX_INIT(&ipn->in_lock, "tftp proxy NAT rule");
 
 	ipn->in_namelen = np->in_namelen;
@@ -274,7 +289,11 @@ ipf_p_tftp_backchannel(fin, aps, nat)
 #ifdef USE_MUTEXES
 	ipf_nat_softc_t *softn = softc->ipf_nat_soft;
 #endif
-	struct in_addr swip,swip2;
+#ifdef USE_INET6
+	i6addr_t swip6, sw2ip6;
+	ip6_t *ip6;
+#endif
+	struct in_addr swip, sw2ip;
 	tftpinfo_t *ti;
 	udphdr_t udp;
 	fr_info_t fi;
@@ -293,30 +312,46 @@ ipf_p_tftp_backchannel(fin, aps, nat)
 	fi.fin_flx |= FI_IGNORE;
 	fi.fin_data[1] = 0;
 
-	ip = fin->fin_ip;
-	slen = ip->ip_len;
-	swip = ip->ip_src;
-	swip2 = ip->ip_dst;
-
-	ip->ip_len = htons(fin->fin_hlen + sizeof(udp));
 	bzero((char *)&udp, sizeof(udp));
 	udp.uh_sport = 0;	/* XXX - don't specify remote port */
 	udp.uh_dport = ti->ti_rule->in_ndport;
 	udp.uh_ulen = htons(sizeof(udp));
 	udp.uh_sum = 0;
-	fi.fin_dp = (char *)&udp;
+
 	fi.fin_fr = &tftpfr;
-	fi.fin_dport = ntohs(ti->ti_rule->in_ndport);
+	fi.fin_dp = (char *)&udp;
 	fi.fin_sport = 0;
+	fi.fin_dport = ntohs(ti->ti_rule->in_ndport);
 	fi.fin_dlen = sizeof(udp);
 	fi.fin_plen = fi.fin_hlen + sizeof(udp);
 	fi.fin_flx &= FI_LOWTTL|FI_FRAG|FI_TCPUDP|FI_OPTIONS|FI_IGNORE;
 	nflags = NAT_SLAVE|IPN_UDP|SI_W_SPORT;
+#ifdef USE_INET6
+	ip6 = (ip6_t *)fin->fin_ip;
+#endif
+	ip = fin->fin_ip;
+	sw2ip.s_addr = 0;
+	swip.s_addr = 0;
 
-	fi.fin_fi.fi_saddr = nat->nat_ndstaddr;
-	ip->ip_src = nat->nat_ndstip;
-	fi.fin_fi.fi_daddr = nat->nat_nsrcaddr;
-	ip->ip_dst = nat->nat_nsrcip;
+	fi.fin_src6 = nat->nat_ndst6;
+	fi.fin_dst6 = nat->nat_nsrc6;
+	if (nat->nat_v[0] == 4) {
+		slen = ip->ip_len;
+		ip->ip_len = htons(fin->fin_hlen + sizeof(udp));
+		swip = ip->ip_src;
+		sw2ip = ip->ip_dst;
+		ip->ip_src = nat->nat_ndstip;
+		ip->ip_dst = nat->nat_nsrcip;
+	} else {
+#ifdef USE_INET6
+		slen = ip6->ip6_plen;
+		ip6->ip6_plen = htons(sizeof(udp));
+		swip6.in6 = ip6->ip6_src;
+		sw2ip6.in6 = ip6->ip6_dst;
+		ip6->ip6_src = nat->nat_ndst6.in6;
+		ip6->ip6_dst = nat->nat_nsrc6.in6;
+#endif
+	}
 
 	if (nat->nat_dir == NAT_INBOUND) {
 		dir = NAT_OUTBOUND;
@@ -328,30 +363,55 @@ ipf_p_tftp_backchannel(fin, aps, nat)
 	nflags |= NAT_NOTRULEPORT;
 
 	MUTEX_ENTER(&softn->ipf_nat_new);
-	nat2 = ipf_nat_add(&fi, ti->ti_rule, NULL, nflags, dir);
+	if (nat->nat_v[0] == 4)
+		nat2 = ipf_nat_add(&fi, ti->ti_rule, NULL, nflags, dir);
+	else
+		nat2 = ipf_nat6_add(&fi, ti->ti_rule, NULL, nflags, dir);
 	MUTEX_EXIT(&softn->ipf_nat_new);
 	if (nat2 != NULL) {
 		(void) ipf_nat_proto(&fi, nat2, IPN_UDP);
 		ipf_nat_update(&fi, nat2);
 		fi.fin_ifp = NULL;
 		if (ti->ti_rule->in_redir == NAT_MAP) {
-			fi.fin_fi.fi_saddr = nat->nat_ndstaddr;
-			ip->ip_src = nat->nat_ndstip;
-			fi.fin_fi.fi_daddr = nat->nat_nsrcaddr;
-			ip->ip_dst = nat->nat_nsrcip;
+			fi.fin_src6 = nat->nat_ndst6;
+			fi.fin_dst6 = nat->nat_nsrc6;
+			if (nat->nat_v[0] == 4) {
+				ip->ip_src = nat->nat_ndstip;
+				ip->ip_dst = nat->nat_nsrcip;
+			} else {
+#ifdef USE_INET6
+				ip6->ip6_src = nat->nat_ndst6.in6;
+				ip6->ip6_dst = nat->nat_nsrc6.in6;
+#endif
+			}
 		} else {
-			fi.fin_fi.fi_saddr = nat->nat_odstaddr;
-			ip->ip_src = nat->nat_odstip;
-			fi.fin_fi.fi_daddr = nat->nat_osrcaddr;
-			ip->ip_dst = nat->nat_osrcip;
+			fi.fin_src6 = nat->nat_odst6;
+			fi.fin_dst6 = nat->nat_osrc6;
+			if (fin->fin_v == 4) {
+				ip->ip_src = nat->nat_odstip;
+				ip->ip_dst = nat->nat_osrcip;
+			} else {
+#ifdef USE_INET6
+				ip6->ip6_src = nat->nat_odst6.in6;
+				ip6->ip6_dst = nat->nat_osrc6.in6;
+#endif
+			}
 		}
 		if (ipf_state_add(softc, &fi, NULL, SI_W_SPORT) != 0) {
 			ipf_nat_setpending(softc, nat2);
 		}
 	}
-	ip->ip_len = slen;
-	ip->ip_src = swip;
-	ip->ip_dst = swip2;
+	if (nat->nat_v[0] == 4) {
+		ip->ip_len = slen;
+		ip->ip_src = swip;
+		ip->ip_dst = sw2ip;
+	} else {
+#ifdef USE_INET6
+		ip6->ip6_plen = slen;
+		ip6->ip6_src = swip6.in6;
+		ip6->ip6_dst = sw2ip6.in6;
+#endif
+	}
 	return 0;
 }
 

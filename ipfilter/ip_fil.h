@@ -209,7 +209,7 @@ typedef	union	i6addr	{
 			      ntohl(HI63(a)) < ntohl(HI63(b))))))))
 #define	NLADD(n,x)	htonl(ntohl(n) + (x))
 #define	IP6_INC(a)	\
-		{ u_32_t *_i6 = (u_32_t *)(a); \
+		do { u_32_t *_i6 = (u_32_t *)(a); \
 		  _i6[3] = NLADD(_i6[3], 1); \
 		  if (_i6[3] == 0) { \
 			_i6[2] = NLADD(_i6[2], 1); \
@@ -220,9 +220,9 @@ typedef	union	i6addr	{
 				} \
 			} \
 		  } \
-		}
+		} while (0)
 #define	IP6_ADD(a,x,d)	\
-		{ i6addr_t *_s = (i6addr_t *)(a); \
+		do { i6addr_t *_s = (i6addr_t *)(a); \
 		  i6addr_t *_d = (i6addr_t *)(d); \
 		  _d->i6[0] = NLADD(_s->i6[0], x); \
 		  if (ntohl(_d->i6[0]) < ntohl(_s->i6[0])) { \
@@ -234,23 +234,23 @@ typedef	union	i6addr	{
 				} \
 			} \
 		  } \
-		}
-#define	IP6_AND(a,b,d)	{ i6addr_t *_s1 = (i6addr_t *)(a); \
+		} while (0)
+#define	IP6_AND(a,b,d)	do { i6addr_t *_s1 = (i6addr_t *)(a); \
 			  i6addr_t *_s2 = (i6addr_t *)(b); \
 			  i6addr_t *_d = (i6addr_t *)(d); \
 			  _d->i6[0] = _s1->i6[0] & _s2->i6[0]; \
 			  _d->i6[1] = _s1->i6[1] & _s2->i6[1]; \
 			  _d->i6[2] = _s1->i6[2] & _s2->i6[2]; \
 			  _d->i6[3] = _s1->i6[3] & _s2->i6[3]; \
-			}
+			} while (0)
 #define	IP6_ANDASSIGN(a,m) \
-			{ i6addr_t *_d = (i6addr_t *)(a); \
+			do { i6addr_t *_d = (i6addr_t *)(a); \
 			  i6addr_t *_m = (i6addr_t *)(m); \
 			  _d->i6[0] &= _m->i6[0]; \
 			  _d->i6[1] &= _m->i6[1]; \
 			  _d->i6[2] &= _m->i6[2]; \
 			  _d->i6[3] &= _m->i6[3]; \
-			}
+			} while (0)
 #define	IP6_MASKEQ(a,m,b) \
 			(((I60(a) & I60(m)) == I60(b)) && \
 			 ((I61(a) & I61(m)) == I61(b)) && \
@@ -262,7 +262,7 @@ typedef	union	i6addr	{
 			 ((I62(a) & I62(m)) != I62(b)) || \
 			 ((I63(a) & I63(m)) != I63(b)))
 #define	IP6_MERGE(a,b,c) \
-			{ i6addr_t *_d, *_s1, *_s2; \
+			do { i6addr_t *_d, *_s1, *_s2; \
 			  _d = (i6addr_t *)(a); \
 			  _s1 = (i6addr_t *)(b); \
 			  _s2 = (i6addr_t *)(c); \
@@ -270,9 +270,9 @@ typedef	union	i6addr	{
 			  _d->i6[1] |= _s1->i6[1] & ~_s2->i6[1]; \
 			  _d->i6[2] |= _s1->i6[2] & ~_s2->i6[2]; \
 			  _d->i6[3] |= _s1->i6[3] & ~_s2->i6[3]; \
-			}
+			} while (0)
 #define	IP6_MASK(a,b,c) \
-			{ i6addr_t *_d, *_s1, *_s2; \
+			do { i6addr_t *_d, *_s1, *_s2; \
 			  _d = (i6addr_t *)(a); \
 			  _s1 = (i6addr_t *)(b); \
 			  _s2 = (i6addr_t *)(c); \
@@ -280,7 +280,15 @@ typedef	union	i6addr	{
 			  _d->i6[1] = _s1->i6[1] & ~_s2->i6[1]; \
 			  _d->i6[2] = _s1->i6[2] & ~_s2->i6[2]; \
 			  _d->i6[3] = _s1->i6[3] & ~_s2->i6[3]; \
-			}
+			} while (0)
+#define	IP6_SETONES(a)	\
+			do { i6addr_t *_d = (i6addr_t *)(a); \
+			  _d->i6[0] = 0xffffffff; \
+			  _d->i6[1] = 0xffffffff; \
+			  _d->i6[2] = 0xffffffff; \
+			  _d->i6[3] = 0xffffffff; \
+			} while (0)
+
 typedef	union ipso_u	{
 	u_short	ipso_ripso[2];
 	u_32_t	ipso_doi;
@@ -332,6 +340,7 @@ typedef	struct	fr_ip	{
 #define	FI_ICMPQUERY	0x80000
 #define	FI_ENCAP	0x100000	/* encap/decap with NAT */
 #define	FI_AH		0x200000	/* AH header present */
+#define	FI_DOCKSUM	0x10000000	/* Proxy wants L4 recalculation */
 #define	FI_NOCKSUM	0x20000000	/* don't do a L4 checksum validation */
 #define	FI_NOWILD	0x40000000	/* Do not do wildcard searches */
 #define	FI_IGNORE	0x80000000
