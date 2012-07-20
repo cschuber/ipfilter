@@ -1452,7 +1452,6 @@ ipf_state_add(softc, fin, stsave, flags)
 	 */
 	is->is_pass = pass;
 	is->is_v = fin->fin_v;
-	is->is_me = stsave;
 	is->is_sec = fin->fin_secmsk;
 	is->is_secmsk = 0xffff;
 	is->is_auth = fin->fin_auth;
@@ -1652,9 +1651,6 @@ ipf_state_add(softc, fin, stsave, flags)
 	}
 	hv = DOUBLE_HASH(hv);
 	is->is_hv = hv;
-	is->is_rule = fr;
-	is->is_flags = flags & IS_INHERITED;
-	is->is_rulen = fin->fin_rule;
 
 	/*
 	 * Look for identical state.
@@ -1680,6 +1676,10 @@ ipf_state_add(softc, fin, stsave, flags)
 		return 5;
 	}
 	bcopy((char *)&ips, (char *)is, sizeof(*is));
+	is->is_flags = flags & IS_INHERITED;
+	is->is_rulen = fin->fin_rule;
+	is->is_rule = fr;
+
 	/*
 	 * Do not do the modulous here, it is done in ipf_state_insert().
 	 */
@@ -1709,9 +1709,15 @@ ipf_state_add(softc, fin, stsave, flags)
 	/*
 	 * It may seem strange to set is_ref to 2, but if stsave is not NULL
 	 * then a copy of the pointer is being stored somewhere else and in
-	 * the end, it * will expect to be able to do osmething with it.
+	 * the end, it will expect to be able to do osmething with it.
 	 */
-	is->is_ref = stsave ? 2 : 1;
+	is->is_me = stsave;
+	if (stsave != NULL) {
+		*stsave = is;
+		is->is_ref = 2;
+	} else {
+		is->is_ref = 1;
+	}
 	is->is_pkts[0] = 0, is->is_bytes[0] = 0;
 	is->is_pkts[1] = 0, is->is_bytes[1] = 0;
 	is->is_pkts[2] = 0, is->is_bytes[2] = 0;
@@ -1830,8 +1836,6 @@ ipf_state_add(softc, fin, stsave, flags)
 
 	RWLOCK_EXIT(&softc->ipf_state);
 
-	if (stsave != NULL)
-		*stsave = is;
 	fin->fin_flx |= FI_STATE;
 	if (fin->fin_flx & FI_FRAG)
 		(void) ipf_frag_new(softc, fin, pass);
@@ -2079,7 +2083,6 @@ ipf_state_tcp(softc, softs, fin, tcp, is)
 	} else {
 		DT2(iss_tcp_oow, fr_info_t *, fin, ipstate_t *, is);
 		SBUMP(ipf_state_stats.iss_tcp_oow);
-		fin->fin_flx |= FI_OOW;
 		ret = 0;
 	}
 	MUTEX_EXIT(&is->is_lock);
@@ -2217,6 +2220,7 @@ ipf_state_tcpinwindow(fin, fdata, tdata, tcp, flags)
 		if (seq != fdata->td_end) {
 			DT2(iss_tcp_struct, tcpdata_t *, fdata, int, seq);
 			SBUMP(ipf_state_stats.iss_tcp_strict);
+			fin->fin_flx |= FI_OOW;
 			return 0;
 		}
 	}
@@ -3604,12 +3608,6 @@ ipf_state_del(softc, is, why)
 		orphan = 0;
 	}
 
-	if (is->is_me != NULL) {
-		*is->is_me = NULL;
-		is->is_me = NULL;
-		is->is_ref--;
-	}
-
 	/*
 	 * Because ipf_state_stats.iss_wild is a count of entries in the state
 	 * table that have wildcard flags set, only decerement it once
@@ -3637,12 +3635,20 @@ ipf_state_del(softc, is, why)
 	 * us back here to do the real delete & free.
 	 */
 	MUTEX_ENTER(&is->is_lock);
-	if (is->is_ref > 1) {
+	if (is->is_me != NULL) {
+		*is->is_me = NULL;
+		is->is_me = NULL;
 		is->is_ref--;
+	}
+	if (is->is_ref > 1) {
+		int refs;
+
+		is->is_ref--;
+		refs = is->is_ref;
 		MUTEX_EXIT(&is->is_lock);
 		if (!orphan)
 			softs->ipf_state_stats.iss_orphan++;
-		return is->is_ref;
+		return refs;
 	}
 	MUTEX_EXIT(&is->is_lock);
 
@@ -4954,11 +4960,13 @@ ipf_state_setpending(softc, is)
 		ipf_queueappend(softc->ipf_ticks, &is->is_sti,
 				&softs->ipf_state_pending, is);
 
+	MUTEX_ENTER(&is->is_lock);
 	if (is->is_me != NULL) {
 		*is->is_me = NULL;
 		is->is_me = NULL;
 		is->is_ref--;
 	}
+	MUTEX_EXIT(&is->is_lock);
 }
 
 
@@ -5022,64 +5030,65 @@ ipf_state_matcharray(state, array, ticks)
 	int *array;
 	u_long ticks;
 {
-	int i, n, *x, e, p;
+	int i, n, *x, rv, p;
+	ipfexp_t *e;
 
-	e = 0;
+	rv = 0;
 	n = array[0];
 	x = array + 1;
 
-	for (; n > 0; x += 3 + x[2]) {
+	for (; n > 0; x += 3 + x[3], rv = 0) {
+		e = (ipfexp_t *)x;
+		n -= e->ipfe_size;
 		if (x[0] == IPF_EXP_END)
 			break;
-
-		n -= x[2] + 3;
-		if (n < 0)
-			break;
-
-		e = 0;
 
 		/*
 		 * If we need to match the protocol and that doesn't match,
 		 * don't even both with the instruction array.
 		 */
-		p = (x[0] >> 16) & 0xff;
-		if (p != 0 && p != state->is_p)
+		p = e->ipfe_cmd >> 16;
+		if ((p != 0) && (p != state->is_p))
 			break;
 
-		switch (x[0])
+		switch (e->ipfe_cmd)
 		{
 		case IPF_EXP_IP_PR :
-			for (i = 0; !e && i < x[2]; i++) {
-				e |= (state->is_p == x[i + 3]);
+			for (i = 0; !rv && i < e->ipfe_narg; i++) {
+				rv |= (state->is_p == e->ipfe_arg0[i]);
 			}
 			break;
 
 		case IPF_EXP_IP_SRCADDR :
 			if (state->is_v != 4)
 				break;
-			for (i = 0; !e && i < x[2]; i++) {
-				e |= ((state->is_saddr & x[i + 4]) ==
-				      x[i + 3]);
+			for (i = 0; !rv && i < e->ipfe_narg; i++) {
+				rv |= ((state->is_saddr &
+					e->ipfe_arg0[i * 2 + 1]) ==
+				      e->ipfe_arg0[i * 2]);
 			}
 			break;
 
 		case IPF_EXP_IP_DSTADDR :
 			if (state->is_v != 4)
 				break;
-			for (i = 0; !e && i < x[2]; i++) {
-				e |= ((state->is_daddr & x[i + 4]) ==
-				      x[i + 3]);
+			for (i = 0; !rv && i < e->ipfe_narg; i++) {
+				rv |= ((state->is_daddr &
+					e->ipfe_arg0[i * 2 + 1]) ==
+				       e->ipfe_arg0[i * 2]);
 			}
 			break;
 
 		case IPF_EXP_IP_ADDR :
 			if (state->is_v != 4)
 				break;
-			for (i = 0; !e && i < x[2]; i++) {
-				e |= ((state->is_saddr & x[i + 4]) ==
-				      x[i + 3]) ||
-				     ((state->is_daddr & x[i + 4]) ==
-				      x[i + 3]);
+			for (i = 0; !rv && i < e->ipfe_narg; i++) {
+				rv |= ((state->is_saddr &
+					e->ipfe_arg0[i * 2 + 1]) ==
+				       e->ipfe_arg0[i * 2]) ||
+				       ((state->is_daddr &
+					e->ipfe_arg0[i * 2 + 1]) ==
+				       e->ipfe_arg0[i * 2]);
 			}
 			break;
 
@@ -5087,77 +5096,81 @@ ipf_state_matcharray(state, array, ticks)
 		case IPF_EXP_IP6_SRCADDR :
 			if (state->is_v != 6)
 				break;
-			for (i = 0; !e && i < x[3]; i++) {
-				e |= IP6_MASKEQ(&state->is_src.in6, x + i + 7,
-						x + i + 3);
+			for (i = 0; !rv && i < x[3]; i++) {
+				rv |= IP6_MASKEQ(&state->is_src.in6,
+						 &e->ipfe_arg0[i * 8 + 4],
+						 &e->ipfe_arg0[i * 8]);
 			}
 			break;
 
 		case IPF_EXP_IP6_DSTADDR :
 			if (state->is_v != 6)
 				break;
-			for (i = 0; !e && i < x[3]; i++) {
-				e |= IP6_MASKEQ(&state->is_dst.in6, x + i + 7,
-						x + i + 3);
+			for (i = 0; !rv && i < x[3]; i++) {
+				rv |= IP6_MASKEQ(&state->is_dst.in6,
+						 &e->ipfe_arg0[i * 8 + 4],
+						 &e->ipfe_arg0[i * 8]);
 			}
 			break;
 
 		case IPF_EXP_IP6_ADDR :
 			if (state->is_v != 6)
 				break;
-			for (i = 0; !e && i < x[3]; i++) {
-				e |= IP6_MASKEQ(&state->is_src.in6, x + i + 7,
-						x + i + 3) ||
-				     IP6_MASKEQ(&state->is_dst.in6, x + i + 7,
-						x + i + 3);
+			for (i = 0; !rv && i < x[3]; i++) {
+				rv |= IP6_MASKEQ(&state->is_src.in6,
+						 &e->ipfe_arg0[i * 8 + 4],
+						 &e->ipfe_arg0[i * 8]) ||
+				      IP6_MASKEQ(&state->is_dst.in6,
+						 &e->ipfe_arg0[i * 8 + 4],
+						 &e->ipfe_arg0[i * 8]);
 			}
 			break;
 #endif
 
 		case IPF_EXP_UDP_PORT :
 		case IPF_EXP_TCP_PORT :
-			for (i = 0; !e && i < x[2]; i++) {
-				e |= (state->is_sport == x[i + 3]) ||
-				     (state->is_dport == x[i + 3]);
+			for (i = 0; !rv && i < e->ipfe_narg; i++) {
+				rv |= (state->is_sport == e->ipfe_arg0[i]) ||
+				      (state->is_dport == e->ipfe_arg0[i]);
 			}
 			break;
 
 		case IPF_EXP_UDP_SPORT :
 		case IPF_EXP_TCP_SPORT :
-			for (i = 0; !e && i < x[2]; i++) {
-				e |= (state->is_sport == x[i + 3]);
+			for (i = 0; !rv && i < e->ipfe_narg; i++) {
+				rv |= (state->is_sport == e->ipfe_arg0[i]);
 			}
 			break;
 
 		case IPF_EXP_UDP_DPORT :
 		case IPF_EXP_TCP_DPORT :
-			for (i = 0; !e && i < x[2]; i++) {
-				e |= (state->is_dport == x[i + 3]);
+			for (i = 0; !rv && i < e->ipfe_narg; i++) {
+				rv |= (state->is_dport == e->ipfe_arg0[i]);
 			}
 			break;
 
 		case IPF_EXP_TCP_STATE :
-			for (i = 0; !e && i < x[2]; i++) {
-				e |= (state->is_state[0] == x[i + 3]) ||
-				     (state->is_state[1] == x[i + 3]);
+			for (i = 0; !rv && i < e->ipfe_narg; i++) {
+				rv |= (state->is_state[0] == e->ipfe_arg0[i]) ||
+				      (state->is_state[1] == e->ipfe_arg0[i]);
 			}
 			break;
 
 		case IPF_EXP_IDLE_GT :
-			e |= (ticks - state->is_touched > x[3]);
+			rv |= (ticks - state->is_touched > e->ipfe_arg0[0]);
 			break;
 		}
 
 		/*
 		 * Factor in doing a negative match.
 		 */
-		e ^= x[1];
+		rv ^= e->ipfe_not;
 
-		if (!e)
+		if (rv == 0)
 			break;
 	}
 
-	return e;
+	return rv;
 }
 
 
