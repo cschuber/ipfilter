@@ -449,6 +449,8 @@ extern	int	ipf_proxy_ok(fr_info_t *, tcphdr_t *, struct ipnat *);
 extern	void	ipf_proxy_free(ipf_main_softc_t *, ap_session_t *);
 extern	int	ipf_proxy_main_load(void);
 extern	int	ipf_proxy_main_unload(void);
+extern	ipnat_t	*ipf_proxy_rule_fwd(nat_t *);
+extern	ipnat_t	*ipf_proxy_rule_rev(nat_t *);
 extern	void	*ipf_proxy_soft_create(ipf_main_softc_t *);
 extern	void	ipf_proxy_soft_destroy(ipf_main_softc_t *, void *);
 extern	int	ipf_proxy_soft_init(ipf_main_softc_t *, void *);
