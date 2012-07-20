@@ -1259,7 +1259,8 @@ ipf_checkv4sum(fin)
 		if (m->m_pkthdr.csum_flags == CSUM_DELAY_DATA) {
 			fin->fin_cksum = FI_CK_L4FULL;
 			return 0;
-		} else if (m->m_pkthdr.csum_flags == CSUM_TCP) {
+		} else if (m->m_pkthdr.csum_flags == CSUM_TCP ||
+			   m->m_pkthdr.csum_flags == CSUM_UDP) {
 			fin->fin_cksum = FI_CK_L4PART;
 			return 0;
 		} else if (m->m_pkthdr.csum_flags == CSUM_IP) {
