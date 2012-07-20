@@ -334,8 +334,8 @@ typedef struct qifpkt {
 					       LIFNAMSIZ)
 #  endif
 #  define	GETKTIME(x)	uniqtime((struct timeval *)x)
-#  define	MSGDSIZE(x)	msgdsize(x)
-#  define	M_LEN(x)	((x)->b_wptr - (x)->b_rptr)
+#  define	MSGDSIZE(m)	msgdsize(m)
+#  define	M_LEN(m)	((m)->b_wptr - (m)->b_rptr)
 #  define	M_ADJ(m,x)	adjmsg(m, x)
 #  define	M_COPY(x)	dupmsg((x))
 #  define	MTOD(m,t)	((t)((m)->b_rptr))
@@ -517,10 +517,10 @@ extern	void	*get_unit(char *, int);
 #  define	KMALLOCS(a, b, c)	MALLOC((a), b, (c), M_IOSYS, M_NOWAIT)
 #  define	KFREE(x)	kmem_free((char *)(x), sizeof(*(x)))
 #  define	KFREES(x,s)	kmem_free((char *)(x), (s))
-#  define	MSGDSIZE(x)	msgdsize(x)
+#  define	MSGDSIZE(m)	msgdsize(m)
 #  define	M_ADJ(m,x)	adjmsg(m, x)
-#  define	M_LEN(x)	((x)->b_wptr - (x)->b_rptr)
-#  define	M_COPY(x)	copymsg((x))
+#  define	M_LEN(m)	((m)->b_wptr - (m)->b_rptr)
+#  define	M_COPY(m)	copymsg((m))
 #  define	M_DUP(m)	dupmsg(m)
 #  define	MTOD(m,t)	((t)((m)->b_rptr))
 #  define	MTYPE(m)	((m)->b_datap->db_type)
@@ -665,10 +665,10 @@ typedef struct {
 #  define	SPL_X(x)	(void) splx(x)
 extern	void	m_copydata(struct mbuf *, int, int, caddr_t);
 extern	void	m_copyback(struct mbuf *, int, int, caddr_t);
-#  define	MSGDSIZE(x)	mbufchainlen(x)
+#  define	MSGDSIZE(m)	mbufchainlen(m)
 #  define	M_ADJ(m,x)	m_adj(m, x)
 #  define	M_LEN(x)	(x)->m_len
-#  define	M_COPY(x)	m_copy((x), 0, M_COPYALL)
+#  define	M_COPY(m)	m_copy((m), 0, M_COPYALL)
 #  define	GETKTIME(x)	microtime((struct timeval *)x)
 #  define	IFNAME(x)	((struct ifnet *)x)->if_name
 #  define	IPF_PANIC(x,y)	if (x) { printf y; panic("ipf_panic"); }
@@ -740,11 +740,11 @@ typedef struct mbuf mb_t;
 					    ((c) > 4096) ? M_WAITOK : M_NOWAIT)
 #  define	KFREE(x)	FREE((x), M_PFILT)
 #  define	KFREES(x,s)	FREE((x), M_PFILT)
-#  define	MSGDSIZE(x)	mbufchainlen(x)
-#  define	M_LEN(x)	(x)->m_len
+#  define	MSGDSIZE(m)	mbufchainlen(m)
+#  define	M_LEN(m)	(m)->m_len
 #  define	M_ADJ(m,x)	m_adj(m, x)
-#  define	M_COPY(x)	m_copy((x), 0, M_COPYALL)
-#  define	M_DUP(x)	m_dup((x), M_COPYALL)
+#  define	M_COPY(m)	m_copy((m), 0, M_COPYALL)
+#  define	M_DUP(m)	m_dup((m), M_COPYALL)
 #  define	GETKTIME(x)	microtime((struct timeval *)x)
 #  define	IFNAME(x)	((struct ifnet *)x)->if_name
 #  define	IPF_PANIC(x,y)	if (x) { printf y; panic("ipf_panic"); }
@@ -863,8 +863,8 @@ typedef	char *	caddr_t;
 #  else
 #   define	PROC_T  struct proc
 #  endif
-#  define	MSGDSIZE(x)	mbufchainlen(x)
-#  define	M_LEN(x)	(x)->m_len
+#  define	MSGDSIZE(m)	mbufchainlen(m)
+#  define	M_LEN(m)	(m)->m_len
 #  define	M_ADJ(m,x)	m_adj(m, x)
 #  define	M_COPY(x)	m_copy((x), 0, M_COPYALL)
 #  define	GETKTIME(x)	microtime((struct timeval *)x)
@@ -1084,8 +1084,8 @@ extern	int	in_cksum(struct mbuf *, int);
 #  if (__FreeBSD_version >= 500024)
 #   define	GET_MINOR		dev2unit
 #  endif
-#  define	MSGDSIZE(x)	mbufchainlen(x)
-#  define	M_LEN(x)	(x)->m_len
+#  define	MSGDSIZE(m)	mbufchainlen(m)
+#  define	M_LEN(m)	(m)->m_len
 #  define	M_ADJ(m,x)	m_adj(m, x)
 #  define	M_COPY(x)	m_copy((x), 0, M_COPYALL)
 #  define	M_DUP(m)	m_dup(m, M_NOWAIT)
@@ -1142,10 +1142,10 @@ typedef	u_int32_t	u_32_t;
 #  define	COPYIN(a,b,c)	copyin((caddr_t)(a), (caddr_t)(b), (c))
 #  define	COPYOUT(a,b,c)	copyout((caddr_t)(a), (caddr_t)(b), (c))
 #  define	GETKTIME(x)	microtime((struct timeval *)x)
-#  define	MSGDSIZE(x)	mbufchainlen(x)
-#  define	M_LEN(x)	(x)->m_len
+#  define	MSGDSIZE(m)	mbufchainlen(m)
+#  define	M_LEN(m)	(m)->m_len
 #  define	M_ADJ(m,x)	m_adj(m, x)
-#  define	M_COPY(x)	m_copy((x), 0, M_COPYALL)
+#  define	M_COPY(m)	m_copy((m), 0, M_COPYALL)
 #  define	IPF_PANIC(x,y)	if (x) { printf y; panic("ipf_panic"); }
 typedef struct mbuf mb_t;
 # endif /* _KERNEL */
@@ -1178,10 +1178,10 @@ typedef	u_int32_t	u_32_t;
 
 # ifdef _KERNEL
 #  define	GETKTIME(x)	microtime((struct timeval *)x)
-#  define	MSGDSIZE(x)	mbufchainlen(x)
-#  define	M_LEN(x)	(x)->m_len
+#  define	MSGDSIZE(m)	mbufchainlen(m)
+#  define	M_LEN(m)	(m)->m_len
 #  define	M_ADJ(m,x)	m_adj(m, x)
-#  define	M_COPY(x)	m_copy((x), 0, M_COPYALL)
+#  define	M_COPY(m)	m_copy((m), 0, M_COPYALL)
 #  define	IFNAME(x)	((struct ifnet *)x)->if_name
 typedef struct mbuf mb_t;
 # endif /* _KERNEL */
@@ -1204,10 +1204,10 @@ typedef	u_int32_t	u_32_t;
 # ifdef _KERNEL
 #  include	<sys/kmem_alloc.h>
 #  define	GETKTIME(x)	uniqtime((struct timeval *)x)
-#  define	MSGDSIZE(x)	mbufchainlen(x)
-#  define	M_LEN(x)	(x)->m_len
+#  define	MSGDSIZE(m)	mbufchainlen(m)
+#  define	M_LEN(m)	(m)->m_len
 #  define	M_ADJ(m,x)	m_adj(m, x)
-#  define	M_COPY(x)	m_copy((x), 0, M_COPYALL)
+#  define	M_COPY(m)	m_copy((m), 0, M_COPYALL)
 #  define	IFNAME(x)	((struct ifnet *)x)->if_name
 #  define	GETIFP(n, v)	ifunit(n, IFNAMSIZ)
 #  define	GETIFMTU_4(x)	((struct ifnet *)x)->if_mtu
@@ -1508,10 +1508,10 @@ extern void* getifp(char *, int);
 					    ((c) > 4096) ? M_WAITOK : M_NOWAIT)
 #  define	KFREE(x)	FREE((x), M_TEMP)
 #  define	KFREES(x,s)	FREE((x), M_TEMP)
-#  define	MSGDSIZE(x)	mbufchainlen(x)
-#  define	M_LEN(x)	(x)->m_len
+#  define	MSGDSIZE(m)	mbufchainlen(m)
+#  define	M_LEN(m)	(m)->m_len
 #  define	M_ADJ(m,x)	m_adj(m, x)
-#  define	M_COPY(x)	m_copy((x), 0, M_COPYALL)
+#  define	M_COPY(m)	m_copy((m), 0, M_COPYALL)
 #  define	GETKTIME(x)
 #  define	IPF_PANIC(x,y)
 typedef struct mbuf mb_t;
@@ -1666,11 +1666,11 @@ typedef	struct	mb_s	{
 # define	m_flags		mb_flags
 # undef		m_data
 # define	m_data		mb_data
-# define	MSGDSIZE(x)	msgdsize(x)
-# define	M_LEN(x)	(x)->mb_len
-# define	M_ADJ(m,x)	(x)->mb_len += x
-# define	M_COPY(x)	dupmbt(x)
-# define	M_DUP(x)	dupmbt(x)
+# define	MSGDSIZE(m)	msgdsize(m)
+# define	M_LEN(m)	(m)->mb_len
+# define	M_ADJ(m,x)	(m)->mb_len += x
+# define	M_COPY(m)	dupmbt(m)
+# define	M_DUP(m)	dupmbt(m)
 # define	GETKTIME(x)	gettimeofday((struct timeval *)(x), NULL)
 # define	MTOD(m, t)	((t)(m)->mb_data)
 # define	FREE_MB_T(x)	freembt(x)
