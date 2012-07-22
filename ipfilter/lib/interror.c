@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007 by Darren Reed
+ * Copyright (C) 2012 by Darren Reed
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
@@ -17,7 +17,7 @@ typedef	struct	{
 
 static ipf_error_entry_t *find_error(int);
 
-#define	IPF_NUM_ERRORS	481
+#define	IPF_NUM_ERRORS	485
 
 /*
  * NO REUSE OF NUMBERS!
@@ -399,6 +399,10 @@ log" },
 	{	70031,	"incorrect mask length in pool node remove" },
 	{	70032,	"cannot allocate memory for pool context" },
 	{	70033,	"cannot allocate memory for radix tree context" },
+	{	70034,	"adding IPv6 node with incorrect address length" },
+	{	70035,	"IPv4 address not masked" },
+	{	70036,	"IPv6 address not masked" },
+	{	70037,	"removing IPv6 node with incorrect address length" },
 /* -------------------------------------------------------------------------- */
 	{	80001,	"could not find proxy" },
 	{	80002,	"proxy does not support control operations" },

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 1993-2001, 2003 by Darren Reed.
+ * Copyright (C) 1993-2001, 2012 by Darren Reed.
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  */
@@ -410,7 +410,7 @@ ipf_pool_node_add(softc, arg, op, uid)
 	else if (node.ipn_addr.adf_family == AF_INET6) {
 		if (node.ipn_addr.adf_len != offsetof(addrfamily_t, adf_addr) +
 					     sizeof(struct in6_addr)) {
-			IPFERROR(77777);
+			IPFERROR(70034);
 			return EINVAL;
 		}
 	}
@@ -427,7 +427,7 @@ ipf_pool_node_add(softc, arg, op, uid)
 		if ((node.ipn_addr.adf_addr.in4.s_addr &
 		     node.ipn_mask.adf_addr.in4.s_addr) !=
 		    node.ipn_addr.adf_addr.in4.s_addr) {
-			IPFERROR(77777);
+			IPFERROR(70035);
 			return EINVAL;
 		}
 	}
@@ -436,7 +436,7 @@ ipf_pool_node_add(softc, arg, op, uid)
 		if (IP6_MASKNEQ(&node.ipn_addr.adf_addr.in6,
 				&node.ipn_mask.adf_addr.in6,
 				&node.ipn_addr.adf_addr.in6)) {
-			IPFERROR(77777);
+			IPFERROR(70036);
 			return EINVAL;
 		}
 	}
@@ -501,7 +501,7 @@ ipf_pool_node_del(softc, arg, op, uid)
 	else if (node.ipn_addr.adf_family == AF_INET6) {
 		if (node.ipn_addr.adf_len != offsetof(addrfamily_t, adf_addr) +
 					     sizeof(struct in6_addr)) {
-			IPFERROR(77777);
+			IPFERROR(70037);
 			return EINVAL;
 		}
 	}
