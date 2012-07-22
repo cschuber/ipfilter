@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 1993-2001 by Darren Reed.
+ * Copyright (C) 1993-2009 by Darren Reed.
  * (C)opyright 1997 by Marc Boucher.
  *
  * See the IPFILTER.LICENCE file for details on licencing.

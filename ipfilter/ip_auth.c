@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 1998-2003 by Darren Reed & Guido van Rooij.
+ * Copyright (C) 1998-2012 by Darren Reed & Guido van Rooij.
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  */

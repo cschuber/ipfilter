@@ -1,6 +1,6 @@
 %{
 /*
- * Copyright (C) 1997-1998 by Darren Reed.
+ * Copyright (C) 1997-2012 by Darren Reed.
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *

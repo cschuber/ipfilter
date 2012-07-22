@@ -19,9 +19,12 @@ sub dosum {
 	local($lsum) = $seed;
 
 	for ($idx = $start, $lsum = $seed; $idx < $max; $idx++) {
+#printf "%#x += %#x\n", $lsum, $bytes[$idx];
 		$lsum += $bytes[$idx];
 	}
-	$lsum = ($lsum & 0xffff) + ($lsum >> 16);
+	while ($lsum > 0xffff) {
+		$lsum = ($lsum & 0xffff) + ($lsum >> 16);
+	}
 	$lsum = ~$lsum & 0xffff;
 	return $lsum;
 }
@@ -147,7 +150,6 @@ sub udpcommon {
 #		&dump();
 		return;
 	}
-print "[cnt=$cnt]";
 
 	local($udpat) = $base + $hl;
 	$hs = &dosum($udpsum, $udpat, $cnt);

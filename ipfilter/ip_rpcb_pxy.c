@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2002-2003 by Ryan Beasley <ryanb@goddamnbastard.org>
+ * Copyright (C) 2002-2012 by Ryan Beasley <ryanb@goddamnbastard.org>
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  */
