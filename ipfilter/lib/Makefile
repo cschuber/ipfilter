@@ -1,5 +1,5 @@
 #
-# Copyright (C) 2011 by Darren Reed.
+# Copyright (C) 2012 by Darren Reed.
 #
 # See the IPFILTER.LICENCE file for details on licencing.
 #
@@ -24,9 +24,9 @@ LIBOBJS=$(DEST)/addicmp.o \
      $(DEST)/dupmbt.o \
      $(DEST)/familyname.o \
      $(DEST)/facpri.o \
-     $(DEST)/flags.o \
      $(DEST)/fill6bits.o \
      $(DEST)/findword.o \
+     $(DEST)/flags.o \
      $(DEST)/freembt.o \
      $(DEST)/ftov.o \
      $(DEST)/genmask.o \
@@ -45,12 +45,12 @@ LIBOBJS=$(DEST)/addicmp.o \
      $(DEST)/initparse.o \
      $(DEST)/interror.o \
      $(DEST)/ionames.o \
-     $(DEST)/ipoptsec.o \
      $(DEST)/ipf_dotuning.o \
      $(DEST)/ipf_perror.o \
      $(DEST)/ipft_hx.o \
      $(DEST)/ipft_pc.o \
      $(DEST)/ipft_tx.o \
+     $(DEST)/ipoptsec.o \
      $(DEST)/kmem.o \
      $(DEST)/kmemcpywrap.o \
      $(DEST)/kvatoname.o \
@@ -87,6 +87,7 @@ LIBOBJS=$(DEST)/addicmp.o \
      $(DEST)/printdstlistdata.o \
      $(DEST)/printdstlistnode.o \
      $(DEST)/printdstlistpolicy.o \
+     $(DEST)/printdstl_live.o \
      $(DEST)/printfieldhdr.o \
      $(DEST)/printfr.o \
      $(DEST)/printfraginfo.o \
@@ -94,7 +95,6 @@ LIBOBJS=$(DEST)/addicmp.o \
      $(DEST)/printhashdata.o \
      $(DEST)/printhashnode.o \
      $(DEST)/printhash_live.o \
-     $(DEST)/printdstl_live.o \
      $(DEST)/printhost.o \
      $(DEST)/printhostmap.o \
      $(DEST)/printhostmask.o \
@@ -121,8 +121,8 @@ LIBOBJS=$(DEST)/addicmp.o \
      $(DEST)/printstate.o \
      $(DEST)/printstatefields.o \
      $(DEST)/printtcpflags.o \
-     $(DEST)/printtunable.o \
      $(DEST)/printtqtable.o \
+     $(DEST)/printtunable.o \
      $(DEST)/printunit.o \
      $(DEST)/remove_hash.o \
      $(DEST)/remove_hashnode.o \

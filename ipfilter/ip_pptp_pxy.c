@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 by Darren Reed.
+ * Copyright (C) 2012 by Darren Reed.
  *
  * Simple PPTP transparent proxy for in-kernel use.  For use with the NAT
  * code.

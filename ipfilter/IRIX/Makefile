@@ -1,6 +1,6 @@
 #!smake
 #
-# Copyright (C) 2004 by Darren Reed.
+# Copyright (C) 2012 by Darren Reed.
 # Copyright (C) 1997 by Marc Boucher.
 #
 # See the IPFILTER.LICENCE file for details on licencing.

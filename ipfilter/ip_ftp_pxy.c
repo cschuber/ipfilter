@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 by Darren Reed.
+ * Copyright (C) 2012 by Darren Reed.
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
@@ -184,7 +184,7 @@ ipf_p_ftp_soft_create(softc)
 #if defined(_KERNEL)
 	softf->ipf_p_ftp_debug = 0;
 #else
-	softf->ipf_p_ftp_debug = 0x0f;
+	softf->ipf_p_ftp_debug = DEBUG_PARSE_ERR;
 #endif
 	softf->ipf_p_ftp_forcepasv = 1;
 
