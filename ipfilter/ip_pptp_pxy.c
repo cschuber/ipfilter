@@ -106,6 +106,7 @@ ipf_p_pptp_main_unload()
  * NOTE: The printf's are broken up with %s in them to prevent them being
  * optimised into puts statements on FreeBSD (this doesn't exist in the kernel)
  */
+/*ARGSUSED*/
 int
 ipf_p_pptp_new(arg, fin, aps, nat)
 	void *arg;
@@ -385,11 +386,12 @@ ipf_p_pptp_nextmessage(fin, nat, pptp, rev)
 		if (pptps->pptps_len > pptps->pptps_bytes)
 			break;
 
-		ipf_p_pptp_message(fin, nat, pptp, pptps);
-		pptps->pptps_wptr = pptps->pptps_buffer;
-		pptps->pptps_gothdr = 0;
-		pptps->pptps_bytes = 0;
-		pptps->pptps_len = 0;
+		if (ipf_p_pptp_message(fin, nat, pptp, pptps) == 0) {
+			pptps->pptps_wptr = pptps->pptps_buffer;
+			pptps->pptps_gothdr = 0;
+			pptps->pptps_bytes = 0;
+			pptps->pptps_len = 0;
+		}
 
 		start += len;
 		msg += len;
@@ -411,17 +413,19 @@ ipf_p_pptp_message(fin, nat, pptp, pptps)
 	pptp_side_t *pptps;
 {
 	pptp_hdr_t *hdr = (pptp_hdr_t *)pptps->pptps_buffer;
+	int err;
 
 	switch (ntohs(hdr->pptph_type))
 	{
 	case PPTP_MSGTYPE_CTL :
-		ipf_p_pptp_mctl(fin, nat, pptp, pptps);
+		err = ipf_p_pptp_mctl(fin, nat, pptp, pptps);
 		break;
 
 	default :
+		err = EINVAL;
 		break;
 	}
-	return 0;
+	return err;
 }
 
 
@@ -517,6 +521,7 @@ ipf_p_pptp_mctl(fin, nat, pptp, pptps)
  * For outgoing PPTP packets.  refresh timeouts for NAT & state entries, if
  * we can.  If they have disappeared, recreate them.
  */
+/*ARGSUSED*/
 int
 ipf_p_pptp_inout(arg, fin, aps, nat)
 	void *arg;

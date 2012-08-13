@@ -94,7 +94,6 @@ buildnodes(addr, mask, nodes)
 	ipf_rdx_node_t nodes[2];
 {
 	u_32_t maskbits;
-	u_32_t lastbits;
 	u_32_t lastmask;
 	u_32_t *last;
 	int masklen;
@@ -108,7 +107,6 @@ buildnodes(addr, mask, nodes)
 		masklen = last - (u_32_t *)mask;
 		lastmask = *last;
 	}
-	lastbits = maskbits & 0x1f;
 
 	bzero(&nodes[0], sizeof(ipf_rdx_node_t) * 2);
 	nodes[0].maskbitcount = maskbits;
@@ -894,19 +892,17 @@ ipf_rx_create()
 
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_rx_init                                                 */
-/* Returns:     int       - 0 = success (always)                            */
+/* Returns:     Nil                                                         */
 /*                                                                          */
 /* ------------------------------------------------------------------------ */
-int
+void
 ipf_rx_init(ctx)
 	void *ctx;
 {
 	radix_softc_t *softr = ctx;
 
-	memset(softr->zeros, 0, 3 * sizeof(addrfamily_t));
-	memset(softr->ones, 0xff, sizeof(addrfamily_t));
-
-	return (0);
+	(void) memset(softr->zeros, 0, 3 * sizeof(addrfamily_t));
+	(void) memset(softr->ones, 0xff, sizeof(addrfamily_t));
 }
 
 

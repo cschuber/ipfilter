@@ -40,6 +40,7 @@ int ipf_p_ipsec_match(fr_info_t *, ap_session_t *, nat_t *);
 /*
  * IPSec application proxy initialization.
  */
+/*ARGSUSED*/
 void *
 ipf_p_ipsec_soft_create(softc)
 	ipf_main_softc_t *softc;
@@ -87,6 +88,7 @@ ipf_p_ipsec_soft_init(softc, arg)
 }
 
 
+/*ARGSUSED*/
 void
 ipf_p_ipsec_soft_fini(softc, arg)
 	ipf_main_softc_t *softc;
@@ -110,6 +112,7 @@ ipf_p_ipsec_soft_fini(softc, arg)
 }
 
 
+/*ARGSUSED*/
 void
 ipf_p_ipsec_soft_destroy(softc, arg)
 	ipf_main_softc_t *softc;

@@ -139,6 +139,7 @@ ipf_p_rpcb_main_unload()
 /*									*/
 /* Allocate resources for per-session proxy structures.			*/
 /* --------------------------------------------------------------------	*/
+/*ARGSUSED*/
 int
 ipf_p_rpcb_new(arg, fin, aps, nat)
 	void *arg;
@@ -172,6 +173,7 @@ ipf_p_rpcb_new(arg, fin, aps, nat)
 /*									*/
 /* Free up a session's list of RPCB requests.				*/
 /* --------------------------------------------------------------------	*/
+/*ARGSUSED*/
 void
 ipf_p_rpcb_del(softc, aps)
 	ipf_main_softc_t *softc;
@@ -199,6 +201,7 @@ ipf_p_rpcb_del(softc, aps)
 /* Given a presumed RPCB request, perform some minor tests and pass off */
 /* for decoding.  Also pass packet off for a rewrite if necessary.	*/
 /* --------------------------------------------------------------------	*/
+/*ARGSUSED*/
 int
 ipf_p_rpcb_in(arg, fin, aps, nat)
 	void *arg;
@@ -271,6 +274,7 @@ ipf_p_rpcb_in(arg, fin, aps, nat)
 /* valid addressing information, create NAT and state structures to	*/
 /* allow direct communication between RPC client and server.		*/
 /* --------------------------------------------------------------------	*/
+/*ARGSUSED*/
 int
 ipf_p_rpcb_out(arg, fin, aps, nat)
 	void *arg;

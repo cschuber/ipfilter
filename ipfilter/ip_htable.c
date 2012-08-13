@@ -59,7 +59,7 @@ static iphtent_t *ipf_iphmfind6(iphtable_t *, i6addr_t *);
 # endif
 static iphtent_t *ipf_iphmfind(iphtable_t *, struct in_addr *);
 static int ipf_iphmfindip(ipf_main_softc_t *, void *, int, void *, u_int);
-static int ipf_htable_clear(ipf_main_softc_t *, void *, iphtable_t *);
+static int ipf_htable_clear(void *, iphtable_t *);
 static int ipf_htable_create(ipf_main_softc_t *, void *, iplookupop_t *);
 static int ipf_htable_deref(ipf_main_softc_t *, void *, void *);
 static int ipf_htable_destroy(ipf_main_softc_t *, void *, int, char *);
@@ -83,8 +83,7 @@ static int ipf_htent_deref(void *, iphtent_t *);
 static iphtent_t *ipf_htent_find(iphtable_t *, iphtent_t *);
 static int ipf_htent_insert(ipf_main_softc_t *, void *, iphtable_t *,
 			    iphtent_t *);
-static int ipf_htent_remove(ipf_main_softc_t *, void *, iphtable_t *,
-			    iphtent_t *);
+static int ipf_htent_remove(void *, iphtable_t *, iphtent_t *);
 static void *ipf_htable_select_add_ref(void *, int, char *);
 static void ipf_htable_expire(ipf_main_softc_t *, void *);
 
@@ -155,6 +154,7 @@ ipf_htable_soft_create(softc)
 /* Clean up the pool by free'ing the radix tree associated with it and free */
 /* up the pool context too.                                                 */
 /* ------------------------------------------------------------------------ */
+/*ARGSUSED*/
 static void
 ipf_htable_soft_destroy(softc, arg)
 	ipf_main_softc_t *softc;
@@ -174,6 +174,7 @@ ipf_htable_soft_destroy(softc, arg)
 /*                                                                          */
 /* Initialise the hash table ready for use.                                 */
 /* ------------------------------------------------------------------------ */
+/*ARGSUSED*/
 static int
 ipf_htable_soft_init(softc, arg)
 	ipf_main_softc_t *softc;
@@ -210,7 +211,7 @@ ipf_htable_soft_fini(softc, arg)
 	fop.iplf_arg = 0;
 	fop.iplf_count = 0;
 	*fop.iplf_name = '\0';
-	ipf_htable_flush(softc, arg, &fop);
+	(void) ipf_htable_flush(softc, arg, &fop);
 }
 
 
@@ -422,12 +423,12 @@ ipf_htable_destroy(softc, arg, unit, name)
 	}
 
 	if (iph->iph_ref != 0) {
-		ipf_htable_clear(softc, arg, iph);
+		(void) ipf_htable_clear(arg, iph);
 		iph->iph_flags |= IPHASH_DELETE;
 		return 0;
 	}
 
-	ipf_htable_remove(softc, arg, iph);
+	(void) ipf_htable_remove(softc, arg, iph);
 
 	return 0;
 }
@@ -436,23 +437,21 @@ ipf_htable_destroy(softc, arg, unit, name)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_htable_clear                                            */
 /* Returns:     int      - 0 = success, else error                          */
-/* Parameters:  softc(I) - pointer to soft context main structure           */
-/*              arg(I)   - pointer to local context to use                  */
+/* Parameters:  arg(I)   - pointer to local context to use                  */
 /*              iph(I)   - pointer to hash table to destroy                 */
 /*                                                                          */
 /* Clean out the hash table by walking the list of entries and removing     */
 /* each one, one by one.                                                    */
 /* ------------------------------------------------------------------------ */
 static int
-ipf_htable_clear(softc, arg, iph)
-	ipf_main_softc_t *softc;
+ipf_htable_clear(arg, iph)
 	void *arg;
 	iphtable_t *iph;
 {
 	iphtent_t *ipe;
 
 	while ((ipe = iph->iph_list) != NULL)
-		if (ipf_htent_remove(softc, arg, iph, ipe) != 0)
+		if (ipf_htent_remove(arg, iph, ipe) != 0)
 			return 1;
 	return 0;
 }
@@ -503,7 +502,7 @@ ipf_htable_remove(softc, arg, iph)
 	iphtable_t *iph;
 {
 
-	if (ipf_htable_clear(softc, arg, iph) != 0)
+	if (ipf_htable_clear(arg, iph) != 0)
 		return 1;
 
 	if (iph->iph_pnext != NULL)
@@ -565,7 +564,7 @@ ipf_htable_node_del(softc, arg, op, uid)
 		return EACCES;
 	}
 
-	err = ipf_htent_remove(softc, arg, iph, ent);
+	err = ipf_htent_remove(arg, iph, ent);
 
 	return err;
 }
@@ -601,16 +600,14 @@ ipf_htable_table_add(softc, arg, op)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_htent_remove                                            */
 /* Returns:     int      - 0 = success, else error                          */
-/* Parameters:  softc(I) - pointer to soft context main structure           */
-/*              arg(I)   - pointer to local context to use                  */
+/* Parameters:  arg(I)   - pointer to local context to use                  */
 /*              iph(I)   - pointer to hash table                            */
 /*              ipe(I)   - pointer to hash table entry to remove            */
 /*                                                                          */
 /* Delete an entry from a hash table.                                       */
 /* ------------------------------------------------------------------------ */
 static int
-ipf_htent_remove(softc, arg, iph, ipe)
-	ipf_main_softc_t *softc;
+ipf_htent_remove(arg, iph, ipe)
 	void *arg;
 	iphtable_t *iph;
 	iphtent_t *ipe;
@@ -644,7 +641,7 @@ ipf_htent_remove(softc, arg, iph, ipe)
 	{
 	case IPHASH_GROUPMAP :
 		if (ipe->ipe_group != NULL)
-			ipf_group_del(softc, ipe->ipe_ptr, NULL);
+			ipf_group_del(ipe->ipe_ptr, NULL);
 		break;
 
 	default :
@@ -665,6 +662,7 @@ ipf_htent_remove(softc, arg, iph, ipe)
 /*              object(I) - pointer to hash table                           */
 /*                                                                          */
 /* ------------------------------------------------------------------------ */
+/*ARGSUSED*/
 static int
 ipf_htable_deref(softc, arg, object)
 	ipf_main_softc_t *softc;
@@ -1037,7 +1035,6 @@ ipf_htent_find(iph, ipeo)
 {
 	iphtent_t ipe, *ent;
 	u_int hv;
-	int bits;
 
 	bcopy((char *)ipeo, (char *)&ipe, sizeof(ipe));
 	ipe.ipe_addr.i6[0] &= ipe.ipe_mask.i6[0];
@@ -1045,7 +1042,6 @@ ipf_htent_find(iph, ipeo)
 	ipe.ipe_addr.i6[2] &= ipe.ipe_mask.i6[2];
 	ipe.ipe_addr.i6[3] &= ipe.ipe_mask.i6[3];
 	if (ipe.ipe_family == AF_INET) {
-		bits = count4bits(ipe.ipe_mask.in4_addr);
 		ipe.ipe_addr.i6[1] = 0;
 		ipe.ipe_addr.i6[2] = 0;
 		ipe.ipe_addr.i6[3] = 0;
@@ -1057,7 +1053,6 @@ ipf_htent_find(iph, ipeo)
 	} else
 #ifdef USE_INET6
 	if (ipe.ipe_family == AF_INET6) {
-		bits = count6bits(ipe.ipe_mask.i6);
 		hv = IPE_V6_HASH_FN(ipe.ipe_addr.i6,
 				    ipe.ipe_mask.i6, iph->iph_size);
 	} else
@@ -1304,7 +1299,7 @@ ipf_htable_iter_next(softc, arg, token, ilp)
 		}
 		if (iph != NULL) {
 			WRITE_ENTER(&softc->ipf_poolrw);
-			ipf_htable_deref(softc, softh, iph);
+			(void) ipf_htable_deref(softc, softh, iph);
 			RWLOCK_EXIT(&softc->ipf_poolrw);
 		}
 		break;
@@ -1317,7 +1312,7 @@ ipf_htable_iter_next(softc, arg, token, ilp)
 		}
 		if (node != NULL) {
 			WRITE_ENTER(&softc->ipf_poolrw);
-			ipf_htent_deref(softc, node);
+			(void) ipf_htent_deref(softc, node);
 			RWLOCK_EXIT(&softc->ipf_poolrw);
 		}
 		break;
@@ -1358,11 +1353,11 @@ ipf_htable_iter_deref(softc, arg, otype, unit, data)
 	switch (otype)
 	{
 	case IPFLOOKUPITER_LIST :
-		ipf_htable_deref(softc, arg, (iphtable_t *)data);
+		(void) ipf_htable_deref(softc, arg, (iphtable_t *)data);
 		break;
 
 	case IPFLOOKUPITER_NODE :
-		ipf_htent_deref(arg, (iphtent_t *)data);
+		(void) ipf_htent_deref(arg, (iphtent_t *)data);
 		break;
 	default :
 		break;
@@ -1429,7 +1424,7 @@ ipf_htable_expire(softc, arg)
 		if (n->ipe_die > softc->ipf_ticks)
 			break;
 
-		ipf_htent_remove(softc, softh, n->ipe_owner, n);
+		(void) ipf_htent_remove(softh, n->ipe_owner, n);
 	}
 }
 

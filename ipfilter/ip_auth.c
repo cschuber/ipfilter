@@ -202,6 +202,7 @@ ipf_auth_main_unload()
 /* Create a structre to store all of the run-time data for packet auth in   */
 /* and initialise some fields to their defaults.                            */
 /* ------------------------------------------------------------------------ */
+/*ARGSUSED*/
 void *
 ipf_auth_soft_create(softc)
 	ipf_main_softc_t *softc;
@@ -235,6 +236,7 @@ ipf_auth_soft_create(softc)
 /* Allocate memory and initialise data structures used in handling auth     */
 /* rules.                                                                   */
 /* ------------------------------------------------------------------------ */
+/*ARGSUSED*/
 int
 ipf_auth_soft_init(softc, arg)
 	ipf_main_softc_t *softc;
@@ -274,6 +276,7 @@ ipf_auth_soft_init(softc, arg)
 /* connectedd to the soft soft context structure *but* do not free that: it */
 /* is free'd by _destroy().                                                 */
 /* ------------------------------------------------------------------------ */
+/*ARGSUSED*/
 int
 ipf_auth_soft_fini(softc, arg)
 	ipf_main_softc_t *softc;
@@ -334,6 +337,7 @@ ipf_auth_soft_fini(softc, arg)
 /*                                                                          */
 /* Undo what was done in _create() - i.e. free the soft context data.       */
 /* ------------------------------------------------------------------------ */
+/*ARGSUSED*/
 void
 ipf_auth_soft_destroy(softc, arg)
 	ipf_main_softc_t *softc;
@@ -623,7 +627,7 @@ ipf_auth_ioctl(softc, data, cmd, mode, uid, ctx)
 			error = ipf_auth_geniter(softc, token, &iter, &obj);
 		else {
 			WRITE_ENTER(&softc->ipf_tokens);
-			ipf_token_deref(softc, token);
+			(void) ipf_token_deref(softc, token);
 			RWLOCK_EXIT(&softc->ipf_tokens);
 			IPFERROR(10001);
 			error = ESRCH;

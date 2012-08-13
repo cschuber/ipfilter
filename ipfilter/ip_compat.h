@@ -204,7 +204,7 @@ struct file;
 #  include <inet/ip_ire.h>
 # endif
 # if SOLARIS2 >= 8
-#  define SNPRINTF	snprintf
+#  define SNPRINTF	(void) snprintf
 
 #  include <inet/ip_if.h>
 #  define	ipif_local_addr	ipif_lcl_addr
@@ -311,14 +311,15 @@ typedef struct qifpkt {
 #   define	COPYIFNAME(v, x,b)					\
 			do {						\
 				if ((v) == 4) {				\
-					net_getifname(softc->ipf_nd_v4,	\
+					(void) net_getifname(softc->ipf_nd_v4,\
 						      (phy_if_t)x, b,	\
 						      sizeof(b));	\
 				} else {				\
-					net_getifname(softc->ipf_nd_v6,	\
+					(void) net_getifname(softc->ipf_nd_v6,\
 						      (phy_if_t)x, b,	\
 						      sizeof(b));	\
 				}					\
+			_NOTE(CONSTCOND)				\
 			} while (0)
 #   define	GETIFMTU_4(x)	net_getmtu(softc->ipf_nd_v4, (phy_if_t)x, 0)
 #   define	GETIFMTU_6(x)	net_getmtu(softc->ipf_nd_v6, (phy_if_t)x, 0)
@@ -388,7 +389,7 @@ typedef	struct	ip6_hdr	ip6_t;
 
 # ifdef _KERNEL
 #  define	FASTROUTE_RECURSION	1
-#  define SNPRINTF	sprintf
+#  define SNPRINTF	(void) sprintf
 #  if (HPUXREV >= 1111)
 #   define	IPL_SELECT
 #   ifdef	IPL_SELECT
@@ -1130,7 +1131,7 @@ typedef	u_int32_t	u_32_t;
 #   include "bpfilter.h"
 #  endif
 #  if (OpenBSD >= 200311)
-#   define SNPRINTF	snprintf
+#   define SNPRINTF	(void) snprintf
 #   if defined(USE_INET6)
 #    include "netinet6/in6_var.h"
 #    include "netinet6/nd6.h"
@@ -2661,6 +2662,14 @@ typedef	struct	tcpiphdr	tcpiphdr_t;
 # define	MLD6_MTRACE		MLD_MTRACE
 #endif
 
+struct ip6_routing {
+	u_char	ip6r_nxt;	/* next header */
+	u_char	ip6r_len;	/* length in units of 8 octets */
+	u_char	ip6r_type;	/* always zero */
+	u_char	ip6r_segleft;	/* segments left */
+	u_32_t	ip6r_reserved;	/* reserved field */
+};
+
 #if !defined(IPV6_FLOWINFO_MASK)
 # if (BYTE_ORDER == BIG_ENDIAN) || defined(_BIG_ENDIAN)
 #  define IPV6_FLOWINFO_MASK	0x0fffffff	/* flow info (28 bits) */
@@ -2798,12 +2807,8 @@ typedef	struct	tcpiphdr	tcpiphdr_t;
 # define	DT4(_n,_a,_b,_c,_d,_e,_f,_g,_h)
 #endif
 
-struct ip6_routing {
-	u_char	ip6r_nxt;	/* next header */
-	u_char	ip6r_len;	/* length in units of 8 octets */
-	u_char	ip6r_type;	/* always zero */
-	u_char	ip6r_segleft;	/* segments left */
-	u_32_t	ip6r_reserved;	/* reserved field */
-};
+#ifndef _NOTE
+# define	_NOTE(s)
+#endif
 
 #endif	/* __IP_COMPAT_H__ */

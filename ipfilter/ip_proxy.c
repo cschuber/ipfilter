@@ -105,7 +105,7 @@ static const char rcsid[] = "@(#)$Id$";
 
 #define	AP_SESS_SIZE	53
 
-static int ipf_proxy_fixseqack(fr_info_t *, ip_t *, ap_session_t *, int );
+static int ipf_proxy_fixseqack(fr_info_t *, ap_session_t *, int );
 static aproxy_t *ipf_proxy_create_clone(ipf_main_softc_t *, aproxy_t *);
 
 typedef struct ipf_proxy_softc_s {
@@ -515,7 +515,7 @@ ipf_proxy_soft_destroy(softc, arg)
 	}
 
 	if (softp->ipf_proxy_tune != NULL) {
-                ipf_tune_array_unlink(softc, softp->ipf_proxy_tune);
+                (void) ipf_tune_array_unlink(softc, softp->ipf_proxy_tune);
                 KFREES(softp->ipf_proxy_tune, sizeof(ipf_proxy_tuneables));
                 softp->ipf_proxy_tune = NULL;
 	}
@@ -714,22 +714,17 @@ ipf_proxy_ok(fin, tcp, np)
 /*              data(I)  - pointer to ioctl data                            */
 /*              cmd(I)   - ioctl command                                    */
 /*              mode(I)  - mode bits for device                             */
-/*              ctx(I)   - pointer to context information                   */
 /*                                                                          */
 /* ------------------------------------------------------------------------ */
 int
-ipf_proxy_ioctl(softc, data, cmd, mode, ctx)
+ipf_proxy_ioctl(softc, data, cmd)
 	ipf_main_softc_t *softc;
 	caddr_t data;
 	ioctlcmd_t cmd;
-	int mode;
-	void *ctx;
 {
 	ap_ctl_t ctl;
 	caddr_t ptr;
 	int error;
-
-	mode = mode;	/* LINT */
 
 	switch (cmd)
 	{
@@ -1042,7 +1037,7 @@ ipf_proxy_check(fin, nat)
 		 * changed or not.
 		 */
 		if (tcp != NULL) {
-			err = ipf_proxy_fixseqack(fin, ip, aps, adjlen);
+			err = ipf_proxy_fixseqack(fin, aps, adjlen);
 			if (fin->fin_cksum == FI_CK_L4PART) {
 				u_short sum = ntohs(tcp->th_sum);
 				sum += adjlen;
@@ -1170,9 +1165,8 @@ ipf_proxy_free(softc, aps)
 /* and the new string being a different length to the old.                  */
 /* ------------------------------------------------------------------------ */
 static int
-ipf_proxy_fixseqack(fin, ip, aps, inc)
+ipf_proxy_fixseqack(fin, aps, inc)
 	fr_info_t *fin;
-	ip_t *ip;
 	ap_session_t *aps;
 	int inc;
 {

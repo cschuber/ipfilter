@@ -126,7 +126,7 @@ typedef struct ipf_lookup {
 } ipf_lookup_t;
 
 extern int ipf_lookup_init(void);
-extern int ipf_lookup_ioctl(ipf_main_softc_t *, caddr_t, ioctlcmd_t, int, int, void *);
+extern int ipf_lookup_ioctl(ipf_main_softc_t *, caddr_t, ioctlcmd_t, int, void *);
 extern void ipf_lookup_main_unload(void);
 extern void ipf_lookup_deref(ipf_main_softc_t *, int, void *);
 extern void ipf_lookup_iterderef(ipf_main_softc_t *, u_32_t, void *);

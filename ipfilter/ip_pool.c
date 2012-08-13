@@ -293,6 +293,7 @@ ipf_pool_soft_create(softc)
 /*                                                                          */
 /* Initialise the routing table data structures where required.             */
 /* ------------------------------------------------------------------------ */
+/*ARGSUSED*/
 static int
 ipf_pool_soft_init(softc, arg)
 	ipf_main_softc_t *softc;
@@ -346,6 +347,7 @@ ipf_pool_soft_fini(softc, arg)
 /* Clean up the pool by free'ing the radix tree associated with it and free */
 /* up the pool context too.                                                 */
 /* ------------------------------------------------------------------------ */
+/*ARGSUSED*/
 static void
 ipf_pool_soft_destroy(softc, arg)
 	ipf_main_softc_t *softc;
@@ -370,6 +372,7 @@ ipf_pool_soft_destroy(softc, arg)
 /* pair supplied has been appropriately prepared by applying the mask to    */
 /* the address prior to calling for the pair to be added.                   */
 /* ------------------------------------------------------------------------ */
+/*ARGSUSED*/
 static int
 ipf_pool_node_add(softc, arg, op, uid)
 	ipf_main_softc_t *softc;
@@ -737,7 +740,7 @@ ipf_pool_select_add_ref(arg, unit, name)
 /*                                                                          */
 /* Searches for an exact match of an entry in the pool.                     */
 /* ------------------------------------------------------------------------ */
-extern void printhostmask(int, u_32_t *, u_32_t *);
+/*ARGSUSED*/
 static ip_pool_node_t *
 ipf_pool_findeq(softp, ipo, addr, mask)
 	ipf_pool_softc_t *softp;
@@ -1211,7 +1214,7 @@ ipf_pool_clearnodes(softc, softp, ipo)
 	ip_pool_node_t *n, **next;
 
 	for (next = &ipo->ipo_list; (n = *next) != NULL; )
-		ipf_pool_remove_node(softc, softp, ipo, n);
+		(void) ipf_pool_remove_node(softc, softp, ipo, n);
 
 	ipo->ipo_list = NULL;
 }
@@ -1241,7 +1244,8 @@ ipf_pool_deref(softc, arg, pool)
 		ipf_pool_free(softc, arg, ipo);
 
 	else if ((ipo->ipo_ref == 1) && (ipo->ipo_flags & IPOOL_DELETE))
-		ipf_pool_destroy(softc, arg, ipo->ipo_unit, ipo->ipo_name);
+		(void) ipf_pool_destroy(softc, arg, ipo->ipo_unit,
+					ipo->ipo_name);
 
 	return 0;
 }
@@ -1371,7 +1375,7 @@ ipf_pool_iter_next(softc, arg, token, ilp)
 		}
 		if (ipo != NULL) {
 			WRITE_ENTER(&softc->ipf_poolrw);
-			ipf_pool_deref(softc, softp, ipo);
+			(void) ipf_pool_deref(softc, softp, ipo);
 			RWLOCK_EXIT(&softc->ipf_poolrw);
 		}
 		break;
@@ -1424,7 +1428,7 @@ ipf_pool_iter_deref(softc, arg, otype, unit, data)
 	switch (otype)
 	{
 	case IPFLOOKUPITER_LIST :
-		ipf_pool_deref(softc, softp, (ip_pool_t *)data);
+		(void) ipf_pool_deref(softc, softp, (ip_pool_t *)data);
 		break;
 
 	case IPFLOOKUPITER_NODE :
@@ -1462,7 +1466,7 @@ ipf_pool_expire(softc, arg)
 		 */
 		if (n->ipn_die > softc->ipf_ticks)
 			break;
-		ipf_pool_remove_node(softc, softp, n->ipn_owner, n);
+		(void) ipf_pool_remove_node(softc, softp, n->ipn_owner, n);
 	}
 }
 

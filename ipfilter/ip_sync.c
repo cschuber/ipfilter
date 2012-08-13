@@ -181,6 +181,7 @@ ipf_sync_soft_create(softc)
 /* Initialise all of the locks required for the sync code and initialise    */
 /* any data structures, as required.                                        */
 /* ------------------------------------------------------------------------ */
+/*ARGSUSED*/
 int
 ipf_sync_soft_init(softc, arg)
 	ipf_main_softc_t *softc;
@@ -248,6 +249,7 @@ ipf_sync_soft_init(softc, arg)
 /* Destroy the locks created when initialising and free any memory in use   */
 /* with the synchronisation tables.                                         */
 /* ------------------------------------------------------------------------ */
+/*ARGSUSED*/
 int
 ipf_sync_soft_fini(softc, arg)
 	ipf_main_softc_t *softc;
@@ -256,16 +258,16 @@ ipf_sync_soft_fini(softc, arg)
 	ipf_sync_softc_t *softs = arg;
 
 	if (softs->syncnattab != NULL) {
-		ipf_sync_flush_table(softs, softs->ipf_sync_nat_tab_sz,
-				     softs->syncnattab);
+		(void) ipf_sync_flush_table(softs, softs->ipf_sync_nat_tab_sz,
+					    softs->syncnattab);
 		KFREES(softs->syncnattab,
 		       softs->ipf_sync_nat_tab_sz * sizeof(*softs->syncnattab));
 		softs->syncnattab = NULL;
 	}
 
 	if (softs->syncstatetab != NULL) {
-		ipf_sync_flush_table(softs, softs->ipf_sync_state_tab_sz,
-				     softs->syncstatetab);
+		(void) ipf_sync_flush_table(softs, softs->ipf_sync_state_tab_sz,
+					    softs->syncstatetab);
 		KFREES(softs->syncstatetab,
 		       softs->ipf_sync_state_tab_sz *
 		       sizeof(*softs->syncstatetab));
@@ -295,6 +297,7 @@ ipf_sync_soft_fini(softc, arg)
 	return 0;
 }
 
+/*ARGSUSED*/
 void
 ipf_sync_soft_destroy(softc, arg)
 	ipf_main_softc_t *softc;
@@ -567,7 +570,7 @@ ipf_sync_write(softc, uio)
 	}
 
 	/* no more data */
-	return 0;
+	return err;
 }
 
 
@@ -745,7 +748,7 @@ ipf_sync_state(softc, sp, data)
 		RWLOCK_EXIT(&softc->ipf_mutex);
 
 		if (softs->ipf_sync_debug > 4)
-			printf("[%d] Filter rules = %p\n", sp->sm_num, fr);
+			printf("[%d] Filter rule = %p\n", sp->sm_num,(void*)fr);
 
 		is->is_rule = fr;
 		is->is_sync = sl;
@@ -763,7 +766,7 @@ ipf_sync_state(softc, sp, data)
 			softs->syncstatetab[hv]->sl_pnext = &sl->sl_next;
 		softs->syncstatetab[hv] = sl;
 		MUTEX_DOWNGRADE(&softs->ipf_syncstate);
-		ipf_state_insert(softc, is, sp->sm_rev);
+		(void) ipf_state_insert(softc, is, sp->sm_rev);
 		/*
 		 * Do not initialise the interface pointers for the state
 		 * entry as the full complement of interface names may not
@@ -937,7 +940,7 @@ ipf_sync_nat(softc, sp, data)
 	nat_t *n, *nat;
 	synclist_t *sl;
 	u_int hv = 0;
-	int err;
+	int err = 0;
 
 	READ_ENTER(&softs->ipf_syncnat);
 
@@ -1014,7 +1017,7 @@ ipf_sync_nat(softc, sp, data)
 	}
 
 	RWLOCK_EXIT(&softs->ipf_syncnat);
-	return 0;
+	return err;
 }
 
 
@@ -1298,12 +1301,10 @@ ipf_sync_flush_table(softs, tabsize, table)
 /* EINVAL on all occasions.                                                 */
 /* ------------------------------------------------------------------------ */
 int
-ipf_sync_ioctl(softc, data, cmd, mode, uid, ctx)
+ipf_sync_ioctl(softc, data, cmd)
 	ipf_main_softc_t *softc;
 	caddr_t data;
 	ioctlcmd_t cmd;
-	int mode, uid;
-	void *ctx;
 {
 	ipf_sync_softc_t *softs = softc->ipf_sync_soft;
 	int error, i;
@@ -1397,6 +1398,7 @@ ipf_sync_canread(arg)
 /* to accept write events.                                                  */
 /* XXX Maybe this should return false if the sync table is full?            */
 /* ------------------------------------------------------------------------ */
+/*ARGSUSED*/
 int
 ipf_sync_canwrite(arg)
 	void *arg;

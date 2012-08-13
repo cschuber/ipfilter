@@ -133,14 +133,16 @@ static int ipf_nat6_insert(ipf_main_softc_t *, ipf_nat_softc_t *, nat_t *);
 #define	NBUMPSIDE(y,x)	softn->ipf_nat_stats.ns_side[y].x++
 #define	NBUMPSIDE6(y,x)	softn->ipf_nat_stats.ns_side6[y].x++
 #define	NBUMPSIDE6D(y,x) \
-			do { \
-				softn->ipf_nat_stats.ns_side6[y].x++; \
-				DT(x); \
+			do {						\
+				softn->ipf_nat_stats.ns_side6[y].x++;	\
+				DT(x);					\
+			_NOTE(CONSTCOND)				\
 			} while (0)
 #define	NBUMPSIDE6DX(y,x,z) \
-			do { \
-				softn->ipf_nat_stats.ns_side6[y].x++; \
-				DT(z); \
+			do {						\
+				softn->ipf_nat_stats.ns_side6[y].x++;	\
+				DT(z);					\
+			_NOTE(CONSTCOND)				\
 			} while (0)
 
 
@@ -196,8 +198,10 @@ ipf_nat6_ruleaddrinit(softc, softn, n)
 	if (error != 0)
 		return error;
 
-	if (n->in_redir & NAT_DIVERTUDP)
-		ipf_nat6_builddivertmp(softn, n);
+	if (n->in_redir & NAT_DIVERTUDP) {
+		if (ipf_nat6_builddivertmp(softn, n) != 0)
+			return ENOBUFS;
+	}
 	return 0;
 }
 
@@ -623,6 +627,8 @@ ipf_nat6_newmap(fin, nat, ni)
 				port += MAPBLK_MINPORT;
 				port = htons(port);
 			}
+#else
+			port = port;
 #endif
 
 		} else if (((np->in_redir & NAT_MAPBLK) == 0) &&
@@ -1163,9 +1169,6 @@ ipf_nat6_finalise(fin, nat)
 	ipf_nat_softc_t *softn = softc->ipf_nat_soft;
 	u_32_t sum1, sum2, sumd;
 	frentry_t *fr;
-	u_32_t flags;
-
-	flags = nat->nat_flags;
 
 	switch (fin->fin_p)
 	{
@@ -1393,9 +1396,9 @@ ipf_nat6_icmperrorlookup(fin, dir)
 {
 	ipf_main_softc_t *softc = fin->fin_main_soft;
 	ipf_nat_softc_t *softn = softc->ipf_nat_soft;
-	struct icmp6_hdr *icmp6, *orgicmp;
-	int flags = 0, type, minlen;
+	struct icmp6_hdr *orgicmp;
 	nat_stat_side_t *nside;
+	int flags = 0, minlen;
 	tcphdr_t *tcp = NULL;
 	u_short data[2];
 	ip6_t *oip6;
@@ -1403,8 +1406,6 @@ ipf_nat6_icmperrorlookup(fin, dir)
 	u_int p;
 
 	minlen = 40;
-	icmp6 = fin->fin_dp;
-	type = icmp6->icmp6_type;
 	nside = &softn->ipf_nat_stats.ns_side6[fin->fin_out];
 	/*
 	 * Does it at least have the return (basic) IP header ?
@@ -1539,9 +1540,8 @@ ipf_nat6_ip6subtract(ip1, ip2)
 	i6addr_t l1, l2, d;
 	u_short *s1, *s2, *ds;
 	u_32_t r;
-	int i, neg;
+	int i;
 
-	neg = 0;
 	l1 = *ip1;
 	l2 = *ip2;
 	s1 = (u_short *)&l1;
@@ -1558,7 +1558,6 @@ ipf_nat6_ip6subtract(ip1, ip2)
 	}
 	if (s2[0] > s1[0]) {
 		ds[0] = s2[0] + 0x10000 - s1[0];
-		neg = 1;
 	} else {
 		ds[0] = s2[0] - s1[0];
 	}
@@ -1913,9 +1912,7 @@ ipf_nat6_inlookup(fin, flags, p, src, mapdst)
 	ipf_main_softc_t *softc = fin->fin_main_soft;
 	ipf_nat_softc_t *softn = softc->ipf_nat_soft;
 	u_short sport, dport;
-	grehdr_t *gre;
 	ipnat_t *ipn;
-	u_int sflags;
 	nat_t *nat;
 	int nflags;
 	i6addr_t dst;
@@ -1925,9 +1922,7 @@ ipf_nat6_inlookup(fin, flags, p, src, mapdst)
 	ifp = fin->fin_ifp;
 	sport = 0;
 	dport = 0;
-	gre = NULL;
 	dst.in6 = *mapdst;
-	sflags = flags & NAT_TCPUDPICMP;
 
 	switch (p)
 	{
@@ -2007,11 +2002,9 @@ ipf_nat6_inlookup(fin, flags, p, src, mapdst)
 
 		if ((nat->nat_flags & IPN_TCPUDP) != 0) {
 			ipn = nat->nat_ptr;
-#ifdef IPF_V6_PROXIES
 			if ((ipn != NULL) && (nat->nat_aps != NULL))
-				if (appr_match(fin, nat) != 0)
+				if (ipf_proxy_match(fin, nat) != 0)
 					continue;
-#endif
 		}
 		if ((nat->nat_ifps[0] == NULL) && (ifp != NULL)) {
 			nat->nat_ifps[0] = ifp;
@@ -2235,14 +2228,12 @@ ipf_nat6_outlookup(fin, flags, p, src, dst)
 	ipf_main_softc_t *softc = fin->fin_main_soft;
 	ipf_nat_softc_t *softn = softc->ipf_nat_soft;
 	u_short sport, dport;
-	u_int sflags;
 	ipnat_t *ipn;
 	nat_t *nat;
 	void *ifp;
 	u_int hv;
 
 	ifp = fin->fin_ifp;
-	sflags = flags & IPN_TCPUDPICMP;
 	sport = 0;
 	dport = 0;
 
@@ -2324,11 +2315,9 @@ ipf_nat6_outlookup(fin, flags, p, src, dst)
 		}
 
 		ipn = nat->nat_ptr;
-#ifdef IPF_V6_PROXIES
 		if ((ipn != NULL) && (nat->nat_aps != NULL))
-			if (appr_match(fin, nat) != 0)
+			if (ipf_proxy_match(fin, nat) != 0)
 				continue;
-#endif
 
 		if ((nat->nat_ifps[1] == NULL) && (ifp != NULL)) {
 			nat->nat_ifps[1] = ifp;
@@ -2730,15 +2719,13 @@ maskloop:
 			    !ipf_matchtag(&np->in_tag, &fr->fr_nattag))
 				continue;
 
-#ifdef IPF_V6_PROXIES
 			if (np->in_plabel != -1) {
 				if (((np->in_flags & IPN_FILTER) == 0) &&
 				    (np->in_odport != fin->fin_data[1]))
 					continue;
-				if (appr_ok(fin, tcp, np) == 0)
+				if (ipf_proxy_ok(fin, tcp, np) == 0)
 					continue;
 			}
-#endif
 
 			if (np->in_flags & IPN_NO) {
 				np->in_hits++;
@@ -3132,13 +3119,11 @@ maskloop:
 					continue;
 			}
 
-#ifdef IPF_V6_PROXIES
 			if (np->in_plabel != -1) {
-				if (!appr_ok(fin, tcp, np)) {
+				if (!ipf_proxy_ok(fin, tcp, np)) {
 					continue;
 				}
 			}
-#endif
 
 			if (np->in_flags & IPN_NO) {
 				np->in_hits++;

@@ -80,7 +80,7 @@ typedef struct radix_softc {
 #endif
 
 extern	void	*ipf_rx_create(void);
-extern	int	ipf_rx_init(void *);
+extern	void	ipf_rx_init(void *);
 extern	void	ipf_rx_destroy(void *);
 extern	int	ipf_rx_inithead(radix_softc_t *, ipf_rdx_head_t **);
 extern	void	ipf_rx_freehead(ipf_rdx_head_t *);

@@ -61,6 +61,7 @@ ipf_p_rcmd_main_unload()
 /*
  * Setup for a new RCMD proxy.
  */
+/*ARGSUSED*/
 int
 ipf_p_rcmd_new(arg, fin, aps, nat)
 	void *arg;
@@ -71,13 +72,7 @@ ipf_p_rcmd_new(arg, fin, aps, nat)
 	tcphdr_t *tcp = (tcphdr_t *)fin->fin_dp;
 	rcmdinfo_t *rc;
 	ipnat_t *ipn;
-	ipnat_t *np;
-	int size;
 
-	fin = fin;	/* LINT */
-
-	np = nat->nat_ptr;
-	size = np->in_size;
 	KMALLOC(rc, rcmdinfo_t *);
 	if (rc == NULL) {
 #ifdef IP_RCMD_PROXY_DEBUG
@@ -152,7 +147,9 @@ ipf_p_rcmd_portmsg(fin, aps, nat)
 	fr_info_t fi;
 	u_short sp;
 	nat_t *nat2;
+#ifdef USE_INET6
 	ip6_t *ip6;
+#endif
 	int tcpsz;
 	int slen;
 	ip_t *ip;
@@ -160,10 +157,13 @@ ipf_p_rcmd_portmsg(fin, aps, nat)
 
 	tcp = (tcphdr_t *)fin->fin_dp;
 
+	slen = 0;
 	m = fin->fin_m;
 	ip = fin->fin_ip;
 	tcpsz = TCP_OFF(tcp) << 2;
+#ifdef USE_INET6
 	ip6 = (ip6_t *)fin->fin_ip;
+#endif
 	softc = fin->fin_main_soft;
 	softn = softc->ipf_nat_soft;
 	off = (char *)tcp - (char *)ip + tcpsz + fin->fin_ipoff;
@@ -319,6 +319,7 @@ ipf_p_rcmd_portmsg(fin, aps, nat)
 }
 
 
+/*ARGSUSED*/
 int
 ipf_p_rcmd_out(arg, fin, aps, nat)
 	void *arg;
@@ -332,6 +333,7 @@ ipf_p_rcmd_out(arg, fin, aps, nat)
 }
 
 
+/*ARGSUSED*/
 int
 ipf_p_rcmd_in(arg, fin, aps, nat)
 	void *arg;

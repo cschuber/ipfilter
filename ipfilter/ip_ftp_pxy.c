@@ -95,11 +95,11 @@ int ipf_p_ftp_pasvreply(ipf_ftp_softc_t *, fr_info_t *, ip_t *, nat_t *,
 int ipf_p_ftp_eprt(ipf_ftp_softc_t *, fr_info_t *, ip_t *, nat_t *,
 		   ftpinfo_t *, int);
 int ipf_p_ftp_eprt4(ipf_ftp_softc_t *, fr_info_t *, ip_t *, nat_t *,
-		    ftpinfo_t *, int);
+		    ftpinfo_t *);
 int ipf_p_ftp_eprt6(ipf_ftp_softc_t *, fr_info_t *, ip_t *, nat_t *,
-		    ftpinfo_t *, int);
-int ipf_p_ftp_addport(ipf_ftp_softc_t *, fr_info_t *, ip_t *, nat_t *,
-		      ftpinfo_t *, int, int, int);
+		    ftpinfo_t *);
+int ipf_p_ftp_addport(ipf_ftp_softc_t *, fr_info_t *, nat_t *,
+		      ftpinfo_t *, int, int);
 void ipf_p_ftp_setpending(ipf_main_softc_t *, ftpinfo_t *);
 
 /*
@@ -211,7 +211,7 @@ ipf_p_ftp_soft_destroy(softc, arg)
 	ipf_ftp_softc_t *softf = arg;
 
 	if (softf->ipf_p_ftp_tune != NULL) {
-		ipf_tune_array_unlink(softc, softf->ipf_p_ftp_tune);
+		(void) ipf_tune_array_unlink(softc, softf->ipf_p_ftp_tune);
 		KFREES(softf->ipf_p_ftp_tune, sizeof(ipf_ftp_tuneables));
 		softf->ipf_p_ftp_tune = NULL;
 	}
@@ -220,6 +220,7 @@ ipf_p_ftp_soft_destroy(softc, arg)
 }
 
 
+/*ARGSUSED*/
 int
 ipf_p_ftp_new(arg, fin, aps, nat)
 	void *arg;
@@ -440,18 +441,17 @@ ipf_p_ftp_port(softf, fin, ip, nat, ftp, dlen)
 	}
 
 	f->ftps_cmd = FTPXY_C_PORT;
-	return ipf_p_ftp_addport(softf, fin, ip, nat, ftp, dlen, sp, inc);
+	return ipf_p_ftp_addport(softf, fin, nat, ftp, sp, inc);
 }
 
 
 int
-ipf_p_ftp_addport(softf, fin, ip, nat, ftp, dlen, nport, inc)
+ipf_p_ftp_addport(softf, fin, nat, ftp, nport, inc)
 	ipf_ftp_softc_t *softf;
 	fr_info_t *fin;
-	ip_t *ip;
 	nat_t *nat;
 	ftpinfo_t *ftp;
-	int dlen, nport, inc;
+	int nport, inc;
 {
 	tcphdr_t tcph, *tcp2 = &tcph;
 	ipf_main_softc_t *softc;
@@ -472,7 +472,8 @@ ipf_p_ftp_addport(softf, fin, ip, nat, ftp, dlen, nport, inc)
 			    ftpinfo_t *, ftp);
 			if (softf->ipf_p_ftp_debug & DEBUG_ERROR)
 				printf("ipf_p_ftp_addport:xfer active %p/%p\n",
-				       ftp->ftp_pendnat, ftp->ftp_pendstate);
+				       (void *)ftp->ftp_pendnat,
+				       (void *)ftp->ftp_pendstate);
 			return 0;
 		}
 		ipf_p_ftp_setpending(softc, ftp);
@@ -509,6 +510,8 @@ ipf_p_ftp_addport(softf, fin, ip, nat, ftp, dlen, nport, inc)
 	if (nat->nat_v[0] == 6) {
 #ifndef USE_INET6
 		return APR_INC(inc);
+#else
+		nat->nat_v[0] = nat->nat_v[0];		/*LINT*/
 #endif
 	}
 
@@ -1025,7 +1028,7 @@ ipf_p_ftp_server(softf, fin, ip, nat, ftp, dlen)
 			/*
 			 * 200 is returned for a successful command.
 			 */
-			;
+			rptr = rptr;	/* LINT */
 		}
 	} else if (softf->ipf_p_ftp_insecure && !strncmp(rptr, "227 ", 4)) {
 		inc = ipf_p_ftp_pasv(softf, fin, ip, nat, ftp, dlen);
@@ -1732,22 +1735,21 @@ ipf_p_ftp_eprt(softf, fin, ip, nat, ftp, dlen)
 		return 0;
 	if (f->ftps_rptr[5] == f->ftps_rptr[7]) {
 		if (f->ftps_rptr[6] == '1' && nat->nat_v[0] == 4)
-			return ipf_p_ftp_eprt4(softf, fin, ip, nat, ftp, dlen);
+			return ipf_p_ftp_eprt4(softf, fin, ip, nat, ftp);
 		if (f->ftps_rptr[6] == '2' && nat->nat_v[0] == 6)
-			return ipf_p_ftp_eprt6(softf, fin, ip, nat, ftp, dlen);
+			return ipf_p_ftp_eprt6(softf, fin, ip, nat, ftp);
 	}
 	return 0;
 }
 
 
 int
-ipf_p_ftp_eprt4(softf, fin, ip, nat, ftp, dlen)
+ipf_p_ftp_eprt4(softf, fin, ip, nat, ftp)
 	ipf_ftp_softc_t *softf;
 	fr_info_t *fin;
 	ip_t *ip;
 	nat_t *nat;
 	ftpinfo_t *ftp;
-	int dlen;
 {
 	int a1, a2, a3, a4, port, olen, nlen, inc, off;
 	char newbuf[IPF_FTPBUFSZ];
@@ -1891,7 +1893,7 @@ ipf_p_ftp_eprt4(softf, fin, ip, nat, ftp, dlen)
 	}
 
 	f->ftps_cmd = FTPXY_C_EPRT;
-	return ipf_p_ftp_addport(softf, fin, ip, nat, ftp, dlen, port, inc);
+	return ipf_p_ftp_addport(softf, fin, nat, ftp, port, inc);
 }
 
 
@@ -1978,13 +1980,12 @@ ipf_p_ftp_epsv(softf, fin, ip, nat, ftp, dlen)
 
 
 int
-ipf_p_ftp_eprt6(softf, fin, ip, nat, ftp, dlen)
+ipf_p_ftp_eprt6(softf, fin, ip, nat, ftp)
 	ipf_ftp_softc_t *softf;
 	fr_info_t *fin;
 	ip_t *ip;
 	nat_t *nat;
 	ftpinfo_t *ftp;
-	int dlen;
 {
 	int port, olen, nlen, inc, off, left, i;
 	char newbuf[IPF_FTPBUFSZ];
@@ -2184,5 +2185,5 @@ ipf_p_ftp_eprt6(softf, fin, ip, nat, ftp, dlen)
 	}
 
 	f->ftps_cmd = FTPXY_C_EPRT;
-	return ipf_p_ftp_addport(softf, fin, ip, nat, ftp, dlen, port, inc);
+	return ipf_p_ftp_addport(softf, fin, nat, ftp, port, inc);
 }

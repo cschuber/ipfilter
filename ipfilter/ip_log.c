@@ -247,6 +247,7 @@ ipf_log_soft_create(softc)
 /* Initialise log buffers & pointers.  Also iniialised the CRC to a local   */
 /* secret for use in calculating the "last log checksum".                   */
 /* ------------------------------------------------------------------------ */
+/*ARGSUSED*/
 int
 ipf_log_soft_init(softc, arg)
 	ipf_main_softc_t *softc;
@@ -352,7 +353,7 @@ ipf_log_soft_destroy(softc, arg)
 	}
 
 	if (softl->ipf_log_tune != NULL) {
-		ipf_tune_array_unlink(softc, softl->ipf_log_tune);
+		(void) ipf_tune_array_unlink(softc, softl->ipf_log_tune);
 		KFREES(softl->ipf_log_tune, sizeof(ipf_log_tuneables));
 		softl->ipf_log_tune = NULL;
 	}

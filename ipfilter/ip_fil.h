@@ -214,6 +214,7 @@ typedef	union	i6addr	{
 				} \
 			} \
 		  } \
+		_NOTE(CONSTCOND) \
 		} while (0)
 #define	IP6_ADD(a,x,d)	\
 		do { i6addr_t *_s = (i6addr_t *)(a); \
@@ -228,6 +229,7 @@ typedef	union	i6addr	{
 				} \
 			} \
 		  } \
+		_NOTE(CONSTCOND) \
 		} while (0)
 #define	IP6_AND(a,b,d)	do { i6addr_t *_s1 = (i6addr_t *)(a); \
 			  i6addr_t *_s2 = (i6addr_t *)(b); \
@@ -236,6 +238,7 @@ typedef	union	i6addr	{
 			  _d->i6[1] = _s1->i6[1] & _s2->i6[1]; \
 			  _d->i6[2] = _s1->i6[2] & _s2->i6[2]; \
 			  _d->i6[3] = _s1->i6[3] & _s2->i6[3]; \
+			_NOTE(CONSTCOND) \
 			} while (0)
 #define	IP6_ANDASSIGN(a,m) \
 			do { i6addr_t *_d = (i6addr_t *)(a); \
@@ -244,6 +247,7 @@ typedef	union	i6addr	{
 			  _d->i6[1] &= _m->i6[1]; \
 			  _d->i6[2] &= _m->i6[2]; \
 			  _d->i6[3] &= _m->i6[3]; \
+			_NOTE(CONSTCOND) \
 			} while (0)
 #define	IP6_MASKEQ(a,m,b) \
 			(((I60(a) & I60(m)) == I60(b)) && \
@@ -264,6 +268,7 @@ typedef	union	i6addr	{
 			  _d->i6[1] |= _s1->i6[1] & ~_s2->i6[1]; \
 			  _d->i6[2] |= _s1->i6[2] & ~_s2->i6[2]; \
 			  _d->i6[3] |= _s1->i6[3] & ~_s2->i6[3]; \
+			_NOTE(CONSTCOND) \
 			} while (0)
 #define	IP6_MASK(a,b,c) \
 			do { i6addr_t *_d, *_s1, *_s2; \
@@ -274,6 +279,7 @@ typedef	union	i6addr	{
 			  _d->i6[1] = _s1->i6[1] & ~_s2->i6[1]; \
 			  _d->i6[2] = _s1->i6[2] & ~_s2->i6[2]; \
 			  _d->i6[3] = _s1->i6[3] & ~_s2->i6[3]; \
+			_NOTE(CONSTCOND) \
 			} while (0)
 #define	IP6_SETONES(a)	\
 			do { i6addr_t *_d = (i6addr_t *)(a); \
@@ -281,6 +287,7 @@ typedef	union	i6addr	{
 			  _d->i6[1] = 0xffffffff; \
 			  _d->i6[2] = 0xffffffff; \
 			  _d->i6[3] = 0xffffffff; \
+			_NOTE(CONSTCOND) \
 			} while (0)
 
 typedef	union ipso_u	{
@@ -1340,6 +1347,7 @@ typedef struct  ipftq   {
 					(x)->ifq_ref = 1;	\
 					(x)->ifq_tail = &(x)->ifq_head; \
 					MUTEX_INIT(&(x)->ifq_lock, (z)); \
+				_NOTE(CONSTCOND)		\
 				} while (0)
 
 #define	IPF_HZ_MULT	1
@@ -1760,8 +1768,10 @@ typedef struct ipf_main_softc_s {
 	u_short		ipf_ip_id;
 } ipf_main_softc_t;
 
-#define	IPFERROR(_e)	do { softc->ipf_interror = (_e); \
-			     DT1(user_error, int, _e); \
+#define	IPFERROR(_e)	do {					\
+				softc->ipf_interror = (_e);	\
+				DT1(user_error, int, _e);	\
+			_NOTE(CONSTCOND)			\
 			} while (0)
 
 #ifndef	_KERNEL
@@ -1936,7 +1946,7 @@ extern int	ipf_pr_pullup(fr_info_t *, int);
 extern	int	ipf_flush(ipf_main_softc_t *, minor_t, int);
 extern	frgroup_t *ipf_group_add(ipf_main_softc_t *, char *, void *,
 				 u_32_t, minor_t, int);
-extern	void	ipf_group_del(ipf_main_softc_t *, frgroup_t *, frentry_t *);
+extern	void	ipf_group_del(frgroup_t *, frentry_t *);
 extern	int	ipf_derefrule(ipf_main_softc_t *, frentry_t **);
 extern	frgroup_t *ipf_findgroup(ipf_main_softc_t *, char *, minor_t,
 				 int, frgroup_t ***);
@@ -1988,7 +1998,7 @@ extern	int		ipf_verifysrc(fr_info_t *fin);
 extern	int		ipf_zerostats(ipf_main_softc_t *, char *);
 extern	int		ipf_getnextrule(ipf_main_softc_t *, ipftoken_t *,
 					void *);
-extern	int		ipf_sync(ipf_main_softc_t *, void *);
+extern	void		ipf_sync(ipf_main_softc_t *, void *);
 extern	int		ipf_token_deref(ipf_main_softc_t *, ipftoken_t *);
 extern	void		ipf_token_expire(ipf_main_softc_t *);
 extern	ipftoken_t	*ipf_token_find(ipf_main_softc_t *, int, int, void *);

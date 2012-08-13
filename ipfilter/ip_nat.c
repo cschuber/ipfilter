@@ -117,18 +117,29 @@ static const char rcsid[] = "@(#)$Id$";
 #define	NATFSUM(n,v,f)	((v) == 4 ? (n)->f.in4.s_addr : (n)->f.i6[0] + \
 			 (n)->f.i6[1] + (n)->f.i6[2] + (n)->f.i6[3])
 #define	NBUMP(x)	softn->(x)++
-#define	NBUMPD(x, y)	do { \
-				softn->x.y++; \
-				DT(y); \
+#define	NBUMPD(x, y)	do {			\
+				softn->x.y++;	\
+				DT(y);		\
+			_NOTE(CONSTCOND)	\
 			} while (0)
 #define	NBUMPSIDE(y,x)	softn->ipf_nat_stats.ns_side[y].x++
-#define	NBUMPSIDED(y,x)	do { softn->ipf_nat_stats.ns_side[y].x++; \
-			     DT(x); } while (0)
+#define	NBUMPSIDED(y,x)	do {						\
+				softn->ipf_nat_stats.ns_side[y].x++;	\
+				DT(x);					\
+			_NOTE(CONSTCOND)				\
+			} while (0)
 #define	NBUMPSIDEX(y,x,z) \
-			do { softn->ipf_nat_stats.ns_side[y].x++; \
-			     DT(z); } while (0)
-#define	NBUMPSIDEDF(y,x)do { softn->ipf_nat_stats.ns_side[y].x++; \
-			     DT1(x, fr_info_t *, fin); } while (0)
+			do {						\
+				softn->ipf_nat_stats.ns_side[y].x++;	\
+				DT(z);					\
+			_NOTE(CONSTCOND)				\
+			} while (0)
+#define	NBUMPSIDEDF(y,x) \
+			do {						\
+				softn->ipf_nat_stats.ns_side[y].x++;	\
+				DT1(x, fr_info_t *, fin);		\
+			_NOTE(CONSTCOND)				\
+			} while (0)
 
 frentry_t	ipfnatblock;
 
@@ -238,7 +249,7 @@ static	int	ipf_nat_match(fr_info_t *, ipnat_t *);
 static	int	ipf_nat_matcharray(nat_t *, int *, u_long);
 static	int	ipf_nat_matchflush(ipf_main_softc_t *, ipf_nat_softc_t *,
 				   caddr_t);
-static	void	ipf_nat_mssclamp(tcphdr_t *, u_32_t, fr_info_t *, u_short *);
+static	void	ipf_nat_mssclamp(tcphdr_t *, u_32_t, u_short *);
 static	int	ipf_nat_newmap(fr_info_t *, nat_t *, natinfo_t *);
 static	int	ipf_nat_newdivert(fr_info_t *, nat_t *, natinfo_t *);
 static	int	ipf_nat_newrdr(fr_info_t *, nat_t *, natinfo_t *);
@@ -363,7 +374,7 @@ ipf_nat_soft_destroy(softc, arg)
 	ipf_nat_softc_t *softn = arg;
 
 	if (softn->ipf_nat_tune != NULL) {
-		ipf_tune_array_unlink(softc, softn->ipf_nat_tune);
+		(void) ipf_tune_array_unlink(softc, softn->ipf_nat_tune);
 		KFREES(softn->ipf_nat_tune, sizeof(ipf_nat_tuneables));
 		softn->ipf_nat_tune = NULL;
 	}
@@ -1333,7 +1344,7 @@ ipf_nat_ioctl(softc, data, cmd, mode, uid, ctx)
 		break;
 
 	case SIOCPROXY :
-		error = ipf_proxy_ioctl(softc, data, cmd, mode, ctx);
+		error = ipf_proxy_ioctl(softc, data, cmd);
 		break;
 
 	case SIOCSTLCK :
@@ -1387,7 +1398,7 @@ ipf_nat_ioctl(softc, data, cmd, mode, uid, ctx)
 		if (token != NULL) {
 			error  = ipf_nat_iterator(softc, token, &iter, &obj);
 			WRITE_ENTER(&softc->ipf_tokens);
-			ipf_token_deref(softc, token);
+			(void) ipf_token_deref(softc, token);
 			RWLOCK_EXIT(&softc->ipf_tokens);
 		}
 		SPL_X(s);
@@ -1604,8 +1615,10 @@ ipf_nat_ruleaddrinit(softc, softn, n)
 	if (error != 0)
 		return error;
 
-	if (n->in_redir & NAT_DIVERTUDP)
-		ipf_nat_builddivertmp(softn, n);
+	if (n->in_redir & NAT_DIVERTUDP) {
+		if (ipf_nat_builddivertmp(softn, n) != 0)
+			return ENOBUFS;
+	}
 
 	return 0;
 }
@@ -3298,12 +3311,9 @@ ipf_nat_finalise(fin, nat)
 	ipf_nat_softc_t *softn = softc->ipf_nat_soft;
 	u_32_t sum1, sum2, sumd;
 	frentry_t *fr;
-	u_32_t flags;
 #if SOLARIS && defined(_KERNEL) && (SOLARIS2 >= 6) && defined(ICK_M_CTL_MAGIC)
 	qpktinfo_t *qpi = fin->fin_qpi;
 #endif
-
-	flags = nat->nat_flags;
 
 	switch (nat->nat_pr[0])
 	{
@@ -3616,17 +3626,15 @@ ipf_nat_icmperrorlookup(fin, dir)
 {
 	ipf_main_softc_t *softc = fin->fin_main_soft;
 	ipf_nat_softc_t *softn = softc->ipf_nat_soft;
-	int flags = 0, type, minlen;
-	icmphdr_t *icmp, *orgicmp;
 	nat_stat_side_t *nside;
+	int flags = 0, minlen;
 	tcphdr_t *tcp = NULL;
+	icmphdr_t *orgicmp;
 	u_short data[2];
 	nat_t *nat;
 	ip_t *oip;
 	u_int p;
 
-	icmp = fin->fin_dp;
-	type = icmp->icmp_type;
 	nside = &softn->ipf_nat_stats.ns_side[fin->fin_out];
 	/*
 	 * Does it at least have the return (basic) IP header ?
@@ -4082,9 +4090,7 @@ ipf_nat_inlookup(fin, flags, p, src, mapdst)
 	ipf_main_softc_t *softc = fin->fin_main_soft;
 	ipf_nat_softc_t *softn = softc->ipf_nat_soft;
 	u_short sport, dport;
-	grehdr_t *gre;
 	ipnat_t *ipn;
-	u_int sflags;
 	nat_t *nat;
 	int nflags;
 	u_32_t dst;
@@ -4092,9 +4098,7 @@ ipf_nat_inlookup(fin, flags, p, src, mapdst)
 	u_int hv, rhv;
 
 	ifp = fin->fin_ifp;
-	gre = NULL;
 	dst = mapdst.s_addr;
-	sflags = flags & NAT_TCPUDPICMP;
 
 	switch (p)
 	{
@@ -4161,6 +4165,7 @@ ipf_nat_inlookup(fin, flags, p, src, mapdst)
 		case NAT_DIVERTOUT :
 			if (nat->nat_dlocal)
 				continue;
+			/*FALLTHROUGH*/
 		case NAT_OUTBOUND :
 			if (nat->nat_v[1] != 4)
 				continue;
@@ -4422,14 +4427,12 @@ ipf_nat_outlookup(fin, flags, p, src, dst)
 	ipf_main_softc_t *softc = fin->fin_main_soft;
 	ipf_nat_softc_t *softn = softc->ipf_nat_soft;
 	u_short sport, dport;
-	u_int sflags;
 	ipnat_t *ipn;
 	nat_t *nat;
 	void *ifp;
 	u_int hv;
 
 	ifp = fin->fin_ifp;
-	sflags = flags & IPN_TCPUDPICMP;
 	sport = 0;
 	dport = 0;
 
@@ -4857,7 +4860,6 @@ ipf_nat_checkout(fin, passp)
 	struct ifnet *ifp, *sifp;
 	ipf_main_softc_t *softc;
 	ipf_nat_softc_t *softn;
-	icmphdr_t *icmp = NULL;
 	tcphdr_t *tcp = NULL;
 	int rval, natfailed;
 	u_int nflags = 0;
@@ -4903,8 +4905,6 @@ ipf_nat_checkout(fin, passp)
 			nflags = IPN_UDP;
 			break;
 		case IPPROTO_ICMP :
-			icmp = fin->fin_dp;
-
 			/*
 			 * This is an incoming packet, so the destination is
 			 * the icmp_id and the source port equals 0
@@ -5821,7 +5821,7 @@ ipf_nat_proto(fin, nat, nflags)
 		 * only deal IPv4 for now.
 		 */
 		if ((nat->nat_mssclamp != 0) && (tcp->th_flags & TH_SYN) != 0)
-			ipf_nat_mssclamp(tcp, nat->nat_mssclamp, fin, csump);
+			ipf_nat_mssclamp(tcp, nat->nat_mssclamp, csump);
 
 		break;
 
@@ -5911,7 +5911,7 @@ ipf_nat_expire(softc)
 	}
 
 	if (softn->ipf_nat_doflush != 0) {
-		ipf_nat_extraflush(softc, softn, 2);
+		(void) ipf_nat_extraflush(softc, softn, 2);
 		softn->ipf_nat_doflush = 0;
 	}
 
@@ -6063,14 +6063,18 @@ ipf_nat_sync(softc, ifp)
 		    (n->in_ifps[idx] != NULL &&
 		     n->in_ifps[idx] != (void *)-1)) {
 
-			ipf_nat_nextaddrinit(softc, n->in_names, &n->in_osrc,
-					     0, n->in_ifps[idx]);
-			ipf_nat_nextaddrinit(softc, n->in_names, &n->in_odst,
-					     0, n->in_ifps[idx]);
-			ipf_nat_nextaddrinit(softc, n->in_names, &n->in_nsrc,
-					     0, n->in_ifps[idx]);
-			ipf_nat_nextaddrinit(softc, n->in_names, &n->in_ndst,
-					     0, n->in_ifps[idx]);
+			(void) ipf_nat_nextaddrinit(softc, n->in_names,
+						    &n->in_osrc, 0,
+						    n->in_ifps[idx]);
+			(void) ipf_nat_nextaddrinit(softc, n->in_names,
+						    &n->in_odst, 0,
+						    n->in_ifps[idx]);
+			(void) ipf_nat_nextaddrinit(softc, n->in_names,
+						    &n->in_nsrc, 0,
+						    n->in_ifps[idx]);
+			(void) ipf_nat_nextaddrinit(softc, n->in_names,
+						    &n->in_ndst, 0,
+						    n->in_ifps[idx]);
 		}
 	}
 	RWLOCK_EXIT(&softc->ipf_nat);
@@ -6489,10 +6493,9 @@ ipf_nat_wildok(nat, sport, dport, flags, dir)
 /* the MSS.                                                                 */
 /* ------------------------------------------------------------------------ */
 static void
-ipf_nat_mssclamp(tcp, maxmss, fin, csump)
+ipf_nat_mssclamp(tcp, maxmss, csump)
 	tcphdr_t *tcp;
 	u_32_t maxmss;
-	fr_info_t *fin;
 	u_short *csump;
 {
 	u_char *cp, *ep, opt;
@@ -7898,8 +7901,8 @@ ipf_nat_matcharray(nat, array, ticks)
 		case IPF_EXP_UDP_PORT :
 		case IPF_EXP_TCP_PORT :
 			for (i = 0; !e && i < x[2]; i++) {
-				e |= (nat->nat_nsport == x[i + 3]) ||
-				     (nat->nat_ndport == x[i + 3]);
+				e |= ((nat->nat_nsport == x[i + 3]) ||
+				      (nat->nat_ndport == x[i + 3]));
 			}
 			break;
 
@@ -7919,8 +7922,8 @@ ipf_nat_matcharray(nat, array, ticks)
 
 		case IPF_EXP_TCP_STATE :
 			for (i = 0; !e && i < x[2]; i++) {
-				e |= (nat->nat_tcpstate[0] == x[i + 3]) ||
-				     (nat->nat_tcpstate[1] == x[i + 3]);
+				e |= ((nat->nat_tcpstate[0] == x[i + 3]) ||
+				      (nat->nat_tcpstate[1] == x[i + 3]));
 			}
 			break;
 
@@ -8039,6 +8042,7 @@ ipf_nat_settimeout(softc, t, p)
 /* insert them into the table.  There are two tables here: an inbound one   */
 /* and an outbound one.  Each NAT entry goes into each table once.          */
 /* ------------------------------------------------------------------------ */
+/*ARGSUSED*/
 int
 ipf_nat_rehash(softc, t, p)
 	ipf_main_softc_t *softc;

@@ -112,16 +112,15 @@ typedef struct ipf_frag_softc_s  {
 #ifdef USE_MUTEXES
 static ipfr_t *ipfr_frag_new(ipf_main_softc_t *, ipf_frag_softc_t *,
 			     fr_info_t *, u_32_t, ipfr_t **, ipfrwlock_t *);
-static ipfr_t *ipf_frag_lookup(ipf_main_softc_t *, ipf_frag_softc_t *,
-			       fr_info_t *, ipfr_t **, ipfrwlock_t *);
+static ipfr_t *ipf_frag_lookup(ipf_frag_softc_t *, fr_info_t *,
+			       ipfr_t **, ipfrwlock_t *);
 static void ipf_frag_deref(void *, ipfr_t **, ipfrwlock_t *);
 static int ipf_frag_next(ipf_main_softc_t *, ipftoken_t *, ipfgeniter_t *,
 			 ipfr_t **, ipfrwlock_t *);
 #else
 static ipfr_t *ipfr_frag_new(ipf_main_softc_t *, ipf_frag_softc_t *,
 			     fr_info_t *, u_32_t, ipfr_t **);
-static ipfr_t *ipf_frag_lookup(ipf_main_softc_t *, ipf_frag_softc_t *,
-			       fr_info_t *, ipfr_t **);
+static ipfr_t *ipf_frag_lookup(ipf_frag_softc_t *, fr_info_t *, ipfr_t **);
 static void ipf_frag_deref(void *, ipfr_t **);
 static int ipf_frag_next(ipf_main_softc_t *, ipftoken_t *, ipfgeniter_t *,
 			 ipfr_t **);
@@ -147,7 +146,11 @@ ipftuneable_t ipf_tuneables[] = {
 };
 
 #define	FBUMP(x)	softf->ipfr_stats.x++
-#define	FBUMPD(x)	do { softf->ipfr_stats.x++; DT(x); } while (0)
+#define	FBUMPD(x)	do {				\
+				softf->ipfr_stats.x++;	\
+				DT(x);			\
+			_NOTE(CONSTCOND)		\
+			} while (0)
 
 
 /* ------------------------------------------------------------------------ */
@@ -227,6 +230,7 @@ ipf_frag_soft_create(softc)
 /*                                                                          */
 /* Initialise the hash tables for the fragment cache lookups.               */
 /* ------------------------------------------------------------------------ */
+/*ARGSUSED*/
 void
 ipf_frag_soft_destroy(softc, arg)
 	ipf_main_softc_t *softc;
@@ -639,8 +643,10 @@ ipf_frag_ipidnew(fin, ipid)
 /* Function:    ipf_frag_lookup                                             */
 /* Returns:     ipfr_t * - pointer to ipfr_t structure if there's a         */
 /*                         matching entry in the frag table, else NULL      */
-/* Parameters:  fin(I)   - pointer to packet information                    */
+/* Parameters:  softf(I) - pointer to fragment context information          */
+/*              fin(I)   - pointer to packet information                    */
 /*              table(I) - pointer to fragment cache table to search        */
+/*              lock(IO) - pointer to lock that owns XXX                    */
 /*                                                                          */
 /* Check the fragment cache to see if there is already a record of this     */
 /* packet with its filter result known.                                     */
@@ -649,12 +655,11 @@ ipf_frag_ipidnew(fin, ipid)
 /* If it fails, no lock is held on return.                                  */
 /* ------------------------------------------------------------------------ */
 static ipfr_t *
-ipf_frag_lookup(softc, softf, fin, table
+ipf_frag_lookup(softf, fin, table
 #ifdef USE_MUTEXES
 , lock
 #endif
 )
-	ipf_main_softc_t *softc;
 	ipf_frag_softc_t *softf;
 	fr_info_t *fin;
 	ipfr_t *table[];
@@ -829,10 +834,10 @@ ipf_frag_natknown(fin)
 	if ((softf->ipfr_lock) || !softf->ipfr_natlist)
 		return NULL;
 #ifdef USE_MUTEXES
-	ipf = ipf_frag_lookup(softc, softf, fin, softf->ipfr_nattab,
+	ipf = ipf_frag_lookup(softf, fin, softf->ipfr_nattab,
 			      &softf->ipfr_natfrag);
 #else
-	ipf = ipf_frag_lookup(softc, softf, fin, softf->ipfr_nattab);
+	ipf = ipf_frag_lookup(softf, fin, softf->ipfr_nattab);
 #endif
 	if (ipf != NULL) {
 		nat = ipf->ipfr_data;
@@ -871,10 +876,10 @@ ipf_frag_ipidknown(fin)
 		return 0xffffffff;
 
 #ifdef USE_MUTEXES
-	ipf = ipf_frag_lookup(softc, softf, fin, softf->ipfr_ipidtab,
+	ipf = ipf_frag_lookup(softf, fin, softf->ipfr_ipidtab,
 			      &softf->ipfr_ipidfrag);
 #else
-	ipf = ipf_frag_lookup(softc, softf, fin, softf->ipfr_ipidtab);
+	ipf = ipf_frag_lookup(softf, fin, softf->ipfr_ipidtab);
 #endif
 	if (ipf != NULL) {
 		id = (u_32_t)(intptr_t)ipf->ipfr_data;
@@ -911,10 +916,10 @@ ipf_frag_known(fin, passp)
 		return NULL;
 
 #ifdef USE_MUTEXES
-	fra = ipf_frag_lookup(softc, softf, fin, softf->ipfr_heads,
+	fra = ipf_frag_lookup(softf, fin, softf->ipfr_heads,
 			      &softc->ipf_frag);
 #else
-	fra = ipf_frag_lookup(softc, softf, fin, softf->ipfr_heads);
+	fra = ipf_frag_lookup(softf, fin, softf->ipfr_heads);
 #endif
 	if (fra != NULL) {
 		if (fin->fin_flx & FI_BAD) {

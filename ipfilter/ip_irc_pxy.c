@@ -223,6 +223,7 @@ ipf_p_irc_complete(ircp, buf, len)
 }
 
 
+/*ARGSUSED*/
 int
 ipf_p_irc_new(arg, fin, aps, nat)
 	void *arg;
@@ -438,6 +439,7 @@ ipf_p_irc_send(fin, nat)
 }
 
 
+/*ARGSUSED*/
 int
 ipf_p_irc_out(arg, fin, aps, nat)
 	void *arg;

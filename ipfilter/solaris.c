@@ -232,8 +232,11 @@ _fini(void)
 	cmn_err(CE_NOTE, "IP Filter: _fini() = %d", rval);
 #endif
 	if (rval == 0) {
-		ipf_unload_all();
-		ipf_stack_fini();
+		rval = ipf_unload_all();
+		if (rval == 0)
+			ipf_stack_fini();
+		else
+			(void) mod_install(&modlink1);
 	}
 	return rval;
 }
@@ -438,7 +441,7 @@ ipf_solaris_init()
 #endif
 	rval = ipf_stack_init();
 	if (rval != 0) {
-		ipf_unload_all();
+		rval = ipf_unload_all();
 		return rval;
 	}
 #ifdef	IPFDEBUG
@@ -562,7 +565,7 @@ ipfpoll(dev, events, anyyet, reventsp, phpp)
 	u_int xmin = getminor(dev);
 	int revents = 0;
 
-	if (xmin < 0 || xmin > IPL_LOGMAX)
+	if (xmin > IPL_LOGMAX)
 		return ENXIO;
 
 	softc = GET_SOFTC(getzoneid());
@@ -813,6 +816,7 @@ ipf_stack_fini()
 #else
 
 
+/*ARGSUSED*/
 int
 ipf_hk_v4_in(tok, data, arg)
 	hook_event_token_t tok;
@@ -851,6 +855,7 @@ ipf_hk_v4_in(tok, data, arg)
 }
 
 
+/*ARGSUSED*/
 int
 ipf_hk_v4_out(tok, data, arg)
 	hook_event_token_t tok;
@@ -889,6 +894,7 @@ ipf_hk_v4_out(tok, data, arg)
 }
 
 
+/*ARGSUSED*/
 int
 ipf_hk_v4_nic(tok, data, arg)
 	hook_event_token_t tok;
@@ -924,6 +930,7 @@ ipf_hk_v4_nic(tok, data, arg)
 }
 
 
+/*ARGSUSED*/
 int
 ipf_hk_v6_in(tok, data, arg)
 	hook_event_token_t tok;
@@ -961,6 +968,7 @@ ipf_hk_v6_in(tok, data, arg)
 }
 
 
+/*ARGSUSED*/
 int
 ipf_hk_v6_out(tok, data, arg)
 	hook_event_token_t tok;
@@ -998,6 +1006,7 @@ ipf_hk_v6_out(tok, data, arg)
 }
 
 
+/*ARGSUSED*/
 int
 ipf_hk_v6_nic(tok, data, arg)
 	hook_event_token_t tok;
@@ -1005,7 +1014,6 @@ ipf_hk_v6_nic(tok, data, arg)
 	void *arg;
 {
 	hook_nic_event_t *nic = (hook_nic_event_t *)data;
-	ipf_main_softc_t *softc = (ipf_main_softc_t *)arg;
 
 	switch (nic->hne_event)
 	{
@@ -1053,6 +1061,7 @@ ipf_instance_create(netid_t id)
 }
 
 
+/*ARGSUSED*/
 static void
 ipf_instance_shutdown(netid_t id, void *arg)
 {
@@ -1062,6 +1071,7 @@ ipf_instance_shutdown(netid_t id, void *arg)
 }
 
 
+/*ARGSUSED*/
 static void
 ipf_instance_destroy(netid_t id, void *arg)
 {
@@ -1095,7 +1105,7 @@ ipf_stack_init()
 static void
 ipf_stack_fini()
 {
-	net_instance_unregister(ipf_inst);
+	(void) net_instance_unregister(ipf_inst);
 	net_instance_free(ipf_inst);
 	ipf_inst = NULL;
 }
@@ -1167,7 +1177,7 @@ ipf_detach_hooks(softc)
 			cmn_err(CE_WARN, "unregister-hook(v4-nic) failed");
 		hook_free(softc->ipf_hk_v4_nic);
 
-		net_protocol_release(softc->ipf_nd_v4);
+		(void) net_protocol_release(softc->ipf_nd_v4);
 		softc->ipf_nd_v4 = NULL;
 	}
 
@@ -1187,7 +1197,7 @@ ipf_detach_hooks(softc)
 			cmn_err(CE_WARN, "unregister-hook(v6-nic) failed");
 		hook_free(softc->ipf_hk_v6_nic);
 
-		net_protocol_release(softc->ipf_nd_v6);
+		(void) net_protocol_release(softc->ipf_nd_v6);
 		softc->ipf_nd_v6 = NULL;
 	}
 }

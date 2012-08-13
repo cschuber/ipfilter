@@ -146,12 +146,16 @@ extern	int	blockreason;
 #endif /* _KERNEL */
 
 #define	LBUMP(x)	softc->x++
-#define	LBUMPD(x, y)	do { softc->x.y++; DT(y); } while (0)
+#define	LBUMPD(x, y)	do {			\
+				softc->x.y++;	\
+				DT(y);		\
+			_NOTE(CONSTCOND)	\
+			} while (0)
 
 static	INLINE int	ipf_check_ipf(fr_info_t *, frentry_t *, int);
 static	u_32_t		ipf_checkcipso(fr_info_t *, u_char *, int);
 static	u_32_t		ipf_checkripso(u_char *);
-static	u_32_t		ipf_decaps(fr_info_t *, u_32_t, int);
+static	u_32_t		ipf_decaps(fr_info_t *, u_32_t);
 #ifdef IPFILTER_LOG
 static	frentry_t	*ipf_dolog(fr_info_t *, u_32_t *);
 #endif
@@ -187,8 +191,7 @@ static	INLINE void	ipf_pr_ipv4hdr(fr_info_t *);
 static	INLINE void	ipf_pr_short(fr_info_t *, int);
 static	INLINE int	ipf_pr_tcpcommon(fr_info_t *);
 static	INLINE int	ipf_pr_udpcommon(fr_info_t *);
-static	void		ipf_rule_delete(ipf_main_softc_t *, frentry_t *f,
-					int, int);
+static	void		ipf_rule_delete(ipf_main_softc_t *, frentry_t *f);
 static	void		ipf_rule_expire_insert(ipf_main_softc_t *,
 					       frentry_t *, int);
 static	int		ipf_synclist(ipf_main_softc_t *, frentry_t *, void *);
@@ -967,7 +970,7 @@ ipf_pr_icmp6(fin)
 		u_char p = fin->fin_p;
 
 		fin->fin_p = IPPROTO_ICMPV6;
-		ipf_checkv6sum(fin);
+		(void) ipf_checkv6sum(fin);
 		fin->fin_p = p;
 	}
 }
@@ -991,7 +994,7 @@ ipf_pr_udp6(fin)
 		u_char p = fin->fin_p;
 
 		fin->fin_p = IPPROTO_UDP;
-		ipf_checkv6sum(fin);
+		(void) ipf_checkv6sum(fin);
 		fin->fin_p = p;
 	}
 }
@@ -1015,7 +1018,7 @@ ipf_pr_tcp6(fin)
 		u_char p = fin->fin_p;
 
 		fin->fin_p = IPPROTO_TCP;
-		ipf_checkv6sum(fin);
+		(void) ipf_checkv6sum(fin);
 		fin->fin_p = p;
 	}
 }
@@ -1259,6 +1262,7 @@ ipf_pr_icmp(fin)
 			if (icmp->icmp_nextmtu < softc->ipf_icmpminfragmtu)
 				fin->fin_flx |= FI_BAD;
 		}
+		/*FALLTHROUGH*/
 #endif
 	case ICMP_SOURCEQUENCH :
 	case ICMP_REDIRECT :
@@ -1293,7 +1297,7 @@ ipf_pr_icmp(fin)
 
 	ipf_pr_short(fin, minicmpsz);
 
-	ipf_checkv4sum(fin);
+	(void) ipf_checkv4sum(fin);
 }
 
 /* ------------------------------------------------------------------------ */
@@ -1454,6 +1458,7 @@ ipf_pr_tcpcommon(fin)
 			 * achieved.
 			 */
 			/*fin->fin_flx |= FI_BAD*/;
+			fin->fin_flx = fin->fin_flx;	/* LINT */
 		} else if (!(flags & (TH_RST|TH_SYN))) {
 			fin->fin_flx |= FI_BAD;
 		} else if ((flags & (TH_URG|TH_PUSH|TH_FIN)) != 0) {
@@ -1610,7 +1615,7 @@ ipf_pr_tcp(fin)
 	ipf_pr_short(fin, sizeof(tcphdr_t));
 
 	if (ipf_pr_tcpcommon(fin) == 0)
-		ipf_checkv4sum(fin);
+		(void) ipf_checkv4sum(fin);
 }
 
 
@@ -1630,7 +1635,7 @@ ipf_pr_udp(fin)
 	ipf_pr_short(fin, sizeof(udphdr_t));
 
 	if (ipf_pr_udpcommon(fin) == 0)
-		ipf_checkv4sum(fin);
+		(void) ipf_checkv4sum(fin);
 }
 
 
@@ -2067,7 +2072,7 @@ ipf_checkcipso(fin, s, ol)
 
 		} else if (tag > 127) {
 			/* Custom defined DOI */
-			;
+			fin->fin_flx = fin->fin_flx;	/* LINT */
 		} else {
 			fin->fin_flx |= FI_BAD;
 			continue;
@@ -2632,7 +2637,7 @@ ipf_scanlist(fin, pass)
 			FR_VERBOSE(("group %s\n", FR_NAME(fr, fr_grhead)));
 
 			if (FR_ISDECAPS(passt))
-				passt = ipf_decaps(fin, pass, fr->fr_icode);
+				passt = ipf_decaps(fin, pass);
 			else
 				passt = ipf_scanlist(fin, pass);
 
@@ -3123,7 +3128,7 @@ ipf_check(ctx, ip, hlen, ifp, out
 		{
 		case 4 :
 			if (ipf_nat_checkout(fin, &pass) == -1) {
-				;
+				pass = pass;		/* LINT */
 			} else if ((softc->ipf_update_ipid != 0) && (v == 4)) {
 				if (ipf_updateipid(fin) == -1) {
 					DT(frb_updateipid);
@@ -3249,7 +3254,7 @@ filterdone:
 		    (fdp->fd_ptr != (void *)-1)) {
 			mc = M_COPY(fin->fin_m);
 			if (mc != NULL)
-				ipf_fastroute(mc, &mc, fin, fdp);
+				(void) ipf_fastroute(mc, &mc, fin, fdp);
 		}
 
 		fdp = fin->fin_tif;
@@ -3263,7 +3268,7 @@ filterdone:
 		} else if ((fdp != NULL) && (fdp->fd_ptr != NULL) &&
 			   (fdp->fd_ptr != (struct ifnet *)-1)) {
 			/* this is for to rules: */
-			ipf_fastroute(fin->fin_m, mp, fin, fdp);
+			(void) ipf_fastroute(fin->fin_m, mp, fin, fdp);
 			m = *mp = NULL;
 		}
 
@@ -3624,8 +3629,7 @@ ipf_group_add(softc, group, head, flags, unit, set)
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_group_del                                               */
 /* Returns:     int      - number of rules deleted                          */
-/* Parameters:  softc(I) - pointer to soft context main structure           */
-/*              group(I) - group name to delete                             */
+/* Parameters:  group(I) - group name to delete                             */
 /*              fr(I)    - filter rule from which group is referenced       */
 /* Write Locks: ipf_mutex                                                   */
 /*                                                                          */
@@ -3635,8 +3639,7 @@ ipf_group_add(softc, group, head, flags, unit, set)
 /* purpose of knowing when the head rule is being deleted.                  */
 /* ------------------------------------------------------------------------ */
 void
-ipf_group_del(softc, group, fr)
-	ipf_main_softc_t *softc;
+ipf_group_del(group, fr)
 	frgroup_t *group;
 	frentry_t *fr;
 {
@@ -3813,12 +3816,12 @@ ipf_flush(softc, unit, flags)
 		set = 1 - set;
 
 	if (flags & FR_OUTQUE) {
-		ipf_flushlist(softc, &flushed, &softc->ipf_rules[1][set]);
-		ipf_flushlist(softc, &flushed, &softc->ipf_acct[1][set]);
+		(void) ipf_flushlist(softc, &flushed,&softc->ipf_rules[1][set]);
+		(void) ipf_flushlist(softc, &flushed, &softc->ipf_acct[1][set]);
 	}
 	if (flags & FR_INQUE) {
-		ipf_flushlist(softc, &flushed, &softc->ipf_rules[0][set]);
-		ipf_flushlist(softc, &flushed, &softc->ipf_acct[0][set]);
+		(void) ipf_flushlist(softc, &flushed,&softc->ipf_rules[0][set]);
+		(void) ipf_flushlist(softc, &flushed, &softc->ipf_acct[0][set]);
 	}
 
 	flushed += ipf_flush_groups(softc, &softc->ipf_groups[unit][set],
@@ -4043,15 +4046,15 @@ ipf_synclist(softc, fr, ifp)
 			    fr->fr_satype != FRI_LOOKUP) {
 				ifa = ipf_resolvenic(softc, fr->fr_names +
 						     fr->fr_sifpidx, v);
-				ipf_ifpaddr(softc, v, fr->fr_satype, ifa,
-					    &fr->fr_src6, &fr->fr_smsk6);
+				(void) ipf_ifpaddr(softc, v, fr->fr_satype, ifa,
+						   &fr->fr_src6, &fr->fr_smsk6);
 			}
 			if (fr->fr_datype != FRI_NORMAL &&
 			    fr->fr_datype != FRI_LOOKUP) {
 				ifa = ipf_resolvenic(softc, fr->fr_names +
 						     fr->fr_sifpidx, v);
-				ipf_ifpaddr(softc, v, fr->fr_datype, ifa,
-					    &fr->fr_dst6, &fr->fr_dmsk6);
+				(void) ipf_ifpaddr(softc, v, fr->fr_datype, ifa,
+						   &fr->fr_dst6, &fr->fr_dmsk6);
 			}
 		}
 
@@ -4120,7 +4123,7 @@ unwind:
 /* filter rules, NAT entries and the state table and check if anything      */
 /* needs to be changed/updated.                                             */
 /* ------------------------------------------------------------------------ */
-int
+void
 ipf_sync(softc, ifp)
 	ipf_main_softc_t *softc;
 	void *ifp;
@@ -4148,8 +4151,6 @@ ipf_sync(softc, ifp)
 			(void) ipf_synclist(softc, g->fg_start, ifp);
 	}
 	RWLOCK_EXIT(&softc->ipf_mutex);
-
-	return 0;
 }
 
 
@@ -4453,13 +4454,12 @@ frrequest(softc, unit, req, data, set, makecopy)
 {
 	int error = 0, in, family, addrem, need_free = 0;
 	frentry_t frd, *fp, *f, **fprev, **ftail;
-	void *ptr, *uptr, *cptr;
+	void *ptr, *uptr;
 	u_int *p, *pp;
 	frgroup_t *fg;
 	char *group;
 
 	ptr = NULL;
-	cptr = NULL;
 	fg = NULL;
 	fp = &frd;
 	if (makecopy != 0) {
@@ -4569,7 +4569,6 @@ frrequest(softc, unit, req, data, set, makecopy)
 	}
 
 	ptr = NULL;
-	cptr = NULL;
 
 	if (FR_ISACCOUNT(fp->fr_flags))
 		unit = IPL_LOGCOUNT;
@@ -5054,7 +5053,7 @@ frrequest(softc, unit, req, data, set, makecopy)
 				goto done;
 			}
 
-			ipf_rule_delete(softc, f, unit, set);
+			ipf_rule_delete(softc, f);
 
 			need_free = makecopy;
 		}
@@ -5115,7 +5114,7 @@ donenolock:
 		}
 		if (fp->fr_grp != NULL) {
 			WRITE_ENTER(&softc->ipf_mutex);
-			ipf_group_del(softc, fp->fr_grp, fp);
+			ipf_group_del(fp->fr_grp, fp);
 			RWLOCK_EXIT(&softc->ipf_mutex);
 		}
 		if ((ptr != NULL) && (makecopy != 0)) {
@@ -5133,8 +5132,6 @@ donenolock:
 /* Parameters: softc(I) - pointer to soft context main structure            */
 /*             f(I)     - pointer to the rule being deleted                 */
 /*             ftail(I) - pointer to the pointer to f                       */
-/*             unit(I)  - device for which this is for                      */
-/*             set(I)   - 1 or 0 (filter set)                               */
 /*                                                                          */
 /* This function attempts to do what it can to delete a filter rule: remove */
 /* it from any linked lists and remove any groups it is responsible for.    */
@@ -5142,10 +5139,9 @@ donenolock:
 /* must use that as the guide for whether or not it can be freed.           */
 /* ------------------------------------------------------------------------ */
 static void
-ipf_rule_delete(softc, f, unit, set)
+ipf_rule_delete(softc, f)
 	ipf_main_softc_t *softc;
 	frentry_t *f;
-	int unit, set;
 {
 
 	/*
@@ -5501,13 +5497,13 @@ ipf_derefrule(softc, frp)
 			ipf_lookup_deref(softc, fr->fr_dsttype, fr->fr_dstptr);
 
 		if (fr->fr_grp != NULL)
-			ipf_group_del(softc, fr->fr_grp, fr);
+			ipf_group_del(fr->fr_grp, fr);
 
 		if (fr->fr_grphead != NULL)
-			ipf_group_del(softc, fr->fr_grphead, fr);
+			ipf_group_del(fr->fr_grphead, fr);
 
 		if (fr->fr_icmpgrp != NULL)
-			ipf_group_del(softc, fr->fr_icmpgrp, fr);
+			ipf_group_del(fr->fr_icmpgrp, fr);
 
 		if ((fr->fr_flags & FR_COPIED) != 0) {
 			if (fr->fr_dsize) {
@@ -6192,8 +6188,7 @@ ipf_ioctlswitch(softc, unit, data, cmd, mode, uid, ctx)
 		break;
 	case IPL_LOGSYNC :
 		if (softc->ipf_running > 0) {
-			error = ipf_sync_ioctl(softc, data, cmd, mode,
-					       uid, ctx);
+			error = ipf_sync_ioctl(softc, data, cmd);
 		} else {
 			error = EIO;
 			IPFERROR(45);
@@ -6213,8 +6208,7 @@ ipf_ioctlswitch(softc, unit, data, cmd, mode, uid, ctx)
 		break;
 	case IPL_LOGLOOKUP :
 		if (softc->ipf_running > 0) {
-			error = ipf_lookup_ioctl(softc, data, cmd, mode,
-						 uid, ctx);
+			error = ipf_lookup_ioctl(softc, data, cmd, uid, ctx);
 		} else {
 			error = EIO;
 			IPFERROR(47);
@@ -7509,7 +7503,7 @@ ipf_token_expire(softc)
 		if (it->ipt_die > softc->ipf_ticks)
 			break;
 
-		ipf_token_deref(softc, it);
+		(void) ipf_token_deref(softc, it);
 	}
 	RWLOCK_EXIT(&softc->ipf_tokens);
 }
@@ -7573,7 +7567,7 @@ ipf_token_del(softc, type, uid, ptr)
 		if (ptr == it->ipt_ctx && type == it->ipt_type &&
 		    uid == it->ipt_uid) {
 			it->ipt_complete = 2;
-			ipf_token_deref(softc, it);
+			(void) ipf_token_deref(softc, it);
 			error = 0;
 			break;
 		}
@@ -7990,7 +7984,7 @@ ipf_frruleiter(softc, data, uid, ctx)
 	if (token != NULL) {
 		error = ipf_getnextrule(softc, token, data);
 		WRITE_ENTER(&softc->ipf_tokens);
-		ipf_token_deref(softc, token);
+		(void) ipf_token_deref(softc, token);
 		RWLOCK_EXIT(&softc->ipf_tokens);
 	} else {
 		error = ipf_inobj(softc, data, &obj, &it, IPFOBJ_IPFITER);
@@ -8085,7 +8079,7 @@ ipf_group_iter(softc, token, itp)
 
 	if ((grp != NULL) && (next != &zero)) {
 		WRITE_ENTER(&softc->ipf_mutex);
-		ipf_group_del(softc, grp, NULL);
+		ipf_group_del(grp, NULL);
 		RWLOCK_EXIT(&softc->ipf_mutex);
 	}
 	return error;
@@ -8156,7 +8150,7 @@ ipf_genericiter(softc, data, uid, ctx)
 	if (token != NULL) {
 		error = ipf_geniter(softc, token, &iter);
 		WRITE_ENTER(&softc->ipf_tokens);
-		ipf_token_deref(softc, token);
+		(void) ipf_token_deref(softc, token);
 		RWLOCK_EXIT(&softc->ipf_tokens);
 	} else {
 		IPFERROR(93);
@@ -8475,7 +8469,6 @@ ipf_ipf_ioctl(softc, data, cmd, mode, uid, ctx)
 /*                           flags indicating packet filtering decision.    */
 /* Parameters:  fin(I)     - pointer to packet information                  */
 /*              pass(I)    - IP protocol version to match                   */
-/*              l5proto(I) - layer 5 protocol to decode UDP data as.        */
 /*                                                                          */
 /* This function is called for packets that are wrapt up in other packets,  */
 /* for example, an IP packet that is the entire data segment for another IP */
@@ -8484,10 +8477,9 @@ ipf_ipf_ioctl(softc, data, cmd, mode, uid, ctx)
 /* rules belonging to the head group this rule specifies.                   */
 /* ------------------------------------------------------------------------ */
 u_32_t
-ipf_decaps(fin, pass, l5proto)
+ipf_decaps(fin, pass)
 	fr_info_t *fin;
 	u_32_t pass;
-	int l5proto;
 {
 	fr_info_t fin2, *fino = NULL;
 	int elen, hlen, nh;
@@ -8638,7 +8630,7 @@ cantdecaps:
 		pass &= ~FR_CMDMASK;
 		pass |= FR_BLOCK|FR_QUICK;
 		fin->fin_reason = FRB_DECAPFRIP;
-		return -1;
+		return pass;
 	}
 
 	pass = ipf_scanlist(fin, pass);
@@ -8873,8 +8865,8 @@ ipf_fr_matcharray(fin, array)
 			for (i = 0; !rv && i < e->ipfe_narg; i++) {
 				rv |= ((fin->fin_saddr &
 					e->ipfe_arg0[i * 2 + 1]) ==
-				       e->ipfe_arg0[i * 2]) ||
-				      ((fin->fin_daddr &
+				       e->ipfe_arg0[i * 2]);
+				rv |= ((fin->fin_daddr &
 					e->ipfe_arg0[i * 2 + 1]) ==
 				       e->ipfe_arg0[i * 2]);
 			}
@@ -8907,8 +8899,8 @@ ipf_fr_matcharray(fin, array)
 			for (i = 0; !rv && i < e->ipfe_narg; i++) {
 				rv |= IP6_MASKEQ(&fin->fin_src6,
 						 &e->ipfe_arg0[i * 8 + 4],
-						 &e->ipfe_arg0[i * 8]) ||
-				      IP6_MASKEQ(&fin->fin_dst6,
+						 &e->ipfe_arg0[i * 8]);
+				rv |= IP6_MASKEQ(&fin->fin_dst6,
 						 &e->ipfe_arg0[i * 8 + 4],
 						 &e->ipfe_arg0[i * 8]);
 			}
@@ -8918,8 +8910,8 @@ ipf_fr_matcharray(fin, array)
 		case IPF_EXP_UDP_PORT :
 		case IPF_EXP_TCP_PORT :
 			for (i = 0; !rv && i < e->ipfe_narg; i++) {
-				rv |= (fin->fin_sport == e->ipfe_arg0[i]) ||
-				      (fin->fin_dport == e->ipfe_arg0[i]);
+				rv |= ((fin->fin_sport == e->ipfe_arg0[i]) ||
+				       (fin->fin_dport == e->ipfe_arg0[i]));
 			}
 			break;
 
@@ -9811,7 +9803,7 @@ ipf_rule_expire(softc)
 		 */
 		if (fr->fr_die > softc->ipf_ticks)
 			break;
-		ipf_rule_delete(softc, fr, IPL_LOGIPF, 0);
+		ipf_rule_delete(softc, fr);
 	}
 
 	while ((fr = softc->ipf_rule_explist[1]) != NULL) {
@@ -9821,7 +9813,7 @@ ipf_rule_expire(softc)
 		 */
 		if (fr->fr_die > softc->ipf_ticks)
 			break;
-		ipf_rule_delete(softc, fr, IPL_LOGIPF, 1);
+		ipf_rule_delete(softc, fr);
 	}
 
 	RWLOCK_EXIT(&softc->ipf_mutex);
@@ -10080,6 +10072,7 @@ ipf_rb_ht_init(head)
 /*                                                                          */
 /* Free an actual host_node_t structure.                                    */
 /* ------------------------------------------------------------------------ */
+/*ARGSUSED*/
 void
 ipf_rb_ht_freenode(node, arg)
 	host_node_t *node;

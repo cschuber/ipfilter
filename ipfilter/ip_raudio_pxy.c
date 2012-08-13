@@ -47,6 +47,7 @@ ipf_p_raudio_main_unload()
 /*
  * Setup for a new proxy to handle Real Audio.
  */
+/*ARGSUSED*/
 int
 ipf_p_raudio_new(arg, fin, aps, nat)
 	void *arg;
@@ -73,7 +74,7 @@ ipf_p_raudio_new(arg, fin, aps, nat)
 }
 
 
-
+/*ARGSUSED*/
 int
 ipf_p_raudio_out(arg, fin, aps, nat)
 	void *arg;
@@ -182,6 +183,7 @@ ipf_p_raudio_out(arg, fin, aps, nat)
 }
 
 
+/*ARGSUSED*/
 int
 ipf_p_raudio_in(arg, fin, aps, nat)
 	void *arg;

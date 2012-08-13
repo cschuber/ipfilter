@@ -146,7 +146,9 @@ int
 ipfattach(softc)
 	ipf_main_softc_t *softc;
 {
+#if SOLARIS2 <= 8
 	int i;
+#endif
 
 #ifdef	IPFDEBUG
 	cmn_err(CE_CONT, "ipfattach()\n");
@@ -242,13 +244,12 @@ ipfioctl(dev, cmd, data, mode, cp, rp)
 	cmn_err(CE_CONT, "ipfioctl(%x,%x,%x,%d,%x,%d)\n",
 		dev, cmd, data, mode, cp, rp);
 #endif
+	softc = GET_SOFTC(crgetzoneid(cp));
 	unit = getminor(dev);
 	if (IPL_LOGMAX < unit) {
 		IPFERROR(130002);
 		return ENXIO;
 	}
-
-	softc = GET_SOFTC(crgetzoneid(cp));
 
 	if (softc->ipf_running <= 0) {
 		if (unit != IPL_LOGIPF && cmd != SIOCIPFINTERROR) {
@@ -720,7 +721,6 @@ ipf_ifpaddr(softc, v, atype, qifptr, inp, inpmask)
 	struct sockaddr_in6 sin6[2];
 	struct sockaddr_in sin[2];
 	net_ifaddr_t types[2];
-	void *array;
 	int error;
 
 	if ((qifptr == NULL) || (qifptr == (void *)-1))
@@ -743,7 +743,6 @@ ipf_ifpaddr(softc, v, atype, qifptr, inp, inpmask)
 	if (v == 4) {
 		int logical = 0;
 
-		array = sin;
 		do {
 			error = net_getlifaddr(softc->ipf_nd_v4,
 					       (phy_if_t)qifptr, logical,
@@ -754,9 +753,10 @@ ipf_ifpaddr(softc, v, atype, qifptr, inp, inpmask)
 		if (sin[0].sin_addr.s_addr == 0 && error != 0)
 			return error;
 	} else {
-		array = sin6;
-		net_getlifaddr(softc->ipf_nd_v6, (phy_if_t)qifptr, 0,
-			       2, types, sin6);
+		error = net_getlifaddr(softc->ipf_nd_v6, (phy_if_t)qifptr, 0,
+				       2, types, sin6);
+		if (error != 0)
+			return error;
 	}
 
 	if (v == 6)
@@ -820,8 +820,6 @@ u_short
 ipf_nextipid(fr_info_t *fin)
 {
 	ipf_main_softc_t *softc = fin->fin_main_soft;
-	ipstate_t *is;
-	nat_t *nat;
 	u_short id;
 
 	MUTEX_ENTER(&softc->ipf_rw);
@@ -1134,6 +1132,7 @@ ipf_fastroute(mb, mpp, fin, fdp)
 				dst6 = fdp->fd_ip6.in6;
 			else
 				dst6 = fin->fin_dst6.in6;
+			dstp = &dst6;
 		}
 #endif
 	}
@@ -1237,7 +1236,7 @@ void *
 ipf_pullup(mb_t *xmin, fr_info_t *fin, int len)
 {
 	qpktinfo_t *qpi = fin->fin_qpi;
-	int out = fin->fin_out, dpoff;
+	int dpoff;
 	char *ip;
 	mb_t *m;
 
@@ -1329,7 +1328,10 @@ ipf_inject(fr_info_t *fin, mb_t *m)
 		return ENOMEM;
 	}
 
-	qp->qp_mb = *fin->fin_mp;
+	if (m == fin->fin_m)
+		qp->qp_mb = *fin->fin_mp;
+	else
+		qp->qp_mb = m;
 	if (fin->fin_v == 4)
 		qp->qp_sap = 0x800;
 	else if (fin->fin_v == 6)
@@ -1343,7 +1345,10 @@ ipf_inject(fr_info_t *fin, mb_t *m)
 	struct sockaddr_in *sin;
 	net_inject_t inject;
 	inject.ni_physical = (phy_if_t)fin->fin_ifp;
-	inject.ni_packet = *fin->fin_mp;
+	if (m == fin->fin_m)
+		inject.ni_packet = *fin->fin_mp;
+	else
+		inject.ni_packet = m;
 	if (fin->fin_v == 4) {
 		sin = (struct sockaddr_in *)&inject.ni_addr;
 		sin->sin_family = AF_INET;
@@ -1356,7 +1361,7 @@ ipf_inject(fr_info_t *fin, mb_t *m)
 
 	sin6 = (struct sockaddr_in6 *)&inject.ni_addr;
 	sin6->sin6_family = AF_INET6;
-	memcpy(&sin6->sin6_addr, &fin->fin_dst6, sizeof(fin->fin_dst6));
+	(void) memcpy(&sin6->sin6_addr, &fin->fin_dst6, sizeof(fin->fin_dst6));
 	if (fin->fin_out == 0)
 		return net_inject(softc->ipf_nd_v6, NI_QUEUE_IN, &inject);
 	return net_inject(softc->ipf_nd_v6, NI_QUEUE_OUT, &inject);
@@ -1364,6 +1369,7 @@ ipf_inject(fr_info_t *fin, mb_t *m)
 }
 
 
+/*ARGSUSED*/
 static int
 ipf_sendpkt(softc, v, ifp, mb, ip, dstp)
 	ipf_main_softc_t *softc;
@@ -1386,13 +1392,13 @@ ipf_sendpkt(softc, v, ifp, mb, ip, dstp)
 	if (v == 4) {
 		sin = (struct sockaddr_in *)&inject.ni_addr;
 		sin->sin_family = AF_INET;
-		memcpy(&sin->sin_addr, dstp, sizeof(sin->sin_addr));
+		(void) memcpy(&sin->sin_addr, dstp, sizeof(sin->sin_addr));
 		return net_inject(softc->ipf_nd_v4, NI_DIRECT_OUT, &inject);
 	}
 
 	sin6 = (struct sockaddr_in6 *)&inject.ni_addr;
 	sin6->sin6_family = AF_INET6;
-	memcpy(&sin6->sin6_addr, dstp, sizeof(sin6->sin6_addr));
+	(void) memcpy(&sin6->sin6_addr, dstp, sizeof(sin6->sin6_addr));
 	return net_inject(softc->ipf_nd_v6, NI_DIRECT_OUT, &inject);
 #endif
 }
@@ -1451,7 +1457,7 @@ allocmbt(size_t len)
 void
 ipf_prependmbt(fr_info_t *fin, mblk_t *m)
 {
-	mblk_t *o = NULL, *top;
+	mblk_t *o = NULL;
 	mblk_t *n = *fin->fin_mp;
 	qpktinfo_t *qpi;
 	int x;
@@ -1495,6 +1501,7 @@ ipf_prependmbt(fr_info_t *fin, mblk_t *m)
 }
 
 
+/*ARGSUSED*/
 static void *
 ipf_routeto(fin, v, dstip)
 	fr_info_t *fin;
@@ -1507,7 +1514,6 @@ ipf_routeto(fin, v, dstip)
 	struct sockaddr_in sin;
 	struct sockaddr *sock;
 	net_handle_t proto;
-	int result;
 
 	switch (fin->fin_v)
 	{

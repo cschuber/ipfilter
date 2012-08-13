@@ -441,7 +441,7 @@ extern	int	ipf_proxy_del(aproxy_t *);
 extern	void	ipf_proxy_deref(aproxy_t *);
 extern	void	ipf_proxy_flush(void *, int);
 extern	int	ipf_proxy_init(void);
-extern	int	ipf_proxy_ioctl(ipf_main_softc_t *, caddr_t, ioctlcmd_t, int, void *);
+extern	int	ipf_proxy_ioctl(ipf_main_softc_t *, caddr_t, ioctlcmd_t);
 extern	aproxy_t	*ipf_proxy_lookup(void *, u_int, char *);
 extern	int	ipf_proxy_match(fr_info_t *, struct nat *);
 extern	int	ipf_proxy_new(fr_info_t *, struct nat *);

@@ -173,6 +173,7 @@ ipf_dstlist_soft_create(softc)
 /* For destination lists, the only thing we have to do when destroying the  */
 /* soft context is free it!                                                 */
 /* ------------------------------------------------------------------------ */
+/*ARGSUSED*/
 static void
 ipf_dstlist_soft_destroy(softc, arg)
 	ipf_main_softc_t *softc;
@@ -192,6 +193,7 @@ ipf_dstlist_soft_destroy(softc, arg)
 /*                                                                          */
 /* There is currently no soft context for destination list management.      */
 /* ------------------------------------------------------------------------ */
+/*ARGSUSED*/
 static int
 ipf_dstlist_soft_init(softc, arg)
 	ipf_main_softc_t *softc;
@@ -209,6 +211,7 @@ ipf_dstlist_soft_init(softc, arg)
 /*                                                                          */
 /* There is currently no soft context for destination list management.      */
 /* ------------------------------------------------------------------------ */
+/*ARGSUSED*/
 static void
 ipf_dstlist_soft_fini(softc, arg)
 	ipf_main_softc_t *softc;
@@ -328,11 +331,11 @@ ipf_dstlist_iter_deref(softc, arg, otype, unit, data)
 	switch (otype)
 	{
 	case IPFLOOKUPITER_LIST :
-		ipf_dstlist_table_deref(softc, arg, (ippool_dst_t *)data);
+		(void) ipf_dstlist_table_deref(softc, arg,(ippool_dst_t *)data);
 		break;
 
 	case IPFLOOKUPITER_NODE :
-		ipf_dstlist_node_deref(arg, (ipf_dstnode_t *)data);
+		(void) ipf_dstlist_node_deref(arg, (ipf_dstnode_t *)data);
 		break;
 	}
 
@@ -433,7 +436,7 @@ ipf_dstlist_iter_next(softc, arg, token, iter)
 	{
 	case IPFLOOKUPITER_LIST :
 		if (dsttab != NULL)
-			ipf_dstlist_table_deref(softc, arg, dsttab);
+			(void) ipf_dstlist_table_deref(softc, arg, dsttab);
 		err = COPYOUT(next, iter->ili_data, sizeof(*next));
 		if (err != 0) {
 			IPFERROR(120005);
@@ -443,7 +446,7 @@ ipf_dstlist_iter_next(softc, arg, token, iter)
 
 	case IPFLOOKUPITER_NODE :
 		if (node != NULL)
-			ipf_dstlist_node_deref(arg, node);
+			(void) ipf_dstlist_node_deref(arg, node);
 		err = COPYOUT(nextnode, iter->ili_data, sizeof(*nextnode));
 		if (err != 0) {
 			IPFERROR(120006);
@@ -601,7 +604,7 @@ ipf_dstlist_node_add(softc, arg, op, uid)
 
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_dstlist_node_deref                                      */
-/* Returns:     int - 0 = success, else error                               */
+/* Returns:     int - 0 = success, else current reference count             */
 /* Parameters:  arg(I)  - pointer to local context to use                   */
 /*              node(I) - pointer to destionation node to free              */
 /*                                                                          */
@@ -623,7 +626,7 @@ ipf_dstlist_node_deref(arg, node)
 	MUTEX_EXIT(&node->ipfd_lock);
 
 	if (ref > 0)
-		return 0;
+		return ref;
 
 	if ((node->ipfd_flags & IPDST_DELETE) != 0)
 		softd->stats.ipls_numderefnodes--;
@@ -754,7 +757,7 @@ ipf_dstlist_node_free(softd, d, node)
 		node->ipfd_flags |= IPDST_DELETE;
 	}
 
-	ipf_dstlist_node_deref(softd, node);
+	(void) ipf_dstlist_node_deref(softd, node);
 }
 
 
@@ -857,7 +860,7 @@ ipf_dstlist_table_add(softc, arg, op)
 
 	MUTEX_INIT(&new->ipld_lock, "ipf dst table lock");
 
-	strncpy(new->ipld_name, op->iplo_name, FR_GROUPLEN);
+	(void) strncpy(new->ipld_name, op->iplo_name, FR_GROUPLEN);
 	unit = op->iplo_unit;
 	new->ipld_unit = unit;
 	new->ipld_policy = user.ipld_policy;
@@ -944,7 +947,7 @@ ipf_dstlist_table_remove(softc, softd, d)
 	softd->stats.ipls_numdereflists++;
 	d->ipld_flags |= IPDST_DELETE;
 
-	ipf_dstlist_table_deref(softc, softd, d);
+	(void) ipf_dstlist_table_deref(softc, softd, d);
 }
 
 
@@ -989,6 +992,7 @@ ipf_dstlist_table_free(softd, d)
 /* Drops the reference count on a destination list table object and free's  */
 /* it if 0 has been reached.                                                */
 /* ------------------------------------------------------------------------ */
+/*ARGSUSED*/
 static int
 ipf_dstlist_table_deref(softc, arg, table)
 	ipf_main_softc_t *softc;
@@ -1296,6 +1300,7 @@ ipf_dstlist_select_node(fin, group, addr, pfdp)
 /*                                                                          */
 /* There are currently no objects to expire in destination lists.           */
 /* ------------------------------------------------------------------------ */
+/*ARGSUSED*/
 static void
 ipf_dstlist_expire(softc, arg)
 	ipf_main_softc_t *softc;

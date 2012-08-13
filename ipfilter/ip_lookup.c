@@ -246,17 +246,15 @@ ipf_lookup_soft_destroy(softc, arg)
 /* command.                                                                 */
 /* ------------------------------------------------------------------------ */
 int
-ipf_lookup_ioctl(softc, data, cmd, mode, uid, ctx)
+ipf_lookup_ioctl(softc, data, cmd, uid, ctx)
 	ipf_main_softc_t *softc;
 	caddr_t data;
 	ioctlcmd_t cmd;
-	int mode, uid;
+	int uid;
 	void *ctx;
 {
 	int err;
 	SPL_INT(s);
-
-	mode = mode;	/* LINT */
 
 	SPL_NET(s);
 
@@ -741,7 +739,7 @@ ipf_lookup_iterate(softc, data, uid, ctx)
 	}
 
 	WRITE_ENTER(&softc->ipf_tokens);
-	ipf_token_deref(softc, token);
+	(void) ipf_token_deref(softc, token);
 	RWLOCK_EXIT(&softc->ipf_tokens);
 
 	return err;

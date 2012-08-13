@@ -66,6 +66,7 @@ ipf_p_netbios_main_unload()
 }
 
 
+/*ARGSUSED*/
 int
 ipf_p_netbios_out(arg, fin, aps, nat)
 	void *arg;

@@ -108,7 +108,7 @@ extern	int ipf_sync_canwrite(void *);
 extern	void ipf_sync_del_nat(void *, synclist_t *);
 extern	void ipf_sync_del_state(void *, synclist_t *);
 extern	int ipf_sync_init(void);
-extern	int ipf_sync_ioctl(ipf_main_softc_t *, caddr_t, ioctlcmd_t, int, int, void *);
+extern	int ipf_sync_ioctl(ipf_main_softc_t *, caddr_t, ioctlcmd_t);
 extern	synclist_t *ipf_sync_new(ipf_main_softc_t *, int, fr_info_t *, void *);
 extern	int ipf_sync_read(ipf_main_softc_t *, struct uio *uio);
 extern	int ipf_sync_write(ipf_main_softc_t *, struct uio *uio);
