@@ -140,6 +140,18 @@ ntests: \
 #
 # Basic IPv6 NAT tests
 #
+intests6: \
+	$(RESDIR)/in1_6 \
+	$(RESDIR)/in2_6 \
+	$(RESDIR)/in3_6 \
+	$(RESDIR)/in4_6 \
+	$(RESDIR)/in5_6 \
+	$(RESDIR)/in6_6 \
+	$(RESDIR)/in8_6 \
+	$(RESDIR)/in100_6 \
+	$(RESDIR)/in101_6 \
+	$(RESDIR)/in102_6
+
 ntests6: \
 	$(RESDIR)/n1_6 \
 	$(RESDIR)/n2_6 \
@@ -223,6 +235,7 @@ ipv6: \
 	$(RESDIR)/ipv6_4 \
 	$(RESDIR)/ipv6_5 \
 	$(RESDIR)/ipv6_6 \
+	intests6 \
 	ntests6
 
 bpf: \
@@ -596,6 +609,36 @@ $(RESDIR)/in102: expected/in102 regress/in102
 
 $(RESDIR)/l1:
 	@/bin/sh ./logtest $@ $(TESTMODE)
+
+$(RESDIR)/in1_6: expected/in1_6 regress/in1_6
+	@/bin/sh ./in_test $@ $(TESTMODE)
+
+$(RESDIR)/in2_6: expected/in2_6 regress/in2_6
+	@/bin/sh ./in_test $@ $(TESTMODE)
+
+$(RESDIR)/in3_6: expected/in3_6 regress/in3_6
+	@/bin/sh ./in_test $@ $(TESTMODE)
+
+$(RESDIR)/in4_6: expected/in4_6 regress/in4_6
+	@/bin/sh ./in_test $@ $(TESTMODE)
+
+$(RESDIR)/in5_6: expected/in5_6 regress/in5_6
+	@/bin/sh ./in_test $@ $(TESTMODE)
+
+$(RESDIR)/in6_6: expected/in6_6 regress/in6_6
+	@/bin/sh ./in_test $@ $(TESTMODE)
+
+$(RESDIR)/in8_6: expected/in8_6 regress/in8_6
+	@/bin/sh ./in_test $@ $(TESTMODE)
+
+$(RESDIR)/in100_6: expected/in100_6 regress/in100_6
+	@/bin/sh ./in_test $@ $(TESTMODE)
+
+$(RESDIR)/in101_6: expected/in101_6 regress/in101_6
+	@/bin/sh ./in_test $@ $(TESTMODE)
+
+$(RESDIR)/in102_6: expected/in102_6 regress/in102_6
+	@/bin/sh ./in_test $@ $(TESTMODE)
 
 $(RESDIR)/ipv6_1: expected/ipv6_1 input/$(RESDIR)/ipv6_1 regress/$(RESDIR)/ipv6_1
 	@/bin/sh ./ipv6_test $@ $(TESTMODE)

@@ -91,7 +91,7 @@ ni1 hex hex update_ipid=1
 ni2 hex hex update_ipid=1
 ni3 hex hex update_ipid=1
 ni4 hex hex update_ipid=1
-ni5 hex hex update_ipid=1
+ni5 hex hex update_ipid=1,ftp_debug=8
 ni6 hex text update_ipid=1 -D
 ni7 hex hex update_ipid=1
 ni8 hex hex update_ipid=1
@@ -147,3 +147,13 @@ n18 text text -D
 f28 text text
 f29 text text
 f30 text text
+in1_6 text text -6
+in2_6 text text -6
+in3_6 text text -6
+in4_6 text text -6
+in5_6 text text -6
+in6_6 text text -6
+in8_6 text text -6
+in100_6 text text -6
+in101_6 text text -6
+in102_6 text text -6
