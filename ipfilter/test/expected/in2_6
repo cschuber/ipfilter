@@ -66,6 +66,6 @@ rdr ge0 inet6 9:8:7::6/128 port 21 -> 1:1:1::1/128 port 21 tcp proxy ftp
 rdr ge0 inet6 9:8:7::6/128 port 21 -> 1:1:1::1/128 port 21 tcp proxy ftp
 rdr le0 inet6 9:8:7::6/128 port 1000-2000 -> 1:1:1::1/128 port 5555 tcp
 rdr le0 inet6 9:8:7::6/128 port 1000-2000 -> 1:1:1::1/128 port = 5555 tcp
-rdr le0 inet6 any -> fedc:ba98:7200:0:a072:1c28:700:0/32 ip
-rdr le0 inet6 any -> fedc:ba98:7200:0:a072:1c28:700:0,fedc:ba98:7200:0:a072:1c28:700:0 ip
+rdr le0 inet6 any -> fe80:aa55:1234:5678:5a5a:a5a5:fedc:ba98/128 ip
+rdr le0 inet6 any -> fe80:aa55:1234:5678:5a5a:a5a5:fedc:ba98,fe80:aa55:1234:5678:5a5a:a5a5:fedc:ba98 ip
 rdr adsl0,ppp0 inet6 9:8:7::6/128 port 1000-2000 -> 1:1:1::1/128 port 5555-7777 tcp
