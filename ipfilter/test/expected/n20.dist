@@ -1,0 +1,30 @@
+4500 0054 0446 0000 4001 f35c 0102 0304 7f00 0001 0800 e824 03e8 0000 5037 420a 000e 8ea0 0809 0a0b 0c0d 0e0f 1011 1213 1415 1617 1819 1a1b 1c1d 1e1f 2021 2223 2425 2627 2829 2a2b 2c2d 2e2f 3031 3233 3435 3637 
+
+4500 0054 0447 0000 4001 7860 7f00 0001 7f00 0001 0000 b0eb 4321 0000 5037 420a 000e 8ea0 0809 0a0b 0c0d 0e0f 1011 1213 1415 1617 1819 1a1b 1c1d 1e1f 2021 2223 2425 2627 2829 2a2b 2c2d 2e2f 3031 3233 3435 3637 
+
+4500 0054 0448 0000 4001 f35a 0102 0304 7f00 0001 0800 e823 03e8 0001 5037 420a 000e 8ea0 0809 0a0b 0c0d 0e0f 1011 1213 1415 1617 1819 1a1b 1c1d 1e1f 2021 2223 2425 2627 2829 2a2b 2c2d 2e2f 3031 3233 3435 3637 
+
+4500 0054 0449 0000 4001 785e 7f00 0001 7f00 0001 0000 b0ea 4321 0001 5037 420a 000e 8ea0 0809 0a0b 0c0d 0e0f 1011 1213 1415 1617 1819 1a1b 1c1d 1e1f 2021 2223 2425 2627 2829 2a2b 2c2d 2e2f 3031 3233 3435 3637 
+
+List of active MAP/Redirect filters:
+map NIC0 0/0 -> 1.2.3.4/32 icmpidmap icmp 1000:2000
+
+List of active sessions:
+MAP 127.0.0.1       <- -> 1.2.3.4         [127.0.0.1]
+
+Hostmap table:
+127.0.0.1,127.0.0.1 -> 1.2.3.4,0.0.0.0 (use = 1)
+List of active state sessions:
+List of configured pools
+List of configured hash tables
+List of groups configured (set 0)
+List of groups configured (set 1)
+Rules configured (set 0, in)
+Rules configured (set 0, out)
+Rules configured (set 1, in)
+Rules configured (set 1, out)
+Accounting rules configured (set 0, in)
+Accounting rules configured (set 0, out)
+Accounting rules configured (set 1, in)
+Accounting rules configured (set 1, out)
+-------------------------------

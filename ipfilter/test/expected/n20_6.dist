@@ -1,0 +1,26 @@
+6000 0000 0010 3a40 0001 0002 0003 0000 0000 0000 0000 0004 fe80 0000 0000 0000 0000 0000 0000 0001 8000 036d 03e8 0000 5037 4e40 0007 db55 
+
+6000 0000 0010 3a40 fe80 0000 0000 0000 0000 0000 0000 0001 fe80 0000 0000 0000 0000 0000 0000 0001 8100 bca5 4b37 0000 5037 4e40 0007 db55 
+
+List of active MAP/Redirect filters:
+map NIC0 inet6 any -> 1:2:3::4/128 icmpidmap icmp 1000:2000
+
+List of active sessions:
+MAP fe80::1 <- -> 1:2:3::4 [fe80::1]
+
+Hostmap table:
+fe80::1,fe80::1 -> 1:2:3::4,any (use = 1)
+List of active state sessions:
+List of configured pools
+List of configured hash tables
+List of groups configured (set 0)
+List of groups configured (set 1)
+Rules configured (set 0, in)
+Rules configured (set 0, out)
+Rules configured (set 1, in)
+Rules configured (set 1, out)
+Accounting rules configured (set 0, in)
+Accounting rules configured (set 0, out)
+Accounting rules configured (set 1, in)
+Accounting rules configured (set 1, out)
+-------------------------------

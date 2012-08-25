@@ -2821,7 +2821,7 @@ ipf_nat_newmap(fin, nat, ni)
 				np->in_snip = ntohl(np->in_nsrcaddr) + 1;
 		}
 
-		if ((port == 0) && (flags & (IPN_TCPUDPICMP|IPN_ICMPQUERY)))
+		if ((port == 0) && (flags & (IPN_TCPUDPICMP|IPN_ICMPERR)))
 			port = sport;
 
 		/*
@@ -4157,7 +4157,7 @@ ipf_nat_inlookup(fin, flags, p, src, mapdst)
 					continue;
 
 			} else if (p == IPPROTO_ICMP) {
-				if (nat->nat_osport != dport) {
+				if (nat->nat_oicmpid != dport) {
 					continue;
 				}
 			}
@@ -4183,7 +4183,7 @@ ipf_nat_inlookup(fin, flags, p, src, mapdst)
 					continue;
 
 			} else if (p == IPPROTO_ICMP) {
-				if (nat->nat_osport != dport) {
+				if (nat->nat_nicmpid != dport) {
 					continue;
 				}
 			}
@@ -4488,7 +4488,7 @@ ipf_nat_outlookup(fin, flags, p, src, dst)
 					continue;
 
 			} else if (p == IPPROTO_ICMP) {
-				if (nat->nat_osport != dport) {
+				if (nat->nat_nicmpid != dport) {
 					continue;
 				}
 			}
@@ -4508,7 +4508,7 @@ ipf_nat_outlookup(fin, flags, p, src, dst)
 					continue;
 
 			} else if (p == IPPROTO_ICMP) {
-				if (nat->nat_osport != dport) {
+				if (nat->nat_oicmpid != dport) {
 					continue;
 				}
 			}
@@ -5275,9 +5275,19 @@ ipf_nat_out(fin, nat, natadd, nflags)
 			}
 		}
 
-		if ((nat->nat_nsport != 0) && (nflags & IPN_ICMPQUERY)) {
+
+		if ((nat->nat_oicmpid != 0) && (nflags & IPN_ICMPQUERY)) {
 			icmp = fin->fin_dp;
-			icmp->icmp_id = nat->nat_nicmpid;
+
+			switch (nat->nat_dir)
+			{
+			case NAT_OUTBOUND :
+				icmp->icmp_id = nat->nat_nicmpid;
+				break;
+			case NAT_INBOUND :
+				icmp->icmp_id = nat->nat_oicmpid;
+				break;
+			}
 		}
 
 		csump = ipf_nat_proto(fin, nat, nflags);
@@ -5749,10 +5759,18 @@ ipf_nat_in(fin, nat, natadd, nflags)
 		}
 
 
-		if ((nat->nat_odport != 0) && (nflags & IPN_ICMPQUERY)) {
+		if ((nat->nat_oicmpid != 0) && (nflags & IPN_ICMPQUERY)) {
 			icmp = fin->fin_dp;
 
-			icmp->icmp_id = nat->nat_nicmpid;
+			switch (nat->nat_dir)
+			{
+			case NAT_INBOUND :
+				icmp->icmp_id = nat->nat_nicmpid;
+				break;
+			case NAT_OUTBOUND :
+				icmp->icmp_id = nat->nat_oicmpid;
+				break;
+			}
 		}
 
 		csump = ipf_nat_proto(fin, nat, nflags);

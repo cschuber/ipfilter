@@ -869,9 +869,9 @@ mapport:
 			  }
 			  free($2);
 			  if ($3.p1 < 0 || $3.p1 > 65535)
-				yyerror("invalid ICMP Id number");
+				yyerror("invalid 1st ICMP Id number");
 			  if ($3.p2 < 0 || $3.p2 > 65535)
-				yyerror("invalid ICMP Id number");
+				yyerror("invalid 2nd ICMP Id number");
 			  if (strcmp($2, "ipv6-icmp") == 0) {
 				nat->in_pr[0] = IPPROTO_ICMPV6;
 				nat->in_pr[1] = IPPROTO_ICMPV6;
@@ -1427,6 +1427,9 @@ setnatproto(p)
 		nat->in_flags |= IPN_UDP;
 		nat->in_flags &= ~IPN_TCP;
 		break;
+#ifdef USE_INET6
+	case IPPROTO_ICMPV6 :
+#endif
 	case IPPROTO_ICMP :
 		nat->in_flags &= ~IPN_TCPUDP;
 		if (!(nat->in_flags & IPN_ICMPQUERY) &&
