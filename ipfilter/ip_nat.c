@@ -2321,6 +2321,7 @@ ipf_nat_delete(softc, nat, logtype)
 
 		bkt = nat->nat_hv[0] % softn->ipf_nat_table_sz;
 		nss = &softn->ipf_nat_stats.ns_side[0];
+		ASSERT(nss->ns_bucketlen[bkt] > 0);
 		nss->ns_bucketlen[bkt]--;
 		if (nss->ns_bucketlen[bkt] == 0) {
 			nss->ns_inuse--;
@@ -2328,6 +2329,7 @@ ipf_nat_delete(softc, nat, logtype)
 
 		bkt = nat->nat_hv[1] % softn->ipf_nat_table_sz;
 		nss = &softn->ipf_nat_stats.ns_side[1];
+		ASSERT(nss->ns_bucketlen[bkt] > 0);
 		nss->ns_bucketlen[bkt]--;
 		if (nss->ns_bucketlen[bkt] == 0) {
 			nss->ns_inuse--;
@@ -3472,8 +3474,13 @@ ipf_nat_insert(softc, softn, nat)
 		/* TRACE nat_nsrcaddr, nat_ndstaddr, hv1 */
 	}
 
-	nat->nat_hv[0] = hv0;
-	nat->nat_hv[1] = hv1;
+	if ((nat->nat_dir & NAT_OUTBOUND) == NAT_OUTBOUND) {
+		nat->nat_hv[0] = hv0;
+		nat->nat_hv[1] = hv1;
+	} else {
+		nat->nat_hv[0] = hv1;
+		nat->nat_hv[1] = hv0;
+	}
 
 	MUTEX_INIT(&nat->nat_lock, "nat entry lock");
 
@@ -3511,9 +3518,11 @@ ipf_nat_insert(softc, softn, nat)
 
 /* ------------------------------------------------------------------------ */
 /* Function:    ipf_nat_hashtab_add                                         */
+/* Returns:     int - 0 == sucess, -1 == failure                            */
 /* Parameters:  softc(I) - pointer to soft context main structure           */
 /*              softn(I) - pointer to NAT context structure                 */
 /*              nat(I) - pointer to NAT structure                           */
+/* Write Lock:  ipf_nat                                                     */
 /*                                                                          */
 /* Handle the insertion of a NAT entry into the table/list.                 */
 /* ------------------------------------------------------------------------ */
@@ -3529,14 +3538,6 @@ ipf_nat_hashtab_add(softc, softn, nat)
 
 	hv0 = nat->nat_hv[0] % softn->ipf_nat_table_sz;
 	hv1 = nat->nat_hv[1] % softn->ipf_nat_table_sz;
-
-	if (nat->nat_dir == NAT_INBOUND || nat->nat_dir == NAT_DIVERTIN) {
-		u_int swap;
-
-		swap = hv0;
-		hv0 = hv1;
-		hv1 = swap;
-	}
 
 	if (softn->ipf_nat_stats.ns_side[0].ns_bucketlen[hv0] >=
 	    softn->ipf_nat_maxbucket) {
@@ -4342,14 +4343,17 @@ ipf_nat_tabmove(softn, nat)
 	if (nat->nat_hnext[0])
 		nat->nat_hnext[0]->nat_phnext[0] = nat->nat_phnext[0];
 	*nat->nat_phnext[0] = nat->nat_hnext[0];
-	nsp->ns_side[0].ns_bucketlen[nat->nat_hv[0] %
-				     softn->ipf_nat_table_sz]--;
+	hv0 = nat->nat_hv[0] % softn->ipf_nat_table_sz;
+	hv1 = nat->nat_hv[1] % softn->ipf_nat_table_sz;
+
+	ASSERT(nsp->ns_side[0].ns_bucketlen[hv0] > 0);
+	nsp->ns_side[0].ns_bucketlen[hv0]--;
 
 	if (nat->nat_hnext[1])
 		nat->nat_hnext[1]->nat_phnext[1] = nat->nat_phnext[1];
 	*nat->nat_phnext[1] = nat->nat_hnext[1];
-	nsp->ns_side[1].ns_bucketlen[nat->nat_hv[1] %
-				     softn->ipf_nat_table_sz]--;
+	ASSERT(nsp->ns_side[1].ns_bucketlen[hv1] > 0);
+	nsp->ns_side[1].ns_bucketlen[hv1]--;
 
 	/*
 	 * Add into the NAT table in the new position
@@ -4361,21 +4365,20 @@ ipf_nat_tabmove(softn, nat)
 	rhv1 = NAT_HASH_FN(nat->nat_ndstaddr, rhv1 + nat->nat_ndport,
 			   0xffffffff);
 
-	hv0 = rhv0 % softn->ipf_nat_table_sz;
-	hv1 = rhv1 % softn->ipf_nat_table_sz;
-
-	if (nat->nat_dir == NAT_INBOUND || nat->nat_dir == NAT_DIVERTIN) {
-		u_int swap;
-
-		swap = hv0;
-		hv0 = hv1;
-		hv1 = swap;
+	if ((nat->nat_dir & NAT_OUTBOUND) == NAT_OUTBOUND) {
+		nat->nat_hv[0] = rhv0;
+		nat->nat_hv[1] = rhv1;
+	} else {
+		nat->nat_hv[0] = rhv1;
+		nat->nat_hv[1] = rhv0;
 	}
+
+	hv0 = nat->nat_hv[0] % softn->ipf_nat_table_sz;
+	hv1 = nat->nat_hv[1] % softn->ipf_nat_table_sz;
 
 	/* TRACE nat_osrcaddr, nat_osport, nat_odstaddr, nat_odport, hv0 */
 	/* TRACE nat_nsrcaddr, nat_nsport, nat_ndstaddr, nat_ndport, hv1 */
 
-	nat->nat_hv[0] = rhv0;
 	natp = &softn->ipf_nat_table[0][hv0];
 	if (*natp)
 		(*natp)->nat_phnext[0] = &nat->nat_hnext[0];
@@ -4384,7 +4387,6 @@ ipf_nat_tabmove(softn, nat)
 	*natp = nat;
 	nsp->ns_side[0].ns_bucketlen[hv0]++;
 
-	nat->nat_hv[1] = rhv1;
 	natp = &softn->ipf_nat_table[1][hv1];
 	if (*natp)
 		(*natp)->nat_phnext[1] = &nat->nat_hnext[1];
