@@ -3425,6 +3425,7 @@ ipf_nat_insert(softc, softn, nat)
 	u_int hv0, hv1;
 	u_int sp, dp;
 	ipnat_t *in;
+	int ret;
 
 	/*
 	 * Try and return an error as early as possible, so calculate the hash
@@ -3512,7 +3513,10 @@ ipf_nat_insert(softc, softn, nat)
 		nat->nat_mtu[1] = GETIFMTU_4(nat->nat_ifps[1]);
 	}
 
-	return ipf_nat_hashtab_add(softc, softn, nat);
+	ret = ipf_nat_hashtab_add(softc, softn, nat);
+	if (ret != 0)
+		MUTEX_DESTROY(&nat->nat_lock);
+	return ret;
 }
 
 
