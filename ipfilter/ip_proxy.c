@@ -202,7 +202,7 @@ static	aproxy_t	ips_proxies[] = {
 	  NULL, NULL,
 	  ipf_p_dns_soft_create, ipf_p_dns_soft_destroy,
 	  NULL, NULL,
-	  ipf_p_dns_new, ipf_p_ipsec_del,
+	  ipf_p_dns_new, ipf_p_dns_del,
 	  ipf_p_dns_inout, ipf_p_dns_inout, ipf_p_dns_match,
 	  ipf_p_dns_ctl, NULL, NULL, NULL },
 #endif
