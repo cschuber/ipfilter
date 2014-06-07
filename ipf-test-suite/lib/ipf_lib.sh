@@ -1,5 +1,9 @@
 #!/bin/ksh
 
+disable_ipfilter() {
+	${BIN_IPF} -D
+}
+
 reset_ipfilter() {
 	if ${BIN_IPF} -D; then
 		if ${BIN_IPF} -V; then
@@ -218,6 +222,56 @@ verify_srcdst_1() {
 	n=$((n))
 	print "| Packets matching ${1},${2} ${3}: $n"
 	return $n
+}
+
+verify_ipf_rulecount_0() {
+	count_ipf_rules 2>&1
+	count=$?
+	if [[ $count = -1 ]] ; then
+		print - "-- ERROR cannot count ipf rules"
+		return -- -1
+	fi
+	count=$((count))
+	if [[ $count != 0 ]] ; then
+		print - "-- ERROR $count ipf rules were not removed"
+		${BIN_IPFSTAT} -io 2>&1
+		return 1
+	fi
+	print - "-- OK no ipf rules present"
+	return 0;
+}
+
+verify_ipf6_rulecount_0() {
+	count_ipf6_rules 2>&1
+	count=$?
+	if [[ $count = -1 ]] ; then
+		print - "-- ERROR cannot count ipf6 rules"
+		return -- -1
+	fi
+	count=$((count))
+	if [[ $count != 0 ]] ; then
+		print - "-- ERROR $count ipf6 rules were not removed"
+		${BIN_IPFSTAT} -io 2>&1
+		return 1
+	fi
+	print - "-- OK no ipf6 rules present"
+	return 0;
+}
+
+verify_ipnat_rulecount_0() {
+	count_ipnat_rules 2>&1
+	active=$?
+	if [[ $active = -1 ]] ; then
+		print - "-- ERROR cannot count ipnat rules"
+		return 1
+	fi
+	if [[ $active != 0 ]] ; then
+		print - "-- ERROR $active ipnat rules were not removed"
+		${BIN_IPNAT} -l 2>&1
+		return 1
+	fi
+	print - "-- OK no ipnat rules remaining"
+	return 0;
 }
 
 dumpcap_src_0() {
@@ -518,7 +572,7 @@ count_ipf_rules() {
 	${BIN_IPFSTAT} -io > ${IPF_TMP_DIR}/ipf.conf.a
 	ret=$?
 	if [[ $ret != 0 ]] ; then
-		return -1
+		return -- -1
 	fi
 	nrules=$(egrep -v 'empty list' ${IPF_TMP_DIR}/ipf.conf.a | wc -l)
 	nrules=$((nrules + 0))
@@ -529,7 +583,7 @@ count_ipf6_rules() {
 	${BIN_IPFSTAT} -6io > ${IPF_TMP_DIR}/ipf.conf.a
 	ret=$?
 	if [[ $ret != 0 ]] ; then
-		return -1
+		return -- -1
 	fi
 	nrules=$(egrep -v 'empty list' ${IPF_TMP_DIR}/ipf.conf.a | wc -l)
 	nrules=$((nrules + 0))
@@ -539,7 +593,7 @@ count_ipnat_rules() {
 	dump_ipnat_rules
 	ret=$?
 	if [[ $ret != 0 ]] ; then
-		return -1
+		return -- -1
 	fi
 	nrules=$(cat ${IPF_TMP_DIR}/ipnat.conf.a | wc -l)
 	nrules=$((nrules + 0))

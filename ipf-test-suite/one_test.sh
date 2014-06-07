@@ -170,6 +170,8 @@ else
 	logging_preserve ${testprefix} "${IPF_LOG_DIR}/${TESTNAME}"
 	print "RESULT FAIL ${TESTNAME}"
 fi
+print '| Disabling IP-Filter'
+disable_ipfilter
 #
 print "#"
 date '+# end time %c'

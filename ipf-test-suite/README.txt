@@ -93,6 +93,10 @@ rsh/ssh	- Required for remote access to other hosts.
 tftpd	- Required as the target for TFTP proxy testing
 tftp	- Required as the client for TFTP proxy testing
 
+*** NOTE: If you are running rsh/ssh/rcmd via inetd.conf, ensure that  ***
+***       inetd is configured to support > 100 connections/second.     ***
+***       Failure to do so will result in the test taking a long time. ***
+
 Test Suite
 ==========
 Each test is completely specified by a single file under the tests

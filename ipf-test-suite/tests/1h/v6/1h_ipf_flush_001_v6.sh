@@ -27,9 +27,13 @@ gen_ippool_conf() {
 do_test() {
 	count_ipf6_rules 2>&1
 	active=$?
+	if [[ $active = -1 ]] ; then
+		print - "-- ERROR cannot count ipf6 rules"
+		return 1
+	fi
 	active=$((active))
 	if [[ $active = 0 ]] ; then
-		print - "-- ERROR no rules loaded prior to flush"
+		print - "-- ERROR no ipf6 rules loaded prior to flush"
 		return 1
 	fi
 	${BIN_IPF} -Fa 2>&1
@@ -37,7 +41,7 @@ do_test() {
 	active=$?
 	active=$((active))
 	if [[ $active != 0 ]] ; then
-		print - "-- ERROR $active rules remaining after flush"
+		print - "-- ERROR $active ipf6 rules remaining after flush"
 		${BIN_IPFSTAT} -6io 2>&1
 		return 1;
 	fi

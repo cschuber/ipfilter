@@ -23,6 +23,10 @@ gen_ippool_conf() {
 do_test() {
 	count_ipf_rules
 	active=$?
+	if [[ $active = -1 ]] ; then
+		print - "-- ERROR cannot count ipf rules"
+		return 1
+	fi
 	if [[ $active != 6 ]] ; then
 		print - "-- ERROR  incorrect rule count prior to flush"
 		return 1

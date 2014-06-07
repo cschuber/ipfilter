@@ -48,14 +48,6 @@ do_tune() {
 }
 
 do_verify() {
-	count_ipnat_rules
-	active=$?
-	active=$((active))
-	if [[ $active != 0 ]] ; then
-		print - "-- ERROR $active ipnat rules not removed"
-		${BIN_IPNAT} -l 2>&1
-		return 1
-	fi
-	print - "-- OK all ipnat rules removed"
-	return 0;
+	verify_ipnat_rulecount_0
+	return $?;
 }

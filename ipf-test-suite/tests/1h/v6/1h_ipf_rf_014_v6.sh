@@ -46,14 +46,6 @@ do_tune() {
 }
 
 do_verify() {
-	count_ipf6_rules 2>&1
-	count=$?
-	count=$((count))
-	if [[ $count != 0 ]] ; then
-		print - "-- ERROR $count rules were not removed"
-		${BIN_IPFSTAT} -io
-		return 1
-	fi
-	print - "-- OK no rules present"
-	return 0;
+	verify_ipf6_rulecount_0
+	return $?;
 }

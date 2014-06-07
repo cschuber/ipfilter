@@ -26,6 +26,10 @@ gen_ippool_conf() {
 do_test() {
 	count_ipnat_rules 2>&1
 	active=$?
+	if [[ $active = -1 ]] ; then
+		print - "-- ERROR cannot count ipnat rules"
+		return 1
+	fi
 	if [[ $active = 0 ]] ; then
 		print - "-- ERROR no ipnat rules loaded prior to flush"
 		return 1

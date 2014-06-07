@@ -14,8 +14,12 @@ gen_ippool_conf() {
 do_test() {
 	count_ipf_rules
 	active=$?
+	if [[ $active = -1 ]] ; then
+		print - "-- ERROR cannot count ipf rules"
+		return 1
+	fi
 	if [[ $active = 0 ]] ; then
-		print - "|  no rules loaded prior to switch"
+		print - "-- ERROR no rules loaded prior to switch"
 		return 1
 	fi
 	${BIN_IPF} -IFa
@@ -23,7 +27,7 @@ do_test() {
 	count_ipf_rules
 	active=$?
 	if [[ $active != 0 ]] ; then
-		print - "|  rules present after switch"
+		print - "-- ERROR rules present after switch"
 		return 1
 	fi
 	return 0;
