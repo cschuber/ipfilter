@@ -63,7 +63,7 @@ static ipf_error_entry_t ipf_errors[IPF_NUM_ERRORS] = {
 	{	35,	"copyout failed for resolving function name -> addr" },
 	{	36,	"copyout failed for resolving function addr -> name" },
 	{	37,	"function name/addr resolving search failed" },
-	{	38,	"group map cannot find it's hash table" },
+	{	38,	"group map cannot find its hash table" },
 	{	39,	"group map hash-table in/out do not match rule" },
 	{	40,	"bcopyout failed for SIOCIPFINTERROR" },
 	{	41,	"" },
