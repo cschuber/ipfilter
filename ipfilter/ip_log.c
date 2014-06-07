@@ -211,6 +211,7 @@ ipf_log_soft_create(softc)
 	ipf_main_softc_t *softc;
 {
 	ipf_log_softc_t *softl;
+	int i;
 
 	KMALLOC(softl, ipf_log_softc_t *);
 	if (softl == NULL)
@@ -229,6 +230,16 @@ ipf_log_soft_create(softc)
 	if (ipf_tune_array_link(softc, softl->ipf_log_tune) == -1) {
 		ipf_log_soft_destroy(softc, softl);
 		return NULL;
+	}
+
+	for (i = IPL_LOGMAX; i >= 0; i--) {
+# if defined(linux) && defined(_KERNEL)
+		init_waitqueue_head(softl->iplh_linux + i);
+# endif
+# if SOLARIS && defined(_KERNEL)
+		cv_init(&softl->ipl_wait[i], NULL, CV_DRIVER, NULL);
+# endif
+		MUTEX_INIT(&softl->ipl_mutex[i], "ipf log mutex");
 	}
 
 	softl->ipl_suppress = 1;
@@ -265,13 +276,6 @@ ipf_log_soft_init(softc, arg)
 		softl->iplog_ss[i].read_waiter = 0;
 		softl->iplog_ss[i].state = 0;
 # endif
-# if defined(linux) && defined(_KERNEL)
-		init_waitqueue_head(softl->iplh_linux + i);
-# endif
-# if SOLARIS && defined(_KERNEL)
-		cv_init(&softl->ipl_wait[i], NULL, CV_DRIVER, NULL);
-# endif
-		MUTEX_INIT(&softl->ipl_mutex[i], "ipf log mutex");
 	}
 
 
