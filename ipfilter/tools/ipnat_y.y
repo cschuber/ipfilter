@@ -1766,7 +1766,7 @@ addname(np, name)
 
 	nlen = strlen(name) + 1;
 	n = calloc(1, (*np)->in_size + nlen);
-	bcopy(*np, n, (*np)->in_size + nlen);
+	bcopy(*np, n, (*np)->in_size);
 	free(*np);
 	if (*np == nattop)
 		nattop = n;
