@@ -65,12 +65,19 @@ walk_live_fr_rules(ticks, out, set, group, walker)
 		if (fp->fr_family != 0 && fp->fr_family != AF_INET)
 			continue;
 		}
-		if (fp->fr_data != NULL)
-			fp->fr_data = (char *)fp + fp->fr_size;
+		if (fp->fr_data != NULL) {
+			fp->fr_data = calloc(1, fp->fr_dsize);
+			if (fp->fr_data != NULL) {
+				bcopy((char *)fp + fp->fr_size, fp->fr_data,
+				      fp->fr_dsize);
+			}
+		}
 		if (fp->fr_die != 0)
 			fp->fr_die -= ticks;
 		rules++;
 		walker(fp);
+		if (fp->fr_data != NULL)
+			free(fp->fr_data);
 	}
 
 	num = IPFOBJ_IPFITER;
