@@ -1056,7 +1056,7 @@ hash:	IPNY_HASH			{ if (!(nat->in_flags & IPN_FILTER)) {
 	;
 
 portstuff:
-	compare portspec		{ $$.pc = $1; $$.p1 = $2; }
+	compare portspec		{ $$.pc = $1; $$.p1 = $2; $$.p2 = 0; }
 	| portspec range portspec	{ $$.pc = $2; $$.p1 = $1; $$.p2 = $3; }
 	;
 
@@ -1149,7 +1149,7 @@ proto:	YY_NUMBER			{ $$ = $1;
 	| YY_STR			{ $$ = getproto($1);
 					  free($1);
 					  if ($$ == -1)
-						yyerror("unknwon protocol");
+						yyerror("unknown protocol");
 					  if ($$ != IPPROTO_TCP &&
 					      $$ != IPPROTO_UDP)
 						suggest_port = 0;
@@ -1171,6 +1171,7 @@ hostname:
 #endif
 						family = AF_INET;
 					  bzero(&$$, sizeof($$));
+					  bzero(&addr, sizeof(addr));
 					  $$.f = family;
 					  if (gethost(family, $1,
 						      &addr) == 0) {
@@ -1509,7 +1510,7 @@ ipnat_addrule(fd, ioctlfunc, ptr)
 		printnat(ipn, opts);
 
 	if (opts & OPT_DEBUG)
-		binprint(ipn, sizeof(*ipn));
+		binprint(ipn, ipn->in_size);
 
 	if ((opts & OPT_ZERORULEST) != 0) {
 		if ((*ioctlfunc)(fd, add, (void *)&obj) == -1) {
