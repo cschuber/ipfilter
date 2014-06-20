@@ -298,7 +298,7 @@ int	ipf_features = 0
 static ipfunc_resolve_t ipf_availfuncs[] = {
 	{ "srcgrpmap", ipf_srcgrpmap, ipf_grpmapinit, ipf_grpmapfini },
 	{ "dstgrpmap", ipf_dstgrpmap, ipf_grpmapinit, ipf_grpmapfini },
-	{ "",	      NULL,	      NULL,	      NULL }
+	{ "",	       NULL,	      NULL,	      NULL }
 };
 
 static ipftuneable_t ipf_main_tuneables[] = {
@@ -4695,7 +4695,7 @@ frrequest(softc, unit, req, data, set, makecopy)
 	ftail = NULL;
 	fprev = NULL;
 	if (unit == IPL_LOGAUTH) {
-                if ((fp->fr_tifs[0].fd_ptr != NULL) ||
+		if ((fp->fr_tifs[0].fd_ptr != NULL) ||
 		    (fp->fr_tifs[1].fd_ptr != NULL) ||
 		    (fp->fr_dif.fd_ptr != NULL) ||
 		    (fp->fr_flags & FR_FASTROUTE)) {
