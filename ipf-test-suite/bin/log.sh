@@ -24,7 +24,8 @@ echo "capture_net0=$capture_net0"
 		fi
 	fi
 	if [[ $capture_ipmon -eq 1 ]] ; then
-		ipmon -DP ${IPF_TMP_DIR}/ipmon.pid -Fa ${IPF_TMP_DIR}/ipmon.out
+		${BIN_IPMON} -DP ${IPF_TMP_DIR}/ipmon.pid -Fa \
+		    ${IPF_TMP_DIR}/ipmon.out
 	fi
 
 	if [[ $capture_sender -eq 1 ]] ; then
