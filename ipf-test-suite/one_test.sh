@@ -51,7 +51,7 @@ abort_test() {
 	print "RESULT FAIL ${TESTNAME} ABORTED"
 	print "#"
 	print '#################################################################'
-	return 1
+	exit 1
 }
 
 if [[ $# -lt 1 ]] ; then
