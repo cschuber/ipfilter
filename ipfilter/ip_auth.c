@@ -1275,6 +1275,8 @@ ipf_auth_reply(softc, softa, data)
 		}
 		RWLOCK_EXIT(&softa->ipf_authlk);
 	}
+#else
+	m = m;	/* LINT */
 #endif /* _KERNEL */
 	SPL_X(s);
 

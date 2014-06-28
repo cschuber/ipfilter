@@ -58,9 +58,10 @@ int main(argc, argv)
 	int nfd = -1 , lfd = -1;
 	int n1, n2, n3, magic, len, inbuf;
 	struct sockaddr_in sin;
+#if RECEIVE_CHECK
 	struct sockaddr_in in;
+#endif
 	char buff[BUFFERLEN];
-	synclogent_t *sl;
 	syncupdent_t *su;
 	synchdr_t *sh;
 	char *progname;
@@ -99,11 +100,13 @@ int main(argc, argv)
 		sin.sin_port = htons(atoi(argv[2]));
 	else
 		sin.sin_port = htons(43434);
+#if RECEIVE_CHECK
 	if (argc > 3)
 		in.sin_addr.s_addr = inet_addr(argv[3]);
 	else
 		in.sin_addr.s_addr = 0;
 	in.sin_port = 0;
+#endif
 
 	while(1) {
 
@@ -206,7 +209,7 @@ moreinbuf:
 
 #ifdef IPSYNC_DEBUG
 			if (sh->sm_cmd == SMC_CREATE) {
-				sl = (synclogent_t *)buff;
+				;
 
 			} else if (sh->sm_cmd == SMC_UPDATE) {
 				su = (syncupdent_t *)buff;

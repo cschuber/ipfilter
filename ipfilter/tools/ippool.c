@@ -459,6 +459,10 @@ poolstats(argc, argv)
 	if (opts & OPT_DEBUG)
 		fprintf(stderr, "poolstats: opts = %#x\n", opts);
 
+	core = core;			/* LINT */
+	kernel = kernel;		/* LINT */
+	live_kernel = live_kernel;	/* LINT */
+
 	if (!(opts & (OPT_DONOTHING|OPT_DONTOPEN)) && (fd == -1)) {
 		fd = open(IPLOOKUP_NAME, O_RDWR);
 		if (fd == -1) {

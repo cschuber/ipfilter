@@ -239,7 +239,9 @@ int main(argc,argv)
 	int refreshtime = 1; 		/* default update time */
 	int sport = -1;			/* -1 = wild card for any source port */
 	int dport = -1;			/* -1 = wild card for any dest port */
+#ifdef STATETOP
 	int topclosed = 0;		/* do not show closed tcp sessions */
+#endif
 	i6addr_t saddr, daddr;
 	u_32_t frf;
 
@@ -336,9 +338,11 @@ int main(argc,argv)
 		case 'A' :
 			opts |= OPT_AUTHSTATS;
 			break;
+#ifdef STATETOP
 		case 'C' :
 			topclosed = 1;
 			break;
+#endif
 		case 'd' :
 			opts |= OPT_DEBUG;
 			break;
