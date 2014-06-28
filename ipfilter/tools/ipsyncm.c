@@ -57,7 +57,6 @@ int main(argc, argv)
 {
 	struct sockaddr_in sin;
 	char buff[BUFFERLEN];
-	synclogent_t *sl;
 	syncupdent_t *su;
 	int nfd = -1, lfd = -1, n1, n2, n3, len;
 	int inbuf;
@@ -188,7 +187,7 @@ moreinbuf:
 
 #ifdef IPSYNC_DEBUG
 			if (sh->sm_cmd == SMC_CREATE) {
-				sl = (synclogent_t *)buff;
+				;
 
 			} else if (sh->sm_cmd == SMC_UPDATE) {
 				su = (syncupdent_t *)buff;
