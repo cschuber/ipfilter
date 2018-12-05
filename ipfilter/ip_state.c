@@ -3848,7 +3848,6 @@ ipf_state_del(softc, is, why)
 			softs->ipf_state_stats.iss_orphan++;
 		return refs;
 	}
-	MUTEX_EXIT(&is->is_lock);
 
 	fr = is->is_rule;
 	is->is_rule = NULL;
@@ -3860,6 +3859,7 @@ ipf_state_del(softc, is, why)
 	}
 
 	ASSERT(is->is_ref == 0);
+	MUTEX_EXIT(&is->is_lock);
 
 	if (is->is_tqehead[0] != NULL) {
 		if (ipf_deletetimeoutqueue(is->is_tqehead[0]) == 0)
