@@ -18,6 +18,7 @@ typedef	struct	ipfr	{
 	void	*ipfr_data;
 	frentry_t *ipfr_rule;
 	u_long	ipfr_ttl;
+	ipftuneable_t	*ipf_frag_tune;
 	u_int	ipfr_pkts;
 	u_int	ipfr_bytes;
 	u_int	ipfr_badorder;
