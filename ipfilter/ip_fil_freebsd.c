@@ -50,9 +50,7 @@ static const char rcsid[] = "@(#)$Id$";
 #else
 # include <sys/dir.h>
 #endif
-#if !defined(__hpux)
 # include <sys/mbuf.h>
-#endif
 #if (__FreeBSD_version < 800000)
 # include <netinet/ipprotosw.h>
 #endif
