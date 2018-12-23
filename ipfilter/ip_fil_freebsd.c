@@ -127,10 +127,6 @@ ipf_main_softc_t ipfmain;
 #  include <net/pfil.h>
 # endif /* NETBSD_PF */
 #endif /* __FreeBSD_version >= 500011 */
-/*
- * We provide the ipf_checkp name just to minimize changes later.
- */
-int (*ipf_checkp)(void *, ip_t *ip, int hlen, void *ifp, int out, mb_t **mp);
 
 
 #if (__FreeBSD_version >= 502103)
@@ -241,11 +237,6 @@ ipfattach(softc)
 	}
 
 
-	if (ipf_checkp != ipf_check) {
-		ipf_savep = ipf_checkp;
-		ipf_checkp = ipf_check;
-	}
-
 	bzero((char *)ipfmain.ipf_selwait, sizeof(ipfmain.ipf_selwait));
 	softc->ipf_running = 1;
 
@@ -289,12 +280,6 @@ ipfdetach(softc)
 #else
 	untimeout(ipf_timer_func, softc);
 #endif /* FreeBSD */
-
-#ifndef NETBSD_PF
-	if (ipf_checkp != NULL)
-		ipf_checkp = ipf_savep;
-	ipf_savep = NULL;
-#endif
 
 	ipf_fini_all(softc);
 

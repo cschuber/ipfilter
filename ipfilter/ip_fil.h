@@ -1777,7 +1777,6 @@ typedef struct ipf_main_softc_s {
 #ifndef	_KERNEL
 extern	int	ipf_check(void *, struct ip *, int, void *, int,
 			  void *, mb_t **);
-extern	int	(*ipf_checkp)(ip_t *, int, void *, int, mb_t **);
 extern	struct	ifnet *get_unit(char *, int);
 extern	char	*get_ifname(struct ifnet *);
 extern	int	ipfioctl(ipf_main_softc_t *, int, ioctlcmd_t, caddr_t, int);
